@@ -1,22 +1,21 @@
-# Finize
+﻿# Finize
 
-Clear household budgeting for shared expenses, savings goals, and fair personal balance.
+Finize is een persoonlijke budgetplanner voor gezamenlijke uitgaven, persoonlijke balans, transacties en spaardoelen.
 
-Single-file GitHub Pages app with Firestore sync via `budgetPlanners/finize`.
+Live app: https://dionvs.github.io/Finize/
 
-Live URL:
+## PWA installeren
 
-https://dionvs.github.io/Finize/
+- Android Chrome: open de app, gebruik het browsermenu en kies **Toevoegen aan startscherm**.
+- iPhone Safari: open de app, tik op delen en kies **Zet op beginscherm**.
 
-Firestore rules for public link sharing:
+## Opslag
 
-```js
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /budgetPlanners/finize {
-      allow read, write: if true;
-    }
-  }
-}
-```
+Gegevens worden lokaal opgeslagen in de browser. Als Firebase/Firestore is verbonden, kan de app live synchroniseren tussen apparaten.
+
+## Bestanden
+
+- `index.html` is de actieve GitHub Pages app.
+- `index-OLD.html` is een back-up van de vorige versie.
+- `manifest.json` en `service-worker.js` maken de app PWA-ready.
+- `icons/` bevat de app-iconen.

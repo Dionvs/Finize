@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Finize</title>
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#6f8a55">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Finize">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
 <link rel="icon" type="image/png" href="finize-logo.png">
 <style>
 :root{
@@ -2408,8 +2414,17 @@ renderActiveTab();
 CloudAdapter.connect();
 
 </script>
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./service-worker.js")
+      .catch(error => console.error("Service worker registratie mislukt:", error));
+  });
+}
+</script>
 </body>
 </html>
+
 
 
 

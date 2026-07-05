@@ -1,11 +1,11 @@
-const CACHE_NAME = "finize-PWA-v1";
+﻿const CACHE_NAME = "finize-v1";
 
 const APP_SHELL = [
   "./",
-  "./index-PWA.html",
-  "./manifest-PWA.json",
-  "./icons-PWA/finize-PWA-icon-192.png",
-  "./icons-PWA/finize-PWA-icon-512.png"
+  "./index.html",
+  "./manifest.json",
+  "./icons/icon-192.png",
+  "./icons/icon-512.png"
 ];
 
 self.addEventListener("install", event => {
@@ -33,7 +33,7 @@ self.addEventListener("fetch", event => {
 
   event.respondWith(
     caches.match(event.request).then(cached => {
-      return cached || fetch(event.request).catch(() => caches.match("./index-PWA.html"));
+      return cached || fetch(event.request).catch(() => caches.match("./index.html"));
     })
   );
 });
