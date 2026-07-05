@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Finize</title>
+<link rel="icon" type="image/png" href="finize-logo.png">
 <style>
 :root{
   --bg:#fbf4ea;
@@ -87,6 +88,7 @@ button.small{ padding:4px 8px; font-size:12px; }
 }
 .topbar-inner{ max-width:1320px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; gap:18px; flex-wrap:wrap; }
 .brand{ display:flex; align-items:center; gap:14px; min-width:280px; }
+.brand-logo{ width:46px; height:46px; border-radius:14px; object-fit:cover; box-shadow:0 12px 24px rgba(86,56,31,.13); background:#fff; border:1px solid rgba(236,220,201,.8); }
 .brand-dot{ width:38px; height:38px; border-radius:12px 22px 12px 22px; background:linear-gradient(135deg, var(--green), var(--blue)); box-shadow:0 12px 24px rgba(124,142,73,.18); position:relative; }
 .brand-dot::after{ content:""; position:absolute; width:18px; height:10px; border:3px solid #fff; border-top:0; border-right:0; left:10px; top:13px; transform:rotate(-35deg); border-radius:0 0 0 10px; }
 .brand h1{ font-size:27px; margin:0; font-weight:780; letter-spacing:-.02em; color:#2f1f18; line-height:1.12; }
@@ -198,6 +200,46 @@ td.num{ text-align:right; }
 
 .section-title{ font-size:12px; text-transform:uppercase; letter-spacing:.075em; color:var(--text-faint); margin:22px 0 10px; padding-top:6px; border-top:1px solid var(--border-soft); }
 .section-title:first-child{ border-top:none; margin-top:0; }
+.app-section{ margin:0 0 20px; }
+.section-header{ display:flex; align-items:flex-end; justify-content:space-between; gap:14px; flex-wrap:wrap; margin:0 0 12px; }
+.section-header h2{ margin:0; font-size:23px; letter-spacing:-.025em; color:var(--text); }
+.section-header p{ margin:4px 0 0; color:var(--text-dim); font-size:13px; line-height:1.4; }
+.section-kicker{ text-transform:uppercase; letter-spacing:.08em; color:var(--green); font-size:11px; font-weight:850; }
+.section-grid{ display:grid; grid-template-columns:repeat(12,minmax(0,1fr)); gap:16px; align-items:start; }
+.manage-stack{ display:grid; gap:12px; }
+.manage-section{ background:var(--card); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow-soft); overflow:hidden; }
+.manage-section[open]{ box-shadow:var(--shadow); }
+.manage-section summary{ cursor:pointer; list-style:none; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:15px 18px; font-weight:820; color:var(--text); }
+.manage-section summary::-webkit-details-marker{ display:none; }
+.manage-section summary::after{ content:"⌄"; color:var(--text-faint); transition:transform .16s; }
+.manage-section[open] summary::after{ transform:rotate(180deg); }
+.manage-body{ padding:0 18px 18px; }
+.manage-section .card{ box-shadow:none; border-color:var(--border-soft); margin-bottom:0; }
+.status-kpi{ min-height:118px; gap:8px; justify-content:flex-start; }
+.status-kpi .metric-value{ font-size:22px; }
+.flow-card{ display:grid; gap:14px; }
+.flow-steps{ display:grid; grid-template-columns:repeat(auto-fit,minmax(126px,1fr)); gap:10px; }
+.flow-step{ background:#fff8f0; border:1px solid var(--border-soft); border-radius:15px; padding:12px; display:grid; gap:5px; }
+.flow-step span{ color:var(--text-faint); font-size:11px; font-weight:800; }
+.flow-step strong{ font-size:16px; font-variant-numeric:tabular-nums; }
+.goal-card-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:10px; }
+.goal-card{
+  background:#fffdf9; border:1px solid var(--border); border-radius:16px; padding:12px;
+  display:grid; gap:9px; min-width:0; box-shadow:var(--shadow-soft);
+}
+.goal-card-head{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+.goal-card-title{ display:flex; gap:11px; align-items:flex-start; min-width:0; }
+.goal-thumb{ width:38px; height:38px; border-radius:13px; display:flex; align-items:center; justify-content:center; flex:0 0 auto; background:var(--green-bg); color:var(--green); font-size:19px; box-shadow:inset 0 0 0 1px rgba(124,142,73,.12); }
+.goal-card h3{ margin:0; font-size:14px; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.goal-owner{ margin-top:3px; color:var(--text-faint); font-size:11.5px; font-weight:750; }
+.goal-money{ display:flex; justify-content:space-between; gap:10px; color:var(--text-dim); font-size:12px; }
+.goal-money strong{ color:var(--text); white-space:nowrap; }
+.goal-card-foot{ display:flex; align-items:center; justify-content:space-between; gap:10px; color:var(--text-faint); font-size:11.5px; }
+.goal-card-foot button{ padding:5px 9px; font-size:11.5px; box-shadow:none; }
+.goal-group-block{ display:grid; gap:10px; }
+.goal-group-title{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:0 2px; }
+.goal-group-title h3{ margin:0; font-size:16px; }
+.muted-empty{ color:var(--text-faint); background:#fff8f0; border:1px dashed var(--border); border-radius:14px; padding:12px; margin:0; }
 
 .footer-note{ text-align:center; color:#846f5f; font-size:14px; margin-top:26px; }
 .toolbar{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
@@ -252,7 +294,14 @@ td.num{ text-align:right; }
 .month-grid button.current.active{ background:#eaf2e2; color:var(--green); border-color:#9fbb83; }
 .month-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
 .copy-month-btn{ border-style:solid; color:var(--green); }
-.dashboard-grid{ display:grid; grid-template-columns:repeat(12,minmax(0,1fr)); gap:16px; }
+.dashboard-grid{ display:grid; grid-template-columns:repeat(12,minmax(0,1fr)); gap:12px; }
+.dashboard-grid > .card{ padding:17px; margin-bottom:0; }
+.dashboard-grid .card-head{ margin-bottom:12px; }
+.dashboard-grid .card-head h2{ font-size:17px; }
+.overview-kpi-row{ display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:12px; align-items:stretch; }
+.overview-kpi-row.cols-4{ grid-template-columns:repeat(4,minmax(0,1fr)); }
+.overview-kpi-row > .card{ margin-bottom:0; min-width:0; }
+.overview-kpi-row > .span-3{ grid-column:auto; }
 .span-3{ grid-column:span 3; }
 .span-4{ grid-column:span 4; }
 .span-5{ grid-column:span 5; }
@@ -260,11 +309,22 @@ td.num{ text-align:right; }
 .span-7{ grid-column:span 7; }
 .span-8{ grid-column:span 8; }
 .span-12{ grid-column:span 12; }
-.metric-card{ min-height:132px; display:flex; flex-direction:column; justify-content:space-between; }
+.metric-card{ min-height:112px; display:flex; flex-direction:column; justify-content:space-between; }
 .metric-label{ color:var(--text-dim); font-size:13px; font-weight:700; }
-.metric-value{ font-size:24px; font-weight:800; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+.metric-value{ font-size:22px; font-weight:800; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
 .metric-sub{ color:var(--text-faint); font-size:12px; line-height:1.35; }
 .inline-edit{ width:100%; font-size:22px !important; font-weight:800 !important; text-align:left !important; }
+.income-metric{ gap:7px; justify-content:flex-start; }
+.income-metric .metric-label{ color:var(--text); font-size:13.5px; }
+.income-metric .metric-value{ font-size:24px; line-height:1.05; }
+.income-breakdown{ display:grid; gap:5px; padding-top:7px; border-top:1px solid var(--border-soft); }
+.income-breakdown div{ display:flex; align-items:center; justify-content:space-between; gap:10px; color:var(--text-dim); font-size:12px; line-height:1.3; }
+.income-breakdown strong{ color:var(--text); font-weight:760; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.income-breakdown input.inline-edit{ width:104px; max-width:42%; padding:5px 8px; font-size:13px !important; font-weight:760 !important; text-align:right !important; background:#fffdf9; border-color:#eadac7; border-radius:10px; box-shadow:none; }
+.income-input-row{ display:grid; gap:5px; margin-top:auto; }
+.income-input-row label{ color:var(--text-faint); font-size:11px; font-weight:800; letter-spacing:.01em; }
+.income-input-row .inline-edit{ width:100%; max-width:156px; padding:7px 10px; font-size:14px !important; font-weight:750 !important; background:#fffdf9; border-color:#eadac7; border-radius:12px; box-shadow:inset 0 1px 0 rgba(255,255,255,.9); }
+.income-badge{ display:inline-flex; align-self:flex-start; padding:4px 8px; border-radius:999px; background:#edf3e6; color:var(--green); font-size:11px; font-weight:800; }
 .summary-list{ display:grid; gap:10px; }
 .summary-line{ display:flex; justify-content:space-between; gap:12px; padding:8px 0; border-bottom:1px solid var(--border-soft); }
 .summary-line:last-child{ border-bottom:none; }
@@ -272,9 +332,9 @@ td.num{ text-align:right; }
 .split-bar{ display:flex; height:12px; border-radius:999px; overflow:hidden; background:#f0e2d2; margin:12px 0 8px; }
 .split-bar span:first-child{ background:var(--blue); }
 .split-bar span:last-child{ background:var(--green); }
-.progress-list{ display:grid; gap:12px; }
+.progress-list{ display:grid; gap:9px; }
 .progress-item{ display:grid; gap:5px; }
-.progress-top{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; font-size:13px; }
+.progress-top{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; font-size:12.5px; }
 .status-badge{ display:inline-flex; align-items:center; border-radius:999px; padding:3px 9px; font-size:11px; font-weight:800; background:var(--green-bg); color:var(--green); white-space:nowrap; }
 .status-badge.amber{ background:#fff1d6; color:#a76c20; }
 .status-badge.red{ background:var(--red-bg); color:var(--red); }
@@ -337,6 +397,7 @@ td.num{ text-align:right; }
   .topbar{ padding:7px 10px 6px; }
   .topbar-inner{ flex-direction:column; align-items:stretch; gap:6px; }
   .brand{ min-width:0; gap:8px; align-items:center; }
+  .brand-logo{ width:30px; height:30px; border-radius:10px; box-shadow:var(--shadow-soft); }
   .brand-dot{ width:24px; height:24px; border-radius:8px 15px 8px 15px; }
   .brand-dot::after{ width:11px; height:6px; border-width:2px; left:7px; top:8px; }
   .brand h1{ font-size:18px; line-height:1.05; }
@@ -398,6 +459,8 @@ td.num{ text-align:right; }
   }
   .quick-actions .hint{ font-size:12px; }
   .dashboard-grid{ grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; width:100%; max-width:100%; overflow-x:hidden; }
+  .overview-kpi-row,
+  .overview-kpi-row.cols-4{ grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
   .dashboard-grid > .card{ width:100%; max-width:100%; }
   .span-3{ grid-column:span 1; }
   .span-4,.span-5,.span-6,.span-7,.span-8,.span-12{ grid-column:1/-1; }
@@ -407,12 +470,19 @@ td.num{ text-align:right; }
   .metric-sub{ font-size:10.5px; }
   .inline-edit{ font-size:18px !important; }
   .goal-preview-grid{ grid-template-columns:1fr; }
+  .section-header h2{ font-size:18px; }
+  .section-grid{ grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+  .goal-card-grid{ grid-template-columns:1fr; }
+  .manage-section summary{ padding:13px 14px; }
+  .manage-body{ padding:0 14px 14px; }
   .year-row{ grid-template-columns:34px minmax(0,1fr); }
   .month-blocks{ grid-template-columns:repeat(4,1fr); }
   .modal-grid{ grid-template-columns:1fr; }
 }
 @media (max-width:370px){
   .dashboard-grid{ grid-template-columns:minmax(0,1fr); }
+  .overview-kpi-row,
+  .overview-kpi-row.cols-4{ grid-template-columns:minmax(0,1fr); }
   .span-3{ grid-column:1/-1; }
 }
 </style>
@@ -422,7 +492,7 @@ td.num{ text-align:right; }
 <div class="topbar">
   <div class="topbar-inner">
     <div class="brand">
-      <div class="brand-dot"></div>
+      <img class="brand-logo" src="finize-logo.png" alt="Finize logo">
       <div>
         <h1>Finize</h1>
         <div class="brand-subtitle">Clear household budgeting for shared expenses, savings goals, and fair personal balance.</div>
@@ -698,6 +768,76 @@ function budgetStatus(used, budget){
   if (ratio > 1) return {ratio, label:'Overschreden', cls:'red'};
   if (ratio >= .85) return {ratio, label:'Bijna vol', cls:'amber'};
   return {ratio, label:'Op schema', cls:''};
+}
+function textSafe(value){
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+function goalIcon(goal){
+  const name = String(goal?.naam || '').toLowerCase();
+  if (/vakantie|reis|travel|vliegtuig|japan|fonds/.test(name)) return '✈';
+  if (/buffer|nood|reserve|veilig/.test(name)) return '◈';
+  if (/beleg|invest|aandeel/.test(name)) return '↗';
+  if (/koffie|coffee/.test(name)) return '☕';
+  if (/huis|inrichting|wonen|keuken|tuin/.test(name)) return '⌂';
+  if (/hond|dieren|huisdier/.test(name)) return '♡';
+  if (/auto|vervoer/.test(name)) return '▣';
+  return '◎';
+}
+function goalStatusBadge(progress){
+  if (progress >= 1) return '<span class="status-badge">Op schema</span>';
+  if (progress >= .75) return '<span class="status-badge amber">Bijna klaar</span>';
+  return '<span class="status-badge muted">Nog te gaan</span>';
+}
+function renderModernGoalCard(item, owner, opts={}){
+  const doel = item.doel || item;
+  const doelbedrag = Number(doel.doelbedrag)||0;
+  const algespaard = Number(doel.algespaard)||0;
+  const progress = doelbedrag > 0 ? Math.min(1, algespaard / doelbedrag) : 0;
+  const barPct = Math.round(progress * 100);
+  const dateText = doel.doeldatum ? formatDateNL(doel.doeldatum) : 'Geen doeldatum';
+  return `<div class="goal-card">
+    <div class="goal-card-head">
+      <div class="goal-card-title">
+        <div class="goal-thumb">${goalIcon(doel)}</div>
+        <div>
+          <h3>${textSafe(doel.naam || 'Spaardoel')}</h3>
+          <div class="goal-owner">${textSafe(owner)}</div>
+        </div>
+      </div>
+      ${goalStatusBadge(progress)}
+    </div>
+    <div class="goal-money"><span>${eur(algespaard)} van ${eur(doelbedrag)}</span><strong>${barPct}%</strong></div>
+    <div class="progress-track"><div class="progress-fill" style="width:${barPct}%"></div></div>
+    <div class="goal-card-foot">
+      <span>Doel: ${dateText}</span>
+      <button class="ghost small" type="button" data-tab-shortcut="${opts.targetTab || 'spaardoelen'}">Bekijk doel</button>
+    </div>
+  </div>`;
+}
+function renderModernGoalCards(doelen, pot, owner, limit=null){
+  let items = calcGroep(doelen || [], pot, TODAY);
+  if (limit) items = items.slice(0, limit);
+  if (!items.length) return '<p class="muted-empty">Nog geen spaardoelen.</p>';
+  return `<div class="goal-card-grid">${items.map(item=>renderModernGoalCard(item, owner)).join('')}</div>`;
+}
+function renderManageSection(title, body, open=false){
+  return `<details class="manage-section" ${open?'open':''}>
+    <summary>${title}</summary>
+    <div class="manage-body">${body}</div>
+  </details>`;
+}
+function renderAppSection(kicker, title, subtitle, content){
+  return `<section class="app-section">
+    <div class="section-header">
+      <div><div class="section-kicker">${kicker}</div><h2>${title}</h2>${subtitle ? `<p>${subtitle}</p>` : ''}</div>
+    </div>
+    ${content}
+  </section>`;
+}
+function availabilityBadge(amount){
+  if (amount < 0) return '<span class="status-badge red">Tekort</span>';
+  if (amount < 200) return '<span class="status-badge amber">Krap</span>';
+  return '<span class="status-badge">Op schema</span>';
 }
 function copyPreviousMonth(){
   const month = getSelectedMonth();
@@ -1671,26 +1811,13 @@ function renderDashboard(){
     {owner:'Dion', items:dionGoals},
     {owner:'Dara', items:daraGoals},
   ];
-  const goalCards = favoriteGoals.length ? favoriteGoals.slice(0,5).map(g=>{
-    const doelbedrag = Number(g.doel.doelbedrag)||0;
-    const algespaard = Number(g.doel.algespaard)||0;
-    const barPct = doelbedrag>0 ? Math.min(100, Math.round((algespaard/doelbedrag)*100)) : 0;
-    const badge = barPct >= 100 ? 'Op schema' : 'Nog te gaan';
-    return `<div class="goal-preview-card">
-      <div class="goal-preview-top">
-        <div class="goal-preview-name"><span class="goal-preview-icon">★</span><div><div class="goal-preview-title">${g.doel.naam || 'Spaardoel'}</div><div class="goal-preview-owner">${g.owner}</div></div></div>
-        <span class="status-badge ${barPct>=100?'':'amber'}">${badge}</span>
-      </div>
-      <div class="goal-preview-money"><span>${eur(algespaard)} / ${eur(doelbedrag)}</span><strong>${barPct}%</strong></div>
-      <div class="progress-track"><div class="progress-fill" style="width:${barPct}%"></div></div>
-    </div>`;
-  }).join('') : fallbackGoalGroups.map(group=>{
+  const goalCards = favoriteGoals.length ? `<div class="goal-card-grid">${favoriteGoals.slice(0,5).map(g=>renderModernGoalCard(g, g.owner)).join('')}</div>` : fallbackGoalGroups.map(group=>{
     const doelbedrag = round2(group.items.reduce((s,g)=>s+(Number(g.doel.doelbedrag)||0),0));
     const algespaard = round2(group.items.reduce((s,g)=>s+(Number(g.doel.algespaard)||0),0));
     const barPct = doelbedrag>0 ? Math.min(100, Math.round((algespaard/doelbedrag)*100)) : 0;
-    return `<div class="goal-preview-card">
+    return `<div class="goal-card">
       <div class="goal-preview-top">
-        <div class="goal-preview-name"><span class="goal-preview-icon">◎</span><div><div class="goal-preview-title">${group.owner}</div><div class="goal-preview-owner">Totaal spaardoelen</div></div></div>
+        <div class="goal-preview-name"><span class="goal-thumb">◎</span><div><div class="goal-preview-title">${group.owner}</div><div class="goal-preview-owner">Totaal spaardoelen</div></div></div>
         <span class="status-badge muted">Totaal</span>
       </div>
       <div class="goal-preview-money"><span>${eur(algespaard)} / ${eur(doelbedrag)}</span><strong>${barPct}%</strong></div>
@@ -1735,7 +1862,7 @@ function renderDashboard(){
     <div class="card span-4">
       <div class="card-head"><h2>Gezamenlijk</h2></div>
       <div class="summary-list">
-        <div class="summary-line"><span>Gepland gezamenlijk budget</span><strong>${eur(r.gezamenlijkeLastenTotaal)}</strong></div>
+        <div class="summary-line"><span>Vaste lasten + budgetten</span><strong>${eur(r.gezamenlijkeLastenTotaal)}</strong></div>
         <div class="summary-line"><span>Variabel gebruikt</span><strong>${eur(r.variabelTotaal)}</strong></div>
         <div class="summary-line"><span>Sparen</span><strong>${eur(r.spaarpotDezeMaand)}</strong></div>
         <div class="summary-line"><span>Resterend voor zakgeld</span><strong class="${jointRemaining<0?'value neg':'value pos'}">${eur(jointRemaining)}</strong></div>
@@ -1748,16 +1875,32 @@ function renderDashboard(){
       <span class="hint">${monthLabel(getSelectedMonth())} · ${state.meta.scenario==='voor'?'Voor verkoop':'Na verkoop'}</span>
     </div>
     <div class="dashboard-grid">
-      <div class="card metric-card span-3"><div class="metric-label">Inkomen Dion</div><div class="metric-value value pos">${eur(r.salarisDion)}</div><input class="inline-edit" type="number" step="0.01" data-month-income="dion"><div class="metric-sub">Basisinkomen deze maand · incl. ${eur(r.vasteTeruggavenDion)} vaste teruggaven</div></div>
-      <div class="card metric-card span-3"><div class="metric-label">Inkomen Dara</div><div class="metric-value value pos">${eur(r.salarisDara)}</div><input class="inline-edit" type="number" step="0.01" data-month-income="dara"><div class="metric-sub">Basisinkomen deze maand · incl. ${eur(r.vasteTeruggavenDara)} vaste teruggaven</div></div>
+      <div class="card metric-card income-metric span-3">
+        <div class="metric-label">Totaal inkomen Dion</div>
+        <div class="metric-value value pos">${eur(r.salarisDion)}</div>
+        <div class="metric-sub">Totaal naar gezamenlijke rekening</div>
+        <div class="income-breakdown">
+          <div><span>Basisinkomen</span><input class="inline-edit" type="number" step="0.01" data-month-income="dion"></div>
+          <div><span>Vaste teruggaven</span><strong>${eur(r.vasteTeruggavenDion)}</strong></div>
+        </div>
+      </div>
+      <div class="card metric-card income-metric span-3">
+        <div class="metric-label">Totaal inkomen Dara</div>
+        <div class="metric-value value pos">${eur(r.salarisDara)}</div>
+        <div class="metric-sub">Totaal naar gezamenlijke rekening</div>
+        <div class="income-breakdown">
+          <div><span>Basisinkomen</span><input class="inline-edit" type="number" step="0.01" data-month-income="dara"></div>
+          <div><span>Vaste teruggaven</span><strong>${eur(r.vasteTeruggavenDara)}</strong></div>
+        </div>
+      </div>
       <div class="card metric-card span-3"><div class="metric-label">Totaal naar gezamenlijke rekening</div><div class="metric-value value pos">${eur(r.totaalSalaris)}</div><div class="metric-sub">Dion + Dara</div></div>
       <div class="card metric-card span-3"><div class="metric-label">Variabel gebruikt</div><div class="metric-value">${eur(r.variabelTotaal)}</div><div class="metric-sub">Budget: ${eur(r.variabelBudgetTotaal)}</div></div>
-      <div class="card span-6"><div class="card-head"><h2>Gezamenlijke rekening</h2><span class="hint">inkomen → lasten → sparen → zakgeld</span></div><div class="summary-list"><div class="summary-line"><span>Totaal inkomen</span><strong>${eur(r.totaalSalaris)}</strong></div><div class="summary-line"><span>Gepland gezamenlijk budget</span><strong>${eur(r.gezamenlijkeLastenTotaal)}</strong></div><div class="summary-line"><span>Gezamenlijk variabel gebruikt</span><strong>${eur(r.variabelTotaal)}</strong></div><div class="summary-line"><span>Gezamenlijk sparen</span><strong>${eur(r.spaarpotDezeMaand)}</strong></div><div class="summary-line"><span>Resterend voor zakgeld</span><strong class="${jointRemaining<0?'value neg':'value pos'}">${eur(jointRemaining)}</strong></div></div></div>
+      <div class="card span-6"><div class="card-head"><h2>Gezamenlijke rekening</h2><span class="hint">inkomen → lasten → sparen → zakgeld</span></div><div class="summary-list"><div class="summary-line"><span>Totaal inkomen</span><strong>${eur(r.totaalSalaris)}</strong></div><div class="summary-line"><span>Vaste lasten + budgetten</span><strong>${eur(r.gezamenlijkeLastenTotaal)}</strong></div><div class="summary-line"><span>Gezamenlijk variabel gebruikt</span><strong>${eur(r.variabelTotaal)}</strong></div><div class="summary-line"><span>Gezamenlijk sparen</span><strong>${eur(r.spaarpotDezeMaand)}</strong></div><div class="summary-line"><span>Resterend voor zakgeld</span><strong class="${jointRemaining<0?'value neg':'value pos'}">${eur(jointRemaining)}</strong></div></div></div>
       <div class="card span-6"><div class="card-head"><h2>Zakgeld teruggestort</h2><span class="hint">Dion / Dara</span></div><div class="metric-value">${eur(totalZakgeld)}</div><div class="split-bar"><span style="width:${Math.round(splitDion*100)}%"></span><span style="width:${100-Math.round(splitDion*100)}%"></span></div><div class="summary-list"><div class="summary-line"><span>Dion</span><strong>${eur(r.dion.zakgeld)} · ${pct(splitDion)}</strong></div><div class="summary-line"><span>Dara</span><strong>${eur(r.dara.zakgeld)} · ${pct(1-splitDion)}</strong></div></div></div>
       ${jointSummary}${personSummary('Dion',r.dion)}${personSummary('Dara',r.dara)}
       <div class="card span-6 card-scroll"><div class="card-head"><h2>Gezamenlijk budget deze maand</h2><span class="hint">transacties vs budget</span></div><div class="scroll-area">${budgetRows || '<p class="hint">Nog geen variabele budgetten.</p>'}</div></div>
       <div class="card span-6 card-scroll"><div class="card-head"><h2>Vaste lasten verdeling</h2><span class="hint">${eur(r.overigeVasteLastenTotaal)}</span></div><div class="scroll-area">${vasteRows || '<p class="hint">Nog geen vaste lasten.</p>'}</div></div>
-      <div class="card span-7 card-scroll"><div class="card-head"><h2>Spaardoelen voortgang</h2><span class="hint">preview</span></div><div class="scroll-area"><div class="goal-preview-grid">${goalCards || '<p class="hint">Nog geen spaardoelen.</p>'}</div></div></div>
+      <div class="card span-7 card-scroll"><div class="card-head"><h2>Spaardoelen voortgang</h2><button class="ghost small" data-tab-shortcut="spaardoelen">Alle spaardoelen bekijken</button></div><div class="scroll-area">${goalCards || '<p class="hint">Nog geen spaardoelen.</p>'}</div></div>
       <div class="card span-5"><div class="card-head"><h2>Jaaroverzicht ${year}</h2><span class="hint">inkomen · uitgaven · sparen</span></div><div class="year-mini">${monthBlocks}</div><div class="year-legend"><span><i class="income-dot"></i>Inkomen</span><span><i class="spent-dot"></i>Uitgaven</span><span><i class="saving-dot"></i>Sparen</span></div></div>
     </div>
   `;
@@ -1862,28 +2005,68 @@ function renderPersonOrJoint(tabId, key, label){
 
   const variabelBasePath = isJoint ? `monthlyBudgets.${getSelectedMonth()}.${state.meta.scenario}.gezamenlijkVariabel` : `${state.meta.scenario}.${key}.variabel`;
 
-  document.getElementById(tabId).innerHTML = `
-    ${incomeCard}
-    ${kpiCard}
-    ${hypotheekCard}
-    <div class="compact-layout">
-      ${refundsCard}
-      <div class="card">
-        <div class="card-head"><h2>${isJoint?(state.meta.scenario==='na'?'Overige vaste lasten':'Vaste lasten'):label+' — eigen vaste lasten'}</h2></div>
-        ${renderRowsTable(`${state.meta.scenario}.${key}.vasteLasten`, data.vasteLasten, {jaarlijks:true, moveable:true})}
+  const jointKpis = isJoint ? `
+    <div class="overview-kpi-row">
+      <div class="card metric-card status-kpi span-3"><div class="metric-label">Vaste lasten totaal</div><div class="metric-value">${eur(r.overigeVasteLastenTotaal)}</div><div class="metric-sub">maandelijks</div></div>
+      <div class="card metric-card status-kpi span-3"><div class="metric-label">Variabel budget</div><div class="metric-value">${eur(r.variabelBudgetTotaal)}</div><div class="metric-sub">${monthLabel(getSelectedMonth())}</div></div>
+      <div class="card metric-card status-kpi span-3"><div class="metric-label">Uitgegeven deze maand</div><div class="metric-value">${eur(r.variabelTotaal)}</div><div class="metric-sub">gezamenlijke transacties</div></div>
+      <div class="card metric-card status-kpi span-3"><div class="metric-label">Resterend budget</div><div class="metric-value ${r.variabelBudgetTotaal-r.variabelTotaal<0?'value neg':'value pos'}">${eur(round2(r.variabelBudgetTotaal-r.variabelTotaal))}</div><div class="metric-sub">variabel budget</div></div>
+      <div class="card metric-card status-kpi span-3"><div class="metric-label">Sparen</div><div class="metric-value value pos">${eur(r.spaarpotDezeMaand)}</div><div class="metric-sub">deze maand</div></div>
+    </div>` : '';
+  const personalKpis = !isJoint ? `
+    <div class="overview-kpi-row">
+      <div class="card metric-card status-kpi span-3"><div class="metric-label">Zakgeld ontvangen</div><div class="metric-value ${rr.zakgeld<0?'value neg':'value pos'}">${eur(rr.zakgeld)}</div><div class="metric-sub">${monthLabel(getSelectedMonth())}</div></div>
+      <div class="card metric-card status-kpi span-3"><div class="metric-label">Persoonlijke vaste lasten / correcties</div><div class="metric-value ${rr.persoonlijkeVasteLasten<0?'value neg':''}">${eur(rr.persoonlijkeVasteLasten)}</div><div class="metric-sub">terugkerend</div></div>
+      <div class="card metric-card status-kpi span-3"><div class="metric-label">Vaste teruggaven</div><div class="metric-value value pos">${eur(vasteTeruggaven)}</div><div class="metric-sub">bij inkomen opgeteld</div></div>
+      <div class="card metric-card status-kpi span-3"><div class="metric-label">Uitgaven deze maand</div><div class="metric-value">${eur(rr.variabeleUitgaven)}</div><div class="metric-sub">transacties</div></div>
+      <div class="card metric-card status-kpi span-3"><div class="metric-label">Beschikbaar voor sparen/vrij gebruik</div><div class="metric-value ${rr.beschikbaarVoorSparen<0?'value neg':'value pos'}">${eur(rr.beschikbaarVoorSparen)}</div><div class="metric-sub">${availabilityBadge(rr.beschikbaarVoorSparen)}</div></div>
+    </div>` : '';
+  const personalFlow = !isJoint ? `
+    <div class="card flow-card">
+      <div class="card-head"><h2>Persoonlijke ruimte</h2><span class="hint">zakgeld → lasten → uitgaven → beschikbaar</span></div>
+      <div class="flow-steps">
+        <div class="flow-step"><span>Zakgeld</span><strong>${eur(rr.zakgeld)}</strong></div>
+        <div class="flow-step"><span>Vaste lasten</span><strong>${eur(rr.persoonlijkeVasteLasten)}</strong></div>
+        <div class="flow-step"><span>Uitgaven</span><strong>${eur(rr.variabeleUitgaven)}</strong></div>
+        <div class="flow-step"><span>Beschikbaar</span><strong class="${rr.beschikbaarVoorSparen<0?'value neg':'value pos'}">${eur(rr.beschikbaarVoorSparen)}</strong></div>
       </div>
-      <div class="card">
-        <div class="card-head"><h2>${isJoint?'Variabele budgetten':'Persoonlijke categorieën'}</h2></div>
-        ${renderRowsTable(variabelBasePath, data.variabel)}
+      <div class="progress-track"><div class="progress-fill" style="width:${Math.min(100, Math.round((rr.variabeleUitgaven / Math.max(1, rr.resterendVoorVariabel))*100))}%"></div></div>
+    </div>` : '';
+  const incomeManage = !isJoint ? `
+    <div class="card">
+      <div class="card-head"><h2>Inkomen</h2><span class="hint">${monthLabel(getSelectedMonth())}</span></div>
+      <div class="summary-list">
+        <div class="summary-line"><span>Basisinkomen deze maand</span><input class="inline-edit" type="number" step="0.01" data-month-income="${key}"></div>
+        <div class="summary-line"><span>Vaste teruggaven</span><strong>${eur(vasteTeruggaven)}</strong></div>
+        <div class="summary-line"><span>Totaal naar gezamenlijke rekening</span><strong class="value pos">${eur(totaalInkomen)}</strong></div>
       </div>
     </div>
-    ${budgetUsageCard}
-    ${transactionCard}
-    <div class="card savings-panel">
-      <div class="card-head"><h2>Sparen</h2><span class="hint">Spaardoelen bewerken doe je op het tabblad Spaardoelen</span></div>
-      ${savingsSummary}
-      ${renderGoalOverviewTable(doelenVoorGroep, spaarpotVoorGroep)}
-    </div>
+    ${refundsCard}` : '';
+
+  document.getElementById(tabId).innerHTML = isJoint ? `
+    ${renderAppSection('Overzicht', `Gezamenlijk overzicht — ${monthLabel(getSelectedMonth())}`, 'De gezamenlijke rekening eerst als overzicht, daarna beheer.', jointKpis)}
+    ${renderAppSection('Deze maand', 'Budgetgebruik deze maand', 'Variabele categorieën tegenover de uitgaven van deze maand.', budgetUsageCard)}
+    ${renderAppSection('Deze maand', 'Gezamenlijke transacties', '', transactionCard)}
+    ${renderAppSection('Voortgang', 'Sparen en spaardoelen-preview', '', `<div class="card">${renderModernGoalCards(doelenVoorGroep, spaarpotVoorGroep, 'Gezamenlijk', 4)}</div>`)}
+    ${renderAppSection('Beheer', 'Beheer', 'Invoer en tabellen staan hier zodat het overzicht rustig blijft.', `
+      <div class="manage-stack">
+        ${hypotheekCard ? renderManageSection('Beheer hypotheek', hypotheekCard, false) : ''}
+        ${renderManageSection('Beheer vaste lasten', `<div class="card">${renderRowsTable(`${state.meta.scenario}.${key}.vasteLasten`, data.vasteLasten, {jaarlijks:true, moveable:true})}</div>`, false)}
+        ${renderManageSection('Beheer variabele budgetten', `<div class="card">${renderRowsTable(variabelBasePath, data.variabel)}</div>`, false)}
+        ${renderManageSection('Sparen / spaardoelen-preview', `<div class="card">${savingsSummary}${renderGoalOverviewTable(doelenVoorGroep, spaarpotVoorGroep)}</div>`, false)}
+      </div>`)}
+  ` : `
+    ${renderAppSection('Overzicht', `${label} overzicht — ${monthLabel(getSelectedMonth())}`, 'Persoonlijk overzicht met inkomen, zakgeld, uitgaven en vrije ruimte.', personalKpis)}
+    ${renderAppSection('Voortgang', 'Persoonlijke ruimte', '', personalFlow)}
+    ${renderAppSection('Deze maand', 'Persoonlijke uitgaven', '', transactionCard)}
+    ${renderAppSection('Voortgang', 'Persoonlijke spaardoelen', '', `<div class="card">${renderModernGoalCards(doelenVoorGroep, spaarpotVoorGroep, label, 4)}</div>`)}
+    ${renderAppSection('Beheer', 'Beheer', 'Invoer en tabellen staan hier zodat de tab overzichtelijk blijft.', `
+      <div class="manage-stack">
+        ${renderManageSection('Inkomen en vaste teruggaven', incomeManage, false)}
+        ${renderManageSection('Eigen vaste lasten', `<div class="card">${renderRowsTable(`${state.meta.scenario}.${key}.vasteLasten`, data.vasteLasten, {jaarlijks:true, moveable:true})}</div>`, false)}
+        ${renderManageSection('Persoonlijke categorieën', `<div class="card">${renderRowsTable(variabelBasePath, data.variabel)}</div>`, false)}
+        ${renderManageSection('Spaardoelen tabeloverzicht', `<div class="card">${renderGoalOverviewTable(doelenVoorGroep, spaarpotVoorGroep)}</div>`, false)}
+      </div>`)}
   `;
 }
 
@@ -1905,31 +2088,35 @@ function renderSpaardoelen(){
     const doel = round2(berekend.reduce((s,b)=>s+(Number(b.doel.doelbedrag)||0),0));
     const gespaard = round2(berekend.reduce((s,b)=>s+(Number(b.doel.algespaard)||0),0));
     const p = doel>0 ? gespaard/doel : 0;
-    const rows = berekend.slice(0,3).map(b=>{
-      const doelbedrag = Number(b.doel.doelbedrag)||0;
-      const al = Number(b.doel.algespaard)||0;
-      const pctGoal = doelbedrag>0 ? Math.min(100, Math.round((al/doelbedrag)*100)) : 0;
-      return `<div class="progress-item"><div class="progress-top"><strong>${b.doel.naam || 'Spaardoel'}</strong><span>${eur(al)} / ${eur(doelbedrag)} · ${pctGoal}%</span></div><div class="progress-track"><div class="progress-fill" style="width:${pctGoal}%"></div></div></div>`;
-    }).join('');
-    return `<div class="card span-4"><div class="card-head"><h2>${g.label}</h2><span class="status-badge">${pct(p)}</span></div>${rows || '<p class="hint">Nog geen doelen.</p>'}<div class="card-total"><span>Totaal</span><span>${eur(gespaard)} / ${eur(doel)}</span></div></div>`;
+    return `<div class="goal-group-block">
+      <div class="goal-group-title"><h3>${g.label}</h3><span class="status-badge">${pct(p)}</span></div>
+      ${renderModernGoalCards(g.doelen, g.pot, g.label)}
+      <div class="card-total"><span>Totaal ${g.label}</span><span>${eur(gespaard)} / ${eur(doel)}</span></div>
+    </div>`;
+  }).join('');
+  const distribution = groups.map(g=>{
+    const total = round2(calcGroep(g.doelen, g.pot, TODAY).reduce((s,b)=>s+(Number(b.doel.doelbedrag)||0),0));
+    const ratio = totaalDoel > 0 ? total / totaalDoel : 0;
+    return `<div class="progress-item"><div class="progress-top"><strong>${g.label}</strong><span>${eur(total)} · ${pct(ratio)}</span></div><div class="progress-track"><div class="progress-fill" style="width:${Math.round(ratio*100)}%"></div></div></div>`;
   }).join('');
   document.getElementById('tab-spaardoelen').innerHTML = `
-    <div class="dashboard-grid">
-      <div class="card metric-card span-3"><div class="metric-label">Totaal gespaard</div><div class="metric-value value pos">${eur(totaalGespaard)}</div><div class="metric-sub">${all.length} actieve spaardoelen</div></div>
-      <div class="card metric-card span-3"><div class="metric-label">Totaal doelbedrag</div><div class="metric-value">${eur(totaalDoel)}</div><div class="metric-sub">alle groepen samen</div></div>
-      <div class="card metric-card span-3"><div class="metric-label">Gemiddelde voortgang</div><div class="metric-value">${pct(gemiddelde)}</div><div class="metric-sub">op basis van gespaard/doel</div></div>
-      <div class="card metric-card span-3"><div class="metric-label">Inleg deze maand</div><div class="metric-value">${eur(inlegDezeMaand)}</div><div class="metric-sub">${monthLabel(getSelectedMonth())}</div></div>
-      ${groupCards}
-    </div>
-    <div class="section-title">Spaardoelen — Gezamenlijk</div>
-    <div class="card">${renderGoalGroup('spaardoelen.gezamenlijk', state.spaardoelen.gezamenlijk, r.spaarpotDezeMaand)}</div>
-    <div class="section-title">Spaardoelen — Dion</div>
-    <div class="card">${renderGoalGroup('spaardoelen.dion', state.spaardoelen.dion, r.dion.beschikbaarVoorSparen)}</div>
-    <div class="section-title">Spaardoelen — Dara</div>
-    <div class="card">${renderGoalGroup('spaardoelen.dara', state.spaardoelen.dara, r.dara.beschikbaarVoorSparen)}</div>
+    ${renderAppSection('Overzicht', 'Spaardoelen overzicht', 'Alle doelen als moderne voortgangskaarten, met beheer lager op de pagina.', `
+      <div class="overview-kpi-row cols-4">
+        <div class="card metric-card span-3"><div class="metric-label">Totaal gespaard</div><div class="metric-value value pos">${eur(totaalGespaard)}</div><div class="metric-sub">${all.length} actieve spaardoelen</div></div>
+        <div class="card metric-card span-3"><div class="metric-label">Totaal doelbedrag</div><div class="metric-value">${eur(totaalDoel)}</div><div class="metric-sub">alle groepen samen</div></div>
+        <div class="card metric-card span-3"><div class="metric-label">Gemiddelde voortgang</div><div class="metric-value">${pct(gemiddelde)}</div><div class="metric-sub">op basis van gespaard/doel</div></div>
+        <div class="card metric-card span-3"><div class="metric-label">Inleg deze maand</div><div class="metric-value">${eur(inlegDezeMaand)}</div><div class="metric-sub">${monthLabel(getSelectedMonth())}</div></div>
+      </div>`)}
+    ${renderAppSection('Voortgang', 'Spaardoelen overzicht', '', `<div class="card">${groupCards}</div>`)}
+    ${renderAppSection('Verdeling', 'Verdeling van spaardoelen', 'Doelbedrag per groep.', `<div class="card"><div class="progress-list">${distribution}</div></div>`)}
+    ${renderAppSection('Beheer', 'Spaardoelen beheren', 'De volledige bewerktabellen blijven beschikbaar in deze beheerblokken.', `
+      <div class="manage-stack">
+        ${renderManageSection('Spaardoelen beheren — Gezamenlijk', `<div class="card">${renderGoalGroup('spaardoelen.gezamenlijk', state.spaardoelen.gezamenlijk, r.spaarpotDezeMaand)}</div>`, false)}
+        ${renderManageSection('Spaardoelen beheren — Dion', `<div class="card">${renderGoalGroup('spaardoelen.dion', state.spaardoelen.dion, r.dion.beschikbaarVoorSparen)}</div>`, false)}
+        ${renderManageSection('Spaardoelen beheren — Dara', `<div class="card">${renderGoalGroup('spaardoelen.dara', state.spaardoelen.dara, r.dara.beschikbaarVoorSparen)}</div>`, false)}
+      </div>`)}
   `;
 }
-
 /* ---------- data & back-up tab ---------- */
 function renderDataTab(){
   document.getElementById('tab-data').innerHTML = `
@@ -2155,6 +2342,12 @@ function renderActiveTab(){
   bindInputs(root);
   handleTableClicks(root);
   handleGoalClicks(root);
+  root.querySelectorAll('[data-tab-shortcut]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      activeTab = btn.dataset.tabShortcut;
+      renderActiveTab();
+    });
+  });
 }
 
 document.getElementById('tabs').addEventListener('click', (e)=>{
@@ -2217,6 +2410,8 @@ CloudAdapter.connect();
 </script>
 </body>
 </html>
+
+
 
 
 
