@@ -1,0 +1,2045 @@
+﻿<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Finize</title>
+<style>
+:root{
+  --bg:#fbf4ea;
+  --bg-soft:#f6eadc;
+  --card:#fffdfa;
+  --card-hover:#fff7ef;
+  --border:#ecdcc9;
+  --border-soft:#f3e8d9;
+  --text:#2f1f18;
+  --text-dim:#705f52;
+  --text-faint:#a49282;
+  --navy:#d76a45;
+  --navy-bright:#c95734;
+  --navy-deep:#fae4d7;
+  --green:#7c8e49;
+  --green-bg:#eef1df;
+  --red:#9f4639;
+  --red-bg:#f8e8df;
+  --amber:#dfad63;
+  --warm:#fff3e6;
+  --radius:18px;
+  --radius-sm:13px;
+  --shadow:0 22px 46px rgba(86,56,31,.12), 0 7px 18px rgba(86,56,31,.07);
+  --shadow-soft:0 14px 28px rgba(86,56,31,.09), 0 2px 8px rgba(86,56,31,.05);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);}
+body{
+  background:
+    radial-gradient(900px 420px at 18% -10%, rgba(216,106,69,.12), transparent 58%),
+    radial-gradient(700px 360px at 100% 0%, rgba(124,142,73,.10), transparent 55%),
+    linear-gradient(180deg, #fffaf4 0%, var(--bg) 52%, #f7ecdf 100%),
+    var(--bg);
+  min-height:100vh;
+  padding-bottom:34px;
+}
+::selection{background:rgba(216,106,69,.20);}
+input, select{
+  font-family:inherit; color:var(--text); background:#fffaf4;
+  border:1px solid var(--border); border-radius:10px; padding:7px 9px; font-size:12.5px;
+  outline:none; transition:border-color .16s, box-shadow .16s, background .16s;
+}
+input:focus, select:focus{ border-color:var(--navy); background:#fff; box-shadow:0 0 0 4px rgba(216,106,69,.14); }
+input[type=number]{ text-align:right; width:100px; }
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+input[type=number]{ -moz-appearance:textfield; appearance:textfield; }
+input[type=text]{ width:100%; }
+input[type=date]{ color-scheme: light; }
+input[type=checkbox]{ width:16px; height:16px; accent-color:var(--green); cursor:pointer; }
+textarea{
+  width:100%; min-height:112px; resize:vertical; font-family:ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  color:var(--text); background:#fffaf4; border:1px solid var(--border); border-radius:12px; padding:10px; font-size:12px;
+}
+code, pre{ font-family:ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace; }
+pre{ white-space:pre-wrap; background:#fffaf4; border:1px solid var(--border-soft); border-radius:12px; padding:10px; font-size:11.5px; color:var(--text-dim); }
+button{
+  font-family:inherit; cursor:pointer; border:1px solid var(--border);
+  background:#fff; color:var(--text); border-radius:12px; padding:7px 12px;
+  font-size:12.5px; font-weight:650; transition:background .16s, border-color .16s, box-shadow .16s, color .16s, transform .16s;
+}
+button:hover{ background:var(--card-hover); border-color:#e0c2ac; box-shadow:var(--shadow-soft); transform:translateY(-1px); }
+button.primary{ background:var(--navy); border-color:var(--navy); color:#fff; box-shadow:0 8px 18px rgba(216,106,69,.18); }
+button.primary:hover{ background:var(--navy-bright); border-color:var(--navy-bright); }
+button.ghost{ background:#fffdfa; border:1px dashed #dfc9b4; color:var(--text-dim); }
+button.danger-ghost{ background:transparent; border:1px solid transparent; color:var(--text-faint); padding:3px 6px; font-size:15px; line-height:1; }
+button.danger-ghost:hover{ color:var(--red); border-color:var(--red); background:var(--red-bg); }
+button.small{ padding:4px 8px; font-size:12px; }
+
+.topbar{
+  position:sticky; top:0; z-index:20;
+  background:rgba(255,250,244,.82); backdrop-filter:blur(18px);
+  border-bottom:1px solid rgba(236,220,201,.80);
+  padding:30px 18px 18px;
+}
+.topbar-inner{ max-width:1320px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; gap:18px; flex-wrap:wrap; }
+.brand{ display:flex; align-items:center; gap:14px; min-width:280px; }
+.brand-dot{ width:38px; height:38px; border-radius:12px 22px 12px 22px; background:linear-gradient(135deg, #d76a45, #7c8e49); box-shadow:0 12px 24px rgba(216,106,69,.20); position:relative; }
+.brand-dot::after{ content:""; position:absolute; width:18px; height:10px; border:3px solid #fff; border-top:0; border-right:0; left:10px; top:13px; transform:rotate(-35deg); border-radius:0 0 0 10px; }
+.brand h1{ font-size:27px; margin:0; font-weight:780; letter-spacing:-.02em; color:#2f1f18; line-height:1.12; }
+.brand-subtitle{ color:#846f5f; font-size:13px; line-height:1.35; margin-top:5px; max-width:620px; }
+.save-status{ font-size:14px; color:#846f5f; margin-top:6px; display:flex; align-items:center; gap:8px; }
+.save-status::before{ content:""; width:9px; height:9px; border-radius:50%; background:var(--green); box-shadow:0 0 0 4px rgba(124,142,73,.12); flex:0 0 auto; }
+
+.scenario-toggle{ display:flex; align-items:center; gap:4px; background:#fffdfa; border:1px solid var(--border); border-radius:18px; padding:4px; box-shadow:0 10px 26px rgba(86,56,31,.07); }
+.scenario-toggle button{ border:none; background:transparent; border-radius:14px; padding:11px 27px; font-size:14px; color:var(--text-dim); box-shadow:none; min-width:138px; }
+.scenario-toggle button:hover{ background:#fff4ea; box-shadow:none; transform:none; }
+.scenario-toggle button.active{ background:#fff5ee; color:#a9482c; box-shadow:inset 0 0 0 1px rgba(216,106,69,.22), 0 8px 18px rgba(216,106,69,.12); }
+
+.tabs{ max-width:1320px; margin:16px auto 0; padding:0 18px; display:flex; gap:10px; flex-wrap:wrap; }
+.tab-btn{ background:rgba(255,253,250,.92); border:1px solid var(--border); color:#705f52; border-radius:999px; padding:12px 22px; font-size:14px; box-shadow:0 10px 24px rgba(86,56,31,.06); min-height:48px; display:flex; align-items:center; gap:10px; }
+.tab-btn:first-child,
+.tab-btn:last-child{ border-radius:999px; }
+.tab-btn + .tab-btn{ margin-left:0; }
+.tab-btn::before{ color:#86604c; font-size:15px; font-weight:800; min-width:18px; text-align:center; }
+.tab-btn[data-tab="dashboard"]::before{ content:"▥"; color:#d76a45; }
+.tab-btn[data-tab="gezamenlijk"]::before{ content:"♚"; }
+.tab-btn[data-tab="dion"]::before,
+.tab-btn[data-tab="dara"]::before{ content:"D"; background:#fae4d7; color:#c95734; width:24px; height:24px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:12px; min-width:24px; }
+.tab-btn[data-tab="spaardoelen"]::before{ content:"◎"; }
+.tab-btn[data-tab="data"]::before{ content:"☁"; }
+.tab-btn:hover{ background:#fff7ef; color:var(--text); border-color:#e1c5ad; box-shadow:none; transform:none; }
+.tab-btn.active{ background:#d76a45; color:#fff; border-color:#d76a45; box-shadow:0 12px 24px rgba(216,106,69,.18); z-index:1; }
+.tab-btn.active::before{ color:#fff; }
+.tab-btn.active[data-tab="dion"]::before,
+.tab-btn.active[data-tab="dara"]::before{ background:rgba(255,255,255,.22); color:#fff; }
+
+.wrap{ max-width:1320px; margin:20px auto; padding:0 18px; display:none; }
+.wrap.active{ display:block; }
+
+.card{
+  background:var(--card); border:1px solid var(--border); border-radius:var(--radius);
+  padding:24px; margin-bottom:22px; box-shadow:var(--shadow); transform:translateY(-2px);
+  transition:box-shadow .18s ease, transform .18s ease, border-color .18s ease;
+}
+.card:hover{ box-shadow:0 28px 58px rgba(86,56,31,.14), 0 10px 24px rgba(86,56,31,.08); transform:translateY(-4px); border-color:#e6ccb5; }
+.card-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; gap:10px; flex-wrap:wrap; }
+.card-head h2{ font-size:20px; margin:0; font-weight:760; color:#2f1f18; letter-spacing:-.02em; }
+.card-head .hint{ font-size:14px; color:#846f5f; }
+
+.kpi-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:16px; }
+.kpi{
+  background:#fff; border:1px solid var(--border); border-radius:var(--radius);
+  padding:20px 22px; position:relative; overflow:hidden; box-shadow:var(--shadow-soft); isolation:isolate;
+}
+.kpi:has(input){ border-left:3px solid var(--navy); }
+.kpi input[type=number]{ background:#fffaf4; border-color:#ead7c4; border-radius:11px; padding:10px 12px; }
+.kpi::before{ content:none; display:none; }
+.kpi > *{ position:relative; z-index:1; }
+.kpi.pos::before{ background:var(--green); }
+.kpi.neg::before{ background:var(--red); }
+.kpi .label{ font-size:14px; color:#705f52; margin-bottom:10px; }
+.kpi .value{ font-size:24px; font-weight:760; letter-spacing:-.015em; }
+.kpi .value.pos{ color:var(--green); }
+.kpi .value.neg{ color:var(--red); }
+
+table{ width:100%; border-collapse:collapse; }
+th{ text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.055em; color:#9b846f; padding:10px 10px; border-bottom:1px solid var(--border); background:#fff8f0; }
+td{ padding:11px 10px; border-bottom:1px solid var(--border-soft); font-size:14px; vertical-align:middle; }
+tbody tr:hover td{ background:#fff8f0; }
+tr:last-child td{ border-bottom:none; }
+td.num{ text-align:right; }
+.tot-row td{ font-weight:760; border-top:1px solid var(--border); border-bottom:none; padding-top:13px; background:#fff8f0; }
+.tot-row .value.pos{ color:var(--green); }
+.tot-row .value.neg{ color:var(--red); }
+.row-actions{ text-align:center; width:30px; }
+.add-row-btn{ margin-top:10px; }
+.list-summary{
+  display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
+  background:#fff8f0; border:1px solid var(--border-soft); border-radius:var(--radius-sm);
+  padding:10px 12px; margin-bottom:10px;
+}
+.list-summary strong{ font-size:13px; }
+.list-summary .hint{ font-size:11.5px; color:var(--text-faint); }
+.move-select{ width:116px; padding:4px 6px; font-size:12px; }
+
+.progress-track{ background:#f0e2d2; border:1px solid #ead8c2; border-radius:999px; height:9px; overflow:hidden; width:100%; min-width:70px; }
+.progress-fill{ height:100%; background:linear-gradient(90deg, var(--navy), var(--green)); border-radius:999px; }
+.progress-label{ font-size:11px; color:var(--text-dim); margin-top:3px; text-align:right; }
+
+.donut-row{ display:flex; gap:14px; flex-wrap:wrap; }
+.donut{
+  width:108px; height:108px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  background: conic-gradient(var(--green) calc(var(--pct,0)*1%), #f0e2d2 0);
+  flex:0 0 auto;
+}
+.donut-inner{ width:78px; height:78px; border-radius:50%; background:var(--card); display:flex; align-items:center; justify-content:center; flex-direction:column; }
+.donut-inner b{ font-size:20px; }
+.donut-inner span{ font-size:11px; color:var(--text-faint); }
+.donut-wrap{ display:flex; flex-direction:column; align-items:center; gap:10px; width:142px; }
+.donut-wrap .name{ font-size:14px; color:#705f52; text-align:center; line-height:1.45; }
+
+.goal{
+  background:#fff8f0; border:1px solid var(--border-soft); border-radius:var(--radius-sm);
+  padding:14px; margin-bottom:12px;
+}
+.goal-top{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; }
+.goal-name-input{ font-weight:720; font-size:14px; border:none; background:transparent; padding:2px 0; width:auto; min-width:80px; }
+.goal-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px; margin-bottom:8px; }
+.goal-grid label{ display:block; font-size:10.5px; color:var(--text-faint); margin-bottom:3px; }
+.goal-grid input{ width:100%; }
+.goal-stats{ display:flex; gap:16px; flex-wrap:wrap; font-size:12px; color:var(--text-dim); margin-top:6px; }
+.goal-stats b{ color:var(--text); }
+
+.section-title{ font-size:12px; text-transform:uppercase; letter-spacing:.075em; color:var(--text-faint); margin:22px 0 10px; padding-top:6px; border-top:1px solid var(--border-soft); }
+.section-title:first-child{ border-top:none; margin-top:0; }
+
+.footer-note{ text-align:center; color:#846f5f; font-size:14px; margin-top:26px; }
+.toolbar{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
+.compact-layout{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; align-items:start; margin-bottom:22px; }
+.compact-layout .card{ padding:16px; margin-bottom:0; box-shadow:var(--shadow-soft); overflow-x:visible; }
+.compact-layout .card-head{ margin-bottom:10px; }
+.compact-layout th{ padding:7px 7px; font-size:10px; }
+.compact-layout td{ padding:7px 7px; font-size:12.5px; }
+.compact-layout input{ padding:7px 8px; font-size:12.5px; }
+.compact-layout input[type=number]{ width:82px; }
+.compact-layout .add-row-btn{ margin-top:10px; }
+.savings-panel{ margin-top:16px; }
+.savings-head{ display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin-bottom:12px; }
+.goal-table-wrap{ overflow-x:visible; }
+.goal-table{ table-layout:fixed; }
+.goal-table th{ white-space:normal; line-height:1.25; padding:7px 5px; font-size:10px; }
+.goal-table td{ padding:7px 5px; font-size:12px; }
+.goal-table input{ padding:7px 8px; font-size:12px; }
+.goal-table input[type=text]{ min-width:0; width:100%; }
+.goal-table input[type=number]{ width:100%; min-width:58px; }
+.goal-table input[type=date]{ width:100%; min-width:112px; }
+.goal-table .progress-track{ min-width:54px; margin-top:4px; }
+.goal-table tfoot td{ font-weight:700; border-top:1px solid var(--border); padding-top:10px; }
+.goal-table .col-name{ width:12%; }
+.goal-table .col-money{ width:9%; }
+.goal-table .col-progress{ width:9%; }
+.goal-table .col-date{ width:12%; }
+.goal-table .col-rate{ width:8%; }
+.goal-table .col-favorite{ width:32px; }
+.goal-table .col-order{ width:38px; }
+.goal-table .col-actions{ width:32px; }
+.goal-summary-row{ display:flex; justify-content:space-between; gap:12px; margin-top:12px; padding-top:10px; border-top:1px solid var(--border); font-weight:700; }
+.favorite-goal{ display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; position:relative; cursor:pointer; }
+.favorite-goal input{ position:absolute; opacity:0; width:1px; height:1px; pointer-events:none; }
+.favorite-goal span{ display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:999px; color:#c0aa8f; border:1px solid var(--border); background:#fff8f0; font-size:15px; line-height:1; }
+.favorite-goal input:checked + span{ color:#d76a45; background:#fff0df; border-color:#e0ad81; box-shadow:0 8px 18px rgba(216,106,69,.14); }
+.goal-order{ display:flex; flex-direction:column; gap:3px; align-items:center; }
+.goal-order button{ width:24px; height:22px; padding:0; line-height:1; font-size:12px; }
+.goal-order button:disabled{ opacity:.28; cursor:not-allowed; }
+.top-actions{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
+.month-control{ position:relative; display:flex; align-items:center; gap:8px; }
+.month-picker-btn{ min-width:112px; padding:10px 14px; border-radius:14px; background:var(--card); border:1px solid var(--border); color:var(--text); font-weight:800; box-shadow:var(--shadow-soft); }
+.month-picker-btn::before{ content:"▦"; margin-right:8px; color:var(--green); font-weight:900; }
+.month-picker-btn::after{ content:"⌄"; margin-left:8px; color:var(--muted); font-size:12px; }
+.month-popover{ position:absolute; top:calc(100% + 8px); right:0; z-index:30; width:min(310px, calc(100vw - 32px)); padding:12px; border:1px solid var(--border); border-radius:18px; background:#fffdfa; box-shadow:0 24px 60px rgba(63,42,28,.18); display:none; }
+.month-control.open .month-popover{ display:block; }
+.year-picker{ display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-bottom:10px; }
+.year-picker button,.month-grid button{ min-width:0; padding:8px 7px; border-radius:12px; box-shadow:none; background:#fff8f0; border:1px solid var(--border); color:var(--text-dim); font-weight:800; }
+.year-picker button.active{ background:linear-gradient(135deg, var(--green), var(--green-soft)); color:#fff; border-color:transparent; }
+.month-grid button.active{ background:#edf3e6; color:var(--green); border-color:#b9ca9f; box-shadow:inset 0 0 0 1px rgba(89,118,72,.14); }
+.month-grid button.current{ background:#fff3e8; border-color:#e7c4a8; color:#9d5636; }
+.month-grid button.current.active{ background:#eaf2e2; color:var(--green); border-color:#9fbb83; }
+.month-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
+.copy-month-btn{ border-style:solid; color:var(--green); }
+.dashboard-grid{ display:grid; grid-template-columns:repeat(12,minmax(0,1fr)); gap:16px; }
+.span-3{ grid-column:span 3; }
+.span-4{ grid-column:span 4; }
+.span-5{ grid-column:span 5; }
+.span-6{ grid-column:span 6; }
+.span-7{ grid-column:span 7; }
+.span-8{ grid-column:span 8; }
+.span-12{ grid-column:span 12; }
+.metric-card{ min-height:132px; display:flex; flex-direction:column; justify-content:space-between; }
+.metric-label{ color:var(--text-dim); font-size:13px; font-weight:700; }
+.metric-value{ font-size:24px; font-weight:800; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+.metric-sub{ color:var(--text-faint); font-size:12px; line-height:1.35; }
+.inline-edit{ width:100%; font-size:22px !important; font-weight:800 !important; text-align:left !important; }
+.summary-list{ display:grid; gap:10px; }
+.summary-line{ display:flex; justify-content:space-between; gap:12px; padding:8px 0; border-bottom:1px solid var(--border-soft); }
+.summary-line:last-child{ border-bottom:none; }
+.summary-line strong, .summary-line .num{ font-variant-numeric:tabular-nums; }
+.split-bar{ display:flex; height:12px; border-radius:999px; overflow:hidden; background:#f0e2d2; margin:12px 0 8px; }
+.split-bar span:first-child{ background:var(--green); }
+.split-bar span:last-child{ background:var(--navy); }
+.progress-list{ display:grid; gap:12px; }
+.progress-item{ display:grid; gap:5px; }
+.progress-top{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; font-size:13px; }
+.status-badge{ display:inline-flex; align-items:center; border-radius:999px; padding:3px 9px; font-size:11px; font-weight:800; background:var(--green-bg); color:var(--green); white-space:nowrap; }
+.status-badge.amber{ background:#fff1d6; color:#a76c20; }
+.status-badge.red{ background:var(--red-bg); color:var(--red); }
+.status-badge.muted{ background:#f0e2d2; color:var(--text-dim); }
+.card-scroll{ display:flex; flex-direction:column; min-height:0; }
+.scroll-area{ max-height:280px; overflow:auto; padding-right:3px; }
+.scroll-area.large{ max-height:360px; }
+.scroll-area.table-scroll{ height:300px; max-height:300px; margin-bottom:10px; border:1px solid var(--border-soft); border-radius:14px; }
+.scroll-area table thead th{ position:sticky; top:0; z-index:1; }
+.scroll-area::-webkit-scrollbar{ width:8px; height:8px; }
+.scroll-area::-webkit-scrollbar-thumb{ background:#d9c3ad; border-radius:999px; }
+.card-total{ margin-top:10px; padding-top:10px; border-top:1px solid var(--border); display:flex; justify-content:space-between; gap:12px; font-weight:800; }
+.month-blocks{ display:grid; grid-template-columns:repeat(12,1fr); gap:6px; }
+.month-block{ border:1px solid var(--border); border-radius:10px; padding:8px 4px; text-align:center; font-size:11px; font-weight:800; color:var(--text-dim); background:#fff8f0; }
+.month-block.green{ background:var(--green-bg); color:var(--green); border-color:#d9dfbc; }
+.month-block.amber{ background:#fff1d6; color:#a76c20; border-color:#efd4a0; }
+.month-block.red{ background:var(--red-bg); color:var(--red); border-color:#edc8bd; }
+.month-block.active{ outline:2px solid var(--navy); }
+.modal-backdrop{ position:fixed; inset:0; background:rgba(47,31,24,.22); display:none; align-items:center; justify-content:center; z-index:50; padding:18px; }
+.modal-backdrop.open{ display:flex; }
+.modal{ width:min(520px,100%); background:var(--card); border:1px solid var(--border); border-radius:22px; box-shadow:0 28px 70px rgba(47,31,24,.22); padding:22px; }
+.modal-grid{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.modal-grid label{ display:grid; gap:5px; font-size:12px; color:var(--text-dim); font-weight:700; }
+.modal-grid .full{ grid-column:1/-1; }
+.modal-actions{ display:flex; justify-content:flex-end; gap:10px; margin-top:16px; flex-wrap:wrap; }
+.quick-actions{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+
+@media (max-width:640px){
+  html,body{ overflow-x:hidden; }
+  .topbar{ padding:20px 10px 14px; }
+  .topbar-inner{ flex-direction:column; align-items:stretch; }
+  .brand{ min-width:0; }
+  .brand-dot{ width:32px; height:32px; }
+  .brand h1{ font-size:22px; line-height:1.15; }
+  .brand-subtitle{ font-size:12px; max-width:none; }
+  .save-status{ line-height:1.25; }
+  .scenario-toggle{ border-radius:30px; }
+  .scenario-toggle button{ flex:1 1 0; padding:8px 10px; }
+  .tabs{ padding:0 12px; gap:8px; }
+  .tab-btn{ padding:10px 13px; line-height:1.15; border-radius:13px; margin-left:0; min-height:44px; }
+  .tab-btn:first-child,
+  .tab-btn:last-child{ border-radius:13px; }
+  .tab-btn + .tab-btn{ margin-left:0; }
+  .tab-btn::before{ display:none; }
+  .wrap{ padding:0 12px; margin:12px auto; width:100%; max-width:100%; overflow-x:hidden; }
+  .card{ padding:18px; border-radius:16px; }
+  .card-head h2{ font-size:18px; }
+  .kpi{ padding:16px 18px; }
+  .kpi .value{ font-size:20px; overflow-wrap:anywhere; }
+  .goal-grid{ grid-template-columns:repeat(2,1fr); }
+  .compact-layout{ grid-template-columns:1fr; }
+  .compact-layout .card{ padding:12px; }
+  .goal-table-wrap{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .goal-table{ min-width:820px; table-layout:fixed; }
+  .goal-table th{ font-size:9px; line-height:1.15; padding:4px 3px; letter-spacing:.02em; vertical-align:bottom; }
+  .goal-table td{ font-size:11px; line-height:1.2; padding:4px 3px; vertical-align:middle; }
+  .goal-table input{ font-size:11px; padding:5px 6px; }
+  .goal-table input[type=number]{ min-width:54px; }
+  .goal-table input[type=date]{ min-width:104px; font-size:10.5px; }
+  .goal-table .progress-track{ min-width:48px; }
+  .goal-table .progress-label{ font-size:10px; }
+  .goal-order{ gap:2px; }
+  .goal-order button{ width:21px; height:19px; font-size:10px; }
+  .goal-table .col-order{ width:30px; }
+  .goal-table .col-actions{ width:28px; }
+  .top-actions{ justify-content:stretch; }
+  .month-control, .scenario-toggle{ width:100%; }
+  .month-picker-btn{ width:100%; }
+  .month-popover{ left:0; right:auto; width:100%; }
+  .scroll-area.table-scroll{ height:300px; max-height:300px; }
+  .copy-month-btn{ width:100%; }
+  .dashboard-grid{ grid-template-columns:minmax(0,1fr); width:100%; max-width:100%; overflow-x:hidden; }
+  .dashboard-grid > .card{ width:100%; max-width:100%; }
+  .span-3,.span-4,.span-5,.span-6,.span-7,.span-8,.span-12{ grid-column:span 1; }
+  .month-blocks{ grid-template-columns:repeat(4,1fr); }
+  .modal-grid{ grid-template-columns:1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <div class="brand-dot"></div>
+      <div>
+        <h1>Finize</h1>
+        <div class="brand-subtitle">Clear household budgeting for shared expenses, savings goals, and fair personal balance.</div>
+        <div class="save-status" id="saveStatus">Lokaal opgeslagen op dit toestel</div>
+      </div>
+    </div>
+    <div class="top-actions">
+      <div class="month-control" id="monthControl">
+        <button type="button" class="month-picker-btn" id="monthPickerButton" aria-expanded="false" aria-controls="monthPickerPanel">Maand</button>
+        <div class="month-popover" id="monthPickerPanel"></div>
+      </div>
+      <button class="ghost small copy-month-btn" id="btnCopyPreviousMonth">Kopieer vorige maand</button>
+      <div class="scenario-toggle" id="scenarioToggle">
+        <button data-scenario="voor">Voor verkoop</button>
+        <button data-scenario="na">Na verkoop</button>
+      </div>
+    </div>
+  </div>
+  <div class="tabs" id="tabs">
+    <button class="tab-btn" data-tab="dashboard">Dashboard</button>
+    <button class="tab-btn" data-tab="gezamenlijk">Gezamenlijk</button>
+    <button class="tab-btn" data-tab="dion">Dion</button>
+    <button class="tab-btn" data-tab="dara">Dara</button>
+    <button class="tab-btn" data-tab="spaardoelen">Spaardoelen</button>
+    <button class="tab-btn" data-tab="data">Data &amp; back-up</button>
+  </div>
+</div>
+
+<div class="wrap" id="tab-dashboard"></div>
+<div class="wrap" id="tab-gezamenlijk"></div>
+<div class="wrap" id="tab-dion"></div>
+<div class="wrap" id="tab-dara"></div>
+<div class="wrap" id="tab-spaardoelen"></div>
+<div class="wrap" id="tab-data"></div>
+
+<div class="footer-note">Gegevens worden lokaal bewaard en, zodra Firebase verbonden is, live gedeeld via Firestore.</div>
+<div class="modal-backdrop" id="transactionModal"></div>
+
+<script>
+/* =========================================================
+   Finize — Budget Planner V3 (lokale HTML-versie)
+   Rekenmotor is 1-op-1 gebaseerd op de formules uit het
+   originele Excel-werkboek (V29).
+   ========================================================= */
+
+/* ---------- helpers ---------- */
+function round2(n){ return Math.round((n + Number.EPSILON) * 100) / 100; }
+function eur(n){
+  if (n === null || n === undefined || isNaN(n)) return '€ -';
+  const sign = n < 0 ? '-' : '';
+  return sign + '€ ' + Math.abs(n).toLocaleString('nl-NL', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+function pct(n){ return (Math.round((n||0)*1000)/10) + '%'; }
+function percentInputValue(n){
+  if (n === null || n === undefined || isNaN(n)) return '';
+  return round2((Number(n)||0) * 100);
+}
+function uid(){ return 'id' + Math.random().toString(36).slice(2,10); }
+function formatDateNL(value){
+  if (!value) return '';
+  const d = new Date(value);
+  if (isNaN(d)) return value;
+  return String(d.getDate()).padStart(2,'0') + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + d.getFullYear();
+}
+function getPath(obj, path){
+  return path.split('.').reduce((o,k)=> (o==null?o:o[k]), obj);
+}
+function setPath(obj, path, value){
+  const keys = path.split('.');
+  let o = obj;
+  for (let i=0;i<keys.length-1;i++) o = o[keys[i]];
+  o[keys[keys.length-1]] = value;
+}
+function sumBedrag(list){
+  return round2((list||[]).reduce((s,r)=> s + (Number(r.bedrag)||0), 0));
+}
+function effectiveBedrag(row){
+  const b = Number(row.bedrag)||0;
+  return row.jaarlijks ? b/12 : b;
+}
+function sumEffective(list){
+  return round2((list||[]).reduce((s,r)=> s + effectiveBedrag(r), 0));
+}
+const CATEGORY_ICONS = [
+  [/huis|hypotheek|vve/i, '⌂'],
+  [/water/i, '~'],
+  [/energie|eneco|gas|stroom/i, '⚡'],
+  [/verzeker/i, '◆'],
+  [/belasting/i, '▤'],
+  [/entertainment|netflix|prime|disney|spotify/i, '▶'],
+  [/internet|telefoon/i, '◌'],
+  [/pensioen/i, '▣'],
+  [/schuld|correctie|duo/i, '□'],
+  [/inkomsten/i, '€'],
+  [/variabel|boodschap|benzine|uitjes|kleding/i, '•'],
+  [/overig/i, '…'],
+];
+function categoryIcon(categorie){
+  const c = String(categorie||'');
+  for (const [re, icon] of CATEGORY_ICONS) if (re.test(c)) return icon;
+  return '•';
+}
+function normalizeCategoryName(categorie){
+  const raw = String(categorie||'').trim();
+  if (!raw) return 'Overig';
+  const normalized = raw.toLowerCase().replace(/\s+/g, ' ');
+  const aliases = [
+    [/^(belasting|belastingen)$/i, 'Belastingen'],
+    [/^entertainment$/i, 'Entertainment'],
+    [/^(internet|telefoon|internet\/telefoon|internet & telefoon)$/i, 'Internet/telefoon'],
+    [/^verzekeringen?$/i, 'Verzekeringen'],
+    [/^water$/i, 'Water'],
+    [/^energie$/i, 'Energie'],
+    [/^huis(dier)?$/i, raw.toLowerCase() === 'huisdier' ? 'Huisdier' : 'Huis'],
+    [/^pensioen$/i, 'Pensioen'],
+    [/^overig$/i, 'Overig'],
+    [/^variabel$/i, 'Variabel'],
+  ];
+  for (const [re, label] of aliases) if (re.test(normalized)) return label;
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+}
+function clone(value){ return JSON.parse(JSON.stringify(value)); }
+function monthKey(date=new Date()){
+  return date.getFullYear() + '-' + String(date.getMonth()+1).padStart(2,'0');
+}
+function previousMonthKey(key){
+  const [y,m] = String(key||monthKey()).split('-').map(Number);
+  const d = new Date(y, (m||1)-2, 1);
+  return monthKey(d);
+}
+function monthLabel(key){
+  const [y,m] = String(key||monthKey()).split('-').map(Number);
+  const d = new Date(y, (m||1)-1, 1);
+  return d.toLocaleDateString('nl-NL', {month:'long', year:'numeric'});
+}
+function monthOptions(centerKey=getSelectedMonth()){
+  const [y] = String(centerKey||monthKey()).split('-').map(Number);
+  const years = [y-1, y, y+1];
+  return years.flatMap(year => Array.from({length:12}, (_,i)=> monthKey(new Date(year, i, 1))));
+}
+function yearsWithMonthData(selected=getSelectedMonth()){
+  const years = new Set([String(selected).slice(0,4), String(monthKey()).slice(0,4)]);
+  Object.keys(state.monthlyIncome || {}).forEach(key=>{ if (/^\d{4}-\d{2}$/.test(key)) years.add(key.slice(0,4)); });
+  Object.keys(state.monthlyBudgets || {}).forEach(key=>{ if (/^\d{4}-\d{2}$/.test(key)) years.add(key.slice(0,4)); });
+  (state.transactions || []).forEach(tx=>{
+    const key = transactionMonth(tx);
+    if (/^\d{4}-\d{2}$/.test(key)) years.add(key.slice(0,4));
+  });
+  return Array.from(years).map(Number).filter(Number.isFinite).sort((a,b)=>a-b);
+}
+function transactionMonth(tx){ return String(tx.date||'').slice(0,7); }
+function getSelectedMonth(){
+  if (!state?.meta?.selectedMonth) return monthKey();
+  return state.meta.selectedMonth;
+}
+function setSelectedMonth(value){
+  if (!/^\d{4}-\d{2}$/.test(String(value||''))) return;
+  state.meta.selectedMonth = value;
+  ensureMonthData(value);
+}
+function ensureMonthData(month=getSelectedMonth()){
+  state.meta.selectedMonth = state.meta.selectedMonth || monthKey();
+  state.monthlyIncome = isPlainObject(state.monthlyIncome) ? state.monthlyIncome : {};
+  state.monthlyBudgets = isPlainObject(state.monthlyBudgets) ? state.monthlyBudgets : {};
+  state.transactions = Array.isArray(state.transactions) ? state.transactions : [];
+  state.monthlyIncome[month] = state.monthlyIncome[month] || {
+    dion: Number(state.personen?.dion?.salaris)||0,
+    dara: Number(state.personen?.dara?.salaris)||0
+  };
+  state.monthlyBudgets[month] = state.monthlyBudgets[month] || {};
+  ['voor','na'].forEach(scenario=>{
+    if (!state.monthlyBudgets[month][scenario]){
+      state.monthlyBudgets[month][scenario] = {
+        gezamenlijkVariabel: clone(state[scenario]?.gezamenlijk?.variabel || [])
+      };
+    }
+  });
+}
+function normalizeGoalDefaults(){
+  ['gezamenlijk','dion','dara'].forEach(group=>{
+    (state.spaardoelen?.[group]||[]).forEach(goal=>{
+      if (!goal.rendementPeriode) goal.rendementPeriode = 'jaarlijks';
+      if (!['jaarlijks','maandelijks'].includes(goal.rendementPeriode)) goal.rendementPeriode = 'jaarlijks';
+      if (goal.favoriet === undefined) goal.favoriet = false;
+    });
+  });
+}
+function normalizeBudgetState(candidate){
+  const normalized = candidate || defaultState();
+  normalized.meta = isPlainObject(normalized.meta) ? normalized.meta : {};
+  normalized.meta.scenario = ['voor','na'].includes(normalized.meta.scenario) ? normalized.meta.scenario : 'voor';
+  normalized.meta.selectedMonth = normalized.meta.selectedMonth || monthKey();
+  normalized.monthlyIncome = isPlainObject(normalized.monthlyIncome) ? normalized.monthlyIncome : {};
+  normalized.monthlyBudgets = isPlainObject(normalized.monthlyBudgets) ? normalized.monthlyBudgets : {};
+  normalized.transactions = Array.isArray(normalized.transactions) ? normalized.transactions : [];
+  state = normalized;
+  ensureMonthData(normalized.meta.selectedMonth);
+  normalizeGoalDefaults();
+  return normalized;
+}
+function getMonthlyIncome(person){
+  const month = getSelectedMonth();
+  ensureMonthData(month);
+  const monthly = Number(state.monthlyIncome?.[month]?.[person]);
+  if (Number.isFinite(monthly) && monthly !== 0) return monthly;
+  return Number(state.personen?.[person]?.salaris)||0;
+}
+function setMonthlyIncome(person, amount){
+  const month = getSelectedMonth();
+  ensureMonthData(month);
+  state.monthlyIncome[month][person] = Number(amount)||0;
+}
+function getMonthlyScenarioData(scenario=state.meta.scenario){
+  const month = getSelectedMonth();
+  ensureMonthData(month);
+  const base = state[scenario];
+  const monthly = state.monthlyBudgets?.[month]?.[scenario];
+  return {
+    ...base,
+    gezamenlijk: {
+      ...base.gezamenlijk,
+      variabel: monthly?.gezamenlijkVariabel || base.gezamenlijk.variabel
+    }
+  };
+}
+function getMonthTransactions(owner=null, month=getSelectedMonth()){
+  return (state.transactions||[]).filter(tx => transactionMonth(tx) === month && (!owner || tx.owner === owner));
+}
+function sumTransactions(owner=null, category=null, month=getSelectedMonth()){
+  return round2(getMonthTransactions(owner, month).reduce((sum, tx)=>{
+    if (category){
+      const txCat = String(tx.category||'').toLowerCase();
+      const wanted = String(category).toLowerCase();
+      if (!(txCat === wanted || txCat.includes(wanted) || wanted.includes(txCat))) return sum;
+    }
+    return sum + (Number(tx.amount)||0);
+  }, 0));
+}
+function transactionsByCategory(owner, month=getSelectedMonth()){
+  const totals = {};
+  getMonthTransactions(owner, month).forEach(tx=>{
+    const key = tx.category || 'Overig';
+    totals[key] = round2((totals[key]||0) + (Number(tx.amount)||0));
+  });
+  return totals;
+}
+function budgetStatus(used, budget){
+  if (!budget) return {ratio:0, label:'Geen budget', cls:'muted'};
+  const ratio = used / budget;
+  if (ratio > 1) return {ratio, label:'Overschreden', cls:'red'};
+  if (ratio >= .85) return {ratio, label:'Bijna vol', cls:'amber'};
+  return {ratio, label:'Op schema', cls:''};
+}
+function copyPreviousMonth(){
+  const month = getSelectedMonth();
+  const prev = previousMonthKey(month);
+  const fallbackIncome = {dion:Number(state.personen?.dion?.salaris)||0, dara:Number(state.personen?.dara?.salaris)||0};
+  const existingIncome = !!state.monthlyIncome?.[month] && JSON.stringify(state.monthlyIncome[month]) !== JSON.stringify(fallbackIncome);
+  const defaultBudgets = {};
+  ['voor','na'].forEach(scenario=> defaultBudgets[scenario] = { gezamenlijkVariabel: state[scenario]?.gezamenlijk?.variabel || [] });
+  const existingBudgets = !!state.monthlyBudgets?.[month] && JSON.stringify(state.monthlyBudgets[month]) !== JSON.stringify(defaultBudgets);
+  const existingTransactions = (state.transactions||[]).some(tx=>transactionMonth(tx) === month);
+  ensureMonthData(prev);
+  const hasData = existingIncome || existingBudgets || existingTransactions;
+  if (hasData && !confirm('Deze maand heeft al maanddata. Inkomens en gezamenlijke budgetten overschrijven met vorige maand?')) return false;
+  ensureMonthData(month);
+  state.monthlyIncome[month] = clone(state.monthlyIncome[prev] || {
+    dion: Number(state.personen.dion.salaris)||0,
+    dara: Number(state.personen.dara.salaris)||0
+  });
+  state.monthlyBudgets[month] = clone(state.monthlyBudgets[prev] || {});
+  ['voor','na'].forEach(scenario=>{
+    if (!state.monthlyBudgets[month][scenario]){
+      state.monthlyBudgets[month][scenario] = { gezamenlijkVariabel: clone(state[scenario].gezamenlijk.variabel || []) };
+    }
+  });
+  return true;
+}
+
+/* ---------- rekenmotor ---------- */
+function monthsRemaining(targetDateStr, today){
+  if (!targetDateStr) return null;
+  const t = new Date(targetDateStr);
+  if (isNaN(t)) return null;
+  const months = (t.getFullYear()-today.getFullYear())*12 + (t.getMonth()-today.getMonth());
+  return Math.max(1, months);
+}
+function monthlyRateFromGoal(doel){
+  const rate = Number(doel.rendement)||0;
+  if (!rate) return 0;
+  return doel.rendementPeriode === 'maandelijks' ? rate : Math.pow(1 + rate, 1/12) - 1;
+}
+function futureValue(current, monthlyFixed, monthlyRate, months){
+  current = current || 0; monthlyFixed = monthlyFixed || 0;
+  if (!monthlyRate) return current + monthlyFixed*months;
+  const i = monthlyRate;
+  const growth = Math.pow(1+i, months);
+  return current*growth + monthlyFixed*((growth-1)/i);
+}
+function calcDoel(doel, today){
+  const doelbedrag = Number(doel.doelbedrag)||0;
+  const algespaard = Number(doel.algespaard)||0;
+  const vasteInleg = Number(doel.vasteInleg)||0;
+  const rendement = monthlyRateFromGoal(doel);
+  const nogTeGaan = Math.max(0, doelbedrag - algespaard);
+  const voortgang = doelbedrag>0 ? algespaard/doelbedrag : 0;
+  let benodigdPerMaand = null, benodigdeExtraInleg = null, verwachteWaarde = null;
+  const months = monthsRemaining(doel.doeldatum, today);
+  if (months !== null && doelbedrag > 0){
+    const fv = futureValue(algespaard, vasteInleg, rendement, months);
+    verwachteWaarde = round2(fv);
+    const tekort = doelbedrag - fv;
+    if (!rendement){ benodigdeExtraInleg = round2(Math.max(0, tekort/months)); }
+    else{
+      const i = rendement;
+      const annuiteit = (Math.pow(1+i,months)-1)/i;
+      benodigdeExtraInleg = round2(Math.max(0, tekort/annuiteit));
+    }
+    benodigdPerMaand = round2(vasteInleg + benodigdeExtraInleg);
+  }
+  return { nogTeGaan, voortgang, benodigdPerMaand, benodigdeExtraInleg, verwachteWaarde, months };
+}
+function calcGroep(doelen, spaarpotDezeMaand, today){
+  const berekend = doelen.map(d => ({ doel:d, ...calcDoel(d, today) }));
+  // Vaste inleg van ALLE doelen (ook 'alleen vast bedrag'-doelen zoals Beleggen) telt mee als al gecommitteerd.
+  const totaalVasteInleg = sumBedrag(doelen.map(d=>({bedrag:d.vasteInleg})));
+  // Het extra overschot/tekort wordt alleen naar rato verdeeld over doelen die NIET op 'alleen vast bedrag' staan.
+  const verdeelbaar = berekend.filter(b => !b.doel.vastBedrag);
+  const totaalBenodigd = round2(verdeelbaar.reduce((s,b)=> s + (b.benodigdPerMaand||0), 0));
+  const totaalExtraBenodigd = round2(verdeelbaar.reduce((s,b)=> s + (b.benodigdeExtraInleg||0), 0));
+  const extraPot = Math.max(0, (spaarpotDezeMaand||0) - totaalVasteInleg);
+  return berekend.map(b=>{
+    const vasteInleg = Number(b.doel.vasteInleg)||0;
+    if (b.doel.vastBedrag){
+      return { ...b, berekendeExtraInleg: 0, werkelijkeInleg: round2(vasteInleg), totaalVasteInleg, totaalBenodigd, totaalExtraBenodigd };
+    }
+    const extraAandeel = totaalExtraBenodigd>0 ? extraPot * ((b.benodigdeExtraInleg||0)/totaalExtraBenodigd) : 0;
+    return { ...b, berekendeExtraInleg: round2(extraAandeel), werkelijkeInleg: round2(vasteInleg + extraAandeel), totaalVasteInleg, totaalBenodigd, totaalExtraBenodigd };
+  });
+}
+function calcScenario(state){
+  const scenario = state.meta.scenario;
+  const salarisDion = getMonthlyIncome('dion');
+  const salarisDara = getMonthlyIncome('dara');
+  const totaalSalaris = salarisDion + salarisDara;
+  const inkomenRatioDion = totaalSalaris>0 ? salarisDion/totaalSalaris : 0;
+  const inkomenRatioDara = totaalSalaris>0 ? salarisDara/totaalSalaris : 0;
+  const s = getMonthlyScenarioData(scenario);
+  const vasteLastenTotaal = sumEffective(s.gezamenlijk.vasteLasten);
+  const variabelBudgetTotaal = sumBedrag(s.gezamenlijk.variabel);
+  const variabelTotaal = sumTransactions('gezamenlijk');
+  const variabelVoorVerdelingTotaal = Math.max(variabelBudgetTotaal, variabelTotaal);
+  const spaarpotDezeMaand = Number(s.spaarpotDezeMaand)||0;
+
+  let effDion, effDara, zakgeldDion, zakgeldDara, hypotheekBedrag = 0;
+  if (scenario === 'voor'){
+    const minDion = Number(s.verdeling.minimumDion);
+    effDion = Math.max(minDion, inkomenRatioDion);
+    effDara = 1 - effDion;
+    const pot = vasteLastenTotaal + variabelVoorVerdelingTotaal + spaarpotDezeMaand;
+    zakgeldDion = round2(salarisDion - pot*effDion);
+    zakgeldDara = round2(salarisDara - pot*effDara);
+  } else {
+    const hypDion = Number(s.verdeling.hypotheekDion);
+    const hypDara = 1 - hypDion;
+    hypotheekBedrag = sumBedrag(s.gezamenlijk.hypotheek);
+    const overigePot = vasteLastenTotaal + variabelVoorVerdelingTotaal + spaarpotDezeMaand;
+    zakgeldDion = round2(salarisDion - (hypotheekBedrag*hypDion + overigePot*inkomenRatioDion));
+    zakgeldDara = round2(salarisDara - (hypotheekBedrag*hypDara + overigePot*inkomenRatioDara));
+    effDion = hypDion; effDara = hypDara;
+  }
+  function persoonlijk(p, zakgeld){
+    const persoonlijkeVasteLasten = sumEffective(s[p].vasteLasten);
+    const resterendVoorVariabel = round2(zakgeld - persoonlijkeVasteLasten);
+    const variabeleUitgaven = sumTransactions(p);
+    const beschikbaarVoorSparen = round2(resterendVoorVariabel - variabeleUitgaven);
+    return { persoonlijkeVasteLasten, resterendVoorVariabel, variabeleUitgaven, beschikbaarVoorSparen };
+  }
+  const dion = { zakgeld: zakgeldDion, ...persoonlijk('dion', zakgeldDion) };
+  const dara = { zakgeld: zakgeldDara, ...persoonlijk('dara', zakgeldDara) };
+  return {
+    totaalSalaris, inkomenRatioDion, inkomenRatioDara,
+    vasteLastenTotaal: round2(vasteLastenTotaal + hypotheekBedrag),
+    gezamenlijkeLastenTotaal: round2(vasteLastenTotaal + hypotheekBedrag + variabelVoorVerdelingTotaal),
+    overigeVasteLastenTotaal: vasteLastenTotaal, hypotheekBedrag,
+    variabelTotaal, variabelBudgetTotaal, variabelVoorVerdelingTotaal, spaarpotDezeMaand, effDion, effDara, dion, dara
+  };
+}
+
+/* ---------- default data (zelfde uitgangspunt als het Excel-bestand) ---------- */
+function defaultState(){
+  const blankVar = (n) => Array.from({length:n}, ()=>({id:uid(), categorie:'Variabel', post:'', bedrag:0}));
+  const blankGoal = (naam, rendement=0.0125) => ({ id:uid(), naam, doelbedrag:0, algespaard:0, doeldatum:'', vasteInleg:0, rendement, rendementPeriode:'jaarlijks', favoriet:false });
+
+  return {
+    meta: { scenario:'voor', selectedMonth: monthKey() },
+    personen: {
+      dion: { naam:'Dion', salaris:2450 },
+      dara: { naam:'Dara', salaris:3010 },
+    },
+    voor: {
+      verdeling: { minimumDion: 0.40 },
+      spaarpotDezeMaand: 0,
+      gezamenlijk: {
+        vasteLasten: [
+          {id:uid(), categorie:'Huis', post:'Hypotheek', bedrag:2000},
+          {id:uid(), categorie:'Water', post:'Evides nieuw adres', bedrag:20},
+          {id:uid(), categorie:'Water', post:'Evides oud adres', bedrag:20},
+          {id:uid(), categorie:'Energie', post:'Eneco nieuw adres', bedrag:32},
+          {id:uid(), categorie:'Energie', post:'Eneco oud adres', bedrag:50},
+          {id:uid(), categorie:'Verzekeringen', post:'Woon nieuw adres', bedrag:24.23},
+          {id:uid(), categorie:'Verzekeringen', post:'Woon oud adres', bedrag:9.29},
+          {id:uid(), categorie:'Belastingen', post:'Gemeente', bedrag:83.96},
+          {id:uid(), categorie:'Belastingen', post:'Waterschap', bedrag:37.22},
+          {id:uid(), categorie:'Entertainment', post:'Netflix', bedrag:15.99},
+          {id:uid(), categorie:'Overig', post:'ING', bedrag:4.55},
+          {id:uid(), categorie:'Overig', post:'Sportschool', bedrag:62.95},
+        ],
+        variabel: [
+          {id:uid(), categorie:'Variabel', post:'Boodschappen', bedrag:500},
+          {id:uid(), categorie:'Variabel', post:'Benzine', bedrag:0},
+          {id:uid(), categorie:'Variabel', post:'Uitjes', bedrag:0},
+          ...blankVar(4),
+        ],
+      },
+      dion: {
+        vasteLasten: [
+          {id:uid(), categorie:'Verzekeringen', post:'Autoverzekering', bedrag:28.89},
+          {id:uid(), categorie:'Verzekeringen', post:'Zorgverzekering', bedrag:191.45},
+          {id:uid(), categorie:'Internet/telefoon', post:'Telefoon', bedrag:7.5},
+          {id:uid(), categorie:'Overig', post:'ANWB', bedrag:8.58},
+          {id:uid(), categorie:'Overig', post:'ING', bedrag:3.9},
+          {id:uid(), categorie:'Entertainment', post:'Spotify', bedrag:6.99},
+          {id:uid(), categorie:'Entertainment', post:'Prime', bedrag:4.99},
+          {id:uid(), categorie:'Belastingen', post:'Wegenbelasting', bedrag:23},
+          {id:uid(), categorie:'Verzekeringen', post:'Reisverzekering', bedrag:23.12},
+          {id:uid(), categorie:'Inkomsten/Correcties', post:'Zorgtoeslag', bedrag:0},
+          {id:uid(), categorie:'Schuld/Correcties', post:'DUO', bedrag:-324},
+          {id:uid(), categorie:'Belasting', post:'Belastingdienst', bedrag:0},
+        ],
+        variabel: ['Eten buiten de deur','Benzine/vervoer','Uitjes','Kleding/hobby','Overig']
+          .map(post=>({id:uid(), categorie:'Variabel', post, bedrag:0})),
+      },
+      dara: {
+        vasteLasten: [
+          {id:uid(), categorie:'Huis', post:'Hypotheek', bedrag:907.51},
+          {id:uid(), categorie:'Huis', post:'VVE', bedrag:164.1},
+          {id:uid(), categorie:'Belastingen', post:'Wegenbelasting', bedrag:23},
+          {id:uid(), categorie:'Belastingen', post:'Waterschap', bedrag:37.22},
+          {id:uid(), categorie:'Belastingen', post:'Gemeente', bedrag:83.96},
+          {id:uid(), categorie:'Verzekeringen', post:'Zorgverzekering', bedrag:225},
+          {id:uid(), categorie:'Verzekeringen', post:'Auto', bedrag:43.59},
+          {id:uid(), categorie:'Verzekeringen', post:'Fiets p/j', bedrag:9.66},
+          {id:uid(), categorie:'Entertainment', post:'Prime', bedrag:4.99},
+          {id:uid(), categorie:'Entertainment', post:'Disney+', bedrag:10.99},
+          {id:uid(), categorie:'Internet/telefoon', post:'Telefoon', bedrag:10},
+          {id:uid(), categorie:'Internet/telefoon', post:'Internet', bedrag:32.5},
+          {id:uid(), categorie:'Overig', post:'ING', bedrag:3.9},
+          {id:uid(), categorie:'Overig', post:'ANWB p/j', bedrag:6},
+          {id:uid(), categorie:'Belasting', post:'Belastingteruggave', bedrag:-226},
+        ],
+        variabel: ['Eten buiten de deur','Benzine/vervoer','Uitjes','Kleding/hobby','Overig']
+          .map(post=>({id:uid(), categorie:'Variabel', post, bedrag:0})),
+      },
+    },
+    na: {
+      verdeling: { hypotheekDion: 0.50 },
+      spaarpotDezeMaand: 500,
+      gezamenlijk: {
+        hypotheek: [
+          {id:uid(), categorie:'Huis', post:'Hypotheek', bedrag:2000},
+        ],
+        vasteLasten: [
+          {id:uid(), categorie:'Water', post:'Evides', bedrag:20},
+          {id:uid(), categorie:'Energie', post:'Eneco', bedrag:75},
+          {id:uid(), categorie:'Verzekeringen', post:'Zorg Dara', bedrag:225},
+          {id:uid(), categorie:'Verzekeringen', post:'Zorg Dion', bedrag:191.45},
+          {id:uid(), categorie:'Verzekeringen', post:'Woon', bedrag:24.23},
+          {id:uid(), categorie:'Verzekeringen', post:'Auto Dara', bedrag:43.59},
+          {id:uid(), categorie:'Verzekeringen', post:'Auto Dion', bedrag:28.89},
+          {id:uid(), categorie:'Verzekeringen', post:'Reis Dion', bedrag:9.64},
+          {id:uid(), categorie:'Verzekeringen', post:'Fiets Dara', bedrag:0},
+          {id:uid(), categorie:'Belastingen', post:'Weg Dara', bedrag:23},
+          {id:uid(), categorie:'Belastingen', post:'Weg Dion', bedrag:23},
+          {id:uid(), categorie:'Belastingen', post:'Gemeente', bedrag:83.96},
+          {id:uid(), categorie:'Belastingen', post:'Waterschap', bedrag:37.22},
+          {id:uid(), categorie:'Internet/telefoon', post:'Internet', bedrag:32.5},
+          {id:uid(), categorie:'Internet/telefoon', post:'Tel Dara', bedrag:10},
+          {id:uid(), categorie:'Internet/telefoon', post:'Tel Dion', bedrag:7.5},
+          {id:uid(), categorie:'Entertainment', post:'Netflix', bedrag:15.99},
+          {id:uid(), categorie:'Entertainment', post:'Disney+', bedrag:10.99},
+          {id:uid(), categorie:'Entertainment', post:'Spotify Dion', bedrag:6.99},
+          {id:uid(), categorie:'Pensioen', post:'SPF pensioen', bedrag:312},
+          {id:uid(), categorie:'Overig', post:'ANWB', bedrag:18},
+          {id:uid(), categorie:'Overig', post:'ING', bedrag:4.55},
+          {id:uid(), categorie:'Overig', post:'Sportschool', bedrag:62.95},
+          {id:uid(), categorie:'Overig', post:'Waterpomp', bedrag:17},
+        ],
+        variabel: [
+          {id:uid(), categorie:'Variabel', post:'Boodschappen', bedrag:500},
+          {id:uid(), categorie:'Variabel', post:'Benzine', bedrag:150},
+          {id:uid(), categorie:'Variabel', post:'Uitjes', bedrag:0},
+          {id:uid(), categorie:'Variabel', post:'overig', bedrag:100},
+          ...blankVar(4),
+        ],
+      },
+      dion: {
+        vasteLasten: [{id:uid(), categorie:'Entertainment', post:'Prime', bedrag:4.99}],
+        variabel: [{id:uid(), categorie:'Variabel', post:'Eten buiten de deur', bedrag:0}],
+      },
+      dara: {
+        vasteLasten: [{id:uid(), categorie:'Entertainment', post:'Prime', bedrag:4.99}],
+        variabel: [{id:uid(), categorie:'Variabel', post:'Eten buiten de deur', bedrag:0}],
+      },
+    },
+    spaardoelen: {
+      gezamenlijk: [
+        {id:uid(), naam:'vakantie', doelbedrag:5000, algespaard:100, doeldatum:'2028-12-31', vasteInleg:0, rendement:0.0125},
+        {id:uid(), naam:'buffer', doelbedrag:10000, algespaard:0, doeldatum:'2030-12-31', vasteInleg:0, rendement:0.0125},
+        {id:uid(), naam:'Beleggen', doelbedrag:50000, algespaard:17941, doeldatum:'2030-12-31', vasteInleg:0, rendement:0.08, vastBedrag:true},
+      ],
+      dion: [
+        {id:uid(), naam:'koffie', doelbedrag:300, algespaard:6.77, doeldatum:'2026-12-31', vasteInleg:0, rendement:0.0125},
+        {id:uid(), naam:'buffer', doelbedrag:5000, algespaard:800, doeldatum:'2028-12-31', vasteInleg:0, rendement:0.0125},
+        {id:uid(), naam:'Beleggen', doelbedrag:50000, algespaard:17941, doeldatum:'2030-12-31', vasteInleg:250, rendement:0.08, vastBedrag:true},
+      ],
+      dara: [],
+    },
+    monthlyIncome: {},
+    monthlyBudgets: {},
+    transactions: [],
+  };
+}
+
+/* ---------- opslag: lokaal + optionele Firebase/Firestore-sync ---------- */
+const STORAGE_KEY = 'finize-budget-planner-v1';
+const BACKUP_STORAGE_KEY = 'finize-budget-planner-v1-last-good-backup';
+const FIREBASE_CONFIG_STORAGE_KEY = 'finize-firebase-config';
+const FIREBASE_SDK_VERSION = '11.10.0';
+const FIRESTORE_COLLECTION = 'budgetPlanners';
+const FIRESTORE_DOC_ID = 'finize';
+const DEFAULT_FIREBASE_CONFIG = {
+  apiKey: 'AIzaSyCiJHGv9nlC_o4c2Xyj9UcyqHWW-YTxKfY',
+  authDomain: 'financien-7dd43.firebaseapp.com',
+  projectId: 'financien-7dd43',
+  storageBucket: 'financien-7dd43.firebasestorage.app',
+  messagingSenderId: '487713041493',
+  appId: '1:487713041493:web:68c897ae2fa06afd5838dc',
+  measurementId: 'G-X2EXXZDK7S'
+};
+
+function isPlainObject(value){
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function validateRows(rows, label, errors){
+  if (!Array.isArray(rows)){
+    errors.push(label + ' moet een lijst zijn.');
+    return;
+  }
+  rows.forEach((row, i)=>{
+    if (!isPlainObject(row)) errors.push(label + '[' + i + '] is geen geldige regel.');
+  });
+}
+
+function validateGoalRows(rows, label, errors){
+  if (!Array.isArray(rows)){
+    errors.push(label + ' moet een lijst zijn.');
+    return;
+  }
+  rows.forEach((row, i)=>{
+    if (!isPlainObject(row)) errors.push(label + '[' + i + '] is geen geldig spaardoel.');
+  });
+}
+
+function validateBudgetState(candidate){
+  const errors = [];
+  if (!isPlainObject(candidate)){
+    return { ok:false, errors:['Het bestand bevat geen budgetplanner-gegevens.'] };
+  }
+  ['meta','personen','voor','na','spaardoelen'].forEach(key=>{
+    if (!isPlainObject(candidate[key])) errors.push('Ontbrekend of ongeldig onderdeel: ' + key + '.');
+  });
+  if (errors.length) return { ok:false, errors };
+
+  if (!['voor','na'].includes(candidate.meta.scenario)){
+    errors.push('Scenario moet "voor" of "na" zijn.');
+  }
+  if (candidate.meta.selectedMonth && !/^\d{4}-\d{2}$/.test(String(candidate.meta.selectedMonth))){
+    errors.push('Geselecteerde maand moet de vorm YYYY-MM hebben.');
+  }
+  ['dion','dara'].forEach(person=>{
+    if (!isPlainObject(candidate.personen[person])) errors.push('Persoon ontbreekt: ' + person + '.');
+  });
+
+  ['voor','na'].forEach(scenario=>{
+    const s = candidate[scenario];
+    if (!isPlainObject(s.verdeling)) errors.push(scenario + '.verdeling ontbreekt.');
+    if (!isPlainObject(s.gezamenlijk)) errors.push(scenario + '.gezamenlijk ontbreekt.');
+    if (!isPlainObject(s.dion)) errors.push(scenario + '.dion ontbreekt.');
+    if (!isPlainObject(s.dara)) errors.push(scenario + '.dara ontbreekt.');
+    if (isPlainObject(s.gezamenlijk)){
+      validateRows(s.gezamenlijk.vasteLasten, scenario + '.gezamenlijk.vasteLasten', errors);
+      validateRows(s.gezamenlijk.variabel, scenario + '.gezamenlijk.variabel', errors);
+      if (scenario === 'na') validateRows(s.gezamenlijk.hypotheek, 'na.gezamenlijk.hypotheek', errors);
+    }
+    ['dion','dara'].forEach(person=>{
+      if (isPlainObject(s[person])){
+        validateRows(s[person].vasteLasten, scenario + '.' + person + '.vasteLasten', errors);
+        validateRows(s[person].variabel, scenario + '.' + person + '.variabel', errors);
+      }
+    });
+  });
+
+  ['gezamenlijk','dion','dara'].forEach(group=>{
+    validateGoalRows(candidate.spaardoelen[group], 'spaardoelen.' + group, errors);
+  });
+  if (candidate.monthlyIncome !== undefined && !isPlainObject(candidate.monthlyIncome)){
+    errors.push('monthlyIncome moet een object zijn.');
+  }
+  if (candidate.monthlyBudgets !== undefined && !isPlainObject(candidate.monthlyBudgets)){
+    errors.push('monthlyBudgets moet een object zijn.');
+  }
+  if (candidate.transactions !== undefined){
+    if (!Array.isArray(candidate.transactions)) errors.push('transactions moet een lijst zijn.');
+    else candidate.transactions.forEach((tx,i)=>{
+      if (!isPlainObject(tx)) errors.push('transactions[' + i + '] is geen geldige transactie.');
+    });
+  }
+
+  return { ok:errors.length === 0, errors };
+}
+
+function backupLabel(){
+  return new Date().toLocaleString('nl-NL');
+}
+
+function downloadJson(filename, data){
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function localSave(state){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function firebaseConfigTemplate(){
+  return JSON.stringify(DEFAULT_FIREBASE_CONFIG, null, 2);
+}
+
+function loadFirebaseConfig(){
+  try{
+    const raw = localStorage.getItem(FIREBASE_CONFIG_STORAGE_KEY);
+    if (!raw) return {...DEFAULT_FIREBASE_CONFIG};
+    return {...DEFAULT_FIREBASE_CONFIG, ...JSON.parse(raw)};
+  }catch(e){
+    console.error('Firebase-config laden mislukt', e);
+    return {...DEFAULT_FIREBASE_CONFIG};
+  }
+}
+
+function firebaseConfigIsComplete(config){
+  return !!(config && config.apiKey && config.authDomain && config.projectId && config.appId);
+}
+
+function saveFirebaseConfigFromText(text){
+  const parsed = JSON.parse(text);
+  const config = {...DEFAULT_FIREBASE_CONFIG, ...parsed};
+  if (!firebaseConfigIsComplete(config)){
+    throw new Error('Firebase-config mist apiKey, authDomain, projectId of appId.');
+  }
+  localStorage.setItem(FIREBASE_CONFIG_STORAGE_KEY, JSON.stringify(config));
+  return config;
+}
+
+const CloudAdapter = {
+  app:null, db:null, docRef:null, modules:null, unsubscribe:null,
+  status:'Firebase niet verbonden', saveTimer:null, applyingRemote:false,
+  config:loadFirebaseConfig(),
+  statusText(){ return this.status; },
+  isConfigured(){ return firebaseConfigIsComplete(this.config); },
+  isConnected(){ return !!(this.db && this.docRef); },
+  async loadModules(){
+    if (this.modules) return this.modules;
+    const base = `https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}`;
+    const [app, firestore] = await Promise.all([
+      import(`${base}/firebase-app.js`),
+      import(`${base}/firebase-firestore.js`)
+    ]);
+    this.modules = {app, firestore};
+    return this.modules;
+  },
+  async connect(){
+    if (!this.isConfigured()){
+      this.status = 'Firebase-config ontbreekt';
+      renderCloudStatus();
+      return false;
+    }
+    try{
+      this.status = 'Firebase laden...';
+      renderCloudStatus();
+      const {app, firestore} = await this.loadModules();
+      this.app = app.getApps().length ? app.getApps()[0] : app.initializeApp(this.config);
+      this.db = firestore.getFirestore(this.app);
+      this.docRef = firestore.doc(this.db, FIRESTORE_COLLECTION, FIRESTORE_DOC_ID);
+      this.attachSnapshot();
+      this.status = 'Firebase live verbonden';
+      renderCloudStatus();
+      return true;
+    }catch(e){
+      console.error('Firebase verbinden mislukt', e);
+      this.status = 'Firebase-fout: ' + (e && e.message ? e.message : e);
+      renderCloudStatus();
+      return false;
+    }
+  },
+  attachSnapshot(){
+    if (this.unsubscribe || !this.docRef) return;
+    const {firestore} = this.modules;
+    this.unsubscribe = firestore.onSnapshot(this.docRef, snap=>{
+      if (!snap.exists()){
+        this.status = 'Firebase verbonden, cloud-document is nog leeg';
+        renderCloudStatus();
+        return;
+      }
+      const remote = snap.data().state;
+      const validation = validateBudgetState(remote);
+      if (!validation.ok){
+        console.error('Firestore-data ongeldig', validation.errors);
+        this.status = 'Firebase-data ongeldig, lokale data behouden';
+        renderCloudStatus();
+        return;
+      }
+      const previousState = state;
+      const normalizedRemote = normalizeBudgetState(remote);
+      if (JSON.stringify(normalizedRemote) === JSON.stringify(previousState)) return;
+      DataAdapter.backup(previousState, 'voor Firestore-sync');
+      this.applyingRemote = true;
+      state = normalizedRemote;
+      window.state = state;
+      try{ localSave(state); }catch(e){ console.error('lokale kopie Firestore-data opslaan mislukt', e); }
+      this.applyingRemote = false;
+      this.status = 'Firebase-data geladen';
+      renderActiveTab();
+    }, err=>{
+      console.error('Firestore live-sync fout', err);
+      this.status = 'Firebase live-sync fout: ' + err.message;
+      renderCloudStatus();
+    });
+  },
+  queueSave(state){
+    if (!this.isConnected() || this.applyingRemote) return;
+    clearTimeout(this.saveTimer);
+    this.saveTimer = setTimeout(()=> this.saveNow(state), 500);
+  },
+  async saveNow(state){
+    if (!this.isConnected()) return false;
+    const validation = validateBudgetState(state);
+    if (!validation.ok){
+      this.status = 'Niet naar Firebase opgeslagen: lokale data ongeldig';
+      renderCloudStatus();
+      return false;
+    }
+    try{
+      const {firestore} = this.modules;
+      await firestore.setDoc(this.docRef, {
+        state,
+        updatedAt: firestore.serverTimestamp(),
+        updatedBy: 'public-link',
+        app: 'finize'
+      }, {merge:true});
+      this.status = 'Firebase opgeslagen om ' + new Date().toLocaleTimeString('nl-NL');
+      renderCloudStatus();
+      return true;
+    }catch(e){
+      console.error('Firestore opslaan mislukt', e);
+      this.status = 'Firebase opslaan mislukt: ' + e.message;
+      renderCloudStatus();
+      return false;
+    }
+  },
+  async signOut(){
+    if (this.unsubscribe){ this.unsubscribe(); this.unsubscribe = null; }
+    this.app = null;
+    this.db = null;
+    this.docRef = null;
+    this.status = 'Firebase losgekoppeld';
+    renderCloudStatus();
+  }
+};
+
+const DataAdapter = {
+  // Lokaal blijft altijd de eerste veiligheidslaag. Firestore is optionele live-sync erbovenop.
+  // Firebase Storage is voor losse bestanden; Firestore is de juiste plek voor live app-data.
+  // We bewaren dezelfde state-vorm als 1 groot JSON-document voor Finize.
+  save(state){
+    try{
+      localSave(state);
+      CloudAdapter.queueSave(state);
+      return true;
+    }catch(e){ console.error('opslaan mislukt', e); return false; }
+  },
+  load(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      const validation = validateBudgetState(parsed);
+      if (!validation.ok){
+        console.error('opgeslagen data ongeldig', validation.errors);
+        return null;
+      }
+      return normalizeBudgetState(parsed);
+    }catch(e){ console.error('laden mislukt', e); return null; }
+  },
+  backup(state, reason){
+    try{
+      localStorage.setItem(BACKUP_STORAGE_KEY, JSON.stringify({
+        savedAt: new Date().toISOString(),
+        label: backupLabel(),
+        reason,
+        state
+      }));
+      return true;
+    }catch(e){ console.error('back-up maken mislukt', e); return false; }
+  },
+  loadBackup(){
+    try{
+      const raw = localStorage.getItem(BACKUP_STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    }catch(e){ console.error('back-up laden mislukt', e); return null; }
+  }
+};
+
+var state = null;
+state = DataAdapter.load() || normalizeBudgetState(defaultState());
+window.state = state;
+let activeTab = 'dashboard';
+const TODAY = new Date();
+
+function persist(){
+  const ok = DataAdapter.save(state);
+  const el = document.getElementById('saveStatus');
+  if (el) el.textContent = ok ? ('Lokaal opgeslagen · ' + new Date().toLocaleTimeString('nl-NL')) : 'Opslaan mislukt';
+}
+
+function renderCloudStatus(){
+  const cloud = document.getElementById('cloudStatus');
+  if (cloud) cloud.textContent = CloudAdapter.statusText();
+  const save = document.getElementById('saveStatus');
+  if (save && CloudAdapter.isConnected()) save.textContent = CloudAdapter.statusText();
+}
+
+/* ---------- generieke input-binding ---------- */
+// Elk element met data-path krijgt zijn waarde uit/naar de state via getPath/setPath.
+function bindInputs(root){
+  root.querySelectorAll('[data-month-income]').forEach(el=>{
+    const person = el.dataset.monthIncome;
+    el.value = getMonthlyIncome(person);
+    const commit = ()=>{
+      const parsed = parseFloat(String(el.value).replace(',', '.'));
+      setMonthlyIncome(person, Number.isFinite(parsed) ? parsed : 0);
+      persist();
+      renderActiveTab();
+    };
+    el.addEventListener('change', commit);
+  });
+  root.querySelectorAll('[data-path]').forEach(el=>{
+    const path = el.dataset.path;
+    const type = el.type;
+    const raw = getPath(state, path);
+    if (type === 'checkbox') el.checked = !!raw;
+    else if (el.dataset.percent === 'true') el.value = percentInputValue(raw);
+    else el.value = raw === undefined || raw === null ? '' : raw;
+
+    const commit = ()=>{
+      let v = el.value;
+      if (type === 'number'){
+        v = v === '' ? 0 : parseFloat(v.replace(',', '.'));
+        if (!Number.isFinite(v)) v = 0;
+        if (el.dataset.percent === 'true') v = v / 100;
+      }
+      if (type === 'checkbox') v = el.checked;
+      setPath(state, path, v);
+      persist();
+      renderActiveTab();
+    };
+    el.addEventListener('change', commit);
+    if (type === 'checkbox') el.addEventListener('click', commit);
+  });
+}
+
+/* ---------- tabel-editor voor vaste lasten / variabel ---------- */
+function sortedRowEntries(rows){
+  return (rows||[]).map((row, index)=>({row, index})).sort((a,b)=>{
+    const cat = String(a.row.categorie||'').localeCompare(String(b.row.categorie||''), 'nl', {sensitivity:'base'});
+    if (cat) return cat;
+    const post = String(a.row.post||'').localeCompare(String(b.row.post||''), 'nl', {sensitivity:'base'});
+    if (post) return post;
+    return a.index - b.index;
+  });
+}
+function moveTargetOptions(basePath){
+  const parts = basePath.split('.');
+  if (parts.length !== 3 || parts[2] !== 'vasteLasten') return null;
+  const scenario = parts[0];
+  const current = parts[1];
+  return ['gezamenlijk','dion','dara'].map(key=>{
+    const label = key === 'gezamenlijk' ? 'Gezamenlijk' : (key === 'dion' ? 'Dion' : 'Dara');
+    return `<option value="${scenario}.${key}.vasteLasten" ${key===current?'selected':''}>${label}</option>`;
+  }).join('');
+}
+function renderRowsTable(basePath, rows, opts={}){
+  const withJaar = !!opts.jaarlijks;
+  const total = withJaar ? sumEffective(rows) : sumBedrag(rows);
+  const useScroll = opts.fixedHeight !== false || (rows||[]).length > 5;
+  const moveOptions = opts.moveable ? moveTargetOptions(basePath) : null;
+  const moveHead = moveOptions ? '<th>Van/naar</th>' : '';
+  const moveCol = (i)=> moveOptions ? `<td><select class="move-select" data-move-row="${basePath}.${i}" title="Verplaatsen naar">${moveOptions}</select></td>` : '';
+  const rowsHtml = sortedRowEntries(rows).map(({row:r,index:i})=>{
+    const eff = effectiveBedrag(r);
+    const jaarHint = r.jaarlijks ? `<div class="progress-label" style="text-align:left;margin-top:2px">≈ ${eur(eff)}/mnd</div>` : '';
+    return `
+    <tr>
+      <td style="width:26px;text-align:center;font-size:15px">${categoryIcon(r.categorie)}</td>
+      <td><input type="text" data-path="${basePath}.${i}.categorie" placeholder="Categorie"></td>
+      <td><input type="text" data-path="${basePath}.${i}.post" placeholder="Omschrijving"></td>
+      <td class="num"><input type="number" step="0.01" data-path="${basePath}.${i}.bedrag">${jaarHint}</td>
+      ${withJaar ? `<td style="text-align:center"><input type="checkbox" data-path="${basePath}.${i}.jaarlijks" title="Bedrag is jaarlijks (wordt /12 gerekend)"></td>` : ''}
+      ${moveCol(i)}
+      <td class="row-actions"><button class="danger-ghost" data-remove="${basePath}.${i}" title="Verwijderen">×</button></td>
+    </tr>`;
+  }).join('');
+  const colspan = 5 + (withJaar ? 1 : 0) + (moveOptions ? 1 : 0);
+  return `
+    <div class="${useScroll ? 'scroll-area table-scroll' : ''}">
+    <table>
+      <thead><tr>
+        <th></th><th>Categorie</th><th>Omschrijving</th><th style="text-align:right">Bedrag</th>
+        ${withJaar ? '<th style="text-align:center" title="Bedrag is jaarlijks">Jaarlijks?</th>' : ''}${moveHead}<th></th>
+      </tr></thead>
+      <tbody>${rowsHtml || `<tr><td colspan="${colspan}" style="color:var(--text-faint)">Nog geen posten toegevoegd.</td></tr>`}</tbody>
+      <tfoot><tr class="tot-row"><td colspan="3">Totaal per maand</td><td class="num">${eur(total)}</td>${withJaar?'<td></td>':''}${moveOptions?'<td></td>':''}<td></td></tr></tfoot>
+    </table>
+    </div>
+    <button class="ghost small add-row-btn" data-addrow="${basePath}">+ Post toevoegen</button>
+  `;
+}
+
+function handleTableClicks(root){
+  root.querySelectorAll('[data-addrow]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const path = btn.dataset.addrow;
+      const arr = getPath(state, path);
+      arr.push({id:uid(), categorie:'', post:'', bedrag:0});
+      persist(); renderActiveTab();
+    });
+  });
+  root.querySelectorAll('[data-remove]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const [path, idxStr] = splitLastIndex(btn.dataset.remove);
+      const arr = getPath(state, path);
+      arr.splice(parseInt(idxStr,10), 1);
+      persist(); renderActiveTab();
+    });
+  });
+  root.querySelectorAll('[data-move-row]').forEach(select=>{
+    select.addEventListener('change', ()=>{
+      const targetPath = select.value;
+      const [sourcePath, idxStr] = splitLastIndex(select.dataset.moveRow);
+      if (!targetPath || targetPath === sourcePath) return;
+      const source = getPath(state, sourcePath);
+      const target = getPath(state, targetPath);
+      if (!Array.isArray(source) || !Array.isArray(target)) return;
+      const idx = parseInt(idxStr, 10);
+      const row = source.splice(idx, 1)[0];
+      if (!row) return;
+      target.push(row);
+      persist(); renderActiveTab();
+    });
+  });
+  root.querySelectorAll('[data-remove-transaction]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const id = btn.dataset.removeTransaction;
+      state.transactions = (state.transactions||[]).filter(tx=>tx.id !== id);
+      persist(); renderActiveTab();
+    });
+  });
+  root.querySelectorAll('[data-open-transaction]').forEach(btn=>{
+    btn.addEventListener('click', ()=> openTransactionModal());
+  });
+}
+function splitLastIndex(pathWithIndex){
+  const parts = pathWithIndex.split('.');
+  const idx = parts.pop();
+  return [parts.join('.'), idx];
+}
+
+/* ---------- alleen-lezen spaardoelen-overzicht (voor Gezamenlijk/Dion/Dara tabs) ---------- */
+function renderGoalOverviewTable(doelen, spaarpotDezeMaand){
+  const berekend = calcGroep(doelen, spaarpotDezeMaand, TODAY);
+  const totaalDoelbedrag = round2(berekend.reduce((s,b)=>s+(Number(b.doel.doelbedrag)||0),0));
+  const totaalAlGespaard = round2(berekend.reduce((s,b)=>s+(Number(b.doel.algespaard)||0),0));
+  const totaalNogTeGaan = round2(berekend.reduce((s,b)=>s+(b.nogTeGaan||0),0));
+  const totaalBenodigd = round2(berekend.reduce((s,b)=>s+(b.benodigdPerMaand||0),0));
+  const totaalVast = round2(berekend.reduce((s,b)=>s+(Number(b.doel.vasteInleg)||0),0));
+  const totaalExtra = round2(berekend.reduce((s,b)=>s+(b.berekendeExtraInleg||0),0));
+  const totaalWerkelijk = round2(berekend.reduce((s,b)=>s+(b.werkelijkeInleg||0),0));
+  const rows = berekend.map(b=>{
+    const barPct = Math.min(100, Math.round((b.voortgang||0)*100));
+    return `<tr>
+      <td>${b.doel.naam || '(naamloos)'}</td>
+      <td class="num">${eur(Number(b.doel.doelbedrag)||0)}</td>
+      <td class="num">${eur(Number(b.doel.algespaard)||0)}</td>
+      <td class="num">${eur(b.nogTeGaan)}</td>
+      <td><div class="progress-track"><div class="progress-fill" style="width:${barPct}%"></div></div><div class="progress-label">${pct(b.voortgang)}</div></td>
+      <td>${formatDateNL(b.doel.doeldatum)}</td>
+      <td class="num">${b.benodigdPerMaand===null?'—':eur(b.benodigdPerMaand)}</td>
+      <td class="num">${eur(Number(b.doel.vasteInleg)||0)}</td>
+      <td class="num">${eur(b.berekendeExtraInleg||0)}</td>
+      <td class="num">${eur(b.werkelijkeInleg)}</td>
+    </tr>`;
+  }).join('');
+  return `<div class="goal-table-wrap"><table class="goal-table">
+    <thead><tr>
+      <th class="col-name">Spaardoel</th><th class="col-money" style="text-align:right">Doelbedrag</th><th class="col-money" style="text-align:right">Al gespaard</th>
+      <th class="col-money" style="text-align:right">Nog te gaan</th><th class="col-progress">Voortgang</th><th class="col-date">Doeldatum</th>
+      <th class="col-money" style="text-align:right">Benodigde inleg/maand</th><th class="col-money" style="text-align:right">Vaste inleg/mnd</th>
+      <th class="col-money" style="text-align:right">Extra deze maand</th><th class="col-money" style="text-align:right">Inleg deze maand</th>
+    </tr></thead>
+    <tbody>${rows || `<tr><td colspan="10" style="color:var(--text-faint)">Nog geen spaardoelen. Voeg ze toe op het tabblad Spaardoelen.</td></tr>`}</tbody>
+    <tfoot><tr>
+      <td>Totaal</td><td class="num">${eur(totaalDoelbedrag)}</td><td class="num">${eur(totaalAlGespaard)}</td>
+      <td class="num">${eur(totaalNogTeGaan)}</td><td></td><td></td>
+      <td class="num">${eur(totaalBenodigd)}</td><td class="num">${eur(totaalVast)}</td>
+      <td class="num">${eur(totaalExtra)}</td><td class="num">${eur(totaalWerkelijk)}</td>
+    </tr></tfoot>
+  </table></div>`;
+}
+
+
+function renderGoalGroup(basePath, doelen, spaarpotDezeMaand){
+  const berekend = calcGroep(doelen, spaarpotDezeMaand, TODAY);
+  const rows = berekend.map((b,i)=>{
+    const barPct = Math.min(100, Math.round((b.voortgang||0)*100));
+    return `
+    <tr>
+      <td class="goal-favorite-cell">
+        <label class="favorite-goal" title="Favoriet op dashboard">
+          <input type="checkbox" data-path="${basePath}.${i}.favoriet">
+          <span>★</span>
+        </label>
+      </td>
+      <td class="goal-order-cell">
+        <div class="goal-order" aria-label="Volgorde wijzigen">
+          <button class="ghost small" data-move-goal="${basePath}.${i}.-1" title="Omhoog" ${i===0?'disabled':''}>▲</button>
+          <button class="ghost small" data-move-goal="${basePath}.${i}.1" title="Omlaag" ${i===berekend.length-1?'disabled':''}>▼</button>
+        </div>
+      </td>
+      <td data-label="Spaardoel"><input type="text" data-path="${basePath}.${i}.naam" placeholder="Naam spaardoel">
+        <label style="display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--text-dim);margin-top:5px">
+          <input type="checkbox" data-path="${basePath}.${i}.vastBedrag"> Vast bedrag
+        </label>
+      </td>
+      <td data-label="Doelbedrag" class="num"><input type="number" step="0.01" data-path="${basePath}.${i}.doelbedrag"></td>
+      <td data-label="Al gespaard" class="num"><input type="number" step="0.01" data-path="${basePath}.${i}.algespaard"></td>
+      <td data-label="Nog te gaan" class="num">${eur(b.nogTeGaan)}</td>
+      <td data-label="Voortgang"><div class="progress-track"><div class="progress-fill" style="width:${barPct}%"></div></div><div class="progress-label">${pct(b.voortgang)}</div></td>
+      <td data-label="Doeldatum"><input type="date" data-path="${basePath}.${i}.doeldatum"></td>
+      <td class="num">${b.benodigdPerMaand===null?'—':eur(b.benodigdPerMaand)}</td>
+      <td data-label="Vaste inleg/mnd" class="num"><input type="number" step="0.01" data-path="${basePath}.${i}.vasteInleg"></td>
+      <td data-label="Verwacht rendement %" class="num">
+        <input type="number" step="0.01" data-percent="true" data-path="${basePath}.${i}.rendement">
+        <select data-path="${basePath}.${i}.rendementPeriode" style="width:100%;margin-top:5px">
+          <option value="jaarlijks">Jaarlijks</option>
+          <option value="maandelijks">Maandelijks</option>
+        </select>
+      </td>
+      <td class="num">${b.verwachteWaarde===null?'—':eur(b.verwachteWaarde)}</td>
+      <td class="row-actions"><button class="danger-ghost" data-remove="${basePath}.${i}" title="Verwijderen">×</button></td>
+    </tr>`;
+  }).join('');
+  const totBenodigd = round2(berekend.reduce((s,b)=>s+(b.benodigdPerMaand||0),0));
+  const totDoelbedrag = round2(berekend.reduce((s,b)=>s+(Number(b.doel.doelbedrag)||0),0));
+  const totAlGespaard = round2(berekend.reduce((s,b)=>s+(Number(b.doel.algespaard)||0),0));
+  const totNogTeGaan = round2(berekend.reduce((s,b)=>s+(b.nogTeGaan||0),0));
+  const totVast = round2(berekend.reduce((s,b)=>s+(Number(b.doel.vasteInleg)||0),0));
+  const totVerwacht = round2(berekend.reduce((s,b)=>s+(b.verwachteWaarde||0),0));
+  return `
+    <div class="goal-table-wrap"><table class="goal-table">
+      <thead><tr>
+        <th class="col-favorite"></th><th class="col-order"></th><th class="col-name">Spaardoel</th><th class="col-money" style="text-align:right">Doelbedrag</th><th class="col-money" style="text-align:right">Al gespaard</th>
+        <th class="col-money" style="text-align:right">Nog te gaan</th><th class="col-progress">Voortgang</th><th class="col-date">Doeldatum</th>
+        <th class="col-money" style="text-align:right">Benodigde inleg/maand</th><th class="col-money" style="text-align:right">Vaste inleg/mnd</th>
+        <th class="col-rate" style="text-align:right">Verwacht rendement %</th><th class="col-money" style="text-align:right">Verwachte waarde op datum</th><th class="col-actions"></th>
+      </tr></thead>
+      <tbody>${rows || `<tr><td colspan="13" style="color:var(--text-faint)">Nog geen spaardoelen.</td></tr>`}</tbody>
+      <tfoot><tr>
+        <td></td><td class="goal-order-cell"></td><td data-label="Spaardoel">Totaal</td><td data-label="Doelbedrag" class="num">${eur(totDoelbedrag)}</td><td data-label="Al gespaard" class="num">${eur(totAlGespaard)}</td>
+        <td class="num">${eur(totNogTeGaan)}</td><td></td><td></td>
+        <td class="num">${eur(totBenodigd)}</td><td class="num">${eur(totVast)}</td><td></td>
+        <td class="num">${eur(totVerwacht)}</td><td></td>
+      </tr></tfoot>
+    </table></div>
+    <button class="ghost small add-row-btn" data-addgoal="${basePath}">+ Spaardoel toevoegen</button>
+  `;
+}
+function handleGoalClicks(root){
+  root.querySelectorAll('[data-move-goal]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const parts = btn.dataset.moveGoal.split('.');
+      const direction = parseInt(parts.pop(), 10);
+      const idx = parseInt(parts.pop(), 10);
+      const path = parts.join('.');
+      const arr = getPath(state, path);
+      const next = idx + direction;
+      if (!Array.isArray(arr) || next < 0 || next >= arr.length) return;
+      const item = arr.splice(idx, 1)[0];
+      arr.splice(next, 0, item);
+      persist(); renderActiveTab();
+    });
+  });
+  root.querySelectorAll('[data-addgoal]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const path = btn.dataset.addgoal;
+      const arr = getPath(state, path);
+      arr.push({id:uid(), naam:'Nieuw doel', doelbedrag:0, algespaard:0, doeldatum:'', vasteInleg:0, rendement:0.0125, rendementPeriode:'jaarlijks', favoriet:false});
+      persist(); renderActiveTab();
+    });
+  });
+}
+
+
+/* ---------- dashboard ---------- */
+function renderDashboard(){
+  const r = calcScenario(state);
+  const scenarioData = getMonthlyScenarioData(state.meta.scenario);
+  const gGoals = calcGroep(state.spaardoelen.gezamenlijk, r.spaarpotDezeMaand, TODAY);
+  const dionGoals = calcGroep(state.spaardoelen.dion, r.dion.beschikbaarVoorSparen, TODAY);
+  const daraGoals = calcGroep(state.spaardoelen.dara, r.dara.beschikbaarVoorSparen, TODAY);
+  const allGoals = [
+    ...gGoals.map(g=>({...g, owner:'Gezamenlijk'})),
+    ...dionGoals.map(g=>({...g, owner:'Dion'})),
+    ...daraGoals.map(g=>({...g, owner:'Dara'})),
+  ];
+  const totalZakgeld = round2(r.dion.zakgeld + r.dara.zakgeld);
+  const jointRemaining = round2(r.totaalSalaris - r.gezamenlijkeLastenTotaal - r.spaarpotDezeMaand);
+  const splitDion = totalZakgeld > 0 ? Math.max(0, r.dion.zakgeld / totalZakgeld) : .5;
+  const budgetRows = (scenarioData.gezamenlijk.variabel||[]).filter(row=>row.post || row.bedrag).map(row=>{
+    const budget = Number(row.bedrag)||0;
+    const used = sumTransactions('gezamenlijk', row.post);
+    const status = budgetStatus(used, budget);
+    return `<div class="progress-item">
+      <div class="progress-top"><strong>${row.post || row.categorie || 'Budget'}</strong><span>${eur(used)} / ${eur(budget)} <span class="status-badge ${status.cls}">${status.label}</span></span></div>
+      <div class="progress-track"><div class="progress-fill" style="width:${Math.min(100, Math.round(status.ratio*100))}%"></div></div>
+    </div>`;
+  }).join('');
+  const vasteByCat = {};
+  (scenarioData.gezamenlijk.vasteLasten||[]).forEach(row=>{
+    const cat = normalizeCategoryName(row.categorie);
+    vasteByCat[cat] = round2((vasteByCat[cat]||0) + effectiveBedrag(row));
+  });
+  const vasteRows = Object.entries(vasteByCat).sort((a,b)=>b[1]-a[1]).map(([cat, amount])=>{
+    const ratio = r.overigeVasteLastenTotaal > 0 ? amount / r.overigeVasteLastenTotaal : 0;
+    return `<div class="progress-item">
+      <div class="progress-top"><strong>${categoryIcon(cat)} ${cat}</strong><span>${eur(amount)} · ${pct(ratio)}</span></div>
+      <div class="progress-track"><div class="progress-fill" style="width:${Math.round(ratio*100)}%"></div></div>
+    </div>`;
+  }).join('');
+  const favoriteGoals = allGoals.filter(g=>g.doel.favoriet);
+  const fallbackGoalGroups = [
+    {owner:'Gezamenlijk', items:gGoals},
+    {owner:'Dion', items:dionGoals},
+    {owner:'Dara', items:daraGoals},
+  ];
+  const goalRows = favoriteGoals.length ? favoriteGoals.slice(0,5).map(g=>{
+    const doelbedrag = Number(g.doel.doelbedrag)||0;
+    const algespaard = Number(g.doel.algespaard)||0;
+    const barPct = doelbedrag>0 ? Math.min(100, Math.round((algespaard/doelbedrag)*100)) : 0;
+    const badge = barPct >= 100 ? 'Op schema' : 'Nog te gaan';
+    return `<tr><td>★ ${g.doel.naam || 'Spaardoel'}<div class="progress-label" style="text-align:left">${g.owner}</div></td>
+      <td class="num">${eur(algespaard)} / ${eur(doelbedrag)}</td>
+      <td><div class="progress-track"><div class="progress-fill" style="width:${barPct}%"></div></div></td>
+      <td><span class="status-badge ${barPct>=100?'':'amber'}">${badge}</span></td></tr>`;
+  }).join('') : fallbackGoalGroups.map(group=>{
+    const doelbedrag = round2(group.items.reduce((s,g)=>s+(Number(g.doel.doelbedrag)||0),0));
+    const algespaard = round2(group.items.reduce((s,g)=>s+(Number(g.doel.algespaard)||0),0));
+    const barPct = doelbedrag>0 ? Math.min(100, Math.round((algespaard/doelbedrag)*100)) : 0;
+    return `<tr><td>${group.owner}<div class="progress-label" style="text-align:left">Totaal spaardoelen</div></td>
+      <td class="num">${eur(algespaard)} / ${eur(doelbedrag)}</td>
+      <td><div class="progress-track"><div class="progress-fill" style="width:${barPct}%"></div></div></td>
+      <td><span class="status-badge muted">Totaal</span></td></tr>`;
+  }).join('');
+  const year = Number(getSelectedMonth().slice(0,4));
+  const monthBlocks = Array.from({length:12}, (_,i)=>{
+    const key = monthKey(new Date(year, i, 1));
+    const income = (state.monthlyIncome?.[key]?.dion || 0) + (state.monthlyIncome?.[key]?.dara || 0);
+    const spent = sumTransactions(null, null, key);
+    const active = key === getSelectedMonth() ? ' active' : '';
+    const cls = income === 0 && spent === 0 ? 'muted' : (income - spent > 0 ? 'green' : 'red');
+    return `<div class="month-block ${cls}${active}">${['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Nov','Dec'][i]}</div>`;
+  }).join('');
+  const personSummary = (label,rr)=>`
+    <div class="card span-4">
+      <div class="card-head"><h2>${label}</h2></div>
+      <div class="summary-list">
+        <div class="summary-line"><span>Zakgeld ontvangen</span><strong>${eur(rr.zakgeld)}</strong></div>
+        <div class="summary-line"><span>Persoonlijke vaste lasten</span><strong>${eur(rr.persoonlijkeVasteLasten)}</strong></div>
+        <div class="summary-line"><span>Uitgaven deze maand</span><strong>${eur(rr.variabeleUitgaven)}</strong></div>
+        <div class="summary-line"><span>Beschikbaar voor sparen/vrij gebruik</span><strong class="${rr.beschikbaarVoorSparen<0?'value neg':'value pos'}">${eur(rr.beschikbaarVoorSparen)}</strong></div>
+      </div>
+    </div>`;
+  const jointSummary = `
+    <div class="card span-4">
+      <div class="card-head"><h2>Gezamenlijk</h2></div>
+      <div class="summary-list">
+        <div class="summary-line"><span>Vaste lasten + variabel budget</span><strong>${eur(r.gezamenlijkeLastenTotaal)}</strong></div>
+        <div class="summary-line"><span>Variabel gebruikt</span><strong>${eur(r.variabelTotaal)}</strong></div>
+        <div class="summary-line"><span>Sparen</span><strong>${eur(r.spaarpotDezeMaand)}</strong></div>
+        <div class="summary-line"><span>Resterend voor zakgeld</span><strong class="${jointRemaining<0?'value neg':'value pos'}">${eur(jointRemaining)}</strong></div>
+      </div>
+    </div>`;
+
+  document.getElementById('tab-dashboard').innerHTML = `
+    <div class="quick-actions" style="margin-bottom:14px">
+      <button class="primary" data-open-transaction>+ Uitgave toevoegen</button>
+      <span class="hint">${monthLabel(getSelectedMonth())} · ${state.meta.scenario==='voor'?'Voor verkoop':'Na verkoop'}</span>
+    </div>
+    <div class="dashboard-grid">
+      <div class="card metric-card span-3"><div class="metric-label">Inkomen Dion</div><input class="inline-edit" type="number" step="0.01" data-month-income="dion"><div class="metric-sub">Komt eerst binnen op de gezamenlijke rekening</div></div>
+      <div class="card metric-card span-3"><div class="metric-label">Inkomen Dara</div><input class="inline-edit" type="number" step="0.01" data-month-income="dara"><div class="metric-sub">Komt eerst binnen op de gezamenlijke rekening</div></div>
+      <div class="card metric-card span-3"><div class="metric-label">Totaal naar gezamenlijke rekening</div><div class="metric-value value pos">${eur(r.totaalSalaris)}</div><div class="metric-sub">Dion + Dara</div></div>
+      <div class="card metric-card span-3"><div class="metric-label">Variabel gebruikt</div><div class="metric-value">${eur(r.variabelTotaal)}</div><div class="metric-sub">Budget: ${eur(r.variabelBudgetTotaal)}</div></div>
+      <div class="card span-6"><div class="card-head"><h2>Gezamenlijke rekening</h2><span class="hint">inkomen → lasten → sparen → zakgeld</span></div><div class="summary-list"><div class="summary-line"><span>Totaal inkomen</span><strong>${eur(r.totaalSalaris)}</strong></div><div class="summary-line"><span>Gezamenlijke vaste lasten + variabel budget</span><strong>${eur(r.gezamenlijkeLastenTotaal)}</strong></div><div class="summary-line"><span>Gezamenlijk variabel gebruikt</span><strong>${eur(r.variabelTotaal)}</strong></div><div class="summary-line"><span>Gezamenlijk sparen</span><strong>${eur(r.spaarpotDezeMaand)}</strong></div><div class="summary-line"><span>Resterend voor zakgeld</span><strong class="${jointRemaining<0?'value neg':'value pos'}">${eur(jointRemaining)}</strong></div></div></div>
+      <div class="card span-6"><div class="card-head"><h2>Zakgeld teruggestort</h2><span class="hint">Dion / Dara</span></div><div class="metric-value">${eur(totalZakgeld)}</div><div class="split-bar"><span style="width:${Math.round(splitDion*100)}%"></span><span style="width:${100-Math.round(splitDion*100)}%"></span></div><div class="summary-list"><div class="summary-line"><span>Dion</span><strong>${eur(r.dion.zakgeld)} · ${pct(splitDion)}</strong></div><div class="summary-line"><span>Dara</span><strong>${eur(r.dara.zakgeld)} · ${pct(1-splitDion)}</strong></div></div></div>
+      ${jointSummary}${personSummary('Dion',r.dion)}${personSummary('Dara',r.dara)}
+      <div class="card span-6 card-scroll"><div class="card-head"><h2>Gezamenlijk budget deze maand</h2><span class="hint">transacties vs budget</span></div><div class="scroll-area">${budgetRows || '<p class="hint">Nog geen variabele budgetten.</p>'}</div></div>
+      <div class="card span-6 card-scroll"><div class="card-head"><h2>Vaste lasten verdeling</h2><span class="hint">${eur(r.overigeVasteLastenTotaal)}</span></div><div class="scroll-area">${vasteRows || '<p class="hint">Nog geen vaste lasten.</p>'}</div></div>
+      <div class="card span-7 card-scroll"><div class="card-head"><h2>Spaardoelen voortgang</h2><span class="hint">preview</span></div><div class="scroll-area"><table><thead><tr><th>Doel</th><th style="text-align:right">Gespaard / doel</th><th>Voortgang</th><th>Status</th></tr></thead><tbody>${goalRows || '<tr><td colspan="4">Nog geen spaardoelen.</td></tr>'}</tbody></table></div></div>
+      <div class="card span-5"><div class="card-head"><h2>Jaaroverzicht ${year}</h2><span class="hint">maandstatus</span></div><div class="month-blocks">${monthBlocks}</div></div>
+    </div>
+  `;
+}
+function renderTransactionsTable(owner){
+  const rows = getMonthTransactions(owner).sort((a,b)=>String(b.date).localeCompare(String(a.date))).map(tx=>`
+    <tr>
+      <td>${formatDateNL(tx.date)}</td>
+      <td>${tx.category || 'Overig'}</td>
+      <td>${tx.description || ''}<div class="progress-label" style="text-align:left">${tx.note || ''}</div></td>
+      <td class="num">${eur(Number(tx.amount)||0)}</td>
+      <td class="row-actions"><button class="danger-ghost" data-remove-transaction="${tx.id}" title="Verwijderen">×</button></td>
+    </tr>`).join('');
+  return `<div class="scroll-area large"><table>
+    <thead><tr><th>Datum</th><th>Categorie</th><th>Omschrijving</th><th style="text-align:right">Bedrag</th><th></th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="5" style="color:var(--text-faint)">Nog geen uitgaven in deze maand.</td></tr>'}</tbody>
+  </table></div>`;
+}
+function renderBudgetUsageList(){
+  const data = getMonthlyScenarioData(state.meta.scenario);
+  return `<div class="progress-list">${(data.gezamenlijk.variabel||[]).filter(row=>row.post || row.bedrag).map(row=>{
+    const budget = Number(row.bedrag)||0;
+    const used = sumTransactions('gezamenlijk', row.post);
+    const status = budgetStatus(used, budget);
+    return `<div class="progress-item">
+      <div class="progress-top"><strong>${row.post || row.categorie}</strong><span>${eur(used)} / ${eur(budget)} <span class="status-badge ${status.cls}">${status.label}</span></span></div>
+      <div class="progress-track"><div class="progress-fill" style="width:${Math.min(100, Math.round(status.ratio*100))}%"></div></div>
+    </div>`;
+  }).join('') || '<p class="hint">Nog geen budgetten.</p>'}</div>`;
+}
+
+/* ---------- gezamenlijk / dion / dara ---------- */
+function renderPersonOrJoint(tabId, key, label){
+  const s = getMonthlyScenarioData(state.meta.scenario);
+  const r = calcScenario(state);
+  const isJoint = key === 'gezamenlijk';
+  const data = s[key];
+  const rr = isJoint ? null : r[key];
+
+  const kpiCard = isJoint ? '' : `
+    <div class="card">
+      <div class="card-head"><h2>${label} — persoonlijk dashboard</h2></div>
+      <div class="kpi-grid">
+        <div class="kpi ${rr.zakgeld<0?'neg':'pos'}"><div class="label">Zakgeld volgens scenario</div><div class="value ${rr.zakgeld<0?'neg':'pos'}">${eur(rr.zakgeld)}</div></div>
+        <div class="kpi ${rr.persoonlijkeVasteLasten<0?'neg':''}"><div class="label">Persoonlijke vaste lasten</div><div class="value ${rr.persoonlijkeVasteLasten<0?'neg':''}">${eur(rr.persoonlijkeVasteLasten)}</div></div>
+        <div class="kpi ${rr.resterendVoorVariabel<0?'neg':'pos'}"><div class="label">Resterend voor variabel</div><div class="value ${rr.resterendVoorVariabel<0?'neg':'pos'}">${eur(rr.resterendVoorVariabel)}</div></div>
+        <div class="kpi"><div class="label">Variabele uitgaven</div><div class="value">${eur(rr.variabeleUitgaven)}</div></div>
+        <div class="kpi ${rr.beschikbaarVoorSparen<0?'neg':'pos'}"><div class="label">Beschikbaar voor sparen</div><div class="value ${rr.beschikbaarVoorSparen<0?'neg':'pos'}">${eur(rr.beschikbaarVoorSparen)}</div></div>
+      </div>
+    </div>`;
+
+  const spaarpotVoorGroep = isJoint ? r.spaarpotDezeMaand : rr.beschikbaarVoorSparen;
+  const doelenVoorGroep = state.spaardoelen[key];
+  const hypotheekCard = isJoint && state.meta.scenario==='na' ? `
+    <div class="card">
+      <div class="card-head"><h2>Hypotheek</h2></div>
+      ${renderRowsTable('na.gezamenlijk.hypotheek', data.hypotheek)}
+    </div>` : '';
+  const savingsSummary = isJoint ? `
+    <div class="savings-head">
+      <div class="kpi"><div class="label">Maandelijkse lasten</div><div class="value">${eur(r.gezamenlijkeLastenTotaal)}</div></div>
+      <div class="kpi">
+        <div class="label">Spaargeld deze maand</div>
+        <input type="number" step="0.01" data-path="${state.meta.scenario}.spaarpotDezeMaand" style="width:100%;font-size:16px;font-weight:700">
+      </div>
+    </div>` : `
+    <div class="savings-head">
+      <div class="kpi ${rr.beschikbaarVoorSparen<0?'neg':'pos'}"><div class="label">Beschikbaar voor sparen</div><div class="value ${rr.beschikbaarVoorSparen<0?'neg':'pos'}">${eur(rr.beschikbaarVoorSparen)}</div></div>
+    </div>`;
+
+  const transactionCard = `
+    <div class="card card-scroll">
+      <div class="card-head"><h2>${isJoint?'Gezamenlijke transacties':'Persoonlijke uitgaven'} — ${monthLabel(getSelectedMonth())}</h2><button class="primary small" data-open-transaction>+ Uitgave toevoegen</button></div>
+      ${renderTransactionsTable(key)}
+      <div class="card-total"><span>Totaal uitgaven</span><span>${eur(sumTransactions(key))}</span></div>
+    </div>`;
+  const budgetUsageCard = isJoint ? `
+    <div class="card">
+      <div class="card-head"><h2>Budgetgebruik</h2><span class="hint">transacties vs budget</span></div>
+      ${renderBudgetUsageList()}
+    </div>` : '';
+
+  const variabelBasePath = isJoint ? `monthlyBudgets.${getSelectedMonth()}.${state.meta.scenario}.gezamenlijkVariabel` : `${state.meta.scenario}.${key}.variabel`;
+
+  document.getElementById(tabId).innerHTML = `
+    ${kpiCard}
+    ${hypotheekCard}
+    <div class="compact-layout">
+      <div class="card">
+        <div class="card-head"><h2>${isJoint?(state.meta.scenario==='na'?'Overige vaste lasten':'Vaste lasten'):label+' — eigen vaste lasten'}</h2></div>
+        ${renderRowsTable(`${state.meta.scenario}.${key}.vasteLasten`, data.vasteLasten, {jaarlijks:true, moveable:true})}
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>${isJoint?'Variabele budgetten':'Persoonlijke categorieën'}</h2></div>
+        ${renderRowsTable(variabelBasePath, data.variabel)}
+      </div>
+    </div>
+    ${budgetUsageCard}
+    ${transactionCard}
+    <div class="card savings-panel">
+      <div class="card-head"><h2>Sparen</h2><span class="hint">Spaardoelen bewerken doe je op het tabblad Spaardoelen</span></div>
+      ${savingsSummary}
+      ${renderGoalOverviewTable(doelenVoorGroep, spaarpotVoorGroep)}
+    </div>
+  `;
+}
+
+/* ---------- spaardoelen-tab ---------- */
+function renderSpaardoelen(){
+  const r = calcScenario(state);
+  const groups = [
+    {key:'gezamenlijk', label:'Gezamenlijk', pot:r.spaarpotDezeMaand, doelen:state.spaardoelen.gezamenlijk},
+    {key:'dion', label:'Dion', pot:r.dion.beschikbaarVoorSparen, doelen:state.spaardoelen.dion},
+    {key:'dara', label:'Dara', pot:r.dara.beschikbaarVoorSparen, doelen:state.spaardoelen.dara},
+  ];
+  const all = groups.flatMap(g=>calcGroep(g.doelen, g.pot, TODAY).map(item=>({...item, owner:g.label})));
+  const totaalGespaard = round2(all.reduce((s,b)=>s+(Number(b.doel.algespaard)||0),0));
+  const totaalDoel = round2(all.reduce((s,b)=>s+(Number(b.doel.doelbedrag)||0),0));
+  const gemiddelde = totaalDoel>0 ? totaalGespaard/totaalDoel : 0;
+  const inlegDezeMaand = round2(all.reduce((s,b)=>s+(b.werkelijkeInleg||0),0));
+  const groupCards = groups.map(g=>{
+    const berekend = calcGroep(g.doelen, g.pot, TODAY);
+    const doel = round2(berekend.reduce((s,b)=>s+(Number(b.doel.doelbedrag)||0),0));
+    const gespaard = round2(berekend.reduce((s,b)=>s+(Number(b.doel.algespaard)||0),0));
+    const p = doel>0 ? gespaard/doel : 0;
+    const rows = berekend.slice(0,3).map(b=>{
+      const doelbedrag = Number(b.doel.doelbedrag)||0;
+      const al = Number(b.doel.algespaard)||0;
+      const pctGoal = doelbedrag>0 ? Math.min(100, Math.round((al/doelbedrag)*100)) : 0;
+      return `<div class="progress-item"><div class="progress-top"><strong>${b.doel.naam || 'Spaardoel'}</strong><span>${eur(al)} / ${eur(doelbedrag)} · ${pctGoal}%</span></div><div class="progress-track"><div class="progress-fill" style="width:${pctGoal}%"></div></div></div>`;
+    }).join('');
+    return `<div class="card span-4"><div class="card-head"><h2>${g.label}</h2><span class="status-badge">${pct(p)}</span></div>${rows || '<p class="hint">Nog geen doelen.</p>'}<div class="card-total"><span>Totaal</span><span>${eur(gespaard)} / ${eur(doel)}</span></div></div>`;
+  }).join('');
+  document.getElementById('tab-spaardoelen').innerHTML = `
+    <div class="dashboard-grid">
+      <div class="card metric-card span-3"><div class="metric-label">Totaal gespaard</div><div class="metric-value value pos">${eur(totaalGespaard)}</div><div class="metric-sub">${all.length} actieve spaardoelen</div></div>
+      <div class="card metric-card span-3"><div class="metric-label">Totaal doelbedrag</div><div class="metric-value">${eur(totaalDoel)}</div><div class="metric-sub">alle groepen samen</div></div>
+      <div class="card metric-card span-3"><div class="metric-label">Gemiddelde voortgang</div><div class="metric-value">${pct(gemiddelde)}</div><div class="metric-sub">op basis van gespaard/doel</div></div>
+      <div class="card metric-card span-3"><div class="metric-label">Inleg deze maand</div><div class="metric-value">${eur(inlegDezeMaand)}</div><div class="metric-sub">${monthLabel(getSelectedMonth())}</div></div>
+      ${groupCards}
+    </div>
+    <div class="section-title">Spaardoelen — Gezamenlijk</div>
+    <div class="card">${renderGoalGroup('spaardoelen.gezamenlijk', state.spaardoelen.gezamenlijk, r.spaarpotDezeMaand)}</div>
+    <div class="section-title">Spaardoelen — Dion</div>
+    <div class="card">${renderGoalGroup('spaardoelen.dion', state.spaardoelen.dion, r.dion.beschikbaarVoorSparen)}</div>
+    <div class="section-title">Spaardoelen — Dara</div>
+    <div class="card">${renderGoalGroup('spaardoelen.dara', state.spaardoelen.dara, r.dara.beschikbaarVoorSparen)}</div>
+  `;
+}
+
+/* ---------- data & back-up tab ---------- */
+function renderDataTab(){
+  document.getElementById('tab-data').innerHTML = `
+    <div class="card">
+      <div class="card-head"><h2>Back-up &amp; overdracht</h2>
+        <span class="hint">Alles staat nu lokaal in de browser op dit toestel</span></div>
+      <p style="color:var(--text-dim);font-size:13.5px;line-height:1.5">
+        Exporteer een JSON-bestand als back-up, of om je gegevens over te zetten naar een ander toestel
+        (of naar Dara's telefoon). Importeer datzelfde bestand daar weer in. Voor importeren of wissen
+        bewaart de app eerst automatisch de huidige stand als lokale nood-back-up.
+      </p>
+      <div class="toolbar">
+        <button class="primary" id="btnExport">Exporteer back-up (JSON)</button>
+        <button class="ghost" id="btnImport">Importeer back-up</button>
+        <button class="ghost" id="btnRestoreBackup">Herstel laatste lokale back-up</button>
+        <button class="ghost" id="btnReset" style="border-color:var(--red);color:var(--red)">Alles wissen</button>
+      </div>
+      <input type="file" id="fileImport" accept="application/json" style="display:none">
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>Firebase / Firestore sync</h2><span class="hint" id="cloudStatus">${CloudAdapter.statusText()}</span></div>
+      <p style="color:var(--text-dim);font-size:13.5px;line-height:1.5">
+        Finize synchroniseert live via Firebase/Firestore zonder Google-login. Iedereen met de link
+        kan dezelfde planner lezen en bewerken zodra Firestore-regels dit ene document toestaan.
+        LocalStorage en JSON-back-up blijven bestaan als lokale veiligheidslaag.
+      </p>
+      <textarea id="firebaseConfigInput" spellcheck="false" placeholder="${firebaseConfigTemplate().replaceAll('"','&quot;')}">${CloudAdapter.isConfigured() ? JSON.stringify(CloudAdapter.config, null, 2) : ''}</textarea>
+      <div class="toolbar" style="margin-top:8px">
+        <button class="ghost small" id="btnSaveFirebaseConfig">Firebase-config opslaan</button>
+        <button class="primary small" id="btnConnectFirebase">Verbinden met cloud</button>
+        <button class="ghost small" id="btnUploadCloud">Lokale stand naar cloud zetten</button>
+        <button class="ghost small" id="btnFirebaseSignOut">Cloud loskoppelen</button>
+      </div>
+      <pre>Firestore rules voorstel:
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /budgetPlanners/finize {
+      allow read, write: if true;
+    }
+  }
+}</pre>
+    </div>
+  `;
+  document.getElementById('btnExport').addEventListener('click', ()=>{
+    downloadJson('dion-dara-budget-backup-' + new Date().toISOString().slice(0,10) + '.json', state);
+  });
+  document.getElementById('btnImport').addEventListener('click', ()=> document.getElementById('fileImport').click());
+  document.getElementById('fileImport').addEventListener('change', (e)=>{
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev)=>{
+      try{
+        const imported = JSON.parse(ev.target.result);
+        const validation = validateBudgetState(imported);
+        if (!validation.ok){
+          alert('Deze back-up is niet geimporteerd:\n\n' + validation.errors.slice(0,6).join('\n'));
+          e.target.value = '';
+          return;
+        }
+        if (!confirm('Deze import vervangt alle huidige gegevens. De huidige stand wordt eerst als lokale nood-back-up bewaard. Doorgaan?')){
+          e.target.value = '';
+          return;
+        }
+        DataAdapter.backup(state, 'voor import van ' + file.name);
+        state = normalizeBudgetState(imported); window.state = state;
+        persist();
+        renderActiveTab();
+        alert('Back-up geimporteerd.');
+      }catch(err){ alert('Kon dit bestand niet lezen: ' + err.message); }
+      e.target.value = '';
+    };
+    reader.readAsText(file);
+  });
+  document.getElementById('btnRestoreBackup').addEventListener('click', ()=>{
+    const backup = DataAdapter.loadBackup();
+    if (!backup || !backup.state){
+      alert('Er is nog geen lokale nood-back-up gevonden.');
+      return;
+    }
+    const validation = validateBudgetState(backup.state);
+    if (!validation.ok){
+      alert('De lokale nood-back-up is ongeldig:\n\n' + validation.errors.slice(0,6).join('\n'));
+      return;
+    }
+    const label = backup.label || backup.savedAt || 'onbekend moment';
+    if (confirm('Laatste lokale nood-back-up herstellen van ' + label + '? De huidige stand wordt eerst opnieuw als nood-back-up bewaard.')){
+      DataAdapter.backup(state, 'voor herstel lokale nood-back-up');
+      state = normalizeBudgetState(backup.state); window.state = state;
+      persist();
+      renderActiveTab();
+    }
+  });
+  document.getElementById('btnReset').addEventListener('click', ()=>{
+    if (confirm('Weet je zeker dat je alle gegevens wilt wissen en opnieuw wilt beginnen? De huidige stand wordt eerst als lokale nood-back-up bewaard.')){
+      DataAdapter.backup(state, 'voor alles wissen');
+      state = normalizeBudgetState(defaultState()); window.state = state;
+      persist();
+      renderActiveTab();
+    }
+  });
+  document.getElementById('btnSaveFirebaseConfig').addEventListener('click', ()=>{
+    try{
+      CloudAdapter.config = saveFirebaseConfigFromText(document.getElementById('firebaseConfigInput').value);
+      CloudAdapter.status = 'Firebase-config opgeslagen';
+      renderCloudStatus();
+    }catch(err){
+      alert('Firebase-config niet opgeslagen: ' + err.message);
+    }
+  });
+  document.getElementById('btnConnectFirebase').addEventListener('click', async ()=>{
+    await CloudAdapter.connect(true);
+  });
+  document.getElementById('btnUploadCloud').addEventListener('click', async ()=>{
+    if (!CloudAdapter.isConnected()){
+      const connected = await CloudAdapter.connect(true);
+      if (!connected) return;
+    }
+    if (confirm('Lokale stand naar Firestore schrijven? Dit overschrijft het Finize cloud-document.')){
+      await CloudAdapter.saveNow(state);
+    }
+  });
+  document.getElementById('btnFirebaseSignOut').addEventListener('click', async ()=>{
+    await CloudAdapter.signOut();
+  });
+}
+
+/* ---------- maandselectie en transactiemodal ---------- */
+function renderMonthSelect(){
+  const button = document.getElementById('monthPickerButton');
+  const panel = document.getElementById('monthPickerPanel');
+  if (!button || !panel) return;
+  const selected = getSelectedMonth();
+  const [selectedYear, selectedMonth] = selected.split('-').map(Number);
+  const yearOptions = yearsWithMonthData(selected);
+  const currentMonthKey = monthKey();
+  const monthNames = ['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
+  button.textContent = monthLabel(selected);
+  button.setAttribute('aria-expanded', document.getElementById('monthControl')?.classList.contains('open') ? 'true' : 'false');
+  panel.innerHTML = `
+    <div class="year-picker">
+      ${yearOptions.map(year=>`<button type="button" data-month-year="${year}" class="${year===selectedYear?'active':''}">${year}</button>`).join('')}
+    </div>
+    <div class="month-grid">
+      ${monthNames.map((name,i)=>{
+        const month = i + 1;
+        const key = selectedYear + '-' + String(month).padStart(2,'0');
+        const classes = [key===selected ? 'active' : '', key===currentMonthKey ? 'current' : ''].filter(Boolean).join(' ');
+        return `<button type="button" data-month-value="${key}" class="${classes}">${name}</button>`;
+      }).join('')}
+    </div>`;
+}
+function closeMonthPicker(){
+  const control = document.getElementById('monthControl');
+  if (!control) return;
+  control.classList.remove('open');
+  document.getElementById('monthPickerButton')?.setAttribute('aria-expanded', 'false');
+}
+function openMonthPicker(){
+  const control = document.getElementById('monthControl');
+  if (!control) return;
+  control.classList.add('open');
+  document.getElementById('monthPickerButton')?.setAttribute('aria-expanded', 'true');
+}
+function openTransactionModal(){
+  const modal = document.getElementById('transactionModal');
+  const today = getSelectedMonth() + '-' + String(new Date().getDate()).padStart(2,'0');
+  modal.innerHTML = `
+    <div class="modal">
+      <div class="card-head"><h2>Uitgave toevoegen</h2><button class="danger-ghost" id="btnCloseTransaction">×</button></div>
+      <div class="modal-grid">
+        <label>Bedrag<input id="txAmount" type="number" step="0.01" placeholder="0,00"></label>
+        <label>Datum<input id="txDate" type="date" value="${today}"></label>
+        <label class="full">Omschrijving<input id="txDescription" type="text" placeholder="Bijvoorbeeld Albert Heijn"></label>
+        <label>Categorie<select id="txCategory">
+          ${['Boodschappen','Benzine / vervoer','Uit eten','Huis','Hond','Kleding','Gezondheid','Abonnementen','Overig'].map(c=>`<option>${c}</option>`).join('')}
+        </select></label>
+        <label>Betaald vanuit<select id="txOwner">
+          <option value="gezamenlijk">Gezamenlijk</option>
+          <option value="dion">Dion</option>
+          <option value="dara">Dara</option>
+        </select></label>
+        <label class="full">Notitie<input id="txNote" type="text" placeholder="Optioneel"></label>
+      </div>
+      <div class="modal-actions">
+        <button class="ghost" id="btnCancelTransaction">Annuleren</button>
+        <button class="primary" id="btnSaveTransaction">Uitgave opslaan</button>
+      </div>
+    </div>`;
+  modal.classList.add('open');
+  const close = ()=> modal.classList.remove('open');
+  document.getElementById('btnCloseTransaction').addEventListener('click', close);
+  document.getElementById('btnCancelTransaction').addEventListener('click', close);
+  modal.addEventListener('click', (e)=>{ if (e.target === modal) close(); }, {once:true});
+  document.getElementById('btnSaveTransaction').addEventListener('click', ()=>{
+    const amount = parseFloat(String(document.getElementById('txAmount').value).replace(',', '.'));
+    if (!Number.isFinite(amount) || amount <= 0){
+      alert('Vul een geldig bedrag in.');
+      return;
+    }
+    const tx = {
+      id: uid(),
+      date: document.getElementById('txDate').value || today,
+      owner: document.getElementById('txOwner').value,
+      category: document.getElementById('txCategory').value,
+      description: document.getElementById('txDescription').value.trim(),
+      amount: round2(amount),
+      note: document.getElementById('txNote').value.trim()
+    };
+    state.transactions.push(tx);
+    persist();
+    close();
+    renderActiveTab();
+  });
+}
+
+/* ---------- routing / init ---------- */
+function renderActiveTab(){
+  ensureMonthData(getSelectedMonth());
+  renderMonthSelect();
+  document.querySelectorAll('.tab-btn').forEach(b=> b.classList.toggle('active', b.dataset.tab===activeTab));
+  document.querySelectorAll('.wrap').forEach(w=> w.classList.toggle('active', w.id === 'tab-'+activeTab));
+  document.querySelectorAll('#scenarioToggle button').forEach(b=> b.classList.toggle('active', b.dataset.scenario===state.meta.scenario));
+
+  if (activeTab==='dashboard') renderDashboard();
+  else if (activeTab==='gezamenlijk') renderPersonOrJoint('tab-gezamenlijk','gezamenlijk','Gezamenlijk');
+  else if (activeTab==='dion') renderPersonOrJoint('tab-dion','dion','Dion');
+  else if (activeTab==='dara') renderPersonOrJoint('tab-dara','dara','Dara');
+  else if (activeTab==='spaardoelen') renderSpaardoelen();
+  else if (activeTab==='data') renderDataTab();
+
+  const root = document.getElementById('tab-'+activeTab);
+  bindInputs(root);
+  handleTableClicks(root);
+  handleGoalClicks(root);
+}
+
+document.getElementById('tabs').addEventListener('click', (e)=>{
+  const btn = e.target.closest('.tab-btn');
+  if (!btn) return;
+  activeTab = btn.dataset.tab;
+  renderActiveTab();
+});
+document.getElementById('scenarioToggle').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  state.meta.scenario = btn.dataset.scenario;
+  persist();
+  renderActiveTab();
+});
+document.getElementById('monthPickerButton').addEventListener('click', (e)=>{
+  e.stopPropagation();
+  const control = document.getElementById('monthControl');
+  if (control.classList.contains('open')) closeMonthPicker();
+  else openMonthPicker();
+});
+document.getElementById('monthPickerPanel').addEventListener('click', (e)=>{
+  const yearBtn = e.target.closest('[data-month-year]');
+  if (yearBtn){
+    const currentMonth = getSelectedMonth().slice(5,7);
+    setSelectedMonth(yearBtn.dataset.monthYear + '-' + currentMonth);
+    persist();
+    renderActiveTab();
+    openMonthPicker();
+    return;
+  }
+  const monthBtn = e.target.closest('[data-month-value]');
+  if (monthBtn){
+    setSelectedMonth(monthBtn.dataset.monthValue);
+    persist();
+    closeMonthPicker();
+    renderActiveTab();
+  }
+});
+document.addEventListener('click', (e)=>{
+  if (!document.getElementById('monthControl')?.contains(e.target)) closeMonthPicker();
+});
+document.addEventListener('keydown', (e)=>{
+  if (e.key === 'Escape') closeMonthPicker();
+});
+document.getElementById('btnCopyPreviousMonth').addEventListener('click', ()=>{
+  if (copyPreviousMonth()){
+    persist();
+    renderActiveTab();
+  }
+});
+
+renderActiveTab();
+CloudAdapter.connect();
+
+</script>
+</body>
+</html>
+
+
+
