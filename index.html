@@ -15,39 +15,44 @@
   --text:#2f1f18;
   --text-dim:#705f52;
   --text-faint:#a49282;
-  --navy:#d76a45;
-  --navy-bright:#c95734;
-  --navy-deep:#fae4d7;
+  --navy:#6f8a55;
+  --navy-bright:#5d7648;
+  --navy-deep:#edf3e6;
   --green:#7c8e49;
+  --green-soft:#9aae74;
   --green-bg:#eef1df;
+  --blue:#4d7fb8;
+  --blue-bg:#e9f1fb;
+  --terracotta:#c96a48;
   --red:#9f4639;
   --red-bg:#f8e8df;
   --amber:#dfad63;
+  --muted:#8e7d6f;
   --warm:#fff3e6;
   --radius:18px;
   --radius-sm:13px;
-  --shadow:0 22px 46px rgba(86,56,31,.12), 0 7px 18px rgba(86,56,31,.07);
-  --shadow-soft:0 14px 28px rgba(86,56,31,.09), 0 2px 8px rgba(86,56,31,.05);
+  --shadow:0 18px 38px rgba(86,56,31,.09), 0 5px 14px rgba(86,56,31,.05);
+  --shadow-soft:0 10px 24px rgba(86,56,31,.07), 0 2px 8px rgba(86,56,31,.04);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;background:var(--bg);color:var(--text);}
 body{
   background:
-    radial-gradient(900px 420px at 18% -10%, rgba(216,106,69,.12), transparent 58%),
+    radial-gradient(900px 420px at 18% -10%, rgba(124,142,73,.12), transparent 58%),
     radial-gradient(700px 360px at 100% 0%, rgba(124,142,73,.10), transparent 55%),
     linear-gradient(180deg, #fffaf4 0%, var(--bg) 52%, #f7ecdf 100%),
     var(--bg);
   min-height:100vh;
   padding-bottom:34px;
 }
-::selection{background:rgba(216,106,69,.20);}
+::selection{background:rgba(124,142,73,.22);}
 input, select{
   font-family:inherit; color:var(--text); background:#fffaf4;
   border:1px solid var(--border); border-radius:10px; padding:7px 9px; font-size:12.5px;
   outline:none; transition:border-color .16s, box-shadow .16s, background .16s;
 }
-input:focus, select:focus{ border-color:var(--navy); background:#fff; box-shadow:0 0 0 4px rgba(216,106,69,.14); }
+input:focus, select:focus{ border-color:var(--navy); background:#fff; box-shadow:0 0 0 4px rgba(124,142,73,.16); }
 input[type=number]{ text-align:right; width:100px; }
 input[type=number]::-webkit-outer-spin-button,
 input[type=number]::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
@@ -67,7 +72,7 @@ button{
   font-size:12.5px; font-weight:650; transition:background .16s, border-color .16s, box-shadow .16s, color .16s, transform .16s;
 }
 button:hover{ background:var(--card-hover); border-color:#e0c2ac; box-shadow:var(--shadow-soft); transform:translateY(-1px); }
-button.primary{ background:var(--navy); border-color:var(--navy); color:#fff; box-shadow:0 8px 18px rgba(216,106,69,.18); }
+button.primary{ background:var(--navy); border-color:var(--navy); color:#fff; box-shadow:0 8px 18px rgba(124,142,73,.18); }
 button.primary:hover{ background:var(--navy-bright); border-color:var(--navy-bright); }
 button.ghost{ background:#fffdfa; border:1px dashed #dfc9b4; color:var(--text-dim); }
 button.danger-ghost{ background:transparent; border:1px solid transparent; color:var(--text-faint); padding:3px 6px; font-size:15px; line-height:1; }
@@ -82,17 +87,19 @@ button.small{ padding:4px 8px; font-size:12px; }
 }
 .topbar-inner{ max-width:1320px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; gap:18px; flex-wrap:wrap; }
 .brand{ display:flex; align-items:center; gap:14px; min-width:280px; }
-.brand-dot{ width:38px; height:38px; border-radius:12px 22px 12px 22px; background:linear-gradient(135deg, #d76a45, #7c8e49); box-shadow:0 12px 24px rgba(216,106,69,.20); position:relative; }
+.brand-dot{ width:38px; height:38px; border-radius:12px 22px 12px 22px; background:linear-gradient(135deg, var(--green), var(--blue)); box-shadow:0 12px 24px rgba(124,142,73,.18); position:relative; }
 .brand-dot::after{ content:""; position:absolute; width:18px; height:10px; border:3px solid #fff; border-top:0; border-right:0; left:10px; top:13px; transform:rotate(-35deg); border-radius:0 0 0 10px; }
 .brand h1{ font-size:27px; margin:0; font-weight:780; letter-spacing:-.02em; color:#2f1f18; line-height:1.12; }
 .brand-subtitle{ color:#846f5f; font-size:13px; line-height:1.35; margin-top:5px; max-width:620px; }
-.save-status{ font-size:14px; color:#846f5f; margin-top:6px; display:flex; align-items:center; gap:8px; }
+.save-status{ font-size:14px; color:#846f5f; margin-top:6px; display:flex; align-items:center; gap:8px; cursor:pointer; width:max-content; max-width:100%; }
 .save-status::before{ content:""; width:9px; height:9px; border-radius:50%; background:var(--green); box-shadow:0 0 0 4px rgba(124,142,73,.12); flex:0 0 auto; }
+.save-status.offline::before{ background:var(--red); box-shadow:0 0 0 4px rgba(159,70,57,.11); }
+.save-status:hover{ color:var(--text); }
 
 .scenario-toggle{ display:flex; align-items:center; gap:4px; background:#fffdfa; border:1px solid var(--border); border-radius:18px; padding:4px; box-shadow:0 10px 26px rgba(86,56,31,.07); }
 .scenario-toggle button{ border:none; background:transparent; border-radius:14px; padding:11px 27px; font-size:14px; color:var(--text-dim); box-shadow:none; min-width:138px; }
-.scenario-toggle button:hover{ background:#fff4ea; box-shadow:none; transform:none; }
-.scenario-toggle button.active{ background:#fff5ee; color:#a9482c; box-shadow:inset 0 0 0 1px rgba(216,106,69,.22), 0 8px 18px rgba(216,106,69,.12); }
+.scenario-toggle button:hover{ background:#f4f7ee; box-shadow:none; transform:none; }
+.scenario-toggle button.active{ background:var(--navy-deep); color:var(--navy-bright); box-shadow:inset 0 0 0 1px rgba(124,142,73,.22), 0 8px 18px rgba(124,142,73,.12); }
 
 .tabs{ max-width:1320px; margin:16px auto 0; padding:0 18px; display:flex; gap:10px; flex-wrap:wrap; }
 .tab-btn{ background:rgba(255,253,250,.92); border:1px solid var(--border); color:#705f52; border-radius:999px; padding:12px 22px; font-size:14px; box-shadow:0 10px 24px rgba(86,56,31,.06); min-height:48px; display:flex; align-items:center; gap:10px; }
@@ -100,14 +107,14 @@ button.small{ padding:4px 8px; font-size:12px; }
 .tab-btn:last-child{ border-radius:999px; }
 .tab-btn + .tab-btn{ margin-left:0; }
 .tab-btn::before{ color:#86604c; font-size:15px; font-weight:800; min-width:18px; text-align:center; }
-.tab-btn[data-tab="dashboard"]::before{ content:"▥"; color:#d76a45; }
+.tab-btn[data-tab="dashboard"]::before{ content:"▥"; color:var(--green); }
 .tab-btn[data-tab="gezamenlijk"]::before{ content:"♚"; }
 .tab-btn[data-tab="dion"]::before,
-.tab-btn[data-tab="dara"]::before{ content:"D"; background:#fae4d7; color:#c95734; width:24px; height:24px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:12px; min-width:24px; }
+.tab-btn[data-tab="dara"]::before{ content:"D"; background:var(--blue-bg); color:var(--blue); width:24px; height:24px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:12px; min-width:24px; }
 .tab-btn[data-tab="spaardoelen"]::before{ content:"◎"; }
 .tab-btn[data-tab="data"]::before{ content:"☁"; }
-.tab-btn:hover{ background:#fff7ef; color:var(--text); border-color:#e1c5ad; box-shadow:none; transform:none; }
-.tab-btn.active{ background:#d76a45; color:#fff; border-color:#d76a45; box-shadow:0 12px 24px rgba(216,106,69,.18); z-index:1; }
+.tab-btn:hover{ background:#f7f9f2; color:var(--text); border-color:#cfdcbe; box-shadow:none; transform:none; }
+.tab-btn.active{ background:var(--navy); color:#fff; border-color:var(--navy); box-shadow:0 12px 24px rgba(124,142,73,.18); z-index:1; }
 .tab-btn.active::before{ color:#fff; }
 .tab-btn.active[data-tab="dion"]::before,
 .tab-btn.active[data-tab="dara"]::before{ background:rgba(255,255,255,.22); color:#fff; }
@@ -117,10 +124,10 @@ button.small{ padding:4px 8px; font-size:12px; }
 
 .card{
   background:var(--card); border:1px solid var(--border); border-radius:var(--radius);
-  padding:24px; margin-bottom:22px; box-shadow:var(--shadow); transform:translateY(-2px);
+  padding:22px; margin-bottom:20px; box-shadow:var(--shadow); transform:none;
   transition:box-shadow .18s ease, transform .18s ease, border-color .18s ease;
 }
-.card:hover{ box-shadow:0 28px 58px rgba(86,56,31,.14), 0 10px 24px rgba(86,56,31,.08); transform:translateY(-4px); border-color:#e6ccb5; }
+.card:hover{ box-shadow:0 20px 42px rgba(86,56,31,.11), 0 8px 20px rgba(86,56,31,.06); transform:translateY(-1px); border-color:#e1d0bb; }
 .card-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; gap:10px; flex-wrap:wrap; }
 .card-head h2{ font-size:20px; margin:0; font-weight:760; color:#2f1f18; letter-spacing:-.02em; }
 .card-head .hint{ font-size:14px; color:#846f5f; }
@@ -161,8 +168,8 @@ td.num{ text-align:right; }
 .list-summary .hint{ font-size:11.5px; color:var(--text-faint); }
 .move-select{ width:116px; padding:4px 6px; font-size:12px; }
 
-.progress-track{ background:#f0e2d2; border:1px solid #ead8c2; border-radius:999px; height:9px; overflow:hidden; width:100%; min-width:70px; }
-.progress-fill{ height:100%; background:linear-gradient(90deg, var(--navy), var(--green)); border-radius:999px; }
+.progress-track{ background:#ece4d8; border:1px solid #e5d7c7; border-radius:999px; height:9px; overflow:hidden; width:100%; min-width:70px; }
+.progress-fill{ height:100%; background:linear-gradient(90deg, var(--blue), var(--green)); border-radius:999px; }
 .progress-label{ font-size:11px; color:var(--text-dim); margin-top:3px; text-align:right; }
 
 .donut-row{ display:flex; gap:14px; flex-wrap:wrap; }
@@ -226,7 +233,7 @@ td.num{ text-align:right; }
 .favorite-goal{ display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; position:relative; cursor:pointer; }
 .favorite-goal input{ position:absolute; opacity:0; width:1px; height:1px; pointer-events:none; }
 .favorite-goal span{ display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:999px; color:#c0aa8f; border:1px solid var(--border); background:#fff8f0; font-size:15px; line-height:1; }
-.favorite-goal input:checked + span{ color:#d76a45; background:#fff0df; border-color:#e0ad81; box-shadow:0 8px 18px rgba(216,106,69,.14); }
+.favorite-goal input:checked + span{ color:var(--terracotta); background:#fff0df; border-color:#e0ad81; box-shadow:0 8px 18px rgba(201,106,72,.14); }
 .goal-order{ display:flex; flex-direction:column; gap:3px; align-items:center; }
 .goal-order button{ width:24px; height:22px; padding:0; line-height:1; font-size:12px; }
 .goal-order button:disabled{ opacity:.28; cursor:not-allowed; }
@@ -263,8 +270,8 @@ td.num{ text-align:right; }
 .summary-line:last-child{ border-bottom:none; }
 .summary-line strong, .summary-line .num{ font-variant-numeric:tabular-nums; }
 .split-bar{ display:flex; height:12px; border-radius:999px; overflow:hidden; background:#f0e2d2; margin:12px 0 8px; }
-.split-bar span:first-child{ background:var(--green); }
-.split-bar span:last-child{ background:var(--navy); }
+.split-bar span:first-child{ background:var(--blue); }
+.split-bar span:last-child{ background:var(--green); }
 .progress-list{ display:grid; gap:12px; }
 .progress-item{ display:grid; gap:5px; }
 .progress-top{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; font-size:13px; }
@@ -285,7 +292,36 @@ td.num{ text-align:right; }
 .month-block.green{ background:var(--green-bg); color:var(--green); border-color:#d9dfbc; }
 .month-block.amber{ background:#fff1d6; color:#a76c20; border-color:#efd4a0; }
 .month-block.red{ background:var(--red-bg); color:var(--red); border-color:#edc8bd; }
-.month-block.active{ outline:2px solid var(--navy); }
+.month-block.active{ outline:2px solid var(--navy); outline-offset:2px; }
+.goal-preview-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; }
+.goal-preview-card{
+  background:#fff8f0; border:1px solid var(--border-soft); border-radius:16px;
+  padding:13px; display:grid; gap:9px; min-width:0;
+}
+.goal-preview-top{ display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+.goal-preview-name{ display:flex; gap:9px; align-items:flex-start; min-width:0; }
+.goal-preview-icon{
+  width:30px; height:30px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center;
+  background:var(--green-bg); color:var(--green); font-size:14px; flex:0 0 auto;
+}
+.goal-preview-title{ font-weight:800; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.goal-preview-owner{ color:var(--text-faint); font-size:11px; margin-top:2px; }
+.goal-preview-money{ display:flex; align-items:center; justify-content:space-between; gap:8px; color:var(--text-dim); font-size:12px; }
+.year-mini{ display:grid; gap:9px; }
+.year-row{ display:grid; grid-template-columns:38px minmax(0,1fr); gap:8px; align-items:center; }
+.year-month{ font-size:11px; font-weight:800; color:var(--text-dim); }
+.year-bars{ display:grid; gap:3px; }
+.year-bar{ height:5px; border-radius:999px; background:#ece4d8; overflow:hidden; }
+.year-bar span{ display:block; height:100%; border-radius:999px; }
+.year-bar.income span{ background:var(--green); }
+.year-bar.spent span{ background:var(--blue); }
+.year-bar.saving span{ background:var(--terracotta); opacity:.75; }
+.year-legend{ display:flex; gap:10px; flex-wrap:wrap; color:var(--text-faint); font-size:11px; margin-top:10px; }
+.year-legend span{ display:inline-flex; align-items:center; gap:5px; }
+.year-legend i{ width:9px; height:9px; border-radius:999px; display:inline-block; }
+.year-legend .income-dot{ background:var(--green); }
+.year-legend .spent-dot{ background:var(--blue); }
+.year-legend .saving-dot{ background:var(--terracotta); }
 .modal-backdrop{ position:fixed; inset:0; background:rgba(47,31,24,.22); display:none; align-items:center; justify-content:center; z-index:50; padding:18px; }
 .modal-backdrop.open{ display:flex; }
 .modal{ width:min(520px,100%); background:var(--card); border:1px solid var(--border); border-radius:22px; box-shadow:0 28px 70px rgba(47,31,24,.22); padding:22px; }
@@ -297,25 +333,41 @@ td.num{ text-align:right; }
 
 @media (max-width:640px){
   html,body{ overflow-x:hidden; }
-  .topbar{ padding:20px 10px 14px; }
-  .topbar-inner{ flex-direction:column; align-items:stretch; }
-  .brand{ min-width:0; }
-  .brand-dot{ width:32px; height:32px; }
-  .brand h1{ font-size:22px; line-height:1.15; }
-  .brand-subtitle{ font-size:12px; max-width:none; }
-  .save-status{ line-height:1.25; }
-  .scenario-toggle{ border-radius:30px; }
-  .scenario-toggle button{ flex:1 1 0; padding:8px 10px; }
-  .tabs{ padding:0 12px; gap:8px; }
-  .tab-btn{ padding:10px 13px; line-height:1.15; border-radius:13px; margin-left:0; min-height:44px; }
+  body{ padding-bottom:86px; }
+  .topbar{ padding:7px 10px 6px; }
+  .topbar-inner{ flex-direction:column; align-items:stretch; gap:6px; }
+  .brand{ min-width:0; gap:8px; align-items:center; }
+  .brand-dot{ width:24px; height:24px; border-radius:8px 15px 8px 15px; }
+  .brand-dot::after{ width:11px; height:6px; border-width:2px; left:7px; top:8px; }
+  .brand h1{ font-size:18px; line-height:1.05; }
+  .brand-subtitle{ display:none; }
+  .save-status{
+    display:inline-flex; width:max-content; max-width:100%; margin-top:3px; padding:3px 7px;
+    border:1px solid var(--border-soft); border-radius:999px; background:rgba(255,253,250,.85);
+    font-size:10.5px; line-height:1.1; color:var(--text-dim);
+  }
+  .save-status::before{ width:7px; height:7px; box-shadow:0 0 0 3px rgba(124,142,73,.10); }
+  .top-actions{ display:grid; grid-template-columns:1fr 1fr; gap:5px; align-items:stretch; }
+  .top-actions button{ min-height:32px; white-space:nowrap; }
+  .scenario-toggle{ grid-column:1/-1; border-radius:999px; padding:3px; }
+  .scenario-toggle button{ flex:1 1 0; padding:6px 9px; min-width:0; font-size:12px; }
+  .tabs{
+    padding:0 10px 3px; margin-top:6px; gap:6px; flex-wrap:nowrap; overflow-x:auto;
+    -webkit-overflow-scrolling:touch; scrollbar-width:none;
+  }
+  .tabs::-webkit-scrollbar{ display:none; }
+  .tab-btn{ flex:0 0 auto; padding:6px 10px; line-height:1.1; border-radius:999px; margin-left:0; min-height:34px; font-size:12px; white-space:nowrap; }
   .tab-btn:first-child,
-  .tab-btn:last-child{ border-radius:13px; }
+  .tab-btn:last-child{ border-radius:999px; }
   .tab-btn + .tab-btn{ margin-left:0; }
   .tab-btn::before{ display:none; }
-  .wrap{ padding:0 12px; margin:12px auto; width:100%; max-width:100%; overflow-x:hidden; }
-  .card{ padding:18px; border-radius:16px; }
-  .card-head h2{ font-size:18px; }
-  .kpi{ padding:16px 18px; }
+  .wrap{ padding:0 10px; margin:10px auto; width:100%; max-width:100%; overflow-x:hidden; }
+  .card{ padding:14px; border-radius:15px; margin-bottom:12px; box-shadow:var(--shadow-soft); }
+  .card:hover{ transform:none; box-shadow:var(--shadow-soft); }
+  .card-head{ margin-bottom:12px; }
+  .card-head h2{ font-size:16px; }
+  .card-head .hint{ font-size:12px; }
+  .kpi{ padding:13px 14px; }
   .kpi .value{ font-size:20px; overflow-wrap:anywhere; }
   .goal-grid{ grid-template-columns:repeat(2,1fr); }
   .compact-layout{ grid-template-columns:1fr; }
@@ -338,12 +390,30 @@ td.num{ text-align:right; }
   .month-picker-btn{ width:100%; }
   .month-popover{ left:0; right:auto; width:100%; }
   .scroll-area.table-scroll{ height:300px; max-height:300px; }
-  .copy-month-btn{ width:100%; }
-  .dashboard-grid{ grid-template-columns:minmax(0,1fr); width:100%; max-width:100%; overflow-x:hidden; }
+  .copy-month-btn{ width:100%; padding-left:8px; padding-right:8px; overflow:hidden; text-overflow:ellipsis; font-size:11.5px; }
+  .quick-actions{ margin-bottom:8px !important; }
+  .quick-actions .primary[data-open-transaction]{
+    position:fixed; right:16px; bottom:calc(16px + env(safe-area-inset-bottom)); z-index:45;
+    border-radius:999px; padding:12px 16px; box-shadow:0 16px 30px rgba(124,142,73,.22);
+  }
+  .quick-actions .hint{ font-size:12px; }
+  .dashboard-grid{ grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; width:100%; max-width:100%; overflow-x:hidden; }
   .dashboard-grid > .card{ width:100%; max-width:100%; }
-  .span-3,.span-4,.span-5,.span-6,.span-7,.span-8,.span-12{ grid-column:span 1; }
+  .span-3{ grid-column:span 1; }
+  .span-4,.span-5,.span-6,.span-7,.span-8,.span-12{ grid-column:1/-1; }
+  .metric-card{ min-height:112px; }
+  .metric-label{ font-size:11.5px; }
+  .metric-value{ font-size:19px; }
+  .metric-sub{ font-size:10.5px; }
+  .inline-edit{ font-size:18px !important; }
+  .goal-preview-grid{ grid-template-columns:1fr; }
+  .year-row{ grid-template-columns:34px minmax(0,1fr); }
   .month-blocks{ grid-template-columns:repeat(4,1fr); }
   .modal-grid{ grid-template-columns:1fr; }
+}
+@media (max-width:370px){
+  .dashboard-grid{ grid-template-columns:minmax(0,1fr); }
+  .span-3{ grid-column:1/-1; }
 }
 </style>
 </head>
@@ -377,7 +447,6 @@ td.num{ text-align:right; }
     <button class="tab-btn" data-tab="dion">Dion</button>
     <button class="tab-btn" data-tab="dara">Dara</button>
     <button class="tab-btn" data-tab="spaardoelen">Spaardoelen</button>
-    <button class="tab-btn" data-tab="data">Data &amp; back-up</button>
   </div>
 </div>
 
@@ -540,6 +609,20 @@ function normalizeGoalDefaults(){
     });
   });
 }
+function normalizePersonDefaults(target){
+  target.personen = isPlainObject(target.personen) ? target.personen : {};
+  ['dion','dara'].forEach(person=>{
+    target.personen[person] = isPlainObject(target.personen[person]) ? target.personen[person] : {};
+    target.personen[person].naam = target.personen[person].naam || (person === 'dion' ? 'Dion' : 'Dara');
+    target.personen[person].salaris = Number(target.personen[person].salaris)||0;
+    const rows = Array.isArray(target.personen[person].vasteTeruggaven) ? target.personen[person].vasteTeruggaven : [];
+    target.personen[person].vasteTeruggaven = rows.filter(isPlainObject).map(row=>({
+      id: row.id || uid(),
+      omschrijving: row.omschrijving ?? row.post ?? '',
+      bedrag: Number(row.bedrag)||0
+    }));
+  });
+}
 function normalizeBudgetState(candidate){
   const normalized = candidate || defaultState();
   normalized.meta = isPlainObject(normalized.meta) ? normalized.meta : {};
@@ -548,17 +631,27 @@ function normalizeBudgetState(candidate){
   normalized.monthlyIncome = isPlainObject(normalized.monthlyIncome) ? normalized.monthlyIncome : {};
   normalized.monthlyBudgets = isPlainObject(normalized.monthlyBudgets) ? normalized.monthlyBudgets : {};
   normalized.transactions = Array.isArray(normalized.transactions) ? normalized.transactions : [];
+  normalizePersonDefaults(normalized);
   state = normalized;
   ensureMonthData(normalized.meta.selectedMonth);
   normalizeGoalDefaults();
   return normalized;
 }
-function getMonthlyIncome(person){
+function getMonthlyBaseIncome(person){
   const month = getSelectedMonth();
   ensureMonthData(month);
   const monthly = Number(state.monthlyIncome?.[month]?.[person]);
   if (Number.isFinite(monthly) && monthly !== 0) return monthly;
   return Number(state.personen?.[person]?.salaris)||0;
+}
+function sumVasteTeruggaven(person){
+  return sumBedrag(state.personen?.[person]?.vasteTeruggaven || []);
+}
+function getTotalMonthlyIncome(person){
+  return round2(getMonthlyBaseIncome(person) + sumVasteTeruggaven(person));
+}
+function getMonthlyIncome(person){
+  return getMonthlyBaseIncome(person);
 }
 function setMonthlyIncome(person, amount){
   const month = getSelectedMonth();
@@ -695,8 +788,12 @@ function calcGroep(doelen, spaarpotDezeMaand, today){
 }
 function calcScenario(state){
   const scenario = state.meta.scenario;
-  const salarisDion = getMonthlyIncome('dion');
-  const salarisDara = getMonthlyIncome('dara');
+  const basisInkomenDion = getMonthlyBaseIncome('dion');
+  const basisInkomenDara = getMonthlyBaseIncome('dara');
+  const vasteTeruggavenDion = sumVasteTeruggaven('dion');
+  const vasteTeruggavenDara = sumVasteTeruggaven('dara');
+  const salarisDion = round2(basisInkomenDion + vasteTeruggavenDion);
+  const salarisDara = round2(basisInkomenDara + vasteTeruggavenDara);
   const totaalSalaris = salarisDion + salarisDara;
   const inkomenRatioDion = totaalSalaris>0 ? salarisDion/totaalSalaris : 0;
   const inkomenRatioDara = totaalSalaris>0 ? salarisDara/totaalSalaris : 0;
@@ -734,7 +831,8 @@ function calcScenario(state){
   const dion = { zakgeld: zakgeldDion, ...persoonlijk('dion', zakgeldDion) };
   const dara = { zakgeld: zakgeldDara, ...persoonlijk('dara', zakgeldDara) };
   return {
-    totaalSalaris, inkomenRatioDion, inkomenRatioDara,
+    basisInkomenDion, basisInkomenDara, vasteTeruggavenDion, vasteTeruggavenDara,
+    salarisDion, salarisDara, totaalSalaris, inkomenRatioDion, inkomenRatioDara,
     vasteLastenTotaal: round2(vasteLastenTotaal + hypotheekBedrag),
     gezamenlijkeLastenTotaal: round2(vasteLastenTotaal + hypotheekBedrag + variabelVoorVerdelingTotaal),
     overigeVasteLastenTotaal: vasteLastenTotaal, hypotheekBedrag,
@@ -750,8 +848,8 @@ function defaultState(){
   return {
     meta: { scenario:'voor', selectedMonth: monthKey() },
     personen: {
-      dion: { naam:'Dion', salaris:2450 },
-      dara: { naam:'Dara', salaris:3010 },
+      dion: { naam:'Dion', salaris:2450, vasteTeruggaven: [] },
+      dara: { naam:'Dara', salaris:3010, vasteTeruggaven: [] },
     },
     voor: {
       verdeling: { minimumDion: 0.40 },
@@ -946,6 +1044,9 @@ function validateBudgetState(candidate){
   }
   ['dion','dara'].forEach(person=>{
     if (!isPlainObject(candidate.personen[person])) errors.push('Persoon ontbreekt: ' + person + '.');
+    else if (candidate.personen[person].vasteTeruggaven !== undefined){
+      validateRows(candidate.personen[person].vasteTeruggaven, 'personen.' + person + '.vasteTeruggaven', errors);
+    }
   });
 
   ['voor','na'].forEach(scenario=>{
@@ -1200,14 +1301,22 @@ const TODAY = new Date();
 function persist(){
   const ok = DataAdapter.save(state);
   const el = document.getElementById('saveStatus');
-  if (el) el.textContent = ok ? ('Lokaal opgeslagen · ' + new Date().toLocaleTimeString('nl-NL')) : 'Opslaan mislukt';
+  if (el && !CloudAdapter.isConnected()){
+    el.textContent = ok ? 'Offline · lokaal opgeslagen' : 'Opslaan mislukt';
+    el.classList.toggle('offline', true);
+  }
 }
 
 function renderCloudStatus(){
   const cloud = document.getElementById('cloudStatus');
   if (cloud) cloud.textContent = CloudAdapter.statusText();
   const save = document.getElementById('saveStatus');
-  if (save && CloudAdapter.isConnected()) save.textContent = CloudAdapter.statusText();
+  if (save){
+    const online = CloudAdapter.isConnected() && !/^Firebase (live-sync fout|opslaan mislukt|fout|data ongeldig)/i.test(CloudAdapter.statusText());
+    save.textContent = online ? 'Online' : 'Offline';
+    save.title = CloudAdapter.statusText() + ' · klik voor back-up en cloud';
+    save.classList.toggle('offline', !online);
+  }
 }
 
 /* ---------- generieke input-binding ---------- */
@@ -1306,12 +1415,42 @@ function renderRowsTable(basePath, rows, opts={}){
   `;
 }
 
+function renderTeruggavenTable(basePath, rows){
+  const total = sumBedrag(rows);
+  const useScroll = (rows||[]).length > 5;
+  const rowsHtml = (rows||[]).map((r,i)=>`
+    <tr>
+      <td><input type="text" data-path="${basePath}.${i}.omschrijving" placeholder="Omschrijving"></td>
+      <td class="num"><input type="number" step="0.01" data-path="${basePath}.${i}.bedrag"></td>
+      <td class="row-actions"><button class="danger-ghost" data-remove="${basePath}.${i}" title="Verwijderen">×</button></td>
+    </tr>
+  `).join('');
+  return `
+    <div class="${useScroll ? 'scroll-area table-scroll' : ''}">
+    <table>
+      <thead><tr><th>Omschrijving</th><th style="text-align:right">Bedrag</th><th></th></tr></thead>
+      <tbody>${rowsHtml || '<tr><td colspan="3" style="color:var(--text-faint)">Nog geen vaste teruggaven.</td></tr>'}</tbody>
+      <tfoot><tr class="tot-row"><td>Totaal per maand</td><td class="num">${eur(total)}</td><td></td></tr></tfoot>
+    </table>
+    </div>
+    <button class="ghost small add-row-btn" data-addrefund="${basePath}">+ Teruggave toevoegen</button>
+  `;
+}
+
 function handleTableClicks(root){
   root.querySelectorAll('[data-addrow]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const path = btn.dataset.addrow;
       const arr = getPath(state, path);
       arr.push({id:uid(), categorie:'', post:'', bedrag:0});
+      persist(); renderActiveTab();
+    });
+  });
+  root.querySelectorAll('[data-addrefund]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const path = btn.dataset.addrefund;
+      const arr = getPath(state, path);
+      arr.push({id:uid(), omschrijving:'', bedrag:0});
       persist(); renderActiveTab();
     });
   });
@@ -1532,39 +1671,62 @@ function renderDashboard(){
     {owner:'Dion', items:dionGoals},
     {owner:'Dara', items:daraGoals},
   ];
-  const goalRows = favoriteGoals.length ? favoriteGoals.slice(0,5).map(g=>{
+  const goalCards = favoriteGoals.length ? favoriteGoals.slice(0,5).map(g=>{
     const doelbedrag = Number(g.doel.doelbedrag)||0;
     const algespaard = Number(g.doel.algespaard)||0;
     const barPct = doelbedrag>0 ? Math.min(100, Math.round((algespaard/doelbedrag)*100)) : 0;
     const badge = barPct >= 100 ? 'Op schema' : 'Nog te gaan';
-    return `<tr><td>★ ${g.doel.naam || 'Spaardoel'}<div class="progress-label" style="text-align:left">${g.owner}</div></td>
-      <td class="num">${eur(algespaard)} / ${eur(doelbedrag)}</td>
-      <td><div class="progress-track"><div class="progress-fill" style="width:${barPct}%"></div></div></td>
-      <td><span class="status-badge ${barPct>=100?'':'amber'}">${badge}</span></td></tr>`;
+    return `<div class="goal-preview-card">
+      <div class="goal-preview-top">
+        <div class="goal-preview-name"><span class="goal-preview-icon">★</span><div><div class="goal-preview-title">${g.doel.naam || 'Spaardoel'}</div><div class="goal-preview-owner">${g.owner}</div></div></div>
+        <span class="status-badge ${barPct>=100?'':'amber'}">${badge}</span>
+      </div>
+      <div class="goal-preview-money"><span>${eur(algespaard)} / ${eur(doelbedrag)}</span><strong>${barPct}%</strong></div>
+      <div class="progress-track"><div class="progress-fill" style="width:${barPct}%"></div></div>
+    </div>`;
   }).join('') : fallbackGoalGroups.map(group=>{
     const doelbedrag = round2(group.items.reduce((s,g)=>s+(Number(g.doel.doelbedrag)||0),0));
     const algespaard = round2(group.items.reduce((s,g)=>s+(Number(g.doel.algespaard)||0),0));
     const barPct = doelbedrag>0 ? Math.min(100, Math.round((algespaard/doelbedrag)*100)) : 0;
-    return `<tr><td>${group.owner}<div class="progress-label" style="text-align:left">Totaal spaardoelen</div></td>
-      <td class="num">${eur(algespaard)} / ${eur(doelbedrag)}</td>
-      <td><div class="progress-track"><div class="progress-fill" style="width:${barPct}%"></div></div></td>
-      <td><span class="status-badge muted">Totaal</span></td></tr>`;
+    return `<div class="goal-preview-card">
+      <div class="goal-preview-top">
+        <div class="goal-preview-name"><span class="goal-preview-icon">◎</span><div><div class="goal-preview-title">${group.owner}</div><div class="goal-preview-owner">Totaal spaardoelen</div></div></div>
+        <span class="status-badge muted">Totaal</span>
+      </div>
+      <div class="goal-preview-money"><span>${eur(algespaard)} / ${eur(doelbedrag)}</span><strong>${barPct}%</strong></div>
+      <div class="progress-track"><div class="progress-fill" style="width:${barPct}%"></div></div>
+    </div>`;
   }).join('');
   const year = Number(getSelectedMonth().slice(0,4));
-  const monthBlocks = Array.from({length:12}, (_,i)=>{
+  const yearData = Array.from({length:12}, (_,i)=>{
     const key = monthKey(new Date(year, i, 1));
-    const income = (state.monthlyIncome?.[key]?.dion || 0) + (state.monthlyIncome?.[key]?.dara || 0);
+    const baseIncome = (state.monthlyIncome?.[key]?.dion || 0) + (state.monthlyIncome?.[key]?.dara || 0);
+    const refunds = baseIncome > 0 ? sumVasteTeruggaven('dion') + sumVasteTeruggaven('dara') : 0;
+    const income = round2(baseIncome + refunds);
     const spent = sumTransactions(null, null, key);
-    const active = key === getSelectedMonth() ? ' active' : '';
-    const cls = income === 0 && spent === 0 ? 'muted' : (income - spent > 0 ? 'green' : 'red');
-    return `<div class="month-block ${cls}${active}">${['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Nov','Dec'][i]}</div>`;
+    const hasMonthData = income > 0 || spent > 0;
+    const saving = hasMonthData ? Number(r.spaarpotDezeMaand)||0 : 0;
+    return { key, name:['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Nov','Dec'][i], income, spent, saving };
+  });
+  const maxYearValue = Math.max(1, ...yearData.flatMap(m=>[m.income, m.spent, m.saving]));
+  const monthBlocks = yearData.map(m=>{
+    const active = m.key === getSelectedMonth() ? ' active' : '';
+    const cls = m.income === 0 && m.spent === 0 && m.saving === 0 ? 'muted' : (m.income - m.spent - m.saving >= 0 ? 'green' : 'red');
+    return `<div class="year-row ${cls}${active}">
+      <div class="year-month">${m.name}</div>
+      <div class="year-bars" title="${m.name}: inkomen ${eur(m.income)}, uitgaven ${eur(m.spent)}, sparen ${eur(m.saving)}">
+        <div class="year-bar income"><span style="width:${Math.round((m.income/maxYearValue)*100)}%"></span></div>
+        <div class="year-bar spent"><span style="width:${Math.round((m.spent/maxYearValue)*100)}%"></span></div>
+        <div class="year-bar saving"><span style="width:${Math.round((m.saving/maxYearValue)*100)}%"></span></div>
+      </div>
+    </div>`;
   }).join('');
   const personSummary = (label,rr)=>`
     <div class="card span-4">
       <div class="card-head"><h2>${label}</h2></div>
       <div class="summary-list">
         <div class="summary-line"><span>Zakgeld ontvangen</span><strong>${eur(rr.zakgeld)}</strong></div>
-        <div class="summary-line"><span>Persoonlijke vaste lasten</span><strong>${eur(rr.persoonlijkeVasteLasten)}</strong></div>
+        <div class="summary-line"><span>Persoonlijke vaste lasten / correcties</span><strong>${eur(rr.persoonlijkeVasteLasten)}</strong></div>
         <div class="summary-line"><span>Uitgaven deze maand</span><strong>${eur(rr.variabeleUitgaven)}</strong></div>
         <div class="summary-line"><span>Beschikbaar voor sparen/vrij gebruik</span><strong class="${rr.beschikbaarVoorSparen<0?'value neg':'value pos'}">${eur(rr.beschikbaarVoorSparen)}</strong></div>
       </div>
@@ -1573,7 +1735,7 @@ function renderDashboard(){
     <div class="card span-4">
       <div class="card-head"><h2>Gezamenlijk</h2></div>
       <div class="summary-list">
-        <div class="summary-line"><span>Vaste lasten + variabel budget</span><strong>${eur(r.gezamenlijkeLastenTotaal)}</strong></div>
+        <div class="summary-line"><span>Gepland gezamenlijk budget</span><strong>${eur(r.gezamenlijkeLastenTotaal)}</strong></div>
         <div class="summary-line"><span>Variabel gebruikt</span><strong>${eur(r.variabelTotaal)}</strong></div>
         <div class="summary-line"><span>Sparen</span><strong>${eur(r.spaarpotDezeMaand)}</strong></div>
         <div class="summary-line"><span>Resterend voor zakgeld</span><strong class="${jointRemaining<0?'value neg':'value pos'}">${eur(jointRemaining)}</strong></div>
@@ -1586,17 +1748,17 @@ function renderDashboard(){
       <span class="hint">${monthLabel(getSelectedMonth())} · ${state.meta.scenario==='voor'?'Voor verkoop':'Na verkoop'}</span>
     </div>
     <div class="dashboard-grid">
-      <div class="card metric-card span-3"><div class="metric-label">Inkomen Dion</div><input class="inline-edit" type="number" step="0.01" data-month-income="dion"><div class="metric-sub">Komt eerst binnen op de gezamenlijke rekening</div></div>
-      <div class="card metric-card span-3"><div class="metric-label">Inkomen Dara</div><input class="inline-edit" type="number" step="0.01" data-month-income="dara"><div class="metric-sub">Komt eerst binnen op de gezamenlijke rekening</div></div>
+      <div class="card metric-card span-3"><div class="metric-label">Inkomen Dion</div><div class="metric-value value pos">${eur(r.salarisDion)}</div><input class="inline-edit" type="number" step="0.01" data-month-income="dion"><div class="metric-sub">Basisinkomen deze maand · incl. ${eur(r.vasteTeruggavenDion)} vaste teruggaven</div></div>
+      <div class="card metric-card span-3"><div class="metric-label">Inkomen Dara</div><div class="metric-value value pos">${eur(r.salarisDara)}</div><input class="inline-edit" type="number" step="0.01" data-month-income="dara"><div class="metric-sub">Basisinkomen deze maand · incl. ${eur(r.vasteTeruggavenDara)} vaste teruggaven</div></div>
       <div class="card metric-card span-3"><div class="metric-label">Totaal naar gezamenlijke rekening</div><div class="metric-value value pos">${eur(r.totaalSalaris)}</div><div class="metric-sub">Dion + Dara</div></div>
       <div class="card metric-card span-3"><div class="metric-label">Variabel gebruikt</div><div class="metric-value">${eur(r.variabelTotaal)}</div><div class="metric-sub">Budget: ${eur(r.variabelBudgetTotaal)}</div></div>
-      <div class="card span-6"><div class="card-head"><h2>Gezamenlijke rekening</h2><span class="hint">inkomen → lasten → sparen → zakgeld</span></div><div class="summary-list"><div class="summary-line"><span>Totaal inkomen</span><strong>${eur(r.totaalSalaris)}</strong></div><div class="summary-line"><span>Gezamenlijke vaste lasten + variabel budget</span><strong>${eur(r.gezamenlijkeLastenTotaal)}</strong></div><div class="summary-line"><span>Gezamenlijk variabel gebruikt</span><strong>${eur(r.variabelTotaal)}</strong></div><div class="summary-line"><span>Gezamenlijk sparen</span><strong>${eur(r.spaarpotDezeMaand)}</strong></div><div class="summary-line"><span>Resterend voor zakgeld</span><strong class="${jointRemaining<0?'value neg':'value pos'}">${eur(jointRemaining)}</strong></div></div></div>
+      <div class="card span-6"><div class="card-head"><h2>Gezamenlijke rekening</h2><span class="hint">inkomen → lasten → sparen → zakgeld</span></div><div class="summary-list"><div class="summary-line"><span>Totaal inkomen</span><strong>${eur(r.totaalSalaris)}</strong></div><div class="summary-line"><span>Gepland gezamenlijk budget</span><strong>${eur(r.gezamenlijkeLastenTotaal)}</strong></div><div class="summary-line"><span>Gezamenlijk variabel gebruikt</span><strong>${eur(r.variabelTotaal)}</strong></div><div class="summary-line"><span>Gezamenlijk sparen</span><strong>${eur(r.spaarpotDezeMaand)}</strong></div><div class="summary-line"><span>Resterend voor zakgeld</span><strong class="${jointRemaining<0?'value neg':'value pos'}">${eur(jointRemaining)}</strong></div></div></div>
       <div class="card span-6"><div class="card-head"><h2>Zakgeld teruggestort</h2><span class="hint">Dion / Dara</span></div><div class="metric-value">${eur(totalZakgeld)}</div><div class="split-bar"><span style="width:${Math.round(splitDion*100)}%"></span><span style="width:${100-Math.round(splitDion*100)}%"></span></div><div class="summary-list"><div class="summary-line"><span>Dion</span><strong>${eur(r.dion.zakgeld)} · ${pct(splitDion)}</strong></div><div class="summary-line"><span>Dara</span><strong>${eur(r.dara.zakgeld)} · ${pct(1-splitDion)}</strong></div></div></div>
       ${jointSummary}${personSummary('Dion',r.dion)}${personSummary('Dara',r.dara)}
       <div class="card span-6 card-scroll"><div class="card-head"><h2>Gezamenlijk budget deze maand</h2><span class="hint">transacties vs budget</span></div><div class="scroll-area">${budgetRows || '<p class="hint">Nog geen variabele budgetten.</p>'}</div></div>
       <div class="card span-6 card-scroll"><div class="card-head"><h2>Vaste lasten verdeling</h2><span class="hint">${eur(r.overigeVasteLastenTotaal)}</span></div><div class="scroll-area">${vasteRows || '<p class="hint">Nog geen vaste lasten.</p>'}</div></div>
-      <div class="card span-7 card-scroll"><div class="card-head"><h2>Spaardoelen voortgang</h2><span class="hint">preview</span></div><div class="scroll-area"><table><thead><tr><th>Doel</th><th style="text-align:right">Gespaard / doel</th><th>Voortgang</th><th>Status</th></tr></thead><tbody>${goalRows || '<tr><td colspan="4">Nog geen spaardoelen.</td></tr>'}</tbody></table></div></div>
-      <div class="card span-5"><div class="card-head"><h2>Jaaroverzicht ${year}</h2><span class="hint">maandstatus</span></div><div class="month-blocks">${monthBlocks}</div></div>
+      <div class="card span-7 card-scroll"><div class="card-head"><h2>Spaardoelen voortgang</h2><span class="hint">preview</span></div><div class="scroll-area"><div class="goal-preview-grid">${goalCards || '<p class="hint">Nog geen spaardoelen.</p>'}</div></div></div>
+      <div class="card span-5"><div class="card-head"><h2>Jaaroverzicht ${year}</h2><span class="hint">inkomen · uitgaven · sparen</span></div><div class="year-mini">${monthBlocks}</div><div class="year-legend"><span><i class="income-dot"></i>Inkomen</span><span><i class="spent-dot"></i>Uitgaven</span><span><i class="saving-dot"></i>Sparen</span></div></div>
     </div>
   `;
 }
@@ -1634,13 +1796,33 @@ function renderPersonOrJoint(tabId, key, label){
   const isJoint = key === 'gezamenlijk';
   const data = s[key];
   const rr = isJoint ? null : r[key];
+  const basisInkomen = isJoint ? 0 : getMonthlyBaseIncome(key);
+  const vasteTeruggaven = isJoint ? 0 : sumVasteTeruggaven(key);
+  const totaalInkomen = isJoint ? 0 : getTotalMonthlyIncome(key);
+
+  const incomeCard = isJoint ? '' : `
+    <div class="card">
+      <div class="card-head"><h2>${label} — inkomen</h2><span class="hint">${monthLabel(getSelectedMonth())}</span></div>
+      <div class="summary-list">
+        <div class="summary-line"><span>Basisinkomen deze maand</span><strong>${eur(basisInkomen)}</strong></div>
+        <div class="summary-line"><span>Vaste teruggaven</span><strong>${eur(vasteTeruggaven)}</strong></div>
+        <div class="summary-line"><span>Totaal naar gezamenlijke rekening</span><strong class="value pos">${eur(totaalInkomen)}</strong></div>
+      </div>
+    </div>`;
+
+  const refundsCard = isJoint ? '' : `
+      <div class="card">
+        <div class="card-head"><h2>Vaste teruggaven</h2></div>
+        <p class="hint" style="margin-top:-4px">Toeslagen, vergoedingen en vaste correcties die maandelijks terugkomen.</p>
+        ${renderTeruggavenTable(`personen.${key}.vasteTeruggaven`, state.personen[key].vasteTeruggaven)}
+      </div>`;
 
   const kpiCard = isJoint ? '' : `
     <div class="card">
       <div class="card-head"><h2>${label} — persoonlijk dashboard</h2></div>
       <div class="kpi-grid">
         <div class="kpi ${rr.zakgeld<0?'neg':'pos'}"><div class="label">Zakgeld volgens scenario</div><div class="value ${rr.zakgeld<0?'neg':'pos'}">${eur(rr.zakgeld)}</div></div>
-        <div class="kpi ${rr.persoonlijkeVasteLasten<0?'neg':''}"><div class="label">Persoonlijke vaste lasten</div><div class="value ${rr.persoonlijkeVasteLasten<0?'neg':''}">${eur(rr.persoonlijkeVasteLasten)}</div></div>
+        <div class="kpi ${rr.persoonlijkeVasteLasten<0?'neg':''}"><div class="label">Persoonlijke vaste lasten / correcties</div><div class="value ${rr.persoonlijkeVasteLasten<0?'neg':''}">${eur(rr.persoonlijkeVasteLasten)}</div></div>
         <div class="kpi ${rr.resterendVoorVariabel<0?'neg':'pos'}"><div class="label">Resterend voor variabel</div><div class="value ${rr.resterendVoorVariabel<0?'neg':'pos'}">${eur(rr.resterendVoorVariabel)}</div></div>
         <div class="kpi"><div class="label">Variabele uitgaven</div><div class="value">${eur(rr.variabeleUitgaven)}</div></div>
         <div class="kpi ${rr.beschikbaarVoorSparen<0?'neg':'pos'}"><div class="label">Beschikbaar voor sparen</div><div class="value ${rr.beschikbaarVoorSparen<0?'neg':'pos'}">${eur(rr.beschikbaarVoorSparen)}</div></div>
@@ -1681,9 +1863,11 @@ function renderPersonOrJoint(tabId, key, label){
   const variabelBasePath = isJoint ? `monthlyBudgets.${getSelectedMonth()}.${state.meta.scenario}.gezamenlijkVariabel` : `${state.meta.scenario}.${key}.variabel`;
 
   document.getElementById(tabId).innerHTML = `
+    ${incomeCard}
     ${kpiCard}
     ${hypotheekCard}
     <div class="compact-layout">
+      ${refundsCard}
       <div class="card">
         <div class="card-head"><h2>${isJoint?(state.meta.scenario==='na'?'Overige vaste lasten':'Vaste lasten'):label+' — eigen vaste lasten'}</h2></div>
         ${renderRowsTable(`${state.meta.scenario}.${key}.vasteLasten`, data.vasteLasten, {jaarlijks:true, moveable:true})}
@@ -1750,13 +1934,7 @@ function renderSpaardoelen(){
 function renderDataTab(){
   document.getElementById('tab-data').innerHTML = `
     <div class="card">
-      <div class="card-head"><h2>Back-up &amp; overdracht</h2>
-        <span class="hint">Alles staat nu lokaal in de browser op dit toestel</span></div>
-      <p style="color:var(--text-dim);font-size:13.5px;line-height:1.5">
-        Exporteer een JSON-bestand als back-up, of om je gegevens over te zetten naar een ander toestel
-        (of naar Dara's telefoon). Importeer datzelfde bestand daar weer in. Voor importeren of wissen
-        bewaart de app eerst automatisch de huidige stand als lokale nood-back-up.
-      </p>
+      <div class="card-head"><h2>Back-up</h2><span class="hint">lokaal herstelpunt en JSON</span></div>
       <div class="toolbar">
         <button class="primary" id="btnExport">Exporteer back-up (JSON)</button>
         <button class="ghost" id="btnImport">Importeer back-up</button>
@@ -1766,12 +1944,7 @@ function renderDataTab(){
       <input type="file" id="fileImport" accept="application/json" style="display:none">
     </div>
     <div class="card">
-      <div class="card-head"><h2>Firebase / Firestore sync</h2><span class="hint" id="cloudStatus">${CloudAdapter.statusText()}</span></div>
-      <p style="color:var(--text-dim);font-size:13.5px;line-height:1.5">
-        Finize synchroniseert live via Firebase/Firestore zonder Google-login. Iedereen met de link
-        kan dezelfde planner lezen en bewerken zodra Firestore-regels dit ene document toestaan.
-        LocalStorage en JSON-back-up blijven bestaan als lokale veiligheidslaag.
-      </p>
+      <div class="card-head"><h2>Firebase / Firestore</h2><span class="hint" id="cloudStatus">${CloudAdapter.statusText()}</span></div>
       <textarea id="firebaseConfigInput" spellcheck="false" placeholder="${firebaseConfigTemplate().replaceAll('"','&quot;')}">${CloudAdapter.isConfigured() ? JSON.stringify(CloudAdapter.config, null, 2) : ''}</textarea>
       <div class="toolbar" style="margin-top:8px">
         <button class="ghost small" id="btnSaveFirebaseConfig">Firebase-config opslaan</button>
@@ -1779,7 +1952,7 @@ function renderDataTab(){
         <button class="ghost small" id="btnUploadCloud">Lokale stand naar cloud zetten</button>
         <button class="ghost small" id="btnFirebaseSignOut">Cloud loskoppelen</button>
       </div>
-      <pre>Firestore rules voorstel:
+      <pre>Firestore rules voor openbaar lezen en bewerken:
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -1858,11 +2031,11 @@ service cloud.firestore {
     }
   });
   document.getElementById('btnConnectFirebase').addEventListener('click', async ()=>{
-    await CloudAdapter.connect(true);
+    await CloudAdapter.connect();
   });
   document.getElementById('btnUploadCloud').addEventListener('click', async ()=>{
     if (!CloudAdapter.isConnected()){
-      const connected = await CloudAdapter.connect(true);
+      const connected = await CloudAdapter.connect();
       if (!connected) return;
     }
     if (confirm('Lokale stand naar Firestore schrijven? Dit overschrijft het Finize cloud-document.')){
@@ -1988,6 +2161,10 @@ document.getElementById('tabs').addEventListener('click', (e)=>{
   const btn = e.target.closest('.tab-btn');
   if (!btn) return;
   activeTab = btn.dataset.tab;
+  renderActiveTab();
+});
+document.getElementById('saveStatus').addEventListener('click', ()=>{
+  activeTab = 'data';
   renderActiveTab();
 });
 document.getElementById('scenarioToggle').addEventListener('click', (e)=>{
