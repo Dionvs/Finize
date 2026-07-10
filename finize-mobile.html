@@ -6681,6 +6681,202 @@ body.v4-app[data-real-active-tab="gezamenlijk"] .joint-fixed-edit-btn svg{
     min-height:38px !important;
     border-radius:14px !important;
   }
+
+  /* build 59: alle budgetbalken op het dashboard gebruiken dezelfde volle kolombreedte */
+  body.v4-app[data-active-tab="dashboard"] .mobile-kpi-grid + .dashboard-grid:not(.v4-desktop-only-grid) + .dashboard-grid:not(.v4-desktop-only-grid) > .v4-bottom-card:not(.v4-desktop-only-block) .budget-preview-main{
+    grid-template-columns:minmax(0, 1fr) !important;
+    width:100% !important;
+  }
+  body.v4-app[data-active-tab="dashboard"] .mobile-kpi-grid + .dashboard-grid:not(.v4-desktop-only-grid) + .dashboard-grid:not(.v4-desktop-only-grid) > .v4-bottom-card:not(.v4-desktop-only-block) .budget-preview-main > .progress-track{
+    grid-column:1 !important;
+    width:100% !important;
+    min-width:0 !important;
+    max-width:none !important;
+  }
+  body.v4-app[data-active-tab="dashboard"] .mobile-kpi-grid + .dashboard-grid:not(.v4-desktop-only-grid) + .dashboard-grid:not(.v4-desktop-only-grid) > .v4-bottom-card:not(.v4-desktop-only-block) .scroll-area{
+    scrollbar-width:thin;
+    scrollbar-color:rgba(95,126,70,.38) transparent;
+  }
+  body.v4-app[data-active-tab="dashboard"] .mobile-kpi-grid + .dashboard-grid:not(.v4-desktop-only-grid) + .dashboard-grid:not(.v4-desktop-only-grid) > .v4-bottom-card:not(.v4-desktop-only-block) .scroll-area::-webkit-scrollbar{
+    width:4px;
+  }
+  body.v4-app[data-active-tab="dashboard"] .mobile-kpi-grid + .dashboard-grid:not(.v4-desktop-only-grid) + .dashboard-grid:not(.v4-desktop-only-grid) > .v4-bottom-card:not(.v4-desktop-only-block) .scroll-area::-webkit-scrollbar-track{
+    background:transparent;
+  }
+  body.v4-app[data-active-tab="dashboard"] .mobile-kpi-grid + .dashboard-grid:not(.v4-desktop-only-grid) + .dashboard-grid:not(.v4-desktop-only-grid) > .v4-bottom-card:not(.v4-desktop-only-block) .scroll-area::-webkit-scrollbar-thumb{
+    background:rgba(95,126,70,.38);
+    border-radius:999px;
+  }
+
+  /* build 60: gezamenlijke transacties naast de variabele lasten */
+  body.v4-app[data-real-active-tab="gezamenlijk"] .joint-transactions-card{
+    display:flex !important;
+    flex-direction:column !important;
+    height:100% !important;
+    min-height:0 !important;
+    max-height:100% !important;
+    margin:0 !important;
+    padding:10px !important;
+    overflow:hidden !important;
+  }
+  body.v4-app[data-real-active-tab="gezamenlijk"] .joint-transactions-card-head{
+    flex:0 0 auto;
+    min-width:0;
+    margin-bottom:6px !important;
+  }
+  body.v4-app[data-real-active-tab="gezamenlijk"] .joint-transactions-card-head .card-head-title{
+    min-width:0;
+    gap:5px !important;
+  }
+  body.v4-app[data-real-active-tab="gezamenlijk"] .joint-transactions-card-head h2{
+    min-width:0;
+    margin:0;
+    font-size:11px !important;
+    line-height:1.1 !important;
+  }
+  body.v4-app[data-real-active-tab="gezamenlijk"] .joint-transactions-card-head h2 span{
+    color:var(--text-dim);
+    font-weight:750;
+    white-space:nowrap;
+  }
+  .joint-transaction-add-btn{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width:28px;
+    height:28px;
+    min-width:28px;
+    padding:0;
+    border:0;
+    border-radius:9px;
+    background:var(--green-bg);
+    color:var(--green);
+  }
+  .joint-transaction-add-btn svg{ width:15px; height:15px; }
+  .joint-transactions-list{
+    flex:1 1 auto;
+    min-height:0;
+    min-width:0;
+    display:grid;
+    align-content:start;
+    gap:3px;
+    overflow-x:hidden;
+    overflow-y:auto;
+    overscroll-behavior:contain;
+    scrollbar-width:thin;
+    scrollbar-color:rgba(95,126,70,.38) transparent;
+  }
+  .joint-transactions-list::-webkit-scrollbar{ width:4px; }
+  .joint-transactions-list::-webkit-scrollbar-track{ background:transparent; }
+  .joint-transactions-list::-webkit-scrollbar-thumb{ background:rgba(95,126,70,.38); border-radius:999px; }
+  .joint-transaction-row{
+    display:grid;
+    grid-template-columns:34px minmax(0,1fr) 46px 12px;
+    gap:2px;
+    align-items:center;
+    min-height:29px;
+    min-width:0;
+    max-width:100%;
+    padding:4px 0;
+    border-bottom:1px solid var(--border-soft);
+    font-size:8.5px;
+    line-height:1.1;
+  }
+  .joint-transaction-row:last-child{ border-bottom:0; }
+  .joint-transaction-meta,
+  .joint-transaction-date,
+  .joint-transaction-category,
+  .joint-transaction-description,
+  .joint-transaction-amount{
+    min-width:0;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .joint-transaction-meta{
+    display:grid;
+    grid-template-rows:1fr 1fr;
+    align-items:center;
+    gap:1px;
+    font-size:7.5px;
+  }
+  .joint-transaction-description{
+    display:grid;
+    grid-template-rows:1fr 1fr;
+    align-items:center;
+    gap:1px;
+    overflow:visible;
+  }
+  .joint-transaction-description-text,
+  .joint-transaction-note{
+    min-width:0;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .joint-transaction-note{
+    color:var(--text-dim);
+    font-size:7.5px;
+  }
+  .joint-transaction-date,
+  .joint-transaction-category{ color:var(--text-dim); }
+  .joint-transaction-amount{ text-align:right; font-weight:850; }
+  .joint-transaction-delete{
+    display:grid;
+    place-items:center;
+    width:14px;
+    min-width:14px;
+    height:20px;
+    padding:0;
+    border:0;
+    background:transparent;
+    color:var(--red);
+    font-size:15px;
+    line-height:1;
+  }
+  .joint-transactions-empty{
+    margin:auto 0;
+    color:var(--text-faint);
+    font-size:10px;
+    text-align:center;
+  }
+  .joint-transactions-total{
+    flex:0 0 auto;
+    display:flex;
+    justify-content:space-between;
+    gap:6px;
+    margin-top:6px;
+    padding-top:6px;
+    border-top:1px solid var(--border);
+    font-size:10px;
+    font-weight:800;
+  }
+  .joint-transactions-total strong{ color:var(--red); white-space:nowrap; }
+
+  #transactionModal.joint-transaction-modal-open{
+    align-items:stretch !important;
+    justify-content:stretch !important;
+    padding:0 !important;
+  }
+  #transactionModal .joint-transaction-fullscreen-editor{
+    width:100% !important;
+    max-width:none !important;
+    height:100dvh !important;
+    max-height:100dvh !important;
+    overflow-y:auto !important;
+    border:0 !important;
+    border-radius:0 !important;
+    padding:12px 12px calc(12px + env(safe-area-inset-bottom)) !important;
+    box-shadow:none !important;
+  }
+  #transactionModal .joint-transaction-fullscreen-editor .modal-grid{ gap:10px; }
+  #transactionModal .joint-transaction-fullscreen-editor .modal-actions{
+    position:sticky;
+    bottom:-12px;
+    margin:14px -12px -12px;
+    padding:8px 12px calc(8px + env(safe-area-inset-bottom));
+    background:rgba(255,250,244,.96);
+  }
 }
 </style>
 </head>
@@ -6787,6 +6983,12 @@ function formatDateNL(value){
   const d = new Date(value);
   if (isNaN(d)) return value;
   return String(d.getDate()).padStart(2,'0') + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + d.getFullYear();
+}
+function formatDayMonth(value){
+  if (!value) return '';
+  const d = new Date(value);
+  if (isNaN(d)) return value;
+  return String(d.getDate()).padStart(2,'0') + '-' + String(d.getMonth()+1).padStart(2,'0');
 }
 function getPath(obj, path){
   return path.split('.').reduce((o,k)=> (o==null?o:o[k]), obj);
@@ -7120,6 +7322,37 @@ function renderJointVariableCostsCardHead(){
   return `<div class="card-head joint-variable-card-head">
     <div class="card-head-title">${iconBadge('chart', 'green', 'card-head-icon')}<h2>Variabele lasten</h2><button type="button" class="joint-variable-edit-btn" data-open-joint-variable-costs aria-label="Variabele lasten aanpassen">${iconSvg('receipt')}</button></div>
   </div>`;
+}
+function jointVariableCategoryOptions(selectedCategory=''){
+  const scenarioData = getMonthlyScenarioData(state.meta.scenario);
+  const seen = new Set();
+  const categories = [];
+  (scenarioData.gezamenlijk.variabel || []).forEach(row=>{
+    const rawLabel = String(row.post || row.categorie || '').trim();
+    const key = rawLabel.toLocaleLowerCase();
+    if (!rawLabel || seen.has(key)) return;
+    seen.add(key);
+    categories.push(key === 'overig' ? 'Overig' : rawLabel);
+  });
+  if (!seen.has('overig')) categories.push('Overig');
+  const selectedKey = String(selectedCategory || '').trim().toLocaleLowerCase();
+  if (selectedCategory && !seen.has(selectedKey)) categories.push(String(selectedCategory).trim());
+  return categories;
+}
+function renderJointTransactionsCardHead(){
+  return `<div class="card-head joint-transactions-card-head">
+    <div class="card-head-title"><h2>Gezamenlijke transacties <span>— ${monthLabel(getSelectedMonth())}</span></h2><button type="button" class="joint-transaction-add-btn" data-open-joint-transaction aria-label="Gezamenlijke uitgave toevoegen">${iconSvg('receipt')}</button></div>
+  </div>`;
+}
+function renderJointTransactionsCard(){
+  const rows = getMonthTransactions('gezamenlijk').sort((a,b)=>String(b.date || '').localeCompare(String(a.date || '')));
+  const rowsHtml = rows.map(tx=>`<div class="joint-transaction-row" data-edit-joint-transaction="${tx.id}" role="button" tabindex="0" aria-label="Transactie ${textSafe(tx.description || tx.category || 'bewerken')} bewerken">
+    <span class="joint-transaction-meta"><span class="joint-transaction-date" title="${formatDateNL(tx.date)}">${formatDayMonth(tx.date)}</span><span class="joint-transaction-category" title="${textSafe(tx.category || 'Overig')}">${textSafe(tx.category || 'Overig')}</span></span>
+    <span class="joint-transaction-description"><span class="joint-transaction-description-text" title="${textSafe(tx.description || '')}">${textSafe(tx.description || '—')}</span>${tx.note ? `<span class="joint-transaction-note" title="${textSafe(tx.note)}">${textSafe(tx.note)}</span>` : ''}</span>
+    <strong class="joint-transaction-amount">${eur(Number(tx.amount) || 0)}</strong>
+    <button type="button" class="joint-transaction-delete" data-remove-transaction="${tx.id}" aria-label="Transactie verwijderen">×</button>
+  </div>`).join('');
+  return `<div class="card joint-two-column-card joint-transactions-card">${renderJointTransactionsCardHead()}<div class="joint-transactions-list">${rowsHtml || '<p class="joint-transactions-empty">Nog geen uitgaven deze maand.</p>'}</div><div class="joint-transactions-total"><span>Totaal uitgaven</span><strong>${eur(sumTransactions('gezamenlijk'))}</strong></div></div>`;
 }
 
 function renderIconKpi(icon, color, label, value, sub, opts={}){
@@ -8858,6 +9091,56 @@ function openTransactionModal(){
   });
 }
 
+function openJointTransactionModal(transactionId=''){
+  const modal = document.getElementById('transactionModal');
+  const today = getSelectedMonth() + '-' + String(new Date().getDate()).padStart(2,'0');
+  const existing = (state.transactions || []).find(tx=>tx.id === transactionId && tx.owner === 'gezamenlijk');
+  const categories = jointVariableCategoryOptions(existing?.category || '');
+  const selectedCategory = existing?.category || categories[0] || 'Overig';
+  modal.innerHTML = `
+    <div class="modal joint-transaction-fullscreen-editor">
+      <div class="card-head"><h2>${existing ? 'Gezamenlijke uitgave bewerken' : 'Gezamenlijke uitgave'}</h2><button class="danger-ghost" id="btnCloseJointTransaction" aria-label="Sluiten">×</button></div>
+      <p class="hint" style="margin-top:-4px">${monthLabel(getSelectedMonth())} · wordt gekoppeld aan jullie variabele lasten</p>
+      <div class="modal-grid">
+        <label>Bedrag<input id="jointTxAmount" type="number" step="0.01" inputmode="decimal" placeholder="0,00" value="${existing ? Number(existing.amount) || '' : ''}"></label>
+        <label>Datum<input id="jointTxDate" type="date" value="${textSafe(existing?.date || today)}"></label>
+        <label class="full">Omschrijving<input id="jointTxDescription" type="text" placeholder="Bijvoorbeeld Albert Heijn" value="${textSafe(existing?.description || '')}"></label>
+        <label class="full">Categorie<select id="jointTxCategory">${categories.map(category=>`<option value="${textSafe(category)}" ${String(category).toLocaleLowerCase() === String(selectedCategory).toLocaleLowerCase() ? 'selected' : ''}>${textSafe(category)}</option>`).join('')}</select></label>
+        <label class="full">Notitie<input id="jointTxNote" type="text" placeholder="Optioneel" value="${textSafe(existing?.note || '')}"></label>
+      </div>
+      <div class="modal-actions">
+        <button class="ghost" id="btnCancelJointTransaction">Annuleren</button>
+        <button class="primary" id="btnSaveJointTransaction">${existing ? 'Wijzigingen opslaan' : 'Uitgave opslaan'}</button>
+      </div>
+    </div>`;
+  modal.classList.add('open', 'joint-transaction-modal-open');
+  const close = ()=> modal.classList.remove('open', 'joint-transaction-modal-open');
+  document.getElementById('btnCloseJointTransaction').addEventListener('click', close);
+  document.getElementById('btnCancelJointTransaction').addEventListener('click', close);
+  modal.addEventListener('click', event=>{ if (event.target === modal) close(); }, {once:true});
+  document.getElementById('btnSaveJointTransaction').addEventListener('click', ()=>{
+    const amount = parseFloat(String(document.getElementById('jointTxAmount').value).replace(',', '.'));
+    if (!Number.isFinite(amount) || amount <= 0){
+      alert('Vul een geldig bedrag in.');
+      return;
+    }
+    const next = {
+      id: existing?.id || uid(),
+      date: document.getElementById('jointTxDate').value || today,
+      owner: 'gezamenlijk',
+      category: document.getElementById('jointTxCategory').value,
+      description: document.getElementById('jointTxDescription').value.trim(),
+      amount: round2(amount),
+      note: document.getElementById('jointTxNote').value.trim()
+    };
+    if (existing) Object.assign(existing, next);
+    else state.transactions.push(next);
+    persist();
+    close();
+    renderActiveTab();
+  });
+}
+
 function showQuickToast(message){
   let toast = document.getElementById('quickToast');
   if (!toast){
@@ -9433,7 +9716,7 @@ function renderJointFirstRow(){
   </div>
   <div class="joint-two-column-row v4-mobile-only-grid" aria-label="Gezamenlijk rij 2">
     <div class="card joint-two-column-card joint-variable-overview-card">${renderJointVariableCostsCardHead()}<div class="joint-variable-overview-list">${variableRows.join('') || '<p class="hint" style="margin:0">Nog geen variabele budgetten.</p>'}</div></div>
-    <div class="card joint-two-column-card"></div>
+    ${renderJointTransactionsCard()}
   </div>
   <div class="card joint-single-card v4-mobile-only-block" aria-label="Gezamenlijk enkele kaart onder rij 2"></div>
   <div class="joint-accordion-stack v4-mobile-only-block" aria-label="Gezamenlijk accordion kolommen">
@@ -9527,6 +9810,24 @@ function renderActiveTab(){
   root.querySelectorAll('[data-open-joint-variable-costs]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       openJointVariableCostsModal();
+    });
+  });
+  root.querySelectorAll('[data-open-joint-transaction]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      openJointTransactionModal();
+    });
+  });
+  root.querySelectorAll('[data-edit-joint-transaction]').forEach(row=>{
+    const openEditor = event=>{
+      if (event?.target.closest('button')) return;
+      openJointTransactionModal(row.dataset.editJointTransaction);
+    };
+    row.addEventListener('click', openEditor);
+    row.addEventListener('keydown', event=>{
+      if (event.key === 'Enter' || event.key === ' '){
+        event.preventDefault();
+        openEditor(event);
+      }
     });
   });
   root.querySelectorAll('[data-copy-previous-mobile]').forEach(btn=>{
