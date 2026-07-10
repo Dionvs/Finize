@@ -6239,6 +6239,449 @@ body.v4-app[data-real-active-tab="gezamenlijk"] .joint-fixed-edit-btn svg{
   }
 }
 
+/* build 56: mobiele variabele-lastenkaart en editor in Gezamenlijk */
+@media (max-width:767px){
+  body.v4-app[data-real-active-tab="gezamenlijk"] .joint-variable-overview-card{
+    display:flex !important;
+    flex-direction:column;
+    min-width:0;
+    height:100%;
+    margin:0 !important;
+    padding:10px !important;
+  }
+  body.v4-app[data-real-active-tab="gezamenlijk"] .joint-variable-card-head{
+    margin-bottom:8px !important;
+    align-items:center !important;
+  }
+  body.v4-app[data-real-active-tab="gezamenlijk"] .joint-variable-card-head .card-head-title{
+    min-width:0;
+    gap:6px !important;
+  }
+  body.v4-app[data-real-active-tab="gezamenlijk"] .joint-variable-card-head h2{
+    min-width:0;
+    font-size:14px !important;
+    line-height:1.1 !important;
+  }
+  .joint-variable-edit-btn{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width:28px;
+    height:28px;
+    min-width:28px;
+    padding:0;
+    border:0;
+    border-radius:9px;
+    background:var(--green-bg);
+    color:var(--green);
+  }
+  .joint-variable-edit-btn svg{ width:15px; height:15px; }
+  .joint-variable-overview-list{
+    display:grid;
+    gap:6px;
+    min-width:0;
+  }
+  .joint-variable-overview-card .budget-preview-item{
+    grid-template-columns:26px minmax(0,1fr);
+    gap:7px;
+    padding:0;
+  }
+  .joint-variable-overview-card .budget-preview-thumb{
+    width:26px;
+    height:26px;
+    border-radius:9px;
+  }
+  .joint-variable-overview-card .budget-preview-thumb svg{ width:14px; height:14px; }
+  .joint-variable-overview-card .budget-preview-top{
+    gap:5px;
+    font-size:10.5px;
+    line-height:1.15;
+  }
+  .joint-variable-overview-card .budget-preview-top strong{
+    min-width:0;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .joint-variable-overview-card .budget-preview-top > span{
+    flex:0 0 auto;
+    font-size:10px;
+    white-space:nowrap;
+  }
+  .joint-variable-overview-card .progress-track{ height:7px; min-width:0; }
+  .joint-variable-overview-card .joint-variable-unassigned .budget-preview-thumb{ color:var(--terracotta); background:var(--red-bg); }
+  .joint-variable-overview-card .joint-variable-unassigned .progress-fill{ background:var(--terracotta); }
+
+  #incomeEditModal.joint-variable-editor-open{
+    align-items:stretch !important;
+    justify-content:stretch !important;
+    padding:0 !important;
+    background:rgba(47,31,24,.20) !important;
+  }
+  #incomeEditModal .joint-variable-fullscreen-editor{
+    width:100% !important;
+    max-width:none !important;
+    height:100dvh !important;
+    max-height:100dvh !important;
+    border:0 !important;
+    border-radius:0 !important;
+    padding:10px 10px calc(10px + env(safe-area-inset-bottom)) !important;
+    background:linear-gradient(180deg,#fffaf4 0%, #fbf4ea 100%) !important;
+    box-shadow:none !important;
+    overflow-y:auto !important;
+  }
+  .joint-variable-editor-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:8px;
+    margin-bottom:8px;
+  }
+  .joint-variable-editor-header h2{
+    margin:1px 0 2px;
+    font-size:19px;
+    line-height:1.05;
+    color:var(--text);
+  }
+  .joint-variable-editor-header p{
+    margin:0;
+    color:var(--text-dim);
+    font-size:10.5px;
+    line-height:1.25;
+  }
+  .joint-variable-editor-close{ min-height:30px; padding:6px 9px; font-size:12px; }
+  .joint-variable-editor-summary{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:10px;
+    padding:8px 10px;
+    margin-bottom:8px;
+    border:1px solid var(--border);
+    border-radius:12px;
+    background:var(--card);
+    box-shadow:var(--shadow-soft);
+  }
+  .joint-variable-editor-summary span{ color:var(--text-dim); font-size:10px; font-weight:800; }
+  .joint-variable-editor-summary strong{ color:var(--green); font-size:18px; font-variant-numeric:tabular-nums; }
+  .joint-variable-editor-list{
+    display:grid;
+    gap:0;
+    overflow:hidden;
+    border:1px solid var(--border);
+    border-radius:14px;
+    background:rgba(255,250,244,.68);
+  }
+  .joint-variable-editor-row{
+    display:grid;
+    grid-template-columns:26px minmax(0,1fr) 82px 26px;
+    align-items:center;
+    gap:7px;
+    padding:8px;
+    border-bottom:1px solid var(--border-soft);
+  }
+  .joint-variable-editor-row:last-child{ border-bottom:0; }
+  .joint-variable-editor-icon{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    width:26px;
+    height:26px;
+    border-radius:9px;
+    background:var(--green-bg);
+    color:var(--green);
+  }
+  .joint-variable-editor-icon svg{ width:14px; height:14px; }
+  .joint-variable-editor-row input{
+    min-width:0;
+    width:100%;
+    height:36px;
+    min-height:36px;
+    padding:6px 8px;
+    border-radius:10px;
+    font-size:12px;
+  }
+  .joint-variable-editor-delete{
+    width:26px;
+    height:26px;
+    min-width:26px;
+    padding:0;
+    border:0;
+    background:transparent;
+    color:var(--red);
+    font-size:18px;
+    line-height:1;
+  }
+  .joint-variable-editor-actions{
+    position:sticky;
+    bottom:0;
+    margin-top:8px;
+    padding-top:2px;
+    background:linear-gradient(180deg,rgba(251,244,234,0),#fbf4ea 35%);
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:6px;
+  }
+  .joint-variable-editor-actions button{ width:100%; min-height:38px; border-radius:14px; font-size:12px; }
+
+  /* De twee kaarten in rij 2 delen één inhoudsgestuurde gridhoogte. */
+  body.v4-app[data-real-active-tab="gezamenlijk"] .joint-two-column-row > .joint-two-column-card{
+    height:auto !important;
+    min-height:124px !important;
+    max-height:none !important;
+    align-self:stretch !important;
+    overflow:visible !important;
+  }
+}
+/* build 57: gezamenlijke vaste lasten als compacte desktoptabel op mobiel */
+@media (max-width:767px){
+  #incomeEditModal .joint-fixed-fullscreen-editor{
+    padding:10px 10px calc(10px + env(safe-area-inset-bottom)) !important;
+  }
+  #incomeEditModal .joint-fixed-editor-list{
+    display:grid !important;
+    gap:8px !important;
+    overflow:visible !important;
+    border:0 !important;
+    border-radius:0 !important;
+    background:transparent !important;
+  }
+  #incomeEditModal .joint-fixed-editor-subhead{
+    margin:0 2px 3px !important;
+    padding:0 !important;
+    background:transparent !important;
+    border:0 !important;
+  }
+  #incomeEditModal .joint-fixed-editor-table-wrap{
+    overflow-x:auto !important;
+    overflow-y:visible !important;
+    border:1px solid var(--border) !important;
+    border-radius:14px !important;
+    background:rgba(255,250,244,.7) !important;
+    -webkit-overflow-scrolling:touch;
+  }
+  #incomeEditModal .joint-fixed-editor-table{
+    width:100%;
+    min-width:640px;
+    border-collapse:collapse;
+    table-layout:fixed;
+  }
+  #incomeEditModal .joint-fixed-editor-table th{
+    position:sticky;
+    top:0;
+    z-index:1;
+    padding:9px 7px;
+    background:#fffaf4;
+    border-bottom:1px solid var(--border);
+    color:var(--text-faint);
+    font-size:9px;
+    font-weight:900;
+    letter-spacing:.06em;
+    text-align:left;
+    text-transform:uppercase;
+  }
+  #incomeEditModal .joint-fixed-editor-table td{
+    padding:7px;
+    border-bottom:1px solid var(--border-soft);
+    vertical-align:middle;
+  }
+  #incomeEditModal .joint-fixed-editor-table tbody tr:last-child td{ border-bottom:0; }
+  #incomeEditModal .joint-fixed-editor-table .joint-fixed-col-icon{ width:28px; text-align:center; }
+  #incomeEditModal .joint-fixed-editor-table .joint-fixed-col-category{ width:23%; }
+  #incomeEditModal .joint-fixed-editor-table .joint-fixed-col-post{ width:27%; }
+  #incomeEditModal .joint-fixed-editor-table .joint-fixed-col-amount{ width:104px; text-align:right; }
+  #incomeEditModal .joint-fixed-editor-table .joint-fixed-col-year{ width:66px; text-align:center; }
+  #incomeEditModal .joint-fixed-editor-table .joint-fixed-col-move{ width:110px; }
+  #incomeEditModal .joint-fixed-editor-table .joint-fixed-col-delete{ width:28px; text-align:center; }
+  #incomeEditModal .joint-fixed-editor-table input,
+  #incomeEditModal .joint-fixed-editor-table select{
+    width:100%;
+    min-width:0;
+    height:32px !important;
+    min-height:32px !important;
+    padding:5px 8px !important;
+    border-radius:10px !important;
+    font-size:11px !important;
+  }
+  #incomeEditModal .joint-fixed-editor-table input[type="checkbox"]{
+    width:17px !important;
+    height:17px !important;
+    min-height:17px !important;
+    padding:0 !important;
+    margin:0;
+  }
+  #incomeEditModal .joint-fixed-editor-table .joint-fixed-editor-row-icon{
+    display:inline-flex !important;
+    width:22px !important;
+    height:22px !important;
+    min-width:22px !important;
+    border-radius:8px !important;
+  }
+  #incomeEditModal .joint-fixed-editor-table .joint-fixed-editor-row-icon svg{ width:12px !important; height:12px !important; }
+  #incomeEditModal .joint-fixed-editor-table .joint-fixed-editor-amount{ text-align:right; }
+  #incomeEditModal .joint-fixed-editor-monthly-hint{ display:block; margin-top:3px; color:var(--text-faint); font-size:9px; white-space:nowrap; }
+  #incomeEditModal .joint-fixed-editor-mortgage-note{ color:var(--green); font-size:10px; font-weight:800; white-space:nowrap; }
+  #incomeEditModal .joint-fixed-row-delete-compact{
+    width:24px !important;
+    height:24px !important;
+    min-width:24px !important;
+    padding:0 !important;
+    border:0 !important;
+    background:transparent !important;
+    color:var(--red) !important;
+  }
+  #incomeEditModal .joint-fixed-editor-actions{
+    display:grid !important;
+    grid-template-columns:1fr 1fr;
+    gap:6px;
+    margin-top:8px !important;
+    padding:4px 0 0 !important;
+  }
+  #incomeEditModal .joint-fixed-editor-actions .primary,
+  #incomeEditModal .joint-fixed-editor-actions .ghost{
+    width:100%;
+    min-height:38px !important;
+    height:38px !important;
+    border-radius:14px !important;
+    font-size:12px !important;
+  }
+}
+/* build 58: vaste-lastenregels blijven als desktoptabel op een mobiele rij */
+@media (max-width:767px){
+  #incomeEditModal .joint-fixed-editor-list{
+    display:block !important;
+    overflow-x:hidden !important;
+    overflow-y:visible !important;
+    border:1px solid var(--border) !important;
+    border-radius:14px !important;
+    background:rgba(255,250,244,.7) !important;
+    -webkit-overflow-scrolling:touch;
+  }
+  #incomeEditModal .joint-fixed-editor-subhead,
+  #incomeEditModal .joint-fixed-editor-table-head,
+  #incomeEditModal .joint-fixed-editor-row.joint-fixed-editor-row-compact{
+    min-width:0 !important;
+  }
+  #incomeEditModal .joint-fixed-editor-subhead{
+    padding:8px 10px 5px !important;
+    margin:0 !important;
+    background:#fffaf4 !important;
+    border-bottom:1px solid var(--border-soft) !important;
+  }
+  #incomeEditModal .joint-fixed-editor-table-head,
+  #incomeEditModal .joint-fixed-editor-row.joint-fixed-editor-row-compact{
+    /* Icoon links; de omschrijving vult alle ruimte tussen de compacte
+       categorie en de vaste actievelden aan de rechterkant. */
+    grid-template-columns:20px 64px minmax(0,1fr) 58px 24px 78px 16px !important;
+    gap:4px !important;
+  }
+  #incomeEditModal .joint-fixed-editor-table-head{
+    position:sticky;
+    top:0;
+    z-index:2;
+    display:grid !important;
+    padding:8px 10px !important;
+    background:#fffaf4 !important;
+    border-bottom:1px solid var(--border) !important;
+  }
+  #incomeEditModal .joint-fixed-editor-row.joint-fixed-editor-row-compact{
+    grid-template-rows:auto !important;
+    grid-auto-flow:row !important;
+    align-items:center !important;
+    padding:6px 10px !important;
+    border-bottom:1px solid var(--border-soft) !important;
+  }
+  #incomeEditModal .joint-fixed-editor-row-compact .joint-fixed-editor-hint{ display:none !important; }
+  /* Oudere mobiele stijlen maakten dit vak een rij over de volle breedte.
+     Hier krijgt ieder veld weer precies zijn eigen tabelkolom. */
+  #incomeEditModal .joint-fixed-editor-row-compact .joint-fixed-editor-row-icon,
+  #incomeEditModal .joint-fixed-editor-row-compact .joint-fixed-editor-amount-cell,
+  #incomeEditModal .joint-fixed-editor-row-compact .joint-fixed-editor-check-compact,
+  #incomeEditModal .joint-fixed-editor-row-compact .joint-fixed-editor-move,
+  #incomeEditModal .joint-fixed-editor-row-compact .joint-fixed-editor-mortgage-note,
+  #incomeEditModal .joint-fixed-editor-row-compact .joint-fixed-row-delete-compact{
+    grid-column:auto !important;
+    grid-row:auto !important;
+    align-self:center !important;
+  }
+  #incomeEditModal .joint-fixed-editor-row-compact .joint-fixed-editor-check-compact{
+    display:flex !important;
+    width:24px !important;
+    min-width:24px !important;
+    height:28px !important;
+    min-height:28px !important;
+    justify-content:center !important;
+    align-items:center !important;
+    padding:0 !important;
+    gap:0 !important;
+    border:0 !important;
+    background:transparent !important;
+  }
+  #incomeEditModal .joint-fixed-editor-row-compact .joint-fixed-editor-check-compact span{
+    display:none !important;
+  }
+  #incomeEditModal .joint-fixed-editor-row-compact .joint-fixed-editor-check-compact input[type="checkbox"]{
+    width:14px !important;
+    height:14px !important;
+    min-height:14px !important;
+  }
+  #incomeEditModal .joint-fixed-editor-row-compact .joint-fixed-row-delete-compact{
+    display:grid !important;
+    width:16px !important;
+    min-width:16px !important;
+    height:28px !important;
+    min-height:28px !important;
+    place-items:center !important;
+    justify-self:center !important;
+    padding:0 !important;
+  }
+  #incomeEditModal .joint-fixed-editor-row-compact .joint-fixed-editor-amount-cell{
+    min-width:0 !important;
+  }
+  #incomeEditModal .joint-fixed-editor-row-compact .joint-fixed-editor-input{
+    min-width:0 !important;
+    height:28px !important;
+    min-height:28px !important;
+    padding:4px 5px !important;
+    border-radius:8px !important;
+    font-size:9px !important;
+  }
+  #incomeEditModal .joint-fixed-editor-table-head > span{
+    min-width:0 !important;
+    overflow:hidden !important;
+    text-overflow:ellipsis !important;
+    white-space:nowrap !important;
+    font-size:8px !important;
+    letter-spacing:.02em !important;
+  }
+  #incomeEditModal .joint-fixed-editor-move{
+    width:100% !important;
+    min-width:0 !important;
+    height:28px !important;
+    min-height:28px !important;
+    padding:4px 16px 4px 3px !important;
+    border-radius:8px !important;
+    font-size:9px !important;
+  }
+  #incomeEditModal .joint-fixed-editor-mortgage-note{
+    color:var(--green);
+    font-size:11px;
+    font-weight:800;
+    text-align:center;
+  }
+  #incomeEditModal .joint-fixed-editor-actions{
+    display:grid !important;
+    grid-template-columns:1fr 1fr !important;
+    gap:6px !important;
+    padding:6px 0 0 !important;
+  }
+  #incomeEditModal .joint-fixed-editor-actions > button{
+    width:100% !important;
+    height:38px !important;
+    min-height:38px !important;
+    border-radius:14px !important;
+  }
+}
 </style>
 </head>
 <body class="v4-app">
@@ -6671,6 +7114,11 @@ function renderDashboardCardHead(title, hint='', tone='green'){
 function renderJointFixedCostsCardHead(){
   return `<div class="card-head joint-fixed-card-head">
     <div class="card-head-title">${iconBadge(dashboardSectionIconName('Vaste lasten verdeling'), 'green', 'card-head-icon')}<h2>Vaste lasten verdeling</h2><button type="button" class="joint-fixed-edit-btn" data-open-joint-fixed-costs aria-label="Vaste lasten aanpassen">${iconSvg('receipt')}</button></div>
+  </div>`;
+}
+function renderJointVariableCostsCardHead(){
+  return `<div class="card-head joint-variable-card-head">
+    <div class="card-head-title">${iconBadge('chart', 'green', 'card-head-icon')}<h2>Variabele lasten</h2><button type="button" class="joint-variable-edit-btn" data-open-joint-variable-costs aria-label="Variabele lasten aanpassen">${iconSvg('receipt')}</button></div>
   </div>`;
 }
 
@@ -8433,12 +8881,14 @@ function renderJointFixedCostsEditorRows(rows, options={}){
   const removeAttr = kind === 'mortgage' ? 'data-mortgage-remove' : 'data-fixed-remove';
   const rowAttr = kind === 'mortgage' ? 'data-mortgage-row' : 'data-fixed-row';
   const note = options.note || '';
+  const moveOptions = kind === 'fixed' ? moveTargetOptions(`${state.meta.scenario}.gezamenlijk.vasteLasten`) : '';
   const header = `<div class="joint-fixed-editor-table-head" aria-hidden="true">
     <span></span>
     <span>Categorie</span>
     <span>Omschrijving</span>
     <span>Bedrag</span>
     <span>Jaarlijks?</span>
+    <span>Van/naar</span>
     <span></span>
   </div>`;
   const body = (rows||[]).map((row, index)=>{
@@ -8456,11 +8906,98 @@ function renderJointFixedCostsEditorRows(rows, options={}){
         <input type="checkbox" ${fieldAttr}="jaarlijks" ${indexAttr}="${index}" ${row.jaarlijks ? 'checked' : ''}>
         <span>${kind === 'mortgage' ? '50/50' : ''}</span>
       </label>
+      ${kind === 'fixed' ? `<select class="joint-fixed-editor-move" data-fixed-move="${state.meta.scenario}.gezamenlijk.vasteLasten.${index}" aria-label="Verplaatsen naar">${moveOptions}</select>` : '<span class="joint-fixed-editor-mortgage-note">50/50</span>'}
       <button type="button" class="joint-fixed-row-delete-compact" ${removeAttr}="${index}" aria-label="Post verwijderen">×</button>
       <div class="joint-fixed-editor-hint joint-fixed-editor-hint-compact">Gerekend als ${eur(monthly)} per maand${note ? ` · ${note}` : ''}</div>
     </div>`;
   }).join('');
   return header + body;
+}
+
+function renderJointVariableBudgetEditorRows(rows){
+  return (rows||[]).map((row, index)=>{
+    const label = row.post || row.categorie || '';
+    return `<div class="joint-variable-editor-row">
+      <span class="joint-variable-editor-icon">${iconSvg(categoryIconName(label))}</span>
+      <input type="text" data-variable-field="post" data-variable-index="${index}" value="${textSafe(label)}" placeholder="Categorie" aria-label="Categorie">
+      <input type="number" step="0.01" inputmode="decimal" data-variable-field="bedrag" data-variable-index="${index}" value="${Number(row.bedrag)||0}" aria-label="Maandbudget">
+      <button type="button" class="joint-variable-editor-delete" data-variable-remove="${index}" aria-label="Categorie verwijderen">×</button>
+    </div>`;
+  }).join('');
+}
+
+function openJointVariableCostsModal(focusLast=false){
+  const modal = document.getElementById('incomeEditModal');
+  const scenario = state.meta.scenario;
+  const scenarioData = getMonthlyScenarioData(scenario);
+  const rows = scenarioData.gezamenlijk.variabel || (scenarioData.gezamenlijk.variabel = []);
+  const scenarioLabel = scenario === 'voor' ? 'Voor verkoop' : 'Na verkoop';
+  const total = ()=> round2(sumBedrag(rows));
+
+  modal.innerHTML = `
+    <div class="modal joint-variable-fullscreen-editor" role="dialog" aria-modal="true" aria-label="Variabele lasten aanpassen">
+      <div class="joint-variable-editor-header">
+        <div>
+          <div class="section-kicker">${scenarioLabel} · ${monthLabel(getSelectedMonth())}</div>
+          <h2>Variabele lasten</h2>
+          <p>Pas maandbudgetten per categorie aan. Wijzigingen worden direct lokaal opgeslagen.</p>
+        </div>
+        <button type="button" class="ghost joint-variable-editor-close" data-close-joint-variable-costs>Sluiten</button>
+      </div>
+      <div class="joint-variable-editor-summary"><span>Totaal maandbudget</span><strong>${eur(total())}</strong></div>
+      <div class="joint-variable-editor-list">${rows.length ? renderJointVariableBudgetEditorRows(rows) : '<p class="hint" style="padding:10px;margin:0">Nog geen variabele budgetcategorieën.</p>'}</div>
+      <div class="joint-variable-editor-actions">
+        <button type="button" class="primary" data-variable-save>Opslaan</button>
+        <button type="button" class="ghost" data-variable-add>+ Categorie</button>
+      </div>
+    </div>`;
+  modal.classList.add('open','joint-variable-editor-open');
+
+  const updateSummary = ()=>{
+    const summary = modal.querySelector('.joint-variable-editor-summary strong');
+    if (summary) summary.textContent = eur(total());
+  };
+  const close = ()=>{
+    modal.classList.remove('open','joint-variable-editor-open');
+    modal.innerHTML = '';
+    renderActiveTab();
+  };
+  modal.querySelectorAll('[data-close-joint-variable-costs]').forEach(btn=>btn.addEventListener('click', close));
+  const commitField = (el, saveNow=true)=>{
+    const row = rows[Number(el.dataset.variableIndex)];
+    if (!row) return;
+    if (el.dataset.variableField === 'bedrag'){
+      const parsed = parseFloat(String(el.value).replace(',', '.'));
+      row.bedrag = Number.isFinite(parsed) ? round2(parsed) : 0;
+    } else {
+      row.post = el.value.trim();
+      row.categorie = 'Variabel';
+    }
+    if (saveNow) persist();
+    updateSummary();
+  };
+  modal.querySelectorAll('[data-variable-field]').forEach(el=> el.addEventListener('change', ()=>commitField(el)));
+  modal.querySelector('[data-variable-save]')?.addEventListener('click', ()=>{
+    modal.querySelectorAll('[data-variable-field]').forEach(el=>commitField(el, false));
+    persist();
+    showQuickToast('Variabele lasten opgeslagen');
+    close();
+  });
+  modal.querySelectorAll('[data-variable-remove]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      rows.splice(Number(btn.dataset.variableRemove), 1);
+      persist();
+      openJointVariableCostsModal(false);
+    });
+  });
+  modal.querySelector('[data-variable-add]')?.addEventListener('click', ()=>{
+    rows.push({id:uid(), categorie:'Variabel', post:'', bedrag:0});
+    persist();
+    openJointVariableCostsModal(true);
+  });
+  if (focusLast){
+    requestAnimationFrame(()=> modal.querySelector('.joint-variable-editor-row:last-child input[data-variable-field="post"]')?.focus());
+  }
 }
 
 function openJointFixedCostsModal(focusLast=false){
@@ -8502,7 +9039,8 @@ function openJointFixedCostsModal(focusLast=false){
         ${rows.length ? renderJointFixedCostsEditorRows(rows) : '<p class="hint">Nog geen vaste lasten toegevoegd.</p>'}
       </div>
       <div class="joint-fixed-editor-actions">
-        <button type="button" class="primary" data-fixed-add>+ Vaste last toevoegen</button>
+        <button type="button" class="primary" data-fixed-save>Opslaan</button>
+        <button type="button" class="ghost" data-fixed-add>+ Vaste last</button>
       </div>
     </div>`;
   modal.classList.add('open','joint-fixed-editor-open');
@@ -8559,6 +9097,22 @@ function openJointFixedCostsModal(focusLast=false){
     if (el.type === 'checkbox') el.addEventListener('click', commit);
   });
 
+  modal.querySelectorAll('[data-fixed-move]').forEach(select=>{
+    select.addEventListener('change', ()=>{
+      const targetPath = select.value;
+      const [sourcePath, idxStr] = splitLastIndex(select.dataset.fixedMove);
+      if (!targetPath || targetPath === sourcePath) return;
+      const source = getPath(state, sourcePath);
+      const target = getPath(state, targetPath);
+      if (!Array.isArray(source) || !Array.isArray(target)) return;
+      const row = source.splice(parseInt(idxStr, 10), 1)[0];
+      if (!row) return;
+      target.push(row);
+      persist();
+      openJointFixedCostsModal(false);
+    });
+  });
+
   modal.querySelectorAll('[data-fixed-remove]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const idx = Number(btn.dataset.fixedRemove);
@@ -8575,6 +9129,27 @@ function openJointFixedCostsModal(focusLast=false){
       persist();
       openJointFixedCostsModal(false);
     });
+  });
+
+  modal.querySelector('[data-fixed-save]')?.addEventListener('click', ()=>{
+    modal.querySelectorAll('[data-fixed-field], [data-mortgage-field]').forEach(el=>{
+      const isMortgage = !!el.dataset.mortgageField;
+      const collection = isMortgage ? mortgageRows : rows;
+      const index = Number(isMortgage ? el.dataset.mortgageIndex : el.dataset.fixedIndex);
+      const field = isMortgage ? el.dataset.mortgageField : el.dataset.fixedField;
+      if (!collection[index]) return;
+      if (field === 'bedrag'){
+        const parsed = parseFloat(String(el.value).replace(',', '.'));
+        collection[index][field] = Number.isFinite(parsed) ? round2(parsed) : 0;
+      } else if (field === 'jaarlijks') {
+        collection[index][field] = !!el.checked;
+      } else {
+        collection[index][field] = el.value;
+      }
+    });
+    persist();
+    showQuickToast('Vaste lasten opgeslagen');
+    close();
   });
 
   const add = modal.querySelector('[data-fixed-add]');
@@ -8767,6 +9342,43 @@ function renderJointFirstRow(){
   const r = calcScenario(state);
   const scenarioData = getMonthlyScenarioData(state.meta.scenario);
   const variabelBudgetPct = r.variabelBudgetTotaal > 0 ? Math.min(100, Math.round((r.variabelTotaal / r.variabelBudgetTotaal) * 100)) : 0;
+  const variableBudgetMap = new Map();
+  (scenarioData.gezamenlijk.variabel||[]).forEach(row=>{
+    const label = String(row.post || row.categorie || '').trim();
+    if (!label && !Number(row.bedrag)) return;
+    const key = label.toLocaleLowerCase();
+    const current = variableBudgetMap.get(key) || {label: label || 'Budget', budget:0};
+    current.budget = round2(current.budget + (Number(row.bedrag)||0));
+    variableBudgetMap.set(key, current);
+  });
+  const usedByBudgetKey = {};
+  let unassignedUsed = 0;
+  getMonthTransactions('gezamenlijk').forEach(tx=>{
+    const key = String(tx.category || '').trim().toLocaleLowerCase();
+    const amount = Number(tx.amount)||0;
+    if (key && variableBudgetMap.has(key)) usedByBudgetKey[key] = round2((usedByBudgetKey[key]||0) + amount);
+    else unassignedUsed = round2(unassignedUsed + amount);
+  });
+  const variableRows = Array.from(variableBudgetMap.entries()).map(([key,row])=>{
+    const used = usedByBudgetKey[key] || 0;
+    const ratio = row.budget > 0 ? Math.min(1, used / row.budget) : 0;
+    return `<div class="budget-preview-item">
+      <div class="budget-preview-thumb tone-green">${iconSvg(categoryIconName(row.label))}</div>
+      <div class="budget-preview-main">
+        <div class="budget-preview-top"><strong>${textSafe(row.label)}</strong><span><span class="neutral-amount">${eur(used)}</span> / <span class="neutral-amount">${eur(row.budget)}</span></span></div>
+        <div class="progress-track budget-gradient"><div class="progress-fill budget-gradient" style="width:${Math.round(ratio*100)}%"></div></div>
+      </div>
+    </div>`;
+  });
+  if (unassignedUsed > 0){
+    variableRows.push(`<div class="budget-preview-item joint-variable-unassigned">
+      <div class="budget-preview-thumb">${iconSvg('more')}</div>
+      <div class="budget-preview-main">
+        <div class="budget-preview-top"><strong>Ongecategoriseerd</strong><span class="neutral-amount">${eur(unassignedUsed)}</span></div>
+        <div class="progress-track"><div class="progress-fill" style="width:100%"></div></div>
+      </div>
+    </div>`);
+  }
   const vasteByCat = {};
   (scenarioData.gezamenlijk.vasteLasten||[]).forEach(row=>{
     const cat = normalizeCategoryName(row.categorie);
@@ -8820,7 +9432,7 @@ function renderJointFirstRow(){
     <div class="joint-fixed-category-body">${vasteRows || '<p class="hint">Nog geen vaste lasten.</p>'}</div>
   </div>
   <div class="joint-two-column-row v4-mobile-only-grid" aria-label="Gezamenlijk rij 2">
-    <div class="card joint-two-column-card"></div>
+    <div class="card joint-two-column-card joint-variable-overview-card">${renderJointVariableCostsCardHead()}<div class="joint-variable-overview-list">${variableRows.join('') || '<p class="hint" style="margin:0">Nog geen variabele budgetten.</p>'}</div></div>
     <div class="card joint-two-column-card"></div>
   </div>
   <div class="card joint-single-card v4-mobile-only-block" aria-label="Gezamenlijk enkele kaart onder rij 2"></div>
@@ -8910,6 +9522,11 @@ function renderActiveTab(){
   root.querySelectorAll('[data-open-joint-fixed-costs]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       openJointFixedCostsModal();
+    });
+  });
+  root.querySelectorAll('[data-open-joint-variable-costs]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      openJointVariableCostsModal();
     });
   });
   root.querySelectorAll('[data-copy-previous-mobile]').forEach(btn=>{
@@ -9034,9 +9651,3 @@ if ("serviceWorker" in navigator) {
 </script>
 </body>
 </html>
-
-
-
-
-
-
