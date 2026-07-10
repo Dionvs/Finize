@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Finize</title>
+<script>
+  // Keep the existing desktop PWA unchanged; phones use the dedicated mobile build.
+  if (window.matchMedia("(max-width: 767px)").matches && !location.pathname.endsWith("/finize-mobile.html")) {
+    location.replace("./finize-mobile.html");
+  }
+</script>
 <link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#6f8a55">
 <meta name="apple-mobile-web-app-capable" content="yes">
