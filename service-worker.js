@@ -1,4 +1,4 @@
-const CACHE_NAME = "finize-v6";
+const CACHE_NAME = "finize-v7";
 
 const APP_SHELL = [
   "./",

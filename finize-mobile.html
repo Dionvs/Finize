@@ -6715,9 +6715,14 @@ body.v4-app[data-real-active-tab="gezamenlijk"] .joint-fixed-edit-btn svg{
     height:100% !important;
     min-height:0 !important;
     max-height:100% !important;
+    contain:size !important;
     margin:0 !important;
     padding:10px !important;
     overflow:hidden !important;
+  }
+  /* De linkerkolom bepaalt de rijhoogte; transacties krijgen alleen de beschikbare ruimte. */
+  body.v4-app[data-real-active-tab="gezamenlijk"] .joint-two-column-row{
+    align-items:stretch !important;
   }
   body.v4-app[data-real-active-tab="gezamenlijk"] .joint-transactions-card-head{
     flex:0 0 auto;
@@ -6924,8 +6929,6 @@ body.v4-app[data-real-active-tab="gezamenlijk"] .joint-fixed-edit-btn svg{
   .joint-savings-card-head h2{ margin:0; font-size:14px !important; line-height:1.1; }
   .joint-savings-card-head .ghost{ min-height:28px; padding:4px 8px; font-size:9px; }
   .joint-savings-primary-grid{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
-  .joint-savings-primary-grid.goals-1{ grid-template-columns:minmax(0,1fr); }
-  .joint-savings-primary-grid.goals-2{ grid-template-columns:repeat(2,minmax(0,1fr)); }
   .joint-savings-primary-goal{
     appearance:none;
     aspect-ratio:1 / 1;
@@ -6944,17 +6947,19 @@ body.v4-app[data-real-active-tab="gezamenlijk"] .joint-fixed-edit-btn svg{
   }
   .joint-savings-primary-goal:active,.joint-savings-rest-goal:active{ transform:scale(.98); }
   .joint-savings-goal-icon{ display:grid; place-items:center; width:20px; height:20px; border-radius:50%; background:var(--green-pale); color:var(--green); font-size:11px; }
+  .joint-savings-primary-goal.has-image{ background-size:cover; background-position:center; color:#fff; border-color:rgba(255,255,255,.28); }.joint-savings-primary-goal.has-image > span:not(.joint-savings-goal-icon):not(.joint-savings-progress),.joint-savings-primary-goal.has-image small{ color:rgba(255,255,255,.88); }.joint-savings-primary-goal.has-image .joint-savings-goal-icon{ background:rgba(255,255,255,.84); color:var(--green); }
   .joint-savings-primary-goal strong,.joint-savings-rest-goal strong{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:10px; line-height:1.15; }
   .joint-savings-primary-goal > span:not(.joint-savings-goal-icon):not(.joint-savings-progress),.joint-savings-rest-goal > span{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-dim); font-size:8px; }
   .joint-savings-progress{ display:block; overflow:hidden; border-radius:99px; background:var(--border-soft); }
   .joint-savings-progress i{ display:block; height:100%; border-radius:inherit; background:var(--green); }
-  .joint-savings-primary-goal em,.joint-savings-rest-goal em{ color:var(--green); font-size:8px; font-style:normal; font-weight:850; }
+  .joint-savings-primary-goal em,.joint-savings-rest-goal em{ color:var(--green); font-size:8px; font-style:normal; font-weight:850; }.joint-savings-primary-goal.has-image em{ color:#fff; }
+  .joint-savings-primary-goal small,.joint-savings-rest-goal small{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-dim); font-size:7px; line-height:1.1; }
   .joint-savings-rest-row{ display:flex; gap:6px; min-width:0; }
   .joint-savings-rest-goal{
     appearance:none;
     flex:1 1 0;
     display:grid;
-    grid-template-columns:minmax(0,1fr) auto;
+    grid-template-columns:24px minmax(0,1fr) auto;
     gap:3px 5px;
     min-width:0;
     padding:7px 8px;
@@ -6966,12 +6971,198 @@ body.v4-app[data-real-active-tab="gezamenlijk"] .joint-fixed-edit-btn svg{
     text-align:left;
     cursor:pointer;
   }
-  .joint-savings-rest-goal strong{ grid-column:1 / -1; }
+  .joint-savings-rest-goal .joint-savings-goal-icon{ width:24px; height:24px; grid-row:1 / span 2; background-size:cover; background-position:center; }.joint-savings-goal-icon.has-image{ color:transparent; }
+  .joint-savings-rest-copy{ display:grid; min-width:0; gap:2px; }.joint-savings-rest-goal strong{ grid-column:auto; }
   .joint-savings-rest-goal em{ text-align:right; }
 
   /* build 63: Dion en Dara gebruiken dezelfde mobiele kaart-layout als Gezamenlijk */
   body.v4-app[data-real-active-tab="gezamenlijk"] #tab-dion,
   body.v4-app[data-real-active-tab="gezamenlijk"] #tab-dara{ width:100% !important; max-width:none !important; margin:0 !important; }
+
+  /* build 64: spaardoelen-overzicht volgens mobiele Finize-layout */
+  body.v4-app[data-real-active-tab="spaardoelen"] .mobile-savings-overview{ display:grid; gap:6px; }
+  .mobile-savings-kpis{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; }
+  .mobile-savings-kpis .card{ min-width:0; min-height:116px; margin:0; padding:9px 6px; display:grid; grid-template-rows:23px minmax(24px,auto) auto auto; gap:3px; text-align:center; align-items:center; }
+  .mobile-savings-kpis span{ display:grid; place-items:center; margin:auto; width:24px; height:24px; border-radius:50%; background:var(--green-pale); color:var(--green); font-weight:900; }
+  .mobile-savings-kpis small{ min-width:0; font-size:8px; line-height:1.12; color:var(--text-dim); }
+  .mobile-savings-kpis strong{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11px; }
+  .mobile-savings-kpis em{ font-size:7.5px; line-height:1.1; color:var(--text-dim); font-style:normal; }
+  .mobile-goal-section{ display:grid; gap:4px; }
+  .mobile-goal-section h2{ margin:4px 2px 0; font-size:14px; line-height:1.2; }
+  .mobile-goal-list{ margin:0; padding:0 10px; overflow:hidden; }
+  .mobile-goal-row{ display:grid; grid-template-columns:34px minmax(0,1fr) 64px; gap:8px; align-items:center; min-width:0; padding:9px 0; border-bottom:1px solid var(--border-soft); }
+  .mobile-goal-row:last-child{ border-bottom:0; }
+  .mobile-goal-icon{ display:grid; place-items:center; width:34px; height:34px; border-radius:50%; background:var(--green-pale); color:var(--green); font-size:16px; }
+  .mobile-goal-icon.tone-dion{ background:var(--blue-bg); color:var(--blue); }.mobile-goal-icon.tone-dara{ background:#f1eaf9; color:#976fbd; }
+  .mobile-goal-main{ display:grid; grid-template-columns:minmax(0,1fr); gap:3px; min-width:0; }.mobile-goal-main strong,.mobile-goal-main span,.mobile-goal-main em{ overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }.mobile-goal-main strong{ font-size:10.5px; }.mobile-goal-main span,.mobile-goal-main em{ color:var(--text-dim); font-size:8.5px; font-style:normal; }.mobile-goal-main .progress-track{ height:5px; }
+  .mobile-goal-side{ display:grid; justify-items:end; gap:5px; }.mobile-goal-side b{ font-size:10px; }.mobile-goal-side .ghost{ min-height:27px; padding:3px 5px; font-size:8px; white-space:nowrap; }
+  .mobile-savings-summary-grid{ display:grid; grid-template-columns:1fr 1fr; gap:6px; }.mobile-savings-summary-grid .card{ margin:0; padding:10px; min-width:0; }.mobile-savings-summary-grid h2{ margin:0 0 9px; font-size:11px; line-height:1.2; }.mobile-goal-summary-line{ display:grid; grid-template-columns:50px minmax(0,1fr); gap:4px; align-items:center; margin:6px 0; font-size:8px; }.mobile-goal-summary-line i{ display:block; height:6px; overflow:hidden; border-radius:9px; background:var(--border-soft); }.mobile-goal-summary-line i b{ display:block; height:100%; border-radius:inherit; background:var(--green); }.mobile-goal-summary-line strong{ grid-column:2; font-size:7.5px; text-align:right; color:var(--text-dim); }.mobile-savings-summary-grid p{ margin:9px 0 0; color:var(--text-dim); font-size:7px; line-height:1.2; }.mobile-savings-month-total{ display:block; margin-top:12px; font-size:11px; text-align:center; color:var(--green); }
+  #incomeEditModal.goal-detail-editor-open{ align-items:stretch; padding:0; }#incomeEditModal .goal-detail-editor{ width:100%; max-width:none; min-height:100dvh; border:0; border-radius:0; padding:12px 12px calc(12px + env(safe-area-inset-bottom)); overflow:auto; }.goal-editor-favorite{ display:flex; gap:8px; align-items:center; font-size:11px; }.goal-detail-editor .modal-actions{ position:sticky; bottom:-12px; margin:14px -12px -12px; padding:8px 12px calc(8px + env(safe-area-inset-bottom)); background:rgba(255,250,244,.96); }
+  .goal-image-field{ display:grid; gap:6px; }.goal-image-preview{ height:100px; display:grid; place-items:center; border:1px dashed var(--border); border-radius:12px; background:var(--green-pale) center/cover no-repeat; color:var(--text-dim); font-size:10px; }.goal-image-field input{ padding:5px; font-size:10px; }.goal-image-field .ghost{ justify-self:start; min-height:30px; }
+  .mobile-goal-manage-open{ width:100%; min-height:34px; font-size:10px; }
+  #incomeEditModal.goal-manager-editor-open{ align-items:stretch; padding:0; }.goal-manager-editor{ width:100%; max-width:none; min-height:100dvh; border:0; border-radius:0; padding:12px 10px calc(12px + env(safe-area-inset-bottom)); overflow:auto; }.goal-manager-head,.goal-manager-row{ display:grid; grid-template-columns:22px minmax(0,1fr) 58px 58px 20px 18px; gap:4px; align-items:center; min-width:0; }.goal-manager-head{ padding:8px 2px; color:var(--text-dim); font-size:7px; font-weight:850; text-transform:uppercase; }.goal-manager-row{ min-height:44px; padding:5px 0; border-top:1px solid var(--border-soft); }.goal-manager-row > span{ display:grid; place-items:center; width:20px; height:20px; border-radius:50%; background:var(--green-pale); color:var(--green); font-size:10px; }.goal-manager-row input{ min-width:0; height:30px; padding:4px 5px; font-size:9px; }.goal-manager-more{ width:20px; height:30px; padding:0; border:0; background:transparent; color:var(--green); font-size:20px; }.goal-manager-editor .joint-variable-editor-actions{ position:sticky; bottom:-12px; margin:12px -10px -12px; padding:8px 10px calc(8px + env(safe-area-inset-bottom)); background:rgba(255,250,244,.96); }
+
+  /* build 65: spaardoelinleg helder uitsplitsen in vast en naar rato */
+  .goal-inleg-breakdown{ display:grid; grid-template-columns:1fr 1fr; gap:3px; min-width:0; }.goal-inleg-breakdown b{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; border-radius:6px; padding:3px 4px; font-size:7px; line-height:1.1; text-align:center; background:var(--green-pale); color:var(--green); }.goal-inleg-breakdown b:last-child{ background:var(--blue-bg); color:var(--blue); }.joint-savings-primary-goal.has-image .goal-inleg-breakdown b:first-child{ background:rgba(239,247,234,.92); }.joint-savings-primary-goal.has-image .goal-inleg-breakdown b:last-child{ background:rgba(232,242,255,.92); }.joint-savings-needed{ display:block; color:var(--text-dim); font-size:7px; line-height:1.1; }.joint-savings-primary-goal.has-image .joint-savings-needed{ color:rgba(255,255,255,.9); }
+  .mobile-goal-row{ grid-template-columns:30px minmax(0,1fr) 48px; }.mobile-goal-main .goal-inleg-breakdown{ margin-top:1px; }.mobile-goal-main .goal-inleg-breakdown b{ font-size:7px; padding:3px; }.mobile-goal-needed{ color:var(--text-dim) !important; font-size:8px !important; }
+  .goal-calculation-card{ grid-column:1/-1; display:grid; gap:7px; padding:10px; border:1px solid var(--border); border-radius:12px; background:var(--cream); }.goal-calculation-card h3{ margin:0; font-size:11px; }.goal-calculation-total{ display:flex; justify-content:space-between; gap:10px; font-size:11px; }.goal-calculation-total strong{ color:var(--green); }.goal-calculation-card .goal-inleg-breakdown b{ padding:6px; font-size:9px; }.goal-calculation-note{ margin:0; font-size:8px; line-height:1.35; color:var(--text-dim); }
+  .goal-editor-fixed-only{ grid-column:1/-1; display:flex !important; align-items:center; gap:8px; padding:8px; border:1px solid var(--border); border-radius:10px; background:var(--cream); color:var(--text) !important; font-size:10px !important; }.goal-editor-fixed-only input{ width:auto; margin:0; }
+  .goal-manager-editor .goal-manager-list{ display:grid; gap:6px; }.goal-manager-row{ grid-template-columns:22px minmax(0,1fr) 52px 52px 20px 18px; min-height:56px; border:1px solid var(--border-soft); border-radius:10px; padding:6px; }.goal-manager-row .goal-manager-copy{ display:grid; gap:2px; min-width:0; }.goal-manager-row .goal-manager-copy strong,.goal-manager-row .goal-manager-copy small{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }.goal-manager-row .goal-manager-copy strong{ font-size:9px; }.goal-manager-row .goal-manager-copy small{ color:var(--text-dim); font-size:7px; }.goal-manager-metric{ display:grid; gap:2px; text-align:right; color:var(--text-dim); font-size:7px; }.goal-manager-metric b{ color:var(--text); font-size:8px; }.goal-manager-moves{ display:grid; gap:1px; }.goal-manager-moves button{ width:20px; min-height:16px; padding:0; border:0; background:transparent; color:var(--green); font-size:9px; }.goal-manager-editor .joint-variable-editor-actions{ display:flex; justify-content:space-between; }
+
+  /* build 68: mobiele Data & back-up-tab volgens de Finize-kaartindeling */
+  body.v4-app[data-real-active-tab="data"] #tab-data{ display:grid; gap:6px; padding:0 10px 96px !important; }
+  body.v4-app[data-real-active-tab="data"] #tab-data .mobile-add-expense{ display:none !important; }
+  body.v4-app[data-real-active-tab="data"] #tab-data .mobile-dashboard-header{ margin-bottom:0 !important; }
+  body.v4-app[data-real-active-tab="data"] #tab-data .mobile-data-intro{ margin:-2px 2px 2px; color:var(--text-dim); font-size:9px; line-height:1.3; }
+  body.v4-app[data-real-active-tab="data"] #tab-data > .dashboard-grid{ display:grid !important; grid-template-columns:1fr !important; gap:0 !important; margin:0 !important; }
+  body.v4-app[data-real-active-tab="data"] #tab-data .status-card{ display:grid !important; grid-template-columns:42px minmax(0,1fr) !important; gap:10px !important; align-items:center !important; min-height:74px !important; margin:0 !important; padding:10px !important; border-radius:0 !important; box-shadow:none !important; }
+  body.v4-app[data-real-active-tab="data"] #tab-data .status-card:first-child{ border-radius:14px 14px 0 0 !important; }
+  body.v4-app[data-real-active-tab="data"] #tab-data .status-card:last-child{ border-radius:0 0 14px 14px !important; box-shadow:var(--shadow-soft) !important; }
+  body.v4-app[data-real-active-tab="data"] #tab-data .status-card + .status-card{ border-top:0 !important; }
+  body.v4-app[data-real-active-tab="data"] #tab-data .status-card .icon-circle{ width:42px; height:42px; margin:0; font-size:18px; background:var(--green-pale); color:var(--green); }
+  body.v4-app[data-real-active-tab="data"] #tab-data .status-card h3{ margin:0 0 3px; font-size:12px; line-height:1.2; }
+  body.v4-app[data-real-active-tab="data"] #tab-data .status-card p{ margin:0; color:var(--text-dim); font-size:9.5px; line-height:1.3; }
+  body.v4-app[data-real-active-tab="data"] #tab-data .status-badge{ display:inline-block; margin-top:4px; padding:2px 6px; border-radius:7px; background:var(--green-pale); color:var(--green); font-size:8px; font-weight:850; }
+  body.v4-app[data-real-active-tab="data"] #tab-data > .card{ margin:0 !important; padding:10px !important; border-radius:14px !important; }
+  body.v4-app[data-real-active-tab="data"] #tab-data > .card .card-head{ margin-bottom:5px !important; }
+  body.v4-app[data-real-active-tab="data"] #tab-data > .card .card-head h2{ margin:0; font-size:15px !important; }
+  body.v4-app[data-real-active-tab="data"] #tab-data > .card .card-head .hint{ max-width:55%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:8px; }
+  body.v4-app[data-real-active-tab="data"] #tab-data > .card > .hint{ margin:0 0 8px !important; font-size:9px; line-height:1.3; }
+  body.v4-app[data-real-active-tab="data"] #tab-data .toolbar{ display:grid !important; grid-template-columns:1fr !important; gap:6px !important; width:100%; }
+  body.v4-app[data-real-active-tab="data"] #tab-data .toolbar button{ width:100%; min-height:38px; margin:0 !important; border-radius:10px; font-size:10px; }
+  body.v4-app[data-real-active-tab="data"] #tab-data #btnReset{ border-style:dashed !important; }
+  body.v4-app[data-real-active-tab="data"] #tab-data #firebaseConfigInput{ width:100%; min-height:138px; max-height:210px; margin:0; padding:9px; border-radius:10px; font-size:8px; line-height:1.35; resize:vertical; }
+  body.v4-app[data-real-active-tab="data"] #tab-data pre{ display:none !important; }
+  body.v4-app[data-real-active-tab="data"] #tab-data .info-callout{ display:grid; grid-template-columns:34px minmax(0,1fr); gap:9px; margin:0; padding:10px; border:1px solid rgba(54,112,180,.20); border-radius:14px; background:rgba(232,242,255,.58); }
+  body.v4-app[data-real-active-tab="data"] #tab-data .info-callout .icon-circle{ width:34px; height:34px; margin:0; background:var(--blue-bg); color:var(--blue); }
+  body.v4-app[data-real-active-tab="data"] #tab-data .info-callout h4{ margin:0 0 4px; font-size:11px; }
+  body.v4-app[data-real-active-tab="data"] #tab-data .info-callout p{ margin:2px 0; color:var(--text-dim); font-size:8.5px; line-height:1.35; }
+
+  /* build 69: iPhone/PWA veilige schaal en compacte mobiele varianten.
+     De 390px-layout blijft hierbij bewust onaangeraakt. */
+  html,
+  body.v4-app{
+    -webkit-text-size-adjust:100%;
+    text-size-adjust:100%;
+    overflow-x:hidden;
+  }
+  body.v4-app .v4-main,
+  body.v4-app .v4-content{
+    min-width:0;
+    max-width:100%;
+    padding-bottom:max(96px, calc(76px + env(safe-area-inset-bottom))) !important;
+  }
+  body.v4-app .v4-bottom-nav{
+    bottom:max(8px, env(safe-area-inset-bottom)) !important;
+    padding-bottom:env(safe-area-inset-bottom);
+    min-width:0;
+  }
+  body.v4-app .mobile-header-top,
+  body.v4-app .mobile-header-top > *,
+  body.v4-app .card-head,
+  body.v4-app .card-head-title,
+  body.v4-app .dashboard-grid,
+  body.v4-app .mobile-kpi-grid,
+  body.v4-app .joint-two-column-row,
+  body.v4-app .mobile-savings-kpis,
+  body.v4-app .mobile-savings-summary-grid,
+  body.v4-app .joint-savings-primary-grid,
+  body.v4-app .joint-savings-rest-row,
+  body.v4-app .manage-stack,
+  body.v4-app #tab-data,
+  body.v4-app .modal,
+  body.v4-app .modal-content{
+    min-width:0;
+    max-width:100%;
+  }
+  body.v4-app .card-head-title > *,
+  body.v4-app .mobile-header-top > *,
+  body.v4-app .joint-transaction-row > *,
+  body.v4-app .bank-review-row > *,
+  body.v4-app .mobile-goal-row > *,
+  body.v4-app .goal-manager-row > *{
+    min-width:0;
+  }
+
+  @media (min-width:375px) and (max-width:389px){
+    body.v4-app .mobile-kpi-grid,
+    body.v4-app .mobile-savings-kpis{ gap:5px; }
+    body.v4-app .mobile-kpi-card{ padding-left:5px !important; padding-right:5px !important; }
+    body.v4-app .mobile-kpi-label{ font-size:8px !important; }
+    body.v4-app .mobile-kpi-value{ font-size:16px !important; }
+    body.v4-app .joint-fixed-editor-table-head,
+    body.v4-app #incomeEditModal .joint-fixed-editor-row.joint-fixed-editor-row-compact{
+      grid-template-columns:19px 58px minmax(0,1fr) 54px 20px 72px 14px !important;
+      gap:3px !important;
+      padding-left:8px !important;
+      padding-right:8px !important;
+    }
+    body.v4-app #incomeEditModal .joint-fixed-editor-move{ padding-right:13px !important; font-size:8.5px !important; }
+    body.v4-app .v4-bottom-nav .bottom-nav-btn{ min-width:0; }
+    body.v4-app .v4-bottom-nav .bottom-nav-btn span:last-child{ font-size:8px !important; }
+  }
+
+  @media (max-width:374px){
+    body.v4-app .mobile-header-top{ gap:5px !important; }
+    body.v4-app .mobile-header-top .mobile-brand strong{ font-size:18px !important; }
+    body.v4-app .mobile-header-top .month-picker-btn,
+    body.v4-app .mobile-header-top select{ max-width:126px; font-size:10px !important; }
+    body.v4-app .mobile-kpi-grid,
+    body.v4-app .mobile-savings-kpis{
+      grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+      gap:6px !important;
+    }
+    body.v4-app .mobile-kpi-card,
+    body.v4-app .mobile-savings-kpis .card{
+      min-height:88px !important;
+      height:auto !important;
+      padding:7px 6px !important;
+    }
+    body.v4-app .mobile-kpi-label,
+    body.v4-app .mobile-savings-kpis small{ overflow-wrap:anywhere; }
+    body.v4-app[data-active-tab="dashboard"] .mobile-kpi-grid + .dashboard-grid:not(.v4-desktop-only-grid),
+    body.v4-app[data-active-tab="dashboard"] .mobile-kpi-grid + .dashboard-grid:not(.v4-desktop-only-grid) + .dashboard-grid:not(.v4-desktop-only-grid),
+    body.v4-app[data-real-active-tab="gezamenlijk"] .joint-two-column-row,
+    body.v4-app .mobile-savings-summary-grid{
+      grid-template-columns:1fr !important;
+    }
+    body.v4-app[data-active-tab="dashboard"] .mobile-kpi-grid + .dashboard-grid:not(.v4-desktop-only-grid) > .card,
+    body.v4-app[data-active-tab="dashboard"] .mobile-kpi-grid + .dashboard-grid:not(.v4-desktop-only-grid) + .dashboard-grid:not(.v4-desktop-only-grid) > .card{
+      min-width:0 !important;
+      height:auto !important;
+      min-height:120px !important;
+    }
+    body.v4-app[data-real-active-tab="gezamenlijk"] .joint-two-column-row > .joint-two-column-card{
+      min-height:124px !important;
+      height:auto !important;
+    }
+    body.v4-app .joint-savings-primary-goal{ padding:5px !important; }
+    body.v4-app .joint-savings-primary-goal strong{ font-size:8.5px !important; }
+    body.v4-app .joint-savings-primary-goal > span:not(.joint-savings-goal-icon):not(.joint-savings-progress),
+    body.v4-app .joint-savings-primary-goal em,
+    body.v4-app .joint-savings-primary-goal small{ font-size:6.5px !important; }
+    body.v4-app .mobile-goal-row{ grid-template-columns:30px minmax(0,1fr) 48px !important; gap:5px !important; padding:7px 0 !important; }
+    body.v4-app .mobile-goal-list{ padding:0 8px !important; }
+    body.v4-app .goal-manager-head,
+    body.v4-app .goal-manager-row{ grid-template-columns:18px minmax(0,1fr) 44px 44px 18px 16px !important; gap:2px !important; }
+    body.v4-app .goal-manager-row{ padding:5px 3px !important; }
+    body.v4-app .goal-manager-head{ font-size:6px !important; }
+    body.v4-app .goal-manager-row input{ padding:3px !important; font-size:8px !important; }
+    body.v4-app #incomeEditModal .joint-fixed-editor-table-head,
+    body.v4-app #incomeEditModal .joint-fixed-editor-row.joint-fixed-editor-row-compact{
+      grid-template-columns:17px 46px minmax(0,1fr) 47px 18px 61px 12px !important;
+      gap:2px !important;
+      padding-left:6px !important;
+      padding-right:6px !important;
+    }
+    body.v4-app #incomeEditModal .joint-fixed-editor-input,
+    body.v4-app #incomeEditModal .joint-fixed-editor-move{ font-size:8px !important; }
+    body.v4-app #incomeEditModal .joint-fixed-editor-move{ padding:4px 11px 4px 2px !important; }
+    body.v4-app .v4-bottom-nav{ left:6px !important; right:6px !important; max-width:calc(100% - 12px); }
+    body.v4-app .v4-bottom-nav .bottom-nav-btn{ min-width:0; padding-left:1px !important; padding-right:1px !important; }
+    body.v4-app .v4-bottom-nav .bottom-nav-btn .bn-icon{ width:28px !important; height:28px !important; }
+    body.v4-app .v4-bottom-nav .bottom-nav-btn span:last-child{ font-size:7px !important; letter-spacing:-.02em; white-space:nowrap; }
+  }
 }
 </style>
 </head>
@@ -7534,32 +7725,30 @@ function renderModernGoalCards(doelen, pot, owner, limit=null){
   if (!items.length) return '<p class="muted-empty">Nog geen spaardoelen.</p>';
   return `<div class="goal-card-grid">${items.map(item=>renderModernGoalCard(item, owner)).join('')}</div>`;
 }
+function goalMonthlyInlegText(item){
+  const fixed = Number(item.vasteInlegWerkelijk ?? item.doel.vasteInleg)||0;
+  const extra = Number(item.berekendeExtraInleg)||0;
+  return `<span class="goal-inleg-breakdown"><b>Vast ${eur(fixed)}</b><b>Naar rato ${eur(extra)}</b></span>`;
+}
+function goalNeededPerMonth(item){
+  return `<span class="joint-savings-needed">Nodig p/m: ${item.benodigdPerMaand === null ? '—' : eur(item.benodigdPerMaand)}</span>`;
+}
+function goalImageStyle(goal){
+  const source = String(goal?.afbeelding || '').replace(/'/g,'%27');
+  return source ? ` style="background-image:linear-gradient(rgba(35,45,30,.47),rgba(35,45,30,.62)),url('${source}')"` : '';
+}
+function goalImageIcon(goal){
+  const source = String(goal?.afbeelding || '').replace(/'/g,'%27');
+  return `<span class="joint-savings-goal-icon${source?' has-image':''}"${source ? ` style="background-image:url('${source}')"` : ''}>${source ? '' : goalIcon(goal)}</span>`;
+}
 function renderJointSavingsOverviewCard(owner='gezamenlijk', savingPot=null){
-  const r = calcScenario(state);
-  const name = ownerLabel(owner);
-  const goals = calcGroep(state.spaardoelen[owner] || [], savingPot ?? r.spaarpotDezeMaand, TODAY).sort((a,b)=>{
-    if (!!a.doel.favoriet !== !!b.doel.favoriet) return a.doel.favoriet ? -1 : 1;
-    const aDate = a.doel.doeldatum ? new Date(a.doel.doeldatum).getTime() : Infinity;
-    const bDate = b.doel.doeldatum ? new Date(b.doel.doeldatum).getTime() : Infinity;
-    return aDate - bDate;
-  });
-  const primary = goals.slice(0,3);
-  const remaining = goals.slice(3);
-  const primaryHtml = primary.map(item=>{
-    const goal = item.doel;
-    const target = Number(goal.doelbedrag)||0;
-    const saved = Number(goal.algespaard)||0;
-    const progress = target > 0 ? Math.min(100, Math.round((saved / target) * 100)) : 0;
-    return `<button type="button" class="joint-savings-primary-goal" data-tab-shortcut="spaardoelen"><span class="joint-savings-goal-icon">${goalIcon(goal)}</span><strong title="${textSafe(goal.naam || 'Spaardoel')}">${textSafe(goal.naam || 'Spaardoel')}</strong><span>${eur(saved)} / ${eur(target)}</span><span class="joint-savings-progress"><i style="width:${progress}%"></i></span><em>${progress}%</em></button>`;
-  }).join('');
-  const remainingHtml = remaining.length ? `<div class="joint-savings-rest-row">${remaining.map(item=>{
-    const goal = item.doel;
-    const target = Number(goal.doelbedrag)||0;
-    const saved = Number(goal.algespaard)||0;
-    const progress = target > 0 ? Math.min(100, Math.round((saved / target) * 100)) : 0;
-    return `<button type="button" class="joint-savings-rest-goal" data-tab-shortcut="spaardoelen"><strong title="${textSafe(goal.naam || 'Spaardoel')}">${textSafe(goal.naam || 'Spaardoel')}</strong><span>${eur(saved)} / ${eur(target)}</span><em>${progress}%</em></button>`;
-  }).join('')}</div>` : '';
-  return `<div class="card joint-single-card joint-savings-overview-card" aria-label="${name} spaardoelen"><div class="card-head joint-savings-card-head"><div class="card-head-title">${iconBadge('piggy', 'green', 'card-head-icon')}<h2>${owner === 'gezamenlijk' ? 'Gezamenlijke spaardoelen' : `${name} spaardoelen`}</h2></div><button type="button" class="ghost small" data-tab-shortcut="spaardoelen">Alle doelen</button></div>${primary.length ? `<div class="joint-savings-primary-grid goals-${primary.length}">${primaryHtml}</div>${remainingHtml}` : `<p class="hint" style="margin:0">Nog geen spaardoelen van ${name}.</p>`}</div>`;
+  const r = calcScenario(state); const name = ownerLabel(owner);
+  const goals = calcGroep(state.spaardoelen[owner] || [], savingPot ?? r.spaarpotDezeMaand, TODAY).sort((a,b)=>{ if (!!a.doel.favoriet !== !!b.doel.favoriet) return a.doel.favoriet ? -1 : 1; return (a.doel.doeldatum ? new Date(a.doel.doeldatum).getTime() : Infinity) - (b.doel.doeldatum ? new Date(b.doel.doeldatum).getTime() : Infinity); });
+  const primary = goals.length >= 3 ? goals.slice(0,3) : [];
+  const compact = goals.length >= 3 ? goals.slice(3) : goals;
+  const primaryHtml = primary.map(item=>{ const goal=item.doel,target=Number(goal.doelbedrag)||0,saved=Number(goal.algespaard)||0,progress=target>0?Math.min(100,Math.round(saved/target*100)):0; return `<button type="button" class="joint-savings-primary-goal${goal.afbeelding?' has-image':''}" data-tab-shortcut="spaardoelen"${goalImageStyle(goal)}>${goalImageIcon(goal)}<strong title="${textSafe(goal.naam || 'Spaardoel')}">${textSafe(goal.naam || 'Spaardoel')}</strong><span>${eur(saved)} / ${eur(target)}</span><span class="joint-savings-progress"><i style="width:${progress}%"></i></span><em>${progress}%</em>${goalNeededPerMonth(item)}${goalMonthlyInlegText(item)}</button>`; }).join('');
+  const compactHtml = compact.length ? `<div class="joint-savings-rest-row">${compact.map(item=>{ const goal=item.doel,target=Number(goal.doelbedrag)||0,saved=Number(goal.algespaard)||0,progress=target>0?Math.min(100,Math.round(saved/target*100)):0; return `<button type="button" class="joint-savings-rest-goal" data-tab-shortcut="spaardoelen">${goalImageIcon(goal)}<span class="joint-savings-rest-copy"><strong title="${textSafe(goal.naam || 'Spaardoel')}">${textSafe(goal.naam || 'Spaardoel')}</strong><span>${eur(saved)} / ${eur(target)}</span>${goalNeededPerMonth(item)}${goalMonthlyInlegText(item)}</span><em>${progress}%</em></button>`; }).join('')}</div>` : '';
+  return `<div class="card joint-single-card joint-savings-overview-card" aria-label="${name} spaardoelen"><div class="card-head joint-savings-card-head"><div class="card-head-title">${iconBadge('piggy', 'green', 'card-head-icon')}<h2>${owner === 'gezamenlijk' ? 'Gezamenlijke spaardoelen' : `${name} spaardoelen`}</h2></div><button type="button" class="ghost small" data-tab-shortcut="spaardoelen">Alle doelen</button></div>${primary.length ? `<div class="joint-savings-primary-grid">${primaryHtml}</div>` : ''}${compactHtml || (!primary.length ? `<p class="hint" style="margin:0">Nog geen spaardoelen van ${name}.</p>` : '')}</div>`;
 }
 function renderDashboardGoalPreviewCard(item){
   const doel = item.doel || item;
@@ -7774,20 +7963,49 @@ function calcDoel(doel, today){
 }
 function calcGroep(doelen, spaarpotDezeMaand, today){
   const berekend = doelen.map(d => ({ doel:d, ...calcDoel(d, today) }));
-  // Vaste inleg van ALLE doelen (ook 'alleen vast bedrag'-doelen zoals Beleggen) telt mee als al gecommitteerd.
-  const totaalVasteInleg = sumBedrag(doelen.map(d=>({bedrag:d.vasteInleg})));
+  const potCents = Math.max(0, Math.round((Number(spaarpotDezeMaand)||0)*100));
+  // Ook vaste inleg stopt bij het resterende doelbedrag. Het vrijgevallen deel kan daarna naar andere doelen.
+  const vasteCents = berekend.map(b=>Math.min(
+    Math.max(0,Math.round((Number(b.doel.vasteInleg)||0)*100)),
+    Math.max(0,Math.round((Number(b.nogTeGaan)||0)*100))
+  ));
+  const totaalVasteCents = vasteCents.reduce((sum,value)=>sum+value,0);
+  const totaalVasteInleg = round2(totaalVasteCents/100);
   // Het extra overschot/tekort wordt alleen naar rato verdeeld over doelen die NIET op 'alleen vast bedrag' staan.
   const verdeelbaar = berekend.filter(b => !b.doel.vastBedrag);
   const totaalBenodigd = round2(verdeelbaar.reduce((s,b)=> s + (b.benodigdPerMaand||0), 0));
   const totaalExtraBenodigd = round2(verdeelbaar.reduce((s,b)=> s + (b.benodigdeExtraInleg||0), 0));
-  const extraPot = Math.max(0, (spaarpotDezeMaand||0) - totaalVasteInleg);
-  return berekend.map(b=>{
-    const vasteInleg = Number(b.doel.vasteInleg)||0;
-    if (b.doel.vastBedrag){
-      return { ...b, berekendeExtraInleg: 0, werkelijkeInleg: round2(vasteInleg), totaalVasteInleg, totaalBenodigd, totaalExtraBenodigd };
+  const extraPotCents = Math.max(0,potCents-totaalVasteCents);
+  let resterendePotCents = extraPotCents;
+  const extraCents = berekend.map(()=>0);
+  const capacities = berekend.map((b,index)=>Math.max(0,Math.round((Number(b.nogTeGaan)||0)*100)-vasteCents[index]));
+  let active = berekend.map((b,index)=>({index,weight:Math.max(0,Number(b.benodigdeExtraInleg)||0)})).filter(item=>!berekend[item.index].doel.vastBedrag && item.weight>0 && capacities[item.index]>0);
+
+  // Verdeel herhaaldelijk. Bereikt een doel zijn maximum, dan gaat het restant opnieuw naar rato naar de overige doelen.
+  while (resterendePotCents>0 && active.length){
+    const totalWeight=active.reduce((sum,item)=>sum+item.weight,0);
+    if (!(totalWeight>0)) break;
+    const capped=active.filter(item=>(resterendePotCents*(item.weight/totalWeight))>=capacities[item.index]);
+    if (capped.length){
+      const cappedIndexes=new Set(capped.map(item=>item.index));
+      capped.forEach(item=>{const amount=capacities[item.index];extraCents[item.index]=amount;resterendePotCents-=amount;});
+      active=active.filter(item=>!cappedIndexes.has(item.index));
+      continue;
     }
-    const extraAandeel = totaalExtraBenodigd>0 ? extraPot * ((b.benodigdeExtraInleg||0)/totaalExtraBenodigd) : 0;
-    return { ...b, berekendeExtraInleg: round2(extraAandeel), werkelijkeInleg: round2(vasteInleg + extraAandeel), totaalVasteInleg, totaalBenodigd, totaalExtraBenodigd };
+    const shares=active.map(item=>{const raw=resterendePotCents*(item.weight/totalWeight);return {...item,cents:Math.floor(raw),fraction:raw-Math.floor(raw)};});
+    let assigned=shares.reduce((sum,item)=>sum+item.cents,0);
+    shares.sort((a,b)=>b.fraction-a.fraction||a.index-b.index);
+    for(let cent=0;cent<resterendePotCents-assigned;cent++) shares[cent%shares.length].cents+=1;
+    shares.forEach(item=>{extraCents[item.index]=Math.min(item.cents,capacities[item.index]);});
+    resterendePotCents=0;
+  }
+
+  const extraPot = round2(extraPotCents/100);
+  const onverdeeld = round2(resterendePotCents/100);
+  return berekend.map((b,index)=>{
+    const vasteInleg=round2(vasteCents[index]/100);
+    const berekendeExtraInleg=round2(extraCents[index]/100);
+    return { ...b, berekendeExtraInleg, werkelijkeInleg:round2(vasteInleg+berekendeExtraInleg), vasteInlegWerkelijk:vasteInleg, totaalVasteInleg, totaalBenodigd, totaalExtraBenodigd, spaarpotDezeMaand:round2(potCents/100), extraPot, onverdeeld };
   });
 }
 function calcScenario(state){
@@ -9037,6 +9255,79 @@ function renderPersonOrJoint(tabId, key, label){
 }
 
 /* ---------- spaardoelen-tab ---------- */
+function renderMobileGoalRow(item, owner, index){
+  const goal = item.doel;
+  const target = Number(goal.doelbedrag)||0;
+  const saved = Number(goal.algespaard)||0;
+  const progress = Math.min(100, Math.round((item.voortgang||0)*100));
+  return `<div class="mobile-goal-row"><span class="mobile-goal-icon tone-${owner === 'gezamenlijk' ? 'green' : owner}">${goalIcon(goal)}</span><div class="mobile-goal-main"><strong>${textSafe(goal.naam || 'Spaardoel')}</strong><span>${eur(saved)} van ${eur(target)}</span><div class="progress-track"><div class="progress-fill" style="width:${progress}%"></div></div><em class="mobile-goal-needed">Nodig p/m: ${item.benodigdPerMaand === null ? '—' : eur(item.benodigdPerMaand)}</em>${goalMonthlyInlegText(item)}<em>Doel: ${goal.doeldatum ? formatDateNL(goal.doeldatum) : 'Geen einddatum'}</em></div><div class="mobile-goal-side"><b>${progress}%</b><button type="button" class="ghost small" data-open-goal-editor="${owner}:${index}">Bekijk doel</button></div></div>`;
+}
+function renderMobileGoalGroup(group){
+  const items = calcGroep(group.doelen, group.pot, TODAY);
+  return `<section class="mobile-goal-section"><h2>${group.label}</h2><div class="card mobile-goal-list">${items.length ? items.map((item,index)=>renderMobileGoalRow(item,group.key,index)).join('') : '<p class="hint">Nog geen spaardoelen.</p>'}</div></section>`;
+}
+function openMobileGoalEditor(owner,index){
+  const goal = state.spaardoelen?.[owner]?.[index];
+  if (!goal) return;
+  const modal = document.getElementById('incomeEditModal');
+  const name = ownerLabel(owner);
+  modal.innerHTML = `<div class="modal goal-detail-editor"><div class="joint-variable-editor-header"><div><div class="section-kicker">${name} · ${monthLabel(getSelectedMonth())}</div><h2>Spaardoel bewerken</h2></div><button type="button" class="ghost" data-close-goal-editor>Sluiten</button></div><div class="modal-grid"><label class="full">Naam<input id="goalEditName" type="text" value="${textSafe(goal.naam || '')}"></label><label>Al gespaard<input id="goalEditSaved" type="number" step="0.01" inputmode="decimal" value="${Number(goal.algespaard)||0}"></label><label>Doelbedrag<input id="goalEditTarget" type="number" step="0.01" inputmode="decimal" value="${Number(goal.doelbedrag)||0}"></label><label>Doeldatum<input id="goalEditDate" type="date" value="${textSafe(goal.doeldatum || '')}"></label><label>Vaste inleg p/m<input id="goalEditMonthly" type="number" step="0.01" inputmode="decimal" value="${Number(goal.vasteInleg)||0}"></label><label class="goal-editor-fixed-only"><input id="goalEditFixedOnly" type="checkbox" ${goal.vastBedrag?'checked':''}> Alleen vaste inleg <span>— niet meedoen met verdeling naar rato</span></label><label>Rendement %<input id="goalEditReturn" type="number" step="0.01" inputmode="decimal" value="${Math.round((Number(goal.rendement)||0)*10000)/100}"></label><label>Periode<select id="goalEditPeriod"><option value="jaarlijks" ${goal.rendementPeriode !== 'maandelijks'?'selected':''}>Jaarlijks</option><option value="maandelijks" ${goal.rendementPeriode === 'maandelijks'?'selected':''}>Maandelijks</option></select></label><label class="full goal-editor-favorite"><input id="goalEditFavorite" type="checkbox" ${goal.favoriet?'checked':''}> Favoriet doel</label><section class="goal-calculation-card" id="goalEditCalculation"></section></div><div class="modal-actions"><button type="button" class="danger-ghost" id="goalEditDelete">Verwijderen</button><button type="button" class="primary" id="goalEditSave">Opslaan</button></div></div>`;
+  modal.classList.add('open','goal-detail-editor-open');
+  let goalImageData = String(goal.afbeelding || '');
+  const imageField = document.createElement('label');
+  imageField.className = 'full goal-image-field';
+  imageField.innerHTML = `<span>Afbeelding</span><div class="goal-image-preview" ${goalImageData ? `style="background-image:url('${goalImageData.replace(/'/g,'%27')}')"` : ''}>${goalImageData ? '' : 'Geen afbeelding'}</div><input type="file" accept="image/*" id="goalEditImage"><button type="button" class="ghost small" id="goalEditImageRemove" ${goalImageData ? '' : 'disabled'}>Afbeelding verwijderen</button>`;
+  modal.querySelector('.modal-grid').appendChild(imageField);
+  const imagePreview = imageField.querySelector('.goal-image-preview');
+  imageField.querySelector('#goalEditImage').addEventListener('change',event=>{ const file=event.target.files?.[0]; if(!file)return; if(file.size>1500000){alert('Kies een afbeelding kleiner dan 1,5 MB.');event.target.value='';return;} const reader=new FileReader(); reader.onload=loaded=>{goalImageData=String(loaded.target.result||'');imagePreview.style.backgroundImage=`url('${goalImageData.replace(/'/g,'%27')}')`;imagePreview.textContent='';imageField.querySelector('#goalEditImageRemove').disabled=false;}; reader.readAsDataURL(file); });
+  imageField.querySelector('#goalEditImageRemove').addEventListener('click',()=>{goalImageData='';imagePreview.style.backgroundImage='';imagePreview.textContent='Geen afbeelding';imageField.querySelector('#goalEditImage').value='';imageField.querySelector('#goalEditImageRemove').disabled=true;});
+  const calculation = modal.querySelector('#goalEditCalculation');
+  const draftItem=()=>{
+    const draft={...goal,algespaard:round2(bankAmount(modal.querySelector('#goalEditSaved').value)||0),doelbedrag:round2(bankAmount(modal.querySelector('#goalEditTarget').value)||0),doeldatum:modal.querySelector('#goalEditDate').value,vasteInleg:round2(bankAmount(modal.querySelector('#goalEditMonthly').value)||0),rendement:(bankAmount(modal.querySelector('#goalEditReturn').value)||0)/100,rendementPeriode:modal.querySelector('#goalEditPeriod').value,vastBedrag:modal.querySelector('#goalEditFixedOnly').checked};
+    const drafts=state.spaardoelen[owner].map((item,itemIndex)=>itemIndex===index?draft:item);
+    const r=calcScenario(state); const pot=owner==='gezamenlijk'?r.spaarpotDezeMaand:r[owner].beschikbaarVoorSparen;
+    return calcGroep(drafts,pot,TODAY)[index];
+  };
+  const renderCalculation=()=>{const item=draftItem(); calculation.innerHTML=`<h3>Berekening deze maand</h3><div class="goal-calculation-total"><span>Nodig per maand</span><strong>${item.benodigdPerMaand === null ? 'Geen einddatum' : eur(item.benodigdPerMaand)}</strong></div><div class="goal-calculation-total"><span>Inleg deze maand</span><strong>${eur(item.werkelijkeInleg)}</strong></div>${goalMonthlyInlegText(item)}<p class="goal-calculation-note">Spaargeld totaal ${eur(item.spaarpotDezeMaand)} − vaste inleg ${eur(item.totaalVasteInleg)} = ${eur(item.extraPot)} voor verdeling naar rato.</p>`;};
+  ['goalEditSaved','goalEditTarget','goalEditDate','goalEditMonthly','goalEditReturn','goalEditPeriod','goalEditFixedOnly'].forEach(id=>modal.querySelector('#'+id).addEventListener('input',renderCalculation));
+  renderCalculation();
+  const close=()=>{modal.classList.remove('open','goal-detail-editor-open');modal.innerHTML='';renderActiveTab();};
+  modal.querySelector('[data-close-goal-editor]').addEventListener('click',close);
+  modal.querySelector('#goalEditSave').addEventListener('click',()=>{ goal.naam=modal.querySelector('#goalEditName').value.trim(); goal.algespaard=round2(bankAmount(modal.querySelector('#goalEditSaved').value)||0); goal.doelbedrag=round2(bankAmount(modal.querySelector('#goalEditTarget').value)||0); goal.doeldatum=modal.querySelector('#goalEditDate').value; goal.vasteInleg=round2(bankAmount(modal.querySelector('#goalEditMonthly').value)||0); goal.vastBedrag=modal.querySelector('#goalEditFixedOnly').checked; goal.rendement=(bankAmount(modal.querySelector('#goalEditReturn').value)||0)/100; goal.rendementPeriode=modal.querySelector('#goalEditPeriod').value; goal.favoriet=modal.querySelector('#goalEditFavorite').checked; goal.afbeelding=goalImageData; persist(); showQuickToast('Spaardoel opgeslagen'); close(); });
+  modal.querySelector('#goalEditDelete').addEventListener('click',()=>{ state.spaardoelen[owner].splice(index,1); persist(); showQuickToast('Spaardoel verwijderd'); close(); });
+}
+function openMobileGoalManager(owner){
+  const goals = state.spaardoelen?.[owner] || [];
+  const modal = document.getElementById('incomeEditModal');
+  const name = ownerLabel(owner);
+  const r=calcScenario(state); const pot=owner==='gezamenlijk'?r.spaarpotDezeMaand:r[owner].beschikbaarVoorSparen;
+  const items=calcGroep(goals,pot,TODAY);
+  const rows = items.map((item,index)=>{const goal=item.doel;return `<div class="goal-manager-row" data-open-manager-goal="${index}" role="button" tabindex="0"><span>${goalIcon(goal)}</span><span class="goal-manager-copy"><strong>${textSafe(goal.naam || 'Spaardoel')}</strong><small>${eur(Number(goal.algespaard)||0)} / ${eur(Number(goal.doelbedrag)||0)}</small></span><span class="goal-manager-metric"><span>Nodig p/m</span><b>${item.benodigdPerMaand === null ? '—' : eur(item.benodigdPerMaand)}</b></span><span class="goal-manager-metric"><span>Deze maand</span><b>${eur(item.werkelijkeInleg)}</b></span><span class="goal-manager-moves"><button type="button" data-move-manager-goal="${index}:-1" ${index===0?'disabled':''} aria-label="Doel omhoog">▲</button><button type="button" data-move-manager-goal="${index}:1" ${index===items.length-1?'disabled':''} aria-label="Doel omlaag">▼</button></span><button type="button" class="joint-fixed-row-delete-compact" data-remove-manager-goal="${index}" aria-label="Doel verwijderen">×</button></div>`;}).join('');
+  modal.innerHTML=`<div class="modal goal-manager-editor"><div class="joint-variable-editor-header"><div><div class="section-kicker">${name} · ${monthLabel(getSelectedMonth())}</div><h2>Spaardoelen beheren</h2><p>Tik op een doel voor alle instellingen en de berekening.</p></div><button type="button" class="ghost" data-close-goal-manager>Sluiten</button></div><div class="goal-manager-list">${rows || '<p class="hint">Nog geen spaardoelen.</p>'}</div><div class="joint-variable-editor-actions"><button type="button" class="primary" data-close-goal-manager>Klaar</button><button type="button" class="ghost" data-add-manager-goal>+ Spaardoel</button></div></div>`;
+  modal.classList.add('open','goal-manager-editor-open');
+  const close=()=>{modal.classList.remove('open','goal-manager-editor-open');modal.innerHTML='';renderActiveTab();};
+  modal.querySelectorAll('[data-close-goal-manager]').forEach(btn=>btn.addEventListener('click',close));
+  modal.querySelectorAll('[data-open-manager-goal]').forEach(btn=>{const open=()=>{modal.classList.remove('open','goal-manager-editor-open');openMobileGoalEditor(owner,Number(btn.dataset.openManagerGoal));};btn.addEventListener('click',open);btn.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();open();}});});
+  modal.querySelectorAll('[data-move-manager-goal]').forEach(btn=>btn.addEventListener('click',event=>{event.stopPropagation();const [index,delta]=btn.dataset.moveManagerGoal.split(':').map(Number);const target=index+delta;if(target<0||target>=goals.length)return;[goals[index],goals[target]]=[goals[target],goals[index]];persist();openMobileGoalManager(owner);}));
+  modal.querySelectorAll('[data-remove-manager-goal]').forEach(btn=>btn.addEventListener('click',event=>{event.stopPropagation();goals.splice(Number(btn.dataset.removeManagerGoal),1);persist();openMobileGoalManager(owner);}));
+  modal.querySelector('[data-add-manager-goal]').addEventListener('click',()=>{goals.push({id:uid(),naam:'Nieuw doel',doelbedrag:0,algespaard:0,doeldatum:'',vasteInleg:0,rendement:.0125,rendementPeriode:'jaarlijks',favoriet:false});persist();openMobileGoalManager(owner);});
+}
+function renderMobileSpaardoelen(){
+  const r=calcScenario(state);
+  const groups=[{key:'gezamenlijk',label:'Gezamenlijk',pot:r.spaarpotDezeMaand,doelen:state.spaardoelen.gezamenlijk},{key:'dion',label:'Dion',pot:r.dion.beschikbaarVoorSparen,doelen:state.spaardoelen.dion},{key:'dara',label:'Dara',pot:r.dara.beschikbaarVoorSparen,doelen:state.spaardoelen.dara}];
+  const calculated=groups.map(group=>({...group,items:calcGroep(group.doelen,group.pot,TODAY)}));
+  const all=calculated.flatMap(group=>group.items); const saved=round2(all.reduce((sum,item)=>sum+(Number(item.doel.algespaard)||0),0)); const target=round2(all.reduce((sum,item)=>sum+(Number(item.doel.doelbedrag)||0),0)); const average=target>0?saved/target:0; const monthly=round2(all.reduce((sum,item)=>sum+(item.werkelijkeInleg||0),0));
+  const groupSummary=calculated.map(group=>{const goalTarget=round2(group.items.reduce((sum,item)=>sum+(Number(item.doel.doelbedrag)||0),0));const goalSaved=round2(group.items.reduce((sum,item)=>sum+(Number(item.doel.algespaard)||0),0));const ratio=target>0?goalTarget/target:0;return {label:group.label,saved:goalSaved,target:goalTarget,ratio,monthly:round2(group.items.reduce((sum,item)=>sum+(item.werkelijkeInleg||0),0))};});
+  const distribution=groupSummary.map(group=>`<div class="mobile-goal-summary-line"><span>${group.label}</span><i><b style="width:${Math.round(group.ratio*100)}%"></b></i><strong>${eur(group.target)} (${pct(group.ratio)})</strong></div>`).join('');
+  const monthSummary=groupSummary.map(group=>`<div class="mobile-goal-summary-line"><span>${group.label}</span><i><b style="width:${monthly>0?Math.round(group.monthly/monthly*100):0}%"></b></i><strong>${eur(group.monthly)}</strong></div>`).join('');
+  const root=document.getElementById('tab-spaardoelen');
+  root.innerHTML=`${renderSharedEmptyTabHeader('Spaardoelen overzicht')}<div class="mobile-savings-overview"><div class="mobile-savings-kpis"><div class="card"><span>◈</span><small>Totaal gespaard</small><strong>${eur(saved)}</strong><em>van ${eur(target)}</em></div><div class="card"><span>◎</span><small>Totaal doelbedrag</small><strong>${eur(target)}</strong><em>alle doelen samen</em></div><div class="card"><span>↗</span><small>Gemiddelde voortgang</small><strong>${pct(average)}</strong><em>op basis van doelbedrag</em></div><div class="card"><span>€</span><small>Inleg deze maand</small><strong>${eur(monthly)}</strong><em>${monthLabel(getSelectedMonth())}</em></div></div>${groups.map(renderMobileGoalGroup).join('')}<div class="mobile-savings-summary-grid"><div class="card"><h2>Verdeling van spaardoelen</h2>${distribution}<p>Percentages gebaseerd op totaal doelbedrag per groep.</p></div><div class="card"><h2>Inleg deze maand</h2>${monthSummary}<strong class="mobile-savings-month-total">${eur(monthly)} totaal</strong></div></div><div class="manage-stack"><details class="manage-section"><summary><span class="manage-title">Spaardoelen beheren — Gezamenlijk</span><span class="expand-chevron"></span></summary><div class="manage-body"><div class="card">${renderGoalGroup('spaardoelen.gezamenlijk',state.spaardoelen.gezamenlijk,r.spaarpotDezeMaand)}</div></div></details><details class="manage-section"><summary><span class="manage-title">Spaardoelen beheren — Dion</span><span class="expand-chevron"></span></summary><div class="manage-body"><div class="card">${renderGoalGroup('spaardoelen.dion',state.spaardoelen.dion,r.dion.beschikbaarVoorSparen)}</div></div></details><details class="manage-section"><summary><span class="manage-title">Spaardoelen beheren — Dara</span><span class="expand-chevron"></span></summary><div class="manage-body"><div class="card">${renderGoalGroup('spaardoelen.dara',state.spaardoelen.dara,r.dara.beschikbaarVoorSparen)}</div></div></details></div></div>`;
+  root.querySelectorAll('.manage-section').forEach((section,index)=>{
+    const owners=['gezamenlijk','dion','dara'];
+    const body=section.querySelector('.manage-body');
+    if (body) body.innerHTML=`<button type="button" class="ghost mobile-goal-manage-open" data-open-goal-manager="${owners[index]}">Open full-screen beheer</button>`;
+  });
+}
 function renderSpaardoelen(){
   const r = calcScenario(state);
   const groups = [
@@ -9108,6 +9399,7 @@ function renderSpaardoelen(){
 }
 /* ---------- data & back-up tab ---------- */
 function renderDataTab(){
+  document.getElementById('tab-data')?.classList.remove('mobile-data-page');
   const lastBackup = DataAdapter.loadBackup();
   const lastBackupDate = lastBackup?.savedAt ? new Date(lastBackup.savedAt) : null;
   const isToday = lastBackupDate && lastBackupDate.toDateString() === new Date().toDateString();
@@ -9246,6 +9538,17 @@ service cloud.firestore {
   document.getElementById('btnFirebaseSignOut').addEventListener('click', async ()=>{
     await CloudAdapter.signOut();
   });
+}
+
+function renderMobileDataTab(){
+  renderDataTab();
+  const root=document.getElementById('tab-data');
+  if (!root) return;
+  root.classList.add('mobile-data-page');
+  const heading=root.querySelector('.page-heading');
+  if (heading) heading.outerHTML=renderSharedEmptyTabHeader('Data & back-up')+'<p class="mobile-data-intro">Beheer je data, maak back-ups en synchroniseer optioneel met de cloud.</p>';
+  const infoParagraphs=root.querySelectorAll('.info-callout p');
+  if (infoParagraphs[1]) infoParagraphs[1].textContent='Cloud synchronisatie via Firebase is optioneel. De toegang wordt bepaald door je ingestelde Firestore-beveiligingsregels.';
 }
 
 /* ---------- maandselectie en transactiemodal ---------- */
@@ -9511,7 +9814,13 @@ function renderJointFixedCostsEditorRows(rows, options={}){
     <span>Van/naar</span>
     <span></span>
   </div>`;
-  const body = (rows||[]).map((row, index)=>{
+  const sortedEntries = (rows||[]).map((row,index)=>({row,index})).sort((a,b)=>{
+    const category=String(a.row.categorie||'').localeCompare(String(b.row.categorie||''),'nl',{sensitivity:'base'});
+    if (category) return category;
+    const description=String(a.row.post||'').localeCompare(String(b.row.post||''),'nl',{sensitivity:'base'});
+    return description || a.index-b.index;
+  });
+  const body = sortedEntries.map(({row, index})=>{
     const bedrag = Number(row.bedrag)||0;
     const monthly = effectiveBedrag(row);
     return `<div class="joint-fixed-editor-row joint-fixed-editor-row-compact ${kind === 'mortgage' ? 'joint-fixed-editor-row-mortgage' : ''}" ${rowAttr}="${index}">
@@ -9673,7 +9982,28 @@ function openJointFixedCostsModal(focusLast=false, owner='gezamenlijk'){
     if (summary) summary.textContent = eur(round2(sumEffective(rows) + (hasMortgage ? sumEffective(mortgageRows) : 0)));
   };
 
+  const commitAllFields = ()=>{
+    modal.querySelectorAll('[data-fixed-field], [data-mortgage-field]').forEach(el=>{
+      const isMortgage = !!el.dataset.mortgageField;
+      const collection = isMortgage ? mortgageRows : rows;
+      const index = Number(isMortgage ? el.dataset.mortgageIndex : el.dataset.fixedIndex);
+      const field = isMortgage ? el.dataset.mortgageField : el.dataset.fixedField;
+      if (!collection[index]) return;
+      if (field === 'bedrag'){
+        const parsed = bankAmount(el.value);
+        collection[index][field] = Number.isFinite(parsed) ? round2(parsed) : 0;
+      } else if (field === 'jaarlijks'){
+        collection[index][field] = !!el.checked;
+      } else {
+        collection[index][field] = el.value.trim();
+      }
+    });
+    persist();
+    updateSummary();
+  };
+
   const close = ()=>{
+    commitAllFields();
     modal.classList.remove('open','joint-fixed-editor-open');
     modal.innerHTML = '';
     renderActiveTab();
@@ -9697,6 +10027,7 @@ function openJointFixedCostsModal(focusLast=false, owner='gezamenlijk'){
       updateSummary();
     };
     el.addEventListener('change', commit);
+    if (el.type !== 'checkbox') el.addEventListener('input', commit);
     if (el.type === 'checkbox') el.addEventListener('click', commit);
   });
 
@@ -9717,11 +10048,13 @@ function openJointFixedCostsModal(focusLast=false, owner='gezamenlijk'){
       updateSummary();
     };
     el.addEventListener('change', commit);
+    if (el.type !== 'checkbox') el.addEventListener('input', commit);
     if (el.type === 'checkbox') el.addEventListener('click', commit);
   });
 
   modal.querySelectorAll('[data-fixed-move]').forEach(select=>{
     select.addEventListener('change', ()=>{
+      commitAllFields();
       const targetPath = select.value;
       const [sourcePath, idxStr] = splitLastIndex(select.dataset.fixedMove);
       if (!targetPath || targetPath === sourcePath) return;
@@ -9738,6 +10071,7 @@ function openJointFixedCostsModal(focusLast=false, owner='gezamenlijk'){
 
   modal.querySelectorAll('[data-fixed-remove]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
+      commitAllFields();
       const idx = Number(btn.dataset.fixedRemove);
       rows.splice(idx, 1);
       persist();
@@ -9747,6 +10081,7 @@ function openJointFixedCostsModal(focusLast=false, owner='gezamenlijk'){
 
   modal.querySelectorAll('[data-mortgage-remove]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
+      commitAllFields();
       const idx = Number(btn.dataset.mortgageRemove);
       mortgageRows.splice(idx, 1);
       persist();
@@ -9755,22 +10090,7 @@ function openJointFixedCostsModal(focusLast=false, owner='gezamenlijk'){
   });
 
   modal.querySelector('[data-fixed-save]')?.addEventListener('click', ()=>{
-    modal.querySelectorAll('[data-fixed-field], [data-mortgage-field]').forEach(el=>{
-      const isMortgage = !!el.dataset.mortgageField;
-      const collection = isMortgage ? mortgageRows : rows;
-      const index = Number(isMortgage ? el.dataset.mortgageIndex : el.dataset.fixedIndex);
-      const field = isMortgage ? el.dataset.mortgageField : el.dataset.fixedField;
-      if (!collection[index]) return;
-      if (field === 'bedrag'){
-        const parsed = parseFloat(String(el.value).replace(',', '.'));
-        collection[index][field] = Number.isFinite(parsed) ? round2(parsed) : 0;
-      } else if (field === 'jaarlijks') {
-        collection[index][field] = !!el.checked;
-      } else {
-        collection[index][field] = el.value;
-      }
-    });
-    persist();
+    commitAllFields();
     showQuickToast('Vaste lasten opgeslagen');
     close();
   });
@@ -9778,6 +10098,7 @@ function openJointFixedCostsModal(focusLast=false, owner='gezamenlijk'){
   const add = modal.querySelector('[data-fixed-add]');
   if (add){
     add.addEventListener('click', ()=>{
+      commitAllFields();
       rows.push({id:uid(), categorie:'', post:'', bedrag:0, jaarlijks:false});
       persist();
       openJointFixedCostsModal(true, owner);
@@ -9787,6 +10108,7 @@ function openJointFixedCostsModal(focusLast=false, owner='gezamenlijk'){
   const addMortgage = modal.querySelector('[data-mortgage-add]');
   if (addMortgage){
     addMortgage.addEventListener('click', ()=>{
+      commitAllFields();
       mortgageRows.push({id:uid(), categorie:'Huis', post:'Hypotheek', bedrag:0, jaarlijks:false});
       persist();
       openJointFixedCostsModal(false, owner);
@@ -9795,7 +10117,7 @@ function openJointFixedCostsModal(focusLast=false, owner='gezamenlijk'){
 
   if (focusLast){
     requestAnimationFrame(()=>{
-      const last = modal.querySelector('.joint-fixed-editor-row:last-child input[data-fixed-field="categorie"]');
+      const last = modal.querySelector(`input[data-fixed-field="categorie"][data-fixed-index="${rows.length-1}"]`);
       if (last) last.focus();
     });
   }
@@ -10164,8 +10486,8 @@ function renderActiveTab(){
   else if (activeTab==='gezamenlijk') renderEmptyVisualTab('tab-gezamenlijk', 'Gezamenlijk');
   else if (activeTab==='dion') renderEmptyVisualTab('tab-dion', 'Dion');
   else if (activeTab==='dara') renderEmptyVisualTab('tab-dara', 'Dara');
-  else if (activeTab==='spaardoelen') renderEmptyVisualTab('tab-spaardoelen', 'Spaardoelen');
-  else if (activeTab==='data') renderEmptyVisualTab('tab-data', 'Data');
+  else if (activeTab==='spaardoelen') renderMobileSpaardoelen();
+  else if (activeTab==='data') renderMobileDataTab();
 
   if (['gezamenlijk','dion','dara','spaardoelen','data'].includes(activeTab)){
     document.body.dataset.activeTab = 'dashboard';
@@ -10190,6 +10512,18 @@ function renderActiveTab(){
   root.querySelectorAll('[data-income-edit]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       openIncomeEditModal(btn.dataset.incomeEdit, btn.dataset.incomeLabel);
+    });
+  });
+  root.querySelectorAll('[data-open-goal-editor]').forEach(btn=>{
+    btn.addEventListener('click',()=>{ const [owner,index]=btn.dataset.openGoalEditor.split(':'); openMobileGoalEditor(owner,Number(index)); });
+  });
+  root.querySelectorAll('[data-open-goal-manager]').forEach(btn=>{
+    btn.addEventListener('click',()=>openMobileGoalManager(btn.dataset.openGoalManager));
+  });
+  root.querySelectorAll('.mobile-savings-overview .manage-section').forEach((section,index)=>{
+    section.querySelector('summary')?.addEventListener('click',event=>{
+      event.preventDefault();
+      openMobileGoalManager(['gezamenlijk','dion','dara'][index]);
     });
   });
   root.querySelectorAll('[data-saving-edit]').forEach(btn=>{
