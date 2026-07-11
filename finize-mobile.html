@@ -7004,6 +7004,13 @@ body.v4-app[data-real-active-tab="gezamenlijk"] .joint-fixed-edit-btn svg{
 
   /* build 65: spaardoelinleg helder uitsplitsen in vast en naar rato */
   .goal-inleg-breakdown{ display:grid; grid-template-columns:1fr 1fr; gap:3px; min-width:0; }.goal-inleg-breakdown b{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; border-radius:6px; padding:3px 4px; font-size:7px; line-height:1.1; text-align:center; background:var(--green-pale); color:var(--green); }.goal-inleg-breakdown b:last-child{ background:var(--blue-bg); color:var(--blue); }.joint-savings-primary-goal.has-image .goal-inleg-breakdown b:first-child{ background:rgba(239,247,234,.92); }.joint-savings-primary-goal.has-image .goal-inleg-breakdown b:last-child{ background:rgba(232,242,255,.92); }.joint-savings-needed{ display:block; color:var(--text-dim); font-size:7px; line-height:1.1; }.joint-savings-primary-goal.has-image .joint-savings-needed{ color:rgba(255,255,255,.9); }
+  .goal-inleg-breakdown b{ display:grid; grid-template-rows:auto auto; justify-items:center; gap:1px; white-space:normal; overflow:visible; text-overflow:clip; }
+  .goal-inleg-label{ display:block; font-size:6px; font-weight:800; line-height:1; white-space:nowrap; }
+  .goal-inleg-value{ display:block; font-size:7px; font-variant-numeric:tabular-nums; line-height:1; white-space:nowrap; }
+  .goal-image-status{ color:var(--text-dim); font-size:9px; line-height:1.25; }
+  .goal-thumb.has-image,.mobile-goal-icon.has-image,.goal-manager-goal-icon.has-image{ background-size:cover!important; background-position:center!important; background-repeat:no-repeat!important; color:transparent!important; }
+  .goal-thumb.has-image{ box-shadow:inset 0 0 0 1px rgba(255,255,255,.34),0 5px 12px rgba(47,31,24,.10)!important; }
+  .mobile-goal-icon.has-image,.goal-manager-goal-icon.has-image{ background-color:transparent!important; box-shadow:inset 0 0 0 1px rgba(255,255,255,.4),0 3px 8px rgba(47,31,24,.10)!important; }
   .mobile-goal-row{ grid-template-columns:30px minmax(0,1fr) 48px; }.mobile-goal-main .goal-inleg-breakdown{ margin-top:1px; }.mobile-goal-main .goal-inleg-breakdown b{ font-size:7px; padding:3px; }.mobile-goal-needed{ color:var(--text-dim) !important; font-size:8px !important; }
   .goal-calculation-card{ grid-column:1/-1; display:grid; gap:7px; padding:10px; border:1px solid var(--border); border-radius:12px; background:var(--cream); }.goal-calculation-card h3{ margin:0; font-size:11px; }.goal-calculation-total{ display:flex; justify-content:space-between; gap:10px; font-size:11px; }.goal-calculation-total strong{ color:var(--green); }.goal-calculation-card .goal-inleg-breakdown b{ padding:6px; font-size:9px; }.goal-calculation-note{ margin:0; font-size:8px; line-height:1.35; color:var(--text-dim); }
   .goal-editor-fixed-only{ grid-column:1/-1; display:flex !important; align-items:center; gap:8px; padding:8px; border:1px solid var(--border); border-radius:10px; background:var(--cream); color:var(--text) !important; font-size:10px !important; }.goal-editor-fixed-only input{ width:auto; margin:0; }
@@ -7700,10 +7707,14 @@ function renderModernGoalCard(item, owner, opts={}){
   const progress = doelbedrag > 0 ? Math.min(1, algespaard / doelbedrag) : 0;
   const barPct = Math.round(progress * 100);
   const dateText = doel.doeldatum ? formatDateNL(doel.doeldatum) : 'Geen doeldatum';
+  const goalImage = String(doel.afbeelding || '').replace(/'/g,'%27');
+  const goalThumbStyle = goalImage
+    ? `background-image:url('${goalImage}'); box-shadow:none;`
+    : `background:${goalThumbGradient(doel)}; color:#fff; box-shadow:none;`;
   return `<div class="goal-card">
     <div class="goal-card-head">
       <div class="goal-card-title">
-        <div class="goal-thumb" style="background:${goalThumbGradient(doel)}; color:#fff; box-shadow:none;">${goalIcon(doel)}</div>
+        <div class="goal-thumb${goalImage ? ' has-image' : ''}" style="${goalThumbStyle}">${goalImage ? '' : goalIcon(doel)}</div>
         <div>
           <h3>${textSafe(doel.naam || 'Spaardoel')}</h3>
           <div class="goal-owner">${textSafe(owner)}</div>
@@ -7728,7 +7739,7 @@ function renderModernGoalCards(doelen, pot, owner, limit=null){
 function goalMonthlyInlegText(item){
   const fixed = Number(item.vasteInlegWerkelijk ?? item.doel.vasteInleg)||0;
   const extra = Number(item.berekendeExtraInleg)||0;
-  return `<span class="goal-inleg-breakdown"><b>Vast ${eur(fixed)}</b><b>Naar rato ${eur(extra)}</b></span>`;
+  return `<span class="goal-inleg-breakdown"><b><span class="goal-inleg-label">Vast</span><span class="goal-inleg-value">${eur(fixed)}</span></b><b><span class="goal-inleg-label">Naar rato</span><span class="goal-inleg-value">${eur(extra)}</span></b></span>`;
 }
 function goalNeededPerMonth(item){
   return `<span class="joint-savings-needed">Nodig p/m: ${item.benodigdPerMaand === null ? '—' : eur(item.benodigdPerMaand)}</span>`;
@@ -7810,6 +7821,45 @@ function bankAmount(value){
   if (text.includes(',') && text.includes('.')) text = text.lastIndexOf(',') > text.lastIndexOf('.') ? text.replace(/\./g,'').replace(',','.') : text.replace(/,/g,'');
   else text = text.replace(',','.');
   return Number(text);
+}
+function dataUrlByteSize(dataUrl){
+  const comma = String(dataUrl).indexOf(',');
+  if (comma < 0) return 0;
+  return Math.ceil(String(dataUrl).slice(comma + 1).length * 3 / 4);
+}
+async function compressGoalImage(file){
+  if (!file) return '';
+  if (!String(file.type || '').startsWith('image/')) throw new Error('Kies een geldig afbeeldingsbestand.');
+  if (file.size > 12000000) throw new Error('Kies een afbeelding kleiner dan 12 MB.');
+  const sourceUrl = URL.createObjectURL(file);
+  try{
+    const image = await new Promise((resolve,reject)=>{
+      const element = new Image();
+      element.onload = ()=>resolve(element);
+      element.onerror = ()=>reject(new Error('De afbeelding kon niet worden gelezen.'));
+      element.src = sourceUrl;
+    });
+    const scale = Math.min(1, 640 / Math.max(image.naturalWidth, image.naturalHeight));
+    let width = Math.max(1, Math.round(image.naturalWidth * scale));
+    let height = Math.max(1, Math.round(image.naturalHeight * scale));
+    let result = '';
+    for (let pass = 0; pass < 3; pass++){
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      const context = canvas.getContext('2d', {alpha:false});
+      context.fillStyle = '#fffdfa'; context.fillRect(0,0,width,height);
+      context.drawImage(image,0,0,width,height);
+      for (const quality of [.82,.72,.62,.52,.44]){
+        result = canvas.toDataURL('image/webp', quality);
+        if (!result.startsWith('data:image/webp')) result = canvas.toDataURL('image/jpeg', quality);
+        if (dataUrlByteSize(result) <= 85000) return result;
+      }
+      width = Math.max(240, Math.round(width * .78));
+      height = Math.max(240, Math.round(height * .78));
+    }
+    if (dataUrlByteSize(result) > 140000) throw new Error('De afbeelding kon niet klein genoeg worden gemaakt.');
+    return result;
+  } finally { URL.revokeObjectURL(sourceUrl); }
 }
 function bankColumnIndex(headers, patterns){
   return headers.findIndex(header=>patterns.some(pattern=>pattern.test(header)));
@@ -9260,7 +9310,10 @@ function renderMobileGoalRow(item, owner, index){
   const target = Number(goal.doelbedrag)||0;
   const saved = Number(goal.algespaard)||0;
   const progress = Math.min(100, Math.round((item.voortgang||0)*100));
-  return `<div class="mobile-goal-row"><span class="mobile-goal-icon tone-${owner === 'gezamenlijk' ? 'green' : owner}">${goalIcon(goal)}</span><div class="mobile-goal-main"><strong>${textSafe(goal.naam || 'Spaardoel')}</strong><span>${eur(saved)} van ${eur(target)}</span><div class="progress-track"><div class="progress-fill" style="width:${progress}%"></div></div><em class="mobile-goal-needed">Nodig p/m: ${item.benodigdPerMaand === null ? '—' : eur(item.benodigdPerMaand)}</em>${goalMonthlyInlegText(item)}<em>Doel: ${goal.doeldatum ? formatDateNL(goal.doeldatum) : 'Geen einddatum'}</em></div><div class="mobile-goal-side"><b>${progress}%</b><button type="button" class="ghost small" data-open-goal-editor="${owner}:${index}">Bekijk doel</button></div></div>`;
+  const goalImage = String(goal.afbeelding || '').replace(/'/g,'%27');
+  const imageStyle = goalImage ? ` style="background-image:url('${goalImage}')"` : '';
+  const iconToneClass = goalImage ? '' : ` tone-${owner === 'gezamenlijk' ? 'green' : owner}`;
+  return `<div class="mobile-goal-row"><span class="mobile-goal-icon${iconToneClass}${goalImage ? ' has-image' : ''}"${imageStyle}>${goalImage ? '' : goalIcon(goal)}</span><div class="mobile-goal-main"><strong>${textSafe(goal.naam || 'Spaardoel')}</strong><span>${eur(saved)} van ${eur(target)}</span><div class="progress-track"><div class="progress-fill" style="width:${progress}%"></div></div><em class="mobile-goal-needed">Nodig p/m: ${item.benodigdPerMaand === null ? '—' : eur(item.benodigdPerMaand)}</em>${goalMonthlyInlegText(item)}<em>Doel: ${goal.doeldatum ? formatDateNL(goal.doeldatum) : 'Geen einddatum'}</em></div><div class="mobile-goal-side"><b>${progress}%</b><button type="button" class="ghost small" data-open-goal-editor="${owner}:${index}">Bekijk doel</button></div></div>`;
 }
 function renderMobileGoalGroup(group){
   const items = calcGroep(group.doelen, group.pot, TODAY);
@@ -9276,11 +9329,25 @@ function openMobileGoalEditor(owner,index){
   let goalImageData = String(goal.afbeelding || '');
   const imageField = document.createElement('label');
   imageField.className = 'full goal-image-field';
-  imageField.innerHTML = `<span>Afbeelding</span><div class="goal-image-preview" ${goalImageData ? `style="background-image:url('${goalImageData.replace(/'/g,'%27')}')"` : ''}>${goalImageData ? '' : 'Geen afbeelding'}</div><input type="file" accept="image/*" id="goalEditImage"><button type="button" class="ghost small" id="goalEditImageRemove" ${goalImageData ? '' : 'disabled'}>Afbeelding verwijderen</button>`;
+  imageField.innerHTML = `<span>Afbeelding</span><div class="goal-image-preview" ${goalImageData ? `style="background-image:url('${goalImageData.replace(/'/g,'%27')}')"` : ''}>${goalImageData ? '' : 'Geen afbeelding'}</div><input type="file" accept="image/*" id="goalEditImage"><small class="goal-image-status" id="goalEditImageStatus">Afbeeldingen worden automatisch verkleind voor betrouwbare opslag.</small><button type="button" class="ghost small" id="goalEditImageRemove" ${goalImageData ? '' : 'disabled'}>Afbeelding verwijderen</button>`;
   modal.querySelector('.modal-grid').appendChild(imageField);
   const imagePreview = imageField.querySelector('.goal-image-preview');
-  imageField.querySelector('#goalEditImage').addEventListener('change',event=>{ const file=event.target.files?.[0]; if(!file)return; if(file.size>1500000){alert('Kies een afbeelding kleiner dan 1,5 MB.');event.target.value='';return;} const reader=new FileReader(); reader.onload=loaded=>{goalImageData=String(loaded.target.result||'');imagePreview.style.backgroundImage=`url('${goalImageData.replace(/'/g,'%27')}')`;imagePreview.textContent='';imageField.querySelector('#goalEditImageRemove').disabled=false;}; reader.readAsDataURL(file); });
-  imageField.querySelector('#goalEditImageRemove').addEventListener('click',()=>{goalImageData='';imagePreview.style.backgroundImage='';imagePreview.textContent='Geen afbeelding';imageField.querySelector('#goalEditImage').value='';imageField.querySelector('#goalEditImageRemove').disabled=true;});
+  const imageInput = imageField.querySelector('#goalEditImage');
+  const imageStatus = imageField.querySelector('#goalEditImageStatus');
+  const saveButton = modal.querySelector('#goalEditSave');
+  let imageProcessing = false;
+  imageInput.addEventListener('change',async event=>{
+    const file=event.target.files?.[0]; if(!file)return;
+    imageProcessing=true; saveButton.disabled=true; imageStatus.textContent='Afbeelding verwerken…';
+    try{
+      goalImageData=await compressGoalImage(file);
+      imagePreview.style.backgroundImage=`url('${goalImageData.replace(/'/g,'%27')}')`; imagePreview.textContent='';
+      imageField.querySelector('#goalEditImageRemove').disabled=false;
+      imageStatus.textContent=`Klaar · ${Math.max(1,Math.round(dataUrlByteSize(goalImageData)/1024))} kB`;
+    }catch(error){ event.target.value=''; imageStatus.textContent='Afbeelding verwerken mislukt.'; alert(error?.message || 'Afbeelding verwerken mislukt.'); }
+    finally{ imageProcessing=false; saveButton.disabled=false; }
+  });
+  imageField.querySelector('#goalEditImageRemove').addEventListener('click',()=>{goalImageData='';imagePreview.style.backgroundImage='';imagePreview.textContent='Geen afbeelding';imageInput.value='';imageStatus.textContent='Afbeelding verwijderd. Sla het doel op om dit te bevestigen.';imageField.querySelector('#goalEditImageRemove').disabled=true;});
   const calculation = modal.querySelector('#goalEditCalculation');
   const draftItem=()=>{
     const draft={...goal,algespaard:round2(bankAmount(modal.querySelector('#goalEditSaved').value)||0),doelbedrag:round2(bankAmount(modal.querySelector('#goalEditTarget').value)||0),doeldatum:modal.querySelector('#goalEditDate').value,vasteInleg:round2(bankAmount(modal.querySelector('#goalEditMonthly').value)||0),rendement:(bankAmount(modal.querySelector('#goalEditReturn').value)||0)/100,rendementPeriode:modal.querySelector('#goalEditPeriod').value,vastBedrag:modal.querySelector('#goalEditFixedOnly').checked};
@@ -9293,7 +9360,7 @@ function openMobileGoalEditor(owner,index){
   renderCalculation();
   const close=()=>{modal.classList.remove('open','goal-detail-editor-open');modal.innerHTML='';renderActiveTab();};
   modal.querySelector('[data-close-goal-editor]').addEventListener('click',close);
-  modal.querySelector('#goalEditSave').addEventListener('click',()=>{ goal.naam=modal.querySelector('#goalEditName').value.trim(); goal.algespaard=round2(bankAmount(modal.querySelector('#goalEditSaved').value)||0); goal.doelbedrag=round2(bankAmount(modal.querySelector('#goalEditTarget').value)||0); goal.doeldatum=modal.querySelector('#goalEditDate').value; goal.vasteInleg=round2(bankAmount(modal.querySelector('#goalEditMonthly').value)||0); goal.vastBedrag=modal.querySelector('#goalEditFixedOnly').checked; goal.rendement=(bankAmount(modal.querySelector('#goalEditReturn').value)||0)/100; goal.rendementPeriode=modal.querySelector('#goalEditPeriod').value; goal.favoriet=modal.querySelector('#goalEditFavorite').checked; goal.afbeelding=goalImageData; persist(); showQuickToast('Spaardoel opgeslagen'); close(); });
+  modal.querySelector('#goalEditSave').addEventListener('click',()=>{ if(imageProcessing)return; goal.naam=modal.querySelector('#goalEditName').value.trim(); goal.algespaard=round2(bankAmount(modal.querySelector('#goalEditSaved').value)||0); goal.doelbedrag=round2(bankAmount(modal.querySelector('#goalEditTarget').value)||0); goal.doeldatum=modal.querySelector('#goalEditDate').value; goal.vasteInleg=round2(bankAmount(modal.querySelector('#goalEditMonthly').value)||0); goal.vastBedrag=modal.querySelector('#goalEditFixedOnly').checked; goal.rendement=(bankAmount(modal.querySelector('#goalEditReturn').value)||0)/100; goal.rendementPeriode=modal.querySelector('#goalEditPeriod').value; goal.favoriet=modal.querySelector('#goalEditFavorite').checked; goal.afbeelding=goalImageData; if(!persist()){alert('Opslaan is mislukt. Verwijder eventueel oude grote afbeeldingen en probeer opnieuw.');return;} showQuickToast('Spaardoel opgeslagen'); close(); });
   modal.querySelector('#goalEditDelete').addEventListener('click',()=>{ state.spaardoelen[owner].splice(index,1); persist(); showQuickToast('Spaardoel verwijderd'); close(); });
 }
 function openMobileGoalManager(owner){
@@ -9302,7 +9369,7 @@ function openMobileGoalManager(owner){
   const name = ownerLabel(owner);
   const r=calcScenario(state); const pot=owner==='gezamenlijk'?r.spaarpotDezeMaand:r[owner].beschikbaarVoorSparen;
   const items=calcGroep(goals,pot,TODAY);
-  const rows = items.map((item,index)=>{const goal=item.doel;return `<div class="goal-manager-row" data-open-manager-goal="${index}" role="button" tabindex="0"><span>${goalIcon(goal)}</span><span class="goal-manager-copy"><strong>${textSafe(goal.naam || 'Spaardoel')}</strong><small>${eur(Number(goal.algespaard)||0)} / ${eur(Number(goal.doelbedrag)||0)}</small></span><span class="goal-manager-metric"><span>Nodig p/m</span><b>${item.benodigdPerMaand === null ? '—' : eur(item.benodigdPerMaand)}</b></span><span class="goal-manager-metric"><span>Deze maand</span><b>${eur(item.werkelijkeInleg)}</b></span><span class="goal-manager-moves"><button type="button" data-move-manager-goal="${index}:-1" ${index===0?'disabled':''} aria-label="Doel omhoog">▲</button><button type="button" data-move-manager-goal="${index}:1" ${index===items.length-1?'disabled':''} aria-label="Doel omlaag">▼</button></span><button type="button" class="joint-fixed-row-delete-compact" data-remove-manager-goal="${index}" aria-label="Doel verwijderen">×</button></div>`;}).join('');
+  const rows = items.map((item,index)=>{const goal=item.doel;const goalImage=String(goal.afbeelding||'').replace(/'/g,'%27');const imageStyle=goalImage?` style="background-image:url('${goalImage}')"`:'';return `<div class="goal-manager-row" data-open-manager-goal="${index}" role="button" tabindex="0"><span class="goal-manager-goal-icon${goalImage?' has-image':''}"${imageStyle}>${goalImage?'':goalIcon(goal)}</span><span class="goal-manager-copy"><strong>${textSafe(goal.naam || 'Spaardoel')}</strong><small>${eur(Number(goal.algespaard)||0)} / ${eur(Number(goal.doelbedrag)||0)}</small></span><span class="goal-manager-metric"><span>Nodig p/m</span><b>${item.benodigdPerMaand === null ? '—' : eur(item.benodigdPerMaand)}</b></span><span class="goal-manager-metric"><span>Deze maand</span><b>${eur(item.werkelijkeInleg)}</b></span><span class="goal-manager-moves"><button type="button" data-move-manager-goal="${index}:-1" ${index===0?'disabled':''} aria-label="Doel omhoog">▲</button><button type="button" data-move-manager-goal="${index}:1" ${index===items.length-1?'disabled':''} aria-label="Doel omlaag">▼</button></span><button type="button" class="joint-fixed-row-delete-compact" data-remove-manager-goal="${index}" aria-label="Doel verwijderen">×</button></div>`;}).join('');
   modal.innerHTML=`<div class="modal goal-manager-editor"><div class="joint-variable-editor-header"><div><div class="section-kicker">${name} · ${monthLabel(getSelectedMonth())}</div><h2>Spaardoelen beheren</h2><p>Tik op een doel voor alle instellingen en de berekening.</p></div><button type="button" class="ghost" data-close-goal-manager>Sluiten</button></div><div class="goal-manager-list">${rows || '<p class="hint">Nog geen spaardoelen.</p>'}</div><div class="joint-variable-editor-actions"><button type="button" class="primary" data-close-goal-manager>Klaar</button><button type="button" class="ghost" data-add-manager-goal>+ Spaardoel</button></div></div>`;
   modal.classList.add('open','goal-manager-editor-open');
   const close=()=>{modal.classList.remove('open','goal-manager-editor-open');modal.innerHTML='';renderActiveTab();};
@@ -9930,13 +9997,16 @@ function openJointVariableCostsModal(focusLast=false, owner='gezamenlijk'){
   }
 }
 
-function openJointFixedCostsModal(focusLast=false, owner='gezamenlijk'){
+function openJointFixedCostsModal(focusLast=false, owner='gezamenlijk', draftSession=null){
   const modal = document.getElementById('incomeEditModal');
   const scenario = state.meta.scenario;
   const account = state[scenario][owner];
-  const rows = account.vasteLasten || (account.vasteLasten = []);
   const hasMortgage = owner === 'gezamenlijk' && scenario === 'na';
-  const mortgageRows = hasMortgage ? (account.hypotheek || (account.hypotheek = [])) : [];
+  const session = draftSession && draftSession.scenario === scenario && draftSession.owner === owner
+    ? draftSession
+    : {scenario,owner,rows:clone(account.vasteLasten || []),mortgageRows:hasMortgage ? clone(account.hypotheek || []) : [],dirty:false};
+  const rows = session.rows;
+  const mortgageRows = session.mortgageRows;
   const name = ownerLabel(owner);
   const scenarioLabel = scenario === 'voor' ? 'Voor verkoop' : 'Na verkoop';
   const total = round2(sumEffective(rows) + (hasMortgage ? sumEffective(mortgageRows) : 0));
@@ -9954,7 +10024,7 @@ function openJointFixedCostsModal(focusLast=false, owner='gezamenlijk'){
         <div>
           <div class="section-kicker">${scenarioLabel} · ${monthLabel(getSelectedMonth())}</div>
           <h2>${owner === 'gezamenlijk' ? 'Gezamenlijke vaste lasten' : `${name} vaste lasten`}</h2>
-          <p>${hasMortgage ? 'Hypotheek staat in dit overzicht, maar wordt in de verdeling 50/50 gerekend.' : 'Pas bedragen aan of voeg vaste lasten toe. Wijzigingen worden direct opgeslagen.'}</p>
+          <p>${hasMortgage ? 'Hypotheek staat in dit overzicht, maar wordt in de verdeling 50/50 gerekend.' : 'Voeg regels toe en bevestig alle wijzigingen met Opslaan.'}</p>
         </div>
         <button type="button" class="ghost joint-fixed-editor-close" data-close-joint-fixed-costs>Sluiten</button>
       </div>
@@ -9998,58 +10068,22 @@ function openJointFixedCostsModal(focusLast=false, owner='gezamenlijk'){
         collection[index][field] = el.value.trim();
       }
     });
-    persist();
     updateSummary();
   };
 
-  const close = ()=>{
-    commitAllFields();
+  const close = (force=false)=>{
+    if (!force && session.dirty && !confirm('Wijzigingen niet opgeslagen. Toch sluiten?')) return;
     modal.classList.remove('open','joint-fixed-editor-open');
     modal.innerHTML = '';
     renderActiveTab();
   };
-  modal.querySelectorAll('[data-close-joint-fixed-costs]').forEach(btn=>btn.addEventListener('click', close));
+  modal.querySelectorAll('[data-close-joint-fixed-costs]').forEach(btn=>btn.addEventListener('click', ()=>close(false)));
 
-  modal.querySelectorAll('[data-fixed-field]').forEach(el=>{
-    const commit = ()=>{
-      const idx = Number(el.dataset.fixedIndex);
-      const field = el.dataset.fixedField;
-      if (!rows[idx]) return;
-      if (field === 'bedrag'){
-        const parsed = parseFloat(String(el.value).replace(',', '.'));
-        rows[idx][field] = Number.isFinite(parsed) ? round2(parsed) : 0;
-      } else if (field === 'jaarlijks'){
-        rows[idx][field] = !!el.checked;
-      } else {
-        rows[idx][field] = el.value;
-      }
-      persist();
-      updateSummary();
-    };
+  const markDirty = ()=>{ session.dirty = true; };
+  modal.querySelectorAll('[data-fixed-field], [data-mortgage-field]').forEach(el=>{
+    const commit = ()=>{ commitAllFields(); markDirty(); };
     el.addEventListener('change', commit);
     if (el.type !== 'checkbox') el.addEventListener('input', commit);
-    if (el.type === 'checkbox') el.addEventListener('click', commit);
-  });
-
-  modal.querySelectorAll('[data-mortgage-field]').forEach(el=>{
-    const commit = ()=>{
-      const idx = Number(el.dataset.mortgageIndex);
-      const field = el.dataset.mortgageField;
-      if (!mortgageRows[idx]) return;
-      if (field === 'bedrag'){
-        const parsed = parseFloat(String(el.value).replace(',', '.'));
-        mortgageRows[idx][field] = Number.isFinite(parsed) ? round2(parsed) : 0;
-      } else if (field === 'jaarlijks'){
-        mortgageRows[idx][field] = !!el.checked;
-      } else {
-        mortgageRows[idx][field] = el.value;
-      }
-      persist();
-      updateSummary();
-    };
-    el.addEventListener('change', commit);
-    if (el.type !== 'checkbox') el.addEventListener('input', commit);
-    if (el.type === 'checkbox') el.addEventListener('click', commit);
   });
 
   modal.querySelectorAll('[data-fixed-move]').forEach(select=>{
@@ -10058,13 +10092,28 @@ function openJointFixedCostsModal(focusLast=false, owner='gezamenlijk'){
       const targetPath = select.value;
       const [sourcePath, idxStr] = splitLastIndex(select.dataset.fixedMove);
       if (!targetPath || targetPath === sourcePath) return;
+      const previousRows = account.vasteLasten;
+      const previousMortgage = hasMortgage ? account.hypotheek : null;
+      account.vasteLasten = clone(rows);
+      if (hasMortgage) account.hypotheek = clone(mortgageRows);
       const source = getPath(state, sourcePath);
       const target = getPath(state, targetPath);
-      if (!Array.isArray(source) || !Array.isArray(target)) return;
+      if (!Array.isArray(source) || !Array.isArray(target)){
+        account.vasteLasten = previousRows;
+        if (hasMortgage) account.hypotheek = previousMortgage;
+        return;
+      }
       const row = source.splice(parseInt(idxStr, 10), 1)[0];
       if (!row) return;
       target.push(row);
-      persist();
+      if (!persist()){
+        target.pop(); source.splice(parseInt(idxStr, 10), 0, row);
+        account.vasteLasten = previousRows;
+        if (hasMortgage) account.hypotheek = previousMortgage;
+        alert('Verplaatsen is mislukt.');
+        return;
+      }
+      showQuickToast('Vaste last verplaatst');
       openJointFixedCostsModal(false, owner);
     });
   });
@@ -10074,8 +10123,8 @@ function openJointFixedCostsModal(focusLast=false, owner='gezamenlijk'){
       commitAllFields();
       const idx = Number(btn.dataset.fixedRemove);
       rows.splice(idx, 1);
-      persist();
-      openJointFixedCostsModal(false, owner);
+      session.dirty = true;
+      openJointFixedCostsModal(false, owner, session);
     });
   });
 
@@ -10084,15 +10133,29 @@ function openJointFixedCostsModal(focusLast=false, owner='gezamenlijk'){
       commitAllFields();
       const idx = Number(btn.dataset.mortgageRemove);
       mortgageRows.splice(idx, 1);
-      persist();
-      openJointFixedCostsModal(false, owner);
+      session.dirty = true;
+      openJointFixedCostsModal(false, owner, session);
     });
   });
 
   modal.querySelector('[data-fixed-save]')?.addEventListener('click', ()=>{
     commitAllFields();
+    const activeRows = rows.filter(row=>String(row.categorie||'').trim() || String(row.post||'').trim() || Number(row.bedrag));
+    activeRows.forEach(row=>{ row.categorie = String(row.categorie||'').trim() || 'Overig'; });
+    rows.splice(0, rows.length, ...activeRows);
+    const previousRows = account.vasteLasten;
+    const previousMortgage = hasMortgage ? account.hypotheek : null;
+    account.vasteLasten = clone(rows);
+    if (hasMortgage) account.hypotheek = clone(mortgageRows);
+    if (!persist()){
+      account.vasteLasten = previousRows;
+      if (hasMortgage) account.hypotheek = previousMortgage;
+      alert('Opslaan van de vaste lasten is mislukt. Controleer de beschikbare opslagruimte en probeer opnieuw.');
+      return;
+    }
+    session.dirty = false;
     showQuickToast('Vaste lasten opgeslagen');
-    close();
+    close(true);
   });
 
   const add = modal.querySelector('[data-fixed-add]');
@@ -10100,8 +10163,8 @@ function openJointFixedCostsModal(focusLast=false, owner='gezamenlijk'){
     add.addEventListener('click', ()=>{
       commitAllFields();
       rows.push({id:uid(), categorie:'', post:'', bedrag:0, jaarlijks:false});
-      persist();
-      openJointFixedCostsModal(true, owner);
+      session.dirty = true;
+      openJointFixedCostsModal(true, owner, session);
     });
   }
 
@@ -10110,8 +10173,8 @@ function openJointFixedCostsModal(focusLast=false, owner='gezamenlijk'){
     addMortgage.addEventListener('click', ()=>{
       commitAllFields();
       mortgageRows.push({id:uid(), categorie:'Huis', post:'Hypotheek', bedrag:0, jaarlijks:false});
-      persist();
-      openJointFixedCostsModal(false, owner);
+      session.dirty = true;
+      openJointFixedCostsModal(false, owner, session);
     });
   }
 
