@@ -104,6 +104,11 @@ button.small{ padding:4px 8px; font-size:12px; }
 .save-status{ font-size:14px; color:#846f5f; margin-top:6px; display:flex; align-items:center; gap:8px; cursor:pointer; width:max-content; max-width:100%; }
 .save-status::before{ content:""; width:9px; height:9px; border-radius:50%; background:var(--green); box-shadow:0 0 0 4px rgba(124,142,73,.12); flex:0 0 auto; }
 .save-status.offline::before{ background:var(--red); box-shadow:0 0 0 4px rgba(159,70,57,.11); }
+.save-status[data-storage-status="Opslaan…"]::before,
+.save-status[data-storage-status="Lokaal opgeslagen"]::before{ background:var(--amber); box-shadow:0 0 0 4px rgba(196,138,61,.12); }
+.save-status[data-storage-status="Cloud opgeslagen"]::before{ background:var(--green); box-shadow:0 0 0 4px rgba(124,142,73,.12); }
+.save-status[data-storage-status="Offline — lokaal bewaard"]::before{ background:#958d84; box-shadow:0 0 0 4px rgba(149,141,132,.12); }
+.save-status[data-storage-status="Synchronisatie mislukt"]::before{ background:var(--red); box-shadow:0 0 0 4px rgba(159,70,57,.11); }
 .save-status:hover{ color:var(--text); }
 
 .scenario-toggle{ display:flex; align-items:center; gap:4px; background:#fffdfa; border:1px solid var(--border); border-radius:18px; padding:4px; box-shadow:0 10px 26px rgba(86,56,31,.07); }
@@ -580,6 +585,8 @@ body.v4-app[data-active-tab="dashboard"] #monthControl .month-picker-btn::after{
 .income-sheet-readonly{ display:flex; justify-content:space-between; font-size:13px; padding:8px 0; border-bottom:1px solid var(--border-soft); }
 .quick-toast{ position:fixed; left:50%; bottom:90px; transform:translate(-50%,10px); background:var(--navy); color:#fff; padding:10px 18px; border-radius:999px; font-size:13px; font-weight:700; opacity:0; pointer-events:none; transition:all .25s ease; z-index:80; }
 .quick-toast.show{ opacity:1; transform:translate(-50%,0); }
+.quick-toast.show{ pointer-events:auto; }
+.quick-toast-undo{ margin-left:8px; padding:0; border:0; background:transparent; color:#fff; font:inherit; text-decoration:underline; cursor:pointer; }
 .quick-actions{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
 
 /* Legacy generic mobile rules (non-V4 elements + shared utility classes like .kpi/.goal-table used outside the V4 dashboard). The V4 mobile dashboard section further below (max-width:767px, "mobile dashboard v2") is authoritative for the V4 dashboard and wins on any overlap. */
@@ -6084,18 +6091,6 @@ body.v4-app[data-real-active-tab="gezamenlijk"] .joint-fixed-edit-btn svg{
   font-size:11px !important;
 }
 
-@media (max-width:767px){
-  #incomeEditModal .joint-fixed-editor-list{
-    overflow-x:auto !important;
-  }
-
-  #incomeEditModal .joint-fixed-editor-table-head,
-  #incomeEditModal .joint-fixed-editor-row.joint-fixed-editor-row-compact{
-    grid-template-columns:30px 128px 148px 92px 66px 24px !important;
-    min-width:520px !important;
-  }
-}
-
 /* build 56: mobiele vaste-lasten editor schalen zodat de tabel in beeld past */
 @media (max-width:767px){
   #incomeEditModal .joint-fixed-fullscreen-editor{
@@ -6431,119 +6426,6 @@ body.v4-app[data-real-active-tab="gezamenlijk"] .joint-fixed-edit-btn svg{
     max-height:none !important;
     align-self:stretch !important;
     overflow:visible !important;
-  }
-}
-/* build 57: gezamenlijke vaste lasten als compacte desktoptabel op mobiel */
-@media (max-width:767px){
-  #incomeEditModal .joint-fixed-fullscreen-editor{
-    padding:10px 10px calc(10px + env(safe-area-inset-bottom)) !important;
-  }
-  #incomeEditModal .joint-fixed-editor-list{
-    display:grid !important;
-    gap:8px !important;
-    overflow:visible !important;
-    border:0 !important;
-    border-radius:0 !important;
-    background:transparent !important;
-  }
-  #incomeEditModal .joint-fixed-editor-subhead{
-    margin:0 2px 3px !important;
-    padding:0 !important;
-    background:transparent !important;
-    border:0 !important;
-  }
-  #incomeEditModal .joint-fixed-editor-table-wrap{
-    overflow-x:auto !important;
-    overflow-y:visible !important;
-    border:1px solid var(--border) !important;
-    border-radius:14px !important;
-    background:rgba(255,250,244,.7) !important;
-    -webkit-overflow-scrolling:touch;
-  }
-  #incomeEditModal .joint-fixed-editor-table{
-    width:100%;
-    min-width:640px;
-    border-collapse:collapse;
-    table-layout:fixed;
-  }
-  #incomeEditModal .joint-fixed-editor-table th{
-    position:sticky;
-    top:0;
-    z-index:1;
-    padding:9px 7px;
-    background:#fffaf4;
-    border-bottom:1px solid var(--border);
-    color:var(--text-faint);
-    font-size:9px;
-    font-weight:900;
-    letter-spacing:.06em;
-    text-align:left;
-    text-transform:uppercase;
-  }
-  #incomeEditModal .joint-fixed-editor-table td{
-    padding:7px;
-    border-bottom:1px solid var(--border-soft);
-    vertical-align:middle;
-  }
-  #incomeEditModal .joint-fixed-editor-table tbody tr:last-child td{ border-bottom:0; }
-  #incomeEditModal .joint-fixed-editor-table .joint-fixed-col-icon{ width:28px; text-align:center; }
-  #incomeEditModal .joint-fixed-editor-table .joint-fixed-col-category{ width:23%; }
-  #incomeEditModal .joint-fixed-editor-table .joint-fixed-col-post{ width:27%; }
-  #incomeEditModal .joint-fixed-editor-table .joint-fixed-col-amount{ width:104px; text-align:right; }
-  #incomeEditModal .joint-fixed-editor-table .joint-fixed-col-year{ width:66px; text-align:center; }
-  #incomeEditModal .joint-fixed-editor-table .joint-fixed-col-move{ width:110px; }
-  #incomeEditModal .joint-fixed-editor-table .joint-fixed-col-delete{ width:28px; text-align:center; }
-  #incomeEditModal .joint-fixed-editor-table input,
-  #incomeEditModal .joint-fixed-editor-table select{
-    width:100%;
-    min-width:0;
-    height:32px !important;
-    min-height:32px !important;
-    padding:5px 8px !important;
-    border-radius:10px !important;
-    font-size:11px !important;
-  }
-  #incomeEditModal .joint-fixed-editor-table input[type="checkbox"]{
-    width:17px !important;
-    height:17px !important;
-    min-height:17px !important;
-    padding:0 !important;
-    margin:0;
-  }
-  #incomeEditModal .joint-fixed-editor-table .joint-fixed-editor-row-icon{
-    display:inline-flex !important;
-    width:22px !important;
-    height:22px !important;
-    min-width:22px !important;
-    border-radius:8px !important;
-  }
-  #incomeEditModal .joint-fixed-editor-table .joint-fixed-editor-row-icon svg{ width:12px !important; height:12px !important; }
-  #incomeEditModal .joint-fixed-editor-table .joint-fixed-editor-amount{ text-align:right; }
-  #incomeEditModal .joint-fixed-editor-monthly-hint{ display:block; margin-top:3px; color:var(--text-faint); font-size:9px; white-space:nowrap; }
-  #incomeEditModal .joint-fixed-editor-mortgage-note{ color:var(--green); font-size:10px; font-weight:800; white-space:nowrap; }
-  #incomeEditModal .joint-fixed-row-delete-compact{
-    width:24px !important;
-    height:24px !important;
-    min-width:24px !important;
-    padding:0 !important;
-    border:0 !important;
-    background:transparent !important;
-    color:var(--red) !important;
-  }
-  #incomeEditModal .joint-fixed-editor-actions{
-    display:grid !important;
-    grid-template-columns:1fr 1fr;
-    gap:6px;
-    margin-top:8px !important;
-    padding:4px 0 0 !important;
-  }
-  #incomeEditModal .joint-fixed-editor-actions .primary,
-  #incomeEditModal .joint-fixed-editor-actions .ghost{
-    width:100%;
-    min-height:38px !important;
-    height:38px !important;
-    border-radius:14px !important;
-    font-size:12px !important;
   }
 }
 /* build 58: vaste-lastenregels blijven als desktoptabel op een mobiele rij */
@@ -7270,7 +7152,38 @@ function percentInputValue(n){
   if (n === null || n === undefined || isNaN(n)) return '';
   return round2((Number(n)||0) * 100);
 }
-function uid(){ return 'id' + Math.random().toString(36).slice(2,10); }
+function uid(){
+  if (globalThis.crypto?.randomUUID) return 'id-' + globalThis.crypto.randomUUID();
+  return 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,10);
+}
+function findItemById(path, id){
+  const rows = getPath(state, path);
+  return Array.isArray(rows) ? rows.find(item=>item?.id === id) || null : null;
+}
+function updateItemById(path, id, changes){
+  const item = findItemById(path, id);
+  if (!item) return false;
+  Object.assign(item, typeof changes === 'function' ? changes({...item}) : changes);
+  return true;
+}
+function removeItemById(path, id){
+  const rows = getPath(state, path);
+  if (!Array.isArray(rows)) return null;
+  const index = rows.findIndex(item=>item?.id === id);
+  if (index < 0) return null;
+  return {item:rows.splice(index, 1)[0], index, path};
+}
+function moveItemById(sourcePath, targetPath, id, targetIndex){
+  const source = getPath(state, sourcePath);
+  const target = getPath(state, targetPath);
+  if (!Array.isArray(source) || !Array.isArray(target)) return false;
+  const sourceIndex = source.findIndex(item=>item?.id === id);
+  if (sourceIndex < 0) return false;
+  const item = source.splice(sourceIndex, 1)[0];
+  const safeIndex = Number.isInteger(targetIndex) ? Math.max(0, Math.min(targetIndex, target.length)) : target.length;
+  target.splice(safeIndex, 0, item);
+  return {item, sourcePath, targetPath, sourceIndex, targetIndex:safeIndex};
+}
 function formatDateNL(value){
   if (!value) return '';
   const d = new Date(value);
@@ -7434,6 +7347,10 @@ function normalizeBudgetState(candidate){
   normalized.meta = isPlainObject(normalized.meta) ? normalized.meta : {};
   normalized.meta.scenario = ['voor','na'].includes(normalized.meta.scenario) ? normalized.meta.scenario : 'voor';
   normalized.meta.selectedMonth = normalized.meta.selectedMonth || monthKey();
+  normalized.meta.schemaVersion = Number(normalized.meta.schemaVersion) || 2;
+  normalized.meta.revision = Math.max(0, Number(normalized.meta.revision) || 0);
+  normalized.meta.updatedAt = normalized.meta.updatedAt || '';
+  normalized.meta.updatedBy = normalized.meta.updatedBy || getDeviceId();
   normalized.monthlyIncome = isPlainObject(normalized.monthlyIncome) ? normalized.monthlyIncome : {};
   normalized.monthlyBudgets = isPlainObject(normalized.monthlyBudgets) ? normalized.monthlyBudgets : {};
   normalized.monthlyTeruggaven = isPlainObject(normalized.monthlyTeruggaven) ? normalized.monthlyTeruggaven : {};
@@ -7443,6 +7360,7 @@ function normalizeBudgetState(candidate){
   state = normalized;
   ensureMonthData(normalized.meta.selectedMonth);
   normalizeGoalDefaults();
+  ensurePersistentIds(normalized);
   return normalized;
 }
 function getMonthlyBaseIncome(person){
@@ -8118,7 +8036,7 @@ function defaultState(){
   const blankGoal = (naam, rendement=0.0125) => ({ id:uid(), naam, doelbedrag:0, algespaard:0, doeldatum:'', vasteInleg:0, rendement, rendementPeriode:'jaarlijks', favoriet:false });
 
   return {
-    meta: { scenario:'voor', selectedMonth: monthKey() },
+    meta: { scenario:'voor', selectedMonth: monthKey(), schemaVersion:2, revision:0, updatedAt:'', updatedBy:getDeviceId() },
     personen: {
       dion: { naam:'Dion', salaris:2450, vasteTeruggaven: [] },
       dara: { naam:'Dara', salaris:3010, vasteTeruggaven: [] },
@@ -8261,6 +8179,8 @@ function defaultState(){
 /* ---------- opslag: lokaal + optionele Firebase/Firestore-sync ---------- */
 const STORAGE_KEY = 'finize-budget-planner-v1';
 const BACKUP_STORAGE_KEY = 'finize-budget-planner-v1-last-good-backup';
+const MIGRATION_BACKUP_STORAGE_KEY = 'finize-budget-planner-v1-pre-schema-v2';
+const DEVICE_ID_STORAGE_KEY = 'finize-device-id';
 const FIREBASE_CONFIG_STORAGE_KEY = 'finize-firebase-config';
 const FIREBASE_SDK_VERSION = '11.10.0';
 const FIRESTORE_COLLECTION = 'budgetPlanners';
@@ -8275,6 +8195,77 @@ const DEFAULT_FIREBASE_CONFIG = {
   measurementId: 'G-X2EXXZDK7S'
 };
 
+function getDeviceId(){
+  try{
+    let id = localStorage.getItem(DEVICE_ID_STORAGE_KEY);
+    if (!id){
+      id = uid();
+      localStorage.setItem(DEVICE_ID_STORAGE_KEY, id);
+    }
+    return id;
+  }catch(e){
+    if (!getDeviceId.fallback) getDeviceId.fallback = uid();
+    return getDeviceId.fallback;
+  }
+}
+
+function ensureRowIds(rows){
+  if (!Array.isArray(rows)) return;
+  const seen = new Set();
+  rows.forEach(row=>{
+    if (!isPlainObject(row)) return;
+    if (!row.id || seen.has(row.id)) row.id = uid();
+    seen.add(row.id);
+  });
+}
+
+function ensurePersistentIds(target){
+  ['voor','na'].forEach(scenario=>{
+    ['gezamenlijk','dion','dara'].forEach(owner=>{
+      ensureRowIds(target?.[scenario]?.[owner]?.vasteLasten);
+      ensureRowIds(target?.[scenario]?.[owner]?.variabel);
+    });
+    ensureRowIds(target?.[scenario]?.gezamenlijk?.hypotheek);
+  });
+  ['dion','dara'].forEach(owner=>ensureRowIds(target?.personen?.[owner]?.vasteTeruggaven));
+  Object.values(target?.monthlyBudgets || {}).forEach(monthData=>{
+    ['voor','na'].forEach(scenario=>{
+      ['gezamenlijkVariabel','dionVariabel','daraVariabel'].forEach(key=>ensureRowIds(monthData?.[scenario]?.[key]));
+    });
+  });
+  Object.values(target?.monthlyTeruggaven || {}).forEach(monthData=>{
+    ['gezamenlijk','dion','dara'].forEach(owner=>ensureRowIds(monthData?.[owner]));
+  });
+  ensureRowIds(target?.transactions);
+  ['gezamenlijk','dion','dara'].forEach(owner=>ensureRowIds(target?.spaardoelen?.[owner]));
+}
+
+function migrateBudgetState(candidate){
+  const original = clone(candidate);
+  const activeStateBeforeMigration = typeof state === 'undefined' ? null : state;
+  try{
+    const fromVersion = Number(candidate?.meta?.schemaVersion) || 1;
+    if (fromVersion < 2){
+      localStorage.setItem(MIGRATION_BACKUP_STORAGE_KEY, JSON.stringify({
+        savedAt:new Date().toISOString(),
+        fromVersion,
+        state:original
+      }));
+    }
+    const migrated = normalizeBudgetState(candidate);
+    migrated.meta.schemaVersion = 2;
+    ensurePersistentIds(migrated);
+    const validation = validateBudgetState(migrated);
+    if (!validation.ok) throw new Error(validation.errors.join(' '));
+    return migrated;
+  }catch(e){
+    console.error('Datamigratie mislukt; oude gegevens blijven behouden', e);
+    throw e;
+  }finally{
+    if (activeStateBeforeMigration) state = activeStateBeforeMigration;
+  }
+}
+
 function isPlainObject(value){
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
@@ -8284,8 +8275,12 @@ function validateRows(rows, label, errors){
     errors.push(label + ' moet een lijst zijn.');
     return;
   }
+  const ids = new Set();
   rows.forEach((row, i)=>{
     if (!isPlainObject(row)) errors.push(label + '[' + i + '] is geen geldige regel.');
+    else if (!row.id) errors.push(label + '[' + i + '] mist een ID.');
+    else if (ids.has(row.id)) errors.push(label + ' bevat een dubbele ID: ' + row.id + '.');
+    else ids.add(row.id);
   });
 }
 
@@ -8294,9 +8289,7 @@ function validateGoalRows(rows, label, errors){
     errors.push(label + ' moet een lijst zijn.');
     return;
   }
-  rows.forEach((row, i)=>{
-    if (!isPlainObject(row)) errors.push(label + '[' + i + '] is geen geldig spaardoel.');
-  });
+  validateRows(rows, label, errors);
 }
 
 function validateBudgetState(candidate){
@@ -8351,10 +8344,7 @@ function validateBudgetState(candidate){
     errors.push('monthlyBudgets moet een object zijn.');
   }
   if (candidate.transactions !== undefined){
-    if (!Array.isArray(candidate.transactions)) errors.push('transactions moet een lijst zijn.');
-    else candidate.transactions.forEach((tx,i)=>{
-      if (!isPlainObject(tx)) errors.push('transactions[' + i + '] is geen geldige transactie.');
-    });
+    validateRows(candidate.transactions, 'transactions', errors);
   }
 
   return { ok:errors.length === 0, errors };
@@ -8408,7 +8398,9 @@ function saveFirebaseConfigFromText(text){
 
 const CloudAdapter = {
   app:null, db:null, docRef:null, modules:null, unsubscribe:null,
-  status:'Firebase niet verbonden', saveTimer:null, applyingRemote:false,
+  status:'Offline — lokaal bewaard', saveTimer:null, applyingRemote:false,
+  pendingState:null, writeInFlight:false, retryTimer:null, retryAttempt:0,
+  lastConfirmedRevision:0,
   config:loadFirebaseConfig(),
   statusText(){ return this.status; },
   isConfigured(){ return firebaseConfigIsComplete(this.config); },
@@ -8425,24 +8417,25 @@ const CloudAdapter = {
   },
   async connect(){
     if (!this.isConfigured()){
-      this.status = 'Firebase-config ontbreekt';
+      this.status = 'Offline — lokaal bewaard';
       renderCloudStatus();
       return false;
     }
     try{
-      this.status = 'Firebase laden...';
+      this.status = 'Opslaan…';
       renderCloudStatus();
       const {app, firestore} = await this.loadModules();
       this.app = app.getApps().length ? app.getApps()[0] : app.initializeApp(this.config);
       this.db = firestore.getFirestore(this.app);
       this.docRef = firestore.doc(this.db, FIRESTORE_COLLECTION, FIRESTORE_DOC_ID);
       this.attachSnapshot();
-      this.status = 'Firebase live verbonden';
+      this.status = this.pendingState ? 'Opslaan…' : 'Lokaal opgeslagen';
       renderCloudStatus();
+      this.flushQueue();
       return true;
     }catch(e){
       console.error('Firebase verbinden mislukt', e);
-      this.status = 'Firebase-fout: ' + (e && e.message ? e.message : e);
+      this.status = 'Synchronisatie mislukt';
       renderCloudStatus();
       return false;
     }
@@ -8452,7 +8445,7 @@ const CloudAdapter = {
     const {firestore} = this.modules;
     this.unsubscribe = firestore.onSnapshot(this.docRef, snap=>{
       if (!snap.exists()){
-        this.status = 'Firebase verbonden, cloud-document is nog leeg';
+        this.status = 'Lokaal opgeslagen';
         renderCloudStatus();
         return;
       }
@@ -8460,54 +8453,101 @@ const CloudAdapter = {
       const validation = validateBudgetState(remote);
       if (!validation.ok){
         console.error('Firestore-data ongeldig', validation.errors);
-        this.status = 'Firebase-data ongeldig, lokale data behouden';
+        this.status = 'Synchronisatie mislukt';
         renderCloudStatus();
         return;
       }
       const previousState = state;
-      const normalizedRemote = normalizeBudgetState(remote);
-      if (JSON.stringify(normalizedRemote) === JSON.stringify(previousState)) return;
+      const normalizedRemote = migrateBudgetState(remote);
+      const remoteRevision = Number(normalizedRemote.meta?.revision) || 0;
+      const localRevision = Number(previousState.meta?.revision) || 0;
+      const sameCommit = remoteRevision === localRevision
+        && normalizedRemote.meta?.updatedBy === previousState.meta?.updatedBy;
+      if (sameCommit){
+        this.lastConfirmedRevision = Math.max(this.lastConfirmedRevision, remoteRevision);
+        this.status = 'Cloud opgeslagen';
+        renderCloudStatus();
+        return;
+      }
+      const localIsFresh = !DataAdapter.loadedFromStorage && localRevision === 0;
+      if (this.pendingState || this.writeInFlight || (!localIsFresh && remoteRevision <= localRevision)){
+        this.status = this.pendingState || this.writeInFlight ? 'Opslaan…' : 'Lokaal opgeslagen';
+        renderCloudStatus();
+        return;
+      }
       DataAdapter.backup(previousState, 'voor Firestore-sync');
       this.applyingRemote = true;
       state = normalizedRemote;
       window.state = state;
       try{ localSave(state); }catch(e){ console.error('lokale kopie Firestore-data opslaan mislukt', e); }
+      DataAdapter.loadedFromStorage = true;
       this.applyingRemote = false;
-      this.status = 'Firebase-data geladen';
+      this.lastConfirmedRevision = remoteRevision;
+      this.status = 'Cloud opgeslagen';
       renderActiveTab();
     }, err=>{
       console.error('Firestore live-sync fout', err);
-      this.status = 'Firebase live-sync fout: ' + err.message;
+      this.status = navigator.onLine ? 'Synchronisatie mislukt' : 'Offline — lokaal bewaard';
       renderCloudStatus();
     });
   },
   queueSave(state){
-    if (!this.isConnected() || this.applyingRemote) return;
+    if (this.applyingRemote) return;
+    this.pendingState = clone(state);
+    this.status = this.isConnected() ? 'Opslaan…' : 'Offline — lokaal bewaard';
+    renderCloudStatus();
+    if (!this.isConnected()) return;
     clearTimeout(this.saveTimer);
-    this.saveTimer = setTimeout(()=> this.saveNow(state), 500);
+    this.saveTimer = setTimeout(()=> this.flushQueue(), 350);
   },
-  async saveNow(state){
+  async flushQueue(){
+    if (this.writeInFlight || !this.isConnected() || !this.pendingState) return false;
+    const snapshot = this.pendingState;
+    this.pendingState = null;
+    this.writeInFlight = true;
+    const ok = await this.saveNow(snapshot);
+    this.writeInFlight = false;
+    if (ok){
+      this.retryAttempt = 0;
+      clearTimeout(this.retryTimer);
+      if (this.pendingState) return this.flushQueue();
+      return true;
+    }
+    if (!this.pendingState || Number(this.pendingState.meta?.revision) < Number(snapshot.meta?.revision)){
+      this.pendingState = snapshot;
+    }
+    this.scheduleRetry();
+    return false;
+  },
+  scheduleRetry(){
+    clearTimeout(this.retryTimer);
+    const delay = Math.min(30000, 1000 * (2 ** Math.min(this.retryAttempt++, 5)));
+    this.retryTimer = setTimeout(()=>this.flushQueue(), delay);
+  },
+  async saveNow(snapshot){
     if (!this.isConnected()) return false;
-    const validation = validateBudgetState(state);
+    const validation = validateBudgetState(snapshot);
     if (!validation.ok){
-      this.status = 'Niet naar Firebase opgeslagen: lokale data ongeldig';
+      this.status = 'Synchronisatie mislukt';
       renderCloudStatus();
       return false;
     }
     try{
       const {firestore} = this.modules;
       await firestore.setDoc(this.docRef, {
-        state,
+        state:snapshot,
         updatedAt: firestore.serverTimestamp(),
-        updatedBy: 'public-link',
+        revision:Number(snapshot.meta?.revision)||0,
+        updatedBy:snapshot.meta?.updatedBy || getDeviceId(),
         app: 'finize'
       }, {merge:true});
-      this.status = 'Firebase opgeslagen om ' + new Date().toLocaleTimeString('nl-NL');
+      this.lastConfirmedRevision = Number(snapshot.meta?.revision)||0;
+      this.status = this.pendingState ? 'Opslaan…' : 'Cloud opgeslagen';
       renderCloudStatus();
       return true;
     }catch(e){
       console.error('Firestore opslaan mislukt', e);
-      this.status = 'Firebase opslaan mislukt: ' + e.message;
+      this.status = navigator.onLine ? 'Synchronisatie mislukt' : 'Offline — lokaal bewaard';
       renderCloudStatus();
       return false;
     }
@@ -8517,12 +8557,13 @@ const CloudAdapter = {
     this.app = null;
     this.db = null;
     this.docRef = null;
-    this.status = 'Firebase losgekoppeld';
+    this.status = 'Offline — lokaal bewaard';
     renderCloudStatus();
   }
 };
 
 const DataAdapter = {
+  loadedFromStorage:false,
   // Lokaal blijft altijd de eerste veiligheidslaag. Firestore is optionele live-sync erbovenop.
   // Firebase Storage is voor losse bestanden; Firestore is de juiste plek voor live app-data.
   // We bewaren dezelfde state-vorm als 1 groot JSON-document voor Finize.
@@ -8537,13 +8578,14 @@ const DataAdapter = {
     try{
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return null;
+      this.loadedFromStorage = true;
       const parsed = JSON.parse(raw);
       const validation = validateBudgetState(parsed);
       if (!validation.ok){
         console.error('opgeslagen data ongeldig', validation.errors);
         return null;
       }
-      return normalizeBudgetState(parsed);
+      return migrateBudgetState(parsed);
     }catch(e){ console.error('laden mislukt', e); return null; }
   },
   backup(state, reason){
@@ -8566,32 +8608,55 @@ const DataAdapter = {
 };
 
 var state = null;
-state = DataAdapter.load() || normalizeBudgetState(defaultState());
+state = DataAdapter.load() || migrateBudgetState(defaultState());
 window.state = state;
 let activeTab = 'dashboard';
 const TODAY = new Date();
 
-function persist(){
-  const ok = DataAdapter.save(state);
-  const el = document.getElementById('saveStatus');
-  if (el && !CloudAdapter.isConnected()){
-    el.textContent = ok ? 'Offline · lokaal opgeslagen' : 'Opslaan mislukt';
-    el.classList.toggle('offline', true);
+function commitChange(change, options={}){
+  const before = clone(state);
+  try{
+    if (typeof change === 'function') change(state);
+    else if (typeof change?.apply === 'function') change.apply(state);
+    ensurePersistentIds(state);
+    state.meta = isPlainObject(state.meta) ? state.meta : {};
+    state.meta.schemaVersion = 2;
+    state.meta.revision = Math.max(0, Number(state.meta.revision)||0) + 1;
+    state.meta.updatedAt = new Date().toISOString();
+    state.meta.updatedBy = getDeviceId();
+    const validation = validateBudgetState(state);
+    if (!validation.ok) throw new Error(validation.errors.join(' '));
+    if (!DataAdapter.save(state)) throw new Error('Lokale opslag is mislukt.');
+    if (options.render !== false) renderCloudStatus();
+    return true;
+  }catch(e){
+    state = before;
+    window.state = state;
+    CloudAdapter.status = 'Synchronisatie mislukt';
+    renderCloudStatus();
+    console.error('Wijziging opslaan mislukt', e);
+    return false;
   }
+}
+
+function persist(){
+  return commitChange(()=>{}, {render:false});
 }
 
 function renderCloudStatus(){
   const cloud = document.getElementById('cloudStatus');
   if (cloud) cloud.textContent = CloudAdapter.statusText();
   const save = document.getElementById('saveStatus');
-  const online = CloudAdapter.isConnected() && !/^Firebase (live-sync fout|opslaan mislukt|fout|data ongeldig)/i.test(CloudAdapter.statusText());
+  const status = CloudAdapter.statusText();
+  const online = CloudAdapter.isConnected() && status !== 'Synchronisatie mislukt';
   if (save){
-    save.textContent = online ? 'Online' : 'Offline';
-    save.title = CloudAdapter.statusText() + ' · klik voor back-up en cloud';
+    save.textContent = status;
+    save.title = status + ' · klik voor back-up en cloud';
+    save.dataset.storageStatus = status;
     save.classList.toggle('offline', !online);
   }
   document.querySelectorAll('.mobile-status-pill').forEach(pill=>{
-    pill.textContent = online ? 'Online' : 'Offline';
+    pill.textContent = status;
     pill.classList.toggle('offline', !online);
   });
 }
@@ -8633,6 +8698,25 @@ function bindInputs(root){
     el.addEventListener('change', commit);
     if (type === 'checkbox') el.addEventListener('click', commit);
   });
+  root.querySelectorAll('[data-item-path][data-item-id][data-item-field]').forEach(el=>{
+    const item = findItemById(el.dataset.itemPath, el.dataset.itemId);
+    if (!item) return;
+    const field = el.dataset.itemField;
+    if (el.type === 'checkbox') el.checked = !!item[field];
+    else if (el.dataset.percent === 'true') el.value = percentInputValue(item[field]);
+    else el.value = item[field] ?? '';
+    const save = ()=>{
+      let value = el.type === 'checkbox' ? el.checked : el.value;
+      if (el.type === 'number'){
+        const parsed = bankAmount(value);
+        value = Number.isFinite(parsed) ? round2(parsed) : 0;
+        if (el.dataset.percent === 'true') value /= 100;
+      } else if (typeof value === 'string') value = value.trim();
+      commitChange(()=>updateItemById(el.dataset.itemPath, el.dataset.itemId, {[field]:value}), {render:false});
+    };
+    el.addEventListener('change', save);
+    if (el.type !== 'checkbox') el.addEventListener('blur', save);
+  });
 }
 
 /* ---------- tabel-editor voor vaste lasten / variabel ---------- */
@@ -8661,19 +8745,19 @@ function renderRowsTable(basePath, rows, opts={}){
   const useScroll = opts.fixedHeight !== false || (rows||[]).length > 5;
   const moveOptions = opts.moveable ? moveTargetOptions(basePath) : null;
   const moveHead = moveOptions ? '<th>Van/naar</th>' : '';
-  const moveCol = (i)=> moveOptions ? `<td><select class="move-select" data-move-row="${basePath}.${i}" title="Verplaatsen naar">${moveOptions}</select></td>` : '';
-  const rowsHtml = sortedRowEntries(rows).map(({row:r,index:i})=>{
+  const moveCol = (id)=> moveOptions ? `<td><select class="move-select" data-move-row-id="${textSafe(id)}" data-source-path="${basePath}" title="Verplaatsen naar">${moveOptions}</select></td>` : '';
+  const rowsHtml = sortedRowEntries(rows).map(({row:r})=>{
     const eff = effectiveBedrag(r);
     const jaarHint = r.jaarlijks ? `<div class="progress-label" style="text-align:left;margin-top:2px">≈ ${eur(eff)}/mnd</div>` : '';
     return `
     <tr>
       <td style="width:26px;text-align:center;font-size:15px">${categoryIcon(r.categorie)}</td>
-      <td><input type="text" data-path="${basePath}.${i}.categorie" placeholder="Categorie"></td>
-      <td><input type="text" data-path="${basePath}.${i}.post" placeholder="Omschrijving"></td>
-      <td class="num"><input type="number" step="0.01" data-path="${basePath}.${i}.bedrag">${jaarHint}</td>
-      ${withJaar ? `<td style="text-align:center"><input type="checkbox" data-path="${basePath}.${i}.jaarlijks" title="Bedrag is jaarlijks (wordt /12 gerekend)"></td>` : ''}
-      ${moveCol(i)}
-      <td class="row-actions"><button class="danger-ghost" data-remove="${basePath}.${i}" title="Verwijderen">×</button></td>
+      <td><input type="text" data-item-path="${basePath}" data-item-id="${textSafe(r.id)}" data-item-field="categorie" placeholder="Categorie"></td>
+      <td><input type="text" data-item-path="${basePath}" data-item-id="${textSafe(r.id)}" data-item-field="post" placeholder="Omschrijving"></td>
+      <td class="num"><input type="number" step="0.01" data-item-path="${basePath}" data-item-id="${textSafe(r.id)}" data-item-field="bedrag">${jaarHint}</td>
+      ${withJaar ? `<td style="text-align:center"><input type="checkbox" data-item-path="${basePath}" data-item-id="${textSafe(r.id)}" data-item-field="jaarlijks" title="Bedrag is jaarlijks (wordt /12 gerekend)"></td>` : ''}
+      ${moveCol(r.id)}
+      <td class="row-actions"><button class="danger-ghost" data-remove-id="${textSafe(r.id)}" data-remove-path="${basePath}" title="Verwijderen">×</button></td>
     </tr>`;
   }).join('');
   const colspan = 5 + (withJaar ? 1 : 0) + (moveOptions ? 1 : 0);
@@ -8695,11 +8779,11 @@ function renderRowsTable(basePath, rows, opts={}){
 function renderTeruggavenTable(basePath, rows){
   const total = sumBedrag(rows);
   const useScroll = (rows||[]).length > 5;
-  const rowsHtml = (rows||[]).map((r,i)=>`
+  const rowsHtml = (rows||[]).map(r=>`
     <tr>
-      <td><input type="text" data-path="${basePath}.${i}.omschrijving" placeholder="Omschrijving"></td>
-      <td class="num"><input type="number" step="0.01" data-path="${basePath}.${i}.bedrag"></td>
-      <td class="row-actions"><button class="danger-ghost" data-remove="${basePath}.${i}" title="Verwijderen">×</button></td>
+      <td><input type="text" data-item-path="${basePath}" data-item-id="${textSafe(r.id)}" data-item-field="omschrijving" placeholder="Omschrijving"></td>
+      <td class="num"><input type="number" step="0.01" data-item-path="${basePath}" data-item-id="${textSafe(r.id)}" data-item-field="bedrag"></td>
+      <td class="row-actions"><button class="danger-ghost" data-remove-id="${textSafe(r.id)}" data-remove-path="${basePath}" title="Verwijderen">×</button></td>
     </tr>
   `).join('');
   return `
@@ -8718,47 +8802,46 @@ function handleTableClicks(root){
   root.querySelectorAll('[data-addrow]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const path = btn.dataset.addrow;
-      const arr = getPath(state, path);
-      arr.push({id:uid(), categorie:'', post:'', bedrag:0});
-      persist(); renderActiveTab();
+      commitChange(()=>getPath(state, path).push({id:uid(), categorie:'', post:'', bedrag:0}), {render:false});
+      renderActiveTab();
     });
   });
   root.querySelectorAll('[data-addrefund]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const path = btn.dataset.addrefund;
-      const arr = getPath(state, path);
-      arr.push({id:uid(), omschrijving:'', bedrag:0});
-      persist(); renderActiveTab();
+      commitChange(()=>getPath(state, path).push({id:uid(), omschrijving:'', bedrag:0}), {render:false});
+      renderActiveTab();
     });
   });
-  root.querySelectorAll('[data-remove]').forEach(btn=>{
+  root.querySelectorAll('[data-remove-id][data-remove-path]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
-      const [path, idxStr] = splitLastIndex(btn.dataset.remove);
-      const arr = getPath(state, path);
-      arr.splice(parseInt(idxStr,10), 1);
-      persist(); renderActiveTab();
+      const path = btn.dataset.removePath;
+      const label = path.includes('spaardoelen') ? 'Spaardoel verwijderd'
+        : path.includes('variabel') ? 'Variabel budget verwijderd'
+        : path.toLowerCase().includes('teruggaven') ? 'Teruggave verwijderd'
+        : 'Vaste last verwijderd';
+      removeWithUndo(path, btn.dataset.removeId, label);
     });
   });
-  root.querySelectorAll('[data-move-row]').forEach(select=>{
+  root.querySelectorAll('[data-move-row-id][data-source-path]').forEach(select=>{
     select.addEventListener('change', ()=>{
+      const sourcePath = select.dataset.sourcePath;
       const targetPath = select.value;
-      const [sourcePath, idxStr] = splitLastIndex(select.dataset.moveRow);
+      const id = select.dataset.moveRowId;
       if (!targetPath || targetPath === sourcePath) return;
-      const source = getPath(state, sourcePath);
-      const target = getPath(state, targetPath);
-      if (!Array.isArray(source) || !Array.isArray(target)) return;
-      const idx = parseInt(idxStr, 10);
-      const row = source.splice(idx, 1)[0];
-      if (!row) return;
-      target.push(row);
-      persist(); renderActiveTab();
+      let movement = null;
+      if (!commitChange(()=>{ movement = moveItemById(sourcePath, targetPath, id); }, {render:false}) || !movement) return;
+      renderActiveTab();
+      showUndoToast('Vaste last verplaatst', ()=>{
+        commitChange(()=>moveItemById(targetPath, sourcePath, id, movement.sourceIndex), {render:false});
+        renderActiveTab();
+      });
     });
   });
   root.querySelectorAll('[data-remove-transaction]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const id = btn.dataset.removeTransaction;
-      state.transactions = (state.transactions||[]).filter(tx=>tx.id !== id);
-      persist(); renderActiveTab();
+      removeWithUndo('transactions', id, 'Transactie verwijderd');
     });
   });
   root.querySelectorAll('[data-open-transaction]').forEach(btn=>{
@@ -8822,37 +8905,37 @@ function renderGoalGroup(basePath, doelen, spaarpotDezeMaand){
     <tr>
       <td class="goal-favorite-cell">
         <label class="favorite-goal" title="Favoriet op dashboard">
-          <input type="checkbox" data-path="${basePath}.${i}.favoriet">
+          <input type="checkbox" data-item-path="${basePath}" data-item-id="${textSafe(b.doel.id)}" data-item-field="favoriet">
           <span>★</span>
         </label>
       </td>
       <td class="goal-order-cell">
         <div class="goal-order" aria-label="Volgorde wijzigen">
-          <button class="ghost small" data-move-goal="${basePath}.${i}.-1" title="Omhoog" ${i===0?'disabled':''}>▲</button>
-          <button class="ghost small" data-move-goal="${basePath}.${i}.1" title="Omlaag" ${i===berekend.length-1?'disabled':''}>▼</button>
+          <button class="ghost small" data-move-goal="${basePath}|${textSafe(b.doel.id)}|-1" title="Omhoog" ${i===0?'disabled':''}>▲</button>
+          <button class="ghost small" data-move-goal="${basePath}|${textSafe(b.doel.id)}|1" title="Omlaag" ${i===berekend.length-1?'disabled':''}>▼</button>
         </div>
       </td>
-      <td data-label="Spaardoel"><input type="text" data-path="${basePath}.${i}.naam" placeholder="Naam spaardoel">
+      <td data-label="Spaardoel"><input type="text" data-item-path="${basePath}" data-item-id="${textSafe(b.doel.id)}" data-item-field="naam" placeholder="Naam spaardoel">
         <label style="display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--text-dim);margin-top:5px">
-          <input type="checkbox" data-path="${basePath}.${i}.vastBedrag"> Vast bedrag
+          <input type="checkbox" data-item-path="${basePath}" data-item-id="${textSafe(b.doel.id)}" data-item-field="vastBedrag"> Vast bedrag
         </label>
       </td>
-      <td data-label="Doelbedrag" class="num"><input type="number" step="0.01" data-path="${basePath}.${i}.doelbedrag"></td>
-      <td data-label="Al gespaard" class="num"><input type="number" step="0.01" data-path="${basePath}.${i}.algespaard"></td>
+      <td data-label="Doelbedrag" class="num"><input type="number" step="0.01" data-item-path="${basePath}" data-item-id="${textSafe(b.doel.id)}" data-item-field="doelbedrag"></td>
+      <td data-label="Al gespaard" class="num"><input type="number" step="0.01" data-item-path="${basePath}" data-item-id="${textSafe(b.doel.id)}" data-item-field="algespaard"></td>
       <td data-label="Nog te gaan" class="num">${eur(b.nogTeGaan)}</td>
       <td data-label="Voortgang"><div class="progress-track"><div class="progress-fill" style="width:${barPct}%"></div></div><div class="progress-label">${pct(b.voortgang)}</div></td>
-      <td data-label="Doeldatum"><input type="date" data-path="${basePath}.${i}.doeldatum"></td>
+      <td data-label="Doeldatum"><input type="date" data-item-path="${basePath}" data-item-id="${textSafe(b.doel.id)}" data-item-field="doeldatum"></td>
       <td class="num">${b.benodigdPerMaand===null?'—':eur(b.benodigdPerMaand)}</td>
-      <td data-label="Vaste inleg/mnd" class="num"><input type="number" step="0.01" data-path="${basePath}.${i}.vasteInleg"></td>
+      <td data-label="Vaste inleg/mnd" class="num"><input type="number" step="0.01" data-item-path="${basePath}" data-item-id="${textSafe(b.doel.id)}" data-item-field="vasteInleg"></td>
       <td data-label="Verwacht rendement %" class="num">
-        <input type="number" step="0.01" data-percent="true" data-path="${basePath}.${i}.rendement">
-        <select data-path="${basePath}.${i}.rendementPeriode" style="width:100%;margin-top:5px">
+        <input type="number" step="0.01" data-percent="true" data-item-path="${basePath}" data-item-id="${textSafe(b.doel.id)}" data-item-field="rendement">
+        <select data-item-path="${basePath}" data-item-id="${textSafe(b.doel.id)}" data-item-field="rendementPeriode" style="width:100%;margin-top:5px">
           <option value="jaarlijks">Jaarlijks</option>
           <option value="maandelijks">Maandelijks</option>
         </select>
       </td>
       <td class="num">${b.verwachteWaarde===null?'—':eur(b.verwachteWaarde)}</td>
-      <td class="row-actions"><button class="danger-ghost" data-remove="${basePath}.${i}" title="Verwijderen">×</button></td>
+      <td class="row-actions"><button class="danger-ghost" data-remove-id="${textSafe(b.doel.id)}" data-remove-path="${basePath}" title="Verwijderen">×</button></td>
     </tr>`;
   }).join('');
   const totBenodigd = round2(berekend.reduce((s,b)=>s+(b.benodigdPerMaand||0),0));
@@ -8883,24 +8966,20 @@ function renderGoalGroup(basePath, doelen, spaarpotDezeMaand){
 function handleGoalClicks(root){
   root.querySelectorAll('[data-move-goal]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
-      const parts = btn.dataset.moveGoal.split('.');
-      const direction = parseInt(parts.pop(), 10);
-      const idx = parseInt(parts.pop(), 10);
-      const path = parts.join('.');
+      const [path,id,directionText] = btn.dataset.moveGoal.split('|');
+      const direction = Number(directionText);
       const arr = getPath(state, path);
+      const idx = arr.findIndex(goal=>goal.id === id);
       const next = idx + direction;
       if (!Array.isArray(arr) || next < 0 || next >= arr.length) return;
-      const item = arr.splice(idx, 1)[0];
-      arr.splice(next, 0, item);
-      persist(); renderActiveTab();
+      commitChange(()=>moveItemById(path,path,id,next), {render:false}); renderActiveTab();
     });
   });
   root.querySelectorAll('[data-addgoal]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const path = btn.dataset.addgoal;
-      const arr = getPath(state, path);
-      arr.push({id:uid(), naam:'Nieuw doel', doelbedrag:0, algespaard:0, doeldatum:'', vasteInleg:0, rendement:0.0125, rendementPeriode:'jaarlijks', favoriet:false});
-      persist(); renderActiveTab();
+      commitChange(()=>getPath(state, path).push({id:uid(), naam:'Nieuw doel', doelbedrag:0, algespaard:0, doeldatum:'', vasteInleg:0, rendement:0.0125, rendementPeriode:'jaarlijks', favoriet:false}), {render:false});
+      renderActiveTab();
     });
   });
 }
@@ -9305,7 +9384,7 @@ function renderPersonOrJoint(tabId, key, label){
 }
 
 /* ---------- spaardoelen-tab ---------- */
-function renderMobileGoalRow(item, owner, index){
+function renderMobileGoalRow(item, owner){
   const goal = item.doel;
   const target = Number(goal.doelbedrag)||0;
   const saved = Number(goal.algespaard)||0;
@@ -9313,14 +9392,15 @@ function renderMobileGoalRow(item, owner, index){
   const goalImage = String(goal.afbeelding || '').replace(/'/g,'%27');
   const imageStyle = goalImage ? ` style="background-image:url('${goalImage}')"` : '';
   const iconToneClass = goalImage ? '' : ` tone-${owner === 'gezamenlijk' ? 'green' : owner}`;
-  return `<div class="mobile-goal-row"><span class="mobile-goal-icon${iconToneClass}${goalImage ? ' has-image' : ''}"${imageStyle}>${goalImage ? '' : goalIcon(goal)}</span><div class="mobile-goal-main"><strong>${textSafe(goal.naam || 'Spaardoel')}</strong><span>${eur(saved)} van ${eur(target)}</span><div class="progress-track"><div class="progress-fill" style="width:${progress}%"></div></div><em class="mobile-goal-needed">Nodig p/m: ${item.benodigdPerMaand === null ? '—' : eur(item.benodigdPerMaand)}</em>${goalMonthlyInlegText(item)}<em>Doel: ${goal.doeldatum ? formatDateNL(goal.doeldatum) : 'Geen einddatum'}</em></div><div class="mobile-goal-side"><b>${progress}%</b><button type="button" class="ghost small" data-open-goal-editor="${owner}:${index}">Bekijk doel</button></div></div>`;
+  return `<div class="mobile-goal-row"><span class="mobile-goal-icon${iconToneClass}${goalImage ? ' has-image' : ''}"${imageStyle}>${goalImage ? '' : goalIcon(goal)}</span><div class="mobile-goal-main"><strong>${textSafe(goal.naam || 'Spaardoel')}</strong><span>${eur(saved)} van ${eur(target)}</span><div class="progress-track"><div class="progress-fill" style="width:${progress}%"></div></div><em class="mobile-goal-needed">Nodig p/m: ${item.benodigdPerMaand === null ? '—' : eur(item.benodigdPerMaand)}</em>${goalMonthlyInlegText(item)}<em>Doel: ${goal.doeldatum ? formatDateNL(goal.doeldatum) : 'Geen einddatum'}</em></div><div class="mobile-goal-side"><b>${progress}%</b><button type="button" class="ghost small" data-open-goal-editor="${owner}:${textSafe(goal.id)}">Bekijk doel</button></div></div>`;
 }
 function renderMobileGoalGroup(group){
   const items = calcGroep(group.doelen, group.pot, TODAY);
-  return `<section class="mobile-goal-section"><h2>${group.label}</h2><div class="card mobile-goal-list">${items.length ? items.map((item,index)=>renderMobileGoalRow(item,group.key,index)).join('') : '<p class="hint">Nog geen spaardoelen.</p>'}</div></section>`;
+  return `<section class="mobile-goal-section"><h2>${group.label}</h2><div class="card mobile-goal-list">${items.length ? items.map(item=>renderMobileGoalRow(item,group.key)).join('') : '<p class="hint">Nog geen spaardoelen.</p>'}</div></section>`;
 }
-function openMobileGoalEditor(owner,index){
-  const goal = state.spaardoelen?.[owner]?.[index];
+function openMobileGoalEditor(owner,id){
+  const index = state.spaardoelen?.[owner]?.findIndex(goal=>goal.id === id) ?? -1;
+  const goal = index >= 0 ? state.spaardoelen?.[owner]?.[index] : null;
   if (!goal) return;
   const modal = document.getElementById('incomeEditModal');
   const name = ownerLabel(owner);
@@ -9360,8 +9440,8 @@ function openMobileGoalEditor(owner,index){
   renderCalculation();
   const close=()=>{modal.classList.remove('open','goal-detail-editor-open');modal.innerHTML='';renderActiveTab();};
   modal.querySelector('[data-close-goal-editor]').addEventListener('click',close);
-  modal.querySelector('#goalEditSave').addEventListener('click',()=>{ if(imageProcessing)return; goal.naam=modal.querySelector('#goalEditName').value.trim(); goal.algespaard=round2(bankAmount(modal.querySelector('#goalEditSaved').value)||0); goal.doelbedrag=round2(bankAmount(modal.querySelector('#goalEditTarget').value)||0); goal.doeldatum=modal.querySelector('#goalEditDate').value; goal.vasteInleg=round2(bankAmount(modal.querySelector('#goalEditMonthly').value)||0); goal.vastBedrag=modal.querySelector('#goalEditFixedOnly').checked; goal.rendement=(bankAmount(modal.querySelector('#goalEditReturn').value)||0)/100; goal.rendementPeriode=modal.querySelector('#goalEditPeriod').value; goal.favoriet=modal.querySelector('#goalEditFavorite').checked; goal.afbeelding=goalImageData; if(!persist()){alert('Opslaan is mislukt. Verwijder eventueel oude grote afbeeldingen en probeer opnieuw.');return;} showQuickToast('Spaardoel opgeslagen'); close(); });
-  modal.querySelector('#goalEditDelete').addEventListener('click',()=>{ state.spaardoelen[owner].splice(index,1); persist(); showQuickToast('Spaardoel verwijderd'); close(); });
+  modal.querySelector('#goalEditSave').addEventListener('click',()=>{ if(imageProcessing||saveButton.disabled)return; const changes={naam:modal.querySelector('#goalEditName').value.trim(),algespaard:round2(bankAmount(modal.querySelector('#goalEditSaved').value)||0),doelbedrag:round2(bankAmount(modal.querySelector('#goalEditTarget').value)||0),doeldatum:modal.querySelector('#goalEditDate').value,vasteInleg:round2(bankAmount(modal.querySelector('#goalEditMonthly').value)||0),vastBedrag:modal.querySelector('#goalEditFixedOnly').checked,rendement:(bankAmount(modal.querySelector('#goalEditReturn').value)||0)/100,rendementPeriode:modal.querySelector('#goalEditPeriod').value,favoriet:modal.querySelector('#goalEditFavorite').checked,afbeelding:goalImageData}; saveButton.disabled=true; if(!commitChange(()=>updateItemById(`spaardoelen.${owner}`,id,changes),{render:false})){saveButton.disabled=false;alert('Opslaan is mislukt. Verwijder eventueel oude grote afbeeldingen en probeer opnieuw.');return;} showQuickToast('Spaardoel opgeslagen'); close(); });
+  modal.querySelector('#goalEditDelete').addEventListener('click',()=>{ close(); removeWithUndo(`spaardoelen.${owner}`,id,'Spaardoel verwijderd'); });
 }
 function openMobileGoalManager(owner){
   const goals = state.spaardoelen?.[owner] || [];
@@ -9369,15 +9449,15 @@ function openMobileGoalManager(owner){
   const name = ownerLabel(owner);
   const r=calcScenario(state); const pot=owner==='gezamenlijk'?r.spaarpotDezeMaand:r[owner].beschikbaarVoorSparen;
   const items=calcGroep(goals,pot,TODAY);
-  const rows = items.map((item,index)=>{const goal=item.doel;const goalImage=String(goal.afbeelding||'').replace(/'/g,'%27');const imageStyle=goalImage?` style="background-image:url('${goalImage}')"`:'';return `<div class="goal-manager-row" data-open-manager-goal="${index}" role="button" tabindex="0"><span class="goal-manager-goal-icon${goalImage?' has-image':''}"${imageStyle}>${goalImage?'':goalIcon(goal)}</span><span class="goal-manager-copy"><strong>${textSafe(goal.naam || 'Spaardoel')}</strong><small>${eur(Number(goal.algespaard)||0)} / ${eur(Number(goal.doelbedrag)||0)}</small></span><span class="goal-manager-metric"><span>Nodig p/m</span><b>${item.benodigdPerMaand === null ? '—' : eur(item.benodigdPerMaand)}</b></span><span class="goal-manager-metric"><span>Deze maand</span><b>${eur(item.werkelijkeInleg)}</b></span><span class="goal-manager-moves"><button type="button" data-move-manager-goal="${index}:-1" ${index===0?'disabled':''} aria-label="Doel omhoog">▲</button><button type="button" data-move-manager-goal="${index}:1" ${index===items.length-1?'disabled':''} aria-label="Doel omlaag">▼</button></span><button type="button" class="joint-fixed-row-delete-compact" data-remove-manager-goal="${index}" aria-label="Doel verwijderen">×</button></div>`;}).join('');
+  const rows = items.map((item,index)=>{const goal=item.doel;const goalImage=String(goal.afbeelding||'').replace(/'/g,'%27');const imageStyle=goalImage?` style="background-image:url('${goalImage}')"`:'';return `<div class="goal-manager-row" data-open-manager-goal="${textSafe(goal.id)}" role="button" tabindex="0"><span class="goal-manager-goal-icon${goalImage?' has-image':''}"${imageStyle}>${goalImage?'':goalIcon(goal)}</span><span class="goal-manager-copy"><strong>${textSafe(goal.naam || 'Spaardoel')}</strong><small>${eur(Number(goal.algespaard)||0)} / ${eur(Number(goal.doelbedrag)||0)}</small></span><span class="goal-manager-metric"><span>Nodig p/m</span><b>${item.benodigdPerMaand === null ? '—' : eur(item.benodigdPerMaand)}</b></span><span class="goal-manager-metric"><span>Deze maand</span><b>${eur(item.werkelijkeInleg)}</b></span><span class="goal-manager-moves"><button type="button" data-move-manager-goal="${textSafe(goal.id)}:-1" ${index===0?'disabled':''} aria-label="Doel omhoog">▲</button><button type="button" data-move-manager-goal="${textSafe(goal.id)}:1" ${index===items.length-1?'disabled':''} aria-label="Doel omlaag">▼</button></span><button type="button" class="joint-fixed-row-delete-compact" data-remove-manager-goal="${textSafe(goal.id)}" aria-label="Doel verwijderen">×</button></div>`;}).join('');
   modal.innerHTML=`<div class="modal goal-manager-editor"><div class="joint-variable-editor-header"><div><div class="section-kicker">${name} · ${monthLabel(getSelectedMonth())}</div><h2>Spaardoelen beheren</h2><p>Tik op een doel voor alle instellingen en de berekening.</p></div><button type="button" class="ghost" data-close-goal-manager>Sluiten</button></div><div class="goal-manager-list">${rows || '<p class="hint">Nog geen spaardoelen.</p>'}</div><div class="joint-variable-editor-actions"><button type="button" class="primary" data-close-goal-manager>Klaar</button><button type="button" class="ghost" data-add-manager-goal>+ Spaardoel</button></div></div>`;
   modal.classList.add('open','goal-manager-editor-open');
   const close=()=>{modal.classList.remove('open','goal-manager-editor-open');modal.innerHTML='';renderActiveTab();};
   modal.querySelectorAll('[data-close-goal-manager]').forEach(btn=>btn.addEventListener('click',close));
-  modal.querySelectorAll('[data-open-manager-goal]').forEach(btn=>{const open=()=>{modal.classList.remove('open','goal-manager-editor-open');openMobileGoalEditor(owner,Number(btn.dataset.openManagerGoal));};btn.addEventListener('click',open);btn.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();open();}});});
-  modal.querySelectorAll('[data-move-manager-goal]').forEach(btn=>btn.addEventListener('click',event=>{event.stopPropagation();const [index,delta]=btn.dataset.moveManagerGoal.split(':').map(Number);const target=index+delta;if(target<0||target>=goals.length)return;[goals[index],goals[target]]=[goals[target],goals[index]];persist();openMobileGoalManager(owner);}));
-  modal.querySelectorAll('[data-remove-manager-goal]').forEach(btn=>btn.addEventListener('click',event=>{event.stopPropagation();goals.splice(Number(btn.dataset.removeManagerGoal),1);persist();openMobileGoalManager(owner);}));
-  modal.querySelector('[data-add-manager-goal]').addEventListener('click',()=>{goals.push({id:uid(),naam:'Nieuw doel',doelbedrag:0,algespaard:0,doeldatum:'',vasteInleg:0,rendement:.0125,rendementPeriode:'jaarlijks',favoriet:false});persist();openMobileGoalManager(owner);});
+  modal.querySelectorAll('[data-open-manager-goal]').forEach(btn=>{const open=()=>{modal.classList.remove('open','goal-manager-editor-open');openMobileGoalEditor(owner,btn.dataset.openManagerGoal);};btn.addEventListener('click',open);btn.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();open();}});});
+  modal.querySelectorAll('[data-move-manager-goal]').forEach(btn=>btn.addEventListener('click',event=>{event.stopPropagation();const [id,deltaText]=btn.dataset.moveManagerGoal.split(':');const index=goals.findIndex(goal=>goal.id===id);const target=index+Number(deltaText);if(index<0||target<0||target>=goals.length)return;commitChange(()=>moveItemById(`spaardoelen.${owner}`,`spaardoelen.${owner}`,id,target),{render:false});openMobileGoalManager(owner);}));
+  modal.querySelectorAll('[data-remove-manager-goal]').forEach(btn=>btn.addEventListener('click',event=>{event.stopPropagation();modal.classList.remove('open','goal-manager-editor-open');removeWithUndo(`spaardoelen.${owner}`,btn.dataset.removeManagerGoal,'Spaardoel verwijderd');}));
+  modal.querySelector('[data-add-manager-goal]').addEventListener('click',()=>{commitChange(()=>goals.push({id:uid(),naam:'Nieuw doel',doelbedrag:0,algespaard:0,doeldatum:'',vasteInleg:0,rendement:.0125,rendementPeriode:'jaarlijks',favoriet:false}),{render:false});openMobileGoalManager(owner);});
 }
 function renderMobileSpaardoelen(){
   const r=calcScenario(state);
@@ -9545,8 +9625,9 @@ service cloud.firestore {
           return;
         }
         DataAdapter.backup(state, 'voor import van ' + file.name);
-        state = normalizeBudgetState(imported); window.state = state;
-        persist();
+        DataAdapter.backup(state, 'voor JSON-import');
+        state = migrateBudgetState(imported); window.state = state;
+        commitChange(()=>{}, {render:false});
         renderActiveTab();
         alert('Back-up geimporteerd.');
       }catch(err){ alert('Kon dit bestand niet lezen: ' + err.message); }
@@ -9568,8 +9649,9 @@ service cloud.firestore {
     const label = backup.label || backup.savedAt || 'onbekend moment';
     if (confirm('Laatste lokale nood-back-up herstellen van ' + label + '? De huidige stand wordt eerst opnieuw als nood-back-up bewaard.')){
       DataAdapter.backup(state, 'voor herstel lokale nood-back-up');
-      state = normalizeBudgetState(backup.state); window.state = state;
-      persist();
+      DataAdapter.backup(state, 'voor herstel lokale back-up');
+      state = migrateBudgetState(backup.state); window.state = state;
+      commitChange(()=>{}, {render:false});
       renderActiveTab();
     }
   });
@@ -9692,6 +9774,8 @@ function openTransactionModal(){
   document.getElementById('btnCancelTransaction').addEventListener('click', close);
   modal.addEventListener('click', (e)=>{ if (e.target === modal) close(); }, {once:true});
   document.getElementById('btnSaveTransaction').addEventListener('click', ()=>{
+    const saveButton = document.getElementById('btnSaveTransaction');
+    if (saveButton.disabled) return;
     const amount = parseFloat(String(document.getElementById('txAmount').value).replace(',', '.'));
     if (!Number.isFinite(amount) || amount <= 0){
       alert('Vul een geldig bedrag in.');
@@ -9706,8 +9790,8 @@ function openTransactionModal(){
       amount: round2(amount),
       note: document.getElementById('txNote').value.trim()
     };
-    state.transactions.push(tx);
-    persist();
+    saveButton.disabled = true;
+    if (!commitChange(()=>state.transactions.push(tx), {render:false})){ saveButton.disabled = false; return; }
     close();
     renderActiveTab();
   });
@@ -9729,12 +9813,16 @@ function openGeneralTransactionModal(){
   document.getElementById('btnCancelGeneralTransaction').addEventListener('click',close);
   document.getElementById('generalTxOwner').addEventListener('change',event=>{ document.getElementById('generalTxCategory').innerHTML = categoryOptions(event.target.value); });
   document.getElementById('btnSaveGeneralTransaction').addEventListener('click',()=>{
+    const saveButton = document.getElementById('btnSaveGeneralTransaction');
+    if (saveButton.disabled) return;
     const amount = bankAmount(document.getElementById('generalTxAmount').value);
     if (!Number.isFinite(amount) || amount <= 0){ alert('Vul een geldig bedrag in.'); return; }
     const owner = document.getElementById('generalTxOwner').value;
     const category = document.getElementById('generalTxCategory').value;
-    state.transactions.push({id:uid(),date:document.getElementById('generalTxDate').value || today,owner,category,description:document.getElementById('generalTxDescription').value.trim(),amount:round2(amount),note:document.getElementById('generalTxNote').value.trim(),kind:String(category).toLocaleLowerCase() === 'vaste lasten' ? 'vaste-last' : 'uitgave'});
-    persist(); close(); renderActiveTab();
+    saveButton.disabled = true;
+    const next = {id:uid(),date:document.getElementById('generalTxDate').value || today,owner,category,description:document.getElementById('generalTxDescription').value.trim(),amount:round2(amount),note:document.getElementById('generalTxNote').value.trim(),kind:String(category).toLocaleLowerCase() === 'vaste lasten' ? 'vaste-last' : 'uitgave'};
+    if (!commitChange(()=>state.transactions.push(next), {render:false})){ saveButton.disabled = false; return; }
+    close(); renderActiveTab();
   });
 }
 function bankRememberCategory(description, category){
@@ -9811,7 +9899,8 @@ function openJointTransactionModal(transactionId=''){
         <label>Bedrag<input id="jointTxAmount" type="number" step="0.01" inputmode="decimal" placeholder="0,00" value="${existing ? Number(existing.amount) || '' : ''}"></label>
         <label>Datum<input id="jointTxDate" type="date" value="${textSafe(existing?.date || today)}"></label>
         <label class="full">Omschrijving<input id="jointTxDescription" type="text" placeholder="Bijvoorbeeld Albert Heijn" value="${textSafe(existing?.description || '')}"></label>
-        <label class="full">Categorie<select id="jointTxCategory">${categories.map(category=>`<option value="${textSafe(category)}" ${String(category).toLocaleLowerCase() === String(selectedCategory).toLocaleLowerCase() ? 'selected' : ''}>${textSafe(category)}</option>`).join('')}</select></label>
+        <label>Categorie<select id="jointTxCategory">${categories.map(category=>`<option value="${textSafe(category)}" ${String(category).toLocaleLowerCase() === String(selectedCategory).toLocaleLowerCase() ? 'selected' : ''}>${textSafe(category)}</option>`).join('')}</select></label>
+        <label>Eigenaar<select id="jointTxOwner"><option value="gezamenlijk">Gezamenlijk</option><option value="dion">Dion</option><option value="dara">Dara</option></select></label>
         <label class="full">Notitie<input id="jointTxNote" type="text" placeholder="Optioneel" value="${textSafe(existing?.note || '')}"></label>
       </div>
       <div class="modal-actions">
@@ -9825,6 +9914,8 @@ function openJointTransactionModal(transactionId=''){
   document.getElementById('btnCancelJointTransaction').addEventListener('click', close);
   modal.addEventListener('click', event=>{ if (event.target === modal) close(); }, {once:true});
   document.getElementById('btnSaveJointTransaction').addEventListener('click', ()=>{
+    const saveButton = document.getElementById('btnSaveJointTransaction');
+    if (saveButton.disabled) return;
     const amount = parseFloat(String(document.getElementById('jointTxAmount').value).replace(',', '.'));
     if (!Number.isFinite(amount) || amount <= 0){
       alert('Vul een geldig bedrag in.');
@@ -9833,15 +9924,17 @@ function openJointTransactionModal(transactionId=''){
     const next = {
       id: existing?.id || uid(),
       date: document.getElementById('jointTxDate').value || today,
-      owner: 'gezamenlijk',
+      owner: document.getElementById('jointTxOwner').value,
       category: document.getElementById('jointTxCategory').value,
       description: document.getElementById('jointTxDescription').value.trim(),
       amount: round2(amount),
       note: document.getElementById('jointTxNote').value.trim()
     };
-    if (existing) Object.assign(existing, next);
-    else state.transactions.push(next);
-    persist();
+    saveButton.disabled = true;
+    if (!commitChange(()=>{
+      if (existing) updateItemById('transactions', existing.id, next);
+      else state.transactions.push(next);
+    }, {render:false})){ saveButton.disabled = false; return; }
     close();
     renderActiveTab();
   });
@@ -9861,11 +9954,48 @@ function showQuickToast(message){
   showQuickToast._t = setTimeout(()=> toast.classList.remove('show'), 1800);
 }
 
+function showUndoToast(message, undo){
+  let toast = document.getElementById('quickToast');
+  if (!toast){
+    toast = document.createElement('div');
+    toast.id = 'quickToast';
+    toast.className = 'quick-toast';
+    document.body.appendChild(toast);
+  }
+  toast.innerHTML = `<span>${textSafe(message)}</span> <button type="button" class="quick-toast-undo">Ongedaan maken</button>`;
+  toast.classList.add('show');
+  clearTimeout(showQuickToast._t);
+  const button = toast.querySelector('.quick-toast-undo');
+  button.addEventListener('click', ()=>{
+    clearTimeout(showQuickToast._t);
+    toast.classList.remove('show');
+    undo();
+  }, {once:true});
+  showQuickToast._t = setTimeout(()=>toast.classList.remove('show'), 6000);
+}
+
+function removeWithUndo(path, id, message, rerender=true){
+  let removed = null;
+  const ok = commitChange(()=>{ removed = removeItemById(path, id); }, {render:false});
+  if (!ok || !removed) return false;
+  if (rerender) renderActiveTab();
+  showUndoToast(message, ()=>{
+    commitChange(()=>{
+      const rows = getPath(state, removed.path);
+      if (Array.isArray(rows) && !rows.some(item=>item?.id === removed.item.id)){
+        rows.splice(Math.min(removed.index, rows.length), 0, removed.item);
+      }
+    }, {render:false});
+    if (rerender) renderActiveTab();
+  });
+  return true;
+}
+
 
 
 function renderJointFixedCostsEditorRows(rows, options={}){
   const kind = options.kind || 'fixed';
-  const indexAttr = kind === 'mortgage' ? 'data-mortgage-index' : 'data-fixed-index';
+  const idAttr = kind === 'mortgage' ? 'data-mortgage-id' : 'data-fixed-id';
   const fieldAttr = kind === 'mortgage' ? 'data-mortgage-field' : 'data-fixed-field';
   const removeAttr = kind === 'mortgage' ? 'data-mortgage-remove' : 'data-fixed-remove';
   const rowAttr = kind === 'mortgage' ? 'data-mortgage-row' : 'data-fixed-row';
@@ -9887,23 +10017,23 @@ function renderJointFixedCostsEditorRows(rows, options={}){
     const description=String(a.row.post||'').localeCompare(String(b.row.post||''),'nl',{sensitivity:'base'});
     return description || a.index-b.index;
   });
-  const body = sortedEntries.map(({row, index})=>{
+  const body = sortedEntries.map(({row})=>{
     const bedrag = Number(row.bedrag)||0;
     const monthly = effectiveBedrag(row);
-    return `<div class="joint-fixed-editor-row joint-fixed-editor-row-compact ${kind === 'mortgage' ? 'joint-fixed-editor-row-mortgage' : ''}" ${rowAttr}="${index}">
+    return `<div class="joint-fixed-editor-row joint-fixed-editor-row-compact ${kind === 'mortgage' ? 'joint-fixed-editor-row-mortgage' : ''}" ${rowAttr}="${textSafe(row.id)}">
       <span class="joint-fixed-editor-row-icon tone-green">${iconSvg(jointFixedCategoryIconName(row.categorie || row.post || 'overig'))}</span>
-      <input class="joint-fixed-editor-input" type="text" ${fieldAttr}="categorie" ${indexAttr}="${index}" value="${textSafe(row.categorie || '')}" placeholder="Categorie" aria-label="Categorie">
-      <input class="joint-fixed-editor-input" type="text" ${fieldAttr}="post" ${indexAttr}="${index}" value="${textSafe(row.post || '')}" placeholder="Omschrijving" aria-label="Omschrijving">
+      <input class="joint-fixed-editor-input" type="text" ${fieldAttr}="categorie" ${idAttr}="${textSafe(row.id)}" value="${textSafe(row.categorie || '')}" placeholder="Categorie" aria-label="Categorie">
+      <input class="joint-fixed-editor-input" type="text" ${fieldAttr}="post" ${idAttr}="${textSafe(row.id)}" value="${textSafe(row.post || '')}" placeholder="Omschrijving" aria-label="Omschrijving">
       <div class="joint-fixed-editor-amount-cell">
-        <input class="joint-fixed-editor-input joint-fixed-editor-amount" type="number" step="0.01" inputmode="decimal" ${fieldAttr}="bedrag" ${indexAttr}="${index}" value="${bedrag}" aria-label="Bedrag">
+        <input class="joint-fixed-editor-input joint-fixed-editor-amount" type="number" step="0.01" inputmode="decimal" ${fieldAttr}="bedrag" ${idAttr}="${textSafe(row.id)}" value="${bedrag}" aria-label="Bedrag">
         <small>${row.jaarlijks ? `≈ ${eur(monthly)}/mnd` : ''}</small>
       </div>
       <label class="joint-fixed-editor-check joint-fixed-editor-check-compact" aria-label="Jaarbedrag, reken per maand /12">
-        <input type="checkbox" ${fieldAttr}="jaarlijks" ${indexAttr}="${index}" ${row.jaarlijks ? 'checked' : ''}>
+        <input type="checkbox" ${fieldAttr}="jaarlijks" ${idAttr}="${textSafe(row.id)}" ${row.jaarlijks ? 'checked' : ''}>
         <span>${kind === 'mortgage' ? '50/50' : ''}</span>
       </label>
-      ${kind === 'fixed' ? `<select class="joint-fixed-editor-move" data-fixed-move="${sourcePath}.${index}" aria-label="Verplaatsen naar">${moveOptions}</select>` : '<span class="joint-fixed-editor-mortgage-note">50/50</span>'}
-      <button type="button" class="joint-fixed-row-delete-compact" ${removeAttr}="${index}" aria-label="Post verwijderen">×</button>
+      ${kind === 'fixed' ? `<select class="joint-fixed-editor-move" data-fixed-move-id="${textSafe(row.id)}" data-fixed-source-path="${sourcePath}" aria-label="Verplaatsen naar">${moveOptions}</select>` : '<span class="joint-fixed-editor-mortgage-note">50/50</span>'}
+      <button type="button" class="joint-fixed-row-delete-compact" ${removeAttr}="${textSafe(row.id)}" aria-label="Post verwijderen">×</button>
       <div class="joint-fixed-editor-hint joint-fixed-editor-hint-compact">Gerekend als ${eur(monthly)} per maand${note ? ` · ${note}` : ''}</div>
     </div>`;
   }).join('');
@@ -9911,13 +10041,13 @@ function renderJointFixedCostsEditorRows(rows, options={}){
 }
 
 function renderJointVariableBudgetEditorRows(rows){
-  return (rows||[]).map((row, index)=>{
+  return (rows||[]).map(row=>{
     const label = row.post || row.categorie || '';
     return `<div class="joint-variable-editor-row">
       <span class="joint-variable-editor-icon">${iconSvg(categoryIconName(label))}</span>
-      <input type="text" data-variable-field="post" data-variable-index="${index}" value="${textSafe(label)}" placeholder="Categorie" aria-label="Categorie">
-      <input type="number" step="0.01" inputmode="decimal" data-variable-field="bedrag" data-variable-index="${index}" value="${Number(row.bedrag)||0}" aria-label="Maandbudget">
-      <button type="button" class="joint-variable-editor-delete" data-variable-remove="${index}" aria-label="Categorie verwijderen">×</button>
+      <input type="text" data-variable-field="post" data-variable-id="${textSafe(row.id)}" value="${textSafe(label)}" placeholder="Categorie" aria-label="Categorie">
+      <input type="number" step="0.01" inputmode="decimal" data-variable-field="bedrag" data-variable-id="${textSafe(row.id)}" value="${Number(row.bedrag)||0}" aria-label="Maandbudget">
+      <button type="button" class="joint-variable-editor-delete" data-variable-remove="${textSafe(row.id)}" aria-label="Categorie verwijderen">×</button>
     </div>`;
   }).join('');
 }
@@ -9927,6 +10057,7 @@ function openJointVariableCostsModal(focusLast=false, owner='gezamenlijk'){
   const scenario = state.meta.scenario;
   const scenarioData = getMonthlyScenarioData(scenario);
   const rows = scenarioData[owner].variabel || (scenarioData[owner].variabel = []);
+  const rowsPath = `monthlyBudgets.${getSelectedMonth()}.${scenario}.${owner}Variabel`;
   const name = ownerLabel(owner);
   const scenarioLabel = scenario === 'voor' ? 'Voor verkoop' : 'Na verkoop';
   const total = ()=> round2(sumBedrag(rows));
@@ -9961,7 +10092,7 @@ function openJointVariableCostsModal(focusLast=false, owner='gezamenlijk'){
   };
   modal.querySelectorAll('[data-close-joint-variable-costs]').forEach(btn=>btn.addEventListener('click', close));
   const commitField = (el, saveNow=true)=>{
-    const row = rows[Number(el.dataset.variableIndex)];
+    const row = rows.find(item=>item.id === el.dataset.variableId);
     if (!row) return;
     if (el.dataset.variableField === 'bedrag'){
       const parsed = parseFloat(String(el.value).replace(',', '.'));
@@ -9982,9 +10113,7 @@ function openJointVariableCostsModal(focusLast=false, owner='gezamenlijk'){
   });
   modal.querySelectorAll('[data-variable-remove]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
-      rows.splice(Number(btn.dataset.variableRemove), 1);
-      persist();
-      openJointVariableCostsModal(false, owner);
+      removeWithUndo(rowsPath, btn.dataset.variableRemove, 'Variabel budget verwijderd');
     });
   });
   modal.querySelector('[data-variable-add]')?.addEventListener('click', ()=>{
@@ -9995,6 +10124,50 @@ function openJointVariableCostsModal(focusLast=false, owner='gezamenlijk'){
   if (focusLast){
     requestAnimationFrame(()=> modal.querySelector('.joint-variable-editor-row:last-child input[data-variable-field="post"]')?.focus());
   }
+}
+
+function openFixedExpenseAddModal(owner='gezamenlijk', draftSession=null){
+  const modal = document.getElementById('incomeEditModal');
+  const scenario = state.meta.scenario;
+  const scenarioLabel = scenario === 'voor' ? 'Voor verkoop' : 'Na verkoop';
+  modal.innerHTML = `<div class="modal income-sheet fixed-expense-add-modal" role="dialog" aria-modal="true" aria-label="Vaste last toevoegen">
+    <div class="card-head"><h2>Vaste last toevoegen</h2><button type="button" class="danger-ghost" data-fixed-add-close aria-label="Sluiten">×</button></div>
+    <p class="hint">${scenarioLabel}</p>
+    <div class="modal-grid">
+      <label>Categorie<input type="text" id="fixedAddCategory" autocomplete="off"></label>
+      <label>Omschrijving<input type="text" id="fixedAddDescription" autocomplete="off"></label>
+      <label>Bedrag<input type="number" id="fixedAddAmount" step="0.01" inputmode="decimal" value="0"></label>
+      <label>Frequentie<select id="fixedAddFrequency"><option value="monthly">Maandelijks</option><option value="yearly">Jaarlijks</option></select></label>
+      <label class="full">Eigenaar<select id="fixedAddOwner"><option value="gezamenlijk">Gezamenlijk</option><option value="dion">Dion</option><option value="dara">Dara</option></select></label>
+    </div>
+    <div class="modal-actions"><button type="button" class="ghost" data-fixed-add-cancel>Annuleren</button><button type="button" class="primary" data-fixed-add-save>Vaste last opslaan</button></div>
+  </div>`;
+  modal.classList.add('open','joint-fixed-editor-open');
+  modal.querySelector('#fixedAddOwner').value = owner;
+  let saving = false;
+  const cancel = ()=>openJointFixedCostsModal(false, owner, draftSession);
+  modal.querySelectorAll('[data-fixed-add-close],[data-fixed-add-cancel]').forEach(button=>button.addEventListener('click', cancel));
+  modal.querySelector('[data-fixed-add-save]').addEventListener('click', ()=>{
+    if (saving) return;
+    const category = modal.querySelector('#fixedAddCategory').value.trim();
+    const post = modal.querySelector('#fixedAddDescription').value.trim();
+    if (!category && !post){ alert('Vul een categorie of omschrijving in.'); return; }
+    const amount = bankAmount(modal.querySelector('#fixedAddAmount').value);
+    if (!Number.isFinite(amount)){ alert('Vul een geldig bedrag in.'); return; }
+    saving = true;
+    const selectedOwner = modal.querySelector('#fixedAddOwner').value;
+    const item = {id:uid(), categorie:category, post, bedrag:round2(amount), jaarlijks:modal.querySelector('#fixedAddFrequency').value === 'yearly'};
+    const ok = commitChange(()=>{
+      if (draftSession){
+        state[scenario][owner].vasteLasten = clone(draftSession.rows || []);
+        if (owner === 'gezamenlijk' && scenario === 'na') state[scenario][owner].hypotheek = clone(draftSession.mortgageRows || []);
+      }
+      state[scenario][selectedOwner].vasteLasten.push(item);
+    }, {render:false});
+    if (!ok){ saving = false; alert('Opslaan van de vaste last is mislukt.'); return; }
+    showQuickToast('Vaste last opgeslagen');
+    openJointFixedCostsModal(false, selectedOwner);
+  });
 }
 
 function openJointFixedCostsModal(focusLast=false, owner='gezamenlijk', draftSession=null){
@@ -10056,16 +10229,17 @@ function openJointFixedCostsModal(focusLast=false, owner='gezamenlijk', draftSes
     modal.querySelectorAll('[data-fixed-field], [data-mortgage-field]').forEach(el=>{
       const isMortgage = !!el.dataset.mortgageField;
       const collection = isMortgage ? mortgageRows : rows;
-      const index = Number(isMortgage ? el.dataset.mortgageIndex : el.dataset.fixedIndex);
+      const id = isMortgage ? el.dataset.mortgageId : el.dataset.fixedId;
       const field = isMortgage ? el.dataset.mortgageField : el.dataset.fixedField;
-      if (!collection[index]) return;
+      const item = collection.find(row=>row.id === id);
+      if (!item) return;
       if (field === 'bedrag'){
         const parsed = bankAmount(el.value);
-        collection[index][field] = Number.isFinite(parsed) ? round2(parsed) : 0;
+        item[field] = Number.isFinite(parsed) ? round2(parsed) : 0;
       } else if (field === 'jaarlijks'){
-        collection[index][field] = !!el.checked;
+        item[field] = !!el.checked;
       } else {
-        collection[index][field] = el.value.trim();
+        item[field] = el.value.trim();
       }
     });
     updateSummary();
@@ -10086,11 +10260,12 @@ function openJointFixedCostsModal(focusLast=false, owner='gezamenlijk', draftSes
     if (el.type !== 'checkbox') el.addEventListener('input', commit);
   });
 
-  modal.querySelectorAll('[data-fixed-move]').forEach(select=>{
+  modal.querySelectorAll('[data-fixed-move-id]').forEach(select=>{
     select.addEventListener('change', ()=>{
       commitAllFields();
       const targetPath = select.value;
-      const [sourcePath, idxStr] = splitLastIndex(select.dataset.fixedMove);
+      const sourcePath = select.dataset.fixedSourcePath;
+      const id = select.dataset.fixedMoveId;
       if (!targetPath || targetPath === sourcePath) return;
       const previousRows = account.vasteLasten;
       const previousMortgage = hasMortgage ? account.hypotheek : null;
@@ -10103,17 +10278,19 @@ function openJointFixedCostsModal(focusLast=false, owner='gezamenlijk', draftSes
         if (hasMortgage) account.hypotheek = previousMortgage;
         return;
       }
-      const row = source.splice(parseInt(idxStr, 10), 1)[0];
-      if (!row) return;
-      target.push(row);
+      const movement = moveItemById(sourcePath, targetPath, id);
+      if (!movement) return;
       if (!persist()){
-        target.pop(); source.splice(parseInt(idxStr, 10), 0, row);
+        moveItemById(targetPath, sourcePath, id, movement.sourceIndex);
         account.vasteLasten = previousRows;
         if (hasMortgage) account.hypotheek = previousMortgage;
         alert('Verplaatsen is mislukt.');
         return;
       }
-      showQuickToast('Vaste last verplaatst');
+      showUndoToast('Vaste last verplaatst', ()=>{
+        commitChange(()=>moveItemById(targetPath, sourcePath, id, movement.sourceIndex), {render:false});
+        renderActiveTab();
+      });
       openJointFixedCostsModal(false, owner);
     });
   });
@@ -10121,20 +10298,44 @@ function openJointFixedCostsModal(focusLast=false, owner='gezamenlijk', draftSes
   modal.querySelectorAll('[data-fixed-remove]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       commitAllFields();
-      const idx = Number(btn.dataset.fixedRemove);
+      const id = btn.dataset.fixedRemove;
+      const idx = rows.findIndex(row=>row.id === id);
+      if (idx < 0) return;
+      const removed = clone(rows[idx]);
+      const nextRows = rows.filter(row=>row.id !== id);
+      if (!commitChange(()=>{ account.vasteLasten = clone(nextRows); }, {render:false})) return;
       rows.splice(idx, 1);
-      session.dirty = true;
+      session.dirty = false;
       openJointFixedCostsModal(false, owner, session);
+      showUndoToast('Vaste last verwijderd', ()=>{
+        commitChange(()=>{
+          const target = state[scenario][owner].vasteLasten;
+          if (!target.some(row=>row.id === id)) target.splice(Math.min(idx,target.length),0,removed);
+        }, {render:false});
+        openJointFixedCostsModal(false, owner);
+      });
     });
   });
 
   modal.querySelectorAll('[data-mortgage-remove]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       commitAllFields();
-      const idx = Number(btn.dataset.mortgageRemove);
+      const id = btn.dataset.mortgageRemove;
+      const idx = mortgageRows.findIndex(row=>row.id === id);
+      if (idx < 0) return;
+      const removed = clone(mortgageRows[idx]);
+      const nextRows = mortgageRows.filter(row=>row.id !== id);
+      if (!commitChange(()=>{ account.hypotheek = clone(nextRows); }, {render:false})) return;
       mortgageRows.splice(idx, 1);
-      session.dirty = true;
+      session.dirty = false;
       openJointFixedCostsModal(false, owner, session);
+      showUndoToast('Vaste last verwijderd', ()=>{
+        commitChange(()=>{
+          const target = state[scenario][owner].hypotheek;
+          if (!target.some(row=>row.id === id)) target.splice(Math.min(idx,target.length),0,removed);
+        }, {render:false});
+        openJointFixedCostsModal(false, owner);
+      });
     });
   });
 
@@ -10162,9 +10363,7 @@ function openJointFixedCostsModal(focusLast=false, owner='gezamenlijk', draftSes
   if (add){
     add.addEventListener('click', ()=>{
       commitAllFields();
-      rows.push({id:uid(), categorie:'', post:'', bedrag:0, jaarlijks:false});
-      session.dirty = true;
-      openJointFixedCostsModal(true, owner, session);
+      openFixedExpenseAddModal(owner, session);
     });
   }
 
@@ -10180,7 +10379,8 @@ function openJointFixedCostsModal(focusLast=false, owner='gezamenlijk', draftSes
 
   if (focusLast){
     requestAnimationFrame(()=>{
-      const last = modal.querySelector(`input[data-fixed-field="categorie"][data-fixed-index="${rows.length-1}"]`);
+      const lastId = rows[rows.length-1]?.id;
+      const last = modal.querySelector(`input[data-fixed-field="categorie"][data-fixed-id="${lastId}"]`);
       if (last) last.focus();
     });
   }
@@ -10476,11 +10676,12 @@ function openPersonalTransactionModal(owner, transactionId=''){
   const categories = jointVariableCategoryOptions(existing?.category || '', owner);
   const selected = existing?.category || categories[0] || 'Overig';
   const name = ownerLabel(owner);
-  modal.innerHTML = `<div class="modal joint-transaction-fullscreen-editor"><div class="card-head"><h2>${existing ? `${name} uitgave bewerken` : `${name} uitgave`}</h2><button class="danger-ghost" id="btnClosePersonalTransaction">×</button></div><p class="hint" style="margin-top:-4px">${monthLabel(getSelectedMonth())} · wordt gekoppeld aan ${name}s variabele lasten</p><div class="modal-grid"><label>Bedrag<input id="personalTxAmount" type="number" step="0.01" inputmode="decimal" value="${existing ? Number(existing.amount)||'' : ''}"></label><label>Datum<input id="personalTxDate" type="date" value="${textSafe(existing?.date || today)}"></label><label class="full">Omschrijving<input id="personalTxDescription" type="text" value="${textSafe(existing?.description || '')}"></label><label class="full">Categorie<select id="personalTxCategory">${categories.map(category=>`<option value="${textSafe(category)}" ${String(category).toLowerCase()===String(selected).toLowerCase()?'selected':''}>${textSafe(category)}</option>`).join('')}</select></label><label class="full">Notitie<input id="personalTxNote" type="text" value="${textSafe(existing?.note || '')}"></label></div><div class="modal-actions"><button class="ghost" id="btnCancelPersonalTransaction">Annuleren</button><button class="primary" id="btnSavePersonalTransaction">${existing?'Wijzigingen opslaan':'Uitgave opslaan'}</button></div></div>`;
+  modal.innerHTML = `<div class="modal joint-transaction-fullscreen-editor"><div class="card-head"><h2>${existing ? `${name} uitgave bewerken` : `${name} uitgave`}</h2><button class="danger-ghost" id="btnClosePersonalTransaction">×</button></div><p class="hint" style="margin-top:-4px">${monthLabel(getSelectedMonth())} · wordt gekoppeld aan ${name}s variabele lasten</p><div class="modal-grid"><label>Bedrag<input id="personalTxAmount" type="number" step="0.01" inputmode="decimal" value="${existing ? Number(existing.amount)||'' : ''}"></label><label>Datum<input id="personalTxDate" type="date" value="${textSafe(existing?.date || today)}"></label><label class="full">Omschrijving<input id="personalTxDescription" type="text" value="${textSafe(existing?.description || '')}"></label><label>Categorie<select id="personalTxCategory">${categories.map(category=>`<option value="${textSafe(category)}" ${String(category).toLowerCase()===String(selected).toLowerCase()?'selected':''}>${textSafe(category)}</option>`).join('')}</select></label><label>Eigenaar<select id="personalTxOwner"><option value="gezamenlijk">Gezamenlijk</option><option value="dion">Dion</option><option value="dara">Dara</option></select></label><label class="full">Notitie<input id="personalTxNote" type="text" value="${textSafe(existing?.note || '')}"></label></div><div class="modal-actions"><button class="ghost" id="btnCancelPersonalTransaction">Annuleren</button><button class="primary" id="btnSavePersonalTransaction">${existing?'Wijzigingen opslaan':'Uitgave opslaan'}</button></div></div>`;
   modal.classList.add('open','joint-transaction-modal-open');
   const close=()=>modal.classList.remove('open','joint-transaction-modal-open');
+  document.getElementById('personalTxOwner').value = existing?.owner || owner;
   document.getElementById('btnClosePersonalTransaction').addEventListener('click',close); document.getElementById('btnCancelPersonalTransaction').addEventListener('click',close);
-  document.getElementById('btnSavePersonalTransaction').addEventListener('click',()=>{ const amount=bankAmount(document.getElementById('personalTxAmount').value); if(!Number.isFinite(amount)||amount<=0){alert('Vul een geldig bedrag in.');return;} const next={id:existing?.id||uid(),date:document.getElementById('personalTxDate').value||today,owner,category:document.getElementById('personalTxCategory').value,description:document.getElementById('personalTxDescription').value.trim(),amount:round2(amount),note:document.getElementById('personalTxNote').value.trim(),kind:'uitgave'}; if(existing) Object.assign(existing,next); else state.transactions.push(next); persist(); close(); renderActiveTab(); });
+  document.getElementById('btnSavePersonalTransaction').addEventListener('click',()=>{ const button=document.getElementById('btnSavePersonalTransaction'); if(button.disabled)return; const amount=bankAmount(document.getElementById('personalTxAmount').value); if(!Number.isFinite(amount)||amount<=0){alert('Vul een geldig bedrag in.');return;} const next={id:existing?.id||uid(),date:document.getElementById('personalTxDate').value||today,owner:document.getElementById('personalTxOwner').value,category:document.getElementById('personalTxCategory').value,description:document.getElementById('personalTxDescription').value.trim(),amount:round2(amount),note:document.getElementById('personalTxNote').value.trim(),kind:'uitgave'}; button.disabled=true; if(!commitChange(()=>{if(existing)updateItemById('transactions',existing.id,next);else state.transactions.push(next);},{render:false})){button.disabled=false;return;} close(); renderActiveTab(); });
 }
 
 function renderPersonalFirstRow(owner){
@@ -10578,7 +10779,7 @@ function renderActiveTab(){
     });
   });
   root.querySelectorAll('[data-open-goal-editor]').forEach(btn=>{
-    btn.addEventListener('click',()=>{ const [owner,index]=btn.dataset.openGoalEditor.split(':'); openMobileGoalEditor(owner,Number(index)); });
+    btn.addEventListener('click',()=>{ const [owner,id]=btn.dataset.openGoalEditor.split(':'); openMobileGoalEditor(owner,id); });
   });
   root.querySelectorAll('[data-open-goal-manager]').forEach(btn=>{
     btn.addEventListener('click',()=>openMobileGoalManager(btn.dataset.openGoalManager));
