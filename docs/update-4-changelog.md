@@ -24,3 +24,11 @@
 ## Bekende acceptatievoorwaarde
 
 De meegeleverde ING-fixtures zijn synthetisch en geanonimiseerd. Voor definitieve acceptatie moeten de drie afgesproken echte, geanonimiseerde exports van Dion, Dara en de gezamenlijke rekening nog door dezelfde testset worden gehaald.
+
+## Cloud-importherstel
+
+- Een importbonnetje of open concept wordt bij ontbreken in IndexedDB automatisch uit Firestore hersteld.
+- De oorspronkelijke CSV hoeft niet op het tweede apparaat te staan.
+- Importchunks worden gecontroleerd op volledigheid, volgorde, rijtelling en checksum voordat ze lokaal worden opgeslagen.
+- Nieuwe cloudheaders bevatten geen volledige CSV-tekst en worden pas na de chunks geschreven.
+- Zichtbare versieaanduidingen `Update 3` en `Update 4` zijn uit de appkaarten verwijderd.

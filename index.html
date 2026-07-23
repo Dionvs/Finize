@@ -9107,6 +9107,7 @@ const CloudAdapter = {
       this.status = this.pendingState ? 'Opslaan…' : 'Lokaal opgeslagen';
       renderCloudStatus();
       this.flushQueue();
+      window.dispatchEvent(new CustomEvent('finize:cloud-connected'));
       return true;
     }catch(e){
       console.error('Firebase verbinden mislukt', e);
@@ -9260,6 +9261,7 @@ const CloudAdapter = {
     renderCloudStatus();
   }
 };
+window.CloudAdapter = CloudAdapter;
 
 const DataAdapter = {
   loadedFromStorage:false,
@@ -12517,7 +12519,7 @@ function renderU3AdminPanel(){
   const status=record?.status==='afgesloten'?'closed':needsCorrection||pending?'pending':'ok';
   const statusLabel=record?.status==='afgesloten'?'Afgesloten':needsCorrection?'Correctie nodig':pending?`${pending} te controleren`:'Klaar voor controle';
   return `<section class="card u3-admin-card">
-    <div class="u3-admin-head"><div><div class="section-kicker">Update 3</div><h2>Maandadministratie</h2><p>Verwacht, werkelijk, rekeningen, reserve en onderlinge voorschotten</p></div><span class="u3-status ${status}">${statusLabel}</span></div>
+    <div class="u3-admin-head"><div><h2>Maandadministratie</h2><p>Verwacht, werkelijk, rekeningen, reserve en onderlinge voorschotten</p></div><span class="u3-status ${status}">${statusLabel}</span></div>
     <div class="u3-admin-metrics">
       <div class="u3-admin-metric"><span>Verwacht inkomen</span><strong>${eur(summary.expectedIncome)}</strong></div>
       <div class="u3-admin-metric"><span>Werkelijk inkomen</span><strong>${eur(summary.actualIncome)}</strong></div>

@@ -28,3 +28,11 @@ Getest met synthetische ING-fixtures voor Dion, Dara en gezamenlijk plus overlap
 7. Open het importbonnetje, pas een verwerking aan en kies Wijzigingen verwerken.
 8. Kies Import ongedaan maken en controleer dat alle financiële gevolgen verdwijnen.
 9. Herhaal stap 6 in een afgesloten maand; de maand moet Correctie nodig tonen.
+
+## Cloud-importherstel
+
+1. Synchroniseer een import op apparaat A en controleer dat de cloudstatus opgeslagen is.
+2. Open dezelfde Finize-data op apparaat B zonder lokale importdetails.
+3. Open het importbonnetje; de melding `Import uit cloud ophalen…` verschijnt en daarna de normale importmodal.
+4. Herlaad apparaat B zonder netwerk; de gecachete import blijft openen.
+5. Controleer dat de appkaarten geen technische titels `Update 3` of `Update 4` tonen.
