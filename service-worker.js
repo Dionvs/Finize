@@ -1,8 +1,10 @@
-const CACHE_NAME = "finize-v13-spaardoelen-accordeon";
+const CACHE_NAME = "finize-v15-update4-bankimport";
 
 const APP_SHELL = [
   "./",
   "./index.html",
+  "./update4.js",
+  "./update4.css",
   "./finize-v4.html",
   "./finize-mobile.html",
   "./manifest.json",
@@ -32,6 +34,19 @@ self.addEventListener("activate", event => {
 
 self.addEventListener("fetch", event => {
   if (event.request.method !== "GET") return;
+
+  if (event.request.mode === "navigate") {
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put("./index.html", copy));
+          return response;
+        })
+        .catch(() => caches.match("./index.html"))
+    );
+    return;
+  }
 
   event.respondWith(
     caches.match(event.request).then(cached => {

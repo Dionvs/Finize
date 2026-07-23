@@ -7238,13 +7238,53 @@ body.v4-app[data-real-active-tab="gezamenlijk"] .joint-fixed-edit-btn svg{
   .u2-inline-actions button{min-height:30px}
   .u2-editor-settings{grid-template-columns:1fr}
 }
+/* Update 3 — financiële maandadministratie */
+.u3-admin-card{display:grid;gap:12px}
+.u3-admin-head,.u3-admin-actions,.u3-row-head,.u3-step-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.u3-admin-head h2,.u3-admin-head p,.u3-step-head h3,.u3-step-head p{margin:0}
+.u3-admin-head p,.u3-step-head p{font-size:10px;color:var(--text-dim)}
+.u3-status{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:4px 8px;font-size:9px;font-weight:850;background:var(--surface-2);color:var(--text-dim)}
+.u3-status.closed,.u3-status.ok{background:var(--soft-green);color:var(--green)}
+.u3-status.pending,.u3-status.warn{background:#fff3d9;color:#8b5f0c}
+.u3-admin-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}
+.u3-admin-metric{display:grid;gap:2px;padding:9px;border:1px solid var(--border-soft);border-radius:11px;background:var(--surface-2)}
+.u3-admin-metric span{font-size:9px;color:var(--text-dim)}
+.u3-admin-metric strong{font-size:13px}
+.u3-admin-actions{justify-content:flex-start}
+.u3-admin-modal{width:min(820px,100%);max-height:92vh;overflow:auto}
+.u3-admin-list{display:grid;gap:7px;margin:10px 0}
+.u3-admin-row{display:grid;gap:7px;padding:10px;border:1px solid var(--border);border-radius:12px;background:var(--surface)}
+.u3-admin-row small{color:var(--text-dim)}
+.u3-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.u3-grid label{display:grid;gap:5px;font-size:10px;color:var(--text-dim);font-weight:750}
+.u3-grid .full{grid-column:1/-1}
+.u3-steps{display:grid;gap:10px;margin-top:12px}
+.u3-step{display:grid;gap:8px;padding:12px;border:1px solid var(--border);border-radius:14px}
+.u3-account-row,.u3-transfer-row{display:grid;grid-template-columns:minmax(0,1fr) 120px auto;gap:8px;align-items:center}
+.u3-budget-list{display:grid;gap:5px}
+.u3-budget-row{display:grid;grid-template-columns:minmax(0,1fr) repeat(3,90px);gap:8px;font-size:10px;padding:6px 0;border-bottom:1px solid var(--border-soft)}
+.u3-budget-row:last-child{border-bottom:0}
+.u3-review-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.u3-review-fields label{display:grid;gap:4px;font-size:9px;color:var(--text-dim)}
+.u3-empty{padding:16px;text-align:center;color:var(--text-dim);font-size:11px}
+@media(max-width:767px){
+  #incomeEditModal.u3-admin-open{align-items:stretch;padding:0}
+  #incomeEditModal .u3-admin-modal{width:100%;max-width:none;min-height:100dvh;max-height:none;border:0;border-radius:0;padding:12px 12px calc(12px + env(safe-area-inset-bottom))}
+  .u3-admin-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .u3-grid,.u3-review-fields{grid-template-columns:1fr}
+  .u3-grid .full{grid-column:auto}
+  .u3-account-row,.u3-transfer-row{grid-template-columns:1fr}
+  .u3-budget-row{grid-template-columns:1fr auto}
+  .u3-budget-row span:nth-child(3),.u3-budget-row span:nth-child(4){display:none}
+}
 </style>
+<link rel="stylesheet" href="./update4.css">
 </head>
 <body class="v4-app">
 
 <aside class="v4-sidebar">
   <div class="v4-sidebar-brand">
-    <img src="finize-logo-icon.png" alt="Finize logo">
+    <img src="finize-logo.png" alt="Finize logo">
     <div>
       <h1>Finize</h1>
       <div class="v4-sidebar-sub">Huishoudbudget</div>
@@ -7313,6 +7353,17 @@ body.v4-app[data-real-active-tab="gezamenlijk"] .joint-fixed-edit-btn svg{
   </button>
 </nav>
 
+<script>
+window.__finizeEarlyErrors=[];
+window.addEventListener('error',event=>{
+  window.__finizeEarlyErrors.push({type:'error',message:String(event.message||''),filename:String(event.filename||''),line:Number(event.lineno||0),column:Number(event.colno||0),stack:String(event.error?.stack||'')});
+  console.error('Finize kon niet volledig starten:',event.message,event.filename?`${event.filename}:${event.lineno||0}`:'');
+});
+window.addEventListener('unhandledrejection',event=>{
+  window.__finizeEarlyErrors.push({type:'rejection',message:String(event.reason?.message||event.reason||''),stack:String(event.reason?.stack||'')});
+  console.error('Finize kon een achtergrondtaak niet afronden:',event.reason?.message||String(event.reason||'Onbekende fout'));
+});
+</script>
 <script>
 /* =========================================================
    Finize — Budget Planner V3 (lokale HTML-versie)
@@ -7543,12 +7594,241 @@ function normalizePersonDefaults(target){
     }));
   });
 }
+
+/* ---------- Update 3: schema v4 en pure maandadministratie ---------- */
+var U3_SCHEMA_VERSION = 5;
+var U3_ACCOUNTS = ['gezamenlijk','dion','dara'];
+var U3_FREQUENCY_UNITS = ['weken','maanden','jaren'];
+
+function u3IsoDate(date){
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+}
+function u3ParseDate(value){
+  const match = String(value||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+  const date = new Date(Number(match[1]), Number(match[2])-1, Number(match[3]), 12);
+  return date.getFullYear() === Number(match[1]) && date.getMonth() === Number(match[2])-1 && date.getDate() === Number(match[3]) ? date : null;
+}
+function u3MonthBounds(month){
+  const match = String(month||'').match(/^(\d{4})-(\d{2})$/);
+  if (!match) return null;
+  const year = Number(match[1]), index = Number(match[2])-1;
+  return {start:new Date(year,index,1,12),end:new Date(year,index+1,0,12)};
+}
+function u3AnchoredDate(year, monthIndex, anchorDay){
+  const lastDay = new Date(year,monthIndex+1,0,12).getDate();
+  return new Date(year,monthIndex,Math.min(anchorDay,lastDay),12);
+}
+function u3AddAnchoredMonths(start, count){
+  const absolute = start.getFullYear()*12 + start.getMonth() + count;
+  return u3AnchoredDate(Math.floor(absolute/12), ((absolute%12)+12)%12, start.getDate());
+}
+function u3AddAnchoredYears(start, count){
+  return u3AnchoredDate(start.getFullYear()+count,start.getMonth(),start.getDate());
+}
+function u3AmountAt(item, dateOrMonth){
+  const key = String(dateOrMonth||'').slice(0,7);
+  if (item?.monthOverrides && Number.isFinite(Number(item.monthOverrides[key]))) return round2(Number(item.monthOverrides[key]));
+  const histories = Array.isArray(item?.amountHistory) ? item.amountHistory : [];
+  const selected = histories
+    .filter(row=>String(row.effectiveFrom||'').slice(0,7) <= key)
+    .sort((a,b)=>String(a.effectiveFrom).localeCompare(String(b.effectiveFrom)))
+    .pop();
+  const fallback = item?.bedrag ?? item?.verwachtBedrag ?? 0;
+  return round2(Number(selected?.amount ?? fallback)||0);
+}
+function u3OccurrenceDates(item, month){
+  const bounds = u3MonthBounds(month);
+  const start = u3ParseDate(item?.begindatum);
+  if (!bounds || !start || item?.actief === false) return [];
+  const end = item?.einddatum ? u3ParseDate(item.einddatum) : null;
+  const amount = Math.max(1,Math.floor(Number(item.frequentieAantal)||1));
+  const unit = U3_FREQUENCY_UNITS.includes(item.frequentieEenheid) ? item.frequentieEenheid : 'maanden';
+  const dates = [];
+  if (unit === 'weken'){
+    const stepMs = amount*7*86400000;
+    let index = Math.max(0,Math.floor((bounds.start-start)/stepMs)-1);
+    for (let guard=0; guard<64; guard++,index++){
+      const date = new Date(start.getTime()+index*stepMs);
+      if (date > bounds.end) break;
+      if (date >= bounds.start && date >= start && (!end || date <= end)) dates.push(u3IsoDate(date));
+    }
+  }else{
+    const multiplier = unit === 'jaren' ? 12*amount : amount;
+    const monthDistance = (bounds.start.getFullYear()-start.getFullYear())*12 + bounds.start.getMonth()-start.getMonth();
+    let index = Math.max(0,Math.floor(monthDistance/multiplier)-1);
+    for (let guard=0; guard<8; guard++,index++){
+      const date = unit === 'jaren' ? u3AddAnchoredYears(start,index*amount) : u3AddAnchoredMonths(start,index*amount);
+      if (date > bounds.end) break;
+      if (date >= bounds.start && date >= start && (!end || date <= end)) dates.push(u3IsoDate(date));
+    }
+  }
+  return dates;
+}
+function u3MonthlyAverage(item){
+  const amount = Math.abs(u3AmountAt(item,getSelectedMonth()));
+  const count = Math.max(1,Number(item?.frequentieAantal)||1);
+  if (item?.frequentieEenheid === 'weken') return round2(amount*(365.2425/12)/(7*count));
+  if (item?.frequentieEenheid === 'jaren') return round2(amount/(12*count));
+  return round2(amount/count);
+}
+function u3OccurrenceId(itemId,date){ return `${itemId}:${date}`; }
+function u3PlannedOccurrences(items,month){
+  return (items||[]).flatMap(item=>u3OccurrenceDates(item,month).map(date=>({
+    id:u3OccurrenceId(item.id,date),itemId:item.id,date,month:String(date).slice(0,7),
+    naam:item.naam,categorie:item.categorie||'',account:item.rekening||item.account||'gezamenlijk',
+    financialFor:item.financialFor||item.eigenaar||item.rekening||'gezamenlijk',
+    amount:u3AmountAt(item,date),source:item
+  })));
+}
+function u3RecognitionFromLegacy(rule){
+  return {
+    id:rule.id||`recognition-${bankText(rule.match||rule.description||uid())}`,
+    text:String(rule.text||rule.match||''),counterparty:String(rule.counterparty||''),
+    account:U3_ACCOUNTS.includes(rule.account)?rule.account:'',
+    category:String(rule.category||'Overig'),fixedExpenseId:rule.fixedExpenseId||'',
+    incomeSourceId:rule.incomeSourceId||'',financialFor:U3_ACCOUNTS.includes(rule.financialFor)?rule.financialFor:'',
+    amount:Number.isFinite(Number(rule.amount))?round2(Number(rule.amount)):null,
+    tolerance:Number.isFinite(Number(rule.tolerance))?Math.max(0,round2(Number(rule.tolerance))):5,
+    updatedAt:rule.updatedAt||new Date().toISOString()
+  };
+}
+function u3LegacyStartMonth(target){
+  const keys = [
+    ...Object.keys(target?.monthlyIncome||{}),
+    ...Object.keys(target?.monthlyBudgets||{}),
+    String(target?.meta?.selectedMonth||'')
+  ].filter(key=>/^\d{4}-\d{2}$/.test(key)).sort();
+  return `${keys[0]||monthKey()}-01`;
+}
+function u3MigrateFixedExpenses(target){
+  target.recurringFixedExpenses = isPlainObject(target.recurringFixedExpenses) ? target.recurringFixedExpenses : {};
+  const start = u3LegacyStartMonth(target);
+  ['voor','na'].forEach(scenario=>{
+    const existing = Array.isArray(target.recurringFixedExpenses[scenario]) ? target.recurringFixedExpenses[scenario] : [];
+    const ids = new Set(existing.map(item=>item.legacyKey).filter(Boolean));
+    U3_ACCOUNTS.forEach(account=>{
+      const groups = [{kind:'vasteLasten',rows:target?.[scenario]?.[account]?.vasteLasten||[]}];
+      if (scenario === 'na' && account === 'gezamenlijk') groups.push({kind:'hypotheek',rows:target?.na?.gezamenlijk?.hypotheek||[]});
+      groups.forEach(group=>group.rows.forEach(row=>{
+        const legacyKey = `${scenario}:${account}:${group.kind}:${row.id}`;
+        if (ids.has(legacyKey)) return;
+        existing.push({
+          id:`fixed-${scenario}-${account}-${row.id}`,legacyKey,naam:String(row.post||row.omschrijving||row.categorie||'Vaste last'),
+          categorie:String(row.categorie||'Overig'),bedrag:round2(Number(row.bedrag)||0),rekening:account,
+          frequentieAantal:row.jaarlijks?1:1,frequentieEenheid:row.jaarlijks?'jaren':'maanden',
+          begindatum:start,einddatum:'',actief:true,amountHistory:[{id:`amount-${row.id}`,effectiveFrom:start,amount:round2(Number(row.bedrag)||0)}],
+          monthOverrides:{},recognition:{text:bankText(row.post||row.omschrijving||''),counterparty:'',amountTolerance:5},legacyKind:group.kind
+        });
+        ids.add(legacyKey);
+      }));
+    });
+    target.recurringFixedExpenses[scenario] = existing;
+  });
+}
+function u3MigrateIncomeSources(target){
+  target.recurringIncomeSources = Array.isArray(target.recurringIncomeSources) ? target.recurringIncomeSources : [];
+  const existingIds = new Set(target.recurringIncomeSources.map(item=>item.id));
+  const start = u3LegacyStartMonth(target);
+  ['dion','dara'].forEach(owner=>{
+    const salaryId = `income-loon-${owner}`;
+    if (!existingIds.has(salaryId)){
+      const base = round2(Number(target?.personen?.[owner]?.salaris)||0);
+      const source = {id:salaryId,naam:`Loon ${owner==='dion'?'Dion':'Dara'}`,type:'loon',eigenaar:owner,rekening:'gezamenlijk',financialFor:'gezamenlijk',verwachtBedrag:base,meetellenVoorVerdeling:true,frequentieAantal:1,frequentieEenheid:'maanden',begindatum:start,einddatum:'',actief:true,amountHistory:[{id:`amount-${salaryId}`,effectiveFrom:start,amount:base}],monthOverrides:{},recognition:{text:'',counterparty:'',amountTolerance:100},legacyKind:'salary'};
+      Object.entries(target.monthlyIncome||{}).forEach(([month,data])=>{
+        const value = Number(data?.[owner]);
+        if (Number.isFinite(value) && value !== 0 && round2(value)!==base) source.monthOverrides[month]=round2(value);
+      });
+      target.recurringIncomeSources.push(source); existingIds.add(salaryId);
+    }
+    (target?.personen?.[owner]?.vasteTeruggaven||[]).forEach(row=>{
+      const id=`income-refund-${owner}-${row.id}`;
+      if (existingIds.has(id)) return;
+      const amount=round2(Number(row.bedrag)||0);
+      target.recurringIncomeSources.push({id,naam:String(row.omschrijving||'Vaste vergoeding'),type:'vergoeding/teruggave',eigenaar:owner,rekening:'gezamenlijk',financialFor:'gezamenlijk',verwachtBedrag:amount,meetellenVoorVerdeling:true,frequentieAantal:1,frequentieEenheid:'maanden',begindatum:start,einddatum:'',actief:true,amountHistory:[{id:`amount-${id}`,effectiveFrom:start,amount}],monthOverrides:{},recognition:{text:bankText(row.omschrijving||''),counterparty:'',amountTolerance:10},legacyKind:'fixed-refund'});
+      existingIds.add(id);
+    });
+  });
+}
+function u3NormalizeRecurringItem(item,kind){
+  item.id=item.id||uid();
+  item.naam=String(item.naam||'');
+  item.rekening=U3_ACCOUNTS.includes(item.rekening)?item.rekening:'gezamenlijk';
+  item.frequentieAantal=Math.max(1,Math.floor(Number(item.frequentieAantal)||1));
+  item.frequentieEenheid=U3_FREQUENCY_UNITS.includes(item.frequentieEenheid)?item.frequentieEenheid:'maanden';
+  item.begindatum=u3ParseDate(item.begindatum)?item.begindatum:`${monthKey()}-01`;
+  item.einddatum=u3ParseDate(item.einddatum)?item.einddatum:'';
+  item.actief=item.actief!==false;
+  item.amountHistory=Array.isArray(item.amountHistory)?item.amountHistory.filter(isPlainObject):[];
+  if(!item.amountHistory.length){
+    const amount=round2(Number(kind==='income'?item.verwachtBedrag:item.bedrag)||0);
+    item.amountHistory=[{id:`amount-${item.id}`,effectiveFrom:item.begindatum,amount}];
+  }
+  item.monthOverrides=isPlainObject(item.monthOverrides)?item.monthOverrides:{};
+  item.recognition=isPlainObject(item.recognition)?item.recognition:{text:'',counterparty:'',amountTolerance:5};
+  if(kind==='income'){
+    item.type=['loon','toeslag','vergoeding/teruggave','overig'].includes(item.type)?item.type:'overig';
+    item.eigenaar=U3_ACCOUNTS.includes(String(item.eigenaar).toLowerCase())?String(item.eigenaar).toLowerCase():'gezamenlijk';
+    item.financialFor=U3_ACCOUNTS.includes(item.financialFor)?item.financialFor:item.rekening;
+    item.meetellenVoorVerdeling=!!item.meetellenVoorVerdeling;
+    item.verwachtBedrag=round2(Number(item.verwachtBedrag)||0);
+  }else{
+    item.categorie=String(item.categorie||'Overig');
+    item.bedrag=round2(Number(item.bedrag)||0);
+    item.financialFor=U3_ACCOUNTS.includes(item.financialFor)?item.financialFor:item.rekening;
+  }
+  return item;
+}
+function u3NormalizeState(target){
+  target.meta=isPlainObject(target.meta)?target.meta:{};
+  u3MigrateFixedExpenses(target);
+  u3MigrateIncomeSources(target);
+  ['voor','na'].forEach(scenario=>{
+    target.recurringFixedExpenses[scenario]=(target.recurringFixedExpenses[scenario]||[]).filter(isPlainObject).map(item=>u3NormalizeRecurringItem(item,'fixed'));
+  });
+  target.recurringIncomeSources=target.recurringIncomeSources.filter(isPlainObject).map(item=>u3NormalizeRecurringItem(item,'income'));
+  target.transactionReviewQueue=Array.isArray(target.transactionReviewQueue)?target.transactionReviewQueue.filter(isPlainObject):[];
+  target.recognitionRules=Array.isArray(target.recognitionRules)?target.recognitionRules.filter(isPlainObject).map(u3RecognitionFromLegacy):[];
+  (target.bankImportRules||[]).forEach(rule=>{
+    const normalized=u3RecognitionFromLegacy(rule);
+    if(normalized.text && !target.recognitionRules.some(item=>item.text===normalized.text && item.account===normalized.account)) target.recognitionRules.push(normalized);
+  });
+  target.monthRecords=isPlainObject(target.monthRecords)?target.monthRecords:{};
+  target.accountSettings=isPlainObject(target.accountSettings)?target.accountSettings:{};
+  U3_ACCOUNTS.forEach(account=>{
+    const row=isPlainObject(target.accountSettings[account])?target.accountSettings[account]:{};
+    target.accountSettings[account]={openingBalance:round2(Number(row.openingBalance)||0),effectiveMonth:/^\d{4}-\d{2}$/.test(row.effectiveMonth)?row.effectiveMonth:String(target.meta.selectedMonth||monthKey()),openingBalanceSet:row.openingBalanceSet===true};
+  });
+  ['reserveLedger','advanceLedger','internalTransfers','monthCorrections'].forEach(key=>{target[key]=Array.isArray(target[key])?target[key].filter(isPlainObject):[];});
+  target.transactions=Array.isArray(target.transactions)?target.transactions:[];
+  target.transactions.forEach(tx=>{
+    tx.reviewStatus=tx.reviewStatus||'bevestigd';
+    tx.account=U3_ACCOUNTS.includes(tx.account)?tx.account:(U3_ACCOUNTS.includes(tx.owner)?tx.owner:'gezamenlijk');
+    tx.financialFor=U3_ACCOUNTS.includes(tx.financialFor)?tx.financialFor:tx.account;
+    tx.owner=tx.financialFor;
+    tx.fixedExpenseId=tx.fixedExpenseId||'';
+    tx.fixedOccurrenceId=tx.fixedOccurrenceId||'';
+    tx.incomeSourceId=tx.incomeSourceId||'';
+    tx.incomeOccurrenceId=tx.incomeOccurrenceId||'';
+  });
+  Object.entries(target.monthRecords).forEach(([month,record])=>{
+    if(!isPlainObject(record)){delete target.monthRecords[month];return;}
+    record.month=month; record.status=['afgesloten','correctie-nodig'].includes(record.status)?record.status:'open';
+    record.closedAt=record.closedAt||''; record.reopenedAt=record.reopenedAt||'';
+    record.closureHistory=Array.isArray(record.closureHistory)?record.closureHistory.filter(isPlainObject):[];
+    record.activeClosureId=record.activeClosureId||'';
+  });
+  target.meta.schemaVersion=U3_SCHEMA_VERSION;
+  return target;
+}
+
 function normalizeBudgetState(candidate){
   const normalized = candidate || defaultState();
   normalized.meta = isPlainObject(normalized.meta) ? normalized.meta : {};
   normalized.meta.scenario = ['voor','na'].includes(normalized.meta.scenario) ? normalized.meta.scenario : 'voor';
   normalized.meta.selectedMonth = normalized.meta.selectedMonth || monthKey();
-  normalized.meta.schemaVersion = Number(normalized.meta.schemaVersion) || 3;
+  normalized.meta.schemaVersion = Number(normalized.meta.schemaVersion) || U3_SCHEMA_VERSION;
   normalized.meta.revision = Math.max(0, Number(normalized.meta.revision) || 0);
   normalized.meta.updatedAt = normalized.meta.updatedAt || '';
   normalized.meta.updatedBy = normalized.meta.updatedBy || getDeviceId();
@@ -7559,6 +7839,7 @@ function normalizeBudgetState(candidate){
   normalized.transactions = Array.isArray(normalized.transactions) ? normalized.transactions : [];
   normalized.bankImportRules = Array.isArray(normalized.bankImportRules) ? normalized.bankImportRules : [];
   normalizePersonDefaults(normalized);
+  u3NormalizeState(normalized);
   state = normalized;
   ensureMonthData(normalized.meta.selectedMonth);
   normalizeGoalDefaults();
@@ -8017,7 +8298,8 @@ function bankSuggestedCategory(description, owner){
   return categories.find(category=>category.toLocaleLowerCase() === String(rule?.category || '').toLocaleLowerCase()) || 'Overig';
 }
 function bankIsDuplicate(row){
-  return (state.transactions || []).some(tx=>tx.owner === row.owner && tx.date === row.date && Math.abs((Number(tx.amount)||0) - Math.abs(row.amount)) < .005 && bankText(tx.description) === bankText(row.description));
+  const matches=tx=>(tx.account||tx.owner)===row.owner&&tx.date===row.date&&Math.abs((Number(tx.amount)||0)-Math.abs(row.amount))<.005&&bankText(tx.description)===bankText(row.description);
+  return (state.transactions||[]).some(matches)||(state.transactionReviewQueue||[]).some(item=>(item.reviewStatus||'te-controleren')!=='genegeerd'&&matches(item));
 }
 function bankParseDraft(){
   if (!bankImportDraft) return;
@@ -8250,7 +8532,7 @@ function defaultState(){
   const blankGoal = (naam, rendement=0.0125) => ({ id:uid(), naam, doelbedrag:0, algespaard:0, doeldatum:'', vasteInleg:0, rendement, rendementPeriode:'jaarlijks', favoriet:false });
 
   return {
-    meta: { scenario:'voor', selectedMonth: monthKey(), schemaVersion:3, revision:0, updatedAt:'', updatedBy:getDeviceId() },
+    meta: { scenario:'voor', selectedMonth: monthKey(), schemaVersion:5, revision:0, updatedAt:'', updatedBy:getDeviceId() },
     personen: {
       dion: { naam:'Dion', salaris:2450, vasteTeruggaven: [] },
       dara: { naam:'Dara', salaris:3010, vasteTeruggaven: [] },
@@ -8387,13 +8669,23 @@ function defaultState(){
     monthlyBudgets: {},
     transactions: [],
     bankImportRules: [],
+    recurringFixedExpenses: {voor:[],na:[]},
+    recurringIncomeSources: [],
+    transactionReviewQueue: [],
+    recognitionRules: [],
+    monthRecords: {},
+    accountSettings: {},
+    reserveLedger: [],
+    advanceLedger: [],
+    internalTransfers: [],
+    monthCorrections: [],
   };
 }
 
 /* ---------- opslag: lokaal + optionele Firebase/Firestore-sync ---------- */
 const STORAGE_KEY = 'finize-budget-planner-v1';
 const BACKUP_STORAGE_KEY = 'finize-budget-planner-v1-last-good-backup';
-const MIGRATION_BACKUP_STORAGE_KEY = 'finize-budget-planner-v1-pre-schema-v3';
+const MIGRATION_BACKUP_STORAGE_KEY = 'finize-budget-planner-v1-pre-schema-v5';
 const DEVICE_ID_STORAGE_KEY = 'finize-device-id';
 const FIREBASE_CONFIG_STORAGE_KEY = 'finize-firebase-config';
 const FIREBASE_SDK_VERSION = '11.10.0';
@@ -8569,6 +8861,15 @@ function ensurePersistentIds(target){
   });
   ensureRowIds(target?.transactions);
   ['gezamenlijk','dion','dara'].forEach(owner=>ensureRowIds(target?.spaardoelen?.[owner]));
+  ['voor','na'].forEach(scenario=>ensureRowIds(target?.recurringFixedExpenses?.[scenario]));
+  ensureRowIds(target?.recurringIncomeSources);
+  ensureRowIds(target?.transactionReviewQueue);
+  ensureRowIds(target?.recognitionRules);
+  ensureRowIds(target?.reserveLedger);
+  ensureRowIds(target?.advanceLedger);
+  ensureRowIds(target?.internalTransfers);
+  ensureRowIds(target?.monthCorrections);
+  Object.values(target?.monthRecords||{}).forEach(record=>ensureRowIds(record?.closureHistory));
 }
 
 function migrateBudgetState(candidate){
@@ -8576,7 +8877,7 @@ function migrateBudgetState(candidate){
   const activeStateBeforeMigration = typeof state === 'undefined' ? null : state;
   try{
     const fromVersion = Number(candidate?.meta?.schemaVersion) || 1;
-    if (fromVersion < 3){
+    if (fromVersion < U3_SCHEMA_VERSION){
       localStorage.setItem(MIGRATION_BACKUP_STORAGE_KEY, JSON.stringify({
         savedAt:new Date().toISOString(),
         fromVersion,
@@ -8584,7 +8885,7 @@ function migrateBudgetState(candidate){
       }));
     }
     const migrated = normalizeBudgetState(candidate);
-    migrated.meta.schemaVersion = 3;
+    migrated.meta.schemaVersion = U3_SCHEMA_VERSION;
     ensurePersistentIds(migrated);
     const validation = validateBudgetState(migrated);
     if (!validation.ok) throw new Error(validation.errors.join(' '));
@@ -8684,6 +8985,17 @@ function validateBudgetState(candidate){
   if (candidate.transactions !== undefined){
     validateRows(candidate.transactions, 'transactions', errors);
   }
+  if (!isPlainObject(candidate.recurringFixedExpenses)) errors.push('recurringFixedExpenses moet een object zijn.');
+  else ['voor','na'].forEach(scenario=>validateRows(candidate.recurringFixedExpenses[scenario],`recurringFixedExpenses.${scenario}`,errors));
+  validateRows(candidate.recurringIncomeSources,'recurringIncomeSources',errors);
+  validateRows(candidate.transactionReviewQueue,'transactionReviewQueue',errors);
+  validateRows(candidate.recognitionRules,'recognitionRules',errors);
+  validateRows(candidate.reserveLedger,'reserveLedger',errors);
+  validateRows(candidate.advanceLedger,'advanceLedger',errors);
+  validateRows(candidate.internalTransfers,'internalTransfers',errors);
+  validateRows(candidate.monthCorrections,'monthCorrections',errors);
+  if (!isPlainObject(candidate.monthRecords)) errors.push('monthRecords moet een object zijn.');
+  if (!isPlainObject(candidate.accountSettings)) errors.push('accountSettings moet een object zijn.');
   if (candidate.spaardoelGeschiedenis !== undefined){
     if (!isPlainObject(candidate.spaardoelGeschiedenis)) errors.push('spaardoelGeschiedenis moet een object zijn.');
     else Object.entries(candidate.spaardoelGeschiedenis).forEach(([key,entry])=>{
@@ -8813,7 +9125,15 @@ const CloudAdapter = {
         return;
       }
       const remote = snap.data().state;
-      const validation = validateBudgetState(remote);
+      let normalizedRemote;
+      try{ normalizedRemote = migrateBudgetState(remote); }
+      catch(error){
+        console.error('Firestore-data kon niet worden gemigreerd', error);
+        this.status = 'Synchronisatie mislukt';
+        renderCloudStatus();
+        return;
+      }
+      const validation = validateBudgetState(normalizedRemote);
       if (!validation.ok){
         console.error('Firestore-data ongeldig', validation.errors);
         this.status = 'Synchronisatie mislukt';
@@ -8821,7 +9141,6 @@ const CloudAdapter = {
         return;
       }
       const previousState = state;
-      const normalizedRemote = migrateBudgetState(remote);
       const remoteRevision = Number(normalizedRemote.meta?.revision) || 0;
       const localRevision = Number(previousState.meta?.revision) || 0;
       const sameCommit = remoteRevision === localRevision
@@ -8842,6 +9161,7 @@ const CloudAdapter = {
       this.applyingRemote = true;
       state = normalizedRemote;
       window.state = state;
+      committedStateSnapshot = clone(state);
       try{
         await GoalImageStore.initializeState(state);
         localSave(state);
@@ -8959,12 +9279,13 @@ const DataAdapter = {
       if (!raw) return null;
       this.loadedFromStorage = true;
       const parsed = JSON.parse(raw);
-      const validation = validateBudgetState(parsed);
+      const migrated = migrateBudgetState(parsed);
+      const validation = validateBudgetState(migrated);
       if (!validation.ok){
         console.error('opgeslagen data ongeldig', validation.errors);
         return null;
       }
-      return migrateBudgetState(parsed);
+      return migrated;
     }catch(e){ console.error('laden mislukt', e); return null; }
   },
   backup(state, reason){
@@ -8987,30 +9308,52 @@ const DataAdapter = {
 };
 
 var state = null;
-state = DataAdapter.load() || migrateBudgetState(defaultState());
+try{
+  state = DataAdapter.load() || migrateBudgetState(defaultState());
+}catch(error){
+  window.__finizeInitError = {
+    message: String(error?.message || error),
+    stack: String(error?.stack || '')
+  };
+  console.error('Finize initialisatie mislukt', error);
+  throw error;
+}
 window.state = state;
+var committedStateSnapshot = clone(state);
 let activeTab = 'dashboard';
 const TODAY = new Date();
 
 function commitChange(change, options={}){
-  const before = clone(state);
+  const before = clone(committedStateSnapshot||state);
   try{
     if (typeof change === 'function') change(state);
     else if (typeof change?.apply === 'function') change.apply(state);
+    Object.entries(before.monthRecords||{}).forEach(([month,record])=>{
+      if(record?.status!=='afgesloten'||state.monthRecords?.[month]?.status!=='afgesloten')return;
+      const monthData=snapshot=>({
+        transactions:(snapshot.transactions||[]).filter(tx=>transactionMonth(tx)===month),
+        income:snapshot.monthlyIncome?.[month]||null,
+        budgets:snapshot.monthlyBudgets?.[month]||null,
+        refunds:snapshot.monthlyTeruggaven?.[month]||null
+      });
+      if(JSON.stringify(monthData(before))!==JSON.stringify(monthData(state)))throw new Error(`${monthLabel(month)} is afgesloten. Heropen de maand voordat je financiële gegevens wijzigt.`);
+    });
     ensurePersistentIds(state);
     state.meta = isPlainObject(state.meta) ? state.meta : {};
-    state.meta.schemaVersion = 3;
+    state.meta.schemaVersion = U3_SCHEMA_VERSION;
     state.meta.revision = Math.max(0, Number(state.meta.revision)||0) + 1;
     state.meta.updatedAt = new Date().toISOString();
     state.meta.updatedBy = getDeviceId();
     const validation = validateBudgetState(state);
     if (!validation.ok) throw new Error(validation.errors.join(' '));
     if (!DataAdapter.save(state)) throw new Error('Lokale opslag is mislukt.');
+    committedStateSnapshot = clone(state);
     if (options.render !== false) renderCloudStatus();
     return true;
   }catch(e){
     state = before;
     window.state = state;
+    committedStateSnapshot = clone(before);
     CloudAdapter.status = 'Synchronisatie mislukt';
     renderCloudStatus();
     console.error('Wijziging opslaan mislukt', e);
@@ -9584,7 +9927,8 @@ function renderDashboard(){
       <div class="card span-6 dashboard-goals-preview v4-mobile-only-block">${renderDashboardCardHead('Spaardoelen preview', '', 'blue')}${goalCardsMobile || '<p class="hint">Nog geen spaardoelen.</p>'}<button type="button" class="goals-preview-link" data-tab-shortcut="spaardoelen"><span>Alle spaardoelen</span><strong>›</strong></button></div>
     </div>
     <div class="manage-stack">
-      <div class="v4-mobile-only-block">${renderManageSection('Bank import & uitgaven', renderBankImportSection(), bankImportOpen)}</div>
+      ${renderU3AdminPanel()}
+      <div>${renderManageSection('Bank import & uitgaven', renderBankImportSection(), bankImportOpen)}</div>
       ${renderManageSection(`Jaaroverzicht ${year}`, `<div class="card"><div class="year-legend top"><span><i class="income-dot"></i>Inkomen</span><span><i class="spent-dot"></i>Uitgaven</span><span><i class="saving-dot"></i>Sparen</span></div><div class="year-summary"><div><span>Inkomen dit jaar</span><strong class="value pos">${eur(yearTotals.income)}</strong></div><div><span>Uitgaven dit jaar</span><strong class="value neg">${eur(yearTotals.spent)}</strong></div><div><span>Sparen dit jaar</span><strong class="value pos">${eur(yearTotals.saving)}</strong></div></div><div class="year-chart">${monthBars}</div></div>`, false)}
     </div>
   `;
@@ -10023,7 +10367,8 @@ service cloud.firestore {
     reader.onload = async (ev)=>{
       try{
         const imported = JSON.parse(ev.target.result);
-        const validation = validateBudgetState(imported);
+        const migratedImport = migrateBudgetState(imported);
+        const validation = validateBudgetState(migratedImport);
         if (!validation.ok){
           alert('Deze back-up is niet geimporteerd:\n\n' + validation.errors.slice(0,6).join('\n'));
           e.target.value = '';
@@ -10035,7 +10380,7 @@ service cloud.firestore {
         }
         DataAdapter.backup(state, 'voor import van ' + file.name);
         DataAdapter.backup(state, 'voor JSON-import');
-        state = migrateBudgetState(imported); window.state = state;
+        state = migratedImport; window.state = state; committedStateSnapshot = clone(state);
         await GoalImageStore.initializeState(state);
         commitChange(()=>{}, {render:false});
         renderActiveTab();
@@ -10051,7 +10396,8 @@ service cloud.firestore {
       alert('Er is nog geen lokale nood-back-up gevonden.');
       return;
     }
-    const validation = validateBudgetState(backup.state);
+    const migratedBackup = migrateBudgetState(backup.state);
+    const validation = validateBudgetState(migratedBackup);
     if (!validation.ok){
       alert('De lokale nood-back-up is ongeldig:\n\n' + validation.errors.slice(0,6).join('\n'));
       return;
@@ -10060,7 +10406,7 @@ service cloud.firestore {
     if (confirm('Laatste lokale nood-back-up herstellen van ' + label + '? De huidige stand wordt eerst opnieuw als nood-back-up bewaard.')){
       DataAdapter.backup(state, 'voor herstel lokale nood-back-up');
       DataAdapter.backup(state, 'voor herstel lokale back-up');
-      state = migrateBudgetState(backup.state); window.state = state;
+      state = migratedBackup; window.state = state; committedStateSnapshot = clone(state);
       await GoalImageStore.initializeState(state);
       commitChange(()=>{}, {render:false});
       renderActiveTab();
@@ -10069,7 +10415,7 @@ service cloud.firestore {
   document.getElementById('btnReset').addEventListener('click', ()=>{
     if (confirm('Weet je zeker dat je alle gegevens wilt wissen en opnieuw wilt beginnen? De huidige stand wordt eerst als lokale nood-back-up bewaard.')){
       DataAdapter.backup(state, 'voor alles wissen');
-      state = normalizeBudgetState(defaultState()); window.state = state;
+      state = normalizeBudgetState(defaultState()); window.state = state; committedStateSnapshot = clone(state);
       persist();
       renderActiveTab();
     }
@@ -10214,9 +10560,9 @@ function openGeneralTransactionModal(){
   const ownerOptions = [['gezamenlijk','Gezamenlijk'],['dion','Dion'],['dara','Dara']];
   const categoryOptions = owner=>bankOwnerCategories(owner).map(category=>`<option value="${textSafe(category)}">${textSafe(category)}</option>`).join('');
   modal.innerHTML = `<div class="modal joint-transaction-fullscreen-editor general-transaction-editor">
-    <div class="card-head"><h2>Uitgave invullen</h2><button class="danger-ghost" id="btnCloseGeneralTransaction" aria-label="Sluiten">×</button></div>
-    <div class="modal-grid"><label>Bedrag<input id="generalTxAmount" type="number" step="0.01" inputmode="decimal" placeholder="0,00"></label><label>Datum<input id="generalTxDate" type="date" value="${today}"></label><label class="full">Omschrijving<input id="generalTxDescription" type="text" placeholder="Bijvoorbeeld Albert Heijn"></label><label>Rekening<select id="generalTxOwner">${ownerOptions.map(([value,label])=>`<option value="${value}">${label}</option>`).join('')}</select></label><label>Categorie<select id="generalTxCategory">${categoryOptions('gezamenlijk')}</select></label><label class="full">Notitie<input id="generalTxNote" type="text" placeholder="Optioneel"></label></div>
-    <div class="modal-actions"><button class="ghost" id="btnCancelGeneralTransaction">Annuleren</button><button class="primary" id="btnSaveGeneralTransaction">Uitgave opslaan</button></div>
+    <div class="card-head"><h2>Transactie invullen</h2><button class="danger-ghost" id="btnCloseGeneralTransaction" aria-label="Sluiten">×</button></div>
+    <div class="modal-grid"><label>Soort<select id="generalTxKind"><option value="uitgave">Uitgave</option><option value="inkomen">Inkomen</option></select></label><label>Bedrag<input id="generalTxAmount" type="number" step="0.01" inputmode="decimal" placeholder="0,00"></label><label>Datum<input id="generalTxDate" type="date" value="${today}"></label><label class="full">Omschrijving<input id="generalTxDescription" type="text" placeholder="Bijvoorbeeld Albert Heijn"></label><label>Fysieke rekening<select id="generalTxOwner">${ownerOptions.map(([value,label])=>`<option value="${value}">${label}</option>`).join('')}</select></label><label>Financieel voor<select id="generalTxFinancialFor">${ownerOptions.map(([value,label])=>`<option value="${value}">${label}</option>`).join('')}</select></label><label>Categorie<select id="generalTxCategory">${categoryOptions('gezamenlijk')}</select></label><label class="full">Notitie<input id="generalTxNote" type="text" placeholder="Optioneel"></label></div>
+    <div class="modal-actions"><button class="ghost" id="btnCancelGeneralTransaction">Annuleren</button><button class="primary" id="btnSaveGeneralTransaction">Transactie opslaan</button></div>
   </div>`;
   modal.classList.add('open','joint-transaction-modal-open');
   const close = ()=>modal.classList.remove('open','joint-transaction-modal-open');
@@ -10229,10 +10575,13 @@ function openGeneralTransactionModal(){
     const amount = bankAmount(document.getElementById('generalTxAmount').value);
     if (!Number.isFinite(amount) || amount <= 0){ alert('Vul een geldig bedrag in.'); return; }
     const owner = document.getElementById('generalTxOwner').value;
+    const financialFor = document.getElementById('generalTxFinancialFor').value;
     const category = document.getElementById('generalTxCategory').value;
     saveButton.disabled = true;
-    const next = {id:uid(),date:document.getElementById('generalTxDate').value || today,owner,category,description:document.getElementById('generalTxDescription').value.trim(),amount:round2(amount),note:document.getElementById('generalTxNote').value.trim(),kind:String(category).toLocaleLowerCase() === 'vaste lasten' ? 'vaste-last' : 'uitgave'};
-    if (!commitChange(()=>state.transactions.push(next), {render:false})){ saveButton.disabled = false; return; }
+    const selectedKind = document.getElementById('generalTxKind').value;
+    const next = {id:uid(),date:document.getElementById('generalTxDate').value || today,owner:financialFor,account:owner,financialFor,reviewStatus:'bevestigd',category,description:document.getElementById('generalTxDescription').value.trim(),amount:round2(amount),note:document.getElementById('generalTxNote').value.trim(),kind:selectedKind==='inkomen'?'inkomen':(String(category).toLocaleLowerCase() === 'vaste lasten' ? 'vaste-last' : 'uitgave')};
+    try{u3AssertMonthOpen(transactionMonth(next));}catch(error){alert(error.message);saveButton.disabled=false;return;}
+    if (!commitChange(()=>{state.transactions.push(next);u3CreateAdvanceForTransaction(next);u3RememberRecognition(next);}, {render:false})){ saveButton.disabled = false; return; }
     close(); renderActiveTab();
   });
 }
@@ -10248,20 +10597,17 @@ function bankImportRows(indexes){
   const wanted = new Set(indexes);
   const rows = bankImportDraft.rows.filter(row=>wanted.has(row.index) && row.selected && !row.duplicate && row.valid);
   rows.forEach(row=>{
-    if (row.positive){
-      const month = transactionMonth({date:row.date}) || getSelectedMonth();
-      ensureMonthData(month);
-      state.monthlyTeruggaven[month][row.owner].push({id:uid(),omschrijving:row.description,bedrag:round2(Math.abs(row.amount))});
-    } else {
-      const isFixed = String(row.category).toLocaleLowerCase() === 'vaste lasten';
-      state.transactions.push({id:uid(),date:row.date,owner:row.owner,category:row.category,description:row.description,amount:round2(Math.abs(row.amount)),note:'',kind:isFixed ? 'vaste-last' : 'uitgave'});
-      bankRememberCategory(row.description,row.category);
+    const signature=`${bankImportDraft.fileName}|${row.index}|${row.date}|${row.owner}|${round2(row.amount)}|${bankText(row.description)}`;
+    const id=`review-${signature}`.replace(/[^a-zA-Z0-9_-]/g,'-').slice(0,220);
+    if(!(state.transactionReviewQueue||[]).some(item=>item.id===id)){
+      const suggestion=u3SuggestedRecognition(row.description,row.owner,Math.abs(row.amount));
+      state.transactionReviewQueue.push({id,date:row.date,account:row.owner,financialFor:suggestion?.financialFor||row.owner,owner:suggestion?.financialFor||row.owner,category:suggestion?.category||row.category,description:row.description,amount:round2(Math.abs(row.amount)),note:'',kind:row.positive?'inkomen':(String(row.category).toLocaleLowerCase()==='vaste lasten'?'vaste-last':'uitgave'),reviewStatus:'te-controleren',importedAt:new Date().toISOString(),sourceFile:bankImportDraft.fileName,rawData:{index:row.index,cells:bankImportDraft.rawRows[row.index]||[]}});
     }
     row.imported = true; row.selected = false;
   });
   if (!rows.length) return;
   persist();
-  showQuickToast(`${rows.length} regel${rows.length === 1 ? '' : 's'} geimporteerd`);
+  showQuickToast(`${rows.length} regel${rows.length === 1 ? '' : 's'} in de controlewachtrij gezet`);
   bankImportDraft = null;
   renderActiveTab();
 }
@@ -11054,17 +11400,7 @@ function renderJointFirstRow(){
     <div class="card joint-two-column-card joint-variable-overview-card">${renderJointVariableCostsCardHead()}<div class="joint-variable-overview-list">${variableRows.join('') || '<p class="hint" style="margin:0">Nog geen variabele budgetten.</p>'}</div></div>
     ${renderJointTransactionsCard()}
   </div>
-  ${renderJointSavingsOverviewCard()}
-  <div class="joint-accordion-stack v4-mobile-only-block" aria-label="Gezamenlijk accordion kolommen">
-    <details class="card joint-accordion-card">
-      <summary><span></span><span class="joint-accordion-chevron" aria-hidden="true"></span></summary>
-      <div class="joint-accordion-body"></div>
-    </details>
-    <details class="card joint-accordion-card">
-      <summary><span></span><span class="joint-accordion-chevron" aria-hidden="true"></span></summary>
-      <div class="joint-accordion-body"></div>
-    </details>
-  </div>`;
+  ${renderJointSavingsOverviewCard()}`;
 }
 
 function renderPersonalTransactionsCard(owner){
@@ -11177,7 +11513,10 @@ function renderActiveTab(){
   bindInputs(root);
   handleTableClicks(root);
   handleGoalClicks(root);
-  if (activeTab === 'dashboard') bindBankImport(root);
+  if (activeTab === 'dashboard'){
+    bindBankImport(root);
+    bindU3Admin(root);
+  }
   root.querySelectorAll('[data-tab-shortcut]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       activeTab = btn.dataset.tabShortcut;
@@ -11351,7 +11690,7 @@ document.getElementById('btnCopyPreviousMonth').addEventListener('click', ()=>{
 });
 
 /* ---------- Update 2: slimme spaardoelenplanner ---------- */
-const U2_SCHEMA_VERSION = 3;
+const U2_SCHEMA_VERSION = 4;
 const U2_OWNERS = ['gezamenlijk','dion','dara'];
 
 function u2GoalTarget(goal){
@@ -11875,6 +12214,557 @@ openMobileGoalManager=function(owner){
   },0),true);
 };
 
+/* ---------- Update 3: rekenlaag en administratieve acties ---------- */
+function u3ConfirmedTransactions(month=getSelectedMonth()){
+  return (state.transactions||[]).filter(tx=>transactionMonth(tx)===month && (tx.reviewStatus||'bevestigd')==='bevestigd');
+}
+function u3IncomeOccurrences(month=getSelectedMonth()){
+  return u3PlannedOccurrences(state.recurringIncomeSources||[],month).map(row=>{
+    const source=(state.recurringIncomeSources||[]).find(item=>item.id===row.itemId);
+    return {...row,source,type:source?.type||'overig',owner:source?.eigenaar||'gezamenlijk',meetellenVoorVerdeling:!!source?.meetellenVoorVerdeling};
+  });
+}
+function u3FixedOccurrences(month=getSelectedMonth(),scenario=state.meta.scenario){
+  return u3PlannedOccurrences(state.recurringFixedExpenses?.[scenario]||[],month);
+}
+function u3LinkedActual(kind,occurrenceId,month=getSelectedMonth()){
+  const field=kind==='income'?'incomeOccurrenceId':'fixedOccurrenceId';
+  return u3ConfirmedTransactions(month).find(tx=>tx[field]===occurrenceId)||null;
+}
+function u3IncomeOccurrenceValue(occurrence){
+  const actual=u3LinkedActual('income',occurrence.id,occurrence.month);
+  return actual?round2(Math.abs(Number(actual.amount)||0)):round2(occurrence.amount);
+}
+function u3IncomeForOwner(owner,options={}){
+  const month=options.month||getSelectedMonth();
+  return round2(u3IncomeOccurrences(month)
+    .filter(row=>row.owner===owner && (options.type?row.type===options.type:true) && (options.distributionOnly?row.meetellenVoorVerdeling:true))
+    .reduce((sum,row)=>sum+u3IncomeOccurrenceValue(row),0));
+}
+function u3ActualIncome(month=getSelectedMonth(),financialFor=null){
+  const calculated=round2(u3ConfirmedTransactions(month).filter(tx=>tx.kind==='inkomen' && (!financialFor||(tx.financialFor||tx.owner)===financialFor)).reduce((sum,tx)=>sum+Math.abs(Number(tx.amount)||0),0));
+  const override=state.actualIncomeOverrides?.[month];
+  return !financialFor&&Number.isFinite(Number(override?.total))?round2(Number(override.total)):calculated;
+}
+function u3ActualExpenses(month=getSelectedMonth(),financialFor=null){
+  return round2(u3ConfirmedTransactions(month).filter(tx=>tx.kind!=='inkomen' && tx.kind!=='interne-overboeking' && tx.kind!=='niet-meetellen' && (!financialFor||(tx.financialFor||tx.owner)===financialFor)).reduce((sum,tx)=>sum+Number(tx.expenseImpact??Math.abs(Number(tx.amount)||0)),0));
+}
+function u3ExpectedIncome(month=getSelectedMonth(),financialFor=null){
+  return round2(u3IncomeOccurrences(month).filter(row=>!financialFor||row.financialFor===financialFor).reduce((sum,row)=>sum+Number(row.amount||0),0));
+}
+function u3PlannedFixedTotal(month=getSelectedMonth(),financialFor=null){
+  return round2(u3FixedOccurrences(month).filter(row=>!financialFor||row.financialFor===financialFor).reduce((sum,row)=>sum+Number(row.amount||0),0));
+}
+function u3VariableBudgets(owner,month=getSelectedMonth(),scenario=state.meta.scenario){
+  ensureMonthData(month);
+  const key=`${owner}Variabel`;
+  return state.monthlyBudgets?.[month]?.[scenario]?.[key]||[];
+}
+function u3BudgetSummary(owner,month=getSelectedMonth(),scenario=state.meta.scenario){
+  const budgets=u3VariableBudgets(owner,month,scenario);
+  const map=new Map();
+  const ensure=(label,budget=null)=>{
+    label=String(label||'Overig').trim()||'Overig';
+    const key=label.toLocaleLowerCase();
+    if(!map.has(key))map.set(key,{category:label,budget,actual:0});
+    else if(budget!==null&&map.get(key).budget===null)map.get(key).budget=0;
+    return map.get(key);
+  };
+  budgets.forEach(row=>{
+    const label=String(row.post||row.categorie||'Overig').trim()||'Overig';
+    const target=ensure(label,0);
+    target.budget=round2((target.budget||0)+(Number(row.bedrag)||0));
+  });
+  const linkedTransactionIds=new Set();
+  u3FixedOccurrences(month,scenario).filter(row=>row.financialFor===owner).forEach(occurrence=>{
+    const target=ensure(occurrence.categorie||'Vaste lasten',0);
+    target.budget=round2((target.budget||0)+(Number(occurrence.amount)||0));
+    const actual=u3LinkedActual('fixed',occurrence.id,month);
+    if(actual){target.actual=round2(target.actual+Number(actual.expenseImpact??Math.abs(Number(actual.amount)||0)));linkedTransactionIds.add(actual.id);}
+  });
+  u3ConfirmedTransactions(month).filter(tx=>tx.kind!=='inkomen'&&tx.kind!=='interne-overboeking'&&tx.kind!=='niet-meetellen'&&(tx.financialFor||tx.owner)===owner&&!linkedTransactionIds.has(tx.id)).forEach(tx=>{
+    const target=ensure(tx.category||'Overig',null);
+    target.actual=round2(target.actual+Number(tx.expenseImpact??Math.abs(Number(tx.amount)||0)));
+  });
+  return [...map.values()].map(row=>({...row,difference:round2((row.budget??0)-row.actual),status:row.budget===null?'geen-budget':row.actual>row.budget?'overschreden':'resterend'}));
+}
+function u3ReserveDelta(owner,month=getSelectedMonth(),scenario=state.meta.scenario){
+  return round2(u3BudgetSummary(owner,month,scenario).reduce((sum,row)=>sum+row.difference,0));
+}
+function u3ReserveBalance(owner,throughMonth='9999-12'){
+  return round2((state.reserveLedger||[]).filter(row=>row.owner===owner&&String(row.month||'')<=throughMonth&&row.status!=='vervallen').reduce((sum,row)=>sum+(Number(row.amount)||0),0));
+}
+function u3OpeningBalance(account,month){
+  const setting=state.accountSettings?.[account]||{openingBalance:0,effectiveMonth:month};
+  const previous=Object.values(state.monthRecords||{})
+    .filter(record=>record?.status==='afgesloten'&&record.month<month&&record.activeClosureId)
+    .sort((a,b)=>String(b.month).localeCompare(String(a.month)))[0];
+  const closure=previous?.closureHistory?.find(item=>item.id===previous.activeClosureId);
+  return round2(Number(closure?.accountControl?.[account]?.administrativeEnd ?? setting.openingBalance)||0);
+}
+function u3ConfirmedTransfersInCalendarMonth(account,month){
+  return (state.internalTransfers||[]).filter(row=>row.status==='uitgevoerd'&&String(row.date||'').slice(0,7)===month).reduce((sum,row)=>{
+    const amount=Number(row.actualAmount??row.calculatedAmount)||0;
+    if(row.sourceAccount===account) return sum-amount;
+    if(row.targetAccount===account) return sum+amount;
+    return sum;
+  },0);
+}
+function u3AccountControl(month=getSelectedMonth()){
+  const result={};
+  U3_ACCOUNTS.forEach(account=>{
+    const opening=u3OpeningBalance(account,month);
+    const transactionDelta=u3ConfirmedTransactions(month).reduce((sum,tx)=>{
+      if((tx.account||tx.owner)!==account)return sum;
+      if(Number.isFinite(Number(tx.accountDelta)))return sum+Number(tx.accountDelta);
+      const amount=Math.abs(Number(tx.amount)||0);
+      return sum+(tx.kind==='inkomen'?amount:-amount);
+    },0);
+    const transferDelta=u3ConfirmedTransfersInCalendarMonth(account,month);
+    const corrections=(state.monthCorrections||[]).filter(row=>row.account===account&&row.effectiveMonth===month&&row.status!=='vervallen').reduce((sum,row)=>sum+(Number(row.amount)||0),0);
+    result[account]={opening,transactionDelta:round2(transactionDelta),transferDelta:round2(transferDelta),corrections:round2(corrections),calculatedEnd:round2(opening+transactionDelta+transferDelta+corrections)};
+  });
+  return result;
+}
+function u3CreateAdvanceForTransaction(tx){
+  const account=tx.account||tx.owner;
+  const financialFor=tx.financialFor||tx.owner;
+  if(account===financialFor||!U3_ACCOUNTS.includes(account)||!U3_ACCOUNTS.includes(financialFor))return null;
+  const existing=(state.advanceLedger||[]).find(row=>row.transactionId===tx.id);
+  if(existing)return existing;
+  const incoming=tx.kind==='inkomen';
+  const debtor=incoming?account:financialFor;
+  const creditor=incoming?financialFor:account;
+  const amount=round2(Math.abs(Number(tx.amount)||0));
+  const row={id:`advance-${tx.id}`,transactionId:tx.id,month:transactionMonth(tx),debtor,creditor,originalAmount:amount,outstandingAmount:amount,status:amount?'open':'voldaan',createdAt:new Date().toISOString(),settlementTransferIds:[]};
+  state.advanceLedger.push(row);
+  return row;
+}
+function u3OpenAdvances(month=null){
+  return (state.advanceLedger||[]).filter(row=>row.status!=='voldaan'&&Number(row.outstandingAmount)>0&&(!month||row.month<=month));
+}
+function u3NetAdvances(month=getSelectedMonth()){
+  const pairs=new Map();
+  u3OpenAdvances(month).forEach(row=>{
+    const forward=`${row.debtor}|${row.creditor}`;
+    const amount=Number(row.outstandingAmount)||0;
+    pairs.set(forward,(pairs.get(forward)||0)+amount);
+  });
+  const result=[];
+  pairs.forEach((amount,key)=>{
+    let [debtor,creditor]=key.split('|');
+    if(amount>.004)result.push({debtor,creditor,amount:round2(amount)});
+  });
+  return result;
+}
+function u3MonthRecord(month=getSelectedMonth()){
+  if(!isPlainObject(state.monthRecords[month]))state.monthRecords[month]={month,status:'open',closedAt:'',reopenedAt:'',activeClosureId:'',closureHistory:[]};
+  return state.monthRecords[month];
+}
+function u3DeterministicTransferId(closureId,type,source,target){return `transfer-${closureId}-${type}-${source}-${target}`.replace(/[^a-zA-Z0-9_-]/g,'-');}
+function u3TransferDrafts(month,closureId,scenarioResult){
+  const drafts=[];
+  const add=(type,source,target,amount,label)=>{
+    amount=round2(Number(amount)||0); if(amount<=0)return;
+    drafts.push({id:u3DeterministicTransferId(closureId,type,source,target),type,sourceAccount:source,targetAccount:U3_ACCOUNTS.includes(target)?target:'',destination:label||target,calculatedAmount:amount,actualAmount:amount,month,status:'nog-te-verwerken',date:'',correction:0,closureId,createdAt:new Date().toISOString()});
+  };
+  const addSigned=(type,source,target,amount,label)=>{
+    amount=round2(Number(amount)||0);
+    if(amount<0)add(`${type}-terug`,target,source,Math.abs(amount),`${label} terug naar gezamenlijk`);
+    else add(type,source,target,amount,label);
+  };
+  addSigned('zakgeld-dion','gezamenlijk','dion',scenarioResult.dion.zakgeld,'Zakgeld Dion');
+  addSigned('zakgeld-dara','gezamenlijk','dara',scenarioResult.dara.zakgeld,'Zakgeld Dara');
+  add('gezamenlijk-sparen','gezamenlijk','',Math.max(0,scenarioResult.spaarpotDezeMaand),'Gezamenlijke spaarrekening');
+  add('dion-sparen','dion','',Math.max(0,scenarioResult.dion.beschikbaarVoorSparen),'Dion spaarrekening');
+  add('dara-sparen','dara','',Math.max(0,scenarioResult.dara.beschikbaarVoorSparen),'Dara spaarrekening');
+  // Update 4: open voorschotten blijven informatief en worden alleen door een
+  // expliciet als terugbetaling gemarkeerde banktransactie afgelost.
+  return drafts;
+}
+function u3MonthSummary(month=getSelectedMonth()){
+  const scenarioResult=calcScenario(state);
+  const actualIncome=u3ActualIncome(month);
+  const actualExpenses=u3ActualExpenses(month);
+  return {
+    month,scenario:state.meta.scenario,expectedIncome:u3ExpectedIncome(month),actualIncome,
+    plannedFixed:u3PlannedFixedTotal(month),actualExpenses,monthResult:round2(actualIncome-actualExpenses),
+    allowanceDion:round2(scenarioResult.dion.zakgeld),allowanceDara:round2(scenarioResult.dara.zakgeld),
+    jointSaving:round2(scenarioResult.spaarpotDezeMaand),
+    reserve:{gezamenlijk:u3ReserveDelta('gezamenlijk',month),dion:u3ReserveDelta('dion',month),dara:u3ReserveDelta('dara',month)}
+  };
+}
+function u3CloseMonth(month=getSelectedMonth(),actualBalances={},correctionAccounts=[],options={}){
+  const pending=u3PendingReviews(month);
+  if(pending.length&&!options.force)return {requiresWarning:true,pendingCount:pending.length,month};
+  const record=u3MonthRecord(month);
+  if(record.status==='afgesloten')return record.closureHistory.find(row=>row.id===record.activeClosureId)||null;
+  const revision=record.closureHistory.length+1;
+  const closureId=`closure-${month}-${revision}`;
+  const summary=u3MonthSummary(month);
+  const accountControl=u3AccountControl(month);
+  U3_ACCOUNTS.forEach(account=>{
+    const actual=Number(actualBalances[account]);
+    accountControl[account].actualBalance=Number.isFinite(actual)?round2(actual):null;
+    accountControl[account].difference=Number.isFinite(actual)?round2(actual-accountControl[account].calculatedEnd):0;
+    accountControl[account].administrativeEnd=accountControl[account].calculatedEnd;
+    if(Number.isFinite(actual)&&correctionAccounts.includes(account)&&Math.abs(accountControl[account].difference)>.004){
+      const id=`correction-${closureId}-${account}`;
+      if(!state.monthCorrections.some(row=>row.id===id))state.monthCorrections.push({id,month,account,effectiveMonth:month,amount:accountControl[account].difference,reason:'Rekeningcorrectie bij maandafsluiting',closureId,status:'actief',createdAt:new Date().toISOString()});
+      accountControl[account].administrativeEnd=round2(actual);
+    }
+  });
+  const scenarioResult=calcScenario(state);
+  const drafts=u3TransferDrafts(month,closureId,scenarioResult);
+  const previous=record.closureHistory[record.closureHistory.length-1];
+  if(previous){
+    const oldByType=new Map((previous.transferSnapshot||[]).map(row=>[`${row.type}|${row.sourceAccount}|${row.targetAccount||row.destination}`,Number(row.calculatedAmount)||0]));
+    drafts.forEach(row=>{
+      const key=`${row.type}|${row.sourceAccount}|${row.targetAccount||row.destination}`;
+      const difference=round2(row.calculatedAmount-(oldByType.get(key)||0));
+      row.calculatedAmount=Math.abs(difference);row.actualAmount=Math.abs(difference);row.correction=difference;
+      if(difference<0){const source=row.sourceAccount;row.sourceAccount=row.targetAccount;row.targetAccount=source;row.destination=`Terugboeking ${row.destination}`;}
+      row.type=`correctie-${row.type}`;row.id=u3DeterministicTransferId(closureId,row.type,row.sourceAccount,row.targetAccount||row.destination);
+    });
+  }
+  drafts.filter(row=>row.calculatedAmount>.004).forEach(row=>{if(!state.internalTransfers.some(item=>item.id===row.id))state.internalTransfers.push(row);});
+  U3_ACCOUNTS.forEach(owner=>{
+    const id=`reserve-${closureId}-${owner}`;
+    if(!state.reserveLedger.some(row=>row.id===id))state.reserveLedger.push({id,month,owner,amount:summary.reserve[owner],reason:'Netto budgetverschil',closureId,status:'actief',createdAt:new Date().toISOString()});
+  });
+  const closure={id:closureId,revision,closedAt:new Date().toISOString(),summary,accountControl,transferIds:drafts.filter(row=>row.calculatedAmount>.004).map(row=>row.id),transferSnapshot:clone(drafts.filter(row=>row.calculatedAmount>.004)),correctionIds:(state.monthCorrections||[]).filter(row=>row.closureId===closureId).map(row=>row.id),updatedBy:getDeviceId()};
+  record.status='afgesloten';record.closedAt=closure.closedAt;record.activeClosureId=closureId;record.closureHistory.push(closure);
+  return closure;
+}
+function u3ReopenMonth(month=getSelectedMonth()){
+  const record=u3MonthRecord(month);
+  if(record.status!=='afgesloten')return false;
+  record.status='open';record.reopenedAt=new Date().toISOString();return true;
+}
+function u3ApplyTransferToAdvances(transfer,amount){
+  if(!String(transfer.type||'').includes('voorschot'))return;
+  let remaining=round2(amount);
+  u3OpenAdvances(transfer.month).filter(row=>row.debtor===transfer.sourceAccount&&row.creditor===transfer.targetAccount).sort((a,b)=>String(a.createdAt).localeCompare(String(b.createdAt))).forEach(row=>{
+    if(remaining<=0)return;
+    const applied=Math.min(remaining,Number(row.outstandingAmount)||0);
+    row.outstandingAmount=round2((Number(row.outstandingAmount)||0)-applied);
+    if(row.outstandingAmount<=.004){row.outstandingAmount=0;row.status='voldaan';}
+    row.settlementTransferIds=Array.isArray(row.settlementTransferIds)?row.settlementTransferIds:[];
+    if(!row.settlementTransferIds.includes(transfer.id))row.settlementTransferIds.push(transfer.id);
+    remaining=round2(remaining-applied);
+  });
+}
+function u3ConfirmTransfer(id,actualAmount,date,status='uitgevoerd'){
+  const transfer=(state.internalTransfers||[]).find(row=>row.id===id);
+  if(!transfer)return false;
+  if(transfer.status==='uitgevoerd'&&status==='uitgevoerd')return true;
+  transfer.actualAmount=round2(Math.max(0,Number(actualAmount)||0));transfer.date=date||u3IsoDate(new Date());transfer.status=status;
+  transfer.correction=round2(transfer.actualAmount-(Number(transfer.calculatedAmount)||0));
+  if(status==='uitgevoerd'){
+    u3ApplyTransferToAdvances(transfer,transfer.actualAmount);
+    if(Math.abs(transfer.correction)>.004){
+      const [year,month]=transfer.month.split('-').map(Number);
+      const nextMonth=monthKey(new Date(year,month,1));
+      const id=`transfer-correction-${transfer.id}`;
+      if(!state.monthCorrections.some(row=>row.id===id))state.monthCorrections.push({id,month:transfer.month,account:transfer.sourceAccount,effectiveMonth:nextMonth,amount:round2(-transfer.correction),reason:'Afwijkend uitgevoerde interne overboeking',transferId:transfer.id,status:'actief',createdAt:new Date().toISOString()});
+    }
+  }
+  return true;
+}
+function u3SuggestedRecognition(description,account,amount){
+  const text=bankText(description);
+  return (state.recognitionRules||[]).map(rule=>{
+    let score=0;
+    if(rule.text&&text.includes(bankText(rule.text)))score+=5;
+    if(rule.counterparty&&text.includes(bankText(rule.counterparty)))score+=3;
+    if(rule.account&&rule.account===account)score+=2;
+    if(Number.isFinite(Number(rule.amount))&&Math.abs(Math.abs(Number(amount))-Math.abs(Number(rule.amount)))<=Number(rule.tolerance||5))score+=2;
+    return {rule,score};
+  }).filter(row=>row.score>0).sort((a,b)=>b.score-a.score)[0]?.rule||null;
+}
+function u3RememberRecognition(tx){
+  const text=bankText(tx.description);
+  if(!text)return;
+  const id=`recognition-${tx.account}-${text}`.replace(/[^a-z0-9_-]/g,'-').slice(0,180);
+  const next={id,text,counterparty:'',account:tx.account,category:tx.category||'Overig',fixedExpenseId:tx.fixedExpenseId||'',incomeSourceId:tx.incomeSourceId||'',financialFor:tx.financialFor||tx.account,amount:round2(Math.abs(Number(tx.amount)||0)),tolerance:Math.max(5,round2(Math.abs(Number(tx.amount)||0)*.15)),updatedAt:new Date().toISOString()};
+  const index=state.recognitionRules.findIndex(row=>row.id===id);
+  if(index>=0)state.recognitionRules[index]=next;else state.recognitionRules.unshift(next);
+  state.recognitionRules=state.recognitionRules.slice(0,300);
+}
+
+function u3PendingReviews(month=getSelectedMonth()){
+  return (state.transactionReviewQueue||[]).filter(row=>(row.reviewStatus||'te-controleren')==='te-controleren'&&String(row.date||'').slice(0,7)===month);
+}
+function u3AssertMonthOpen(month=getSelectedMonth()){
+  if(state.monthRecords?.[month]?.status==='afgesloten')throw new Error(`${monthLabel(month)} is afgesloten. Heropen de maand voordat je gegevens wijzigt.`);
+}
+function u3AccountLabel(value){return ownerLabel(value||'gezamenlijk');}
+function u3AdminModal(html,extraClass=''){
+  const modal=document.getElementById('incomeEditModal');
+  modal.innerHTML=`<div class="modal u3-admin-modal ${extraClass}" role="dialog" aria-modal="true">${html}</div>`;
+  modal.classList.add('open','u3-admin-open');
+  const close=()=>{modal.classList.remove('open','u3-admin-open');modal.innerHTML='';renderActiveTab();};
+  modal.querySelectorAll('[data-u3-close]').forEach(button=>button.addEventListener('click',close));
+  return {modal,close};
+}
+function renderU3AdminPanel(){
+  const month=getSelectedMonth();
+  const summary=u3MonthSummary(month);
+  const record=state.monthRecords?.[month];
+  const pending=u3PendingReviews(month).length;
+  const control=u3AccountControl(month);
+  const needsCorrection=record?.status==='correctie-nodig';
+  const status=record?.status==='afgesloten'?'closed':needsCorrection||pending?'pending':'ok';
+  const statusLabel=record?.status==='afgesloten'?'Afgesloten':needsCorrection?'Correctie nodig':pending?`${pending} te controleren`:'Klaar voor controle';
+  return `<section class="card u3-admin-card">
+    <div class="u3-admin-head"><div><div class="section-kicker">Update 3</div><h2>Maandadministratie</h2><p>Verwacht, werkelijk, rekeningen, reserve en onderlinge voorschotten</p></div><span class="u3-status ${status}">${statusLabel}</span></div>
+    <div class="u3-admin-metrics">
+      <div class="u3-admin-metric"><span>Verwacht inkomen</span><strong>${eur(summary.expectedIncome)}</strong></div>
+      <div class="u3-admin-metric"><span>Werkelijk inkomen</span><strong>${eur(summary.actualIncome)}</strong></div>
+      <div class="u3-admin-metric"><span>Werkelijke uitgaven</span><strong>${eur(summary.actualExpenses)}</strong></div>
+      <div class="u3-admin-metric"><span>Gezamenlijke rekening</span><strong>${eur(control.gezamenlijk.calculatedEnd)}</strong></div>
+    </div>
+    <div class="u3-admin-actions">
+      <button type="button" class="ghost small" data-u3-open="planning">Vaste lasten & inkomsten</button>
+      <button type="button" class="${pending?'primary':'ghost'} small" data-u3-open="review">Transacties controleren${pending?` (${pending})`:''}</button>
+      <button type="button" class="ghost small" data-u3-open="actual-income">Werkelijk inkomen aanpassen</button>
+      <button type="button" class="ghost small" data-u3-open="close">Maandafsluiting</button>
+      <button type="button" class="ghost small" data-u3-open="transfers">Overboekingen</button>
+    </div>
+  </section>`;
+}
+function bindU3Admin(root){
+  root.querySelectorAll('[data-u3-open]').forEach(button=>button.addEventListener('click',()=>{
+    const view=button.dataset.u3Open;
+    if(view==='planning')u3OpenPlanning();
+    else if(view==='review')u3OpenReview();
+    else if(view==='actual-income'){
+      const month=getSelectedMonth();
+      const current=state.actualIncomeOverrides?.[month]?.total;
+      const value=prompt(`Werkelijk inkomen voor ${month}. Laat leeg om de handmatige correctie te verwijderen.`,Number.isFinite(Number(current))?String(current):String(u3ActualIncome(month)));
+      if(value===null)return;
+      const ok=commitChange(()=>{
+        state.actualIncomeOverrides=isPlainObject(state.actualIncomeOverrides)?state.actualIncomeOverrides:{};
+        if(!String(value).trim())delete state.actualIncomeOverrides[month];
+        else{
+          const amount=round2(bankAmount(value));
+          if(!Number.isFinite(amount)||amount<0)throw new Error('Vul een geldig positief bedrag in.');
+          state.actualIncomeOverrides[month]={total:amount,updatedAt:new Date().toISOString()};
+        }
+      });
+      if(!ok)alert('Werkelijk inkomen aanpassen is niet opgeslagen.');
+    }
+    else if(view==='close')u3OpenClose();
+    else if(view==='transfers')u3OpenTransfers();
+  }));
+}
+function u3RecurringRows(kind){
+  if(kind==='income')return state.recurringIncomeSources||[];
+  return state.recurringFixedExpenses?.[state.meta.scenario]||[];
+}
+function u3OpenPlanning(){
+  const fixed=u3RecurringRows('fixed');
+  const incomes=u3RecurringRows('income');
+  const rows=(items,kind)=>items.map(item=>`<article class="u3-admin-row"><div class="u3-row-head"><div><strong>${textSafe(item.naam||'Zonder naam')}</strong><br><small>${u3AccountLabel(item.rekening)} → ${u3AccountLabel(item.financialFor||item.rekening)} · elke ${item.frequentieAantal} ${textSafe(item.frequentieEenheid)}</small></div><div><span class="u3-status ${item.actief!==false?'ok':''}">${item.actief!==false?'Actief':'Gestopt'}</span> <button class="ghost small" data-u3-edit-recurring="${kind}:${item.id}">Bewerken</button></div></div><div>${eur(u3AmountAt(item,getSelectedMonth()))} <small>· gemiddeld ${eur(u3MonthlyAverage(item))} p/m</small></div></article>`).join('');
+  const {modal}=u3AdminModal(`<div class="u3-admin-head"><div><div class="section-kicker">${monthLabel(getSelectedMonth())} · ${state.meta.scenario==='voor'?'Voor verkoop':'Na verkoop'}</div><h2>Planning beheren</h2><p>Bedragen kunnen voor één maand of vanaf deze maand wijzigen.</p></div><button class="ghost" data-u3-close>Sluiten</button></div>
+    <div class="u3-steps">
+      <section class="u3-step"><div class="u3-step-head"><div><h3>Vaste lasten</h3><p>${fixed.length} terugkerende posten in dit scenario</p></div><button class="primary small" data-u3-add-recurring="fixed">+ Vaste last</button></div><div class="u3-admin-list">${rows(fixed,'fixed')||'<div class="u3-empty">Nog geen vaste lasten.</div>'}</div></section>
+      <section class="u3-step"><div class="u3-step-head"><div><h3>Inkomstenbronnen</h3><p>${incomes.length} terugkerende bronnen</p></div><button class="primary small" data-u3-add-recurring="income">+ Inkomstenbron</button></div><div class="u3-admin-list">${rows(incomes,'income')||'<div class="u3-empty">Nog geen inkomstenbronnen.</div>'}</div></section>
+    </div>`);
+  modal.querySelectorAll('[data-u3-add-recurring]').forEach(button=>button.addEventListener('click',()=>u3OpenRecurringEditor(button.dataset.u3AddRecurring)));
+  modal.querySelectorAll('[data-u3-edit-recurring]').forEach(button=>button.addEventListener('click',()=>{const [kind,id]=button.dataset.u3EditRecurring.split(':');u3OpenRecurringEditor(kind,id);}));
+}
+function u3OpenRecurringEditor(kind,id=''){
+  const existing=u3RecurringRows(kind).find(item=>item.id===id);
+  const income=kind==='income';
+  const current=getSelectedMonth();
+  const value=existing?u3AmountAt(existing,current):0;
+  const {modal}=u3AdminModal(`<div class="u3-admin-head"><div><div class="section-kicker">${income?'Inkomstenbron':'Vaste last'}</div><h2>${existing?'Bewerken':'Toevoegen'}</h2></div><button class="ghost" data-u3-close>Sluiten</button></div>
+    <div class="u3-grid">
+      <label class="full">Naam<input id="u3RecName" value="${textSafe(existing?.naam||'')}"></label>
+      <label>Bedrag<input id="u3RecAmount" type="number" step="0.01" inputmode="decimal" value="${Number(value)||''}"></label>
+      ${income?`<label>Type<select id="u3RecCategory">${['loon','toeslag','vergoeding/teruggave','overig'].map(value=>`<option ${existing?.type===value?'selected':''}>${value}</option>`).join('')}</select></label>`:`<label>Categorie<input id="u3RecCategory" value="${textSafe(existing?.categorie||'Overig')}"></label>`}
+      <label>Fysieke rekening<select id="u3RecAccount">${U3_ACCOUNTS.map(value=>`<option value="${value}" ${(existing?.rekening||'gezamenlijk')===value?'selected':''}>${u3AccountLabel(value)}</option>`).join('')}</select></label>
+      <label>Financieel voor<select id="u3RecFor">${U3_ACCOUNTS.map(value=>`<option value="${value}" ${(existing?.financialFor||existing?.rekening||'gezamenlijk')===value?'selected':''}>${u3AccountLabel(value)}</option>`).join('')}</select></label>
+      ${income?`<label>Eigenaar<select id="u3RecOwner">${U3_ACCOUNTS.map(value=>`<option value="${value}" ${(existing?.eigenaar||'gezamenlijk')===value?'selected':''}>${u3AccountLabel(value)}</option>`).join('')}</select></label><label class="u2-checkbox"><input id="u3RecDistribution" type="checkbox" ${existing?.meetellenVoorVerdeling!==false?'checked':''}> Meetellen voor verdeling</label>`:''}
+      <label>Elke<input id="u3RecFrequency" type="number" min="1" step="1" value="${existing?.frequentieAantal||1}"></label>
+      <label>Frequentie<select id="u3RecUnit">${U3_FREQUENCY_UNITS.map(value=>`<option value="${value}" ${existing?.frequentieEenheid===value?'selected':''}>${value}</option>`).join('')}</select></label>
+      <label>Begindatum<input id="u3RecStart" type="date" value="${textSafe(existing?.begindatum||`${current}-01`)}"></label>
+      <label>Einddatum<input id="u3RecEnd" type="date" value="${textSafe(existing?.einddatum||'')}"></label>
+      <label>Bedrag wijzigen<select id="u3RecScope"><option value="from">Vanaf ${monthLabel(current)}</option><option value="once">Alleen ${monthLabel(current)}</option></select></label>
+      <label class="u2-checkbox"><input id="u3RecActive" type="checkbox" ${existing?.actief!==false?'checked':''}> Actief</label>
+    </div>
+    <div class="modal-actions">${existing?'<button class="danger-ghost" id="u3RecDelete">Stoppen</button>':''}<button class="ghost" data-u3-back-planning>Terug</button><button class="primary" id="u3RecSave">Opslaan</button></div>`);
+  modal.querySelector('[data-u3-back-planning]')?.addEventListener('click',u3OpenPlanning);
+  modal.querySelector('#u3RecDelete')?.addEventListener('click',()=>{
+    try{u3AssertMonthOpen();commitChange(()=>{existing.actief=false;existing.einddatum=existing.einddatum||u3IsoDate(new Date(`${current}-01T12:00:00`));},{render:false});u3OpenPlanning();}catch(error){alert(error.message);}
+  });
+  modal.querySelector('#u3RecSave').addEventListener('click',()=>{
+    try{
+      u3AssertMonthOpen();
+      const name=modal.querySelector('#u3RecName').value.trim();
+      const amount=round2(bankAmount(modal.querySelector('#u3RecAmount').value));
+      if(!name||!Number.isFinite(amount)||amount<0)throw new Error('Vul een naam en een geldig bedrag in.');
+      commitChange(()=>{
+        const item=existing||{id:uid(),amountHistory:[],monthOverrides:{},recognition:{text:'',counterparty:'',amountTolerance:5}};
+        item.naam=name;item.rekening=modal.querySelector('#u3RecAccount').value;item.financialFor=modal.querySelector('#u3RecFor').value;
+        item.frequentieAantal=Math.max(1,Math.floor(Number(modal.querySelector('#u3RecFrequency').value)||1));item.frequentieEenheid=modal.querySelector('#u3RecUnit').value;
+        item.begindatum=modal.querySelector('#u3RecStart').value||`${current}-01`;item.einddatum=modal.querySelector('#u3RecEnd').value;item.actief=modal.querySelector('#u3RecActive').checked;
+        if(income){item.type=modal.querySelector('#u3RecCategory').value;item.eigenaar=modal.querySelector('#u3RecOwner').value;item.meetellenVoorVerdeling=modal.querySelector('#u3RecDistribution').checked;item.verwachtBedrag=amount;}
+        else{item.categorie=modal.querySelector('#u3RecCategory').value.trim()||'Overig';item.bedrag=amount;}
+        item.amountHistory=Array.isArray(item.amountHistory)?item.amountHistory:[];item.monthOverrides=isPlainObject(item.monthOverrides)?item.monthOverrides:{};
+        if(modal.querySelector('#u3RecScope').value==='once')item.monthOverrides[current]=amount;
+        else{delete item.monthOverrides[current];item.amountHistory=item.amountHistory.filter(row=>String(row.effectiveFrom).slice(0,7)!==current);item.amountHistory.push({id:`amount-${item.id}-${current}`,effectiveFrom:`${current}-01`,amount});}
+        if(!existing)u3RecurringRows(kind).push(item);
+      },{render:false});
+      u3OpenPlanning();
+    }catch(error){alert(error.message);}
+  });
+}
+function u3ReviewOccurrenceOptions(row){
+  const month=String(row.date||'').slice(0,7)||getSelectedMonth();
+  const fixed=u3FixedOccurrences(month).filter(item=>!u3LinkedActual('fixed',item.id,month)).map(item=>`<option value="fixed|${item.id}">Vaste last · ${textSafe(item.naam)} · ${eur(item.amount)}</option>`);
+  const incomes=u3IncomeOccurrences(month).filter(item=>!u3LinkedActual('income',item.id,month)).map(item=>`<option value="income|${item.id}">Inkomen · ${textSafe(item.naam)} · ${eur(item.amount)}</option>`);
+  return '<option value="">Geen koppeling</option>'+fixed.concat(incomes).join('');
+}
+function u3OpenReview(){
+  const rows=u3PendingReviews();
+  const rowHtml=rows.map(row=>{
+    const suggestion=u3SuggestedRecognition(row.description,row.account,Math.abs(Number(row.amount)||0));
+    const financialFor=suggestion?.financialFor||row.financialFor||row.account||'gezamenlijk';
+    const category=suggestion?.category||row.category||'Overig';
+    return `<article class="u3-admin-row" data-u3-review-row="${row.id}">
+      <div class="u3-row-head"><div><strong>${textSafe(row.description||'Zonder omschrijving')}</strong><br><small>${textSafe(row.date)} · ${u3AccountLabel(row.account)} · ${row.kind==='inkomen'?'bijschrijving':'afschrijving'}</small></div><strong class="${row.kind==='inkomen'?'value pos':'value neg'}">${eur(Math.abs(Number(row.amount)||0))}</strong></div>
+      <div class="u3-review-fields">
+        <label>Financieel voor<select data-u3-review-for>${U3_ACCOUNTS.map(value=>`<option value="${value}" ${financialFor===value?'selected':''}>${u3AccountLabel(value)}</option>`).join('')}</select></label>
+        <label>Categorie<input data-u3-review-category value="${textSafe(category)}"></label>
+        <label class="full">Koppeling<select data-u3-review-link>${u3ReviewOccurrenceOptions(row)}</select></label>
+        <label class="u2-checkbox"><input type="checkbox" data-u3-review-advance ${(row.account||'gezamenlijk')!==financialFor?'checked':''}> Voorschot/schuld bij afwijkende rekening</label>
+      </div>
+      <div class="u3-admin-actions"><button class="ghost small" data-u3-ignore-review="${row.id}">Negeren</button><button class="primary small" data-u3-confirm-review="${row.id}">Bevestigen</button></div>
+    </article>`;
+  }).join('');
+  const {modal}=u3AdminModal(`<div class="u3-admin-head"><div><div class="section-kicker">${monthLabel(getSelectedMonth())}</div><h2>Transacties controleren</h2><p>Suggesties worden nooit automatisch bevestigd.</p></div><button class="ghost" data-u3-close>Sluiten</button></div><div class="u3-admin-list">${rowHtml||'<div class="u3-empty">Alles is gecontroleerd.</div>'}</div>`);
+  modal.querySelectorAll('[data-u3-ignore-review]').forEach(button=>button.addEventListener('click',()=>{
+    commitChange(()=>{const row=state.transactionReviewQueue.find(item=>item.id===button.dataset.u3IgnoreReview);if(row)row.reviewStatus='genegeerd';},{render:false});u3OpenReview();
+  }));
+  modal.querySelectorAll('[data-u3-confirm-review]').forEach(button=>button.addEventListener('click',()=>{
+    try{
+      u3AssertMonthOpen();
+      const source=state.transactionReviewQueue.find(item=>item.id===button.dataset.u3ConfirmReview);
+      const editor=button.closest('[data-u3-review-row]');
+      if(!source||!editor)return;
+      const financialFor=editor.querySelector('[data-u3-review-for]').value;
+      const link=editor.querySelector('[data-u3-review-link]').value;
+      const tx={...source,id:source.transactionId||uid(),reviewStatus:'bevestigd',owner:financialFor,account:source.account||'gezamenlijk',financialFor,category:editor.querySelector('[data-u3-review-category]').value.trim()||'Overig'};
+      delete tx.rawData;delete tx.transactionId;
+      tx.fixedExpenseId='';tx.fixedOccurrenceId='';tx.incomeSourceId='';tx.incomeOccurrenceId='';
+      if(link){const separator=link.indexOf('|');const type=link.slice(0,separator);const occurrenceId=link.slice(separator+1);if(u3LinkedActual(type,occurrenceId,transactionMonth(tx)))throw new Error('Dit betaalmoment is al aan een andere transactie gekoppeld.');const occurrence=(type==='fixed'?u3FixedOccurrences(transactionMonth(tx)):u3IncomeOccurrences(transactionMonth(tx))).find(item=>item.id===occurrenceId);if(type==='fixed'){tx.fixedOccurrenceId=occurrenceId;tx.fixedExpenseId=occurrence?.itemId||'';tx.kind='vaste-last';}else{tx.incomeOccurrenceId=occurrenceId;tx.incomeSourceId=occurrence?.itemId||'';tx.kind='inkomen';}}
+      commitChange(()=>{
+        state.transactions.push(tx);
+        source.reviewStatus='bevestigd';source.confirmedTransactionId=tx.id;
+        u3RememberRecognition(tx);
+        if(editor.querySelector('[data-u3-review-advance]').checked)u3CreateAdvanceForTransaction(tx);
+      },{render:false});
+      u3OpenReview();
+    }catch(error){alert(error.message);}
+  }));
+}
+function u3OpenClose(){
+  const month=getSelectedMonth();
+  const record=u3MonthRecord(month);
+  const summary=u3MonthSummary(month);
+  const control=u3AccountControl(month);
+  const pending=u3PendingReviews(month).length;
+  const budgets=U3_ACCOUNTS.flatMap(owner=>u3BudgetSummary(owner,month).map(row=>({...row,owner})));
+  const budgetHtml=budgets.map(row=>`<div class="u3-budget-row"><strong>${u3AccountLabel(row.owner)} · ${textSafe(row.category)}</strong><span>${row.budget===null?'Geen budget ingesteld':eur(row.budget)}</span><span>${eur(row.actual)}</span><span class="${row.difference<0?'value neg':'value pos'}">${eur(row.difference)}</span></div>`).join('');
+  const accounts=U3_ACCOUNTS.map(account=>{const setting=state.accountSettings[account];const row=control[account];return `<div class="u3-account-row"><div><strong>${u3AccountLabel(account)}</strong><br><small>Administratief ${eur(row.calculatedEnd)} · opening ${eur(row.opening)}</small></div><input data-u3-actual="${account}" type="number" step="0.01" inputmode="decimal" placeholder="Banksaldo"><label class="u2-checkbox"><input data-u3-correct="${account}" type="checkbox"> corrigeer verschil</label>${setting?.openingBalanceSet?'':`<div><input data-u3-opening="${account}" type="number" step="0.01" placeholder="Openingssaldo"><button class="ghost small" data-u3-save-opening="${account}">Eenmalig vastleggen</button></div>`}</div>`;}).join('');
+  const {modal}=u3AdminModal(`<div class="u3-admin-head"><div><div class="section-kicker">${monthLabel(month)}</div><h2>Maandafsluiting</h2><p>Afgesloten geschiedenis blijft als onveranderlijke snapshot bewaard.</p></div><span class="u3-status ${record.status==='afgesloten'?'closed':pending?'pending':'ok'}">${record.status==='afgesloten'?'Afgesloten':pending?`${pending} transacties open`:'Open'}</span><button class="ghost" data-u3-close>Sluiten</button></div>
+    <div class="u3-steps">
+      <section class="u3-step"><div class="u3-step-head"><div><h3>1. Controle</h3><p>Alleen ongecontroleerde transacties blokkeren.</p></div><span class="u3-status ${pending?'warn':'ok'}">${pending?`${pending} te doen`:'Compleet'}</span></div><div class="u3-grid"><div>Verwacht inkomen<br><strong>${eur(summary.expectedIncome)}</strong></div><div>Werkelijk inkomen<br><strong>${eur(summary.actualIncome)}</strong></div><div>Geplande vaste lasten<br><strong>${eur(summary.plannedFixed)}</strong></div><div>Werkelijke uitgaven<br><strong>${eur(summary.actualExpenses)}</strong></div></div><div class="u3-budget-list">${budgetHtml||'<small>Geen variabele budgetten.</small>'}</div></section>
+      <section class="u3-step"><div class="u3-step-head"><div><h3>2. Rekeningstanden</h3><p>Een verschil wijzigt alleen met een expliciete correctie het volgende saldo.</p></div></div>${accounts}</section>
+      <section class="u3-step"><div class="u3-step-head"><div><h3>3. Overboekingen</h3><p>Zakgeld, sparen en netto voorschotten worden als voorstellen klaargezet.</p></div></div>${u3NetAdvances(month).map(row=>`<div>${u3AccountLabel(row.debtor)} → ${u3AccountLabel(row.creditor)} <strong>${eur(row.amount)}</strong></div>`).join('')||'<small>Geen openstaande voorschotten.</small>'}</section>
+      <section class="u3-step"><div class="u3-step-head"><div><h3>4. Bevestigen</h3><p>Open bankcontroles geven een waarschuwing maar blokkeren afsluiten niet.</p></div></div><div class="modal-actions">${record.status==='afgesloten'?'<button class="danger-ghost" id="u3ReopenMonth">Maand heropenen</button>':pending?'<button class="ghost" id="u3GoTransactions">Ga naar banktransacties</button><button class="primary" id="u3CloseMonthForce">Toch maand sluiten</button>':'<button class="primary" id="u3CloseMonth">Maand afsluiten</button>'}</div></section>
+    </div>`);
+  modal.querySelectorAll('[data-u3-save-opening]').forEach(button=>button.addEventListener('click',()=>{
+    const account=button.dataset.u3SaveOpening;const value=bankAmount(modal.querySelector(`[data-u3-opening="${account}"]`).value);
+    if(!Number.isFinite(value)){alert('Vul een geldig openingssaldo in.');return;}
+    commitChange(()=>{state.accountSettings[account]={openingBalance:round2(value),effectiveMonth:month,openingBalanceSet:true};},{render:false});u3OpenClose();
+  }));
+  modal.querySelector('#u3ReopenMonth')?.addEventListener('click',()=>{commitChange(()=>u3ReopenMonth(month),{render:false});u3OpenClose();});
+  modal.querySelector('#u3GoTransactions')?.addEventListener('click',()=>{
+    modal.closest('#incomeEditModal')?.classList.remove('open','u3-admin-open');
+    bankImportOpen=true;renderActiveTab();
+    [...document.querySelectorAll('.manage-section')].find(item=>item.querySelector('summary')?.textContent.includes('Bank import & uitgaven'))?.setAttribute('open','');
+  });
+  const closeMonth=(force=false)=>{
+    try{
+      const actual={};const corrections=[];
+      U3_ACCOUNTS.forEach(account=>{const value=bankAmount(modal.querySelector(`[data-u3-actual="${account}"]`).value);if(Number.isFinite(value))actual[account]=value;if(modal.querySelector(`[data-u3-correct="${account}"]`).checked)corrections.push(account);});
+      commitChange(()=>u3CloseMonth(month,actual,corrections,{force}),{render:false});u3OpenClose();
+    }catch(error){alert(error.message);}
+  };
+  modal.querySelector('#u3CloseMonth')?.addEventListener('click',()=>closeMonth(false));
+  modal.querySelector('#u3CloseMonthForce')?.addEventListener('click',()=>closeMonth(true));
+}
+function u3OpenTransfers(){
+  const month=getSelectedMonth();
+  const rows=(state.internalTransfers||[]).filter(row=>row.month===month);
+  const html=rows.map(row=>`<article class="u3-admin-row"><div class="u3-transfer-row"><div><strong>${textSafe(row.destination||row.type)}</strong><br><small>${u3AccountLabel(row.sourceAccount)}${row.targetAccount?` → ${u3AccountLabel(row.targetAccount)}`:''} · ${row.status}</small></div><input data-u3-transfer-amount="${row.id}" type="number" step="0.01" value="${Number(row.actualAmount??row.calculatedAmount)||0}" ${row.status==='uitgevoerd'?'disabled':''}><button class="${row.status==='uitgevoerd'?'ghost':'primary'} small" data-u3-confirm-transfer="${row.id}" ${row.status==='uitgevoerd'?'disabled':''}>${row.status==='uitgevoerd'?'Uitgevoerd':'Bevestig'}</button></div></article>`).join('');
+  const {modal}=u3AdminModal(`<div class="u3-admin-head"><div><div class="section-kicker">${monthLabel(month)}</div><h2>Interne overboekingen</h2><p>Uitvoering is handmatig; bevestigde aflossingen tellen niet als inkomen of uitgave.</p></div><button class="ghost" data-u3-close>Sluiten</button></div><div class="u3-admin-list">${html||'<div class="u3-empty">Nog geen voorstellen. Sluit de maand eerst af.</div>'}</div>`);
+  modal.querySelectorAll('[data-u3-confirm-transfer]').forEach(button=>button.addEventListener('click',()=>{
+    const id=button.dataset.u3ConfirmTransfer;const amount=bankAmount(modal.querySelector(`[data-u3-transfer-amount="${id}"]`).value);
+    if(!Number.isFinite(amount)||amount<0){alert('Vul een geldig bedrag in.');return;}
+    commitChange(()=>u3ConfirmTransfer(id,amount,u3IsoDate(new Date())),{render:false});u3OpenTransfers();
+  }));
+}
+
+const u3LegacyMonthlyScenarioData=getMonthlyScenarioData;
+getMonthlyScenarioData=function(scenario=state.meta.scenario){
+  const base=u3LegacyMonthlyScenarioData(scenario);
+  const month=getSelectedMonth();
+  const result=clone(base);
+  U3_ACCOUNTS.forEach(account=>{
+    const planned=u3FixedOccurrences(month,scenario).filter(row=>row.financialFor===account);
+    result[account]=result[account]||{};
+    result[account].vasteLasten=planned.filter(row=>row.source.legacyKind!=='hypotheek').map(row=>({id:row.id,categorie:row.categorie,post:row.naam,bedrag:row.amount,u3OccurrenceId:row.id}));
+    if(account==='gezamenlijk')result[account].hypotheek=planned.filter(row=>row.source.legacyKind==='hypotheek').map(row=>({id:row.id,categorie:row.categorie,post:row.naam,bedrag:row.amount,u3OccurrenceId:row.id}));
+  });
+  return result;
+};
+getMonthlyBaseIncome=function(person){
+  const amount=u3IncomeForOwner(person,{type:'loon',distributionOnly:true});
+  return amount||Number(state.personen?.[person]?.salaris)||0;
+};
+sumVasteTeruggaven=function(person){
+  return u3IncomeForOwner(person,{distributionOnly:true})-u3IncomeForOwner(person,{type:'loon',distributionOnly:true});
+};
+getMonthTransactions=function(owner=null,month=getSelectedMonth()){
+  return (state.transactions||[]).filter(tx=>transactionMonth(tx)===month&&(tx.reviewStatus||'bevestigd')==='bevestigd'&&(!owner||(tx.financialFor||tx.owner)===owner));
+};
+
+window.FinizeUpdate3=Object.freeze({
+  schemaVersion:U3_SCHEMA_VERSION,
+  occurrenceDates:(item,month)=>u3OccurrenceDates(clone(item),month),
+  plannedOccurrences:(items,month)=>u3PlannedOccurrences(clone(items),month),
+  amountAt:(item,dateOrMonth)=>u3AmountAt(clone(item),dateOrMonth),
+  monthlyAverage:item=>u3MonthlyAverage(clone(item)),
+  budgetSummary:(owner,month,scenario)=>u3BudgetSummary(owner,month,scenario),
+  monthSummary:month=>u3MonthSummary(month),
+  accountControl:month=>u3AccountControl(month),
+  expectedIncome:(month,financialFor)=>u3ExpectedIncome(month,financialFor),
+  actualIncome:(month,financialFor)=>u3ActualIncome(month,financialFor),
+  actualExpenses:(month,financialFor)=>u3ActualExpenses(month,financialFor),
+  reserveDelta:(owner,month,scenario)=>u3ReserveDelta(owner,month,scenario),
+  reserveBalance:(owner,throughMonth)=>u3ReserveBalance(owner,throughMonth),
+  netAdvances:month=>u3NetAdvances(month),
+  closeMonth:(month,actualBalances,correctionAccounts)=>u3CloseMonth(month,actualBalances,correctionAccounts),
+  reopenMonth:month=>u3ReopenMonth(month),
+  confirmTransfer:(id,amount,date,status)=>u3ConfirmTransfer(id,amount,date,status),
+  suggestRecognition:(description,account,amount)=>clone(u3SuggestedRecognition(description,account,amount)),
+  normalize:candidate=>u3NormalizeState(clone(candidate))
+});
+
 window.FinizeUpdate2=Object.freeze({
   schemaVersion:U2_SCHEMA_VERSION,
   calculateGroup:(goals,pot,today)=>calcGroep(clone(goals),pot,new Date(today)),
@@ -11885,6 +12775,7 @@ window.FinizeUpdate2=Object.freeze({
 u2NormalizeState(state);
 ensurePersistentIds(state);
 localSave(state);
+committedStateSnapshot=clone(state);
 
 async function initializeApp(){
   try{
@@ -11899,6 +12790,7 @@ async function initializeApp(){
 initializeApp();
 
 </script>
+<script src="./update4.js"></script>
 <script>
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
