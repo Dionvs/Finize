@@ -32,3 +32,19 @@
   - herstel van een onderbroken pending journal.
 - Tests: v1-v4-achtige normalisatie, idempotentie, eigenaarvelden en chunking.
 - Resterend: fasen 2 t/m 7.
+
+## Fase 2 — CSV-importmotor
+
+- Status: afgerond met synthetische ING-fixtures
+- Uitgevoerd:
+  - quote- en newline-veilige CSV-tokenizer;
+  - ING-formaat- en kolomdetectie plus generieke mapping;
+  - rekeningprofielherkenning op genormaliseerd IBAN;
+  - onveranderbare banklaag, import-ID's en fingerprints;
+  - duplicaatcontrole op originele bankgegevens;
+  - regelprioriteit tegenrekening, omschrijving, organisatie, zoekwoord en voorspelling;
+  - Zeker/Nakijken met conflict- en bijzondere-verwerkingsredenen;
+  - salaris, overige inkomsten, sparen en interne overboekingen altijd Nakijken.
+- Tests: Dion-, Dara- en gezamenlijke ING-fixture, overlap, conflict en eigenaar-isolatie.
+- Openstaand: definitieve controle met drie echte geanonimiseerde ING-exports.
+- Resterend: fasen 3 t/m 7.

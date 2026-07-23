@@ -165,6 +165,244 @@
     return chunks;
   }
 
+  function normalizeText(value){
+    return String(value||'').toLocaleLowerCase('nl-NL').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim().replace(/\s+/g,' ');
+  }
+
+  function detectDelimiter(text){
+    const first=String(text||'').replace(/^\uFEFF/,'').split(/\r?\n/,1)[0]||'';
+    const counts=[[';',0],[',',0],['\t',0]];
+    let quoted=false;
+    for(const char of first){
+      if(char==='"')quoted=!quoted;
+      else if(!quoted){const hit=counts.find(item=>item[0]===char);if(hit)hit[1]++;}
+    }
+    return counts.sort((a,b)=>b[1]-a[1])[0][0];
+  }
+
+  function parseDelimited(text,delimiter=detectDelimiter(text)){
+    const rows=[];let row=[];let cell='';let quoted=false;
+    const input=String(text||'').replace(/^\uFEFF/,'');
+    for(let index=0;index<input.length;index++){
+      const char=input[index];
+      if(char==='"'){
+        if(quoted&&input[index+1]==='"'){cell+='"';index++;}
+        else quoted=!quoted;
+      }else if(char===delimiter&&!quoted){row.push(cell.trim());cell='';}
+      else if((char==='\n'||char==='\r')&&!quoted){
+        if(char==='\r'&&input[index+1]==='\n')index++;
+        row.push(cell.trim());cell='';
+        if(row.some(value=>value!==''))rows.push(row);
+        row=[];
+      }else cell+=char;
+    }
+    row.push(cell.trim());
+    if(row.some(value=>value!==''))rows.push(row);
+    return rows;
+  }
+
+  function parseDate(value){
+    const text=String(value||'').trim();
+    let match=text.match(/^(\d{4})[-/]?(\d{2})[-/]?(\d{2})$/);
+    if(match)return `${match[1]}-${match[2]}-${match[3]}`;
+    match=text.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2}|\d{4})$/);
+    if(!match)return '';
+    return `${match[3].length===2?'20'+match[3]:match[3]}-${match[2].padStart(2,'0')}-${match[1].padStart(2,'0')}`;
+  }
+
+  function parseAmount(value){
+    let text=String(value??'').trim().replace(/\s/g,'').replace(/€|EUR/gi,'');
+    if(!text)return NaN;
+    let negative=/^\(.*\)$/.test(text)||text.endsWith('-');
+    text=text.replace(/[()]/g,'').replace(/-$/,'');
+    if(text.includes(',')&&text.includes('.'))text=text.lastIndexOf(',')>text.lastIndexOf('.')?text.replace(/\./g,'').replace(',','.'):text.replace(/,/g,'');
+    else text=text.replace(',','.');
+    const amount=Number(text);
+    return negative?-Math.abs(amount):amount;
+  }
+
+  const HEADER_ALIASES={
+    date:['datum','date','boekdatum','transactiedatum','rentedatum'],
+    description:['naam omschrijving','omschrijving','description','naam tegenpartij','tegenpartij'],
+    accountIdentifier:['rekening','rekeningnummer','iban','eigen rekening'],
+    counterpartyAccount:['tegenrekening','tegenrekening iban','iban tegenpartij'],
+    amount:['bedrag eur','bedrag','amount','mutatie'],
+    direction:['af bij','credit debit','debet credit'],
+    currency:['muntsoort','valuta','currency'],
+    reference:['transactiereferentie','referentie','bankreferentie','kenmerk'],
+    code:['code','mutatiesoort'],
+    notes:['mededelingen','omschrijving 2','details']
+  };
+
+  function headerKey(value){return normalizeText(value).replace(/\s/g,'');}
+  function findHeader(headers,aliases){
+    const normalized=headers.map(value=>({text:normalizeText(value),key:headerKey(value)}));
+    return normalized.findIndex(header=>aliases.some(alias=>header.text===normalizeText(alias)||header.key===headerKey(alias)));
+  }
+  function detectFormat(headers){
+    const normalized=headers.map(normalizeText);
+    const ing=normalized.includes('naam omschrijving')&&(normalized.includes('af bij')||normalized.some(value=>value.includes('bedrag eur')));
+    return ing?'ing':'generic';
+  }
+  function inferMapping(headers){
+    const mapping={};
+    Object.entries(HEADER_ALIASES).forEach(([key,aliases])=>mapping[key]=findHeader(headers,aliases));
+    return mapping;
+  }
+
+  function hashText(value){
+    let hash=2166136261;
+    for(const char of String(value||'')){hash^=char.charCodeAt(0);hash=Math.imul(hash,16777619);}
+    return (hash>>>0).toString(16).padStart(8,'0');
+  }
+  function fingerprint(original,profileId=''){
+    const reference=normalizeText(original.reference);
+    const basis=reference
+      ? `${profileId}|ref|${reference}`
+      : [profileId,original.bankDate,round2(original.amount),normalizeText(original.description),normalizeIban(original.counterpartyAccount),normalizeText(original.currency||'EUR')].join('|');
+    return `u4-${hashText(basis)}`;
+  }
+
+  function organizationName(description){
+    return normalizeText(description)
+      .replace(/\b(pasvolgnr|betaalautomaat|incasso|ideal|sepa|europese|betaling|kenmerk|omschrijving)\b.*$/,'')
+      .replace(/\b\d{3,}\b/g,'').trim();
+  }
+
+  function proposeType(original,profiles=[]){
+    const text=normalizeText(`${original.description} ${original.notes||''}`);
+    const counterpart=normalizeIban(original.counterpartyAccount);
+    if(counterpart&&profiles.some(profile=>normalizeIban(profile.identifier)===counterpart))return 'interne-overboeking';
+    if(/\bvakantiegeld\b/.test(text))return 'vakantiegeld';
+    if(/\b(nabetaling|correctie loon)\b/.test(text))return 'nabetaling';
+    if(/\b(salaris|loon|payroll)\b/.test(text))return 'salaris';
+    if(/\b(belastingdienst|belastingteruggave)\b/.test(text)&&Number(original.amount)>0)return 'belastingteruggave';
+    if(/\b(vergoeding|declaratie|onkosten|kilometer)\b/.test(text)&&Number(original.amount)>0)return 'vergoeding';
+    if(/\b(spaar|sparen|deposito)\b/.test(text))return 'sparen';
+    if(Number(original.amount)>0&&/\b(retour|refund|terugbetaling)\b/.test(text))return 'terugbetaling';
+    return Number(original.amount)>0?'overige-inkomsten':'uitgave';
+  }
+
+  function recognitionProposal(original,rules=[]){
+    const description=normalizeText(original.description);
+    const organization=organizationName(original.rawDescription||original.description);
+    const counterpart=normalizeIban(original.counterpartyAccount);
+    const levels=[
+      ['counterparty',rule=>counterpart&&normalizeIban(rule.value)===counterpart],
+      ['description',rule=>description&&normalizeText(rule.value)===description],
+      ['organization',rule=>organization&&normalizeText(rule.value)===organization],
+      ['keyword',rule=>description&&description.includes(normalizeText(rule.value))],
+      ['prediction',rule=>description&&description.includes(normalizeText(rule.value))]
+    ];
+    for(const [level,match] of levels){
+      const hits=(rules||[]).filter(rule=>rule.enabled!==false&&rule.level===level&&rule.value&&match(rule));
+      if(!hits.length)continue;
+      const signatures=new Set(hits.map(rule=>[rule.category,rule.transactionType,rule.budgetItemId,rule.fixedExpenseId,rule.savingsGoalId].join('|')));
+      return {level,rules:hits,rule:hits[0],conflict:signatures.size>1};
+    }
+    return null;
+  }
+
+  function classifyOriginal(original,profile,rules=[],profiles=[]){
+    const type=proposeType(original,profiles);
+    const proposal=recognitionProposal(original,rules);
+    const special=!['uitgave'].includes(type);
+    const strong=proposal&&['counterparty','description','organization'].includes(proposal.level);
+    const category=proposal?.rule?.category||'Ongecategoriseerd';
+    const alwaysReview=proposal?.rules?.some(rule=>rule.alwaysReview)===true;
+    const review=!profile||special||!strong||proposal?.conflict||alwaysReview||category==='Ongecategoriseerd'||!!proposal?.rule?.fixedExpenseId||!!proposal?.rule?.savingsGoalId;
+    return {
+      certainty:review?'nakijken':'zeker',
+      reasons:[
+        !profile?'rekeningprofiel ontbreekt':'',
+        special?`bijzonder type: ${type}`:'',
+        proposal?.conflict?'conflicterende herkenningsregels':'',
+        !proposal?'geen herkenningsregel':'',
+        category==='Ongecategoriseerd'?'categorie onbekend':'',
+        alwaysReview?'regel staat op altijd nakijken':''
+      ].filter(Boolean),
+      processing:{
+        processingDate:original.bankDate,
+        processedAmount:round2(Math.abs(Number(original.amount)||0)),
+        category,
+        transactionType:type,
+        budgetOwner:profile?.accountOwner||'',
+        budgetItemId:proposal?.rule?.budgetItemId||'',
+        fixedExpenseId:proposal?.rule?.fixedExpenseId||'',
+        savingsGoalId:proposal?.rule?.savingsGoalId||'',
+        splits:[],
+        advanceMode:'auto',
+        include:true,
+        recognitionRuleId:proposal?.rule?.id||'',
+        note:''
+      }
+    };
+  }
+
+  function parseBankCsv(text,options={}){
+    const table=parseDelimited(text);
+    if(table.length<2)throw new Error('CSV bevat geen transactieregels.');
+    const headers=table[0].map(value=>String(value||'').trim());
+    const format=detectFormat(headers);
+    const mapping={...inferMapping(headers),...(options.mapping||{})};
+    const required=['date','description','amount'];
+    if(required.some(key=>Number(mapping[key])<0))throw new Error('Datum, omschrijving of bedragkolom kon niet worden herkend.');
+    const rows=table.slice(1).map((cells,index)=>{
+      const direction=normalizeText(cells[mapping.direction]);
+      let amount=parseAmount(cells[mapping.amount]);
+      if(/^af\b|debit|debet/.test(direction))amount=-Math.abs(amount);
+      if(/^bij\b|credit/.test(direction))amount=Math.abs(amount);
+      const description=String(cells[mapping.description]||'').trim();
+      const notes=String(cells[mapping.notes]||'').trim();
+      return {
+        bankDate:parseDate(cells[mapping.date]),
+        description:notes&&notes!==description?`${description} — ${notes}`:description,
+        rawDescription:description,
+        amount:round2(amount),
+        accountIdentifier:normalizeIban(cells[mapping.accountIdentifier]),
+        counterpartyAccount:normalizeIban(cells[mapping.counterpartyAccount]),
+        currency:String(cells[mapping.currency]||'EUR').trim().toUpperCase()||'EUR',
+        reference:String(cells[mapping.reference]||'').trim(),
+        code:String(cells[mapping.code]||'').trim(),
+        notes,
+        lineNumber:index+2,
+        rawCells:cells,
+        valid:!!parseDate(cells[mapping.date])&&!!description&&Number.isFinite(amount)
+      };
+    });
+    return {format,headers,mapping,rows};
+  }
+
+  function findProfile(parsed,profiles=[]){
+    const identifiers=[...new Set(parsed.rows.map(row=>row.accountIdentifier).filter(Boolean))];
+    if(identifiers.length!==1)return null;
+    return profiles.find(profile=>normalizeIban(profile.identifier)===identifiers[0])||null;
+  }
+
+  function createImportDraft({text,fileName='import.csv',profiles=[],rules=[],transactions=[],id=uid('import')}){
+    const parsed=parseBankCsv(text);
+    const profile=findProfile(parsed,profiles);
+    const existingFingerprints=new Set((transactions||[]).map(tx=>tx.bankOriginal?.fingerprint).filter(Boolean));
+    const rows=parsed.rows.map((original,index)=>{
+      original.importBatchId=id;
+      original.importTransactionId=`${id}-${String(index+1).padStart(5,'0')}`;
+      original.fingerprint=fingerprint(original,profile?.id||original.accountIdentifier);
+      const duplicate=existingFingerprints.has(original.fingerprint);
+      const proposal=classifyOriginal(original,profile,rules,profiles);
+      return {id:original.importTransactionId,bankOriginal:original,accountProfileId:profile?.id||'',accountOwner:profile?.accountOwner||'',duplicate,...proposal};
+    });
+    const active=rows.filter(row=>row.bankOriginal.valid&&!row.duplicate);
+    const dates=active.map(row=>row.bankOriginal.bankDate).sort();
+    const income=active.filter(row=>row.bankOriginal.amount>0).reduce((sum,row)=>sum+row.processing.processedAmount,0);
+    const expenses=active.filter(row=>row.bankOriginal.amount<0).reduce((sum,row)=>sum+row.processing.processedAmount,0);
+    return {
+      id,fileName,bank:parsed.format==='ing'?'ING':'Onbekend',format:parsed.format,headers:parsed.headers,mapping:parsed.mapping,
+      accountProfileId:profile?.id||'',accountOwner:profile?.accountOwner||'',status:'concept',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),
+      periodFrom:dates[0]||'',periodTo:dates[dates.length-1]||'',rows,
+      summary:{newCount:active.length,duplicateCount:rows.filter(row=>row.duplicate).length,totalIncome:round2(income),totalExpenses:round2(expenses),sureCount:active.filter(row=>row.certainty==='zeker').length,reviewCount:active.filter(row=>row.certainty==='nakijken').length}
+    };
+  }
+
   async function queueImportSync(record){
     await ImportStore.putSync({id:record.id,importId:record.id,queuedAt:new Date().toISOString(),attempts:0});
   }
@@ -219,11 +457,14 @@
       validate:candidate=>validateCore(candidate),
       normalizeIban,
       chunkRows,
+      parseBankCsv,
+      createImportDraft,
+      fingerprint,
+      classifyOriginal,
       importStore:ImportStore
     });
     Promise.resolve().then(()=>recoverJournal(root)).then(()=>flushImportSync(root)).catch(error=>console.warn('Update 4 opslaginitialisatie uitgesteld.',error));
   }
 
-  return {SCHEMA_VERSION,OWNERS,IMPORT_STATUSES,normalizeIban,normalizeRule,normalizeTransaction,normalizeCore,validateCore,chunkRows,ImportStore,queueImportSync,flushImportSync,recoverJournal,install,round2,uid,clone};
+  return {SCHEMA_VERSION,OWNERS,IMPORT_STATUSES,normalizeIban,normalizeRule,normalizeTransaction,normalizeCore,validateCore,chunkRows,normalizeText,detectDelimiter,parseDelimited,parseDate,parseAmount,detectFormat,inferMapping,hashText,fingerprint,organizationName,proposeType,recognitionProposal,classifyOriginal,parseBankCsv,findProfile,createImportDraft,ImportStore,queueImportSync,flushImportSync,recoverJournal,install,round2,uid,clone};
 });
-
