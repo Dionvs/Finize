@@ -7053,6 +7053,88 @@ body.v4-app[data-real-active-tab="gezamenlijk"] .joint-fixed-edit-btn svg{
     body.v4-app .v4-bottom-nav .bottom-nav-btn span:last-child{ font-size:7px !important; letter-spacing:-.02em; white-space:nowrap; }
   }
 }
+/* Update: ruimere mobiele spaardoelkaarten met volledige bedragen en inleglabels. */
+@media (max-width:767px){
+  body.v4-app .mobile-savings-kpis{
+    gap:4px !important;
+  }
+  body.v4-app .mobile-savings-kpis .card{
+    padding:8px 3px !important;
+    gap:2px !important;
+  }
+  body.v4-app .mobile-savings-kpis strong{
+    width:100%;
+    overflow:visible !important;
+    text-overflow:clip !important;
+    white-space:nowrap !important;
+    font-size:clamp(7.6px,2.15vw,9px) !important;
+    letter-spacing:-.055em;
+    font-variant-numeric:tabular-nums;
+  }
+  body.v4-app .joint-savings-primary-grid{
+    gap:4px !important;
+  }
+  body.v4-app .joint-savings-primary-grid.goal-count-2{
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  }
+  body.v4-app .joint-savings-primary-grid.goal-count-2 .joint-savings-primary-goal{
+    width:100% !important;
+    min-width:0 !important;
+  }
+  body.v4-app .joint-savings-primary-goal{
+    padding:6px 4px !important;
+    gap:2px !important;
+  }
+  body.v4-app .joint-savings-primary-goal strong,
+  body.v4-app .joint-savings-primary-goal > span:not(.joint-savings-goal-icon):not(.joint-savings-progress),
+  body.v4-app .joint-savings-primary-goal small{
+    overflow:visible !important;
+    text-overflow:clip !important;
+  }
+  body.v4-app .joint-savings-primary-goal.has-image .joint-savings-goal-icon{
+    display:none !important;
+  }
+  body.v4-app .joint-savings-primary-goal.has-image{
+    grid-template-rows:minmax(0,1fr) auto 6px auto auto auto !important;
+  }
+  body.v4-app .joint-savings-primary-goal .goal-inleg-breakdown{
+    display:flex !important;
+    align-items:center !important;
+    justify-content:flex-start !important;
+    justify-self:stretch !important;
+    width:100% !important;
+    max-width:100% !important;
+    min-width:0 !important;
+    margin:0 !important;
+    padding:0 !important;
+    gap:2px !important;
+    overflow:visible !important;
+  }
+  body.v4-app .joint-savings-primary-goal .goal-inleg-breakdown b{
+    flex:0 0 auto !important;
+    width:max-content !important;
+    max-width:none !important;
+    min-width:0 !important;
+    display:inline-flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+    gap:1px !important;
+    padding:3px 2px !important;
+    overflow:visible !important;
+    text-overflow:clip !important;
+    white-space:nowrap !important;
+    font-size:clamp(5.8px,1.55vw,6.6px) !important;
+    line-height:1.05 !important;
+    letter-spacing:-.055em !important;
+    font-variant-numeric:tabular-nums;
+  }
+  body.v4-app .joint-savings-primary-goal .goal-inleg-label,
+  body.v4-app .joint-savings-primary-goal .goal-inleg-value{
+    display:inline;
+    flex:0 0 auto !important;
+    white-space:nowrap !important;
+  }
+}
 </style>
 </head>
 <body class="v4-app">
@@ -7625,7 +7707,7 @@ function renderModernGoalCard(item, owner, opts={}){
   const progress = doelbedrag > 0 ? Math.min(1, algespaard / doelbedrag) : 0;
   const barPct = Math.round(progress * 100);
   const dateText = doel.doeldatum ? formatDateNL(doel.doeldatum) : 'Geen doeldatum';
-  const goalImage = String(doel.afbeelding || '').replace(/'/g,'%27');
+  const goalImage = String(goalImageSource(doel) || '').replace(/'/g,'%27');
   const goalThumbStyle = goalImage
     ? `background-image:url('${goalImage}'); box-shadow:none;`
     : `background:${goalThumbGradient(doel)}; color:#fff; box-shadow:none;`;
@@ -7663,21 +7745,21 @@ function goalNeededPerMonth(item){
   return `<span class="joint-savings-needed">Nodig p/m: ${item.benodigdPerMaand === null ? '—' : eur(item.benodigdPerMaand)}</span>`;
 }
 function goalImageStyle(goal){
-  const source = String(goal?.afbeelding || '').replace(/'/g,'%27');
+  const source = String(goalImageSource(goal) || '').replace(/'/g,'%27');
   return source ? ` style="background-image:linear-gradient(rgba(35,45,30,.47),rgba(35,45,30,.62)),url('${source}')"` : '';
 }
 function goalImageIcon(goal){
-  const source = String(goal?.afbeelding || '').replace(/'/g,'%27');
+  const source = String(goalImageSource(goal) || '').replace(/'/g,'%27');
   return `<span class="joint-savings-goal-icon${source?' has-image':''}"${source ? ` style="background-image:url('${source}')"` : ''}>${source ? '' : goalIcon(goal)}</span>`;
 }
 function renderJointSavingsOverviewCard(owner='gezamenlijk', savingPot=null){
   const r = calcScenario(state); const name = ownerLabel(owner);
   const goals = calcGroep(state.spaardoelen[owner] || [], savingPot ?? r.spaarpotDezeMaand, TODAY).sort((a,b)=>{ if (!!a.doel.favoriet !== !!b.doel.favoriet) return a.doel.favoriet ? -1 : 1; return (a.doel.doeldatum ? new Date(a.doel.doeldatum).getTime() : Infinity) - (b.doel.doeldatum ? new Date(b.doel.doeldatum).getTime() : Infinity); });
-  const primary = goals.length >= 3 ? goals.slice(0,3) : [];
-  const compact = goals.length >= 3 ? goals.slice(3) : goals;
-  const primaryHtml = primary.map(item=>{ const goal=item.doel,target=Number(goal.doelbedrag)||0,saved=Number(goal.algespaard)||0,progress=target>0?Math.min(100,Math.round(saved/target*100)):0; return `<button type="button" class="joint-savings-primary-goal${goal.afbeelding?' has-image':''}" data-tab-shortcut="spaardoelen"${goalImageStyle(goal)}>${goalImageIcon(goal)}<strong title="${textSafe(goal.naam || 'Spaardoel')}">${textSafe(goal.naam || 'Spaardoel')}</strong><span>${eur(saved)} / ${eur(target)}</span><span class="joint-savings-progress"><i style="width:${progress}%"></i></span><em>${progress}%</em>${goalNeededPerMonth(item)}${goalMonthlyInlegText(item)}</button>`; }).join('');
+  const primary = goals.length >= 2 ? goals.slice(0,Math.min(3,goals.length)) : [];
+  const compact = goals.length >= 3 ? goals.slice(3) : (goals.length === 1 ? goals : []);
+  const primaryHtml = primary.map(item=>{ const goal=item.doel,target=Number(goal.doelbedrag)||0,saved=Number(goal.algespaard)||0,progress=target>0?Math.min(100,Math.round(saved/target*100)):0,hasImage=!!goalImageSource(goal); return `<button type="button" class="joint-savings-primary-goal${hasImage?' has-image':''}" data-tab-shortcut="spaardoelen"${goalImageStyle(goal)}>${goalImageIcon(goal)}<strong title="${textSafe(goal.naam || 'Spaardoel')}">${textSafe(goal.naam || 'Spaardoel')}</strong><span>${eur(saved)} / ${eur(target)}</span><span class="joint-savings-progress"><i style="width:${progress}%"></i></span><em>${progress}%</em>${goalNeededPerMonth(item)}${goalMonthlyInlegText(item)}</button>`; }).join('');
   const compactHtml = compact.length ? `<div class="joint-savings-rest-row">${compact.map(item=>{ const goal=item.doel,target=Number(goal.doelbedrag)||0,saved=Number(goal.algespaard)||0,progress=target>0?Math.min(100,Math.round(saved/target*100)):0; return `<button type="button" class="joint-savings-rest-goal" data-tab-shortcut="spaardoelen">${goalImageIcon(goal)}<span class="joint-savings-rest-copy"><strong title="${textSafe(goal.naam || 'Spaardoel')}">${textSafe(goal.naam || 'Spaardoel')}</strong><span>${eur(saved)} / ${eur(target)}</span>${goalNeededPerMonth(item)}${goalMonthlyInlegText(item)}</span><em>${progress}%</em></button>`; }).join('')}</div>` : '';
-  return `<div class="card joint-single-card joint-savings-overview-card" aria-label="${name} spaardoelen"><div class="card-head joint-savings-card-head"><div class="card-head-title">${iconBadge('piggy', 'green', 'card-head-icon')}<h2>${owner === 'gezamenlijk' ? 'Gezamenlijke spaardoelen' : `${name} spaardoelen`}</h2></div><button type="button" class="ghost small" data-tab-shortcut="spaardoelen">Alle doelen</button></div>${primary.length ? `<div class="joint-savings-primary-grid">${primaryHtml}</div>` : ''}${compactHtml || (!primary.length ? `<p class="hint" style="margin:0">Nog geen spaardoelen van ${name}.</p>` : '')}</div>`;
+  return `<div class="card joint-single-card joint-savings-overview-card" aria-label="${name} spaardoelen"><div class="card-head joint-savings-card-head"><div class="card-head-title">${iconBadge('piggy', 'green', 'card-head-icon')}<h2>${owner === 'gezamenlijk' ? 'Gezamenlijke spaardoelen' : `${name} spaardoelen`}</h2></div><button type="button" class="ghost small" data-tab-shortcut="spaardoelen">Alle doelen</button></div>${primary.length ? `<div class="joint-savings-primary-grid goal-count-${primary.length}">${primaryHtml}</div>` : ''}${compactHtml || (!primary.length ? `<p class="hint" style="margin:0">Nog geen spaardoelen van ${name}.</p>` : '')}</div>`;
 }
 function renderDashboardGoalPreviewCard(item){
   const doel = item.doel || item;
@@ -7741,7 +7823,7 @@ function bankAmount(value){
   return Number(text);
 }
 function dataUrlByteSize(dataUrl){
-  const comma = String(dataUrl).indexOf(',');
+  const comma = String(dataUrl || '').indexOf(',');
   if (comma < 0) return 0;
   return Math.ceil(String(dataUrl).slice(comma + 1).length * 3 / 4);
 }
@@ -7749,24 +7831,33 @@ async function compressGoalImage(file){
   if (!file) return '';
   if (!String(file.type || '').startsWith('image/')) throw new Error('Kies een geldig afbeeldingsbestand.');
   if (file.size > 12000000) throw new Error('Kies een afbeelding kleiner dan 12 MB.');
-  const sourceUrl = URL.createObjectURL(file);
-  try{
-    const image = await new Promise((resolve,reject)=>{
-      const element = new Image();
-      element.onload = ()=>resolve(element);
-      element.onerror = ()=>reject(new Error('De afbeelding kon niet worden gelezen.'));
-      element.src = sourceUrl;
+
+  let bitmap = null;
+  let sourceUrl = '';
+  if ('createImageBitmap' in window){
+    bitmap = await createImageBitmap(file, {imageOrientation:'from-image'});
+  }else{
+    sourceUrl = URL.createObjectURL(file);
+    bitmap = await new Promise((resolve,reject)=>{
+      const image = new Image();
+      image.onload = ()=>resolve(image);
+      image.onerror = ()=>reject(new Error('De afbeelding kon niet worden gelezen.'));
+      image.src = sourceUrl;
     });
-    const scale = Math.min(1, 640 / Math.max(image.naturalWidth, image.naturalHeight));
-    let width = Math.max(1, Math.round(image.naturalWidth * scale));
-    let height = Math.max(1, Math.round(image.naturalHeight * scale));
+  }
+  try{
+    const sourceWidth = bitmap.width || bitmap.naturalWidth;
+    const sourceHeight = bitmap.height || bitmap.naturalHeight;
+    const scale = Math.min(1, 640 / Math.max(sourceWidth, sourceHeight));
+    let width = Math.max(1, Math.round(sourceWidth * scale));
+    let height = Math.max(1, Math.round(sourceHeight * scale));
     let result = '';
     for (let pass = 0; pass < 3; pass++){
       const canvas = document.createElement('canvas');
       canvas.width = width; canvas.height = height;
       const context = canvas.getContext('2d', {alpha:false});
       context.fillStyle = '#fffdfa'; context.fillRect(0,0,width,height);
-      context.drawImage(image,0,0,width,height);
+      context.drawImage(bitmap,0,0,width,height);
       for (const quality of [.82,.72,.62,.52,.44]){
         result = canvas.toDataURL('image/webp', quality);
         if (!result.startsWith('data:image/webp')) result = canvas.toDataURL('image/jpeg', quality);
@@ -7777,7 +7868,10 @@ async function compressGoalImage(file){
     }
     if (dataUrlByteSize(result) > 140000) throw new Error('De afbeelding kon niet klein genoeg worden gemaakt.');
     return result;
-  } finally { URL.revokeObjectURL(sourceUrl); }
+  } finally {
+    if (typeof bitmap?.close === 'function') bitmap.close();
+    if (sourceUrl) URL.revokeObjectURL(sourceUrl);
+  }
 }
 function bankColumnIndex(headers, patterns){
   return headers.findIndex(header=>patterns.some(pattern=>pattern.test(header)));
@@ -8185,6 +8279,123 @@ const FIREBASE_CONFIG_STORAGE_KEY = 'finize-firebase-config';
 const FIREBASE_SDK_VERSION = '11.10.0';
 const FIRESTORE_COLLECTION = 'budgetPlanners';
 const FIRESTORE_DOC_ID = 'finize';
+const GOAL_IMAGE_DB_NAME = 'finize-goal-images-v1';
+const GOAL_IMAGE_STORE_NAME = 'images';
+const GOAL_IMAGE_REF_PREFIX = 'idb:goal-image:';
+
+const GoalImageStore = {
+  dbPromise:null,
+  cache:new Map(),
+  ref(goalId){ return GOAL_IMAGE_REF_PREFIX + goalId; },
+  keyFromRef(value){
+    const raw = String(value || '');
+    return raw.startsWith(GOAL_IMAGE_REF_PREFIX) ? raw.slice(GOAL_IMAGE_REF_PREFIX.length) : '';
+  },
+  open(){
+    if (this.dbPromise) return this.dbPromise;
+    this.dbPromise = new Promise((resolve,reject)=>{
+      if (!('indexedDB' in window)){
+        reject(new Error('IndexedDB is niet beschikbaar op dit toestel.'));
+        return;
+      }
+      const request = indexedDB.open(GOAL_IMAGE_DB_NAME, 1);
+      request.onupgradeneeded = ()=>{
+        const db = request.result;
+        if (!db.objectStoreNames.contains(GOAL_IMAGE_STORE_NAME)) db.createObjectStore(GOAL_IMAGE_STORE_NAME);
+      };
+      request.onsuccess = ()=>resolve(request.result);
+      request.onerror = ()=>reject(request.error || new Error('Afbeeldingenopslag openen mislukt.'));
+    });
+    return this.dbPromise;
+  },
+  async transact(mode, action){
+    const db = await this.open();
+    return new Promise((resolve,reject)=>{
+      const tx = db.transaction(GOAL_IMAGE_STORE_NAME, mode);
+      const store = tx.objectStore(GOAL_IMAGE_STORE_NAME);
+      try{ action(store); }
+      catch(error){ reject(error); return; }
+      tx.oncomplete = ()=>resolve();
+      tx.onerror = ()=>reject(tx.error || new Error('Afbeeldingenopslag mislukt.'));
+      tx.onabort = ()=>reject(tx.error || new Error('Afbeeldingenopslag is afgebroken.'));
+    });
+  },
+  async put(goalId, dataUrl){
+    if (!goalId || !dataUrl) return;
+    await this.transact('readwrite', store=>store.put(String(dataUrl), String(goalId)));
+    this.cache.set(String(goalId), String(dataUrl));
+  },
+  async get(goalId){
+    const key = String(goalId || '');
+    if (!key) return '';
+    if (this.cache.has(key)) return this.cache.get(key) || '';
+    const db = await this.open();
+    const value = await new Promise((resolve,reject)=>{
+      const tx = db.transaction(GOAL_IMAGE_STORE_NAME, 'readonly');
+      const request = tx.objectStore(GOAL_IMAGE_STORE_NAME).get(key);
+      request.onsuccess = ()=>resolve(request.result || '');
+      request.onerror = ()=>reject(request.error || new Error('Afbeelding laden mislukt.'));
+    });
+    if (value) this.cache.set(key, value);
+    return value || '';
+  },
+  async remove(goalId){
+    const key = String(goalId || '');
+    if (!key) return;
+    await this.transact('readwrite', store=>store.delete(key));
+    this.cache.delete(key);
+  },
+  source(goal){
+    const raw = String(goal?.afbeelding || '');
+    const key = this.keyFromRef(raw);
+    if (key) return this.cache.get(key) || '';
+    return raw.startsWith('data:image/') ? raw : '';
+  },
+  async storeOrFallback(goalId, dataUrl){
+    if (!dataUrl) return '';
+    try{
+      await this.put(goalId, dataUrl);
+      return this.ref(goalId);
+    }catch(error){
+      console.warn('IndexedDB niet beschikbaar; spaardoelfoto blijft in lokale app-data.', error);
+      return dataUrl;
+    }
+  },
+  async initializeState(target){
+    let changed = false;
+    for (const owner of ['gezamenlijk','dion','dara']){
+      for (const goal of (target?.spaardoelen?.[owner] || [])){
+        const raw = String(goal.afbeelding || '');
+        if (raw.startsWith('data:image/')){
+          const stored = await this.storeOrFallback(goal.id, raw);
+          if (stored !== raw){ goal.afbeelding = stored; changed = true; }
+        }else{
+          const key = this.keyFromRef(raw);
+          if (key){
+            try{ await this.get(key); }
+            catch(error){ console.error('Spaardoelfoto laden mislukt', error); }
+          }
+        }
+      }
+    }
+    return changed;
+  },
+  async expandStateForTransfer(target){
+    for (const owner of ['gezamenlijk','dion','dara']){
+      for (const goal of (target?.spaardoelen?.[owner] || [])){
+        const key = this.keyFromRef(goal.afbeelding);
+        if (!key) continue;
+        const image = await this.get(key);
+        if (!image) throw new Error('Een lokaal opgeslagen spaardoelfoto kon niet worden geladen.');
+        goal.afbeelding = image;
+      }
+    }
+    return target;
+  }
+};
+
+function goalImageSource(goal){ return GoalImageStore.source(goal); }
+
 const DEFAULT_FIREBASE_CONFIG = {
   apiKey: 'AIzaSyCiJHGv9nlC_o4c2Xyj9UcyqHWW-YTxKfY',
   authDomain: 'financien-7dd43.firebaseapp.com',
@@ -8363,8 +8574,22 @@ function downloadJson(filename, data){
   URL.revokeObjectURL(a.href);
 }
 
+function isStorageQuotaError(error){
+  return error?.name === 'QuotaExceededError'
+    || error?.name === 'NS_ERROR_DOM_QUOTA_REACHED'
+    || error?.code === 22
+    || error?.code === 1014;
+}
+
 function localSave(state){
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  const serialized = JSON.stringify(state);
+  try{
+    localStorage.setItem(STORAGE_KEY, serialized);
+  }catch(error){
+    if (!isStorageQuotaError(error)) throw error;
+    localStorage.removeItem(BACKUP_STORAGE_KEY);
+    localStorage.setItem(STORAGE_KEY, serialized);
+  }
 }
 
 function firebaseConfigTemplate(){
@@ -8400,7 +8625,7 @@ const CloudAdapter = {
   app:null, db:null, docRef:null, modules:null, unsubscribe:null,
   status:'Offline — lokaal bewaard', saveTimer:null, applyingRemote:false,
   pendingState:null, writeInFlight:false, retryTimer:null, retryAttempt:0,
-  lastConfirmedRevision:0,
+  lastConfirmedRevision:0, lastFailureRetryable:true,
   config:loadFirebaseConfig(),
   statusText(){ return this.status; },
   isConfigured(){ return firebaseConfigIsComplete(this.config); },
@@ -8443,7 +8668,7 @@ const CloudAdapter = {
   attachSnapshot(){
     if (this.unsubscribe || !this.docRef) return;
     const {firestore} = this.modules;
-    this.unsubscribe = firestore.onSnapshot(this.docRef, snap=>{
+    this.unsubscribe = firestore.onSnapshot(this.docRef, async snap=>{
       if (!snap.exists()){
         this.status = 'Lokaal opgeslagen';
         renderCloudStatus();
@@ -8479,7 +8704,10 @@ const CloudAdapter = {
       this.applyingRemote = true;
       state = normalizedRemote;
       window.state = state;
-      try{ localSave(state); }catch(e){ console.error('lokale kopie Firestore-data opslaan mislukt', e); }
+      try{
+        await GoalImageStore.initializeState(state);
+        localSave(state);
+      }catch(e){ console.error('lokale kopie Firestore-data opslaan mislukt', e); }
       DataAdapter.loadedFromStorage = true;
       this.applyingRemote = false;
       this.lastConfirmedRevision = remoteRevision;
@@ -8513,6 +8741,7 @@ const CloudAdapter = {
       if (this.pendingState) return this.flushQueue();
       return true;
     }
+    if (!this.lastFailureRetryable) return false;
     if (!this.pendingState || Number(this.pendingState.meta?.revision) < Number(snapshot.meta?.revision)){
       this.pendingState = snapshot;
     }
@@ -8526,22 +8755,34 @@ const CloudAdapter = {
   },
   async saveNow(snapshot){
     if (!this.isConnected()) return false;
-    const validation = validateBudgetState(snapshot);
-    if (!validation.ok){
-      this.status = 'Synchronisatie mislukt';
-      renderCloudStatus();
-      return false;
-    }
+    this.lastFailureRetryable = true;
     try{
+      const cloudSnapshot = clone(snapshot);
+      await GoalImageStore.expandStateForTransfer(cloudSnapshot);
+      const payloadBytes = new Blob([JSON.stringify(cloudSnapshot)]).size;
+      if (payloadBytes > 900000){
+        this.lastFailureRetryable = false;
+        this.status = 'Synchronisatie mislukt';
+        console.error('Cloudopslag overgeslagen: app-data is groter dan 900 kB.');
+        renderCloudStatus();
+        return false;
+      }
+      const validation = validateBudgetState(cloudSnapshot);
+      if (!validation.ok){
+        this.lastFailureRetryable = false;
+        this.status = 'Synchronisatie mislukt';
+        renderCloudStatus();
+        return false;
+      }
       const {firestore} = this.modules;
       await firestore.setDoc(this.docRef, {
-        state:snapshot,
+        state:cloudSnapshot,
         updatedAt: firestore.serverTimestamp(),
-        revision:Number(snapshot.meta?.revision)||0,
-        updatedBy:snapshot.meta?.updatedBy || getDeviceId(),
+        revision:Number(cloudSnapshot.meta?.revision)||0,
+        updatedBy:cloudSnapshot.meta?.updatedBy || getDeviceId(),
         app: 'finize'
       }, {merge:true});
-      this.lastConfirmedRevision = Number(snapshot.meta?.revision)||0;
+      this.lastConfirmedRevision = Number(cloudSnapshot.meta?.revision)||0;
       this.status = this.pendingState ? 'Opslaan…' : 'Cloud opgeslagen';
       renderCloudStatus();
       return true;
@@ -9389,7 +9630,7 @@ function renderMobileGoalRow(item, owner){
   const target = Number(goal.doelbedrag)||0;
   const saved = Number(goal.algespaard)||0;
   const progress = Math.min(100, Math.round((item.voortgang||0)*100));
-  const goalImage = String(goal.afbeelding || '').replace(/'/g,'%27');
+  const goalImage = String(goalImageSource(goal) || '').replace(/'/g,'%27');
   const imageStyle = goalImage ? ` style="background-image:url('${goalImage}')"` : '';
   const iconToneClass = goalImage ? '' : ` tone-${owner === 'gezamenlijk' ? 'green' : owner}`;
   return `<div class="mobile-goal-row"><span class="mobile-goal-icon${iconToneClass}${goalImage ? ' has-image' : ''}"${imageStyle}>${goalImage ? '' : goalIcon(goal)}</span><div class="mobile-goal-main"><strong>${textSafe(goal.naam || 'Spaardoel')}</strong><span>${eur(saved)} van ${eur(target)}</span><div class="progress-track"><div class="progress-fill" style="width:${progress}%"></div></div><em class="mobile-goal-needed">Nodig p/m: ${item.benodigdPerMaand === null ? '—' : eur(item.benodigdPerMaand)}</em>${goalMonthlyInlegText(item)}<em>Doel: ${goal.doeldatum ? formatDateNL(goal.doeldatum) : 'Geen einddatum'}</em></div><div class="mobile-goal-side"><b>${progress}%</b><button type="button" class="ghost small" data-open-goal-editor="${owner}:${textSafe(goal.id)}">Bekijk doel</button></div></div>`;
@@ -9406,7 +9647,7 @@ function openMobileGoalEditor(owner,id){
   const name = ownerLabel(owner);
   modal.innerHTML = `<div class="modal goal-detail-editor"><div class="joint-variable-editor-header"><div><div class="section-kicker">${name} · ${monthLabel(getSelectedMonth())}</div><h2>Spaardoel bewerken</h2></div><button type="button" class="ghost" data-close-goal-editor>Sluiten</button></div><div class="modal-grid"><label class="full">Naam<input id="goalEditName" type="text" value="${textSafe(goal.naam || '')}"></label><label>Al gespaard<input id="goalEditSaved" type="number" step="0.01" inputmode="decimal" value="${Number(goal.algespaard)||0}"></label><label>Doelbedrag<input id="goalEditTarget" type="number" step="0.01" inputmode="decimal" value="${Number(goal.doelbedrag)||0}"></label><label>Doeldatum<input id="goalEditDate" type="date" value="${textSafe(goal.doeldatum || '')}"></label><label>Vaste inleg p/m<input id="goalEditMonthly" type="number" step="0.01" inputmode="decimal" value="${Number(goal.vasteInleg)||0}"></label><label class="goal-editor-fixed-only"><input id="goalEditFixedOnly" type="checkbox" ${goal.vastBedrag?'checked':''}> Alleen vaste inleg <span>— niet meedoen met verdeling naar rato</span></label><label>Rendement %<input id="goalEditReturn" type="number" step="0.01" inputmode="decimal" value="${Math.round((Number(goal.rendement)||0)*10000)/100}"></label><label>Periode<select id="goalEditPeriod"><option value="jaarlijks" ${goal.rendementPeriode !== 'maandelijks'?'selected':''}>Jaarlijks</option><option value="maandelijks" ${goal.rendementPeriode === 'maandelijks'?'selected':''}>Maandelijks</option></select></label><label class="full goal-editor-favorite"><input id="goalEditFavorite" type="checkbox" ${goal.favoriet?'checked':''}> Favoriet doel</label><section class="goal-calculation-card" id="goalEditCalculation"></section></div><div class="modal-actions"><button type="button" class="danger-ghost" id="goalEditDelete">Verwijderen</button><button type="button" class="primary" id="goalEditSave">Opslaan</button></div></div>`;
   modal.classList.add('open','goal-detail-editor-open');
-  let goalImageData = String(goal.afbeelding || '');
+  let goalImageData = String(goalImageSource(goal) || '');
   const imageField = document.createElement('label');
   imageField.className = 'full goal-image-field';
   imageField.innerHTML = `<span>Afbeelding</span><div class="goal-image-preview" ${goalImageData ? `style="background-image:url('${goalImageData.replace(/'/g,'%27')}')"` : ''}>${goalImageData ? '' : 'Geen afbeelding'}</div><input type="file" accept="image/*" id="goalEditImage"><small class="goal-image-status" id="goalEditImageStatus">Afbeeldingen worden automatisch verkleind voor betrouwbare opslag.</small><button type="button" class="ghost small" id="goalEditImageRemove" ${goalImageData ? '' : 'disabled'}>Afbeelding verwijderen</button>`;
@@ -9440,7 +9681,30 @@ function openMobileGoalEditor(owner,id){
   renderCalculation();
   const close=()=>{modal.classList.remove('open','goal-detail-editor-open');modal.innerHTML='';renderActiveTab();};
   modal.querySelector('[data-close-goal-editor]').addEventListener('click',close);
-  modal.querySelector('#goalEditSave').addEventListener('click',()=>{ if(imageProcessing||saveButton.disabled)return; const changes={naam:modal.querySelector('#goalEditName').value.trim(),algespaard:round2(bankAmount(modal.querySelector('#goalEditSaved').value)||0),doelbedrag:round2(bankAmount(modal.querySelector('#goalEditTarget').value)||0),doeldatum:modal.querySelector('#goalEditDate').value,vasteInleg:round2(bankAmount(modal.querySelector('#goalEditMonthly').value)||0),vastBedrag:modal.querySelector('#goalEditFixedOnly').checked,rendement:(bankAmount(modal.querySelector('#goalEditReturn').value)||0)/100,rendementPeriode:modal.querySelector('#goalEditPeriod').value,favoriet:modal.querySelector('#goalEditFavorite').checked,afbeelding:goalImageData}; saveButton.disabled=true; if(!commitChange(()=>updateItemById(`spaardoelen.${owner}`,id,changes),{render:false})){saveButton.disabled=false;alert('Opslaan is mislukt. Verwijder eventueel oude grote afbeeldingen en probeer opnieuw.');return;} showQuickToast('Spaardoel opgeslagen'); close(); });
+  modal.querySelector('#goalEditSave').addEventListener('click',async ()=>{
+    if(imageProcessing||saveButton.disabled)return;
+    const previousImage = goalImageSource(goal);
+    saveButton.disabled=true;
+    try{
+      const imageReference = await GoalImageStore.storeOrFallback(id, goalImageData);
+      const changes={naam:modal.querySelector('#goalEditName').value.trim(),algespaard:round2(bankAmount(modal.querySelector('#goalEditSaved').value)||0),doelbedrag:round2(bankAmount(modal.querySelector('#goalEditTarget').value)||0),doeldatum:modal.querySelector('#goalEditDate').value,vasteInleg:round2(bankAmount(modal.querySelector('#goalEditMonthly').value)||0),vastBedrag:modal.querySelector('#goalEditFixedOnly').checked,rendement:(bankAmount(modal.querySelector('#goalEditReturn').value)||0)/100,rendementPeriode:modal.querySelector('#goalEditPeriod').value,favoriet:modal.querySelector('#goalEditFavorite').checked,afbeelding:imageReference};
+      if(!commitChange(()=>updateItemById(`spaardoelen.${owner}`,id,changes),{render:false})) throw new Error('Lokale opslag is mislukt.');
+      if (!goalImageData){
+        try{ await GoalImageStore.remove(id); }
+        catch(error){ console.warn('Verwijderde spaardoelfoto kon niet uit IndexedDB worden opgeruimd.', error); }
+      }
+      showQuickToast('Spaardoel opgeslagen');
+      close();
+    }catch(error){
+      try{
+        if (previousImage) await GoalImageStore.put(id, previousImage);
+        else await GoalImageStore.remove(id);
+      }catch(ignore){}
+      console.error('Spaardoel opslaan mislukt', error);
+      alert('Opslaan is mislukt. De vorige gegevens zijn behouden.');
+      saveButton.disabled=false;
+    }
+  });
   modal.querySelector('#goalEditDelete').addEventListener('click',()=>{ close(); removeWithUndo(`spaardoelen.${owner}`,id,'Spaardoel verwijderd'); });
 }
 function openMobileGoalManager(owner){
@@ -9449,7 +9713,7 @@ function openMobileGoalManager(owner){
   const name = ownerLabel(owner);
   const r=calcScenario(state); const pot=owner==='gezamenlijk'?r.spaarpotDezeMaand:r[owner].beschikbaarVoorSparen;
   const items=calcGroep(goals,pot,TODAY);
-  const rows = items.map((item,index)=>{const goal=item.doel;const goalImage=String(goal.afbeelding||'').replace(/'/g,'%27');const imageStyle=goalImage?` style="background-image:url('${goalImage}')"`:'';return `<div class="goal-manager-row" data-open-manager-goal="${textSafe(goal.id)}" role="button" tabindex="0"><span class="goal-manager-goal-icon${goalImage?' has-image':''}"${imageStyle}>${goalImage?'':goalIcon(goal)}</span><span class="goal-manager-copy"><strong>${textSafe(goal.naam || 'Spaardoel')}</strong><small>${eur(Number(goal.algespaard)||0)} / ${eur(Number(goal.doelbedrag)||0)}</small></span><span class="goal-manager-metric"><span>Nodig p/m</span><b>${item.benodigdPerMaand === null ? '—' : eur(item.benodigdPerMaand)}</b></span><span class="goal-manager-metric"><span>Deze maand</span><b>${eur(item.werkelijkeInleg)}</b></span><span class="goal-manager-moves"><button type="button" data-move-manager-goal="${textSafe(goal.id)}:-1" ${index===0?'disabled':''} aria-label="Doel omhoog">▲</button><button type="button" data-move-manager-goal="${textSafe(goal.id)}:1" ${index===items.length-1?'disabled':''} aria-label="Doel omlaag">▼</button></span><button type="button" class="joint-fixed-row-delete-compact" data-remove-manager-goal="${textSafe(goal.id)}" aria-label="Doel verwijderen">×</button></div>`;}).join('');
+  const rows = items.map((item,index)=>{const goal=item.doel;const goalImage=String(goalImageSource(goal)||'').replace(/'/g,'%27');const imageStyle=goalImage?` style="background-image:url('${goalImage}')"`:'';return `<div class="goal-manager-row" data-open-manager-goal="${textSafe(goal.id)}" role="button" tabindex="0"><span class="goal-manager-goal-icon${goalImage?' has-image':''}"${imageStyle}>${goalImage?'':goalIcon(goal)}</span><span class="goal-manager-copy"><strong>${textSafe(goal.naam || 'Spaardoel')}</strong><small>${eur(Number(goal.algespaard)||0)} / ${eur(Number(goal.doelbedrag)||0)}</small></span><span class="goal-manager-metric"><span>Nodig p/m</span><b>${item.benodigdPerMaand === null ? '—' : eur(item.benodigdPerMaand)}</b></span><span class="goal-manager-metric"><span>Deze maand</span><b>${eur(item.werkelijkeInleg)}</b></span><span class="goal-manager-moves"><button type="button" data-move-manager-goal="${textSafe(goal.id)}:-1" ${index===0?'disabled':''} aria-label="Doel omhoog">▲</button><button type="button" data-move-manager-goal="${textSafe(goal.id)}:1" ${index===items.length-1?'disabled':''} aria-label="Doel omlaag">▼</button></span><button type="button" class="joint-fixed-row-delete-compact" data-remove-manager-goal="${textSafe(goal.id)}" aria-label="Doel verwijderen">×</button></div>`;}).join('');
   modal.innerHTML=`<div class="modal goal-manager-editor"><div class="joint-variable-editor-header"><div><div class="section-kicker">${name} · ${monthLabel(getSelectedMonth())}</div><h2>Spaardoelen beheren</h2><p>Tik op een doel voor alle instellingen en de berekening.</p></div><button type="button" class="ghost" data-close-goal-manager>Sluiten</button></div><div class="goal-manager-list">${rows || '<p class="hint">Nog geen spaardoelen.</p>'}</div><div class="joint-variable-editor-actions"><button type="button" class="primary" data-close-goal-manager>Klaar</button><button type="button" class="ghost" data-add-manager-goal>+ Spaardoel</button></div></div>`;
   modal.classList.add('open','goal-manager-editor-open');
   const close=()=>{modal.classList.remove('open','goal-manager-editor-open');modal.innerHTML='';renderActiveTab();};
@@ -9603,15 +9867,22 @@ service cloud.firestore {
       </div>
     </div>
   `;
-  document.getElementById('btnExport').addEventListener('click', ()=>{
-    downloadJson('dion-dara-budget-backup-' + new Date().toISOString().slice(0,10) + '.json', state);
+  document.getElementById('btnExport').addEventListener('click', async ()=>{
+    try{
+      const exportState = clone(state);
+      await GoalImageStore.expandStateForTransfer(exportState);
+      downloadJson('dion-dara-budget-backup-' + new Date().toISOString().slice(0,10) + '.json', exportState);
+    }catch(error){
+      console.error('Back-up exporteren mislukt', error);
+      alert('De back-up kon niet volledig worden gemaakt omdat een spaardoelfoto niet kon worden geladen.');
+    }
   });
   document.getElementById('btnImport').addEventListener('click', ()=> document.getElementById('fileImport').click());
   document.getElementById('fileImport').addEventListener('change', (e)=>{
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev)=>{
+    reader.onload = async (ev)=>{
       try{
         const imported = JSON.parse(ev.target.result);
         const validation = validateBudgetState(imported);
@@ -9627,6 +9898,7 @@ service cloud.firestore {
         DataAdapter.backup(state, 'voor import van ' + file.name);
         DataAdapter.backup(state, 'voor JSON-import');
         state = migrateBudgetState(imported); window.state = state;
+        await GoalImageStore.initializeState(state);
         commitChange(()=>{}, {render:false});
         renderActiveTab();
         alert('Back-up geimporteerd.');
@@ -9635,7 +9907,7 @@ service cloud.firestore {
     };
     reader.readAsText(file);
   });
-  document.getElementById('btnRestoreBackup').addEventListener('click', ()=>{
+  document.getElementById('btnRestoreBackup').addEventListener('click', async ()=>{
     const backup = DataAdapter.loadBackup();
     if (!backup || !backup.state){
       alert('Er is nog geen lokale nood-back-up gevonden.');
@@ -9651,6 +9923,7 @@ service cloud.firestore {
       DataAdapter.backup(state, 'voor herstel lokale nood-back-up');
       DataAdapter.backup(state, 'voor herstel lokale back-up');
       state = migrateBudgetState(backup.state); window.state = state;
+      await GoalImageStore.initializeState(state);
       commitChange(()=>{}, {render:false});
       renderActiveTab();
     }
@@ -10939,8 +11212,17 @@ document.getElementById('btnCopyPreviousMonth').addEventListener('click', ()=>{
   }
 });
 
-renderActiveTab();
-CloudAdapter.connect();
+async function initializeApp(){
+  try{
+    const imagesMigrated = await GoalImageStore.initializeState(state);
+    if (imagesMigrated) localSave(state);
+  }catch(error){
+    console.warn('Lokale spaardoelfoto-opslag kon niet worden voorbereid.', error);
+  }
+  renderActiveTab();
+  CloudAdapter.connect();
+}
+initializeApp();
 
 </script>
 <script>
