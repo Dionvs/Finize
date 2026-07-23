@@ -12345,15 +12345,12 @@ function u3NetAdvances(month=getSelectedMonth()){
   const pairs=new Map();
   u3OpenAdvances(month).forEach(row=>{
     const forward=`${row.debtor}|${row.creditor}`;
-    const reverse=`${row.creditor}|${row.debtor}`;
     const amount=Number(row.outstandingAmount)||0;
-    if(pairs.has(reverse))pairs.set(reverse,pairs.get(reverse)-amount);
-    else pairs.set(forward,(pairs.get(forward)||0)+amount);
+    pairs.set(forward,(pairs.get(forward)||0)+amount);
   });
   const result=[];
   pairs.forEach((amount,key)=>{
     let [debtor,creditor]=key.split('|');
-    if(amount<0){[debtor,creditor]=[creditor,debtor];amount=Math.abs(amount);}
     if(amount>.004)result.push({debtor,creditor,amount:round2(amount)});
   });
   return result;
@@ -12379,7 +12376,8 @@ function u3TransferDrafts(month,closureId,scenarioResult){
   add('gezamenlijk-sparen','gezamenlijk','',Math.max(0,scenarioResult.spaarpotDezeMaand),'Gezamenlijke spaarrekening');
   add('dion-sparen','dion','',Math.max(0,scenarioResult.dion.beschikbaarVoorSparen),'Dion spaarrekening');
   add('dara-sparen','dara','',Math.max(0,scenarioResult.dara.beschikbaarVoorSparen),'Dara spaarrekening');
-  u3NetAdvances(month).forEach(row=>add('voorschot',row.debtor,row.creditor,row.amount,`Voorschot naar ${ownerLabel(row.creditor)}`));
+  // Update 4: open voorschotten blijven informatief en worden alleen door een
+  // expliciet als terugbetaling gemarkeerde banktransactie afgelost.
   return drafts;
 }
 function u3MonthSummary(month=getSelectedMonth()){

@@ -63,7 +63,10 @@ assert.equal(accounts.gezamenlijk.calculatedEnd,500);
 const advance = context.u3CreateAdvanceForTransaction(state.transactions[0]);
 assert.deepEqual({debtor:advance.debtor,creditor:advance.creditor,amount:advance.originalAmount},{debtor:'gezamenlijk',creditor:'dion',amount:100});
 state.advanceLedger.push({id:'reverse',month:'2026-07',debtor:'dion',creditor:'gezamenlijk',originalAmount:40,outstandingAmount:40,status:'open',createdAt:'2026-07-02',settlementTransferIds:[]});
-assert.deepEqual(JSON.parse(JSON.stringify(context.u3NetAdvances('2026-07'))),[{debtor:'gezamenlijk',creditor:'dion',amount:60}]);
+assert.deepEqual(JSON.parse(JSON.stringify(context.u3NetAdvances('2026-07'))),[
+  {debtor:'gezamenlijk',creditor:'dion',amount:100},
+  {debtor:'dion',creditor:'gezamenlijk',amount:40}
+]);
 
 state.transactionReviewQueue.push({id:'pending',date:'2026-07-08',reviewStatus:'te-controleren'});
 assert.equal(context.u3CloseMonth('2026-07').requiresWarning,true);
@@ -77,10 +80,8 @@ const secondClose=context.u3CloseMonth('2026-07',{gezamenlijk:500,dion:175,dara:
 assert.notEqual(secondClose.id,firstClose.id);
 assert.equal(state.monthRecords['2026-07'].closureHistory.length,2);
 
-const settlement=state.internalTransfers.find(row=>String(row.type).includes('voorschot')&&row.sourceAccount==='gezamenlijk'&&row.targetAccount==='dion');
-assert.ok(settlement,'Voorschotvoorstel ontbreekt');
-context.u3ConfirmTransfer(settlement.id,30,'2026-08-01');
-assert.equal(state.advanceLedger.find(row=>row.id==='advance-joint-groceries').outstandingAmount,70);
+const settlement=state.internalTransfers.find(row=>String(row.type).includes('voorschot'));
+assert.equal(settlement,undefined,'Maandafsluiting mag voorschotten niet automatisch aflossen');
 assert.equal(context.u3ActualIncome('2026-07'),0);
 assert.equal(context.u3ActualExpenses('2026-07'),125);
 

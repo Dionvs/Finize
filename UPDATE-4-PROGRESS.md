@@ -82,3 +82,17 @@
   - importsamenvatting na verwerking.
 - Tests: splits, gesloten maand, fysieke rekeningmutatie, voorschottelling, invalidatie en idempotent opnieuw toepassen.
 - Resterend: fasen 5 t/m 7.
+
+## Fase 5 — Sparen, interne overboekingen en verrekenen
+
+- Status: afgerond
+- Uitgevoerd:
+  - deterministische spaardoelledger met idempotente doelcorrectie;
+  - voorgestelde paren voor twee kanten van een interne overboeking;
+  - directionele voorschotten zonder automatische nettosaldering;
+  - maandafsluiting maakt geen automatische voorschotaflossingen meer;
+  - handmatig type `terugbetaling-voorschot` met oudste-eerst voorstel;
+  - gedeeltelijke allocaties over open voorschotten;
+  - dashboardkaart en detailvenster met persoon- en maandfilter.
+- Tests: directionele tegengestelde saldi, oudste-eerst, spaardoelimpact en idempotentie.
+- Resterend: fasen 6 en 7.
