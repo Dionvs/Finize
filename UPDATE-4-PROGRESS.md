@@ -48,3 +48,20 @@
 - Tests: Dion-, Dara- en gezamenlijke ING-fixture, overlap, conflict en eigenaar-isolatie.
 - Openstaand: definitieve controle met drie echte geanonimiseerde ING-exports.
 - Resterend: fasen 3 t/m 7.
+
+## Fase 3 — Full-screen importinterface
+
+- Status: afgerond
+- Uitgevoerd:
+  - gedeeld dashboardblok op desktop en mobiel;
+  - full-screen conceptmodal met sticky verwerkingsactie;
+  - Nakijken open, Zeker ingeklapt en duplicaten compact;
+  - rekeningprofiel kiezen of aanmaken;
+  - datum, bedrag, budgeteigenaar, categorie, type en status bewerken;
+  - Meer opties, vaste last, spaardoel, voorschot, Niet meetellen, notitie en splits;
+  - conceptwijzigingen direct naar IndexedDB;
+  - maximaal drie importbonnetjes en alle-importsweergave;
+  - beheerscherm voor regels zonder eigenaarvelden;
+  - responsieve layout voor 384/430 px en desktop.
+- Tests: UI-markers, externe assets en mobiele CSS-structuur.
+- Resterend: fasen 4 t/m 7.

@@ -1,0 +1,49 @@
+.u4-import-panel{display:grid;gap:12px}
+.u4-import-actions,.u4-import-summary,.u4-import-row-main,.u4-receipt-head,.u4-modal-head,.u4-modal-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.u4-import-actions input[type=file]{position:absolute;inline-size:1px;block-size:1px;opacity:0;pointer-events:none}
+.u4-concept-banner{padding:12px;border:1px solid #e0c994;border-radius:14px;background:#fff7df;color:#594715}
+.u4-import-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.u4-import-summary>div{display:grid;gap:2px;padding:9px;border:1px solid var(--border-soft);border-radius:12px;background:var(--surface-2)}
+.u4-import-summary span,.u4-muted{font-size:10px;color:var(--text-dim)}
+.u4-import-receipts{display:grid;gap:8px}
+.u4-receipt{padding:10px;border:1px solid var(--border);border-radius:13px;background:var(--surface)}
+.u4-status{display:inline-flex;padding:4px 8px;border-radius:999px;background:#edf3e6;color:var(--green);font-size:10px;font-weight:800}
+.u4-status.concept{background:#fff1cf;color:#75550a}
+.u4-status.teruggedraaid{background:#eee;color:#666}
+#u4ImportModalRoot{position:fixed;inset:0;z-index:10000;display:none;background:rgba(37,28,22,.46);backdrop-filter:blur(5px)}
+#u4ImportModalRoot.open{display:block}
+.u4-import-modal{height:100dvh;width:100%;display:grid;grid-template-rows:auto 1fr auto;background:var(--bg);color:var(--text)}
+.u4-modal-head{padding:14px 18px;border-bottom:1px solid var(--border);background:var(--surface);position:relative;z-index:2}
+.u4-modal-head h2,.u4-modal-head p{margin:0}
+.u4-modal-body{overflow:auto;padding:16px 18px 120px;display:grid;align-content:start;gap:14px}
+.u4-modal-actions{position:fixed;left:0;right:0;bottom:0;padding:12px 18px calc(12px + env(safe-area-inset-bottom));background:rgba(255,253,250,.96);border-top:1px solid var(--border);box-shadow:0 -8px 24px rgba(50,35,25,.08);z-index:10002}
+.u4-section{border:1px solid var(--border);border-radius:16px;background:var(--surface);overflow:hidden}
+.u4-section>summary{padding:13px 15px;font-weight:900;cursor:pointer;display:flex;justify-content:space-between}
+.u4-section-list{display:grid;gap:9px;padding:0 10px 10px}
+.u4-import-row{border:1px solid var(--border-soft);border-radius:13px;padding:10px;background:#fffdf9}
+.u4-import-row-main{align-items:flex-start}
+.u4-import-row-main>div:first-child{min-width:180px;flex:1}
+.u4-import-row-main strong{display:block}
+.u4-row-grid,.u4-more-grid,.u4-profile-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:9px}
+.u4-row-grid label,.u4-more-grid label,.u4-profile-grid label{display:grid;gap:4px;font-size:10px;color:var(--text-dim)}
+.u4-row-grid input,.u4-row-grid select,.u4-more-grid input,.u4-more-grid select,.u4-profile-grid input,.u4-profile-grid select{width:100%;min-width:0}
+.u4-row-grid .wide,.u4-more-grid .wide,.u4-profile-grid .wide{grid-column:span 2}
+.u4-row-reasons{font-size:10px;color:#8a6111;margin-top:5px}
+.u4-original{padding:8px;border-radius:10px;background:#f5f1eb;font-size:10px;line-height:1.45;overflow-wrap:anywhere}
+.u4-split-list{display:grid;gap:6px;margin-top:8px}
+.u4-split-row{display:grid;grid-template-columns:110px 1fr 1fr auto;gap:6px}
+.u4-error{color:var(--red);font-weight:800}
+.u4-empty{padding:18px;text-align:center;color:var(--text-dim)}
+@media(max-width:700px){
+  .u4-import-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .u4-modal-head{padding:10px 12px}
+  .u4-modal-body{padding:10px 10px 120px}
+  .u4-modal-actions{padding:10px calc(10px + env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) calc(10px + env(safe-area-inset-left))}
+  .u4-row-grid,.u4-more-grid,.u4-profile-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .u4-import-row-main{display:grid}
+  .u4-split-row{grid-template-columns:90px 1fr;align-items:end}
+}
+@media(max-width:390px){
+  .u4-import-summary,.u4-row-grid,.u4-more-grid,.u4-profile-grid{grid-template-columns:1fr}
+  .u4-row-grid .wide,.u4-more-grid .wide,.u4-profile-grid .wide{grid-column:auto}
+}

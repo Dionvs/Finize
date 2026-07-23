@@ -7278,6 +7278,7 @@ body.v4-app[data-real-active-tab="gezamenlijk"] .joint-fixed-edit-btn svg{
   .u3-budget-row span:nth-child(3),.u3-budget-row span:nth-child(4){display:none}
 }
 </style>
+<link rel="stylesheet" href="./update4.css">
 </head>
 <body class="v4-app">
 
@@ -9927,7 +9928,7 @@ function renderDashboard(){
     </div>
     <div class="manage-stack">
       ${renderU3AdminPanel()}
-      <div class="v4-mobile-only-block">${renderManageSection('Bank import & uitgaven', renderBankImportSection(), bankImportOpen)}</div>
+      <div>${renderManageSection('Bank import & uitgaven', renderBankImportSection(), bankImportOpen)}</div>
       ${renderManageSection(`Jaaroverzicht ${year}`, `<div class="card"><div class="year-legend top"><span><i class="income-dot"></i>Inkomen</span><span><i class="spent-dot"></i>Uitgaven</span><span><i class="saving-dot"></i>Sparen</span></div><div class="year-summary"><div><span>Inkomen dit jaar</span><strong class="value pos">${eur(yearTotals.income)}</strong></div><div><span>Uitgaven dit jaar</span><strong class="value neg">${eur(yearTotals.spent)}</strong></div><div><span>Sparen dit jaar</span><strong class="value pos">${eur(yearTotals.saving)}</strong></div></div><div class="year-chart">${monthBars}</div></div>`, false)}
     </div>
   `;
