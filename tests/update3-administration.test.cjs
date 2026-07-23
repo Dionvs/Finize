@@ -83,6 +83,10 @@ assert.equal(state.monthRecords['2026-07'].closureHistory.length,2);
 const settlement=state.internalTransfers.find(row=>String(row.type).includes('voorschot'));
 assert.equal(settlement,undefined,'Maandafsluiting mag voorschotten niet automatisch aflossen');
 assert.equal(context.u3ActualIncome('2026-07'),0);
+state.transactions.push({id:'salary',date:'2026-07-25',kind:'inkomen',amount:2500,account:'gezamenlijk',financialFor:'gezamenlijk',owner:'gezamenlijk',reviewStatus:'bevestigd'});
+assert.equal(context.u3ActualIncome('2026-07'),2500);
+state.actualIncomeOverrides={'2026-07':{total:2475}};
+assert.equal(context.u3ActualIncome('2026-07'),2475,'handmatige override staat los van de salaristransactie');
 assert.equal(context.u3ActualExpenses('2026-07'),125);
 
 console.log('UPDATE3_ADMINISTRATION_OK');

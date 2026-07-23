@@ -331,6 +331,7 @@
         budgetOwner:profile?.accountOwner||'',
         budgetItemId:proposal?.rule?.budgetItemId||'',
         fixedExpenseId:proposal?.rule?.fixedExpenseId||'',
+        fixedAmountMode:'none',
         savingsGoalId:proposal?.rule?.savingsGoalId||'',
         splits:[],
         advanceMode:'auto',
@@ -457,6 +458,13 @@
     if(!id)return true;
     return ['voor','na'].some(scenario=>(state.recurringFixedExpenses?.[scenario]||[]).some(item=>item.id===id));
   }
+  function findFixedItem(state,id){
+    for(const scenario of ['voor','na']){
+      const item=(state.recurringFixedExpenses?.[scenario]||[]).find(row=>row.id===id);
+      if(item)return {scenario,item};
+    }
+    return null;
+  }
   function validateDraft(draft,state){
     const errors=[];
     const profile=(state.accountProfiles||[]).find(item=>item.id===draft.accountProfileId);
@@ -548,7 +556,7 @@
     const validation=validateDraft(draft,state);
     if(!validation.ok)return {ok:false,errors:validation.errors};
     const profile=state.accountProfiles.find(item=>item.id===draft.accountProfileId);
-    const transactions=[];const replacements=[];const savingsEntries=[];const advances=[];const repayments=[];const affectedMonths=new Set();const counts={expenses:0,income:0,internal:0,savings:0,refunds:0,advances:0,uncategorized:0};
+    const transactions=[];const replacements=[];const savingsEntries=[];const advances=[];const repayments=[];const fixedAdjustments=[];const affectedMonths=new Set();const counts={expenses:0,income:0,internal:0,savings:0,refunds:0,advances:0,uncategorized:0};
     for(const row of draft.rows.filter(item=>item.bankOriginal.valid&&!item.duplicate)){
       const p=row.processing;const type=p.include===false?'niet-meetellen':p.transactionType;
       financialRows(row).forEach(part=>{
@@ -578,9 +586,20 @@
         const manual=state.transactions.find(tx=>tx.id===p.manualMatchId&&!tx.importBatchId);
         if(manual)replacements.push({id:`replacement-${draft.id}-${manual.id}`,manualTransaction:clone(manual),replacementTransactionId:transactions.find(tx=>tx.importTransactionId===row.id)?.id||''});
       }
+      if(p.fixedExpenseId&&['month','from'].includes(p.fixedAmountMode)){
+        const found=findFixedItem(state,p.fixedExpenseId);
+        if(found&&!fixedAdjustments.some(item=>item.fixedExpenseId===p.fixedExpenseId&&item.month===String(p.processingDate).slice(0,7))){
+          fixedAdjustments.push({
+            id:`fixed-adjustment-${draft.id}-${p.fixedExpenseId}-${String(p.processingDate).slice(0,7)}`,
+            fixedExpenseId:p.fixedExpenseId,scenario:found.scenario,month:String(p.processingDate).slice(0,7),
+            mode:p.fixedAmountMode,amount:round2(p.processedAmount),
+            before:{amountHistory:clone(found.item.amountHistory||[]),monthOverrides:clone(found.item.monthOverrides||{})}
+          });
+        }
+      }
     }
     const internalPairs=detectInternalPairs(transactions,state);
-    return {ok:true,importId:draft.id,transactions,replacements,savingsEntries,advances,repayments,internalPairs,affectedMonths:[...affectedMonths],counts,duplicateCount:draft.summary.duplicateCount||0,totalIncome:draft.summary.totalIncome,totalExpenses:draft.summary.totalExpenses};
+    return {ok:true,importId:draft.id,transactions,replacements,savingsEntries,advances,repayments,internalPairs,fixedAdjustments,affectedMonths:[...affectedMonths],counts,duplicateCount:draft.summary.duplicateCount||0,totalIncome:draft.summary.totalIncome,totalExpenses:draft.summary.totalExpenses};
   }
   function findGoal(state,id){
     for(const owner of OWNERS){const goal=(state.spaardoelen?.[owner]||[]).find(item=>item.id===id);if(goal)return goal;}
@@ -613,6 +632,16 @@
     });
     state.internalTransferPairs=state.internalTransferPairs||[];
     plan.internalPairs.forEach(pair=>{if(!state.internalTransferPairs.some(item=>item.id===pair.id))state.internalTransferPairs.push(clone(pair));});
+    (plan.fixedAdjustments||[]).forEach(adjustment=>{
+      const found=findFixedItem(state,adjustment.fixedExpenseId);if(!found)return;
+      const item=found.item;item.amountHistory=Array.isArray(item.amountHistory)?item.amountHistory:[];item.monthOverrides=plain(item.monthOverrides)?item.monthOverrides:{};
+      if(adjustment.mode==='month')item.monthOverrides[adjustment.month]=adjustment.amount;
+      else{
+        delete item.monthOverrides[adjustment.month];
+        item.amountHistory=item.amountHistory.filter(row=>String(row.effectiveFrom||'').slice(0,7)!==adjustment.month);
+        item.amountHistory.push({id:`amount-${item.id}-${adjustment.month}`,effectiveFrom:`${adjustment.month}-01`,amount:adjustment.amount});
+      }
+    });
     state.monthRecords=state.monthRecords||{};
     plan.affectedMonths.forEach(month=>{
       const record=state.monthRecords[month];
@@ -634,6 +663,7 @@
       advanceIds:plan.advances.map(item=>item.id),
       repaymentIds:plan.repayments.map(item=>item.id),
       internalPairIds:plan.internalPairs.map(item=>item.id),
+      fixedAdjustments:clone(plan.fixedAdjustments||[]),
       affectedMonths:plan.affectedMonths,
       counts:clone(plan.counts)
     };
@@ -665,6 +695,11 @@
     state.savingsGoalLedger=state.savingsGoalLedger.filter(item=>!savingIds.has(item.id));
     state.advanceLedger=(state.advanceLedger||[]).filter(item=>!advanceIds.has(item.id));
     state.internalTransferPairs=(state.internalTransferPairs||[]).filter(item=>!pairIds.has(item.id));
+    (manifest.fixedAdjustments||[]).forEach(adjustment=>{
+      const found=findFixedItem(state,adjustment.fixedExpenseId);if(!found)return;
+      found.item.amountHistory=clone(adjustment.before?.amountHistory||[]);
+      found.item.monthOverrides=clone(adjustment.before?.monthOverrides||{});
+    });
 
     state.manualTransactionReplacements=state.manualTransactionReplacements||[];
     state.manualTransactionReplacements.filter(item=>replacementIds.has(item.id)).forEach(replacement=>{
@@ -805,6 +840,7 @@
         <div class="u4-original wide">Origineel: ${esc(original.bankDate)} · ${euro(original.amount)}<br>${esc(original.accountIdentifier||'Geen rekeningkenmerk')} → ${esc(original.counterpartyAccount||'Geen tegenrekening')}<br>Regel ${Number(original.lineNumber)||'—'} · ${esc(original.fingerprint)}</div>
         <label>Budgetpost<input data-u4-field="budgetItemId" value="${esc(p.budgetItemId)}"></label>
         <label>Vaste last<select data-u4-field="fixedExpenseId">${fixedOptions(root,p.fixedExpenseId)}</select></label>
+        <label>Afwijkend vast bedrag<select data-u4-field="fixedAmountMode">${option('none','Planning niet aanpassen',p.fixedAmountMode||'none')}${option('month','Alleen deze maand',p.fixedAmountMode)}${option('from','Vanaf deze maand',p.fixedAmountMode)}</select></label>
         <label>Spaardoel<select data-u4-field="savingsGoalId">${goalOptions(root,p.savingsGoalId)}</select></label>
         <label>Voorschot<select data-u4-field="advanceMode">${option('auto','Automatisch bij andere eigenaar',p.advanceMode)}${option('none','Geen voorschot',p.advanceMode)}${option('force','Altijd voorschot',p.advanceMode)}</select></label>
         <label>Meetellen<select data-u4-field="include">${option('true','Meetellen',String(p.include))}${option('false','Niet meetellen',String(p.include))}</select></label>

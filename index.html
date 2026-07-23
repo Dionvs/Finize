@@ -7284,7 +7284,7 @@ body.v4-app[data-real-active-tab="gezamenlijk"] .joint-fixed-edit-btn svg{
 
 <aside class="v4-sidebar">
   <div class="v4-sidebar-brand">
-    <img src="finize-logo-icon.png" alt="Finize logo">
+    <img src="finize-logo.png" alt="Finize logo">
     <div>
       <h1>Finize</h1>
       <div class="v4-sidebar-sub">Huishoudbudget</div>
@@ -12242,7 +12242,9 @@ function u3IncomeForOwner(owner,options={}){
     .reduce((sum,row)=>sum+u3IncomeOccurrenceValue(row),0));
 }
 function u3ActualIncome(month=getSelectedMonth(),financialFor=null){
-  return round2(u3ConfirmedTransactions(month).filter(tx=>tx.kind==='inkomen' && (!financialFor||(tx.financialFor||tx.owner)===financialFor)).reduce((sum,tx)=>sum+Math.abs(Number(tx.amount)||0),0));
+  const calculated=round2(u3ConfirmedTransactions(month).filter(tx=>tx.kind==='inkomen' && (!financialFor||(tx.financialFor||tx.owner)===financialFor)).reduce((sum,tx)=>sum+Math.abs(Number(tx.amount)||0),0));
+  const override=state.actualIncomeOverrides?.[month];
+  return !financialFor&&Number.isFinite(Number(override?.total))?round2(Number(override.total)):calculated;
 }
 function u3ActualExpenses(month=getSelectedMonth(),financialFor=null){
   return round2(u3ConfirmedTransactions(month).filter(tx=>tx.kind!=='inkomen' && tx.kind!=='interne-overboeking' && tx.kind!=='niet-meetellen' && (!financialFor||(tx.financialFor||tx.owner)===financialFor)).reduce((sum,tx)=>sum+Number(tx.expenseImpact??Math.abs(Number(tx.amount)||0)),0));
@@ -12511,8 +12513,9 @@ function renderU3AdminPanel(){
   const record=state.monthRecords?.[month];
   const pending=u3PendingReviews(month).length;
   const control=u3AccountControl(month);
-  const status=record?.status==='afgesloten'?'closed':pending?'pending':'ok';
-  const statusLabel=record?.status==='afgesloten'?'Afgesloten':pending?`${pending} te controleren`:'Klaar voor controle';
+  const needsCorrection=record?.status==='correctie-nodig';
+  const status=record?.status==='afgesloten'?'closed':needsCorrection||pending?'pending':'ok';
+  const statusLabel=record?.status==='afgesloten'?'Afgesloten':needsCorrection?'Correctie nodig':pending?`${pending} te controleren`:'Klaar voor controle';
   return `<section class="card u3-admin-card">
     <div class="u3-admin-head"><div><div class="section-kicker">Update 3</div><h2>Maandadministratie</h2><p>Verwacht, werkelijk, rekeningen, reserve en onderlinge voorschotten</p></div><span class="u3-status ${status}">${statusLabel}</span></div>
     <div class="u3-admin-metrics">
@@ -12524,6 +12527,7 @@ function renderU3AdminPanel(){
     <div class="u3-admin-actions">
       <button type="button" class="ghost small" data-u3-open="planning">Vaste lasten & inkomsten</button>
       <button type="button" class="${pending?'primary':'ghost'} small" data-u3-open="review">Transacties controleren${pending?` (${pending})`:''}</button>
+      <button type="button" class="ghost small" data-u3-open="actual-income">Werkelijk inkomen aanpassen</button>
       <button type="button" class="ghost small" data-u3-open="close">Maandafsluiting</button>
       <button type="button" class="ghost small" data-u3-open="transfers">Overboekingen</button>
     </div>
@@ -12534,6 +12538,22 @@ function bindU3Admin(root){
     const view=button.dataset.u3Open;
     if(view==='planning')u3OpenPlanning();
     else if(view==='review')u3OpenReview();
+    else if(view==='actual-income'){
+      const month=getSelectedMonth();
+      const current=state.actualIncomeOverrides?.[month]?.total;
+      const value=prompt(`Werkelijk inkomen voor ${month}. Laat leeg om de handmatige correctie te verwijderen.`,Number.isFinite(Number(current))?String(current):String(u3ActualIncome(month)));
+      if(value===null)return;
+      const ok=commitChange(()=>{
+        state.actualIncomeOverrides=isPlainObject(state.actualIncomeOverrides)?state.actualIncomeOverrides:{};
+        if(!String(value).trim())delete state.actualIncomeOverrides[month];
+        else{
+          const amount=round2(bankAmount(value));
+          if(!Number.isFinite(amount)||amount<0)throw new Error('Vul een geldig positief bedrag in.');
+          state.actualIncomeOverrides[month]={total:amount,updatedAt:new Date().toISOString()};
+        }
+      });
+      if(!ok)alert('Werkelijk inkomen aanpassen is niet opgeslagen.');
+    }
     else if(view==='close')u3OpenClose();
     else if(view==='transfers')u3OpenTransfers();
   }));

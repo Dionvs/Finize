@@ -110,3 +110,17 @@
   - achteraf aanpassen gebruikt in één lokale operatie eerst undo en daarna dezelfde effectplanner als de import.
 - Tests: volledig herstel, gesloten maand, handmatige vervanging en dubbele undo.
 - Resterend: fase 7.
+
+## Fase 7 — Regressie en afronding
+
+- Status: afgerond
+- Uitgevoerd:
+  - gerichte tests voor migratie v1–v5, parser, classificatie, profielen, duplicaten, splits, verwerking, sparen, voorschotten, undo en herstel;
+  - synthetische ING-fixtures voor Dion, Dara en gezamenlijk;
+  - handmatige override voor werkelijk inkomen, los van verwachte en geïmporteerde inkomsten;
+  - keuze om een afwijkende vaste last alleen deze maand of vanaf deze maand in de planning te verwerken;
+  - documentatie voor datamodel, changelog en handmatige controle;
+  - PWA-cachemarker verhoogd naar `finize-v15-update4-bankimport`;
+  - Update 4-assets toegevoegd aan de offline app-shell.
+- Controles: JavaScript-syntax, service worker, HTML-structuur, volledige Node-testset, diffcontrole en lokale browserconsole.
+- Open externe acceptatiestap: de drie echte geanonimiseerde ING-exports zijn nog niet aangeleverd. Tot die tijd bewijzen synthetische fixtures de codepaden, niet de exacte kolomvarianten van die drie bestanden.

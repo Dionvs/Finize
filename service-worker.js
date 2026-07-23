@@ -1,8 +1,10 @@
-const CACHE_NAME = "finize-v14-maandadministratie";
+const CACHE_NAME = "finize-v15-update4-bankimport";
 
 const APP_SHELL = [
   "./",
   "./index.html",
+  "./update4.js",
+  "./update4.css",
   "./finize-v4.html",
   "./finize-mobile.html",
   "./manifest.json",
