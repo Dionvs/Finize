@@ -66,7 +66,7 @@ state.advanceLedger.push({id:'reverse',month:'2026-07',debtor:'dion',creditor:'g
 assert.deepEqual(JSON.parse(JSON.stringify(context.u3NetAdvances('2026-07'))),[{debtor:'gezamenlijk',creditor:'dion',amount:60}]);
 
 state.transactionReviewQueue.push({id:'pending',date:'2026-07-08',reviewStatus:'te-controleren'});
-assert.throws(()=>context.u3CloseMonth('2026-07'),/Verwerk eerst 1/);
+assert.equal(context.u3CloseMonth('2026-07').requiresWarning,true);
 state.transactionReviewQueue[0].reviewStatus='genegeerd';
 const firstClose=context.u3CloseMonth('2026-07',{gezamenlijk:500,dion:175,dara:200},[]);
 assert.equal(state.monthRecords['2026-07'].status,'afgesloten');

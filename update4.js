@@ -447,6 +447,127 @@
     commitSummary(root,draft);
     if(sync){await queueImportSync(draft);flushImportSync(root).catch(()=>{});}
   }
+  function goalExists(state,id){
+    if(!id)return true;
+    return OWNERS.some(owner=>(state.spaardoelen?.[owner]||[]).some(goal=>goal.id===id));
+  }
+  function fixedExists(state,id){
+    if(!id)return true;
+    return ['voor','na'].some(scenario=>(state.recurringFixedExpenses?.[scenario]||[]).some(item=>item.id===id));
+  }
+  function validateDraft(draft,state){
+    const errors=[];
+    const profile=(state.accountProfiles||[]).find(item=>item.id===draft.accountProfileId);
+    if(!profile)errors.push({code:'profile',message:'Kies of maak eerst een rekeningprofiel.'});
+    (draft.rows||[]).filter(row=>!row.duplicate).forEach(row=>{
+      if(!row.bankOriginal?.valid)errors.push({rowId:row.id,code:'original',message:'Originele bankregel mist datum, omschrijving of bedrag.'});
+      const p=row.processing||{};
+      if(!parseDate(p.processingDate))errors.push({rowId:row.id,code:'date',message:'Ongeldige verwerkingsdatum.'});
+      if(!Number.isFinite(Number(p.processedAmount)))errors.push({rowId:row.id,code:'amount',message:'Verwerkt bedrag ontbreekt.'});
+      if(!OWNERS.includes(p.budgetOwner))errors.push({rowId:row.id,code:'owner',message:'Budgeteigenaar ontbreekt.'});
+      if(p.savingsGoalId&&!goalExists(state,p.savingsGoalId))errors.push({rowId:row.id,code:'goal',message:'Het gekozen spaardoel bestaat niet meer.'});
+      if(p.fixedExpenseId&&!fixedExists(state,p.fixedExpenseId))errors.push({rowId:row.id,code:'fixed',message:'De gekozen vaste last bestaat niet meer.'});
+      if((p.splits||[]).length){
+        const splitTotal=round2(p.splits.reduce((sum,split)=>sum+Number(split.amount||0),0));
+        if(Math.abs(splitTotal-round2(p.processedAmount))>.004)errors.push({rowId:row.id,code:'splits',message:`Splitbedragen ${euro(splitTotal)} tellen niet op tot ${euro(p.processedAmount)}.`});
+        p.splits.forEach(split=>{
+          if(!OWNERS.includes(split.budgetOwner)||!split.category)errors.push({rowId:row.id,code:'split-fields',message:'Iedere splitregel heeft een budgeteigenaar en categorie nodig.'});
+          if(split.savingsGoalId&&!goalExists(state,split.savingsGoalId))errors.push({rowId:row.id,code:'split-goal',message:'Een spaardoel in een splitregel bestaat niet meer.'});
+        });
+      }
+    });
+    return {ok:errors.length===0,errors};
+  }
+  function transactionKind(type,include=true){
+    if(!include||type==='niet-meetellen')return 'niet-meetellen';
+    if(['salaris','vakantiegeld','nabetaling','vergoeding','belastingteruggave','overige-inkomsten'].includes(type))return 'inkomen';
+    if(['interne-overboeking','maandelijkse-bijdrage','extra-bijdrage','sparen','terugbetaling-voorschot'].includes(type))return 'interne-overboeking';
+    if(type==='vaste-last')return 'vaste-last';
+    return 'uitgave';
+  }
+  function expenseImpact(type,amount,include=true){
+    if(!include||['salaris','vakantiegeld','nabetaling','vergoeding','belastingteruggave','overige-inkomsten','interne-overboeking','maandelijkse-bijdrage','extra-bijdrage','sparen','terugbetaling-voorschot'].includes(type))return 0;
+    return type==='terugbetaling'?-Math.abs(amount):Math.abs(amount);
+  }
+  function financialRows(row){
+    const p=row.processing;
+    if((p.splits||[]).length)return p.splits.map((split,index)=>({
+      id:`${row.id}-split-${split.id||index+1}`,amount:round2(split.amount),budgetOwner:split.budgetOwner,category:split.category,
+      budgetItemId:split.budgetItemId||'',savingsGoalId:split.savingsGoalId||'',advanceMode:split.advanceMode||'auto',include:split.include!==false,splitId:split.id||String(index+1),isFirst:index===0
+    }));
+    return [{id:`tx-${row.id}`,amount:round2(p.processedAmount),budgetOwner:p.budgetOwner,category:p.category,budgetItemId:p.budgetItemId||'',savingsGoalId:p.savingsGoalId||'',advanceMode:p.advanceMode||'auto',include:p.include!==false,splitId:'',isFirst:true}];
+  }
+  function planImportEffects(draft,state){
+    const validation=validateDraft(draft,state);
+    if(!validation.ok)return {ok:false,errors:validation.errors};
+    const profile=state.accountProfiles.find(item=>item.id===draft.accountProfileId);
+    const transactions=[];const replacements=[];const affectedMonths=new Set();const counts={expenses:0,income:0,internal:0,savings:0,refunds:0,advances:0,uncategorized:0};
+    for(const row of draft.rows.filter(item=>item.bankOriginal.valid&&!item.duplicate)){
+      const p=row.processing;const type=p.include===false?'niet-meetellen':p.transactionType;
+      financialRows(row).forEach(part=>{
+        const kind=transactionKind(type,part.include);
+        const tx={
+          id:part.id,date:p.processingDate,amount:round2(part.amount),description:row.bankOriginal.description,category:part.category||'Ongecategoriseerd',
+          kind,transactionType:type,reviewStatus:'bevestigd',accountOwner:profile.accountOwner,budgetOwner:part.budgetOwner,
+          account:profile.accountOwner,financialFor:part.budgetOwner,owner:part.budgetOwner,accountProfileId:profile.id,
+          importBatchId:draft.id,importTransactionId:row.id,splitId:part.splitId,bankOriginal:clone(row.bankOriginal),
+          processing:{...clone(p),processedAmount:part.amount,budgetOwner:part.budgetOwner,category:part.category,budgetItemId:part.budgetItemId,savingsGoalId:part.savingsGoalId,include:part.include},
+          expenseImpact:expenseImpact(type,part.amount,part.include),
+          accountDelta:part.isFirst?round2(row.bankOriginal.amount):0,
+          fixedExpenseId:p.fixedExpenseId||'',fixedOccurrenceId:'',incomeSourceId:p.incomeSourceId||'',incomeOccurrenceId:'',
+          savingsGoalId:part.savingsGoalId,note:p.note||'',createdAt:new Date().toISOString()
+        };
+        transactions.push(tx);affectedMonths.add(String(tx.date).slice(0,7));
+        if(kind==='inkomen')counts.income++;else if(kind==='interne-overboeking')counts.internal++;else if(kind!=='niet-meetellen')counts.expenses++;
+        if(type==='sparen')counts.savings++;if(type==='terugbetaling')counts.refunds++;if(tx.category==='Ongecategoriseerd')counts.uncategorized++;
+        if(part.advanceMode==='force'||(part.advanceMode!=='none'&&profile.accountOwner!==part.budgetOwner))counts.advances++;
+      });
+      if(p.manualMatchId){
+        const manual=state.transactions.find(tx=>tx.id===p.manualMatchId&&!tx.importBatchId);
+        if(manual)replacements.push({id:`replacement-${draft.id}-${manual.id}`,manualTransaction:clone(manual),replacementTransactionId:transactions.find(tx=>tx.importTransactionId===row.id)?.id||''});
+      }
+    }
+    return {ok:true,importId:draft.id,transactions,replacements,affectedMonths:[...affectedMonths],counts,duplicateCount:draft.summary.duplicateCount||0,totalIncome:draft.summary.totalIncome,totalExpenses:draft.summary.totalExpenses};
+  }
+  function applyImportPlan(state,plan){
+    const transactionIds=new Set((state.transactions||[]).map(tx=>tx.id));
+    plan.transactions.forEach(tx=>{if(!transactionIds.has(tx.id)){state.transactions.push(clone(tx));transactionIds.add(tx.id);}});
+    state.manualTransactionReplacements=state.manualTransactionReplacements||[];
+    plan.replacements.forEach(replacement=>{
+      if(!state.manualTransactionReplacements.some(item=>item.id===replacement.id))state.manualTransactionReplacements.push(clone(replacement));
+      state.transactions=state.transactions.filter(tx=>tx.id!==replacement.manualTransaction.id);
+    });
+    state.monthRecords=state.monthRecords||{};
+    plan.affectedMonths.forEach(month=>{
+      const record=state.monthRecords[month];
+      if(record?.status==='afgesloten'){
+        record.status='correctie-nodig';
+        record.lateImportTransactionIds=[...new Set([...(record.lateImportTransactionIds||[]),...plan.transactions.filter(tx=>String(tx.date).slice(0,7)===month).map(tx=>tx.id)])];
+      }
+    });
+    const summary=state.importSummaries.find(item=>item.id===plan.importId);
+    if(summary){summary.status=plan.affectedMonths.some(month=>state.monthRecords?.[month]?.status==='correctie-nodig')?'correctie-nodig':'verwerkt';summary.processedAt=new Date().toISOString();summary.counts=clone(plan.counts);}
+    if(state.activeImportId===plan.importId)state.activeImportId='';
+    return plan;
+  }
+  function processedSummaryHtml(plan){
+    return `<div class="u4-import-summary"><div><span>Uitgaven</span><strong>${plan.counts.expenses}</strong></div><div><span>Inkomsten</span><strong>${plan.counts.income}</strong></div><div><span>Interne overboekingen</span><strong>${plan.counts.internal}</strong></div><div><span>Sparen</span><strong>${plan.counts.savings}</strong></div><div><span>Terugbetalingen</span><strong>${plan.counts.refunds}</strong></div><div><span>Voorschotten</span><strong>${plan.counts.advances}</strong></div><div><span>Ongecategoriseerd</span><strong>${plan.counts.uncategorized}</strong></div><div><span>Duplicaten</span><strong>${plan.duplicateCount}</strong></div></div><p><strong>Inkomsten ${euro(plan.totalIncome)}</strong> · uitgaven ${euro(plan.totalExpenses)}</p>`;
+  }
+  async function processDraft(root,draft){
+    const plan=planImportEffects(draft,root.state);
+    if(!plan.ok){alert(`Import kan nog niet worden verwerkt:\n${plan.errors.slice(0,8).map(error=>`• ${error.message}`).join('\n')}`);return false;}
+    const journal={id:`process-${draft.id}`,importId:draft.id,status:'pending',createdAt:new Date().toISOString(),transactionIds:plan.transactions.map(tx=>tx.id)};
+    await ImportStore.putJournal(journal);
+    const ok=root.commitChange(()=>applyImportPlan(root.state,plan),{render:false});
+    if(!ok){journal.status='rolled-back';journal.updatedAt=new Date().toISOString();await ImportStore.putJournal(journal);throw new Error('De import is volledig teruggedraaid omdat opslaan mislukte.');}
+    draft.status=root.state.importSummaries.find(item=>item.id===draft.id)?.status||'verwerkt';
+    draft.processedAt=new Date().toISOString();draft.effectManifest={transactionIds:plan.transactions.map(tx=>tx.id),replacementIds:plan.replacements.map(item=>item.id),affectedMonths:plan.affectedMonths,counts:plan.counts};
+    await ImportStore.putImport(draft);await queueImportSync(draft);
+    journal.status='completed';journal.completedAt=new Date().toISOString();await ImportStore.putJournal(journal);
+    flushImportSync(root).catch(()=>{});
+    const modal=ensureModalRoot();modal.innerHTML=`<div class="u4-import-modal"><header class="u4-modal-head"><h2>Import verwerkt</h2><button class="ghost" data-u4-close>Sluiten</button></header><main class="u4-modal-body">${processedSummaryHtml(plan)}</main></div>`;modal.querySelector('[data-u4-close]').addEventListener('click',()=>{closeDraft();root.renderActiveTab();});
+    return true;
+  }
   function renderReceipt(summary){
     return `<article class="u4-receipt" data-u4-open-receipt="${esc(summary.id)}"><div class="u4-receipt-head"><div><strong>${esc(summary.fileName)}</strong><div class="u4-muted">${esc(summary.bank)} · ${esc(summary.periodFrom||'—')} t/m ${esc(summary.periodTo||'—')}</div></div><span class="u4-status ${esc(summary.status)}">${esc(summary.status)}</span></div><div class="u4-muted">${Number(summary.newCount)||0} transacties · ${Number(summary.duplicateCount)||0} duplicaten · ${euro(summary.totalExpenses)} uitgaven</div></article>`;
   }
@@ -634,6 +755,7 @@
     root.renderBankImportSection=()=>renderImportPanel(root);
     root.bindBankImport=element=>bindImportPanel(element,root);
     if(typeof root.renderActiveTab==='function')root.renderActiveTab();
+    root.FinizeUpdate4Process=draft=>processDraft(root,draft).catch(error=>{alert(error.message);return false;});
     if(root.state.activeImportId)ImportStore.getImport(root.state.activeImportId).then(draft=>{UI.draft=draft||null;}).catch(()=>{});
   }
 
@@ -695,11 +817,13 @@
       createImportDraft,
       fingerprint,
       classifyOriginal,
+      validateDraft,
+      planImportEffects,
       importStore:ImportStore
     });
     installUI(root);
     Promise.resolve().then(()=>recoverJournal(root)).then(()=>flushImportSync(root)).catch(error=>console.warn('Update 4 opslaginitialisatie uitgesteld.',error));
   }
 
-  return {SCHEMA_VERSION,OWNERS,IMPORT_STATUSES,normalizeIban,normalizeRule,normalizeTransaction,normalizeCore,validateCore,chunkRows,normalizeText,detectDelimiter,parseDelimited,parseDate,parseAmount,detectFormat,inferMapping,hashText,fingerprint,organizationName,proposeType,recognitionProposal,classifyOriginal,parseBankCsv,findProfile,createImportDraft,updateDraftSummary,compactSummary,ImportStore,queueImportSync,flushImportSync,recoverJournal,install,round2,uid,clone};
+  return {SCHEMA_VERSION,OWNERS,IMPORT_STATUSES,normalizeIban,normalizeRule,normalizeTransaction,normalizeCore,validateCore,chunkRows,normalizeText,detectDelimiter,parseDelimited,parseDate,parseAmount,detectFormat,inferMapping,hashText,fingerprint,organizationName,proposeType,recognitionProposal,classifyOriginal,parseBankCsv,findProfile,createImportDraft,updateDraftSummary,compactSummary,validateDraft,transactionKind,expenseImpact,financialRows,planImportEffects,applyImportPlan,ImportStore,queueImportSync,flushImportSync,recoverJournal,install,round2,uid,clone};
 });

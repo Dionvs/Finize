@@ -65,3 +65,20 @@
   - responsieve layout voor 384/430 px en desktop.
 - Tests: UI-markers, externe assets en mobiele CSS-structuur.
 - Resterend: fasen 4 t/m 7.
+
+## Fase 4 — Definitieve financiële verwerking
+
+- Status: afgerond
+- Uitgevoerd:
+  - technische validatie vóór iedere kernwijziging;
+  - één idempotent effectplan en operation journal;
+  - splits als afzonderlijke financiële regels met één fysieke bankmutatie;
+  - salaris en overige inkomsten apart van uitgaven;
+  - terugbetaling als negatieve uitgave;
+  - Niet meetellen zonder budget-, inkomen- of spaardoelimpact;
+  - originele bankmutatie voor rekeningcontrole;
+  - vervanging van bevestigde handmatige matches met herstelarchief;
+  - late import in afgesloten maand als `Correctie nodig`;
+  - importsamenvatting na verwerking.
+- Tests: splits, gesloten maand, fysieke rekeningmutatie, voorschottelling, invalidatie en idempotent opnieuw toepassen.
+- Resterend: fasen 5 t/m 7.

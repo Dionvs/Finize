@@ -7814,7 +7814,7 @@ function u3NormalizeState(target){
   });
   Object.entries(target.monthRecords).forEach(([month,record])=>{
     if(!isPlainObject(record)){delete target.monthRecords[month];return;}
-    record.month=month; record.status=record.status==='afgesloten'?'afgesloten':'open';
+    record.month=month; record.status=['afgesloten','correctie-nodig'].includes(record.status)?record.status:'open';
     record.closedAt=record.closedAt||''; record.reopenedAt=record.reopenedAt||'';
     record.closureHistory=Array.isArray(record.closureHistory)?record.closureHistory.filter(isPlainObject):[];
     record.activeClosureId=record.activeClosureId||'';
@@ -12245,7 +12245,7 @@ function u3ActualIncome(month=getSelectedMonth(),financialFor=null){
   return round2(u3ConfirmedTransactions(month).filter(tx=>tx.kind==='inkomen' && (!financialFor||(tx.financialFor||tx.owner)===financialFor)).reduce((sum,tx)=>sum+Math.abs(Number(tx.amount)||0),0));
 }
 function u3ActualExpenses(month=getSelectedMonth(),financialFor=null){
-  return round2(u3ConfirmedTransactions(month).filter(tx=>tx.kind!=='inkomen' && tx.kind!=='interne-overboeking' && (!financialFor||(tx.financialFor||tx.owner)===financialFor)).reduce((sum,tx)=>sum+Math.abs(Number(tx.amount)||0),0));
+  return round2(u3ConfirmedTransactions(month).filter(tx=>tx.kind!=='inkomen' && tx.kind!=='interne-overboeking' && tx.kind!=='niet-meetellen' && (!financialFor||(tx.financialFor||tx.owner)===financialFor)).reduce((sum,tx)=>sum+Number(tx.expenseImpact??Math.abs(Number(tx.amount)||0)),0));
 }
 function u3ExpectedIncome(month=getSelectedMonth(),financialFor=null){
   return round2(u3IncomeOccurrences(month).filter(row=>!financialFor||row.financialFor===financialFor).reduce((sum,row)=>sum+Number(row.amount||0),0));
@@ -12278,11 +12278,11 @@ function u3BudgetSummary(owner,month=getSelectedMonth(),scenario=state.meta.scen
     const target=ensure(occurrence.categorie||'Vaste lasten',0);
     target.budget=round2((target.budget||0)+(Number(occurrence.amount)||0));
     const actual=u3LinkedActual('fixed',occurrence.id,month);
-    if(actual){target.actual=round2(target.actual+Math.abs(Number(actual.amount)||0));linkedTransactionIds.add(actual.id);}
+    if(actual){target.actual=round2(target.actual+Number(actual.expenseImpact??Math.abs(Number(actual.amount)||0)));linkedTransactionIds.add(actual.id);}
   });
-  u3ConfirmedTransactions(month).filter(tx=>tx.kind!=='inkomen'&&tx.kind!=='interne-overboeking'&&(tx.financialFor||tx.owner)===owner&&!linkedTransactionIds.has(tx.id)).forEach(tx=>{
+  u3ConfirmedTransactions(month).filter(tx=>tx.kind!=='inkomen'&&tx.kind!=='interne-overboeking'&&tx.kind!=='niet-meetellen'&&(tx.financialFor||tx.owner)===owner&&!linkedTransactionIds.has(tx.id)).forEach(tx=>{
     const target=ensure(tx.category||'Overig',null);
-    target.actual=round2(target.actual+Math.abs(Number(tx.amount)||0));
+    target.actual=round2(target.actual+Number(tx.expenseImpact??Math.abs(Number(tx.amount)||0)));
   });
   return [...map.values()].map(row=>({...row,difference:round2((row.budget??0)-row.actual),status:row.budget===null?'geen-budget':row.actual>row.budget?'overschreden':'resterend'}));
 }
@@ -12314,6 +12314,7 @@ function u3AccountControl(month=getSelectedMonth()){
     const opening=u3OpeningBalance(account,month);
     const transactionDelta=u3ConfirmedTransactions(month).reduce((sum,tx)=>{
       if((tx.account||tx.owner)!==account)return sum;
+      if(Number.isFinite(Number(tx.accountDelta)))return sum+Number(tx.accountDelta);
       const amount=Math.abs(Number(tx.amount)||0);
       return sum+(tx.kind==='inkomen'?amount:-amount);
     },0);
@@ -12393,9 +12394,9 @@ function u3MonthSummary(month=getSelectedMonth()){
     reserve:{gezamenlijk:u3ReserveDelta('gezamenlijk',month),dion:u3ReserveDelta('dion',month),dara:u3ReserveDelta('dara',month)}
   };
 }
-function u3CloseMonth(month=getSelectedMonth(),actualBalances={},correctionAccounts=[]){
+function u3CloseMonth(month=getSelectedMonth(),actualBalances={},correctionAccounts=[],options={}){
   const pending=u3PendingReviews(month);
-  if(pending.length)throw new Error(`Verwerk eerst ${pending.length} ongecontroleerde transactie${pending.length===1?'':'s'}.`);
+  if(pending.length&&!options.force)return {requiresWarning:true,pendingCount:pending.length,month};
   const record=u3MonthRecord(month);
   if(record.status==='afgesloten')return record.closureHistory.find(row=>row.id===record.activeClosureId)||null;
   const revision=record.closureHistory.length+1;
@@ -12665,7 +12666,7 @@ function u3OpenClose(){
       <section class="u3-step"><div class="u3-step-head"><div><h3>1. Controle</h3><p>Alleen ongecontroleerde transacties blokkeren.</p></div><span class="u3-status ${pending?'warn':'ok'}">${pending?`${pending} te doen`:'Compleet'}</span></div><div class="u3-grid"><div>Verwacht inkomen<br><strong>${eur(summary.expectedIncome)}</strong></div><div>Werkelijk inkomen<br><strong>${eur(summary.actualIncome)}</strong></div><div>Geplande vaste lasten<br><strong>${eur(summary.plannedFixed)}</strong></div><div>Werkelijke uitgaven<br><strong>${eur(summary.actualExpenses)}</strong></div></div><div class="u3-budget-list">${budgetHtml||'<small>Geen variabele budgetten.</small>'}</div></section>
       <section class="u3-step"><div class="u3-step-head"><div><h3>2. Rekeningstanden</h3><p>Een verschil wijzigt alleen met een expliciete correctie het volgende saldo.</p></div></div>${accounts}</section>
       <section class="u3-step"><div class="u3-step-head"><div><h3>3. Overboekingen</h3><p>Zakgeld, sparen en netto voorschotten worden als voorstellen klaargezet.</p></div></div>${u3NetAdvances(month).map(row=>`<div>${u3AccountLabel(row.debtor)} → ${u3AccountLabel(row.creditor)} <strong>${eur(row.amount)}</strong></div>`).join('')||'<small>Geen openstaande voorschotten.</small>'}</section>
-      <section class="u3-step"><div class="u3-step-head"><div><h3>4. Bevestigen</h3><p>Update 3 verandert geen spaardoelsaldi.</p></div></div><div class="modal-actions">${record.status==='afgesloten'?'<button class="danger-ghost" id="u3ReopenMonth">Maand heropenen</button>':'<button class="primary" id="u3CloseMonth">Maand afsluiten</button>'}</div></section>
+      <section class="u3-step"><div class="u3-step-head"><div><h3>4. Bevestigen</h3><p>Open bankcontroles geven een waarschuwing maar blokkeren afsluiten niet.</p></div></div><div class="modal-actions">${record.status==='afgesloten'?'<button class="danger-ghost" id="u3ReopenMonth">Maand heropenen</button>':pending?'<button class="ghost" id="u3GoTransactions">Ga naar banktransacties</button><button class="primary" id="u3CloseMonthForce">Toch maand sluiten</button>':'<button class="primary" id="u3CloseMonth">Maand afsluiten</button>'}</div></section>
     </div>`);
   modal.querySelectorAll('[data-u3-save-opening]').forEach(button=>button.addEventListener('click',()=>{
     const account=button.dataset.u3SaveOpening;const value=bankAmount(modal.querySelector(`[data-u3-opening="${account}"]`).value);
@@ -12673,13 +12674,20 @@ function u3OpenClose(){
     commitChange(()=>{state.accountSettings[account]={openingBalance:round2(value),effectiveMonth:month,openingBalanceSet:true};},{render:false});u3OpenClose();
   }));
   modal.querySelector('#u3ReopenMonth')?.addEventListener('click',()=>{commitChange(()=>u3ReopenMonth(month),{render:false});u3OpenClose();});
-  modal.querySelector('#u3CloseMonth')?.addEventListener('click',()=>{
+  modal.querySelector('#u3GoTransactions')?.addEventListener('click',()=>{
+    modal.closest('#incomeEditModal')?.classList.remove('open','u3-admin-open');
+    bankImportOpen=true;renderActiveTab();
+    [...document.querySelectorAll('.manage-section')].find(item=>item.querySelector('summary')?.textContent.includes('Bank import & uitgaven'))?.setAttribute('open','');
+  });
+  const closeMonth=(force=false)=>{
     try{
       const actual={};const corrections=[];
       U3_ACCOUNTS.forEach(account=>{const value=bankAmount(modal.querySelector(`[data-u3-actual="${account}"]`).value);if(Number.isFinite(value))actual[account]=value;if(modal.querySelector(`[data-u3-correct="${account}"]`).checked)corrections.push(account);});
-      commitChange(()=>u3CloseMonth(month,actual,corrections),{render:false});u3OpenClose();
+      commitChange(()=>u3CloseMonth(month,actual,corrections,{force}),{render:false});u3OpenClose();
     }catch(error){alert(error.message);}
-  });
+  };
+  modal.querySelector('#u3CloseMonth')?.addEventListener('click',()=>closeMonth(false));
+  modal.querySelector('#u3CloseMonthForce')?.addEventListener('click',()=>closeMonth(true));
 }
 function u3OpenTransfers(){
   const month=getSelectedMonth();
