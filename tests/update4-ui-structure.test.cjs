@@ -9,10 +9,13 @@ const css=fs.readFileSync(path.join(__dirname,'..','update4.css'),'utf8');
 assert.match(html,/update4\.css/);
 assert.match(html,/update4\.js/);
 assert.doesNotMatch(html,/v4-mobile-only-block">\$\{renderManageSection\('Bank import & uitgaven'/);
-for(const marker of ['Bankimport controleren','Nakijken','Zeker','Meer opties','Alles verwerken','Herkenningsregels','Alle imports bekijken']){
+for(const marker of ['Bankimport controleren','Nakijken','Zeker','Meer opties','Alles verwerken','Herkenningsregels','Alle imports bekijken','Import uit cloud ophalen','Opnieuw proberen']){
   assert.match(js,new RegExp(marker),`UI-marker ontbreekt: ${marker}`);
 }
+assert.doesNotMatch(html,/section-kicker">Update 3/);
+assert.doesNotMatch(js,/section-kicker">Update 4/);
 assert.match(css,/#u4ImportModalRoot/);
+assert.match(css,/u4-cloud-spinner/);
 assert.match(css,/height:100dvh/);
 assert.match(css,/@media\(max-width:390px\)/);
 console.log('UPDATE4_UI_STRUCTURE_OK');

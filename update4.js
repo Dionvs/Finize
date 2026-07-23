@@ -14,6 +14,8 @@
   const IMPORT_STORE='imports';
   const JOURNAL_STORE='journal';
   const SYNC_STORE='syncQueue';
+  const CLOUD_STORAGE_VERSION=2;
+  const CLOUD_READ_CONCURRENCY=4;
   const OWNERS=['gezamenlijk','dion','dara'];
   const IMPORT_STATUSES=['concept','verwerkt','teruggedraaid','correctie-nodig'];
 
@@ -144,7 +146,7 @@
         tx.onabort=()=>reject(tx.error||new Error('Importopslagtransactie afgebroken.'));
       });
     },
-    putImport(record){return this.request(IMPORT_STORE,'readwrite',store=>store.put(clone(record)));},
+    putImport(record){const next=clone(record);delete next.rawText;return this.request(IMPORT_STORE,'readwrite',store=>store.put(next));},
     getImport(id){return this.request(IMPORT_STORE,'readonly',store=>store.get(String(id)));},
     deleteImport(id){return this.request(IMPORT_STORE,'readwrite',store=>store.delete(String(id)));},
     listImports(){return this.request(IMPORT_STORE,'readonly',store=>store.getAll());},
@@ -165,6 +167,126 @@
     });
     if(current.length)chunks.push(current);
     return chunks;
+  }
+
+  function canonicalValue(value){
+    if(Array.isArray(value))return value.map(canonicalValue);
+    if(plain(value))return Object.keys(value).sort().reduce((result,key)=>{result[key]=canonicalValue(value[key]);return result;},{});
+    return value;
+  }
+
+  function rowsChecksum(rows){
+    return hashText(JSON.stringify(canonicalValue(rows||[])));
+  }
+
+  function buildCloudImportEnvelope(record){
+    if(!plain(record)||!record.id)throw new Error('Importrecord mist een ID.');
+    const rows=Array.isArray(record.rows)?record.rows:[];
+    const chunks=chunkRows(rows);
+    const header=clone(record);
+    delete header.rows;
+    delete header.rawText;
+    header.storageVersion=CLOUD_STORAGE_VERSION;
+    header.rowCount=rows.length;
+    header.chunkCount=chunks.length;
+    header.rowsChecksum=rowsChecksum(rows);
+    header.syncedAt=new Date().toISOString();
+    return {header,chunks:chunks.map((chunk,index)=>({index,rows:clone(chunk)}))};
+  }
+
+  function cloudImportError(code,message){
+    const error=new Error(message);error.code=code;return error;
+  }
+
+  function assembleCloudImport(header,chunks,expectedId=''){
+    if(!plain(header)||!header.id)throw cloudImportError('cloud-invalid','De cloudkopie heeft geen geldig import-ID.');
+    if(expectedId&&String(header.id)!==String(expectedId))throw cloudImportError('cloud-invalid','De cloudkopie hoort bij een andere import.');
+    const chunkCount=Number(header.chunkCount);
+    const rowCount=Number(header.rowCount);
+    if(!Number.isInteger(chunkCount)||chunkCount<0||!Number.isInteger(rowCount)||rowCount<0){
+      throw cloudImportError('cloud-invalid','De cloudkopie bevat ongeldige aantallen.');
+    }
+    if(!Array.isArray(chunks)||chunks.length!==chunkCount){
+      throw cloudImportError('cloud-incomplete','Niet alle importdelen zijn in de cloud beschikbaar.');
+    }
+    const byIndex=new Map();
+    chunks.forEach(chunk=>{
+      if(!plain(chunk)||!Number.isInteger(Number(chunk.index))||!Array.isArray(chunk.rows)){
+        throw cloudImportError('cloud-invalid','Een importdeel in de cloud is beschadigd.');
+      }
+      const index=Number(chunk.index);
+      if(index<0||index>=chunkCount||byIndex.has(index)){
+        throw cloudImportError('cloud-incomplete','De importdelen zijn dubbel of niet aaneengesloten.');
+      }
+      byIndex.set(index,chunk.rows);
+    });
+    const rows=[];
+    for(let index=0;index<chunkCount;index++){
+      if(!byIndex.has(index))throw cloudImportError('cloud-incomplete','Een importdeel ontbreekt in de cloud.');
+      rows.push(...clone(byIndex.get(index)));
+    }
+    if(rows.length!==rowCount)throw cloudImportError('cloud-incomplete','Het aantal bankregels in de cloudkopie klopt niet.');
+    if(Number(header.storageVersion)>=CLOUD_STORAGE_VERSION&&!header.rowsChecksum){
+      throw cloudImportError('cloud-invalid','De cloudkopie mist de vereiste controlecode.');
+    }
+    if(header.rowsChecksum&&rowsChecksum(rows)!==String(header.rowsChecksum)){
+      throw cloudImportError('cloud-checksum','De controlecode van de cloudkopie klopt niet.');
+    }
+    const record=clone(header);
+    delete record.rawText;delete record.rowCount;delete record.chunkCount;delete record.rowsChecksum;
+    record.rows=rows;
+    return record;
+  }
+
+  async function mapWithConcurrency(values,limit,mapper){
+    const result=new Array(values.length);let cursor=0;
+    async function worker(){
+      while(cursor<values.length){
+        const index=cursor++;
+        result[index]=await mapper(values[index],index);
+      }
+    }
+    await Promise.all(Array.from({length:Math.min(Math.max(1,limit),values.length||1)},worker));
+    return result;
+  }
+
+  async function fetchImportFromCloud(root,id){
+    const cloud=root?.CloudAdapter;
+    if(!cloud?.isConnected?.()){
+      if(cloud?.isConfigured?.()&&typeof cloud.connect==='function')await cloud.connect();
+    }
+    if(!cloud?.isConnected?.()||!cloud.modules?.firestore||!cloud.db){
+      throw cloudImportError('cloud-offline','De import staat niet lokaal en de cloudverbinding is niet beschikbaar.');
+    }
+    const firestore=cloud.modules.firestore;
+    const importRef=firestore.doc(cloud.db,'budgetPlanners','finize','imports',String(id));
+    let headerSnapshot;
+    try{headerSnapshot=await firestore.getDoc(importRef);}
+    catch(error){throw cloudImportError('cloud-offline',`De import kon niet uit de cloud worden opgehaald: ${error?.message||error}`);}
+    if(!headerSnapshot?.exists?.()){
+      throw cloudImportError('cloud-missing','Deze import is nog niet vanaf het bronapparaat naar de cloud gesynchroniseerd.');
+    }
+    const header=headerSnapshot.data();
+    const count=Number(header?.chunkCount);
+    if(!Number.isInteger(count)||count<0)throw cloudImportError('cloud-invalid','De cloudkopie bevat geen geldige importindeling.');
+    const indices=Array.from({length:count},(_,index)=>index);
+    const chunks=await mapWithConcurrency(indices,CLOUD_READ_CONCURRENCY,async index=>{
+      const chunkRef=firestore.doc(cloud.db,'budgetPlanners','finize','imports',String(id),'chunks',String(index).padStart(4,'0'));
+      let snapshot;
+      try{snapshot=await firestore.getDoc(chunkRef);}
+      catch(error){throw cloudImportError('cloud-offline',`Een importdeel kon niet worden opgehaald: ${error?.message||error}`);}
+      if(!snapshot?.exists?.())throw cloudImportError('cloud-incomplete',`Importdeel ${index+1} van ${count} ontbreekt in de cloud.`);
+      return snapshot.data();
+    });
+    return assembleCloudImport(header,chunks,id);
+  }
+
+  async function resolveImportDetails(id,{localRead,cloudRead,localWrite}){
+    const local=await localRead(String(id));
+    if(local)return {record:local,source:'local'};
+    const cloud=await cloudRead(String(id));
+    await localWrite(cloud);
+    return {record:cloud,source:'cloud'};
   }
 
   function normalizeText(value){
@@ -880,10 +1002,39 @@
     modal.classList.add('open');
     bindDraftModal(root,draft,modal);
   }
+  function cloudImportMessage(error){
+    if(error?.code==='cloud-missing')return 'Deze import is nog niet vanaf het bronapparaat naar de cloud gesynchroniseerd. Open Finize daar een keer met internetverbinding en probeer het daarna opnieuw.';
+    if(error?.code==='cloud-incomplete'||error?.code==='cloud-checksum'||error?.code==='cloud-invalid')return 'De cloudkopie van deze import is niet compleet of beschadigd. Er is niets gedeeltelijk op dit apparaat opgeslagen.';
+    if(error?.code==='cloud-offline')return 'Deze import staat niet lokaal en de cloud is nu niet bereikbaar. Controleer de verbinding en probeer opnieuw.';
+    return `De import kon niet worden geopend: ${error?.message||error}`;
+  }
+  function renderCloudImportState(root,id,error=null){
+    const modal=ensureModalRoot();
+    modal.innerHTML=`<div class="u4-import-modal u4-cloud-import-state" role="dialog" aria-modal="true" aria-label="Import uit cloud ophalen">
+      <header class="u4-modal-head"><div><h2>${error?'Import niet beschikbaar':'Import uit cloud ophalen…'}</h2><p>${error?'De lokale kopie ontbreekt. Finize probeert de veilig bewaarde importdetails te herstellen.':'De bankregels worden veilig op dit apparaat opgeslagen.'}</p></div><button type="button" class="ghost" data-u4-close>Sluiten</button></header>
+      <main class="u4-modal-body"><div class="u4-cloud-message">${error?`<strong>Ophalen mislukt</strong><p>${esc(cloudImportMessage(error))}</p><button type="button" class="primary" data-u4-cloud-retry>Opnieuw proberen</button>`:'<span class="u4-cloud-spinner" aria-hidden="true"></span><strong>Even geduld…</strong><p>Het oorspronkelijke CSV-bestand is niet nodig.</p>'}</div></main>
+    </div>`;
+    modal.classList.add('open');
+    modal.querySelector('[data-u4-close]')?.addEventListener('click',closeDraft);
+    modal.querySelector('[data-u4-cloud-retry]')?.addEventListener('click',()=>openDraft(root,id));
+  }
   async function openDraft(root,id){
-    const draft=await ImportStore.getImport(id);
-    if(!draft)throw new Error('Importdetails zijn op dit apparaat niet beschikbaar.');
-    UI.draft=draft;renderDraftModal(root,draft);
+    let local;
+    try{local=await ImportStore.getImport(id);}
+    catch(error){renderCloudImportState(root,id,error);return null;}
+    if(!local)renderCloudImportState(root,id);
+    try{
+      const resolved=await resolveImportDetails(id,{
+        localRead:async()=>local,
+        cloudRead:importId=>fetchImportFromCloud(root,importId),
+        localWrite:record=>ImportStore.putImport(record)
+      });
+      UI.draft=resolved.record;renderDraftModal(root,resolved.record);
+      return resolved.record;
+    }catch(error){
+      renderCloudImportState(root,id,error);
+      return null;
+    }
   }
   function closeDraft(){const modal=document.getElementById('u4ImportModalRoot');modal?.classList.remove('open');}
   async function applyProfile(root,draft,modal){
@@ -962,7 +1113,6 @@
       reader.onload=async loaded=>{
         try{
           const draft=createImportDraft({text:String(loaded.target.result||''),fileName:file.name,profiles:root.state.accountProfiles,rules:root.state.recognitionRules,transactions:root.state.transactions});
-          draft.rawText=String(loaded.target.result||'');
           UI.draft=draft;await saveDraft(root,draft,{sync:true});root.renderActiveTab();renderDraftModal(root,draft);
         }catch(error){alert(`CSV importeren mislukt: ${error.message}`);}
       };
@@ -991,7 +1141,7 @@
     if(!target)return;
     const balances=directionalBalances(root.state,root.state.meta.selectedMonth||'9999-12');
     const section=document.createElement('section');section.className='card u4-settlement-card';
-    section.innerHTML=`<div class="card-head"><div><div class="section-kicker">Update 4</div><h2>Onderling te verrekenen</h2></div><button type="button" class="ghost small" data-u4-open-settlement>Details</button></div><div class="u4-settlement-lines">${balances.map(row=>`<div class="u4-settlement-line"><span>${ownerLabel(row.debtor)} → ${ownerLabel(row.creditor)}</span><strong>${euro(row.amount)}</strong></div>`).join('')||'<span class="u4-muted">Geen openstaande voorschotten.</span>'}</div>`;
+    section.innerHTML=`<div class="card-head"><div><h2>Onderling te verrekenen</h2></div><button type="button" class="ghost small" data-u4-open-settlement>Details</button></div><div class="u4-settlement-lines">${balances.map(row=>`<div class="u4-settlement-line"><span>${ownerLabel(row.debtor)} → ${ownerLabel(row.creditor)}</span><strong>${euro(row.amount)}</strong></div>`).join('')||'<span class="u4-muted">Geen openstaande voorschotten.</span>'}</div>`;
     target.prepend(section);section.querySelector('[data-u4-open-settlement]').addEventListener('click',()=>renderSettlementDetail(root));
   }
   function renderSettlementDetail(root,filters={}){
@@ -1028,14 +1178,13 @@
       const record=await ImportStore.getImport(item.importId);
       if(!record){await ImportStore.deleteSync(item.id);continue;}
       try{
-        const chunks=chunkRows(record.rows||[]);
-        const header={...record,rows:undefined,rowCount:(record.rows||[]).length,chunkCount:chunks.length,syncedAt:new Date().toISOString()};
-        const importRef=firestore.doc(cloud.db,'budgetPlanners','finize','imports',record.id);
-        await firestore.setDoc(importRef,header,{merge:true});
-        for(let index=0;index<chunks.length;index++){
+        const envelope=buildCloudImportEnvelope(record);
+        for(let index=0;index<envelope.chunks.length;index++){
           const chunkRef=firestore.doc(cloud.db,'budgetPlanners','finize','imports',record.id,'chunks',String(index).padStart(4,'0'));
-          await firestore.setDoc(chunkRef,{index,rows:chunks[index]},{merge:false});
+          await firestore.setDoc(chunkRef,envelope.chunks[index],{merge:false});
         }
+        const importRef=firestore.doc(cloud.db,'budgetPlanners','finize','imports',record.id);
+        await firestore.setDoc(importRef,envelope.header,{merge:false});
         await ImportStore.deleteSync(item.id);
       }catch(error){
         item.attempts=(item.attempts||0)+1;item.lastError=String(error?.message||error);item.updatedAt=new Date().toISOString();
@@ -1070,6 +1219,11 @@
       validate:candidate=>validateCore(candidate),
       normalizeIban,
       chunkRows,
+      rowsChecksum,
+      buildCloudImportEnvelope,
+      assembleCloudImport,
+      fetchImportFromCloud,
+      resolveImportDetails,
       parseBankCsv,
       createImportDraft,
       fingerprint,
@@ -1082,8 +1236,12 @@
       importStore:ImportStore
     });
     installUI(root);
+    if(!root.__finizeUpdate4CloudListener){
+      root.__finizeUpdate4CloudListener=true;
+      root.addEventListener?.('finize:cloud-connected',()=>flushImportSync(root).catch(error=>console.warn('Importsynchronisatie uitgesteld.',error)));
+    }
     Promise.resolve().then(()=>recoverJournal(root)).then(()=>flushImportSync(root)).catch(error=>console.warn('Update 4 opslaginitialisatie uitgesteld.',error));
   }
 
-  return {SCHEMA_VERSION,OWNERS,IMPORT_STATUSES,normalizeIban,normalizeRule,normalizeTransaction,normalizeCore,validateCore,chunkRows,normalizeText,detectDelimiter,parseDelimited,parseDate,parseAmount,detectFormat,inferMapping,hashText,fingerprint,organizationName,proposeType,recognitionProposal,classifyOriginal,parseBankCsv,findProfile,createImportDraft,updateDraftSummary,compactSummary,validateDraft,transactionKind,expenseImpact,financialRows,advanceForTransaction,savingsForTransaction,detectInternalPairs,directionalBalances,proposeRepaymentAllocations,planImportEffects,applyImportPlan,effectManifest,undoImportEffects,ImportStore,queueImportSync,flushImportSync,recoverJournal,install,round2,uid,clone};
+  return {SCHEMA_VERSION,CLOUD_STORAGE_VERSION,CLOUD_READ_CONCURRENCY,OWNERS,IMPORT_STATUSES,normalizeIban,normalizeRule,normalizeTransaction,normalizeCore,validateCore,chunkRows,canonicalValue,rowsChecksum,buildCloudImportEnvelope,assembleCloudImport,mapWithConcurrency,fetchImportFromCloud,resolveImportDetails,normalizeText,detectDelimiter,parseDelimited,parseDate,parseAmount,detectFormat,inferMapping,hashText,fingerprint,organizationName,proposeType,recognitionProposal,classifyOriginal,parseBankCsv,findProfile,createImportDraft,updateDraftSummary,compactSummary,validateDraft,transactionKind,expenseImpact,financialRows,advanceForTransaction,savingsForTransaction,detectInternalPairs,directionalBalances,proposeRepaymentAllocations,planImportEffects,applyImportPlan,effectManifest,undoImportEffects,ImportStore,queueImportSync,flushImportSync,recoverJournal,install,round2,uid,clone};
 });

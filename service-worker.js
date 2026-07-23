@@ -1,4 +1,4 @@
-const CACHE_NAME = "finize-v15-update4-bankimport";
+const CACHE_NAME = "finize-v16-cloud-importherstel";
 
 const APP_SHELL = [
   "./",

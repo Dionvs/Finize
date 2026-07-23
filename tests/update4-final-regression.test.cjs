@@ -10,7 +10,9 @@ const progress=fs.readFileSync(path.join(root,'UPDATE-4-PROGRESS.md'),'utf8');
 assert.match(html,/schemaVersion:\s*5/);
 assert.match(html,/Werkelijk inkomen aanpassen/);
 assert.match(html,/Correctie nodig/);
-assert.match(sw,/finize-v15-update4-bankimport/);
+assert.match(html,/window\.CloudAdapter\s*=\s*CloudAdapter/);
+assert.match(html,/finize:cloud-connected/);
+assert.match(sw,/finize-v16-cloud-importherstel/);
 assert.match(sw,/\.\/update4\.js/);
 assert.match(sw,/\.\/update4\.css/);
 for(const file of ['update-4-datamodel.md','update-4-changelog.md','update-4-handmatig-testverslag.md']){
