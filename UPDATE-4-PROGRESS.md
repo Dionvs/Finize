@@ -96,3 +96,17 @@
   - dashboardkaart en detailvenster met persoon- en maandfilter.
 - Tests: directionele tegengestelde saldi, oudste-eerst, spaardoelimpact en idempotentie.
 - Resterend: fasen 6 en 7.
+
+## Fase 6 — Importgeschiedenis en herstel
+
+- Status: afgerond
+- Uitgevoerd:
+  - importbonnetjes en volledige geschiedenis tonen de vier importstatussen;
+  - importdetails bewaren originele bankvelden, verwerking, zekerheid, koppelingen, splits en duplicaten;
+  - effectmanifesten sturen één centraal, idempotent herstelpad;
+  - undo verwijdert importtransacties, spaardoelimpact, voorschotten, aflossingen en overboekingsparen;
+  - vervangen handmatige transacties worden uit het herstelarchief teruggezet;
+  - maandcorrectiestatus wordt na herstel opnieuw bepaald;
+  - achteraf aanpassen gebruikt in één lokale operatie eerst undo en daarna dezelfde effectplanner als de import.
+- Tests: volledig herstel, gesloten maand, handmatige vervanging en dubbele undo.
+- Resterend: fase 7.

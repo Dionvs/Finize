@@ -626,6 +626,95 @@
     if(state.activeImportId===plan.importId)state.activeImportId='';
     return plan;
   }
+  function effectManifest(plan){
+    return {
+      transactionIds:plan.transactions.map(tx=>tx.id),
+      replacementIds:plan.replacements.map(item=>item.id),
+      savingIds:plan.savingsEntries.map(item=>item.id),
+      advanceIds:plan.advances.map(item=>item.id),
+      repaymentIds:plan.repayments.map(item=>item.id),
+      internalPairIds:plan.internalPairs.map(item=>item.id),
+      affectedMonths:plan.affectedMonths,
+      counts:clone(plan.counts)
+    };
+  }
+  function undoImportEffects(state,draft){
+    const manifest=draft.effectManifest||{};
+    const transactionIds=new Set(manifest.transactionIds||[]);
+    const savingIds=new Set(manifest.savingIds||[]);
+    const advanceIds=new Set(manifest.advanceIds||[]);
+    const repaymentIds=new Set(manifest.repaymentIds||[]);
+    const pairIds=new Set(manifest.internalPairIds||[]);
+    const replacementIds=new Set(manifest.replacementIds||[]);
+
+    state.advanceRepayments=state.advanceRepayments||[];
+    state.advanceRepayments.filter(item=>repaymentIds.has(item.id)).forEach(repayment=>{
+      const advance=(state.advanceLedger||[]).find(item=>item.id===repayment.advanceId);
+      if(!advance)return;
+      advance.outstandingAmount=round2((Number(advance.outstandingAmount)||0)+Number(repayment.amount||0));
+      advance.status=advance.outstandingAmount>.004?'open':'voldaan';
+      advance.repaymentAllocationIds=(advance.repaymentAllocationIds||[]).filter(id=>id!==repayment.id);
+    });
+    state.advanceRepayments=state.advanceRepayments.filter(item=>!repaymentIds.has(item.id));
+
+    state.savingsGoalLedger=state.savingsGoalLedger||[];
+    state.savingsGoalLedger.filter(item=>savingIds.has(item.id)).forEach(entry=>{
+      const goal=findGoal(state,entry.goalId);
+      if(goal)goal.algespaard=round2((Number(goal.algespaard)||0)-Number(entry.amount||0));
+    });
+    state.savingsGoalLedger=state.savingsGoalLedger.filter(item=>!savingIds.has(item.id));
+    state.advanceLedger=(state.advanceLedger||[]).filter(item=>!advanceIds.has(item.id));
+    state.internalTransferPairs=(state.internalTransferPairs||[]).filter(item=>!pairIds.has(item.id));
+
+    state.manualTransactionReplacements=state.manualTransactionReplacements||[];
+    state.manualTransactionReplacements.filter(item=>replacementIds.has(item.id)).forEach(replacement=>{
+      if(replacement.manualTransaction&&!state.transactions.some(tx=>tx.id===replacement.manualTransaction.id)){
+        state.transactions.push(clone(replacement.manualTransaction));
+      }
+    });
+    state.manualTransactionReplacements=state.manualTransactionReplacements.filter(item=>!replacementIds.has(item.id));
+    state.transactions=(state.transactions||[]).filter(tx=>!transactionIds.has(tx.id));
+
+    (manifest.affectedMonths||[]).forEach(month=>{
+      const record=state.monthRecords?.[month];
+      if(!record)return;
+      record.lateImportTransactionIds=(record.lateImportTransactionIds||[]).filter(id=>!transactionIds.has(id));
+      if(record.status==='correctie-nodig'&&!record.lateImportTransactionIds.length)record.status='afgesloten';
+    });
+    const summary=(state.importSummaries||[]).find(item=>item.id===draft.id);
+    if(summary){summary.status='teruggedraaid';summary.undoneAt=new Date().toISOString();summary.updatedAt=summary.undoneAt;}
+    if(state.activeImportId===draft.id)state.activeImportId='';
+    return state;
+  }
+  async function undoImport(root,draft){
+    if(draft.status==='teruggedraaid')return true;
+    const journal={id:`undo-${draft.id}`,importId:draft.id,operation:'undo',status:'pending',createdAt:new Date().toISOString()};
+    await ImportStore.putJournal(journal);
+    const ok=root.commitChange(()=>undoImportEffects(root.state,draft),{render:false});
+    if(!ok){journal.status='rolled-back';journal.updatedAt=new Date().toISOString();await ImportStore.putJournal(journal);throw new Error('Ongedaan maken is afgebroken; er zijn geen halve wijzigingen bewaard.');}
+    draft.status='teruggedraaid';draft.undoneAt=new Date().toISOString();
+    await ImportStore.putImport(draft);await queueImportSync(draft);
+    journal.status='completed';journal.completedAt=new Date().toISOString();await ImportStore.putJournal(journal);
+    flushImportSync(root).catch(()=>{});
+    root.renderActiveTab();renderDraftModal(root,draft);
+    return true;
+  }
+  async function reconcileImport(root,draft){
+    const working=clone(root.state);
+    undoImportEffects(working,draft);
+    const plan=planImportEffects(draft,working);
+    if(!plan.ok){alert(`Correctie kan nog niet worden verwerkt:\n${plan.errors.slice(0,8).map(error=>`• ${error.message}`).join('\n')}`);return false;}
+    const journal={id:`reconcile-${draft.id}-${Date.now()}`,importId:draft.id,operation:'reconcile',status:'pending',createdAt:new Date().toISOString()};
+    await ImportStore.putJournal(journal);
+    const ok=root.commitChange(()=>{undoImportEffects(root.state,draft);applyImportPlan(root.state,plan);},{render:false});
+    if(!ok){journal.status='rolled-back';journal.updatedAt=new Date().toISOString();await ImportStore.putJournal(journal);throw new Error('De correctie is volledig afgebroken omdat opslaan mislukte.');}
+    draft.status=root.state.importSummaries.find(item=>item.id===draft.id)?.status||'verwerkt';
+    draft.correctedAt=new Date().toISOString();draft.effectManifest=effectManifest(plan);
+    await ImportStore.putImport(draft);await queueImportSync(draft);
+    journal.status='completed';journal.completedAt=new Date().toISOString();await ImportStore.putJournal(journal);
+    flushImportSync(root).catch(()=>{});root.renderActiveTab();renderDraftModal(root,draft);
+    return true;
+  }
   function processedSummaryHtml(plan){
     return `<div class="u4-import-summary"><div><span>Uitgaven</span><strong>${plan.counts.expenses}</strong></div><div><span>Inkomsten</span><strong>${plan.counts.income}</strong></div><div><span>Interne overboekingen</span><strong>${plan.counts.internal}</strong></div><div><span>Sparen</span><strong>${plan.counts.savings}</strong></div><div><span>Terugbetalingen</span><strong>${plan.counts.refunds}</strong></div><div><span>Voorschotten</span><strong>${plan.counts.advances}</strong></div><div><span>Ongecategoriseerd</span><strong>${plan.counts.uncategorized}</strong></div><div><span>Duplicaten</span><strong>${plan.duplicateCount}</strong></div></div><p><strong>Inkomsten ${euro(plan.totalIncome)}</strong> · uitgaven ${euro(plan.totalExpenses)}</p>`;
   }
@@ -637,7 +726,7 @@
     const ok=root.commitChange(()=>applyImportPlan(root.state,plan),{render:false});
     if(!ok){journal.status='rolled-back';journal.updatedAt=new Date().toISOString();await ImportStore.putJournal(journal);throw new Error('De import is volledig teruggedraaid omdat opslaan mislukte.');}
     draft.status=root.state.importSummaries.find(item=>item.id===draft.id)?.status||'verwerkt';
-    draft.processedAt=new Date().toISOString();draft.effectManifest={transactionIds:plan.transactions.map(tx=>tx.id),replacementIds:plan.replacements.map(item=>item.id),savingIds:plan.savingsEntries.map(item=>item.id),advanceIds:plan.advances.map(item=>item.id),repaymentIds:plan.repayments.map(item=>item.id),internalPairIds:plan.internalPairs.map(item=>item.id),affectedMonths:plan.affectedMonths,counts:plan.counts};
+    draft.processedAt=new Date().toISOString();draft.effectManifest=effectManifest(plan);
     await ImportStore.putImport(draft);await queueImportSync(draft);
     journal.status='completed';journal.completedAt=new Date().toISOString();await ImportStore.putJournal(journal);
     flushImportSync(root).catch(()=>{});
@@ -736,19 +825,21 @@
   }
   function renderDraftModal(root,draft){
     updateDraftSummary(draft);
+    const isConcept=draft.status==='concept';
+    const canCorrect=draft.status==='verwerkt'||draft.status==='correctie-nodig';
     const active=draft.rows.filter(row=>row.bankOriginal.valid&&!row.duplicate);
     const review=active.filter(row=>row.certainty==='nakijken').slice(0,UI.visibleRows);
     const sure=active.filter(row=>row.certainty==='zeker').slice(0,UI.visibleRows);
     const modal=ensureModalRoot();
     modal.innerHTML=`<div class="u4-import-modal" role="dialog" aria-modal="true" aria-label="Bankimport controleren">
-      <header class="u4-modal-head"><div><h2>Bankimport controleren</h2><p>${esc(draft.fileName)} · ${esc(draft.bank)} · ${esc(draft.periodFrom||'—')} t/m ${esc(draft.periodTo||'—')}</p></div><button type="button" class="ghost" data-u4-close>Sluiten</button></header>
-      <main class="u4-modal-body">${profileEditor(root,draft)}
+      <header class="u4-modal-head"><div><h2>${isConcept?'Bankimport controleren':'Importdetails'}</h2><p>${esc(draft.fileName)} · ${esc(draft.bank)} · ${esc(draft.periodFrom||'—')} t/m ${esc(draft.periodTo||'—')} · ${esc(draft.status)}</p></div><button type="button" class="ghost" data-u4-close>Sluiten</button></header>
+      <main class="u4-modal-body">${isConcept?profileEditor(root,draft):''}
         <div class="u4-import-summary"><div><span>Nieuw</span><strong>${draft.summary.newCount}</strong></div><div><span>Duplicaten</span><strong>${draft.summary.duplicateCount}</strong></div><div><span>Inkomsten</span><strong>${euro(draft.summary.totalIncome)}</strong></div><div><span>Uitgaven</span><strong>${euro(draft.summary.totalExpenses)}</strong></div></div>
         <details class="u4-section" open><summary><span>Nakijken</span><span>${draft.summary.reviewCount}</span></summary><div class="u4-section-list">${review.map(row=>rowHtml(root,row)).join('')||'<div class="u4-empty">Geen transacties om na te kijken.</div>'}</div></details>
         <details class="u4-section"><summary><span>Zeker</span><span>${draft.summary.sureCount}</span></summary><div class="u4-section-list">${sure.map(row=>rowHtml(root,row)).join('')||'<div class="u4-empty">Geen zekere transacties.</div>'}</div></details>
         ${draft.summary.duplicateCount?`<details class="u4-section"><summary><span>Eerder geïmporteerd — overgeslagen</span><span>${draft.summary.duplicateCount}</span></summary><div class="u4-section-list">${draft.rows.filter(row=>row.duplicate).map(row=>`<div class="u4-original">${esc(row.bankOriginal.bankDate)} · ${esc(row.bankOriginal.description)} · ${euro(row.bankOriginal.amount)}</div>`).join('')}</div></details>`:''}
       </main>
-      <footer class="u4-modal-actions"><span class="u4-muted">Wijzigingen worden als concept bewaard.</span><button type="button" class="primary" data-u4-process>Alles verwerken</button></footer>
+      <footer class="u4-modal-actions"><span class="u4-muted">${isConcept?'Wijzigingen worden als concept bewaard.':canCorrect?'Aanpassingen worden pas financieel verwerkt na bevestiging.':'Deze import is financieel teruggedraaid.'}</span>${canCorrect?'<button type="button" class="danger-ghost" data-u4-undo>Import ongedaan maken</button><button type="button" class="primary" data-u4-reconcile>Wijzigingen verwerken</button>':isConcept?'<button type="button" class="primary" data-u4-process>Alles verwerken</button>':''}</footer>
     </div>`;
     modal.classList.add('open');
     bindDraftModal(root,draft,modal);
@@ -818,6 +909,12 @@
       if(event.target.closest('[data-u4-process]')){
         if(typeof root.FinizeUpdate4Process!=='function'){alert('De verwerkingslaag wordt in de volgende fase geactiveerd. Het concept blijft bewaard.');return;}
         await root.FinizeUpdate4Process(draft);
+      }
+      if(event.target.closest('[data-u4-undo]')){
+        if(confirm('Deze import en alle bijbehorende financiële gevolgen ongedaan maken?'))await undoImport(root,draft);
+      }
+      if(event.target.closest('[data-u4-reconcile]')){
+        if(confirm('De bestaande import vervangen door deze aangepaste verwerking?'))await reconcileImport(root,draft);
       }
     });
   }
@@ -917,7 +1014,7 @@
     const entries=await ImportStore.listJournal();
     for(const entry of entries.filter(item=>item.status==='pending')){
       const processed=(root.state?.transactions||[]).some(tx=>tx.importBatchId===entry.importId);
-      entry.status=processed?'completed':'rolled-back';
+      entry.status=entry.operation==='undo'?!processed?'completed':'rolled-back':processed?'completed':'rolled-back';
       entry.recoveredAt=new Date().toISOString();
       await ImportStore.putJournal(entry);
     }
@@ -943,6 +1040,7 @@
       classifyOriginal,
       validateDraft,
       planImportEffects,
+      undoImportEffects,
       directionalBalances,
       proposeRepaymentAllocations,
       importStore:ImportStore
@@ -951,5 +1049,5 @@
     Promise.resolve().then(()=>recoverJournal(root)).then(()=>flushImportSync(root)).catch(error=>console.warn('Update 4 opslaginitialisatie uitgesteld.',error));
   }
 
-  return {SCHEMA_VERSION,OWNERS,IMPORT_STATUSES,normalizeIban,normalizeRule,normalizeTransaction,normalizeCore,validateCore,chunkRows,normalizeText,detectDelimiter,parseDelimited,parseDate,parseAmount,detectFormat,inferMapping,hashText,fingerprint,organizationName,proposeType,recognitionProposal,classifyOriginal,parseBankCsv,findProfile,createImportDraft,updateDraftSummary,compactSummary,validateDraft,transactionKind,expenseImpact,financialRows,advanceForTransaction,savingsForTransaction,detectInternalPairs,directionalBalances,proposeRepaymentAllocations,planImportEffects,applyImportPlan,ImportStore,queueImportSync,flushImportSync,recoverJournal,install,round2,uid,clone};
+  return {SCHEMA_VERSION,OWNERS,IMPORT_STATUSES,normalizeIban,normalizeRule,normalizeTransaction,normalizeCore,validateCore,chunkRows,normalizeText,detectDelimiter,parseDelimited,parseDate,parseAmount,detectFormat,inferMapping,hashText,fingerprint,organizationName,proposeType,recognitionProposal,classifyOriginal,parseBankCsv,findProfile,createImportDraft,updateDraftSummary,compactSummary,validateDraft,transactionKind,expenseImpact,financialRows,advanceForTransaction,savingsForTransaction,detectInternalPairs,directionalBalances,proposeRepaymentAllocations,planImportEffects,applyImportPlan,effectManifest,undoImportEffects,ImportStore,queueImportSync,flushImportSync,recoverJournal,install,round2,uid,clone};
 });
