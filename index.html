@@ -7595,7 +7595,7 @@ function normalizePersonDefaults(target){
 }
 
 /* ---------- Update 3: schema v4 en pure maandadministratie ---------- */
-var U3_SCHEMA_VERSION = 4;
+var U3_SCHEMA_VERSION = 5;
 var U3_ACCOUNTS = ['gezamenlijk','dion','dara'];
 var U3_FREQUENCY_UNITS = ['weken','maanden','jaren'];
 
@@ -8531,7 +8531,7 @@ function defaultState(){
   const blankGoal = (naam, rendement=0.0125) => ({ id:uid(), naam, doelbedrag:0, algespaard:0, doeldatum:'', vasteInleg:0, rendement, rendementPeriode:'jaarlijks', favoriet:false });
 
   return {
-    meta: { scenario:'voor', selectedMonth: monthKey(), schemaVersion:4, revision:0, updatedAt:'', updatedBy:getDeviceId() },
+    meta: { scenario:'voor', selectedMonth: monthKey(), schemaVersion:5, revision:0, updatedAt:'', updatedBy:getDeviceId() },
     personen: {
       dion: { naam:'Dion', salaris:2450, vasteTeruggaven: [] },
       dara: { naam:'Dara', salaris:3010, vasteTeruggaven: [] },
@@ -8684,7 +8684,7 @@ function defaultState(){
 /* ---------- opslag: lokaal + optionele Firebase/Firestore-sync ---------- */
 const STORAGE_KEY = 'finize-budget-planner-v1';
 const BACKUP_STORAGE_KEY = 'finize-budget-planner-v1-last-good-backup';
-const MIGRATION_BACKUP_STORAGE_KEY = 'finize-budget-planner-v1-pre-schema-v4';
+const MIGRATION_BACKUP_STORAGE_KEY = 'finize-budget-planner-v1-pre-schema-v5';
 const DEVICE_ID_STORAGE_KEY = 'finize-device-id';
 const FIREBASE_CONFIG_STORAGE_KEY = 'finize-firebase-config';
 const FIREBASE_SDK_VERSION = '11.10.0';
@@ -12763,6 +12763,7 @@ async function initializeApp(){
 initializeApp();
 
 </script>
+<script src="./update4.js"></script>
 <script>
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
