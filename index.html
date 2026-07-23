@@ -11399,17 +11399,7 @@ function renderJointFirstRow(){
     <div class="card joint-two-column-card joint-variable-overview-card">${renderJointVariableCostsCardHead()}<div class="joint-variable-overview-list">${variableRows.join('') || '<p class="hint" style="margin:0">Nog geen variabele budgetten.</p>'}</div></div>
     ${renderJointTransactionsCard()}
   </div>
-  ${renderJointSavingsOverviewCard()}
-  <div class="joint-accordion-stack v4-mobile-only-block" aria-label="Gezamenlijk accordion kolommen">
-    <details class="card joint-accordion-card">
-      <summary><span></span><span class="joint-accordion-chevron" aria-hidden="true"></span></summary>
-      <div class="joint-accordion-body"></div>
-    </details>
-    <details class="card joint-accordion-card">
-      <summary><span></span><span class="joint-accordion-chevron" aria-hidden="true"></span></summary>
-      <div class="joint-accordion-body"></div>
-    </details>
-  </div>`;
+  ${renderJointSavingsOverviewCard()}`;
 }
 
 function renderPersonalTransactionsCard(owner){
