@@ -36,3 +36,8 @@ De regels geven Finize toegang tot het hoofddocument en de aparte import- en chu
 - Met **Concept opslaan** kan de actuele versie expliciet naar IndexedDB en Firestore worden geschreven.
 - De importeditor gebruikt een eigen scrollgebied, zodat lange transactielijsten op mobiel en desktop bewerkbaar blijven.
 
+
+
+## Versie 32
+
+De bankimportmodal gebruikt één betrouwbaar scrollvlak. Kop en actiebalk blijven sticky zichtbaar, terwijl de volledige importinhoud ertussen kan worden gescrold.
