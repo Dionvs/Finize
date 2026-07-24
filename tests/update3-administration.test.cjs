@@ -45,6 +45,7 @@ const context = {
   getTotalMonthlyIncome:()=>0,
   sumTransactions:()=>0,
   sumMaandTeruggaven:()=>0,
+  u2ReconcileSavingsGoals:()=>{},
   isPlainObject:value=>value!==null&&typeof value==='object'&&!Array.isArray(value),
   calcScenario:()=>({dion:{zakgeld:10},dara:{zakgeld:20},spaarpotDezeMaand:30}),
   clone:value=>JSON.parse(JSON.stringify(value)),
@@ -85,6 +86,15 @@ assert.equal(context.u3ReopenMonth('2026-07'),true);
 const secondClose=context.u3CloseMonth('2026-07',{gezamenlijk:500,dion:175,dara:200},[]);
 assert.notEqual(secondClose.id,firstClose.id);
 assert.equal(state.monthRecords['2026-07'].closureHistory.length,2);
+assert.equal(firstClose.status,'vervangen');
+assert.equal(secondClose.status,'actief');
+assert.equal(state.reserveLedger.filter(row=>row.status==='actief').length,3);
+for(let cycle=0;cycle<2;cycle++){
+  assert.equal(context.u3ReopenMonth('2026-07'),true);
+  context.u3CloseMonth('2026-07',{gezamenlijk:500,dion:175,dara:200},[]);
+  assert.equal(state.reserveLedger.filter(row=>row.status==='actief').length,3,'herhaald afsluiten mag reserves niet stapelen');
+}
+assert.equal(state.monthRecords['2026-07'].closureHistory.length,4);
 
 const settlement=state.internalTransfers.find(row=>String(row.type).includes('voorschot'));
 assert.equal(settlement,undefined,'Maandafsluiting mag voorschotten niet automatisch aflossen');

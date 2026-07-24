@@ -13,7 +13,7 @@ const context={
   console,Date,Math,Number,String,Array,Object,
   U3_ACCOUNTS:['gezamenlijk','dion','dara'],
   U3_FREQUENCY_UNITS:['weken','maanden','jaren'],
-  U3_SCHEMA_VERSION:7,
+  U3_SCHEMA_VERSION:8,
   isPlainObject:value=>value!==null&&typeof value==='object'&&!Array.isArray(value),
   round2:value=>Math.round((Number(value)+Number.EPSILON)*100)/100,
   bankText:value=>String(value||'').trim().toLowerCase(),
@@ -48,7 +48,7 @@ function fixture(version){
 
 for(const version of [1,2,3]){
   const migrated=context.u3NormalizeState(fixture(version));
-  assert.equal(migrated.meta.schemaVersion,7);
+  assert.equal(migrated.meta.schemaVersion,8);
   assert.equal(migrated.transactions[0].account,'dion');
   assert.equal(migrated.transactions[0].financialFor,'dion');
   assert.equal(migrated.transactions[0].reviewStatus,'bevestigd');

@@ -7597,7 +7597,7 @@ function normalizePersonDefaults(target){
 }
 
 /* ---------- Update 3: schema v4 en pure maandadministratie ---------- */
-var U3_SCHEMA_VERSION = 7;
+var U3_SCHEMA_VERSION = 8;
 var U3_ACCOUNTS = ['gezamenlijk','dion','dara'];
 var U3_FREQUENCY_UNITS = ['weken','maanden','jaren'];
 
@@ -7803,6 +7803,13 @@ function u3LegacyFinancialSnapshot(month,record,closure){
 function u3NormalizeClosureSnapshot(month,record,closure){
   closure.id=closure.id||closure.closingId||`closure-${month}-${closure.revision||1}`;
   closure.closingId=closure.closingId||closure.id;
+  closure.month=closure.month||month;
+  closure.version=Math.max(1,Number(closure.version||closure.revision)||1);
+  closure.revision=closure.version;
+  closure.status=['actief','vervangen','teruggedraaid'].includes(closure.status)?closure.status:
+    (record.activeClosureId===closure.closingId?'actief':'vervangen');
+  closure.createdAt=closure.createdAt||closure.closedAt||record.closedAt||new Date(0).toISOString();
+  closure.supersedesClosingId=String(closure.supersedesClosingId||'');
   closure.financialSnapshot=isPlainObject(closure.financialSnapshot)
     ? closure.financialSnapshot
     : u3LegacyFinancialSnapshot(month,record,closure);
@@ -7861,6 +7868,11 @@ function u3NormalizeState(target){
     record.closureHistory=(Array.isArray(record.closureHistory)?record.closureHistory.filter(isPlainObject):[])
       .map(closure=>u3NormalizeClosureSnapshot(month,record,closure));
     record.activeClosureId=record.activeClosureId||'';
+  });
+  ['reserveLedger','internalTransfers','monthCorrections','savingsGoalLedger'].forEach(key=>{
+    (target[key]||[]).forEach(row=>{
+      if(!row.sourceClosingId&&row.closureId)row.sourceClosingId=row.closureId;
+    });
   });
   target.meta.schemaVersion=U3_SCHEMA_VERSION;
   return target;
@@ -12480,7 +12492,7 @@ function u3TransferDrafts(month,closureId,scenarioResult){
   const drafts=[];
   const add=(type,source,target,amount,label)=>{
     amount=round2(Number(amount)||0); if(amount<=0)return;
-    drafts.push({id:u3DeterministicTransferId(closureId,type,source,target),type,sourceAccount:source,targetAccount:U3_ACCOUNTS.includes(target)?target:'',destination:label||target,calculatedAmount:amount,actualAmount:amount,month,status:'nog-te-verwerken',date:'',correction:0,closureId,createdAt:new Date().toISOString()});
+    drafts.push({id:u3DeterministicTransferId(closureId,type,source,target),type,sourceAccount:source,targetAccount:U3_ACCOUNTS.includes(target)?target:'',destination:label||target,calculatedAmount:amount,actualAmount:amount,month,status:'nog-te-verwerken',date:'',correction:0,closureId,sourceClosingId:closureId,createdAt:new Date().toISOString()});
   };
   const addSigned=(type,source,target,amount,label)=>{
     amount=round2(Number(amount)||0);
@@ -12569,12 +12581,24 @@ function getMonthFinancialResult(month=getSelectedMonth()){
   }
   return u3LiveFinancialSnapshot(month);
 }
+function u3DeactivateClosingEffects(closingId){
+  if(!closingId)return;
+  (state.reserveLedger||[]).forEach(row=>{if((row.sourceClosingId||row.closureId)===closingId)row.status='vervallen';});
+  (state.internalTransfers||[]).forEach(row=>{if((row.sourceClosingId||row.closureId)===closingId)row.status='vervallen';});
+  (state.monthCorrections||[]).forEach(row=>{if((row.sourceClosingId||row.closureId)===closingId)row.status='vervallen';});
+  (state.savingsGoalLedger||[]).forEach(row=>{
+    if(row.sourceClosingId!==closingId)return;
+    row.active=false;row.status='teruggedraaid';row.updatedAt=new Date().toISOString();
+  });
+  u2ReconcileSavingsGoals();
+}
 function u3CloseMonth(month=getSelectedMonth(),actualBalances={},correctionAccounts=[],options={}){
   const pending=u3PendingReviews(month);
   if(pending.length&&!options.force)return {requiresWarning:true,pendingCount:pending.length,month};
   const record=u3MonthRecord(month);
   if(record.status==='afgesloten')return record.closureHistory.find(row=>row.id===record.activeClosureId)||null;
-  const revision=record.closureHistory.length+1;
+  const previous=record.closureHistory[record.closureHistory.length-1]||null;
+  const revision=Math.max(0,...record.closureHistory.map(item=>Number(item.version||item.revision)||0))+1;
   const closureId=`closure-${month}-${revision}`;
   const summary=u3MonthSummary(month);
   const accountControl=u3AccountControl(month);
@@ -12585,38 +12609,30 @@ function u3CloseMonth(month=getSelectedMonth(),actualBalances={},correctionAccou
     accountControl[account].administrativeEnd=accountControl[account].calculatedEnd;
     if(Number.isFinite(actual)&&correctionAccounts.includes(account)&&Math.abs(accountControl[account].difference)>.004){
       const id=`correction-${closureId}-${account}`;
-      if(!state.monthCorrections.some(row=>row.id===id))state.monthCorrections.push({id,month,account,effectiveMonth:month,amount:accountControl[account].difference,reason:'Rekeningcorrectie bij maandafsluiting',closureId,status:'actief',createdAt:new Date().toISOString()});
+      if(!state.monthCorrections.some(row=>row.id===id))state.monthCorrections.push({id,month,account,effectiveMonth:month,amount:accountControl[account].difference,reason:'Rekeningcorrectie bij maandafsluiting',closureId,sourceClosingId:closureId,status:'actief',createdAt:new Date().toISOString()});
       accountControl[account].administrativeEnd=round2(actual);
     }
   });
   const scenarioResult=calcScenario(state);
   const drafts=u3TransferDrafts(month,closureId,scenarioResult);
-  const previous=record.closureHistory[record.closureHistory.length-1];
-  if(previous){
-    const oldByType=new Map((previous.transferSnapshot||[]).map(row=>[`${row.type}|${row.sourceAccount}|${row.targetAccount||row.destination}`,Number(row.calculatedAmount)||0]));
-    drafts.forEach(row=>{
-      const key=`${row.type}|${row.sourceAccount}|${row.targetAccount||row.destination}`;
-      const difference=round2(row.calculatedAmount-(oldByType.get(key)||0));
-      row.calculatedAmount=Math.abs(difference);row.actualAmount=Math.abs(difference);row.correction=difference;
-      if(difference<0){const source=row.sourceAccount;row.sourceAccount=row.targetAccount;row.targetAccount=source;row.destination=`Terugboeking ${row.destination}`;}
-      row.type=`correctie-${row.type}`;row.id=u3DeterministicTransferId(closureId,row.type,row.sourceAccount,row.targetAccount||row.destination);
-    });
-  }
+  if(previous){u3DeactivateClosingEffects(previous.closingId||previous.id);previous.status='vervangen';}
   drafts.filter(row=>row.calculatedAmount>.004).forEach(row=>{if(!state.internalTransfers.some(item=>item.id===row.id))state.internalTransfers.push(row);});
   U3_ACCOUNTS.forEach(owner=>{
     const id=`reserve-${closureId}-${owner}`;
-    if(!state.reserveLedger.some(row=>row.id===id))state.reserveLedger.push({id,month,owner,amount:summary.reserve[owner],reason:'Netto budgetverschil',closureId,status:'actief',createdAt:new Date().toISOString()});
+    if(!state.reserveLedger.some(row=>row.id===id))state.reserveLedger.push({id,month,owner,amount:summary.reserve[owner],reason:'Netto budgetverschil',closureId,sourceClosingId:closureId,status:'actief',createdAt:new Date().toISOString()});
   });
   const financialSnapshot=u3LiveFinancialSnapshot(month);
   financialSnapshot.status='afgesloten';financialSnapshot.closedAt=new Date().toISOString();
-  const closure={id:closureId,closingId:closureId,revision,closedAt:financialSnapshot.closedAt,summary,financialSnapshot,accountControl,transferIds:drafts.filter(row=>row.calculatedAmount>.004).map(row=>row.id),transferSnapshot:clone(drafts.filter(row=>row.calculatedAmount>.004)),correctionIds:(state.monthCorrections||[]).filter(row=>row.closureId===closureId).map(row=>row.id),updatedBy:getDeviceId()};
+  const closure={id:closureId,closingId:closureId,month,version:revision,revision,status:'actief',createdAt:financialSnapshot.closedAt,supersedesClosingId:previous?.closingId||previous?.id||'',closedAt:financialSnapshot.closedAt,summary,financialSnapshot,accountControl,transferIds:drafts.filter(row=>row.calculatedAmount>.004).map(row=>row.id),transferSnapshot:clone(drafts.filter(row=>row.calculatedAmount>.004)),correctionIds:(state.monthCorrections||[]).filter(row=>row.closureId===closureId).map(row=>row.id),updatedBy:getDeviceId()};
   record.status='afgesloten';record.closedAt=closure.closedAt;record.activeClosureId=closureId;record.closureHistory.push(closure);
   return closure;
 }
 function u3ReopenMonth(month=getSelectedMonth()){
   const record=u3MonthRecord(month);
   if(record.status!=='afgesloten')return false;
-  record.status='open';record.reopenedAt=new Date().toISOString();return true;
+  const closure=record.closureHistory.find(item=>(item.closingId||item.id)===record.activeClosureId);
+  if(closure){closure.status='teruggedraaid';closure.reopenedAt=new Date().toISOString();u3DeactivateClosingEffects(closure.closingId||closure.id);}
+  record.status='open';record.reopenedAt=new Date().toISOString();record.activeClosureId='';return true;
 }
 function u3ApplyTransferToAdvances(transfer,amount){
   if(!String(transfer.type||'').includes('voorschot'))return;
