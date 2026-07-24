@@ -8,7 +8,7 @@
 })(typeof window!=='undefined'?window:globalThis,function(){
   'use strict';
 
-  const SCHEMA_VERSION=5;
+  const SCHEMA_VERSION=6;
   const DB_NAME='finize-imports-v1';
   const DB_VERSION=1;
   const IMPORT_STORE='imports';
@@ -64,6 +64,73 @@
     return tx;
   }
 
+  function allGoals(state){
+    return OWNERS.flatMap(owner=>(state?.spaardoelen?.[owner]||[]).map(goal=>({owner,goal})));
+  }
+  function contributionAmount(entry){
+    if(entry?.active===false||['geannuleerd','teruggedraaid'].includes(entry?.status))return 0;
+    const value=Number(entry?.effectiveAmount??entry?.amount);
+    return Number.isFinite(value)?round2(value):0;
+  }
+  function calculateGoalSavedAmount(state,goalId){
+    return round2((state?.savingsGoalLedger||[]).filter(entry=>entry.goalId===goalId).reduce((sum,entry)=>sum+contributionAmount(entry),0));
+  }
+  function reconcileGoalSavedAmounts(state,goalIds=null){
+    const selected=goalIds?new Set(goalIds):null;
+    allGoals(state).forEach(({goal})=>{
+      if(selected&&!selected.has(goal.id))return;
+      const saved=Math.max(0,calculateGoalSavedAmount(state,goal.id));
+      goal.algespaard=round2(saved);
+      if(Array.isArray(goal.subdoelen)&&goal.subdoelen.length){
+        let remaining=Math.round(saved*100);
+        goal.subdoelen.forEach(child=>{
+          const capacity=Math.max(0,Math.round((Number(child.doelbedrag)||0)*100));
+          const applied=Math.min(capacity,Math.max(0,remaining));
+          child.gespaard=round2(applied/100);
+          child.voltooid=capacity>0&&applied>=capacity;
+          remaining-=applied;
+        });
+        goal.algespaard=round2(goal.subdoelen.reduce((sum,child)=>sum+(Number(child.gespaard)||0),0));
+      }
+    });
+    return state;
+  }
+  function normalizeSavingsLedger(target){
+    target.savingsGoalLedger=Array.isArray(target.savingsGoalLedger)?target.savingsGoalLedger.filter(plain):[];
+    target.savingsGoalLedger=target.savingsGoalLedger.map((entry,index)=>{
+      const amount=Number(entry.effectiveAmount??entry.amount??0);
+      const actual=Number(entry.actualAmount??entry.amount);
+      const month=String(entry.month||'').slice(0,7)||String((target.transactions||[]).find(tx=>tx.id===entry.transactionId)?.date||'').slice(0,7);
+      return {
+        ...entry,
+        id:String(entry.id||`saving-legacy-${index}`),
+        goalId:String(entry.goalId||''),
+        month,
+        plannedAmount:round2(Number(entry.plannedAmount)||0),
+        actualAmount:Number.isFinite(actual)?round2(actual):null,
+        effectiveAmount:round2(Number.isFinite(amount)?amount:0),
+        status:String(entry.status||'uitgevoerd'),
+        source:String(entry.source||'bank-import'),
+        transactionId:String(entry.transactionId||''),
+        active:entry.active!==false,
+        createdAt:String(entry.createdAt||new Date(0).toISOString()),
+        updatedAt:String(entry.updatedAt||entry.createdAt||new Date(0).toISOString())
+      };
+    });
+    allGoals(target).forEach(({goal})=>{
+      const id=`saving-opening-${goal.id}`;
+      if(target.savingsGoalLedger.some(entry=>entry.id===id))return;
+      const existing=target.savingsGoalLedger.filter(entry=>entry.goalId===goal.id).reduce((sum,entry)=>sum+contributionAmount(entry),0);
+      const opening=round2((Number(goal.algespaard)||0)-existing);
+      target.savingsGoalLedger.unshift({
+        id,goalId:goal.id,month:'',plannedAmount:0,actualAmount:null,effectiveAmount:opening,
+        status:'uitgevoerd',source:'legacy-opening',transactionId:'',active:true,
+        createdAt:new Date(0).toISOString(),updatedAt:new Date(0).toISOString()
+      });
+    });
+    reconcileGoalSavedAmounts(target);
+  }
+
   function normalizeCore(candidate){
     const target=candidate||{};
     target.meta=plain(target.meta)?target.meta:{};
@@ -84,7 +151,7 @@
       summary.id=String(summary.id||uid('import'));
     });
     target.activeImportId=String(target.activeImportId||'');
-    target.savingsGoalLedger=Array.isArray(target.savingsGoalLedger)?target.savingsGoalLedger.filter(plain):[];
+    normalizeSavingsLedger(target);
     target.manualTransactionReplacements=Array.isArray(target.manualTransactionReplacements)?target.manualTransactionReplacements.filter(plain):[];
     target.internalTransferPairs=Array.isArray(target.internalTransferPairs)?target.internalTransferPairs.filter(plain):[];
     target.advanceRepayments=Array.isArray(target.advanceRepayments)?target.advanceRepayments.filter(plain):[];
@@ -636,9 +703,21 @@
     const creditor=incoming?tx.budgetOwner:tx.accountOwner;
     return {id:`advance-${tx.id}`,transactionId:tx.id,month:String(tx.date).slice(0,7),debtor,creditor,originalAmount:round2(tx.amount),outstandingAmount:round2(tx.amount),status:'open',createdAt:tx.createdAt,settlementTransferIds:[],repaymentAllocationIds:[]};
   }
-  function savingsForTransaction(tx){
+  function savingsForTransaction(tx,state){
     if(tx.transactionType!=='sparen'||!tx.savingsGoalId||tx.kind==='niet-meetellen')return null;
-    return {id:`saving-${tx.id}`,transactionId:tx.id,importBatchId:tx.importBatchId,goalId:tx.savingsGoalId,amount:round2(tx.amount),status:'actief',createdAt:tx.createdAt};
+    const month=String(tx.date||'').slice(0,7);
+    const amount=round2(tx.amount);
+    const candidates=(state?.savingsGoalLedger||[]).filter(entry=>
+      entry.goalId===tx.savingsGoalId&&entry.month===month&&entry.active!==false&&!entry.transactionId&&
+      entry.source==='planned'
+    );
+    const planned=candidates.find(entry=>Math.abs(Number(entry.plannedAmount||entry.effectiveAmount)-amount)<=.01)||(candidates.length===1?candidates[0]:null);
+    return {
+      id:`saving-${tx.id}`,transactionId:tx.id,importBatchId:tx.importBatchId,goalId:tx.savingsGoalId,month,
+      plannedAmount:0,actualAmount:amount,effectiveAmount:planned?round2(amount-Number(planned.effectiveAmount||0)):amount,
+      matchedContributionId:planned?.id||'',status:planned&&Math.abs(amount-Number(planned.plannedAmount||0))>.004?'afwijkend':'uitgevoerd',
+      source:planned?'bank-match':'bank-import',active:true,createdAt:tx.createdAt,updatedAt:tx.createdAt
+    };
   }
   function daysBetween(a,b){return Math.abs(new Date(`${a}T12:00:00`)-new Date(`${b}T12:00:00`))/86400000;}
   function detectInternalPairs(transactions,state){
@@ -695,7 +774,7 @@
           savingsGoalId:part.savingsGoalId,note:p.note||'',createdAt:new Date().toISOString()
         };
         transactions.push(tx);affectedMonths.add(String(tx.date).slice(0,7));
-        const saving=savingsForTransaction(tx);if(saving)savingsEntries.push(saving);
+        const saving=savingsForTransaction(tx,state);if(saving)savingsEntries.push(saving);
         const advance=advanceForTransaction(tx);if(advance){advances.push(advance);counts.advances++;}
         if(type==='terugbetaling-voorschot'){
           const allocations=p.repaymentAllocations||[];
@@ -739,8 +818,18 @@
     plan.savingsEntries.forEach(entry=>{
       if(state.savingsGoalLedger.some(item=>item.id===entry.id))return;
       const goal=findGoal(state,entry.goalId);if(!goal)return;
-      state.savingsGoalLedger.push(clone(entry));goal.algespaard=round2((Number(goal.algespaard)||0)+Number(entry.amount||0));
+      if(entry.matchedContributionId){
+        const planned=state.savingsGoalLedger.find(item=>item.id===entry.matchedContributionId);
+        if(planned){
+          planned.transactionId=entry.transactionId;
+          planned.actualAmount=entry.actualAmount;
+          planned.status=entry.status;
+          planned.updatedAt=entry.updatedAt;
+        }
+      }
+      state.savingsGoalLedger.push(clone(entry));
     });
+    reconcileGoalSavedAmounts(state,plan.savingsEntries.map(entry=>entry.goalId));
     state.advanceLedger=state.advanceLedger||[];
     plan.advances.forEach(entry=>{if(!state.advanceLedger.some(item=>item.id===entry.id))state.advanceLedger.push(clone(entry));});
     state.advanceRepayments=state.advanceRepayments||[];
@@ -810,11 +899,14 @@
     state.advanceRepayments=state.advanceRepayments.filter(item=>!repaymentIds.has(item.id));
 
     state.savingsGoalLedger=state.savingsGoalLedger||[];
+    const affectedSavingGoals=state.savingsGoalLedger.filter(item=>savingIds.has(item.id)).map(entry=>entry.goalId);
     state.savingsGoalLedger.filter(item=>savingIds.has(item.id)).forEach(entry=>{
-      const goal=findGoal(state,entry.goalId);
-      if(goal)goal.algespaard=round2((Number(goal.algespaard)||0)-Number(entry.amount||0));
+      if(!entry.matchedContributionId)return;
+      const planned=state.savingsGoalLedger.find(item=>item.id===entry.matchedContributionId);
+      if(planned){planned.transactionId='';planned.actualAmount=null;planned.status='gepland';planned.updatedAt=new Date().toISOString();}
     });
     state.savingsGoalLedger=state.savingsGoalLedger.filter(item=>!savingIds.has(item.id));
+    reconcileGoalSavedAmounts(state,affectedSavingGoals);
     state.advanceLedger=(state.advanceLedger||[]).filter(item=>!advanceIds.has(item.id));
     state.internalTransferPairs=(state.internalTransferPairs||[]).filter(item=>!pairIds.has(item.id));
     (manifest.fixedAdjustments||[]).forEach(adjustment=>{
@@ -1233,6 +1325,7 @@
       undoImportEffects,
       directionalBalances,
       proposeRepaymentAllocations,
+      calculateGoalSavedAmount:(goalId,candidate=root.state)=>calculateGoalSavedAmount(candidate,goalId),
       importStore:ImportStore
     });
     installUI(root);
@@ -1243,5 +1336,5 @@
     Promise.resolve().then(()=>recoverJournal(root)).then(()=>flushImportSync(root)).catch(error=>console.warn('Update 4 opslaginitialisatie uitgesteld.',error));
   }
 
-  return {SCHEMA_VERSION,CLOUD_STORAGE_VERSION,CLOUD_READ_CONCURRENCY,OWNERS,IMPORT_STATUSES,normalizeIban,normalizeRule,normalizeTransaction,normalizeCore,validateCore,chunkRows,canonicalValue,rowsChecksum,buildCloudImportEnvelope,assembleCloudImport,mapWithConcurrency,fetchImportFromCloud,resolveImportDetails,normalizeText,detectDelimiter,parseDelimited,parseDate,parseAmount,detectFormat,inferMapping,hashText,fingerprint,organizationName,proposeType,recognitionProposal,classifyOriginal,parseBankCsv,findProfile,createImportDraft,updateDraftSummary,compactSummary,validateDraft,transactionKind,expenseImpact,financialRows,advanceForTransaction,savingsForTransaction,detectInternalPairs,directionalBalances,proposeRepaymentAllocations,planImportEffects,applyImportPlan,effectManifest,undoImportEffects,ImportStore,queueImportSync,flushImportSync,recoverJournal,install,round2,uid,clone};
+  return {SCHEMA_VERSION,CLOUD_STORAGE_VERSION,CLOUD_READ_CONCURRENCY,OWNERS,IMPORT_STATUSES,normalizeIban,normalizeRule,normalizeTransaction,normalizeCore,validateCore,calculateGoalSavedAmount,reconcileGoalSavedAmounts,chunkRows,canonicalValue,rowsChecksum,buildCloudImportEnvelope,assembleCloudImport,mapWithConcurrency,fetchImportFromCloud,resolveImportDetails,normalizeText,detectDelimiter,parseDelimited,parseDate,parseAmount,detectFormat,inferMapping,hashText,fingerprint,organizationName,proposeType,recognitionProposal,classifyOriginal,parseBankCsv,findProfile,createImportDraft,updateDraftSummary,compactSummary,validateDraft,transactionKind,expenseImpact,financialRows,advanceForTransaction,savingsForTransaction,detectInternalPairs,directionalBalances,proposeRepaymentAllocations,planImportEffects,applyImportPlan,effectManifest,undoImportEffects,ImportStore,queueImportSync,flushImportSync,recoverJournal,install,round2,uid,clone};
 });
