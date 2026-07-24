@@ -7596,7 +7596,7 @@ function normalizePersonDefaults(target){
 }
 
 /* ---------- Update 3: schema v4 en pure maandadministratie ---------- */
-var U3_SCHEMA_VERSION = 6;
+var U3_SCHEMA_VERSION = 7;
 var U3_ACCOUNTS = ['gezamenlijk','dion','dara'];
 var U3_FREQUENCY_UNITS = ['weken','maanden','jaren'];
 
@@ -7780,6 +7780,35 @@ function u3NormalizeRecurringItem(item,kind){
   }
   return item;
 }
+function u3LegacyFinancialSnapshot(month,record,closure){
+  const summary=isPlainObject(closure?.summary)?closure.summary:{};
+  const actualIncome=round2(Number(summary.actualIncome)||0);
+  const fixedExpenses=round2(Number(summary.plannedFixed)||0);
+  const variableTotal=round2(Number(summary.actualExpenses)||0);
+  const savings=round2(Number(summary.jointSaving)||0);
+  return {
+    month,version:1,status:record.status,legacy:true,
+    income:{dion:0,dara:0,joint:actualIncome,total:actualIncome},
+    fixedExpenses,
+    variableExpenses:{dion:0,dara:0,joint:variableTotal,total:variableTotal},
+    refunds:0,savings,
+    allowance:{dion:round2(Number(summary.allowanceDion)||0),dara:round2(Number(summary.allowanceDara)||0)},
+    contributions:{dion:0,dara:0,joint:0,total:0},
+    remaining:round2(Number(summary.monthResult)||0),
+    goalAllocations:[],
+    closedAt:String(closure?.closedAt||record.closedAt||'')
+  };
+}
+function u3NormalizeClosureSnapshot(month,record,closure){
+  closure.id=closure.id||closure.closingId||`closure-${month}-${closure.revision||1}`;
+  closure.closingId=closure.closingId||closure.id;
+  closure.financialSnapshot=isPlainObject(closure.financialSnapshot)
+    ? closure.financialSnapshot
+    : u3LegacyFinancialSnapshot(month,record,closure);
+  closure.financialSnapshot.month=month;
+  closure.financialSnapshot.closedAt=closure.financialSnapshot.closedAt||closure.closedAt||record.closedAt||'';
+  return closure;
+}
 function u3NormalizeState(target){
   target.meta=isPlainObject(target.meta)?target.meta:{};
   u3MigrateFixedExpenses(target);
@@ -7816,7 +7845,8 @@ function u3NormalizeState(target){
     if(!isPlainObject(record)){delete target.monthRecords[month];return;}
     record.month=month; record.status=['afgesloten','correctie-nodig'].includes(record.status)?record.status:'open';
     record.closedAt=record.closedAt||''; record.reopenedAt=record.reopenedAt||'';
-    record.closureHistory=Array.isArray(record.closureHistory)?record.closureHistory.filter(isPlainObject):[];
+    record.closureHistory=(Array.isArray(record.closureHistory)?record.closureHistory.filter(isPlainObject):[])
+      .map(closure=>u3NormalizeClosureSnapshot(month,record,closure));
     record.activeClosureId=record.activeClosureId||'';
   });
   target.meta.schemaVersion=U3_SCHEMA_VERSION;
@@ -9796,12 +9826,10 @@ function renderDashboard(){
   const year = Number(getSelectedMonth().slice(0,4));
   const yearData = Array.from({length:12}, (_,i)=>{
     const key = monthKey(new Date(year, i, 1));
-    const baseIncome = (state.monthlyIncome?.[key]?.dion || 0) + (state.monthlyIncome?.[key]?.dara || 0);
-    const refunds = baseIncome > 0 ? sumVasteTeruggaven('dion') + sumVasteTeruggaven('dara') : 0;
-    const income = round2(baseIncome + refunds);
-    const spent = sumTransactions(null, null, key);
-    const hasMonthData = income > 0 || spent > 0;
-    const saving = hasMonthData ? Number(r.spaarpotDezeMaand)||0 : 0;
+    const monthResult=getMonthFinancialResult(key);
+    const income=round2(Number(monthResult.income?.total)||0);
+    const spent=round2((Number(monthResult.fixedExpenses)||0)+(Number(monthResult.variableExpenses?.total)||0));
+    const saving=round2(Number(monthResult.savings)||0);
     return { key, name:['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Nov','Dec'][i], income, spent, saving };
   });
   const maxYearValue = Math.max(1, ...yearData.flatMap(m=>[m.income, m.spent, m.saving]));
@@ -12435,6 +12463,62 @@ function u3MonthSummary(month=getSelectedMonth()){
     reserve:{gezamenlijk:u3ReserveDelta('gezamenlijk',month),dion:u3ReserveDelta('dion',month),dara:u3ReserveDelta('dara',month)}
   };
 }
+function u3WithSelectedMonth(month,callback){
+  const previous=state.meta.selectedMonth;
+  try{
+    state.meta.selectedMonth=month;
+    ensureMonthData(month);
+    return callback();
+  }finally{
+    state.meta.selectedMonth=previous;
+  }
+}
+function u3LiveFinancialSnapshot(month=getSelectedMonth()){
+  return u3WithSelectedMonth(month,()=>{
+    const scenarioResult=calcScenario(state);
+    const income={
+      dion:round2(getTotalMonthlyIncome('dion')),
+      dara:round2(getTotalMonthlyIncome('dara')),
+      joint:round2(u3ActualIncome(month,'gezamenlijk'))
+    };
+    income.total=round2(income.dion+income.dara+income.joint);
+    const variableExpenses={
+      dion:round2(sumTransactions('dion',null,month)),
+      dara:round2(sumTransactions('dara',null,month)),
+      joint:round2(sumTransactions('gezamenlijk',null,month))
+    };
+    variableExpenses.total=round2(variableExpenses.dion+variableExpenses.dara+variableExpenses.joint);
+    const fixedExpenses=round2(u3PlannedFixedTotal(month));
+    const refunds=round2(sumMaandTeruggaven('dion',month)+sumMaandTeruggaven('dara',month)+sumMaandTeruggaven('gezamenlijk',month));
+    const savings=round2(scenarioResult.spaarpotDezeMaand);
+    const contributions={dion:0,dara:0,joint:0,total:0};
+    (state.savingsGoalLedger||[]).filter(entry=>entry.active!==false&&entry.month===month&&!['geannuleerd','teruggedraaid'].includes(entry.status)).forEach(entry=>{
+      const goalOwner=U3_ACCOUNTS.find(owner=>(state.spaardoelen?.[owner]||[]).some(goal=>goal.id===entry.goalId))||'gezamenlijk';
+      contributions[goalOwner]=round2(contributions[goalOwner]+Number(entry.effectiveAmount||0));
+    });
+    contributions.total=round2(contributions.dion+contributions.dara+contributions.joint);
+    return {
+      month,version:2,status:'open',legacy:false,income,fixedExpenses,variableExpenses,refunds,savings,
+      allowance:{dion:round2(scenarioResult.dion.zakgeld),dara:round2(scenarioResult.dara.zakgeld)},
+      contributions,remaining:round2(income.total-fixedExpenses-variableExpenses.total-savings),
+      goalAllocations:(state.savingsGoalLedger||[]).filter(entry=>entry.month===month&&entry.active!==false).map(entry=>({id:entry.id,goalId:entry.goalId,amount:round2(Number(entry.effectiveAmount)||0),status:entry.status})),
+      closedAt:''
+    };
+  });
+}
+function getMonthFinancialResult(month=getSelectedMonth()){
+  const record=state.monthRecords?.[month];
+  if(record&&['afgesloten','correctie-nodig'].includes(record.status)&&record.activeClosureId){
+    const closure=(record.closureHistory||[]).find(item=>(item.closingId||item.id)===record.activeClosureId);
+    if(closure){
+      const snapshot=clone(closure.financialSnapshot||u3LegacyFinancialSnapshot(month,record,closure));
+      snapshot.status=record.status;
+      snapshot.pendingCorrectionTransactionIds=[...(record.lateImportTransactionIds||[])];
+      return snapshot;
+    }
+  }
+  return u3LiveFinancialSnapshot(month);
+}
 function u3CloseMonth(month=getSelectedMonth(),actualBalances={},correctionAccounts=[],options={}){
   const pending=u3PendingReviews(month);
   if(pending.length&&!options.force)return {requiresWarning:true,pendingCount:pending.length,month};
@@ -12473,7 +12557,9 @@ function u3CloseMonth(month=getSelectedMonth(),actualBalances={},correctionAccou
     const id=`reserve-${closureId}-${owner}`;
     if(!state.reserveLedger.some(row=>row.id===id))state.reserveLedger.push({id,month,owner,amount:summary.reserve[owner],reason:'Netto budgetverschil',closureId,status:'actief',createdAt:new Date().toISOString()});
   });
-  const closure={id:closureId,revision,closedAt:new Date().toISOString(),summary,accountControl,transferIds:drafts.filter(row=>row.calculatedAmount>.004).map(row=>row.id),transferSnapshot:clone(drafts.filter(row=>row.calculatedAmount>.004)),correctionIds:(state.monthCorrections||[]).filter(row=>row.closureId===closureId).map(row=>row.id),updatedBy:getDeviceId()};
+  const financialSnapshot=u3LiveFinancialSnapshot(month);
+  financialSnapshot.status='afgesloten';financialSnapshot.closedAt=new Date().toISOString();
+  const closure={id:closureId,closingId:closureId,revision,closedAt:financialSnapshot.closedAt,summary,financialSnapshot,accountControl,transferIds:drafts.filter(row=>row.calculatedAmount>.004).map(row=>row.id),transferSnapshot:clone(drafts.filter(row=>row.calculatedAmount>.004)),correctionIds:(state.monthCorrections||[]).filter(row=>row.closureId===closureId).map(row=>row.id),updatedBy:getDeviceId()};
   record.status='afgesloten';record.closedAt=closure.closedAt;record.activeClosureId=closureId;record.closureHistory.push(closure);
   return closure;
 }

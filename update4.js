@@ -8,7 +8,7 @@
 })(typeof window!=='undefined'?window:globalThis,function(){
   'use strict';
 
-  const SCHEMA_VERSION=6;
+  const SCHEMA_VERSION=7;
   const DB_NAME='finize-imports-v1';
   const DB_VERSION=1;
   const IMPORT_STORE='imports';
