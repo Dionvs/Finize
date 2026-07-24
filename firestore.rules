@@ -1,0 +1,21 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /budgetPlanners/dion-dara {
+      allow read, write: if true;
+    }
+
+    match /budgetPlanners/finize {
+      allow read, write: if true;
+
+      match /imports/{importId} {
+        allow read, write: if true;
+
+        match /chunks/{chunkId} {
+          allow read, write: if true;
+        }
+      }
+    }
+  }
+}

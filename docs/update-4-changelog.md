@@ -32,3 +32,12 @@ De meegeleverde ING-fixtures zijn synthetisch en geanonimiseerd. Voor definitiev
 - Importchunks worden gecontroleerd op volledigheid, volgorde, rijtelling en checksum voordat ze lokaal worden opgeslagen.
 - Nieuwe cloudheaders bevatten geen volledige CSV-tekst en worden pas na de chunks geschreven.
 - Zichtbare versieaanduidingen `Update 3` en `Update 4` zijn uit de appkaarten verwijderd.
+
+## CSV-cloudherstel
+
+- De gepubliceerde Firestore-regels zijn vastgelegd in `firestore.rules`.
+- Importheaders en chunks hebben dezelfde loginloze toegang als het bestaande Finize-hoofddocument.
+- Firebase gebruikt één gedeelde verbindingspoging wanneer de app en een import tegelijk verbinding maken.
+- Rechten-, offline-, ontbrekende en beschadigde clouddata geven afzonderlijke herstelmeldingen.
+- Een vastgelopen actief concept kan na bevestiging worden verwijderd zonder financiële gegevens of verwerkte imports te wijzigen.
+- Verouderde `activeImportId`-verwijzingen worden bij opstarten veilig hersteld.

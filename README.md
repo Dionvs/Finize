@@ -18,4 +18,5 @@ Gegevens worden lokaal opgeslagen in de browser. Als Firebase/Firestore is verbo
 - `index.html` is de actieve GitHub Pages app.
 - `index-OLD.html` is een back-up van de vorige versie.
 - `manifest.json` en `service-worker.js` maken de app PWA-ready.
+- `firestore.rules` bevat de gepubliceerde toegangsregels voor Finize en zijn importchunks.
 - `icons/` bevat de app-iconen.

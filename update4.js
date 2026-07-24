@@ -652,6 +652,93 @@
     commitSummary(root,draft);
     if(sync){await queueImportSync(draft);flushImportSync(root).catch(()=>{});}
   }
+  async function reconcileActiveImportReference(root,{localRead=id=>ImportStore.getImport(id)}={}){
+    const activeId=String(root?.state?.activeImportId||'');
+    if(!activeId)return {action:'none',activeImportId:''};
+    const summaries=root.state.importSummaries||[];
+    const summary=summaries.find(item=>String(item.id)===activeId);
+    let local=null;
+    try{local=await localRead(activeId);}
+    catch(error){return {action:'local-error',activeImportId:activeId,error};}
+    if(local){
+      if(local.status==='concept'){
+        if(!summary)commitSummary(root,local);
+        return {action:summary?'local':'summary-restored',activeImportId:activeId};
+      }
+      commitSummary(root,local);
+      return {action:'cleared-finished',activeImportId:''};
+    }
+    if(!summary||summary.status!=='concept'){
+      const ok=root.commitChange(()=>{if(root.state.activeImportId===activeId)root.state.activeImportId='';},{render:false});
+      if(!ok)throw new Error('De verouderde importblokkade kon niet worden hersteld.');
+      return {action:'cleared-stale',activeImportId:''};
+    }
+    return {action:'cloud-needed',activeImportId:activeId};
+  }
+
+  async function deleteCloudImportBestEffort(root,id,record=null){
+    const cloud=root?.CloudAdapter;
+    try{
+      if(!cloud?.isConnected?.()||!cloud.modules?.firestore||!cloud.db)return false;
+      const firestore=cloud.modules.firestore;
+      if(typeof firestore.deleteDoc!=='function')return false;
+      const importRef=firestore.doc(cloud.db,'budgetPlanners','finize','imports',String(id));
+      let chunkCount=null;
+      if(typeof firestore.getDoc==='function'){
+        const snapshot=await firestore.getDoc(importRef);
+        if(!snapshot?.exists?.())return true;
+        chunkCount=Number(snapshot.data()?.chunkCount);
+      }
+      if(!Number.isInteger(chunkCount)&&Array.isArray(record?.rows))chunkCount=chunkRows(record.rows).length;
+      if(Number.isInteger(chunkCount)&&chunkCount>=0){
+        const indices=Array.from({length:chunkCount},(_,index)=>index);
+        await mapWithConcurrency(indices,CLOUD_READ_CONCURRENCY,index=>firestore.deleteDoc(
+          firestore.doc(cloud.db,'budgetPlanners','finize','imports',String(id),'chunks',String(index).padStart(4,'0'))
+        ));
+      }
+      await firestore.deleteDoc(importRef);
+      return true;
+    }catch(error){
+      console.warn('Cloudkopie van verwijderd importconcept kon niet worden opgeruimd.',classifyCloudError(error,'Cloudopschoning mislukt.'));
+      return false;
+    }
+  }
+
+  async function discardImportConcept(root,id,{cleanupCloud=true}={}){
+    const importId=String(id||'');
+    const summary=(root?.state?.importSummaries||[]).find(item=>String(item.id)===importId);
+    if(!importId||String(root?.state?.activeImportId||'')!==importId||summary?.status!=='concept'){
+      throw new Error('Alleen het actieve, onverwerkte importconcept kan worden verwijderd.');
+    }
+    let local=null;
+    try{local=await ImportStore.getImport(importId);}
+    catch(error){console.warn('Lokaal importconcept kon niet worden gelezen voor verwijdering.',error);}
+    const journal={id:`discard-${importId}`,operation:'discard',importId,status:'pending',createdAt:new Date().toISOString()};
+    await ImportStore.putJournal(journal);
+    const ok=root.commitChange(()=>{
+      root.state.importSummaries=(root.state.importSummaries||[]).filter(item=>String(item.id)!==importId);
+      if(root.state.activeImportId===importId)root.state.activeImportId='';
+    },{render:false});
+    if(!ok){
+      journal.status='rolled-back';journal.updatedAt=new Date().toISOString();await ImportStore.putJournal(journal);
+      throw new Error('Het importconcept is niet verwijderd; de bestaande gegevens zijn behouden.');
+    }
+    let localCleanup=true;
+    try{
+      await ImportStore.deleteImport(importId);
+      await ImportStore.deleteSync(importId);
+    }catch(error){
+      localCleanup=false;journal.localCleanupError=String(error?.message||error);
+    }
+    const cloudCleanup=cleanupCloud?await deleteCloudImportBestEffort(root,importId,local):false;
+    if(UI.draft?.id===importId)UI.draft=null;
+    journal.status=localCleanup?'completed':'pending';
+    if(localCleanup)journal.completedAt=new Date().toISOString();
+    journal.localCleanup=localCleanup;journal.cloudCleanup=cloudCleanup;
+    await ImportStore.putJournal(journal);
+    root.renderActiveTab?.();
+    return {ok:true,localCleanup,cloudCleanup};
+  }
   function goalExists(state,id){
     if(!id)return true;
     return OWNERS.some(owner=>(state.spaardoelen?.[owner]||[]).some(goal=>goal.id===id));
@@ -1116,13 +1203,27 @@
   }
   function renderCloudImportState(root,id,error=null){
     const modal=ensureModalRoot();
+    const summary=(root.state.importSummaries||[]).find(item=>String(item.id)===String(id));
+    const canDiscard=String(root.state.activeImportId||'')===String(id)&&summary?.status==='concept';
     modal.innerHTML=`<div class="u4-import-modal u4-cloud-import-state" role="dialog" aria-modal="true" aria-label="Import uit cloud ophalen">
       <header class="u4-modal-head"><div><h2>${error?'Import niet beschikbaar':'Import uit cloud ophalen…'}</h2><p>${error?'De lokale kopie ontbreekt. Finize probeert de veilig bewaarde importdetails te herstellen.':'De bankregels worden veilig op dit apparaat opgeslagen.'}</p></div><button type="button" class="ghost" data-u4-close>Sluiten</button></header>
-      <main class="u4-modal-body"><div class="u4-cloud-message">${error?`<strong>Ophalen mislukt</strong><p>${esc(cloudImportMessage(error))}</p><button type="button" class="primary" data-u4-cloud-retry>Opnieuw proberen</button>`:'<span class="u4-cloud-spinner" aria-hidden="true"></span><strong>Even geduld…</strong><p>Het oorspronkelijke CSV-bestand is niet nodig.</p>'}</div></main>
+      <main class="u4-modal-body"><div class="u4-cloud-message">${error?`<strong>Ophalen mislukt</strong><p>${esc(cloudImportMessage(error))}</p><div class="u4-cloud-actions"><button type="button" class="primary" data-u4-cloud-retry>Opnieuw proberen</button>${canDiscard?'<button type="button" class="danger-ghost" data-u4-discard-concept>Concept verwijderen en nieuwe import toestaan</button>':''}</div>`:'<span class="u4-cloud-spinner" aria-hidden="true"></span><strong>Even geduld…</strong><p>Het oorspronkelijke CSV-bestand is niet nodig.</p>'}</div></main>
     </div>`;
     modal.classList.add('open');
     modal.querySelector('[data-u4-close]')?.addEventListener('click',closeDraft);
     modal.querySelector('[data-u4-cloud-retry]')?.addEventListener('click',()=>openDraft(root,id));
+    modal.querySelector('[data-u4-discard-concept]')?.addEventListener('click',async event=>{
+      if(!confirm('Dit onverwerkte importconcept verwijderen? De financiële administratie en verwerkte imports blijven behouden.'))return;
+      event.currentTarget.disabled=true;
+      try{
+        await discardImportConcept(root,id);
+        closeDraft();
+        alert('Het vastgelopen importconcept is verwijderd. Je kunt nu een nieuw CSV-bestand kiezen.');
+      }catch(discardError){
+        event.currentTarget.disabled=false;
+        alert(discardError.message);
+      }
+    });
   }
   async function openDraft(root,id){
     let local;
@@ -1214,7 +1315,7 @@
   function bindImportPanel(rootElement,root){
     rootElement.querySelector('[data-u4-file]')?.addEventListener('change',event=>{
       const file=event.target.files?.[0];if(!file)return;
-      if(root.state.activeImportId){alert('Verwerk of verwijder eerst het openstaande importconcept.');event.target.value='';return;}
+      if(root.state.activeImportId){event.target.value='';openDraft(root,root.state.activeImportId);return;}
       const reader=new FileReader();
       reader.onload=async loaded=>{
         try{
@@ -1307,6 +1408,28 @@
   async function recoverJournal(root){
     const entries=await ImportStore.listJournal();
     for(const entry of entries.filter(item=>item.status==='pending')){
+      if(entry.operation==='discard'){
+        if(root.state?.activeImportId===entry.importId){
+          entry.status='rolled-back';
+        }else{
+          try{
+            await ImportStore.deleteImport(entry.importId);
+            await ImportStore.deleteSync(entry.importId);
+            entry.localCleanup=true;
+          }catch(error){
+            entry.localCleanup=false;entry.localCleanupError=String(error?.message||error);
+          }
+          if(entry.localCleanup){
+            entry.cloudCleanup=await deleteCloudImportBestEffort(root,entry.importId);
+            entry.status='completed';entry.completedAt=new Date().toISOString();
+          }else{
+            entry.status='pending';
+          }
+        }
+        entry.recoveredAt=new Date().toISOString();
+        await ImportStore.putJournal(entry);
+        continue;
+      }
       const processed=(root.state?.transactions||[]).some(tx=>tx.importBatchId===entry.importId);
       entry.status=entry.operation==='undo'?!processed?'completed':'rolled-back':processed?'completed':'rolled-back';
       entry.recoveredAt=new Date().toISOString();
@@ -1334,6 +1457,8 @@
       classifyCloudError,
       fetchImportFromCloud,
       resolveImportDetails,
+      reconcileActiveImportReference,
+      discardImportConcept,
       parseBankCsv,
       createImportDraft,
       fingerprint,
@@ -1349,10 +1474,10 @@
     installUI(root);
     if(!root.__finizeUpdate4CloudListener){
       root.__finizeUpdate4CloudListener=true;
-      root.addEventListener?.('finize:cloud-connected',()=>flushImportSync(root).catch(error=>console.warn('Importsynchronisatie uitgesteld.',error)));
+      root.addEventListener?.('finize:cloud-connected',()=>recoverJournal(root).then(()=>flushImportSync(root)).catch(error=>console.warn('Importsynchronisatie uitgesteld.',error)));
     }
-    Promise.resolve().then(()=>recoverJournal(root)).then(()=>flushImportSync(root)).catch(error=>console.warn('Update 4 opslaginitialisatie uitgesteld.',error));
+    Promise.resolve().then(()=>recoverJournal(root)).then(()=>reconcileActiveImportReference(root)).then(()=>flushImportSync(root)).catch(error=>console.warn('Update 4 opslaginitialisatie uitgesteld.',error));
   }
 
-  return {SCHEMA_VERSION,CLOUD_STORAGE_VERSION,CLOUD_READ_CONCURRENCY,OWNERS,IMPORT_STATUSES,normalizeIban,normalizeRule,normalizeTransaction,normalizeCore,validateCore,calculateGoalSavedAmount,reconcileGoalSavedAmounts,chunkRows,canonicalValue,rowsChecksum,buildCloudImportEnvelope,assembleCloudImport,mapWithConcurrency,classifyCloudError,fetchImportFromCloud,resolveImportDetails,normalizeText,detectDelimiter,parseDelimited,parseDate,parseAmount,detectFormat,inferMapping,hashText,fingerprint,organizationName,proposeType,recognitionProposal,classifyOriginal,parseBankCsv,findProfile,createImportDraft,updateDraftSummary,compactSummary,validateDraft,transactionKind,expenseImpact,financialRows,advanceForTransaction,savingsForTransaction,detectInternalPairs,directionalBalances,proposeRepaymentAllocations,planImportEffects,applyImportPlan,effectManifest,undoImportEffects,ImportStore,queueImportSync,flushImportSync,recoverJournal,install,round2,uid,clone};
+  return {SCHEMA_VERSION,CLOUD_STORAGE_VERSION,CLOUD_READ_CONCURRENCY,OWNERS,IMPORT_STATUSES,normalizeIban,normalizeRule,normalizeTransaction,normalizeCore,validateCore,calculateGoalSavedAmount,reconcileGoalSavedAmounts,chunkRows,canonicalValue,rowsChecksum,buildCloudImportEnvelope,assembleCloudImport,mapWithConcurrency,classifyCloudError,fetchImportFromCloud,resolveImportDetails,reconcileActiveImportReference,deleteCloudImportBestEffort,discardImportConcept,normalizeText,detectDelimiter,parseDelimited,parseDate,parseAmount,detectFormat,inferMapping,hashText,fingerprint,organizationName,proposeType,recognitionProposal,classifyOriginal,parseBankCsv,findProfile,createImportDraft,updateDraftSummary,compactSummary,validateDraft,transactionKind,expenseImpact,financialRows,advanceForTransaction,savingsForTransaction,detectInternalPairs,directionalBalances,proposeRepaymentAllocations,planImportEffects,applyImportPlan,effectManifest,undoImportEffects,ImportStore,queueImportSync,flushImportSync,recoverJournal,install,round2,uid,clone};
 });

@@ -10,7 +10,7 @@ const sw = fs.readFileSync(path.join(root, 'service-worker.js'), 'utf8');
 
 assert.match(html, /update5\.css/);
 assert.match(html, /update5\.js/);
-assert.match(sw, /finize-v28-personal-overview-cleanup/);
+assert.match(sw, /finize-v29-csv-cloudherstel/);
 assert.match(sw, /\.\/update5\.css/);
 assert.match(sw, /\.\/update5\.js/);
 assert.doesNotMatch(html, /class="u5-page-context"/);

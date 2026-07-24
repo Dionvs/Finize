@@ -36,3 +36,13 @@ Getest met synthetische ING-fixtures voor Dion, Dara en gezamenlijk plus overlap
 3. Open het importbonnetje; de melding `Import uit cloud ophalen…` verschijnt en daarna de normale importmodal.
 4. Herlaad apparaat B zonder netwerk; de gecachete import blijft openen.
 5. Controleer dat de appkaarten geen technische titels `Update 3` of `Update 4` tonen.
+
+## CSV-cloudverbinding en conceptherstel
+
+1. Controleer dat `budgetPlanners/finize`, een importheader en een chunkdocument via Firestore bereikbaar zijn.
+2. Maak een nieuwe conceptimport en controleer dat de syncwachtrij na verbinding leegloopt.
+3. Open het concept op een tweede apparaat met lege IndexedDB en controleer dat het daarna ook offline opent.
+4. Blokkeer tijdelijk de importpaden en controleer de specifieke melding over Firebase-beveiligingsregels.
+5. Kies bij een onbereikbaar actief concept `Concept verwijderen en nieuwe import toestaan`.
+6. Bevestig dat alleen het concept verdwijnt en dat daarna direct een andere CSV kan worden gekozen.
+7. Controleer dat transacties, spaardoelen, voorschotten, maandstatussen en verwerkte importbonnetjes gelijk blijven.
