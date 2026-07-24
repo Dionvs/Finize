@@ -4,6 +4,8 @@ const vm = require('node:vm');
 const path = require('node:path');
 
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+const impactStart = html.indexOf('function getTransactionExpenseImpact');
+const impactEnd = html.indexOf('function sumTransactions', impactStart);
 const start = html.indexOf('function u3ConfirmedTransactions');
 const end = html.indexOf('const u3LegacyMonthlyScenarioData', start);
 assert.ok(start >= 0 && end > start, 'Update 3 administratierekenlaag is niet gevonden');
@@ -40,6 +42,10 @@ const context = {
   transactionMonth:tx=>String(tx.date||'').slice(0,7),
   u3PlannedOccurrences:()=>[],
   ensureMonthData:()=>{},
+  getTotalMonthlyIncome:()=>0,
+  sumTransactions:()=>0,
+  sumMaandTeruggaven:()=>0,
+  u2ReconcileSavingsGoals:()=>{},
   isPlainObject:value=>value!==null&&typeof value==='object'&&!Array.isArray(value),
   calcScenario:()=>({dion:{zakgeld:10},dara:{zakgeld:20},spaarpotDezeMaand:30}),
   clone:value=>JSON.parse(JSON.stringify(value)),
@@ -50,6 +56,7 @@ const context = {
   bankText:value=>String(value||'').toLowerCase()
 };
 vm.createContext(context);
+vm.runInContext(html.slice(impactStart,impactEnd),context,{filename:'update4-expense-impact-inline.js'});
 vm.runInContext(html.slice(start,end),context,{filename:'update3-administration-inline.js'});
 
 const budget = context.u3BudgetSummary('gezamenlijk','2026-07','voor');
@@ -79,6 +86,15 @@ assert.equal(context.u3ReopenMonth('2026-07'),true);
 const secondClose=context.u3CloseMonth('2026-07',{gezamenlijk:500,dion:175,dara:200},[]);
 assert.notEqual(secondClose.id,firstClose.id);
 assert.equal(state.monthRecords['2026-07'].closureHistory.length,2);
+assert.equal(firstClose.status,'vervangen');
+assert.equal(secondClose.status,'actief');
+assert.equal(state.reserveLedger.filter(row=>row.status==='actief').length,3);
+for(let cycle=0;cycle<2;cycle++){
+  assert.equal(context.u3ReopenMonth('2026-07'),true);
+  context.u3CloseMonth('2026-07',{gezamenlijk:500,dion:175,dara:200},[]);
+  assert.equal(state.reserveLedger.filter(row=>row.status==='actief').length,3,'herhaald afsluiten mag reserves niet stapelen');
+}
+assert.equal(state.monthRecords['2026-07'].closureHistory.length,4);
 
 const settlement=state.internalTransfers.find(row=>String(row.type).includes('voorschot'));
 assert.equal(settlement,undefined,'Maandafsluiting mag voorschotten niet automatisch aflossen');

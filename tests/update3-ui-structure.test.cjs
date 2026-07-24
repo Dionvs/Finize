@@ -22,5 +22,7 @@ for (const id of ['tab-dashboard', 'tab-gezamenlijk', 'tab-dion', 'tab-dara', 't
 
 assert.match(html, /function renderJointFirstRow\(\)/, 'Gezamenlijke weergave ontbreekt');
 assert.match(html, /function renderU3AdminPanel\(\)/, 'Maandadministratie ontbreekt');
+assert.match(html, /renderManageSection\('Maandadministratie',body,false,'data-dashboard-accordion="month-admin"'\)/, 'Maandadministratie is geen dashboardaccordeon');
+assert.match(html, /data-u3-open="planning"/, 'Maandadministratie-acties ontbreken');
 
 console.log('UPDATE3_UI_STRUCTURE_OK');

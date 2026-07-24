@@ -14,6 +14,15 @@ for(const marker of ['Bankimport controleren','Nakijken','Zeker','Meer opties','
 }
 assert.doesNotMatch(html,/section-kicker">Update 3/);
 assert.doesNotMatch(js,/section-kicker">Update 4/);
+assert.match(html,/data-dashboard-accordion="bank-import"/,'Bankimport mist een stabiele accordeonidentificatie');
+assert.match(html,/querySelector\('\[data-dashboard-accordion="bank-import"\]'\)/,'Bankimportstatus gebruikt geen stabiele accordeonselectie');
+assert.match(html,/function bindDashboardAccordionKeyboard\(root\)/,'Centrale toetsenbordbediening voor dashboardaccordeons ontbreekt');
+assert.match(html,/\['Enter',' ','Spacebar'\]\.includes\(event\.key\)/,'Enter- en spatiebediening voor dashboardaccordeons ontbreekt');
+assert.match(html,/renderManageSection\('Maandadministratie',body,false,'data-dashboard-accordion="month-admin"'\)/,'Maandadministratie start niet als gesloten accordeon');
+assert.match(js,/accordion\.dataset\.dashboardAccordion='settlement'/,'Onderling te verrekenen is geen dashboardaccordeon');
+assert.doesNotMatch(js,/accordion\.open\s*=\s*true/,'Onderling te verrekenen start niet gesloten');
+assert.match(js,/class="manage-title">Onderling te verrekenen/,'Titel van verrekenaccordeon ontbreekt');
+assert.match(js,/data-u4-open-settlement/,'Detailsactie voor verrekenen ontbreekt');
 assert.match(css,/#u4ImportModalRoot/);
 assert.match(css,/u4-cloud-spinner/);
 assert.match(css,/height:100dvh/);
