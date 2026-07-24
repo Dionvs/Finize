@@ -5259,8 +5259,8 @@ body.v4-app .modal-content{ min-width:0; }
   .u3-budget-row span:nth-child(3),.u3-budget-row span:nth-child(4){display:none}
 }
 </style>
-<link rel="stylesheet" href="./update4.css?v=28">
-<link rel="stylesheet" href="./update5.css?v=28">
+<link rel="stylesheet" href="./update4.css?v=30">
+<link rel="stylesheet" href="./update5.css?v=29">
 </head>
 <body class="v4-app">
 
@@ -7133,7 +7133,7 @@ function saveFirebaseConfigFromText(text){
 }
 
 const CloudAdapter = {
-  app:null, db:null, docRef:null, modules:null, unsubscribe:null,
+  app:null, db:null, docRef:null, modules:null, unsubscribe:null, connectPromise:null,
   status:'Offline — lokaal bewaard', saveTimer:null, applyingRemote:false,
   pendingState:null, writeInFlight:false, retryTimer:null, retryAttempt:0,
   lastConfirmedRevision:0, lastFailureRetryable:true,
@@ -7152,6 +7152,16 @@ const CloudAdapter = {
     return this.modules;
   },
   async connect(){
+    if (this.isConnected()) return true;
+    if (this.connectPromise) return this.connectPromise;
+    this.connectPromise = this.connectOnce();
+    try{
+      return await this.connectPromise;
+    }finally{
+      this.connectPromise = null;
+    }
+  },
+  async connectOnce(){
     if (!this.isConfigured()){
       this.status = 'Offline — lokaal bewaard';
       renderCloudStatus();
@@ -8427,6 +8437,12 @@ service cloud.firestore {
   match /databases/{database}/documents {
     match /budgetPlanners/finize {
       allow read, write: if true;
+      match /imports/{importId} {
+        allow read, write: if true;
+        match /chunks/{chunkId} {
+          allow read, write: if true;
+        }
+      }
     }
   }
 }</pre>
@@ -11092,8 +11108,8 @@ async function initializeApp(){
 initializeApp();
 
 </script>
-<script src="./update4.js?v=28"></script>
-<script src="./update5.js?v=28"></script>
+<script src="./update4.js?v=30"></script>
+<script src="./update5.js?v=29"></script>
 <script>
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {

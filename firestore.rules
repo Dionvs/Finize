@@ -1,0 +1,23 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Finize gebruikt momenteel een gedeelde, niet-geauthenticeerde planner.
+    // Deze regels behouden het bestaande gedrag en staan ook de CSV-importdetails toe.
+    match /budgetPlanners/finize {
+      allow read, write: if true;
+
+      match /imports/{importId} {
+        allow read, write: if true;
+
+        match /chunks/{chunkId} {
+          allow read, write: if true;
+        }
+      }
+    }
+
+    // Alle overige Firestore-documenten blijven standaard gesloten.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

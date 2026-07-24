@@ -266,6 +266,18 @@
     const error=new Error(message);error.code=code;return error;
   }
 
+  function classifyCloudError(error,context='De import kon niet uit de cloud worden opgehaald.'){
+    const code=String(error?.code||error?.name||'').toLocaleLowerCase();
+    const message=String(error?.message||error||'').trim();
+    if(code.includes('permission-denied')||code.includes('permission_denied')||message.toLocaleLowerCase().includes('missing or insufficient permissions')){
+      return cloudImportError('cloud-permission','Firestore blokkeert de toegang tot bankimports. Controleer de gepubliceerde beveiligingsregels.');
+    }
+    if(code.includes('unavailable')||code.includes('network')||code.includes('offline')||code.includes('deadline-exceeded')){
+      return cloudImportError('cloud-offline',`${context} De cloudverbinding is tijdelijk niet beschikbaar.`);
+    }
+    return cloudImportError('cloud-error',`${context}${message?` ${message}`:''}`);
+  }
+
   function assembleCloudImport(header,chunks,expectedId=''){
     if(!plain(header)||!header.id)throw cloudImportError('cloud-invalid','De cloudkopie heeft geen geldig import-ID.');
     if(expectedId&&String(header.id)!==String(expectedId))throw cloudImportError('cloud-invalid','De cloudkopie hoort bij een andere import.');
@@ -330,7 +342,7 @@
     const importRef=firestore.doc(cloud.db,'budgetPlanners','finize','imports',String(id));
     let headerSnapshot;
     try{headerSnapshot=await firestore.getDoc(importRef);}
-    catch(error){throw cloudImportError('cloud-offline',`De import kon niet uit de cloud worden opgehaald: ${error?.message||error}`);}
+    catch(error){throw classifyCloudError(error,'De importheader kon niet worden opgehaald.');}
     if(!headerSnapshot?.exists?.()){
       throw cloudImportError('cloud-missing','Deze import is nog niet vanaf het bronapparaat naar de cloud gesynchroniseerd.');
     }
@@ -342,7 +354,7 @@
       const chunkRef=firestore.doc(cloud.db,'budgetPlanners','finize','imports',String(id),'chunks',String(index).padStart(4,'0'));
       let snapshot;
       try{snapshot=await firestore.getDoc(chunkRef);}
-      catch(error){throw cloudImportError('cloud-offline',`Een importdeel kon niet worden opgehaald: ${error?.message||error}`);}
+      catch(error){throw classifyCloudError(error,`Importdeel ${index+1} van ${count} kon niet worden opgehaald.`);}
       if(!snapshot?.exists?.())throw cloudImportError('cloud-incomplete',`Importdeel ${index+1} van ${count} ontbreekt in de cloud.`);
       return snapshot.data();
     });
@@ -634,11 +646,107 @@
     },{render:false});
     if(!ok)throw new Error('Importsamenvatting kon niet worden opgeslagen.');
   }
-  async function saveDraft(root,draft,{sync=false}={}){
-    updateDraftSummary(draft);
+  async function persistImportDraft(root,draft,{syncCloud=true,updateSummary=true}={}){
+    if(!plain(draft)||!draft.id)throw new Error('Importconcept mist een geldig ID.');
+    if(updateSummary)updateDraftSummary(draft);
+    else draft.updatedAt=new Date().toISOString();
     await ImportStore.putImport(draft);
     commitSummary(root,draft);
-    if(sync){await queueImportSync(draft);flushImportSync(root).catch(()=>{});}
+    if(syncCloud){
+      await queueImportSync(draft);
+      flushImportSync(root).catch(error=>console.warn('Importsynchronisatie wordt later opnieuw geprobeerd.',error));
+    }
+    return draft;
+  }
+  async function saveDraft(root,draft,{sync=false}={}){
+    return persistImportDraft(root,draft,{syncCloud:sync,updateSummary:true});
+  }
+  async function reconcileActiveImportReference(root,{localRead=id=>ImportStore.getImport(id)}={}){
+    const activeId=String(root?.state?.activeImportId||'');
+    if(!activeId)return {action:'none',activeImportId:''};
+    const summaries=root.state.importSummaries||[];
+    const summary=summaries.find(item=>String(item.id)===activeId);
+    let local=null;
+    try{local=await localRead(activeId);}
+    catch(error){return {action:'local-error',activeImportId:activeId,error};}
+    if(local){
+      if(local.status==='concept'){
+        if(!summary)commitSummary(root,local);
+        return {action:summary?'local':'summary-restored',activeImportId:activeId};
+      }
+      commitSummary(root,local);
+      return {action:'cleared-finished',activeImportId:''};
+    }
+    if(!summary||summary.status!=='concept'){
+      const ok=root.commitChange(()=>{if(root.state.activeImportId===activeId)root.state.activeImportId='';},{render:false});
+      if(!ok)throw new Error('De verouderde importblokkade kon niet worden hersteld.');
+      return {action:'cleared-stale',activeImportId:''};
+    }
+    return {action:'cloud-needed',activeImportId:activeId};
+  }
+
+  async function deleteCloudImportBestEffort(root,id,record=null){
+    const cloud=root?.CloudAdapter;
+    try{
+      if(!cloud?.isConnected?.()||!cloud.modules?.firestore||!cloud.db)return false;
+      const firestore=cloud.modules.firestore;
+      if(typeof firestore.deleteDoc!=='function')return false;
+      const importRef=firestore.doc(cloud.db,'budgetPlanners','finize','imports',String(id));
+      let chunkCount=null;
+      if(typeof firestore.getDoc==='function'){
+        const snapshot=await firestore.getDoc(importRef);
+        if(!snapshot?.exists?.())return true;
+        chunkCount=Number(snapshot.data()?.chunkCount);
+      }
+      if(!Number.isInteger(chunkCount)&&Array.isArray(record?.rows))chunkCount=chunkRows(record.rows).length;
+      if(Number.isInteger(chunkCount)&&chunkCount>=0){
+        const indices=Array.from({length:chunkCount},(_,index)=>index);
+        await mapWithConcurrency(indices,CLOUD_READ_CONCURRENCY,index=>firestore.deleteDoc(
+          firestore.doc(cloud.db,'budgetPlanners','finize','imports',String(id),'chunks',String(index).padStart(4,'0'))
+        ));
+      }
+      await firestore.deleteDoc(importRef);
+      return true;
+    }catch(error){
+      console.warn('Cloudkopie van verwijderd importconcept kon niet worden opgeruimd.',classifyCloudError(error,'Cloudopschoning mislukt.'));
+      return false;
+    }
+  }
+
+  async function discardImportConcept(root,id,{cleanupCloud=true}={}){
+    const importId=String(id||'');
+    const summary=(root?.state?.importSummaries||[]).find(item=>String(item.id)===importId);
+    if(!importId||String(root?.state?.activeImportId||'')!==importId||summary?.status!=='concept'){
+      throw new Error('Alleen het actieve, onverwerkte importconcept kan worden verwijderd.');
+    }
+    let local=null;
+    try{local=await ImportStore.getImport(importId);}
+    catch(error){console.warn('Lokaal importconcept kon niet worden gelezen voor verwijdering.',error);}
+    const journal={id:`discard-${importId}`,operation:'discard',importId,status:'pending',createdAt:new Date().toISOString()};
+    await ImportStore.putJournal(journal);
+    const ok=root.commitChange(()=>{
+      root.state.importSummaries=(root.state.importSummaries||[]).filter(item=>String(item.id)!==importId);
+      if(root.state.activeImportId===importId)root.state.activeImportId='';
+    },{render:false});
+    if(!ok){
+      journal.status='rolled-back';journal.updatedAt=new Date().toISOString();await ImportStore.putJournal(journal);
+      throw new Error('Het importconcept is niet verwijderd; de bestaande gegevens zijn behouden.');
+    }
+    let localCleanup=true;
+    try{
+      await ImportStore.deleteImport(importId);
+      await ImportStore.deleteSync(importId);
+    }catch(error){
+      localCleanup=false;journal.localCleanupError=String(error?.message||error);
+    }
+    const cloudCleanup=cleanupCloud?await deleteCloudImportBestEffort(root,importId,local):false;
+    if(UI.draft?.id===importId)UI.draft=null;
+    journal.status=localCleanup?'completed':'pending';
+    if(localCleanup)journal.completedAt=new Date().toISOString();
+    journal.localCleanup=localCleanup;journal.cloudCleanup=cloudCleanup;
+    await ImportStore.putJournal(journal);
+    root.renderActiveTab?.();
+    return {ok:true,localCleanup,cloudCleanup};
   }
   function goalExists(state,id){
     if(!id)return true;
@@ -1098,18 +1206,33 @@
   function cloudImportMessage(error){
     if(error?.code==='cloud-missing')return 'Deze import is nog niet vanaf het bronapparaat naar de cloud gesynchroniseerd. Open Finize daar een keer met internetverbinding en probeer het daarna opnieuw.';
     if(error?.code==='cloud-incomplete'||error?.code==='cloud-checksum'||error?.code==='cloud-invalid')return 'De cloudkopie van deze import is niet compleet of beschadigd. Er is niets gedeeltelijk op dit apparaat opgeslagen.';
+    if(error?.code==='cloud-permission')return 'De Firebase-verbinding werkt, maar de beveiligingsregels blokkeren bankimports. Publiceer de Finize-importregels en probeer opnieuw.';
     if(error?.code==='cloud-offline')return 'Deze import staat niet lokaal en de cloud is nu niet bereikbaar. Controleer de verbinding en probeer opnieuw.';
     return `De import kon niet worden geopend: ${error?.message||error}`;
   }
   function renderCloudImportState(root,id,error=null){
     const modal=ensureModalRoot();
+    const summary=(root.state.importSummaries||[]).find(item=>String(item.id)===String(id));
+    const canDiscard=String(root.state.activeImportId||'')===String(id)&&summary?.status==='concept';
     modal.innerHTML=`<div class="u4-import-modal u4-cloud-import-state" role="dialog" aria-modal="true" aria-label="Import uit cloud ophalen">
       <header class="u4-modal-head"><div><h2>${error?'Import niet beschikbaar':'Import uit cloud ophalen…'}</h2><p>${error?'De lokale kopie ontbreekt. Finize probeert de veilig bewaarde importdetails te herstellen.':'De bankregels worden veilig op dit apparaat opgeslagen.'}</p></div><button type="button" class="ghost" data-u4-close>Sluiten</button></header>
-      <main class="u4-modal-body"><div class="u4-cloud-message">${error?`<strong>Ophalen mislukt</strong><p>${esc(cloudImportMessage(error))}</p><button type="button" class="primary" data-u4-cloud-retry>Opnieuw proberen</button>`:'<span class="u4-cloud-spinner" aria-hidden="true"></span><strong>Even geduld…</strong><p>Het oorspronkelijke CSV-bestand is niet nodig.</p>'}</div></main>
+      <main class="u4-modal-body"><div class="u4-cloud-message">${error?`<strong>Ophalen mislukt</strong><p>${esc(cloudImportMessage(error))}</p><div class="u4-cloud-actions"><button type="button" class="primary" data-u4-cloud-retry>Opnieuw proberen</button>${canDiscard?'<button type="button" class="danger-ghost" data-u4-discard-concept>Concept verwijderen en nieuwe import toestaan</button>':''}</div>`:'<span class="u4-cloud-spinner" aria-hidden="true"></span><strong>Even geduld…</strong><p>Het oorspronkelijke CSV-bestand is niet nodig.</p>'}</div></main>
     </div>`;
     modal.classList.add('open');
     modal.querySelector('[data-u4-close]')?.addEventListener('click',closeDraft);
     modal.querySelector('[data-u4-cloud-retry]')?.addEventListener('click',()=>openDraft(root,id));
+    modal.querySelector('[data-u4-discard-concept]')?.addEventListener('click',async event=>{
+      if(!confirm('Dit onverwerkte importconcept verwijderen? De financiële administratie en verwerkte imports blijven behouden.'))return;
+      event.currentTarget.disabled=true;
+      try{
+        await discardImportConcept(root,id);
+        closeDraft();
+        alert('Het vastgelopen importconcept is verwijderd. Je kunt nu een nieuw CSV-bestand kiezen.');
+      }catch(discardError){
+        event.currentTarget.disabled=false;
+        alert(discardError.message);
+      }
+    });
   }
   async function openDraft(root,id){
     let local;
@@ -1165,7 +1288,7 @@
         if(field==='transactionType'&&value==='terugbetaling-voorschot'){
           const relation=repaymentRelation(root,row);
           row.processing.repaymentAllocations=relation?proposeRepaymentAllocations(root.state,relation.debtor,relation.creditor,row.processing.processedAmount):[];
-          await ImportStore.putImport(draft);renderDraftModal(root,draft);return;
+          await persistImportDraft(root,draft);renderDraftModal(root,draft);return;
         }
       }else if(event.target.hasAttribute('data-u4-row-certainty'))row.certainty=event.target.value;
       else if(event.target.dataset.u4SplitField){
@@ -1176,16 +1299,16 @@
         const allocation=row.processing.repaymentAllocations[Number(event.target.closest('[data-u4-allocation]').dataset.u4Allocation)];
         allocation[event.target.dataset.u4AllocationField]=round2(Math.abs(Number(event.target.value)||0));
       }
-      await ImportStore.putImport(draft);updateDraftSummary(draft);
+      await persistImportDraft(root,draft);
     });
     modal.addEventListener('click',async event=>{
       const container=event.target.closest('[data-u4-row]');const row=container?draft.rows.find(item=>item.id===container.dataset.u4Row):null;
       if(event.target.closest('[data-u4-add-split]')&&row){
         row.processing.splits=row.processing.splits||[];row.processing.splits.push({id:uid('split'),amount:0,budgetOwner:row.processing.budgetOwner,category:row.processing.category,budgetItemId:'',savingsGoalId:'',advanceMode:'auto',include:true});
-        await ImportStore.putImport(draft);renderDraftModal(root,draft);return;
+        await persistImportDraft(root,draft);renderDraftModal(root,draft);return;
       }
       const remove=event.target.closest('[data-u4-remove-split]');
-      if(remove&&row){row.processing.splits.splice(Number(remove.dataset.u4RemoveSplit),1);await ImportStore.putImport(draft);renderDraftModal(root,draft);return;}
+      if(remove&&row){row.processing.splits.splice(Number(remove.dataset.u4RemoveSplit),1);await persistImportDraft(root,draft);renderDraftModal(root,draft);return;}
       if(event.target.closest('[data-u4-process]')){
         if(typeof root.FinizeUpdate4Process!=='function'){alert('De verwerkingslaag wordt in de volgende fase geactiveerd. Het concept blijft bewaard.');return;}
         await root.FinizeUpdate4Process(draft);
@@ -1201,7 +1324,7 @@
   function bindImportPanel(rootElement,root){
     rootElement.querySelector('[data-u4-file]')?.addEventListener('change',event=>{
       const file=event.target.files?.[0];if(!file)return;
-      if(root.state.activeImportId){alert('Verwerk of verwijder eerst het openstaande importconcept.');event.target.value='';return;}
+      if(root.state.activeImportId){event.target.value='';openDraft(root,root.state.activeImportId);return;}
       const reader=new FileReader();
       reader.onload=async loaded=>{
         try{
@@ -1266,6 +1389,7 @@
 
   async function flushImportSync(root){
     const cloud=root.CloudAdapter;
+    if(!cloud?.isConnected?.()&&cloud?.isConfigured?.()&&typeof cloud.connect==='function')await cloud.connect();
     if(!cloud?.isConnected?.()||!cloud.modules?.firestore||!cloud.db)return false;
     const firestore=cloud.modules.firestore;
     for(const item of await ImportStore.listSync()){
@@ -1281,7 +1405,8 @@
         await firestore.setDoc(importRef,envelope.header,{merge:false});
         await ImportStore.deleteSync(item.id);
       }catch(error){
-        item.attempts=(item.attempts||0)+1;item.lastError=String(error?.message||error);item.updatedAt=new Date().toISOString();
+        const classified=classifyCloudError(error,'De import kon niet worden gesynchroniseerd.');
+        item.attempts=(item.attempts||0)+1;item.lastError=classified.message;item.lastErrorCode=classified.code;item.updatedAt=new Date().toISOString();
         await ImportStore.putSync(item);
         return false;
       }
@@ -1292,6 +1417,28 @@
   async function recoverJournal(root){
     const entries=await ImportStore.listJournal();
     for(const entry of entries.filter(item=>item.status==='pending')){
+      if(entry.operation==='discard'){
+        if(root.state?.activeImportId===entry.importId){
+          entry.status='rolled-back';
+        }else{
+          try{
+            await ImportStore.deleteImport(entry.importId);
+            await ImportStore.deleteSync(entry.importId);
+            entry.localCleanup=true;
+          }catch(error){
+            entry.localCleanup=false;entry.localCleanupError=String(error?.message||error);
+          }
+          if(entry.localCleanup){
+            entry.cloudCleanup=await deleteCloudImportBestEffort(root,entry.importId);
+            entry.status='completed';entry.completedAt=new Date().toISOString();
+          }else{
+            entry.status='pending';
+          }
+        }
+        entry.recoveredAt=new Date().toISOString();
+        await ImportStore.putJournal(entry);
+        continue;
+      }
       const processed=(root.state?.transactions||[]).some(tx=>tx.importBatchId===entry.importId);
       entry.status=entry.operation==='undo'?!processed?'completed':'rolled-back':processed?'completed':'rolled-back';
       entry.recoveredAt=new Date().toISOString();
@@ -1316,8 +1463,11 @@
       rowsChecksum,
       buildCloudImportEnvelope,
       assembleCloudImport,
+      classifyCloudError,
       fetchImportFromCloud,
       resolveImportDetails,
+      reconcileActiveImportReference,
+      discardImportConcept,
       parseBankCsv,
       createImportDraft,
       fingerprint,
@@ -1333,10 +1483,10 @@
     installUI(root);
     if(!root.__finizeUpdate4CloudListener){
       root.__finizeUpdate4CloudListener=true;
-      root.addEventListener?.('finize:cloud-connected',()=>flushImportSync(root).catch(error=>console.warn('Importsynchronisatie uitgesteld.',error)));
+      root.addEventListener?.('finize:cloud-connected',()=>recoverJournal(root).then(()=>flushImportSync(root)).catch(error=>console.warn('Importsynchronisatie uitgesteld.',error)));
     }
-    Promise.resolve().then(()=>recoverJournal(root)).then(()=>flushImportSync(root)).catch(error=>console.warn('Update 4 opslaginitialisatie uitgesteld.',error));
+    Promise.resolve().then(()=>recoverJournal(root)).then(()=>reconcileActiveImportReference(root)).then(()=>flushImportSync(root)).catch(error=>console.warn('Update 4 opslaginitialisatie uitgesteld.',error));
   }
 
-  return {SCHEMA_VERSION,CLOUD_STORAGE_VERSION,CLOUD_READ_CONCURRENCY,OWNERS,IMPORT_STATUSES,normalizeIban,normalizeRule,normalizeTransaction,normalizeCore,validateCore,calculateGoalSavedAmount,reconcileGoalSavedAmounts,chunkRows,canonicalValue,rowsChecksum,buildCloudImportEnvelope,assembleCloudImport,mapWithConcurrency,fetchImportFromCloud,resolveImportDetails,normalizeText,detectDelimiter,parseDelimited,parseDate,parseAmount,detectFormat,inferMapping,hashText,fingerprint,organizationName,proposeType,recognitionProposal,classifyOriginal,parseBankCsv,findProfile,createImportDraft,updateDraftSummary,compactSummary,validateDraft,transactionKind,expenseImpact,financialRows,advanceForTransaction,savingsForTransaction,detectInternalPairs,directionalBalances,proposeRepaymentAllocations,planImportEffects,applyImportPlan,effectManifest,undoImportEffects,ImportStore,queueImportSync,flushImportSync,recoverJournal,install,round2,uid,clone};
+  return {SCHEMA_VERSION,CLOUD_STORAGE_VERSION,CLOUD_READ_CONCURRENCY,OWNERS,IMPORT_STATUSES,normalizeIban,normalizeRule,normalizeTransaction,normalizeCore,validateCore,calculateGoalSavedAmount,reconcileGoalSavedAmounts,chunkRows,canonicalValue,rowsChecksum,buildCloudImportEnvelope,assembleCloudImport,mapWithConcurrency,classifyCloudError,fetchImportFromCloud,resolveImportDetails,reconcileActiveImportReference,deleteCloudImportBestEffort,discardImportConcept,normalizeText,detectDelimiter,parseDelimited,parseDate,parseAmount,detectFormat,inferMapping,hashText,fingerprint,organizationName,proposeType,recognitionProposal,classifyOriginal,parseBankCsv,findProfile,createImportDraft,updateDraftSummary,compactSummary,validateDraft,transactionKind,expenseImpact,financialRows,advanceForTransaction,savingsForTransaction,detectInternalPairs,directionalBalances,proposeRepaymentAllocations,planImportEffects,applyImportPlan,effectManifest,undoImportEffects,ImportStore,persistImportDraft,queueImportSync,flushImportSync,recoverJournal,install,round2,uid,clone};
 });
