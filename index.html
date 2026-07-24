@@ -7531,6 +7531,7 @@ function setSelectedMonth(value){
 function ensureMonthData(month=getSelectedMonth()){
   state.meta.selectedMonth = state.meta.selectedMonth || monthKey();
   state.monthlyIncome = isPlainObject(state.monthlyIncome) ? state.monthlyIncome : {};
+  state.monthlyIncomeOverrides = isPlainObject(state.monthlyIncomeOverrides) ? state.monthlyIncomeOverrides : {};
   state.monthlyBudgets = isPlainObject(state.monthlyBudgets) ? state.monthlyBudgets : {};
   state.monthlyTeruggaven = isPlainObject(state.monthlyTeruggaven) ? state.monthlyTeruggaven : {};
   state.transactions = Array.isArray(state.transactions) ? state.transactions : [];
@@ -7811,6 +7812,18 @@ function u3NormalizeClosureSnapshot(month,record,closure){
 }
 function u3NormalizeState(target){
   target.meta=isPlainObject(target.meta)?target.meta:{};
+  target.monthlyIncomeOverrides=isPlainObject(target.monthlyIncomeOverrides)?target.monthlyIncomeOverrides:{};
+  Object.entries(target.monthlyIncome||{}).forEach(([month,values])=>{
+    if(!isPlainObject(values))return;
+    const overrides=isPlainObject(target.monthlyIncomeOverrides[month])?target.monthlyIncomeOverrides[month]:{};
+    ['dion','dara'].forEach(owner=>{
+      if(!Object.prototype.hasOwnProperty.call(values,owner))return;
+      const value=Number(values[owner]);
+      const expected=Number(target.personen?.[owner]?.salaris)||0;
+      if(Number.isFinite(value)&&(value===0||round2(value)!==round2(expected)))overrides[owner]=round2(value);
+    });
+    if(Object.keys(overrides).length)target.monthlyIncomeOverrides[month]=overrides;
+  });
   u3MigrateFixedExpenses(target);
   u3MigrateIncomeSources(target);
   ['voor','na'].forEach(scenario=>{
@@ -7879,9 +7892,7 @@ function normalizeBudgetState(candidate){
 function getMonthlyBaseIncome(person){
   const month = getSelectedMonth();
   ensureMonthData(month);
-  const monthly = Number(state.monthlyIncome?.[month]?.[person]);
-  if (Number.isFinite(monthly) && monthly !== 0) return monthly;
-  return Number(state.personen?.[person]?.salaris)||0;
+  return resolveMonthlyIncome(person,month).amount;
 }
 function sumVasteTeruggaven(person){
   return sumBedrag(state.personen?.[person]?.vasteTeruggaven || []);
@@ -7899,7 +7910,9 @@ function getMonthlyIncome(person){
 function setMonthlyIncome(person, amount){
   const month = getSelectedMonth();
   ensureMonthData(month);
-  state.monthlyIncome[month][person] = Number(amount)||0;
+  state.monthlyIncomeOverrides[month]=isPlainObject(state.monthlyIncomeOverrides[month])?state.monthlyIncomeOverrides[month]:{};
+  state.monthlyIncomeOverrides[month][person]=round2(Number(amount)||0);
+  state.monthlyIncome[month][person]=round2(Number(amount)||0);
 }
 function getMonthlyScenarioData(scenario=state.meta.scenario){
   const month = getSelectedMonth();
@@ -12310,10 +12323,33 @@ function u3IncomeForOwner(owner,options={}){
     .filter(row=>row.owner===owner && (options.type?row.type===options.type:true) && (options.distributionOnly?row.meetellenVoorVerdeling:true))
     .reduce((sum,row)=>sum+u3IncomeOccurrenceValue(row),0));
 }
+function u3IncomeTransactionOwner(tx){
+  const source=(state.recurringIncomeSources||[]).find(item=>item.id===tx.incomeSourceId);
+  return source?.eigenaar||tx.budgetOwner||tx.financialFor||tx.owner||'gezamenlijk';
+}
+function resolveMonthlyIncome(owner,month=getSelectedMonth()){
+  if(owner==='total'){
+    const aggregate=state.actualIncomeOverrides?.[month];
+    if(Number.isFinite(Number(aggregate?.total)))return {amount:round2(Number(aggregate.total)),source:'actual'};
+    const parts=['dion','dara','gezamenlijk'].map(key=>resolveMonthlyIncome(key,month));
+    const sources=[...new Set(parts.map(item=>item.source))];
+    return {amount:round2(parts.reduce((sum,item)=>sum+item.amount,0)),source:sources.length===1?sources[0]:'mixed'};
+  }
+  const manualActual=state.actualIncomeOverrides?.[month]?.[owner];
+  if(Number.isFinite(Number(manualActual)))return {amount:round2(Number(manualActual)),source:'actual'};
+  const actualRows=u3ConfirmedTransactions(month).filter(tx=>tx.kind==='inkomen'&&u3IncomeTransactionOwner(tx)===owner);
+  if(actualRows.length)return {amount:round2(actualRows.reduce((sum,tx)=>sum+Math.abs(Number(tx.amount)||0),0)),source:'actual'};
+  const monthOverrides=state.monthlyIncomeOverrides?.[month];
+  if(isPlainObject(monthOverrides)&&Object.prototype.hasOwnProperty.call(monthOverrides,owner)){
+    return {amount:round2(Number(monthOverrides[owner])||0),source:'monthly-override'};
+  }
+  const expected=round2(u3IncomeOccurrences(month).filter(row=>row.owner===owner).reduce((sum,row)=>sum+Number(row.amount||0),0));
+  if(expected||owner==='gezamenlijk')return {amount:expected,source:expected?'expected':'none'};
+  const legacy=Number(state.personen?.[owner]?.salaris);
+  return Number.isFinite(legacy)?{amount:round2(legacy),source:'expected'}:{amount:0,source:'none'};
+}
 function u3ActualIncome(month=getSelectedMonth(),financialFor=null){
-  const calculated=round2(u3ConfirmedTransactions(month).filter(tx=>tx.kind==='inkomen' && (!financialFor||(tx.financialFor||tx.owner)===financialFor)).reduce((sum,tx)=>sum+Math.abs(Number(tx.amount)||0),0));
-  const override=state.actualIncomeOverrides?.[month];
-  return !financialFor&&Number.isFinite(Number(override?.total))?round2(Number(override.total)):calculated;
+  return resolveMonthlyIncome(financialFor||'total',month).amount;
 }
 function u3ActualExpenses(month=getSelectedMonth(),financialFor=null){
   return round2(u3ConfirmedTransactions(month).filter(tx=>(!financialFor||(tx.financialFor||tx.owner)===financialFor)).reduce((sum,tx)=>sum+getTransactionExpenseImpact(tx),0));
@@ -12476,12 +12512,17 @@ function u3WithSelectedMonth(month,callback){
 function u3LiveFinancialSnapshot(month=getSelectedMonth()){
   return u3WithSelectedMonth(month,()=>{
     const scenarioResult=calcScenario(state);
+    const dionIncome=resolveMonthlyIncome('dion',month);
+    const daraIncome=resolveMonthlyIncome('dara',month);
+    const jointIncome=resolveMonthlyIncome('gezamenlijk',month);
+    const totalIncome=resolveMonthlyIncome('total',month);
     const income={
-      dion:round2(getTotalMonthlyIncome('dion')),
-      dara:round2(getTotalMonthlyIncome('dara')),
-      joint:round2(u3ActualIncome(month,'gezamenlijk'))
+      dion:dionIncome.amount,
+      dara:daraIncome.amount,
+      joint:jointIncome.amount,
+      total:totalIncome.amount,
+      sources:{dion:dionIncome.source,dara:daraIncome.source,joint:jointIncome.source,total:totalIncome.source}
     };
-    income.total=round2(income.dion+income.dara+income.joint);
     const variableExpenses={
       dion:round2(sumTransactions('dion',null,month)),
       dara:round2(sumTransactions('dara',null,month)),

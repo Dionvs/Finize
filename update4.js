@@ -156,6 +156,7 @@
     target.internalTransferPairs=Array.isArray(target.internalTransferPairs)?target.internalTransferPairs.filter(plain):[];
     target.advanceRepayments=Array.isArray(target.advanceRepayments)?target.advanceRepayments.filter(plain):[];
     target.actualIncomeOverrides=plain(target.actualIncomeOverrides)?target.actualIncomeOverrides:{};
+    target.monthlyIncomeOverrides=plain(target.monthlyIncomeOverrides)?target.monthlyIncomeOverrides:{};
     target.recognitionRules=(Array.isArray(target.recognitionRules)?target.recognitionRules:[]).map(normalizeRule).filter(rule=>rule.value);
     target.transactions=Array.isArray(target.transactions)?target.transactions:[];
     target.transactions.forEach(normalizeTransaction);
