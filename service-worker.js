@@ -1,10 +1,12 @@
-const CACHE_NAME = "finize-v18-dashboard-accordeons";
+const CACHE_NAME = "finize-v24-update5-annotations";
 
 const APP_SHELL = [
   "./",
   "./index.html",
   "./update4.js",
   "./update4.css",
+  "./update5.js?v=24",
+  "./update5.css?v=24",
   "./finize-v4.html",
   "./finize-mobile.html",
   "./manifest.json",
