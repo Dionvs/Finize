@@ -7133,7 +7133,7 @@ function saveFirebaseConfigFromText(text){
 }
 
 const CloudAdapter = {
-  app:null, db:null, docRef:null, modules:null, unsubscribe:null,
+  app:null, db:null, docRef:null, modules:null, unsubscribe:null, connectPromise:null,
   status:'Offline — lokaal bewaard', saveTimer:null, applyingRemote:false,
   pendingState:null, writeInFlight:false, retryTimer:null, retryAttempt:0,
   lastConfirmedRevision:0, lastFailureRetryable:true,
@@ -7152,6 +7152,16 @@ const CloudAdapter = {
     return this.modules;
   },
   async connect(){
+    if (this.isConnected()) return true;
+    if (this.connectPromise) return this.connectPromise;
+    this.connectPromise = this.connectOnce();
+    try{
+      return await this.connectPromise;
+    }finally{
+      this.connectPromise = null;
+    }
+  },
+  async connectOnce(){
     if (!this.isConfigured()){
       this.status = 'Offline — lokaal bewaard';
       renderCloudStatus();

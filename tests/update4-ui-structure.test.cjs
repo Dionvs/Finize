@@ -8,6 +8,8 @@ const css=fs.readFileSync(path.join(__dirname,'..','update4.css'),'utf8');
 
 assert.match(html,/update4\.css/);
 assert.match(html,/update4\.js/);
+assert.match(html,/connectPromise:null/,'Firebase-verbinding deelt geen lopende verbindingspoging');
+assert.match(html,/if \(this\.connectPromise\) return this\.connectPromise/,'Firebase connect is niet idempotent');
 assert.doesNotMatch(html,/v4-mobile-only-block">\$\{renderManageSection\('Bank import & uitgaven'/);
 for(const marker of ['Bankimport controleren','Nakijken','Zeker','Meer opties','Alles verwerken','Herkenningsregels','Alle imports bekijken','Import uit cloud ophalen','Opnieuw proberen']){
   assert.match(js,new RegExp(marker),`UI-marker ontbreekt: ${marker}`);

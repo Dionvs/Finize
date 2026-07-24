@@ -75,6 +75,9 @@ function snapshot(value){
   documents.delete('budgetPlanners/finize/imports/cloud-1/chunks/0001');
   await assert.rejects(()=>u4.fetchImportFromCloud(root,'cloud-1'),error=>error.code==='cloud-incomplete');
   await assert.rejects(()=>u4.fetchImportFromCloud({CloudAdapter:{isConnected:()=>false,isConfigured:()=>false}},'cloud-1'),error=>error.code==='cloud-offline');
+  assert.equal(u4.classifyCloudError({code:'permission-denied'}).code,'cloud-permission');
+  assert.equal(u4.classifyCloudError({code:'unavailable'}).code,'cloud-offline');
+  assert.equal(u4.classifyCloudError(new Error('onbekend')).code,'cloud-error');
 
   const originalListSync=u4.ImportStore.listSync;
   const originalGetImport=u4.ImportStore.getImport;

@@ -266,6 +266,18 @@
     const error=new Error(message);error.code=code;return error;
   }
 
+  function classifyCloudError(error,context='De import kon niet uit de cloud worden opgehaald.'){
+    const code=String(error?.code||error?.name||'').toLocaleLowerCase();
+    const message=String(error?.message||error||'').trim();
+    if(code.includes('permission-denied')||code.includes('permission_denied')||message.toLocaleLowerCase().includes('missing or insufficient permissions')){
+      return cloudImportError('cloud-permission','Firestore blokkeert de toegang tot bankimports. Controleer de gepubliceerde beveiligingsregels.');
+    }
+    if(code.includes('unavailable')||code.includes('network')||code.includes('offline')||code.includes('deadline-exceeded')){
+      return cloudImportError('cloud-offline',`${context} De cloudverbinding is tijdelijk niet beschikbaar.`);
+    }
+    return cloudImportError('cloud-error',`${context}${message?` ${message}`:''}`);
+  }
+
   function assembleCloudImport(header,chunks,expectedId=''){
     if(!plain(header)||!header.id)throw cloudImportError('cloud-invalid','De cloudkopie heeft geen geldig import-ID.');
     if(expectedId&&String(header.id)!==String(expectedId))throw cloudImportError('cloud-invalid','De cloudkopie hoort bij een andere import.');
@@ -330,7 +342,7 @@
     const importRef=firestore.doc(cloud.db,'budgetPlanners','finize','imports',String(id));
     let headerSnapshot;
     try{headerSnapshot=await firestore.getDoc(importRef);}
-    catch(error){throw cloudImportError('cloud-offline',`De import kon niet uit de cloud worden opgehaald: ${error?.message||error}`);}
+    catch(error){throw classifyCloudError(error,'De importheader kon niet worden opgehaald.');}
     if(!headerSnapshot?.exists?.()){
       throw cloudImportError('cloud-missing','Deze import is nog niet vanaf het bronapparaat naar de cloud gesynchroniseerd.');
     }
@@ -342,7 +354,7 @@
       const chunkRef=firestore.doc(cloud.db,'budgetPlanners','finize','imports',String(id),'chunks',String(index).padStart(4,'0'));
       let snapshot;
       try{snapshot=await firestore.getDoc(chunkRef);}
-      catch(error){throw cloudImportError('cloud-offline',`Een importdeel kon niet worden opgehaald: ${error?.message||error}`);}
+      catch(error){throw classifyCloudError(error,`Importdeel ${index+1} van ${count} kon niet worden opgehaald.`);}
       if(!snapshot?.exists?.())throw cloudImportError('cloud-incomplete',`Importdeel ${index+1} van ${count} ontbreekt in de cloud.`);
       return snapshot.data();
     });
@@ -1098,6 +1110,7 @@
   function cloudImportMessage(error){
     if(error?.code==='cloud-missing')return 'Deze import is nog niet vanaf het bronapparaat naar de cloud gesynchroniseerd. Open Finize daar een keer met internetverbinding en probeer het daarna opnieuw.';
     if(error?.code==='cloud-incomplete'||error?.code==='cloud-checksum'||error?.code==='cloud-invalid')return 'De cloudkopie van deze import is niet compleet of beschadigd. Er is niets gedeeltelijk op dit apparaat opgeslagen.';
+    if(error?.code==='cloud-permission')return 'De Firebase-verbinding werkt, maar de beveiligingsregels blokkeren bankimports. Publiceer de Finize-importregels en probeer opnieuw.';
     if(error?.code==='cloud-offline')return 'Deze import staat niet lokaal en de cloud is nu niet bereikbaar. Controleer de verbinding en probeer opnieuw.';
     return `De import kon niet worden geopend: ${error?.message||error}`;
   }
@@ -1266,6 +1279,7 @@
 
   async function flushImportSync(root){
     const cloud=root.CloudAdapter;
+    if(!cloud?.isConnected?.()&&cloud?.isConfigured?.()&&typeof cloud.connect==='function')await cloud.connect();
     if(!cloud?.isConnected?.()||!cloud.modules?.firestore||!cloud.db)return false;
     const firestore=cloud.modules.firestore;
     for(const item of await ImportStore.listSync()){
@@ -1281,7 +1295,8 @@
         await firestore.setDoc(importRef,envelope.header,{merge:false});
         await ImportStore.deleteSync(item.id);
       }catch(error){
-        item.attempts=(item.attempts||0)+1;item.lastError=String(error?.message||error);item.updatedAt=new Date().toISOString();
+        const classified=classifyCloudError(error,'De import kon niet worden gesynchroniseerd.');
+        item.attempts=(item.attempts||0)+1;item.lastError=classified.message;item.lastErrorCode=classified.code;item.updatedAt=new Date().toISOString();
         await ImportStore.putSync(item);
         return false;
       }
@@ -1316,6 +1331,7 @@
       rowsChecksum,
       buildCloudImportEnvelope,
       assembleCloudImport,
+      classifyCloudError,
       fetchImportFromCloud,
       resolveImportDetails,
       parseBankCsv,
@@ -1338,5 +1354,5 @@
     Promise.resolve().then(()=>recoverJournal(root)).then(()=>flushImportSync(root)).catch(error=>console.warn('Update 4 opslaginitialisatie uitgesteld.',error));
   }
 
-  return {SCHEMA_VERSION,CLOUD_STORAGE_VERSION,CLOUD_READ_CONCURRENCY,OWNERS,IMPORT_STATUSES,normalizeIban,normalizeRule,normalizeTransaction,normalizeCore,validateCore,calculateGoalSavedAmount,reconcileGoalSavedAmounts,chunkRows,canonicalValue,rowsChecksum,buildCloudImportEnvelope,assembleCloudImport,mapWithConcurrency,fetchImportFromCloud,resolveImportDetails,normalizeText,detectDelimiter,parseDelimited,parseDate,parseAmount,detectFormat,inferMapping,hashText,fingerprint,organizationName,proposeType,recognitionProposal,classifyOriginal,parseBankCsv,findProfile,createImportDraft,updateDraftSummary,compactSummary,validateDraft,transactionKind,expenseImpact,financialRows,advanceForTransaction,savingsForTransaction,detectInternalPairs,directionalBalances,proposeRepaymentAllocations,planImportEffects,applyImportPlan,effectManifest,undoImportEffects,ImportStore,queueImportSync,flushImportSync,recoverJournal,install,round2,uid,clone};
+  return {SCHEMA_VERSION,CLOUD_STORAGE_VERSION,CLOUD_READ_CONCURRENCY,OWNERS,IMPORT_STATUSES,normalizeIban,normalizeRule,normalizeTransaction,normalizeCore,validateCore,calculateGoalSavedAmount,reconcileGoalSavedAmounts,chunkRows,canonicalValue,rowsChecksum,buildCloudImportEnvelope,assembleCloudImport,mapWithConcurrency,classifyCloudError,fetchImportFromCloud,resolveImportDetails,normalizeText,detectDelimiter,parseDelimited,parseDate,parseAmount,detectFormat,inferMapping,hashText,fingerprint,organizationName,proposeType,recognitionProposal,classifyOriginal,parseBankCsv,findProfile,createImportDraft,updateDraftSummary,compactSummary,validateDraft,transactionKind,expenseImpact,financialRows,advanceForTransaction,savingsForTransaction,detectInternalPairs,directionalBalances,proposeRepaymentAllocations,planImportEffects,applyImportPlan,effectManifest,undoImportEffects,ImportStore,queueImportSync,flushImportSync,recoverJournal,install,round2,uid,clone};
 });
