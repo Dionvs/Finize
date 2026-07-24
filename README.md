@@ -30,3 +30,9 @@ firebase deploy --only firestore:rules
 ```
 
 De regels geven Finize toegang tot het hoofddocument en de aparte import- en chunkdocumenten die nodig zijn om CSV-concepten tussen apparaten te openen.
+## Importconcepten
+
+- Bewerkingen in een CSV-concept worden automatisch lokaal opgeslagen en klaargezet voor cloudsynchronisatie.
+- Met **Concept opslaan** kan de actuele versie expliciet naar IndexedDB en Firestore worden geschreven.
+- De importeditor gebruikt een eigen scrollgebied, zodat lange transactielijsten op mobiel en desktop bewerkbaar blijven.
+

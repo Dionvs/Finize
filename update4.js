@@ -1198,7 +1198,7 @@
         <details class="u4-section"><summary><span>Zeker</span><span>${draft.summary.sureCount}</span></summary><div class="u4-section-list">${sure.map(row=>rowHtml(root,row)).join('')||'<div class="u4-empty">Geen zekere transacties.</div>'}</div></details>
         ${draft.summary.duplicateCount?`<details class="u4-section"><summary><span>Eerder geïmporteerd — overgeslagen</span><span>${draft.summary.duplicateCount}</span></summary><div class="u4-section-list">${draft.rows.filter(row=>row.duplicate).map(row=>`<div class="u4-original">${esc(row.bankOriginal.bankDate)} · ${esc(row.bankOriginal.description)} · ${euro(row.bankOriginal.amount)}</div>`).join('')}</div></details>`:''}
       </main>
-      <footer class="u4-modal-actions"><span class="u4-muted">${isConcept?'Wijzigingen worden als concept bewaard.':canCorrect?'Aanpassingen worden pas financieel verwerkt na bevestiging.':'Deze import is financieel teruggedraaid.'}</span>${canCorrect?'<button type="button" class="danger-ghost" data-u4-undo>Import ongedaan maken</button><button type="button" class="primary" data-u4-reconcile>Wijzigingen verwerken</button>':isConcept?'<button type="button" class="primary" data-u4-process>Alles verwerken</button>':''}</footer>
+      <footer class="u4-modal-actions"><span class="u4-muted" data-u4-save-status>${isConcept?'Wijzigingen worden automatisch lokaal bewaard.':canCorrect?'Aanpassingen worden pas financieel verwerkt na bevestiging.':'Deze import is financieel teruggedraaid.'}</span>${canCorrect?'<button type="button" class="danger-ghost" data-u4-undo>Import ongedaan maken</button><button type="button" class="primary" data-u4-reconcile>Wijzigingen verwerken</button>':isConcept?'<button type="button" class="ghost" data-u4-save-concept>Concept opslaan</button><button type="button" class="primary" data-u4-process>Alles verwerken</button>':''}</footer>
     </div>`;
     modal.classList.add('open');
     bindDraftModal(root,draft,modal);
@@ -1309,6 +1309,30 @@
       }
       const remove=event.target.closest('[data-u4-remove-split]');
       if(remove&&row){row.processing.splits.splice(Number(remove.dataset.u4RemoveSplit),1);await persistImportDraft(root,draft);renderDraftModal(root,draft);return;}
+      const saveButton=event.target.closest('[data-u4-save-concept]');
+      if(saveButton){
+        const status=modal.querySelector('[data-u4-save-status]');
+        saveButton.disabled=true;
+        saveButton.textContent='Opslaan…';
+        if(status)status.textContent='Concept wordt lokaal en in de cloud opgeslagen…';
+        try{
+          await persistImportDraft(root,draft,{syncCloud:true,updateSummary:true});
+          await flushImportSync(root);
+          saveButton.textContent='Opgeslagen';
+          if(status)status.textContent='Concept is lokaal en in de cloud opgeslagen.';
+          setTimeout(()=>{
+            if(!saveButton.isConnected)return;
+            saveButton.disabled=false;
+            saveButton.textContent='Concept opslaan';
+          },1400);
+        }catch(error){
+          saveButton.disabled=false;
+          saveButton.textContent='Opnieuw opslaan';
+          if(status)status.textContent='Cloudopslag is niet afgerond. Het concept staat wel lokaal op dit apparaat.';
+          alert(`Concept opslaan mislukt: ${error.message}`);
+        }
+        return;
+      }
       if(event.target.closest('[data-u4-process]')){
         if(typeof root.FinizeUpdate4Process!=='function'){alert('De verwerkingslaag wordt in de volgende fase geactiveerd. Het concept blijft bewaard.');return;}
         await root.FinizeUpdate4Process(draft);

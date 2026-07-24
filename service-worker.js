@@ -1,10 +1,10 @@
-const CACHE_NAME = "finize-v30-import-persistence";
+const CACHE_NAME = "finize-v31-import-save-scroll";
 
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./update4.js?v=30",
-  "./update4.css?v=30",
+  "./update4.js?v=31",
+  "./update4.css?v=31",
   "./update5.js?v=29",
   "./update5.css?v=29",
   "./finize-v4.html",
