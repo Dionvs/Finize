@@ -7921,6 +7921,7 @@ function getMonthlyIncome(person){
 }
 function setMonthlyIncome(person, amount){
   const month = getSelectedMonth();
+  assertMonthMutationAllowed(month);
   ensureMonthData(month);
   state.monthlyIncomeOverrides[month]=isPlainObject(state.monthlyIncomeOverrides[month])?state.monthlyIncomeOverrides[month]:{};
   state.monthlyIncomeOverrides[month][person]=round2(Number(amount)||0);
@@ -8425,6 +8426,7 @@ function personStatusBadge(amount){
 }
 function copyPreviousMonth(){
   const month = getSelectedMonth();
+  assertMonthMutationAllowed(month);
   const prev = previousMonthKey(month);
   const fallbackIncome = {dion:Number(state.personen?.dion?.salaris)||0, dara:Number(state.personen?.dara?.salaris)||0};
   const existingIncome = !!state.monthlyIncome?.[month] && JSON.stringify(state.monthlyIncome[month]) !== JSON.stringify(fallbackIncome);
@@ -9398,14 +9400,25 @@ function commitChange(change, options={}){
     if (typeof change === 'function') change(state);
     else if (typeof change?.apply === 'function') change.apply(state);
     Object.entries(before.monthRecords||{}).forEach(([month,record])=>{
-      if(record?.status!=='afgesloten'||state.monthRecords?.[month]?.status!=='afgesloten')return;
+      if(!['afgesloten','correctie-nodig'].includes(record?.status))return;
+      const afterRecord=state.monthRecords?.[month];
+      const lateImportAllowed=['afgesloten','correctie-nodig'].includes(record.status)&&afterRecord?.status==='correctie-nodig'&&
+        (afterRecord.lateImportTransactionIds||[]).length>(record.lateImportTransactionIds||[]).length;
       const monthData=snapshot=>({
         transactions:(snapshot.transactions||[]).filter(tx=>transactionMonth(tx)===month),
         income:snapshot.monthlyIncome?.[month]||null,
+        incomeOverrides:snapshot.monthlyIncomeOverrides?.[month]||null,
         budgets:snapshot.monthlyBudgets?.[month]||null,
-        refunds:snapshot.monthlyTeruggaven?.[month]||null
+        refunds:snapshot.monthlyTeruggaven?.[month]||null,
+        savings:(snapshot.savingsGoalLedger||[]).filter(row=>row.month===month),
+        advances:(snapshot.advanceLedger||[]).filter(row=>row.month===month),
+        repayments:(snapshot.advanceRepayments||[]).filter(row=>String(row.date||'').slice(0,7)===month),
+        reserves:(snapshot.reserveLedger||[]).filter(row=>row.month===month),
+        transfers:(snapshot.internalTransfers||[]).filter(row=>row.month===month)
       });
-      if(JSON.stringify(monthData(before))!==JSON.stringify(monthData(state)))throw new Error(`${monthLabel(month)} is afgesloten. Heropen de maand voordat je financiële gegevens wijzigt.`);
+      if(!lateImportAllowed&&options.mutationMode!=='correction'&&JSON.stringify(monthData(before))!==JSON.stringify(monthData(state))){
+        throw new Error('Deze maand is afgesloten. Heropen de maand of maak een correctie om financiële gegevens te wijzigen.');
+      }
     });
     ensurePersistentIds(state);
     state.meta = isPlainObject(state.meta) ? state.meta : {};
@@ -9632,6 +9645,8 @@ function handleTableClicks(root){
   root.querySelectorAll('[data-remove-transaction]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const id = btn.dataset.removeTransaction;
+      const tx=(state.transactions||[]).find(item=>item.id===id);
+      try{if(tx)assertMonthMutationAllowed(transactionMonth(tx));}catch(error){alert(error.message);return;}
       removeWithUndo('transactions', id, 'Transactie verwijderd');
     });
   });
@@ -11496,7 +11511,7 @@ function openPersonalTransactionModal(owner, transactionId=''){
   const close=()=>modal.classList.remove('open','joint-transaction-modal-open');
   document.getElementById('personalTxOwner').value = existing?.owner || owner;
   document.getElementById('btnClosePersonalTransaction').addEventListener('click',close); document.getElementById('btnCancelPersonalTransaction').addEventListener('click',close);
-  document.getElementById('btnSavePersonalTransaction').addEventListener('click',()=>{ const button=document.getElementById('btnSavePersonalTransaction'); if(button.disabled)return; const amount=bankAmount(document.getElementById('personalTxAmount').value); if(!Number.isFinite(amount)||amount<=0){alert('Vul een geldig bedrag in.');return;} const next={id:existing?.id||uid(),date:document.getElementById('personalTxDate').value||today,owner:document.getElementById('personalTxOwner').value,category:document.getElementById('personalTxCategory').value,description:document.getElementById('personalTxDescription').value.trim(),amount:round2(amount),note:document.getElementById('personalTxNote').value.trim(),kind:'uitgave'}; button.disabled=true; if(!commitChange(()=>{if(existing)updateItemById('transactions',existing.id,next);else state.transactions.push(next);},{render:false})){button.disabled=false;return;} close(); renderActiveTab(); });
+  document.getElementById('btnSavePersonalTransaction').addEventListener('click',()=>{ const button=document.getElementById('btnSavePersonalTransaction'); if(button.disabled)return; const amount=bankAmount(document.getElementById('personalTxAmount').value); if(!Number.isFinite(amount)||amount<=0){alert('Vul een geldig bedrag in.');return;} const next={id:existing?.id||uid(),date:document.getElementById('personalTxDate').value||today,owner:document.getElementById('personalTxOwner').value,category:document.getElementById('personalTxCategory').value,description:document.getElementById('personalTxDescription').value.trim(),amount:round2(amount),note:document.getElementById('personalTxNote').value.trim(),kind:'uitgave'}; try{assertMonthMutationAllowed(transactionMonth(next));}catch(error){alert(error.message);return;} button.disabled=true; if(!commitChange(()=>{if(existing)updateItemById('transactions',existing.id,next);else state.transactions.push(next);},{render:false})){button.disabled=false;return;} close(); renderActiveTab(); });
 }
 
 function renderPersonalFirstRow(owner){
@@ -12026,6 +12041,7 @@ function u2FixedFallback(items,pot){
 }
 function u2OpenProcessModal(owner){
   const month=getSelectedMonth();
+  try{assertMonthMutationAllowed(month);}catch(error){alert(error.message);return;}
   if (u2IsProcessed(owner,month)){ alert(`${monthLabel(month)} is voor ${ownerLabel(owner)} al verwerkt.`); return; }
   const goals=state.spaardoelen[owner]||[];
   const pot=u2PotForOwner(owner);
@@ -12650,6 +12666,7 @@ function u3ApplyTransferToAdvances(transfer,amount){
 function u3ConfirmTransfer(id,actualAmount,date,status='uitgevoerd'){
   const transfer=(state.internalTransfers||[]).find(row=>row.id===id);
   if(!transfer)return false;
+  assertMonthMutationAllowed(transfer.month);
   if(transfer.status==='uitgevoerd'&&status==='uitgevoerd')return true;
   transfer.actualAmount=round2(Math.max(0,Number(actualAmount)||0));transfer.date=date||u3IsoDate(new Date());transfer.status=status;
   transfer.correction=round2(transfer.actualAmount-(Number(transfer.calculatedAmount)||0));
@@ -12688,8 +12705,14 @@ function u3RememberRecognition(tx){
 function u3PendingReviews(month=getSelectedMonth()){
   return (state.transactionReviewQueue||[]).filter(row=>(row.reviewStatus||'te-controleren')==='te-controleren'&&String(row.date||'').slice(0,7)===month);
 }
+function assertMonthMutationAllowed(month=getSelectedMonth(),mode='direct'){
+  const status=state.monthRecords?.[month]?.status;
+  if(!['afgesloten','correctie-nodig'].includes(status))return true;
+  if(['reopen','correction','late-import'].includes(mode))return true;
+  throw new Error('Deze maand is afgesloten. Heropen de maand of maak een correctie om financiële gegevens te wijzigen.');
+}
 function u3AssertMonthOpen(month=getSelectedMonth()){
-  if(state.monthRecords?.[month]?.status==='afgesloten')throw new Error(`${monthLabel(month)} is afgesloten. Heropen de maand voordat je gegevens wijzigt.`);
+  return assertMonthMutationAllowed(month);
 }
 function u3AccountLabel(value){return ownerLabel(value||'gezamenlijk');}
 function u3AdminModal(html,extraClass=''){

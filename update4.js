@@ -857,7 +857,7 @@
     state.monthRecords=state.monthRecords||{};
     plan.affectedMonths.forEach(month=>{
       const record=state.monthRecords[month];
-      if(record?.status==='afgesloten'){
+      if(['afgesloten','correctie-nodig'].includes(record?.status)){
         record.status='correctie-nodig';
         record.lateImportTransactionIds=[...new Set([...(record.lateImportTransactionIds||[]),...plan.transactions.filter(tx=>String(tx.date).slice(0,7)===month).map(tx=>tx.id)])];
       }
@@ -940,7 +940,7 @@
     if(draft.status==='teruggedraaid')return true;
     const journal={id:`undo-${draft.id}`,importId:draft.id,operation:'undo',status:'pending',createdAt:new Date().toISOString()};
     await ImportStore.putJournal(journal);
-    const ok=root.commitChange(()=>undoImportEffects(root.state,draft),{render:false});
+    const ok=root.commitChange(()=>undoImportEffects(root.state,draft),{render:false,mutationMode:'correction'});
     if(!ok){journal.status='rolled-back';journal.updatedAt=new Date().toISOString();await ImportStore.putJournal(journal);throw new Error('Ongedaan maken is afgebroken; er zijn geen halve wijzigingen bewaard.');}
     draft.status='teruggedraaid';draft.undoneAt=new Date().toISOString();
     await ImportStore.putImport(draft);await queueImportSync(draft);
@@ -956,7 +956,7 @@
     if(!plan.ok){alert(`Correctie kan nog niet worden verwerkt:\n${plan.errors.slice(0,8).map(error=>`• ${error.message}`).join('\n')}`);return false;}
     const journal={id:`reconcile-${draft.id}-${Date.now()}`,importId:draft.id,operation:'reconcile',status:'pending',createdAt:new Date().toISOString()};
     await ImportStore.putJournal(journal);
-    const ok=root.commitChange(()=>{undoImportEffects(root.state,draft);applyImportPlan(root.state,plan);},{render:false});
+    const ok=root.commitChange(()=>{undoImportEffects(root.state,draft);applyImportPlan(root.state,plan);},{render:false,mutationMode:'correction'});
     if(!ok){journal.status='rolled-back';journal.updatedAt=new Date().toISOString();await ImportStore.putJournal(journal);throw new Error('De correctie is volledig afgebroken omdat opslaan mislukte.');}
     draft.status=root.state.importSummaries.find(item=>item.id===draft.id)?.status||'verwerkt';
     draft.correctedAt=new Date().toISOString();draft.effectManifest=effectManifest(plan);
@@ -973,7 +973,7 @@
     if(!plan.ok){alert(`Import kan nog niet worden verwerkt:\n${plan.errors.slice(0,8).map(error=>`• ${error.message}`).join('\n')}`);return false;}
     const journal={id:`process-${draft.id}`,importId:draft.id,status:'pending',createdAt:new Date().toISOString(),transactionIds:plan.transactions.map(tx=>tx.id)};
     await ImportStore.putJournal(journal);
-    const ok=root.commitChange(()=>applyImportPlan(root.state,plan),{render:false});
+    const ok=root.commitChange(()=>applyImportPlan(root.state,plan),{render:false,mutationMode:'late-import'});
     if(!ok){journal.status='rolled-back';journal.updatedAt=new Date().toISOString();await ImportStore.putJournal(journal);throw new Error('De import is volledig teruggedraaid omdat opslaan mislukte.');}
     draft.status=root.state.importSummaries.find(item=>item.id===draft.id)?.status||'verwerkt';
     draft.processedAt=new Date().toISOString();draft.effectManifest=effectManifest(plan);
