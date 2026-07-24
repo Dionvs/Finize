@@ -1,0 +1,14 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+
+const html=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
+const scripts=[...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)].map(match=>match[1]);
+assert.ok(scripts.length,'Geen inline JavaScript gevonden');
+scripts.forEach((source,index)=>{
+  assert.doesNotThrow(()=>new Function(source),`Inline script ${index+1} bevat ongeldige JavaScript`);
+});
+assert.equal((html.match(/<main\b/gi)||[]).length,1);
+assert.equal((html.match(/<body\b/gi)||[]).length,1);
+assert.equal((html.match(/<\/body>/gi)||[]).length,1);
+console.log('HTML_INLINE_SYNTAX_OK');

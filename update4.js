@@ -686,7 +686,7 @@
     return 'uitgave';
   }
   function expenseImpact(type,amount,include=true){
-    if(!include||['salaris','vakantiegeld','nabetaling','vergoeding','belastingteruggave','overige-inkomsten','interne-overboeking','maandelijkse-bijdrage','extra-bijdrage','sparen','terugbetaling-voorschot'].includes(type))return 0;
+    if(!include||['salaris','vakantiegeld','nabetaling','vergoeding','belastingteruggave','overige-inkomsten','interne-overboeking','maandelijkse-bijdrage','extra-bijdrage','sparen','terugbetaling-voorschot','vaste-last'].includes(type))return 0;
     return type==='terugbetaling'?-Math.abs(amount):Math.abs(amount);
   }
   function financialRows(row){

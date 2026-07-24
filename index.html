@@ -7953,10 +7953,11 @@ function getMonthTransactions(owner=null, month=getSelectedMonth()){
 }
 function getTransactionExpenseImpact(tx){
   if (!tx || tx.processing?.include === false || tx.kind === 'niet-meetellen') return 0;
-  const stored = Number(tx.expenseImpact);
-  if (tx.expenseImpact !== null && tx.expenseImpact !== '' && Number.isFinite(stored)) return round2(stored);
   const kind = String(tx.kind || '').toLowerCase();
   const type = String(tx.transactionType || tx.type || '').toLowerCase();
+  if(kind==='vaste-last')return 0;
+  const stored = Number(tx.expenseImpact);
+  if (tx.expenseImpact !== null && tx.expenseImpact !== '' && Number.isFinite(stored)) return round2(stored);
   if (
     ['inkomen','interne-overboeking','niet-meetellen','vaste-last'].includes(kind) ||
     ['sparen','interne-overboeking','maandelijkse-bijdrage','extra-bijdrage','terugbetaling-voorschot','niet-meetellen'].includes(type)
@@ -11825,7 +11826,7 @@ function u2NormalizeState(target, fromVersion=Number(target?.meta?.schemaVersion
       u2NormalizeChildren(goal);
     });
   });
-  target.meta.schemaVersion = U2_SCHEMA_VERSION;
+  target.meta.schemaVersion = Math.max(Number(target.meta.schemaVersion)||1,U2_SCHEMA_VERSION);
   return target;
 }
 function u2MonthHistory(owner){
@@ -12421,6 +12422,7 @@ function u3BudgetSummary(owner,month=getSelectedMonth(),scenario=state.meta.scen
   u3FixedOccurrences(month,scenario).filter(row=>row.financialFor===owner).forEach(occurrence=>{
     const target=ensure(occurrence.categorie||'Vaste lasten',0);
     target.budget=round2((target.budget||0)+(Number(occurrence.amount)||0));
+    target.actual=round2(target.actual+(Number(occurrence.amount)||0));
     const actual=u3LinkedActual('fixed',occurrence.id,month);
     if(actual){linkedTransactionIds.add(actual.id);}
   });

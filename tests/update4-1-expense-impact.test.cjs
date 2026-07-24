@@ -15,7 +15,7 @@ const transactions = [
   {id:'transfer',date:'2026-07-04',owner:'dion',kind:'interne-overboeking',transactionType:'interne-overboeking',amount:500,accountDelta:-500},
   {id:'saving',date:'2026-07-05',owner:'dion',kind:'interne-overboeking',transactionType:'sparen',amount:250},
   {id:'excluded',date:'2026-07-06',owner:'dion',kind:'uitgave',amount:75,processing:{include:false}},
-  {id:'fixed',date:'2026-07-07',owner:'gezamenlijk',kind:'vaste-last',amount:900},
+  {id:'fixed',date:'2026-07-07',owner:'gezamenlijk',kind:'vaste-last',amount:900,expenseImpact:900},
   {id:'stored',date:'2026-07-08',owner:'dion',kind:'uitgave',amount:80,expenseImpact:12.34},
   {id:'legacy',date:'2026-07-09',owner:'dara',amount:42}
 ];
