@@ -1,12 +1,12 @@
-const CACHE_NAME = "finize-v24-update5-annotations";
+const CACHE_NAME = "finize-v28-personal-overview-cleanup";
 
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./update4.js",
-  "./update4.css",
-  "./update5.js?v=24",
-  "./update5.css?v=24",
+  "./update4.js?v=28",
+  "./update4.css?v=28",
+  "./update5.js?v=28",
+  "./update5.css?v=28",
   "./finize-v4.html",
   "./finize-mobile.html",
   "./manifest.json",

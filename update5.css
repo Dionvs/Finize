@@ -167,12 +167,21 @@ body.v4-app .value.is-negative{color:var(--red) !important}
     padding:18px !important;
     border-top:4px solid transparent !important;
   }
+  button.u5-primary-kpi{
+    width:100%;
+    color:var(--text);
+    text-align:left;
+    cursor:pointer;
+  }
+  button.u5-primary-kpi:hover{background:#fffdf9 !important}
+  button.u5-primary-kpi:focus-visible{outline:3px solid rgba(67,123,181,.25);outline-offset:2px}
   .u5-primary-kpi.tone-income{border-top-color:var(--green) !important}
   .u5-primary-kpi.tone-budget{border-top-color:var(--terracotta) !important}
   .u5-primary-kpi.tone-saving{border-top-color:var(--blue) !important}
   .u5-primary-kpi.tone-allowance{border-top-color:#c99a63 !important}
   .u5-primary-kpi .metric-value{font-size:clamp(25px,2.4vw,34px)}
   .u5-planning-realisation{margin-bottom:16px}
+  .dashboard-preview-row{margin-bottom:16px}
   .u5-flow-list{display:grid;gap:0}
   .u5-flow-list>div{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:10px 0;border-bottom:1px solid var(--border-soft)}
   .u5-flow-list>div:not(:first-child):not(.u5-flow-result) span::before{content:"−";display:inline-block;width:18px;color:var(--text-faint)}
@@ -187,8 +196,12 @@ body.v4-app .value.is-negative{color:var(--red) !important}
   .overview-kpi-row{grid-template-columns:repeat(4,minmax(0,1fr)) !important}
   .overview-kpi-row>.icon-kpi{min-width:0}
   .dashboard-grid{gap:16px !important}
-  body.v4-app[data-real-active-tab="gezamenlijk"] #tab-gezamenlijk>.overview-kpi-row,
-  body.v4-app[data-real-active-tab="gezamenlijk"] #tab-gezamenlijk>.dashboard-grid{margin-bottom:16px}
+  #tab-gezamenlijk>.overview-kpi-row,
+  #tab-gezamenlijk>.dashboard-grid,
+  #tab-dion>.overview-kpi-row,
+  #tab-dion>.dashboard-grid,
+  #tab-dara>.overview-kpi-row,
+  #tab-dara>.dashboard-grid{margin-bottom:16px}
   .manage-stack{gap:12px}
   .manage-section>summary{background:rgba(255,250,244,.65)}
   .table-wrap,.scroll-area{scrollbar-color:rgba(88,124,76,.35) transparent}
@@ -201,6 +214,12 @@ body.v4-app .value.is-negative{color:var(--red) !important}
   .u5-goal-master{display:grid;grid-template-columns:minmax(280px,360px) minmax(0,1fr);gap:18px;align-items:start}
   .u5-goal-list{position:sticky;top:116px;padding:15px !important}
   .u5-goal-list-scroll{display:grid;gap:7px;max-height:calc(100vh - 280px);overflow:auto;padding-right:3px;margin-bottom:10px}
+  .u5-goal-owner-group{display:grid;gap:7px}
+  .u5-goal-owner-group+.u5-goal-owner-group{margin-top:6px;padding-top:12px;border-top:1px solid var(--border)}
+  .u5-goal-owner-label{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 4px;color:var(--text)}
+  .u5-goal-owner-label span{font-size:12px;font-weight:850}
+  .u5-goal-owner-label small{color:var(--text-faint);font-size:10px}
+  .u5-goal-owner-items{display:grid;gap:7px}
   .u5-goal-list-card{
     width:100%;display:grid;grid-template-columns:62px minmax(0,1fr) auto;align-items:center;gap:10px;
     min-height:80px;padding:9px;border:1px solid var(--border-soft);border-radius:14px;background:#fffaf4;
@@ -229,7 +248,7 @@ body.v4-app .value.is-negative{color:var(--red) !important}
   .u5-goal-table-stack{display:grid;gap:14px}
   .u5-goal-table-stack>.card{overflow:auto}
 
-  .u5-data-sections{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
+  .u5-data-sections{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start;margin-bottom:16px}
   .u5-data-sections>.card{margin:0}
   .u5-data-sections .u5-data-danger{border-color:rgba(190,75,61,.32)}
   .u5-data-danger h2{color:var(--red)}
@@ -248,6 +267,17 @@ body.v4-app .value.is-negative{color:var(--red) !important}
   .v4-sidebar-card strong{font-size:13px !important}
   .v4-sidebar-card span{font-size:11px !important}
   body.v4-app .v4-main{padding:24px 28px 36px !important}
+  .v4-main-topbar>.v4-dashboard-heading,
+  .v4-main-topbar>.page-heading{
+    display:block !important;
+    flex:1 1 auto;
+    min-width:210px;
+    margin:0 !important;
+  }
+  .v4-main-topbar>.v4-dashboard-heading h2,
+  .v4-main-topbar>.page-heading h2{font-size:25px}
+  .v4-main-topbar>.v4-dashboard-heading p,
+  .v4-main-topbar>.page-heading p{font-size:12px;white-space:nowrap}
   .u5-primary-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}
   body.v4-app .metric-card{min-height:134px;padding:18px}
   body.v4-app .income-metric .metric-value{margin:5px 0 2px}
@@ -263,7 +293,9 @@ body.v4-app .value.is-negative{color:var(--red) !important}
   body.v4-app .v4-bottom-card{min-height:316px}
   body.v4-app .v4-bottom-card .scroll-area{max-height:238px}
   body.v4-app .dashboard-goals-preview.v4-desktop-only-block .scroll-area{padding-bottom:6px}
-  body.v4-app[data-real-active-tab="gezamenlijk"] #tab-gezamenlijk .dashboard-grid>.span-5 .goal-card-grid{
+  #tab-gezamenlijk .dashboard-grid>.span-5 .goal-card-grid,
+  #tab-dion .dashboard-grid>.span-5 .goal-card-grid,
+  #tab-dara .dashboard-grid>.span-5 .goal-card-grid{
     grid-template-columns:minmax(0,1fr);
   }
 }

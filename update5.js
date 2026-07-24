@@ -70,6 +70,18 @@
     </button>`;
   }
 
+  function goalListContent(items){
+    if (goalOwnerFilter !== 'alle') return items.map(goalListCard).join('');
+    return goalGroups().map(group=>{
+      const owned = items.filter(item=>item.owner === group.owner);
+      if (!owned.length) return '';
+      return `<section class="u5-goal-owner-group" aria-label="${textSafe(group.label)} spaardoelen">
+        <div class="u5-goal-owner-label"><span>${textSafe(group.label)}</span><small>${owned.length} ${owned.length === 1 ? 'doel' : 'doelen'}</small></div>
+        <div class="u5-goal-owner-items">${owned.map(goalListCard).join('')}</div>
+      </section>`;
+    }).join('');
+  }
+
   function goalDetail(item){
     if (!item) return `<div class="card u5-goal-empty"><strong>Nog geen spaardoelen</strong><span>Voeg een doel toe om de detailweergave te gebruiken.</span></div>`;
     const goal = item.doel;
@@ -141,7 +153,7 @@
     },{saved:0,target:0,monthly:0});
     const selection = selectedGoal(items);
     const root = document.getElementById('tab-spaardoelen');
-    root.innerHTML = `${renderPageHeading(`Spaardoelen — ${monthLabel(getSelectedMonth())}`,'Dezelfde doelen en berekeningen, in een rustige master-detailweergave.')}
+    root.innerHTML = `${renderPageHeading(`Spaardoelen — ${monthLabel(getSelectedMonth())}`,'Elke maand een stap dichter bij wat jullie belangrijk vinden.')}
       <div class="overview-kpi-row cols-4 u5-goal-kpis">
         ${renderIconKpi('◇','green','Totaal gespaard',eur(totals.saved),`van ${eur(totals.target)}`,{valueClass:'value pos'})}
         ${renderIconKpi('◎','blue','Totaal doelbedrag',eur(totals.target),'alle doelen samen')}
@@ -160,7 +172,7 @@
       ${goalViewMode === 'table' ? goalTableView(groups) : `<div class="u5-goal-master">
         <aside class="card u5-goal-list">
           <div class="card-head"><div><h2>Spaardoelen</h2><span class="hint">${selection.visible.length} zichtbaar</span></div></div>
-          <div class="u5-goal-list-scroll">${selection.visible.map(goalListCard).join('') || '<p class="hint">Geen doelen in deze groep.</p>'}</div>
+          <div class="u5-goal-list-scroll">${goalListContent(selection.visible) || '<p class="hint">Geen doelen in deze groep.</p>'}</div>
           <button type="button" class="ghost" data-open-goal-manager="${selection.selected?.owner||'gezamenlijk'}">+ Nieuw doel of volgorde wijzigen</button>
         </aside>
         ${goalDetail(selection.selected)}

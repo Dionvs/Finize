@@ -256,16 +256,6 @@ td.num{ text-align:right; }
 .page-heading{ margin-bottom:18px; }
 .page-heading h2{ margin:0 0 4px; font-size:22px; }
 .page-heading p{ margin:0; color:var(--text-faint); font-size:13px; }
-.flow-card{ display:grid; gap:14px; }
-.flow-bar{ display:flex; height:9px; border-radius:999px; overflow:hidden; background:var(--border-soft); }
-.flow-bar span{ height:100%; }
-.flow-bar .seg-lasten{ background:var(--blue); }
-.flow-bar .seg-uitgaven{ background:#9fc3df; }
-.flow-bar .seg-beschikbaar{ background:var(--green); }
-.flow-steps{ display:grid; grid-template-columns:repeat(auto-fit,minmax(126px,1fr)); gap:10px; }
-.flow-step{ background:#fff8f0; border:1px solid var(--border-soft); border-radius:15px; padding:12px; display:grid; gap:5px; }
-.flow-step span{ color:var(--text-faint); font-size:11px; font-weight:800; }
-.flow-step strong{ font-size:16px; font-variant-numeric:tabular-nums; }
 .goal-card-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:10px; }
 .goal-card{
   background:#fffdf9; border:1px solid var(--border); border-radius:16px; padding:12px;
@@ -5269,8 +5259,8 @@ body.v4-app .modal-content{ min-width:0; }
   .u3-budget-row span:nth-child(3),.u3-budget-row span:nth-child(4){display:none}
 }
 </style>
-<link rel="stylesheet" href="./update4.css">
-<link rel="stylesheet" href="./update5.css?v=24">
+<link rel="stylesheet" href="./update4.css?v=28">
+<link rel="stylesheet" href="./update5.css?v=28">
 </head>
 <body class="v4-app">
 
@@ -7954,7 +7944,7 @@ function renderDashboard(){
       </div>
     </div>
     <div class="u5-primary-kpis v4-desktop-only-grid" aria-label="Geplande financiële verdeling">
-      <div class="card u5-primary-kpi tone-income"><div class="metric-label">Totaal inkomen</div><div class="metric-value value pos">${eur(r.totaalSalaris)}</div><div class="metric-sub">Dion en Dara, inclusief vaste teruggaven</div></div>
+      <button type="button" class="card u5-primary-kpi u5-income-kpi tone-income" data-open-total-income aria-label="Maandinkomen van Dion en Dara handmatig aanpassen"><div class="metric-label">Totaal inkomen</div><div class="metric-value value pos">${eur(r.totaalSalaris)}</div><div class="metric-sub">Dion en Dara, inclusief vaste teruggaven · aanpassen</div></button>
       <div class="card u5-primary-kpi tone-budget"><div class="metric-label">Gezamenlijk budget</div><div class="metric-value">${eur(r.gezamenlijkeLastenTotaal)}</div><div class="metric-sub">Vaste lasten + vooraf ingestelde budgetten</div></div>
       <div class="card u5-primary-kpi tone-saving"><div class="metric-label">Gezamenlijk sparen</div><div class="metric-value value pos">${eur(r.spaarpotDezeMaand)}</div><div class="metric-sub">${monthLabel(getSelectedMonth())}</div></div>
       <div class="card u5-primary-kpi tone-allowance"><div class="metric-label">Zakgeld totaal</div><div class="metric-value ${totalZakgeld<0?'value neg':'value pos'}">${eur(totalZakgeld)}</div><div class="metric-sub">Vooraf berekende overdracht</div></div>
@@ -8061,6 +8051,28 @@ function renderBudgetUsageList(){
   }).join('') || '<p class="hint">Nog geen budgetten.</p>'}</div>`;
 }
 
+function renderRecurringFixedManage(owner){
+  const scenario = state.meta.scenario;
+  const rows = (state.recurringFixedExpenses?.[scenario] || []).filter(item=>{
+    const financialFor = item.financialFor || item.rekening || 'gezamenlijk';
+    return financialFor === owner && item.legacyKind !== 'hypotheek';
+  });
+  const month = getSelectedMonth();
+  const total = round2(u3FixedOccurrences(month, scenario)
+    .filter(item=>(item.financialFor || item.rekening || 'gezamenlijk') === owner && item.source?.legacyKind !== 'hypotheek')
+    .reduce((sum,item)=>sum + (Number(item.amount)||0),0));
+  const rowsHtml = rows.map(item=>`
+    <div class="summary-line">
+      <span><strong>${textSafe(item.naam || 'Vaste last')}</strong><small class="hint">${textSafe(item.categorie || 'Overig')} · elke ${Math.max(1, Number(item.frequentieAantal)||1)} ${textSafe(item.frequentieEenheid || 'maanden')}${item.actief === false ? ' · gestopt' : ''}</small></span>
+      <span><strong>${eur(u3AmountAt(item, month))}</strong><button type="button" class="ghost small" data-u3-edit-recurring="fixed:${textSafe(item.id)}">Bewerken</button></span>
+    </div>`).join('');
+  return `<div class="card">
+    <div class="card-head"><div><h2>Terugkerende vaste lasten</h2><span class="hint">Bron van het maandbedrag</span></div><button type="button" class="primary small" data-u3-add-recurring="fixed" data-u3-recurring-owner="${owner}">+ Vaste last</button></div>
+    <div class="summary-list">${rowsHtml || '<p class="hint">Nog geen vaste lasten toegevoegd.</p>'}</div>
+    <div class="card-total"><span>Totaal in ${monthLabel(month)}</span><strong class="value neg">${eur(total)}</strong></div>
+  </div>`;
+}
+
 /* ---------- gezamenlijk / dion / dara ---------- */
 function renderPersonOrJoint(tabId, key, label){
   const s = getMonthlyScenarioData(state.meta.scenario);
@@ -8071,6 +8083,9 @@ function renderPersonOrJoint(tabId, key, label){
   const basisInkomen = isJoint ? 0 : getMonthlyBaseIncome(key);
   const vasteTeruggaven = isJoint ? 0 : sumVasteTeruggaven(key);
   const totaalInkomen = isJoint ? 0 : getTotalMonthlyIncome(key);
+  const pageGreeting = isJoint
+    ? 'Samen houden jullie grip op deze maand.'
+    : `Jouw maand, jouw keuzes — zo sta je ervoor, ${label}.`;
 
   const refundsCard = isJoint ? '' : `
       <div class="card">
@@ -8124,23 +8139,8 @@ function renderPersonOrJoint(tabId, key, label){
       ${renderIconKpi('▥','blue','Uitgaven deze maand', eur(rr.variabeleUitgaven), 'transacties', {valueClass:'value neg'})}
       ${renderIconKpi('◎','green','Beschikbaar voor sparen/vrij gebruik', eur(rr.beschikbaarVoorSparen), availabilityBadge(rr.beschikbaarVoorSparen), {valueClass: rr.beschikbaarVoorSparen<0?'value neg':'value pos'})}
     </div>` : '';
-  const flowTotal = Math.max(1, Math.abs(rr?.zakgeld||0));
-  const lastenSeg = !isJoint ? Math.max(0, Math.min(100, Math.round((Math.abs(rr.persoonlijkeVasteLasten)/flowTotal)*100))) : 0;
-  const uitgavenSeg = !isJoint ? Math.max(0, Math.min(100-lastenSeg, Math.round((rr.variabeleUitgaven/flowTotal)*100))) : 0;
-  const beschikbaarSeg = !isJoint ? Math.max(0, 100-lastenSeg-uitgavenSeg) : 0;
-  const personalFlow = !isJoint ? `
-    <div class="card flow-card span-7">
-      <div class="card-head"><h2>Persoonlijke ruimte</h2><span class="hint">zakgeld → lasten → uitgaven → beschikbaar</span></div>
-      <div class="flow-bar"><span class="seg-lasten" style="width:${lastenSeg}%"></span><span class="seg-uitgaven" style="width:${uitgavenSeg}%"></span><span class="seg-beschikbaar" style="width:${beschikbaarSeg}%"></span></div>
-      <div class="flow-steps">
-        <div class="flow-step"><span>Zakgeld</span><strong>${eur(rr.zakgeld)}</strong></div>
-        <div class="flow-step"><span>Vaste lasten</span><strong>${eur(rr.persoonlijkeVasteLasten)}</strong></div>
-        <div class="flow-step"><span>Uitgaven</span><strong class="value neg">${eur(rr.variabeleUitgaven)}</strong></div>
-        <div class="flow-step"><span>Beschikbaar</span><strong class="${rr.beschikbaarVoorSparen<0?'value neg':'value pos'}">${eur(rr.beschikbaarVoorSparen)}</strong></div>
-      </div>
-    </div>` : '';
   const personalIncomeCard = !isJoint ? `
-    <div class="card metric-card income-metric span-5">
+    <div class="card metric-card income-metric span-12">
       <div class="metric-label">Totaal inkomen ${label}</div>
       <div class="metric-value value pos">${eur(totaalInkomen)}</div>
       <div class="metric-sub">Totaal naar gezamenlijke rekening</div>
@@ -8161,7 +8161,7 @@ function renderPersonOrJoint(tabId, key, label){
     ${refundsCard}` : '';
 
   document.getElementById(tabId).innerHTML = isJoint ? `
-    ${renderPageHeading(`Gezamenlijk overzicht — ${monthLabel(getSelectedMonth())}`, 'Een helder overzicht van jullie gezamenlijke budgetten en uitgaven.')}
+    ${renderPageHeading(`Gezamenlijk overzicht — ${monthLabel(getSelectedMonth())}`, pageGreeting)}
     ${jointKpis}
     <div class="dashboard-grid">
       <div class="card span-7"><div class="card-head"><h2>Budgetgebruik deze maand</h2><span class="hint">Dion / Dara</span></div>${renderBudgetUsageList()}</div>
@@ -8173,15 +8173,14 @@ function renderPersonOrJoint(tabId, key, label){
     </div>
     <div class="manage-stack">
       ${hypotheekCard ? renderManageSection('Beheer hypotheek', hypotheekCard, false) : ''}
-      ${renderManageSection('Beheer vaste lasten', `<div class="card">${renderRowsTable(`${state.meta.scenario}.${key}.vasteLasten`, data.vasteLasten, {jaarlijks:true, moveable:true})}</div>`, false)}
+      ${renderManageSection('Beheer vaste lasten', renderRecurringFixedManage(key), false)}
       ${renderManageSection('Beheer variabele budgetten', `<div class="card">${renderRowsTable(variabelBasePath, data.variabel)}</div>`, false)}
       ${renderManageSection('Sparen', `<div class="card">${savingsSummary}${renderGoalOverviewTable(doelenVoorGroep, spaarpotVoorGroep)}</div>`, false)}
     </div>
   ` : `
-    ${renderPageHeading(`${label} overzicht — ${monthLabel(getSelectedMonth())}`, 'Persoonlijk overzicht met inkomen, zakgeld, uitgaven en vrije ruimte.')}
+    ${renderPageHeading(`${label} overzicht — ${monthLabel(getSelectedMonth())}`, pageGreeting)}
     ${personalKpis}
     <div class="dashboard-grid">
-      ${personalFlow}
       ${personalIncomeCard}
     </div>
     <div class="dashboard-grid">
@@ -8190,7 +8189,7 @@ function renderPersonOrJoint(tabId, key, label){
     </div>
     <div class="manage-stack">
       ${renderManageSection('Inkomen en vaste teruggaven', incomeManage, false)}
-      ${renderManageSection('Eigen vaste lasten', `<div class="card">${renderRowsTable(`${state.meta.scenario}.${key}.vasteLasten`, data.vasteLasten, {jaarlijks:true, moveable:true})}</div>`, false)}
+      ${renderManageSection('Eigen vaste lasten', renderRecurringFixedManage(key), false)}
       ${renderManageSection('Persoonlijke categorieën', `<div class="card">${renderRowsTable(variabelBasePath, data.variabel)}</div>`, false)}
       ${renderManageSection('Spaardoelen tabeloverzicht', `<div class="card">${renderGoalOverviewTable(doelenVoorGroep, spaarpotVoorGroep)}</div>`, false)}
     </div>
@@ -8363,7 +8362,7 @@ function renderSpaardoelen(){
   </div>`;
 
   document.getElementById('tab-spaardoelen').innerHTML = `
-    ${renderPageHeading(`Spaardoelen overzicht — ${monthLabel(getSelectedMonth())}`, 'Alle doelen als moderne voortgangskaarten, met beheer lager op de pagina.')}
+    ${renderPageHeading(`Spaardoelen overzicht — ${monthLabel(getSelectedMonth())}`, 'Elke maand een stap dichter bij wat jullie belangrijk vinden.')}
     <div class="overview-kpi-row cols-4">
       ${renderIconKpi('◈','green','Totaal gespaard', eur(totaalGespaard), `van ${eur(totaalDoel)}`, {valueClass:'value pos'})}
       ${renderIconKpi('◎','blue','Totaal doelbedrag', eur(totaalDoel), 'alle doelen samen')}
@@ -8395,7 +8394,7 @@ function renderDataTab(){
   const cloudTitle = cloudConnected ? 'Cloud status: verbonden' : (CloudAdapter.isConfigured() ? 'Cloud status: klaar om te verbinden' : 'Cloud status: niet gekoppeld');
 
   document.getElementById('tab-data').innerHTML = `
-    ${renderPageHeading('Data & back-up', 'Beheer je data, maak back-ups en synchroniseer optioneel met de cloud.')}
+    ${renderPageHeading('Data & back-up', 'Alles veilig op één plek — lokaal én klaar voor een back-up.')}
     <div class="dashboard-grid">
       ${renderStatusCard('✓','green','Lokale opslag actief','Je data wordt lokaal in je browser opgeslagen.')}
       ${renderStatusCard('◷','green',`Laatste back-up`, backupDesc, lastBackupDate ? `<span class="status-badge">${isToday?'Actueel':'Bewaard'}</span>` : '')}
@@ -9338,6 +9337,53 @@ function openIncomeEditModal(person, label){
   });
 }
 
+function openTotalIncomeEditModal(){
+  const modal = document.getElementById('incomeEditModal');
+  const month = getSelectedMonth();
+  const dion = getMonthlyBaseIncome('dion');
+  const dara = getMonthlyBaseIncome('dara');
+  const refunds = round2(sumVasteTeruggaven('dion') + sumVasteTeruggaven('dara'));
+  const actualIncomePresent = ['dion','dara'].some(person=>resolveMonthlyIncome(person,month).source === 'actual');
+  modal.innerHTML = `
+    <div class="modal income-sheet">
+      <div class="income-sheet-handle"></div>
+      <div class="card-head"><h2>Maandinkomen aanpassen</h2><button class="danger-ghost" id="btnCloseTotalIncomeEdit" aria-label="Sluiten">&times;</button></div>
+      <div class="income-sheet-meta"><span>Dion en Dara</span><span>${monthLabel(month)}</span></div>
+      <p class="hint">Handmatige bedragen gelden als planning. Een bevestigd salaris uit een CSV-bankimport krijgt voor deze maand automatisch voorrang.</p>
+      ${actualIncomePresent ? '<div class="status-badge status-ok">Bevestigd salaris uit transacties actief</div>' : ''}
+      <label class="income-sheet-field">Basisinkomen Dion
+        <input id="totalIncomeDion" type="number" step="0.01" inputmode="decimal" value="${dion}">
+      </label>
+      <label class="income-sheet-field">Basisinkomen Dara
+        <input id="totalIncomeDara" type="number" step="0.01" inputmode="decimal" value="${dara}">
+      </label>
+      <div class="income-sheet-readonly"><span>Vaste teruggaven</span><strong>${eur(refunds)}</strong></div>
+      <div class="income-sheet-total"><span>Totaal inkomen</span><strong id="totalIncomePreview">${eur(round2(dion+dara+refunds))}</strong></div>
+      <div class="modal-actions"><button class="ghost" id="btnCancelTotalIncomeEdit">Annuleren</button><button class="primary" id="btnSaveTotalIncomeEdit">Opslaan</button></div>
+    </div>`;
+  modal.classList.add('open');
+  const close = ()=>{ modal.classList.remove('open'); modal.innerHTML=''; };
+  const inputs = [document.getElementById('totalIncomeDion'),document.getElementById('totalIncomeDara')];
+  const preview = document.getElementById('totalIncomePreview');
+  const amount = input=>{
+    const parsed = bankAmount(input.value);
+    return Number.isFinite(parsed) ? round2(parsed) : 0;
+  };
+  const updatePreview = ()=>{ preview.textContent = eur(round2(amount(inputs[0])+amount(inputs[1])+refunds)); };
+  inputs.forEach(input=>input.addEventListener('input',updatePreview));
+  document.getElementById('btnCloseTotalIncomeEdit').addEventListener('click',close);
+  document.getElementById('btnCancelTotalIncomeEdit').addEventListener('click',close);
+  modal.addEventListener('click',event=>{ if(event.target===modal)close(); },{once:true});
+  document.getElementById('btnSaveTotalIncomeEdit').addEventListener('click',()=>{
+    setMonthlyIncome('dion',amount(inputs[0]));
+    setMonthlyIncome('dara',amount(inputs[1]));
+    persist();
+    close();
+    renderActiveTab();
+    showQuickToast('Maandinkomen opgeslagen');
+  });
+}
+
 
 function renderSharedEmptyTabHeader(title){
   let header = `<div class="mobile-header-top v4-mobile-only-block">
@@ -9602,10 +9648,10 @@ function renderActiveTab(){
   bindInputs(root);
   handleTableClicks(root);
   handleGoalClicks(root);
+  bindU3Admin(root);
   if (activeTab === 'dashboard'){
     bindDashboardAccordionKeyboard(root);
     bindBankImport(root);
-    bindU3Admin(root);
   }
   root.querySelectorAll('[data-tab-shortcut]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
@@ -9617,6 +9663,9 @@ function renderActiveTab(){
     btn.addEventListener('click', ()=>{
       openIncomeEditModal(btn.dataset.incomeEdit, btn.dataset.incomeLabel);
     });
+  });
+  root.querySelectorAll('[data-open-total-income]').forEach(btn=>{
+    btn.addEventListener('click', openTotalIncomeEditModal);
   });
   root.querySelectorAll('[data-open-goal-editor]').forEach(btn=>{
     btn.addEventListener('click',()=>{ const [owner,id]=btn.dataset.openGoalEditor.split(':'); openMobileGoalEditor(owner,id); });
@@ -9681,6 +9730,7 @@ function renderActiveTab(){
   });
   renderCloudStatus();
   placeMonthControl();
+  placeDesktopPageHeading(root);
   window.FinizeUpdate5?.markNegativeValues(root);
 }
 
@@ -9699,6 +9749,28 @@ function placeMonthControl(){
     home.insertBefore(control, home.firstChild);
   }
 }
+function placeDesktopPageHeading(root=document.getElementById('tab-' + activeTab)){
+  const topbar = document.querySelector('.v4-main-topbar');
+  if (!topbar) return;
+  const parkedHeadings = [...topbar.querySelectorAll(':scope > .v4-dashboard-heading, :scope > .page-heading')];
+  const activeRoot = root?.id === 'tab-' + activeTab ? root : document.getElementById('tab-' + activeTab);
+  const rootHeading = activeRoot?.querySelector(':scope > .v4-dashboard-heading, :scope > .page-heading');
+  const matchingParked = parkedHeadings.find(heading=>heading.dataset.headingOwner === activeTab);
+  const heading = rootHeading || matchingParked;
+  if (!heading || !activeRoot){
+    parkedHeadings.forEach(item=>item.remove());
+    return;
+  }
+  if (window.innerWidth >= 1024){
+    parkedHeadings.forEach(item=>{ if(item !== heading)item.remove(); });
+    heading.dataset.headingOwner = activeTab;
+    if (heading.parentNode !== topbar) topbar.insertBefore(heading, topbar.firstChild);
+  }else if (heading.parentNode !== activeRoot){
+    const firstDesktopContent = activeRoot.querySelector('.u5-primary-kpis, .overview-kpi-row, .dashboard-grid, .u5-data-sections');
+    activeRoot.insertBefore(heading, firstDesktopContent || activeRoot.firstChild);
+    delete heading.dataset.headingOwner;
+  }
+}
 function rescueMonthControl(){
   const control = document.getElementById('monthControl');
   const home = document.getElementById('topActionsHome');
@@ -9707,7 +9779,10 @@ function rescueMonthControl(){
     home.insertBefore(control, home.firstChild);
   }
 }
-window.addEventListener('resize', placeMonthControl);
+window.addEventListener('resize', ()=>{
+  placeMonthControl();
+  placeDesktopPageHeading();
+});
 
 document.getElementById('bottomNav').addEventListener('click', (e)=>{
   const btn = e.target.closest('.tab-btn');
@@ -10776,6 +10851,13 @@ function bindU3Admin(root){
     else if(view==='close')u3OpenClose();
     else if(view==='transfers')u3OpenTransfers();
   }));
+  root.querySelectorAll('[data-u3-add-recurring]').forEach(button=>button.addEventListener('click',()=>{
+    u3OpenRecurringEditor(button.dataset.u3AddRecurring, '', {owner:button.dataset.u3RecurringOwner});
+  }));
+  root.querySelectorAll('[data-u3-edit-recurring]').forEach(button=>button.addEventListener('click',()=>{
+    const [kind,id]=button.dataset.u3EditRecurring.split(':');
+    u3OpenRecurringEditor(kind,id);
+  }));
 }
 function u3RecurringRows(kind){
   if(kind==='income')return state.recurringIncomeSources||[];
@@ -10793,18 +10875,19 @@ function u3OpenPlanning(){
   modal.querySelectorAll('[data-u3-add-recurring]').forEach(button=>button.addEventListener('click',()=>u3OpenRecurringEditor(button.dataset.u3AddRecurring)));
   modal.querySelectorAll('[data-u3-edit-recurring]').forEach(button=>button.addEventListener('click',()=>{const [kind,id]=button.dataset.u3EditRecurring.split(':');u3OpenRecurringEditor(kind,id);}));
 }
-function u3OpenRecurringEditor(kind,id=''){
+function u3OpenRecurringEditor(kind,id='',defaults={}){
   const existing=u3RecurringRows(kind).find(item=>item.id===id);
   const income=kind==='income';
   const current=getSelectedMonth();
   const value=existing?u3AmountAt(existing,current):0;
+  const defaultOwner=U3_ACCOUNTS.includes(defaults.owner)?defaults.owner:'gezamenlijk';
   const {modal}=u3AdminModal(`<div class="u3-admin-head"><div><div class="section-kicker">${income?'Inkomstenbron':'Vaste last'}</div><h2>${existing?'Bewerken':'Toevoegen'}</h2></div><button class="ghost" data-u3-close>Sluiten</button></div>
     <div class="u3-grid">
       <label class="full">Naam<input id="u3RecName" value="${textSafe(existing?.naam||'')}"></label>
       <label>Bedrag<input id="u3RecAmount" type="number" step="0.01" inputmode="decimal" value="${Number(value)||''}"></label>
       ${income?`<label>Type<select id="u3RecCategory">${['loon','toeslag','vergoeding/teruggave','overig'].map(value=>`<option ${existing?.type===value?'selected':''}>${value}</option>`).join('')}</select></label>`:`<label>Categorie<input id="u3RecCategory" value="${textSafe(existing?.categorie||'Overig')}"></label>`}
-      <label>Fysieke rekening<select id="u3RecAccount">${U3_ACCOUNTS.map(value=>`<option value="${value}" ${(existing?.rekening||'gezamenlijk')===value?'selected':''}>${u3AccountLabel(value)}</option>`).join('')}</select></label>
-      <label>Financieel voor<select id="u3RecFor">${U3_ACCOUNTS.map(value=>`<option value="${value}" ${(existing?.financialFor||existing?.rekening||'gezamenlijk')===value?'selected':''}>${u3AccountLabel(value)}</option>`).join('')}</select></label>
+      <label>Fysieke rekening<select id="u3RecAccount">${U3_ACCOUNTS.map(value=>`<option value="${value}" ${(existing?.rekening||defaultOwner)===value?'selected':''}>${u3AccountLabel(value)}</option>`).join('')}</select></label>
+      <label>Financieel voor<select id="u3RecFor">${U3_ACCOUNTS.map(value=>`<option value="${value}" ${(existing?.financialFor||existing?.rekening||defaultOwner)===value?'selected':''}>${u3AccountLabel(value)}</option>`).join('')}</select></label>
       ${income?`<label>Eigenaar<select id="u3RecOwner">${U3_ACCOUNTS.map(value=>`<option value="${value}" ${(existing?.eigenaar||'gezamenlijk')===value?'selected':''}>${u3AccountLabel(value)}</option>`).join('')}</select></label><label class="u2-checkbox"><input id="u3RecDistribution" type="checkbox" ${existing?.meetellenVoorVerdeling!==false?'checked':''}> Meetellen voor verdeling</label>`:''}
       <label>Elke<input id="u3RecFrequency" type="number" min="1" step="1" value="${existing?.frequentieAantal||1}"></label>
       <label>Frequentie<select id="u3RecUnit">${U3_FREQUENCY_UNITS.map(value=>`<option value="${value}" ${existing?.frequentieEenheid===value?'selected':''}>${value}</option>`).join('')}</select></label>
@@ -11009,8 +11092,8 @@ async function initializeApp(){
 initializeApp();
 
 </script>
-<script src="./update4.js"></script>
-<script src="./update5.js?v=24"></script>
+<script src="./update4.js?v=28"></script>
+<script src="./update5.js?v=28"></script>
 <script>
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {

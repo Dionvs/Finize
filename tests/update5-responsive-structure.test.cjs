@@ -10,7 +10,7 @@ const sw = fs.readFileSync(path.join(root, 'service-worker.js'), 'utf8');
 
 assert.match(html, /update5\.css/);
 assert.match(html, /update5\.js/);
-assert.match(sw, /finize-v24-update5-annotations/);
+assert.match(sw, /finize-v28-personal-overview-cleanup/);
 assert.match(sw, /\.\/update5\.css/);
 assert.match(sw, /\.\/update5\.js/);
 assert.doesNotMatch(html, /class="u5-page-context"/);
@@ -19,13 +19,28 @@ assert.doesNotMatch(html, /class="[^"]*v4-dashboard-add-btn/);
 assert.doesNotMatch(html, /class="footer-note"/);
 assert.doesNotMatch(html, /class="v4-sidebar-sub"/);
 assert.match(html, /data-month-copy-previous/);
+assert.match(html, /class="card u5-primary-kpi u5-income-kpi tone-income" data-open-total-income/);
+assert.match(html, /function openTotalIncomeEditModal\(\)/);
+assert.match(html, /Een bevestigd salaris uit een CSV-bankimport krijgt voor deze maand automatisch voorrang/);
+assert.match(html, /id="btnCloseTotalIncomeEdit" aria-label="Sluiten">&times;<\/button>/);
+assert.doesNotMatch(html, /Persoonlijke ruimte|personalFlow|flow-card/);
+assert.match(html, /class="card metric-card income-metric span-12"/);
+assert.match(html, /function placeDesktopPageHeading\(root=/);
+assert.match(html, /placeDesktopPageHeading\(root\)/);
+assert.match(html, /Samen houden jullie grip op deze maand/);
+assert.match(html, /Jouw maand, jouw keuzes/);
+assert.match(html + js, /Elke maand een stap dichter bij wat jullie belangrijk vinden/);
+assert.match(html, /Alles veilig op één plek/);
 assert.match(js, /reuseMobileNavigationIcons/);
 assert.match(css, /body\.v4-app \.value\.is-negative\{color:var\(--red\) !important\}/);
 assert.match(js, /function markNegativeValues\(root=document\)/);
 assert.match(html, /FinizeUpdate5\?\.markNegativeValues\(root\)/);
 assert.match(css, /\.dashboard-goals-preview\.v4-desktop-only-block \.scroll-area\{padding-bottom:6px\}/);
-assert.match(css, /#tab-gezamenlijk>\.overview-kpi-row,[\s\S]*#tab-gezamenlijk>\.dashboard-grid\{margin-bottom:16px\}/);
-assert.match(css, /#tab-gezamenlijk \.dashboard-grid>\.span-5 \.goal-card-grid\{[\s\S]*grid-template-columns:minmax\(0,1fr\)/);
+assert.match(css, /#tab-gezamenlijk>\.overview-kpi-row,[\s\S]*#tab-dara>\.dashboard-grid\{margin-bottom:16px\}/);
+assert.match(css, /\.dashboard-preview-row\{margin-bottom:16px\}/);
+assert.match(css, /\.u5-data-sections\{[^}]*margin-bottom:16px\}/);
+assert.match(css, /#tab-gezamenlijk \.dashboard-grid>\.span-5 \.goal-card-grid,[\s\S]*#tab-dara \.dashboard-grid>\.span-5 \.goal-card-grid\{[\s\S]*grid-template-columns:minmax\(0,1fr\)/);
+assert.match(css, /#tab-dion>\.dashboard-grid,[\s\S]*#tab-dara>\.dashboard-grid\{margin-bottom:16px\}/);
 
 assert.match(css, /@media \(min-width:768px\)/);
 assert.match(css, /@media \(min-width:1024px\)/);
@@ -127,12 +142,22 @@ assert.match(html, /Deze realisatie verandert het vooraf berekende zakgeld niet/
 assert.match(html, /window\.innerWidth >= 768 \? renderPersonOrJoint/);
 assert.match(html, /window\.innerWidth >= 768 && window\.FinizeUpdate5\?\.renderGoals/);
 assert.match(html, /window\.innerWidth >= 768 && window\.FinizeUpdate5\?\.renderData/);
+assert.match(html, /function renderRecurringFixedManage\(owner\)/);
+assert.match(html, /state\.recurringFixedExpenses\?\.\[scenario\]/);
+assert.match(html, /data-u3-edit-recurring="fixed:/);
+assert.match(html, /data-u3-recurring-owner="\$\{owner\}"/);
+assert.match(html, /renderManageSection\('Beheer vaste lasten', renderRecurringFixedManage\(key\)/);
+assert.match(html, /renderManageSection\('Eigen vaste lasten', renderRecurringFixedManage\(key\)/);
+assert.doesNotMatch(html, /renderManageSection\('(?:Beheer vaste lasten|Eigen vaste lasten)', `<div class="card">`\s*\+\s*renderRowsTable/);
 
 for (const marker of ['u5-goal-master','Tabelweergave','goalImageSource','renderGoalGroup','renderDataTab','Gevarenzone']) {
   assert.match(js, new RegExp(marker), `Update 5-marker ontbreekt: ${marker}`);
 }
 assert.match(js, /let selectedGoalRef = ''/);
 assert.match(js, /let goalOwnerFilter = 'alle'/);
+assert.match(js, /function goalListContent\(items\)/);
+assert.match(js, /class="u5-goal-owner-group"/);
+assert.match(css, /\.u5-goal-owner-group\+\.u5-goal-owner-group/);
 assert.doesNotMatch(js, /localStorage\.setItem|DataAdapter\.save|CloudAdapter\.saveNow/, 'Tijdelijke weergavestatus mag niet worden opgeslagen');
 
 for (const mobileMarker of [
