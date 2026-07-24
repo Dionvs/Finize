@@ -7895,22 +7895,34 @@ function getMonthlyScenarioData(scenario=state.meta.scenario){
 function getMonthTransactions(owner=null, month=getSelectedMonth()){
   return (state.transactions||[]).filter(tx => transactionMonth(tx) === month && (!owner || tx.owner === owner));
 }
+function getTransactionExpenseImpact(tx){
+  if (!tx || tx.processing?.include === false || tx.kind === 'niet-meetellen') return 0;
+  const stored = Number(tx.expenseImpact);
+  if (tx.expenseImpact !== null && tx.expenseImpact !== '' && Number.isFinite(stored)) return round2(stored);
+  const kind = String(tx.kind || '').toLowerCase();
+  const type = String(tx.transactionType || tx.type || '').toLowerCase();
+  if (
+    ['inkomen','interne-overboeking','niet-meetellen','vaste-last'].includes(kind) ||
+    ['sparen','interne-overboeking','maandelijkse-bijdrage','extra-bijdrage','terugbetaling-voorschot','niet-meetellen'].includes(type)
+  ) return 0;
+  const amount = Math.abs(Number(tx.amount) || 0);
+  return round2(type === 'terugbetaling' || kind === 'terugbetaling' ? -amount : amount);
+}
 function sumTransactions(owner=null, category=null, month=getSelectedMonth()){
   return round2(getMonthTransactions(owner, month).reduce((sum, tx)=>{
-    if (tx.kind === 'vaste-last') return sum;
     if (category){
       const txCat = String(tx.category||'').toLowerCase();
       const wanted = String(category).toLowerCase();
-      if (!(txCat === wanted || txCat.includes(wanted) || wanted.includes(txCat))) return sum;
+      if (!txCat || !(txCat === wanted || txCat.includes(wanted) || wanted.includes(txCat))) return sum;
     }
-    return sum + (Number(tx.amount)||0);
+    return sum + getTransactionExpenseImpact(tx);
   }, 0));
 }
 function transactionsByCategory(owner, month=getSelectedMonth()){
   const totals = {};
   getMonthTransactions(owner, month).forEach(tx=>{
     const key = tx.category || 'Overig';
-    totals[key] = round2((totals[key]||0) + (Number(tx.amount)||0));
+    totals[key] = round2((totals[key]||0) + getTransactionExpenseImpact(tx));
   });
   return totals;
 }
@@ -11322,7 +11334,7 @@ function renderJointFirstRow(){
   let unassignedUsed = 0;
   getMonthTransactions('gezamenlijk').forEach(tx=>{
     const key = String(tx.category || '').trim().toLocaleLowerCase();
-    const amount = Number(tx.amount)||0;
+    const amount = getTransactionExpenseImpact(tx);
     if (key && variableBudgetMap.has(key)) usedByBudgetKey[key] = round2((usedByBudgetKey[key]||0) + amount);
     else unassignedUsed = round2(unassignedUsed + amount);
   });
@@ -11414,7 +11426,7 @@ function renderPersonalTransactionsCard(owner){
     <strong class="joint-transaction-amount">${eur(Number(tx.amount) || 0)}</strong>
     <button type="button" class="joint-transaction-delete" data-remove-transaction="${tx.id}" aria-label="Transactie verwijderen">×</button>
   </div>`).join('');
-  const total = round2(rows.reduce((sum, tx)=>sum + (Number(tx.amount)||0), 0));
+  const total = round2(rows.reduce((sum, tx)=>sum + getTransactionExpenseImpact(tx), 0));
   return `<div class="card joint-two-column-card joint-transactions-card"><div class="card-head joint-transactions-card-head"><div class="card-head-title"><h2>${name} transacties <span>— ${monthLabel(getSelectedMonth())}</span></h2><button type="button" class="joint-transaction-add-btn" data-open-personal-transaction="${owner}" aria-label="Uitgave toevoegen">${iconSvg('receipt')}</button></div></div><div class="joint-transactions-list">${rowsHtml || '<p class="joint-transactions-empty">Nog geen uitgaven deze maand.</p>'}</div><div class="joint-transactions-total"><span>Totaal uitgaven</span><strong>${eur(total)}</strong></div></div>`;
 }
 
@@ -11442,7 +11454,7 @@ function renderPersonalFirstRow(owner){
   (data.variabel || []).forEach(row=>{ const label=String(row.post || row.categorie || '').trim(); if(label) budgets.set(label.toLocaleLowerCase(),{label,budget:Number(row.bedrag)||0}); });
   const used = {};
   let uncategorized = 0;
-  getMonthTransactions(owner).filter(tx=>tx.kind !== 'vaste-last').forEach(tx=>{ const key=String(tx.category||'').trim().toLocaleLowerCase(); if (budgets.has(key)) used[key]=round2((used[key]||0)+(Number(tx.amount)||0)); else uncategorized=round2(uncategorized+(Number(tx.amount)||0)); });
+  getMonthTransactions(owner).forEach(tx=>{ const key=String(tx.category||'').trim().toLocaleLowerCase(); const impact=getTransactionExpenseImpact(tx); if (budgets.has(key)) used[key]=round2((used[key]||0)+impact); else uncategorized=round2(uncategorized+impact); });
   const variableRows = [...budgets.entries()].map(([key,row])=>{ const amount=used[key]||0; const ratio=row.budget>0?Math.min(1,amount/row.budget):0; return `<div class="budget-preview-item"><div class="budget-preview-thumb tone-green">${iconSvg(categoryIconName(row.label))}</div><div class="budget-preview-main"><div class="budget-preview-top"><strong>${textSafe(row.label)}</strong><span>${eur(amount)} / ${eur(row.budget)}</span></div><div class="progress-track budget-gradient"><div class="progress-fill budget-gradient" style="width:${Math.round(ratio*100)}%"></div></div></div></div>`; });
   if (uncategorized>0) variableRows.push(`<div class="budget-preview-item joint-variable-unassigned"><div class="budget-preview-thumb">${iconSvg('more')}</div><div class="budget-preview-main"><div class="budget-preview-top"><strong>Ongecategoriseerd</strong><span>${eur(uncategorized)}</span></div><div class="progress-track"><div class="progress-fill" style="width:100%"></div></div></div></div>`);
   const fixed={}; (data.vasteLasten||[]).forEach(row=>{ const cat=normalizeCategoryName(row.categorie); fixed[cat]=round2((fixed[cat]||0)+effectiveBedrag(row)); });
@@ -12249,7 +12261,7 @@ function u3ActualIncome(month=getSelectedMonth(),financialFor=null){
   return !financialFor&&Number.isFinite(Number(override?.total))?round2(Number(override.total)):calculated;
 }
 function u3ActualExpenses(month=getSelectedMonth(),financialFor=null){
-  return round2(u3ConfirmedTransactions(month).filter(tx=>tx.kind!=='inkomen' && tx.kind!=='interne-overboeking' && tx.kind!=='niet-meetellen' && (!financialFor||(tx.financialFor||tx.owner)===financialFor)).reduce((sum,tx)=>sum+Number(tx.expenseImpact??Math.abs(Number(tx.amount)||0)),0));
+  return round2(u3ConfirmedTransactions(month).filter(tx=>(!financialFor||(tx.financialFor||tx.owner)===financialFor)).reduce((sum,tx)=>sum+getTransactionExpenseImpact(tx),0));
 }
 function u3ExpectedIncome(month=getSelectedMonth(),financialFor=null){
   return round2(u3IncomeOccurrences(month).filter(row=>!financialFor||row.financialFor===financialFor).reduce((sum,row)=>sum+Number(row.amount||0),0));
@@ -12282,11 +12294,11 @@ function u3BudgetSummary(owner,month=getSelectedMonth(),scenario=state.meta.scen
     const target=ensure(occurrence.categorie||'Vaste lasten',0);
     target.budget=round2((target.budget||0)+(Number(occurrence.amount)||0));
     const actual=u3LinkedActual('fixed',occurrence.id,month);
-    if(actual){target.actual=round2(target.actual+Number(actual.expenseImpact??Math.abs(Number(actual.amount)||0)));linkedTransactionIds.add(actual.id);}
+    if(actual){linkedTransactionIds.add(actual.id);}
   });
-  u3ConfirmedTransactions(month).filter(tx=>tx.kind!=='inkomen'&&tx.kind!=='interne-overboeking'&&tx.kind!=='niet-meetellen'&&(tx.financialFor||tx.owner)===owner&&!linkedTransactionIds.has(tx.id)).forEach(tx=>{
+  u3ConfirmedTransactions(month).filter(tx=>(tx.financialFor||tx.owner)===owner&&!linkedTransactionIds.has(tx.id)).forEach(tx=>{
     const target=ensure(tx.category||'Overig',null);
-    target.actual=round2(target.actual+Number(tx.expenseImpact??Math.abs(Number(tx.amount)||0)));
+    target.actual=round2(target.actual+getTransactionExpenseImpact(tx));
   });
   return [...map.values()].map(row=>({...row,difference:round2((row.budget??0)-row.actual),status:row.budget===null?'geen-budget':row.actual>row.budget?'overschreden':'resterend'}));
 }

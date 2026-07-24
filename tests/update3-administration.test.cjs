@@ -4,6 +4,8 @@ const vm = require('node:vm');
 const path = require('node:path');
 
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+const impactStart = html.indexOf('function getTransactionExpenseImpact');
+const impactEnd = html.indexOf('function sumTransactions', impactStart);
 const start = html.indexOf('function u3ConfirmedTransactions');
 const end = html.indexOf('const u3LegacyMonthlyScenarioData', start);
 assert.ok(start >= 0 && end > start, 'Update 3 administratierekenlaag is niet gevonden');
@@ -50,6 +52,7 @@ const context = {
   bankText:value=>String(value||'').toLowerCase()
 };
 vm.createContext(context);
+vm.runInContext(html.slice(impactStart,impactEnd),context,{filename:'update4-expense-impact-inline.js'});
 vm.runInContext(html.slice(start,end),context,{filename:'update3-administration-inline.js'});
 
 const budget = context.u3BudgetSummary('gezamenlijk','2026-07','voor');
