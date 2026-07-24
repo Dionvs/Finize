@@ -22,8 +22,10 @@ const context = {
   round2: value => Math.round((Number(value) + Number.EPSILON) * 100) / 100,
   uid: (() => { let id = 0; return () => `test-${++id}`; })(),
   clone: value => JSON.parse(JSON.stringify(value)),
-  state: { spaardoelGeschiedenis: {} },
+  state: { spaardoelGeschiedenis: {}, monthRecords:{} },
   TODAY: new Date(2026, 6, 23),
+  getSelectedMonth:()=> '2026-07',
+  getCalculationDateForSelectedMonth:()=>new Date(2026,6,1,12),
   monthlyRateFromGoal: goal => {
     const rate = Number(goal.rendement) || 0;
     return goal.rendementPeriode === 'maandelijks' ? rate : (rate ? Math.pow(1 + rate, 1 / 12) - 1 : 0);

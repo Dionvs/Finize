@@ -8443,7 +8443,7 @@ function monthsRemaining(targetDateStr, today){
   const t = new Date(targetDateStr);
   if (isNaN(t)) return null;
   const months = (t.getFullYear()-today.getFullYear())*12 + (t.getMonth()-today.getMonth());
-  return Math.max(1, months);
+  return Math.max(0, months+1);
 }
 function monthlyRateFromGoal(doel){
   const rate = Number(doel.rendement)||0;
@@ -11821,7 +11821,8 @@ function u2ExpectedDate(goal, monthly){
   if (target <= balance) return new Date();
   if (!(monthly > 0)) return null;
   const rate = monthlyRateFromGoal(goal);
-  const date = new Date(TODAY.getFullYear(), TODAY.getMonth(), 1);
+  const reference=getCalculationDateForSelectedMonth(getSelectedMonth(),goal.eigenaar||'gezamenlijk');
+  const date = new Date(reference.getFullYear(), reference.getMonth(), 1);
   for (let month=1; month<=1200; month++){
     balance = balance * (1 + rate) + monthly;
     date.setMonth(date.getMonth()+1);
@@ -11844,6 +11845,7 @@ function u2Status(item){
 }
 
 calcDoel = function(doel, today){
+  today=getCalculationDateForSelectedMonth(getSelectedMonth(),doel.eigenaar||'gezamenlijk');
   const doelbedrag = u2GoalTarget(doel);
   const algespaard = u2GoalSaved(doel);
   const vasteInleg = Math.max(0, Number(doel.vasteInleg)||0);
@@ -11854,7 +11856,7 @@ calcDoel = function(doel, today){
   let benodigdeExtraInleg = null;
   let benodigdPerMaand = null;
   let verwachteWaarde = null;
-  if (months !== null && doelbedrag > 0){
+  if (months !== null && months > 0 && doelbedrag > 0){
     const fv = futureValue(algespaard, vasteInleg, rendement, months);
     verwachteWaarde = round2(fv);
     const tekort = doelbedrag - fv;
@@ -11864,7 +11866,7 @@ calcDoel = function(doel, today){
       benodigdeExtraInleg = round2(Math.max(0, tekort/annuiteit));
     }
     benodigdPerMaand = round2(vasteInleg + benodigdeExtraInleg);
-  }
+  }else if(months===0){benodigdeExtraInleg=0;benodigdPerMaand=0;verwachteWaarde=round2(algespaard);}
   const historieGemiddelde = u2AverageContribution(doel);
   const gemiddeldeInleg = historieGemiddelde === null ? vasteInleg : historieGemiddelde;
   const verwachteEinddatum = u2ExpectedDate(doel, gemiddeldeInleg);
@@ -11996,6 +11998,13 @@ function u2PotForOwner(owner){
 }
 function u2HistoryKey(owner,month=getSelectedMonth()){ return `${owner}:${month}`; }
 function u2IsProcessed(owner,month=getSelectedMonth()){ return !!state.spaardoelGeschiedenis?.[u2HistoryKey(owner,month)]; }
+function getCalculationDateForSelectedMonth(selectedMonth=getSelectedMonth(),owner='gezamenlijk'){
+  const match=String(selectedMonth||'').match(/^(\d{4})-(\d{2})$/);
+  if(!match)return new Date(TODAY.getFullYear(),TODAY.getMonth(),1);
+  const record=state.monthRecords?.[selectedMonth];
+  const processed=u2IsProcessed(owner,selectedMonth)||['afgesloten','correctie-nodig'].includes(record?.status);
+  return new Date(Number(match[1]),Number(match[2])-1+(processed?1:0),1,12);
+}
 function u2FixedFallback(items,pot){
   const cents=Math.round(pot*100);
   const candidates=items.map((item,index)=>({index,weight:Math.max(0,Number(item.doel.vasteInleg)||0)})).filter(item=>item.weight>0);
