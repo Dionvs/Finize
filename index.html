@@ -8248,11 +8248,21 @@ function renderDashboardGoalPreviewCard(item){
     </div>
   </div>`;
 }
-function renderManageSection(title, body, open=false){
-  return `<details class="manage-section" ${open?'open':''}>
+function renderManageSection(title, body, open=false, attributes=''){
+  return `<details class="manage-section" ${String(attributes||'').trim()} ${open?'open':''}>
     <summary><span class="manage-title">${title}</span><span class="expand-chevron" aria-hidden="true"></span></summary>
     <div class="manage-body">${body}</div>
   </details>`;
+}
+function bindDashboardAccordionKeyboard(root){
+  if(!root||root.dataset.dashboardAccordionKeyboardBound==='true')return;
+  root.dataset.dashboardAccordionKeyboardBound='true';
+  root.addEventListener('keydown',event=>{
+    const summary=event.target.closest?.('[data-dashboard-accordion] > summary');
+    if(!summary||!root.contains(summary)||!['Enter',' ','Spacebar'].includes(event.key))return;
+    event.preventDefault();
+    summary.parentElement.open=!summary.parentElement.open;
+  });
 }
 
 let bankImportDraft = null;
@@ -10011,7 +10021,7 @@ function renderDashboard(){
     </div>
     <div class="manage-stack">
       ${renderU3AdminPanel()}
-      <div>${renderManageSection('Bank import & uitgaven', renderBankImportSection(), bankImportOpen)}</div>
+      ${renderManageSection('Bank import & uitgaven', renderBankImportSection(), bankImportOpen, 'data-dashboard-accordion="bank-import"')}
       ${renderManageSection(`Jaaroverzicht ${year}`, `<div class="card"><div class="year-legend top"><span><i class="income-dot"></i>Inkomen</span><span><i class="spent-dot"></i>Uitgaven</span><span><i class="saving-dot"></i>Sparen</span></div><div class="year-summary"><div><span>Inkomen dit jaar</span><strong class="value pos">${eur(yearTotals.income)}</strong></div><div><span>Uitgaven dit jaar</span><strong class="value neg">${eur(yearTotals.spent)}</strong></div><div><span>Sparen dit jaar</span><strong class="value pos">${eur(yearTotals.saving)}</strong></div></div><div class="year-chart">${monthBars}</div></div>`, false)}
     </div>
   `;
@@ -10696,7 +10706,7 @@ function bankImportRows(indexes){
   renderActiveTab();
 }
 function bindBankImport(root){
-  root.querySelector('.manage-section')?.addEventListener('toggle', event=>{ bankImportOpen = event.currentTarget.open; });
+  root.querySelector('[data-dashboard-accordion="bank-import"]')?.addEventListener('toggle', event=>{ bankImportOpen = event.currentTarget.open; });
   root.querySelectorAll('[data-open-general-transaction]').forEach(button=>button.addEventListener('click',openGeneralTransactionModal));
   root.querySelector('[data-bank-import-owner]')?.addEventListener('change',event=>{
     if (!bankImportDraft) return;
@@ -11598,6 +11608,7 @@ function renderActiveTab(){
   handleTableClicks(root);
   handleGoalClicks(root);
   if (activeTab === 'dashboard'){
+    bindDashboardAccordionKeyboard(root);
     bindBankImport(root);
     bindU3Admin(root);
   }
@@ -12734,8 +12745,8 @@ function renderU3AdminPanel(){
   const needsCorrection=record?.status==='correctie-nodig';
   const status=record?.status==='afgesloten'?'closed':needsCorrection||pending?'pending':'ok';
   const statusLabel=record?.status==='afgesloten'?'Afgesloten':needsCorrection?'Correctie nodig':pending?`${pending} te controleren`:'Klaar voor controle';
-  return `<section class="card u3-admin-card">
-    <div class="u3-admin-head"><div><h2>Maandadministratie</h2><p>Verwacht, werkelijk, rekeningen, reserve en onderlinge voorschotten</p></div><span class="u3-status ${status}">${statusLabel}</span></div>
+  const body=`<section class="card u3-admin-card">
+    <div class="u3-admin-head"><p>Verwacht, werkelijk, rekeningen, reserve en onderlinge voorschotten</p><span class="u3-status ${status}">${statusLabel}</span></div>
     <div class="u3-admin-metrics">
       <div class="u3-admin-metric"><span>Verwacht inkomen</span><strong>${eur(summary.expectedIncome)}</strong></div>
       <div class="u3-admin-metric"><span>Werkelijk inkomen</span><strong>${eur(summary.actualIncome)}</strong></div>
@@ -12750,6 +12761,7 @@ function renderU3AdminPanel(){
       <button type="button" class="ghost small" data-u3-open="transfers">Overboekingen</button>
     </div>
   </section>`;
+  return renderManageSection('Maandadministratie',body,false,'data-dashboard-accordion="month-admin"');
 }
 function bindU3Admin(root){
   root.querySelectorAll('[data-u3-open]').forEach(button=>button.addEventListener('click',()=>{
