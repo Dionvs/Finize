@@ -110,3 +110,11 @@ De bankimportmodal gebruikt één betrouwbaar scrollvlak. Kop en actiebalk blijv
 - Migreert oude maandwaarden nog maar één keer naar maandafwijkingen.
 - Een nieuwe standaard vanaf een maand vervangt oude toekomstige overrides voor die persoon.
 - Dashboard, persoonlijke tabbladen en verdeelsleutel gebruiken dezelfde inkomensbron.
+
+
+## v43 – sparen uit uitgaven en maandinleg spaardoelen
+
+- Naar/van spaarrekening, interne overboekingen en spaardoeltransacties worden niet meer getoond in de uitgavenlijsten.
+- Ook oudere transacties met afwijkende schrijfwijzen worden als spaar- of interne overboeking herkend.
+- Spaardoelen tonen primair **Inleg deze maand**.
+- De uitsplitsing vaste inleg en naar rato staat in het doelvenster na het openen van een doel.

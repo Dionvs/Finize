@@ -5259,7 +5259,7 @@ body.v4-app .modal-content{ min-width:0; }
   .u3-budget-row span:nth-child(3),.u3-budget-row span:nth-child(4){display:none}
 }
 </style>
-<link rel="stylesheet" href="./update4.css?v=42">
+<link rel="stylesheet" href="./update4.css?v=43">
 <link rel="stylesheet" href="./update5.css?v=29">
 </head>
 <body class="v4-app">
@@ -5998,18 +5998,31 @@ function getMonthlyScenarioData(scenario=state.meta.scenario){
 function getMonthTransactions(owner=null, month=getSelectedMonth()){
   return (state.transactions||[]).filter(tx => transactionMonth(tx) === month && (!owner || tx.owner === owner));
 }
+function normalizedTransactionType(tx){
+  const values=[tx?.transactionType,tx?.type,tx?.processing?.transactionType,tx?.kind,tx?.category]
+    .map(value=>String(value||'').trim().toLocaleLowerCase('nl-NL').replace(/[ _]+/g,'-'));
+  const joined=values.join('|');
+  if(/naar-?spaar-?rekening|storten-?naar-?spaar/.test(joined))return 'naar-spaarrekening';
+  if(/van-?spaar-?rekening|opnemen-?van-?spaar/.test(joined))return 'van-spaarrekening';
+  if(/interne-?overboeking|eigen-?rekening/.test(joined))return 'interne-overboeking';
+  if(/maandelijkse-?bijdrage/.test(joined))return 'maandelijkse-bijdrage';
+  if(/extra-?bijdrage/.test(joined))return 'extra-bijdrage';
+  if(/sparen|spaardoel/.test(joined))return 'sparen';
+  return values.find(Boolean)||'';
+}
+function isBudgetExpenseTransaction(tx){
+  if(!tx||tx.processing?.include===false||tx.kind==='niet-meetellen')return false;
+  const kind=String(tx.kind||'').toLocaleLowerCase('nl-NL').replace(/[ _]+/g,'-');
+  const type=normalizedTransactionType(tx);
+  if(['inkomen','interne-overboeking','terugbetaling','niet-meetellen'].includes(kind))return false;
+  if(['sparen','naar-spaarrekening','van-spaarrekening','interne-overboeking','maandelijkse-bijdrage','extra-bijdrage','terugbetaling-voorschot','terugbetaling','niet-meetellen','salaris','vakantiegeld','nabetaling','vergoeding','belastingteruggave','overige-inkomsten'].includes(type))return false;
+  return true;
+}
 function getTransactionExpenseImpact(tx){
-  if (!tx || tx.processing?.include === false || tx.kind === 'niet-meetellen') return 0;
-  const kind = String(tx.kind || '').toLowerCase();
-  const type = String(tx.transactionType || tx.type || '').toLowerCase();
-  if (
-    ['inkomen','interne-overboeking','terugbetaling','niet-meetellen','vaste-last'].includes(kind) ||
-    ['sparen','naar-spaarrekening','van-spaarrekening','interne-overboeking','maandelijkse-bijdrage','extra-bijdrage','terugbetaling-voorschot','terugbetaling','niet-meetellen'].includes(type)
-  ) return 0;
-  const stored = Number(tx.expenseImpact);
-  if (tx.expenseImpact !== null && tx.expenseImpact !== '' && Number.isFinite(stored)) return round2(stored);
-  const amount = Math.abs(Number(tx.amount) || 0);
-  return round2(amount);
+  if(!isBudgetExpenseTransaction(tx))return 0;
+  const stored=Number(tx.expenseImpact);
+  if(tx.expenseImpact!==null&&tx.expenseImpact!==''&&Number.isFinite(stored))return round2(Math.max(0,stored));
+  return round2(Math.abs(Number(tx.amount)||0));
 }
 function sumTransactions(owner=null, category=null, month=getSelectedMonth()){
   return round2(getMonthTransactions(owner, month).reduce((sum, tx)=>{
@@ -6209,7 +6222,7 @@ function renderJointTransactionsCardHead(){
   </div>`;
 }
 function renderJointTransactionsCard(){
-  const rows = getMonthTransactions('gezamenlijk').sort((a,b)=>String(b.date || '').localeCompare(String(a.date || '')));
+  const rows = getMonthTransactions('gezamenlijk').filter(isBudgetExpenseTransaction).sort((a,b)=>String(b.date || '').localeCompare(String(a.date || '')));
   const rowsHtml = rows.map(tx=>`<div class="joint-transaction-row" data-edit-joint-transaction="${tx.id}" role="button" tabindex="0" aria-label="Transactie ${textSafe(tx.description || tx.category || 'bewerken')} bewerken">
     <span class="joint-transaction-meta"><span class="joint-transaction-date" title="${formatDateNL(tx.date)}">${formatDayMonth(tx.date)}</span><span class="joint-transaction-category" title="${textSafe(tx.category || 'Overig')}">${textSafe(tx.category || 'Overig')}</span></span>
     <span class="joint-transaction-description"><span class="joint-transaction-description-text" title="${textSafe(tx.description || '')}">${textSafe(tx.description || '—')}</span>${tx.note ? `<span class="joint-transaction-note" title="${textSafe(tx.note)}">${textSafe(tx.note)}</span>` : ''}</span>
@@ -6281,8 +6294,12 @@ function renderModernGoalCards(doelen, pot, owner, limit=null){
   return `<div class="goal-card-grid">${items.map(item=>renderModernGoalCard(item, owner)).join('')}</div>`;
 }
 function goalMonthlyInlegText(item){
-  const fixed = Number(item.vasteInlegWerkelijk ?? item.doel.vasteInleg)||0;
-  const extra = Number(item.berekendeExtraInleg)||0;
+  const total=Number(item.werkelijkeInleg)||0;
+  return `<span class="goal-monthly-contribution"><span>Inleg deze maand</span><strong>${eur(total)}</strong><small>Tik voor vaste inleg en naar rato</small></span>`;
+}
+function goalMonthlyInlegBreakdown(item){
+  const fixed=Number(item.vasteInlegWerkelijk??item.doel.vasteInleg)||0;
+  const extra=Number(item.berekendeExtraInleg)||0;
   return `<span class="goal-inleg-breakdown"><b><span class="goal-inleg-label">Vast</span><span class="goal-inleg-value">${eur(fixed)}</span></b><b><span class="goal-inleg-label">Naar rato</span><span class="goal-inleg-value">${eur(extra)}</span></b></span>`;
 }
 function goalNeededPerMonth(item){
@@ -8359,7 +8376,7 @@ function openMobileGoalEditor(owner,id){
     const r=calcScenario(state); const pot=owner==='gezamenlijk'?r.spaarpotDezeMaand:r[owner].beschikbaarVoorSparen;
     return calcGroep(drafts,pot,TODAY)[index];
   };
-  const renderCalculation=()=>{const item=draftItem(); calculation.innerHTML=`<h3>Berekening deze maand</h3><div class="goal-calculation-total"><span>Nodig per maand</span><strong>${item.benodigdPerMaand === null ? 'Geen einddatum' : eur(item.benodigdPerMaand)}</strong></div><div class="goal-calculation-total"><span>Inleg deze maand</span><strong>${eur(item.werkelijkeInleg)}</strong></div>${goalMonthlyInlegText(item)}<p class="goal-calculation-note">Spaargeld totaal ${eur(item.spaarpotDezeMaand)} − vaste inleg ${eur(item.totaalVasteInleg)} = ${eur(item.extraPot)} voor verdeling naar rato.</p>`;};
+  const renderCalculation=()=>{const item=draftItem(); calculation.innerHTML=`<h3>Berekening deze maand</h3><div class="goal-calculation-total"><span>Nodig per maand</span><strong>${item.benodigdPerMaand === null ? 'Geen einddatum' : eur(item.benodigdPerMaand)}</strong></div><div class="goal-calculation-total"><span>Inleg deze maand</span><strong>${eur(item.werkelijkeInleg)}</strong></div>${goalMonthlyInlegBreakdown(item)}<p class="goal-calculation-note">Spaargeld totaal ${eur(item.spaarpotDezeMaand)} − vaste inleg ${eur(item.totaalVasteInleg)} = ${eur(item.extraPot)} voor verdeling naar rato.</p>`;};
   ['goalEditSaved','goalEditTarget','goalEditDate','goalEditMonthly','goalEditReturn','goalEditPeriod','goalEditFixedOnly'].forEach(id=>modal.querySelector('#'+id).addEventListener('input',renderCalculation));
   renderCalculation();
   const close=()=>{modal.classList.remove('open','goal-detail-editor-open');modal.innerHTML='';renderActiveTab();};
@@ -9659,7 +9676,7 @@ function renderJointFirstRow(){
 
 function renderPersonalTransactionsCard(owner){
   const name = ownerLabel(owner);
-  const rows = getMonthTransactions(owner).sort((a,b)=>String(b.date || '').localeCompare(String(a.date || '')));
+  const rows = getMonthTransactions(owner).filter(isBudgetExpenseTransaction).sort((a,b)=>String(b.date || '').localeCompare(String(a.date || '')));
   const rowsHtml = rows.map(tx=>`<div class="joint-transaction-row" data-edit-personal-transaction="${tx.id}" data-owner="${owner}" role="button" tabindex="0" aria-label="Transactie bewerken">
     <span class="joint-transaction-meta"><span class="joint-transaction-date">${formatDayMonth(tx.date)}</span><span class="joint-transaction-category">${textSafe(tx.category || 'Overig')}</span></span>
     <span class="joint-transaction-description"><span class="joint-transaction-description-text">${textSafe(tx.description || '—')}</span>${tx.note ? `<span class="joint-transaction-note">${textSafe(tx.note)}</span>` : ''}</span>
@@ -10342,7 +10359,7 @@ function u2RenderGoalRow(item,owner){
   return `<article class="card u2-goal-card">
     <button class="u2-goal-main" type="button" data-open-goal-editor="${owner}:${textSafe(goal.id)}">
       <span class="u2-goal-image${image?' has-image':''}"${image?` style="background-image:url('${image}')"`:''}>${image?'':goalIcon(goal)}</span>
-      <span class="u2-goal-copy"><span class="u2-goal-title"><strong>${textSafe(goal.naam||'Spaardoel')}</strong><em class="u2-status ${item.status.key}">${item.status.label}</em></span><span>${eur(saved)} van ${eur(target)}</span><span class="progress-track"><span class="progress-fill" style="width:${progress}%"></span></span>${u2RenderChildSummary(goal)}</span>
+      <span class="u2-goal-copy"><span class="u2-goal-title"><strong>${textSafe(goal.naam||'Spaardoel')}</strong><em class="u2-status ${item.status.key}">${item.status.label}</em></span><span>${eur(saved)} van ${eur(target)}</span><span class="progress-track"><span class="progress-fill" style="width:${progress}%"></span></span>${u2RenderChildSummary(goal)}${goalMonthlyInlegText(item)}</span>
       <span class="u2-goal-side"><b>${progress}%</b><small>Nog ${eur(item.nogTeGaan)}</small></span>
     </button>
     <div class="u2-prognosis"><span>Benodigd p/m <strong>${item.benodigdPerMaand===null?'—':eur(item.benodigdPerMaand)}</strong></span><span>Gemiddeld 6 mnd <strong>${item.historieGemiddelde===null?'Nog geen historie':eur(item.gemiddeldeInleg)}</strong></span><span>Verwacht gereed <strong>${u2DateLabel(item.verwachteEinddatum)}</strong></span></div>
@@ -11232,7 +11249,7 @@ async function initializeApp(){
 initializeApp();
 
 </script>
-<script src="./update4.js?v=42"></script>
+<script src="./update4.js?v=43"></script>
 <script src="./update5.js?v=29"></script>
 <script>
 if ("serviceWorker" in navigator) {
