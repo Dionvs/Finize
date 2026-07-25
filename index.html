@@ -5299,8 +5299,84 @@ body.v4-app[data-real-active-tab="spaardoelen"] .u2-goal-accordion>summary::afte
   .u3-budget-row{grid-template-columns:1fr auto}
   .u3-budget-row span:nth-child(3),.u3-budget-row span:nth-child(4){display:none}
 }
+
+/* Finize icon system — één consistente professionele lijnstijl */
+:root{
+  --icon-line:#51483f;
+  --icon-sage:#6f8a55;
+  --icon-blue:#5f82a8;
+  --icon-terra:#bd7659;
+  --icon-amber:#c99655;
+}
+.ui-svg,
+.u5-nav-icon svg,
+.bn-icon svg,
+.finize-action-icon svg{
+  display:block;
+  width:1em;
+  height:1em;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.65;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+  vector-effect:non-scaling-stroke;
+}
+.u5-nav-icon,
+.bn-icon,
+.icon-badge,
+.mobile-kpi-icon,
+.progress-item-icon,
+.budget-preview-thumb,
+.dashboard-goal-preview-thumb,
+.goal-thumb,
+.joint-fixed-editor-row-icon,
+.joint-variable-editor-icon{
+  color:var(--icon-line);
+}
+.u5-nav-icon{
+  width:34px !important;
+  height:34px !important;
+  min-width:34px;
+  display:inline-flex !important;
+  align-items:center;
+  justify-content:center;
+  border-radius:999px;
+  background:rgba(237,243,230,.8);
+  box-shadow:inset 0 0 0 1px rgba(111,138,85,.10);
+}
+.u5-nav-icon svg{width:18px;height:18px}
+.tab-btn[data-tab="dion"] .u5-nav-icon{background:rgba(233,241,251,.92);color:var(--icon-blue)}
+.tab-btn[data-tab="dara"] .u5-nav-icon{background:rgba(238,241,223,.92);color:var(--icon-sage)}
+.tab-btn[data-tab="spaardoelen"] .u5-nav-icon{background:rgba(247,230,218,.82);color:var(--icon-terra)}
+.tab-btn[data-tab="data"] .u5-nav-icon{background:rgba(233,241,251,.82);color:var(--icon-blue)}
+.tab-btn.active .u5-nav-icon{background:rgba(255,255,255,.76);color:currentColor;box-shadow:none}
+.bn-icon svg{width:18px !important;height:18px !important}
+.v4-bottom-nav .bottom-nav-btn[data-tab="dion"] .bn-icon{background:rgba(233,241,251,.82) !important;color:var(--icon-blue)}
+.v4-bottom-nav .bottom-nav-btn[data-tab="dara"] .bn-icon{background:rgba(238,241,223,.88) !important;color:var(--icon-sage)}
+.v4-bottom-nav .bottom-nav-btn[data-tab="spaardoelen"] .bn-icon{background:rgba(247,230,218,.82) !important;color:var(--icon-terra)}
+.icon-badge,.mobile-kpi-icon,.progress-item-icon,.budget-preview-thumb,.dashboard-goal-preview-thumb,.goal-thumb{
+  border:1px solid rgba(111,138,85,.10);
+}
+.tone-green{color:var(--icon-sage)!important}
+.tone-blue,.tone-dion{color:var(--icon-blue)!important}
+.tone-terracotta{color:var(--icon-terra)!important}
+.tone-dara{color:var(--icon-sage)!important}
+.finize-icon-cell{width:34px;text-align:center}
+.finize-icon-cell .ui-svg{width:18px;height:18px;margin:auto;color:var(--icon-line)}
+.finize-action-icon{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto}
+.finize-action-icon svg{width:15px;height:15px}
+button.has-finize-icon{display:inline-flex;align-items:center;justify-content:center;gap:7px}
+button.icon-only-finize{width:34px;height:34px;padding:0!important;border-radius:999px!important}
+.month-picker-btn::before{content:none!important}
+.month-picker-btn .finize-action-icon{color:var(--icon-sage)}
+@media(max-width:767px){
+  .u5-nav-icon{width:30px!important;height:30px!important;min-width:30px}
+  .v4-bottom-nav .bottom-nav-btn .bn-icon{padding:6px!important}
+  .v4-bottom-nav .bottom-nav-btn.active .bn-icon{outline:none!important;box-shadow:inset 0 0 0 1px rgba(111,138,85,.16)!important}
+}
 </style>
-<link rel="stylesheet" href="./update4.css?v=49-savings-pot-formula">
+<link rel="stylesheet" href="./update4.css?v=50-icon-system">
 <link rel="stylesheet" href="./update5.css?v=29">
 </head>
 <body class="v4-app">
@@ -5471,24 +5547,8 @@ function effectiveBedrag(row){
 function sumEffective(list){
   return round2((list||[]).reduce((s,r)=> s + effectiveBedrag(r), 0));
 }
-const CATEGORY_ICONS = [
-  [/huis|hypotheek|vve/i, '⌂'],
-  [/water/i, '~'],
-  [/energie|eneco|gas|stroom/i, '⚡'],
-  [/verzeker/i, '◆'],
-  [/belasting/i, '▤'],
-  [/entertainment|netflix|prime|disney|spotify/i, '▶'],
-  [/internet|telefoon/i, '◌'],
-  [/pensioen/i, '▣'],
-  [/schuld|correctie|duo/i, '□'],
-  [/inkomsten/i, '€'],
-  [/variabel|boodschap|benzine|uitjes|kleding/i, '•'],
-  [/overig/i, '…'],
-];
 function categoryIcon(categorie){
-  const c = String(categorie||'');
-  for (const [re, icon] of CATEGORY_ICONS) if (re.test(c)) return icon;
-  return '•';
+  return iconSvg(categoryIconName(categorie));
 }
 function normalizeCategoryName(categorie){
   const raw = String(categorie||'').trim();
@@ -6124,15 +6184,7 @@ function textSafe(value){
   return String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 }
 function goalIcon(goal){
-  const name = String(goal?.naam || '').toLowerCase();
-  if (/vakantie|reis|travel|vliegtuig|japan|fonds/.test(name)) return '✈';
-  if (/buffer|nood|reserve|veilig/.test(name)) return '◈';
-  if (/beleg|invest|aandeel/.test(name)) return '↗';
-  if (/koffie|coffee/.test(name)) return '☕';
-  if (/huis|inrichting|wonen|keuken|tuin/.test(name)) return '⌂';
-  if (/hond|dieren|huisdier/.test(name)) return '♡';
-  if (/auto|vervoer/.test(name)) return '▣';
-  return '◎';
+  return iconSvg(goalIconName(goal));
 }
 function goalThumbGradient(goal){
   const name = String(goal?.naam || '').toLowerCase();
@@ -6178,12 +6230,120 @@ function iconSvg(name){
     phone:'<rect x="8" y="3.5" width="8" height="17" rx="2"/><path d="M11 17.5h2"/>',
     play:'<rect x="4.5" y="6.5" width="15" height="11" rx="2"/><path d="M10.5 9.5l4 2.5l-4 2.5Z"/>',
     receipt:'<path d="M6 4h12v16l-2-1.2L14 20l-2-1.2L10 20l-2-1.2L6 20V4Z"/><path d="M9 8h6M9 12h6M9 16h4"/>',
-    more:'<circle cx="7" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="17" cy="12" r="1.3" fill="currentColor" stroke="none"/>'
+    more:'<circle cx="7" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="17" cy="12" r="1.3" fill="currentColor" stroke="none"/>',
+    dashboard:'<rect x="4" y="4" width="6" height="6" rx="1.4"/><rect x="14" y="4" width="6" height="6" rx="1.4"/><rect x="4" y="14" width="6" height="6" rx="1.4"/><rect x="14" y="14" width="6" height="6" rx="1.4"/>',
+    shared:'<circle cx="8" cy="8" r="2.6"/><circle cx="16" cy="8" r="2.6"/><path d="M3.8 18a4.2 4.2 0 0 1 8.4 0"/><path d="M11.8 18a4.2 4.2 0 0 1 8.4 0"/><path d="M10 11.8h4"/>',
+    cloud:'<path d="M7.5 18H18a3 3 0 0 0 .4-6A5.5 5.5 0 0 0 8 10.2A4 4 0 0 0 7.5 18Z"/><path d="M9.5 14.5l2 2l3.5-4"/>',
+    calendar:'<rect x="4" y="5.5" width="16" height="14.5" rx="2.2"/><path d="M8 3.5v4M16 3.5v4M4 9.5h16"/><path d="M8 13h2M14 13h2M8 16.5h2"/>',
+    plus:'<path d="M12 5v14M5 12h14"/>',
+    edit:'<path d="M5 19l3.5-.8L19 7.7L16.3 5L5.8 15.5L5 19Z"/><path d="M14.8 6.5l2.7 2.7"/>',
+    trash:'<path d="M5 7h14M9 7V4.5h6V7M7 7l1 13h8l1-13M10 10.5v6M14 10.5v6"/>',
+    upload:'<path d="M12 16V5M8 9l4-4l4 4"/><path d="M5 16v3h14v-3"/>',
+    download:'<path d="M12 5v11M8 12l4 4l4-4"/><path d="M5 19h14"/>',
+    sync:'<path d="M18 8a7 7 0 0 0-11-2L4 9"/><path d="M4 5v4h4"/><path d="M6 16a7 7 0 0 0 11 2l3-3"/><path d="M20 19v-4h-4"/>',
+    undo:'<path d="M9 7L5 11l4 4"/><path d="M5 11h8a6 6 0 0 1 6 6"/>',
+    check:'<path d="M5 12.5l4 4L19 6.5"/>',
+    close:'<path d="M6 6l12 12M18 6L6 18"/>',
+    filter:'<path d="M4 6h16l-6 7v5l-4 2v-7L4 6Z"/>',
+    search:'<circle cx="10.5" cy="10.5" r="5.5"/><path d="M15 15l5 5"/>',
+    info:'<circle cx="12" cy="12" r="9"/><path d="M12 10.5V17"/><circle cx="12" cy="7.5" r=".8" fill="currentColor" stroke="none"/>',
+    warning:'<path d="M12 4l9 16H3L12 4Z"/><path d="M12 9v5"/><circle cx="12" cy="17" r=".7" fill="currentColor" stroke="none"/>',
+    tax:'<path d="M6 4h9l3 3v13H6V4Z"/><path d="M15 4v4h4M9 11h6M9 15h4"/>',
+    water:'<path d="M12 3.5s-5 5.4-5 9.5a5 5 0 0 0 10 0c0-4.1-5-9.5-5-9.5Z"/>',
+    energy:'<path d="M13 2.8L5.5 13h5L9.8 21.2L18.5 10h-5L13 2.8Z"/>',
+    internet:'<path d="M4 9a12 12 0 0 1 16 0M7 12a8 8 0 0 1 10 0M10 15a4 4 0 0 1 4 0"/><circle cx="12" cy="18" r="1" fill="currentColor" stroke="none"/>',
+    pension:'<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>',
+    debt:'<circle cx="12" cy="12" r="8"/><path d="M8 12h8"/>',
+    transfer:'<path d="M5 8h13M15 5l3 3l-3 3M19 16H6M9 13l-3 3l3 3"/>',
+    lock:'<rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
+    image:'<rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="M5.5 17l4.5-4l3 2.5l2.5-2l3 3.5"/>'
   };
   return `<svg viewBox="0 0 24 24" class="ui-svg" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round">${icons[name] || icons.wallet}</svg>`;
 }
 function iconBadge(name, tone='green', extra=''){
   return `<span class="icon-badge tone-${tone} ${extra}">${iconSvg(name)}</span>`;
+}
+
+const FINIZE_NAV_ICONS={dashboard:'dashboard',gezamenlijk:'shared',dion:'person',dara:'person',spaardoelen:'target',data:'cloud'};
+function finizeIconWrap(name, cls='finize-action-icon'){
+  return `<span class="${cls}" aria-hidden="true">${iconSvg(name)}</span>`;
+}
+function applyFinizeIconSystem(root=document){
+  root.querySelectorAll('.tab-btn[data-tab] .u5-nav-icon').forEach(slot=>{
+    const tab=slot.closest('[data-tab]')?.dataset.tab;
+    const iconName=FINIZE_NAV_ICONS[tab]||'dashboard';
+    if(slot.dataset.finizeIcon===iconName) return;
+    slot.dataset.finizeIcon=iconName;
+    slot.innerHTML=iconSvg(iconName);
+  });
+  root.querySelectorAll('.bottom-nav-btn[data-tab] .bn-icon').forEach(slot=>{
+    const tab=slot.closest('[data-tab]')?.dataset.tab;
+    const iconName=FINIZE_NAV_ICONS[tab]||'dashboard';
+    if(slot.dataset.finizeIcon===iconName) return;
+    slot.dataset.finizeIcon=iconName;
+    slot.innerHTML=iconSvg(iconName);
+  });
+  const monthButton=root.querySelector('#monthPickerButton');
+  if(monthButton&&!monthButton.querySelector('.finize-action-icon')){
+    const text=monthButton.textContent.trim();
+    monthButton.innerHTML=finizeIconWrap('calendar')+`<span class="month-picker-label">${text}</span>`;
+  }
+  const buttonRules=[
+    ['[data-open-transaction], [data-open-joint-transaction], [data-open-personal-transaction]', 'plus'],
+    ['[data-addrow], [data-addrefund], [data-addgoal], [data-add-subgoal], [data-add-account]', 'plus'],
+    ['[data-open-owner-fixed], [data-open-owner-variable], .joint-fixed-edit-btn, .joint-variable-edit-btn', 'edit'],
+    ['[data-remove], [data-remove-transaction], .danger-ghost', 'trash'],
+    ['#btnExport, [data-export]', 'download'],
+    ['#btnImport, [data-import]', 'upload'],
+    ['#btnRestoreBackup, [data-restore]', 'undo'],
+    ['#btnConnectFirebase, #btnUploadCloud, [data-sync]', 'sync'],
+    ['#btnSaveFirebaseConfig, #btnSaveTransaction, [data-save]', 'check'],
+    ['#btnCloseTransaction, #btnCancelTransaction, [data-close]', 'close']
+  ];
+  buttonRules.forEach(([selector,name])=>{
+    root.querySelectorAll(selector).forEach(btn=>{
+      if(!(btn instanceof HTMLElement)||btn.querySelector(':scope > .finize-action-icon')) return;
+      btn.classList.add('has-finize-icon');
+      btn.insertAdjacentHTML('afterbegin',finizeIconWrap(name));
+    });
+  });
+  root.querySelectorAll('button').forEach(btn=>{
+    if(btn.querySelector(':scope > .finize-action-icon')) return;
+    const cue=`${btn.textContent||''} ${btn.getAttribute('aria-label')||''} ${btn.title||''}`.toLowerCase();
+    let name='';
+    if(/verwijder|wissen|prullen/.test(cue)) name='trash';
+    else if(/bewerk|aanpassen/.test(cue)) name='edit';
+    else if(/toevoegen|nieuwe|uitgave toevoegen/.test(cue)) name='plus';
+    else if(/opslaan|bevestig|goedkeur/.test(cue)) name='check';
+    else if(/import/.test(cue)) name='upload';
+    else if(/export/.test(cue)) name='download';
+    else if(/herstel|terugzetten/.test(cue)) name='undo';
+    else if(/synchron|cloud verbinden|verbinden met cloud/.test(cue)) name='sync';
+    if(!name) return;
+    btn.classList.add('has-finize-icon');
+    btn.insertAdjacentHTML('afterbegin',finizeIconWrap(name));
+  });
+  root.querySelectorAll('td:first-child').forEach(cell=>{
+    const text=cell.textContent.trim();
+    if(/^[⌂~⚡◆▤▶◌▣□€•…]$/.test(text)){
+      const row=cell.closest('tr');
+      const category=row?.querySelector('input[data-path$=".categorie"]')?.value||row?.querySelector('td:nth-child(2) input')?.value||'';
+      cell.classList.add('finize-icon-cell');
+      cell.innerHTML=iconSvg(categoryIconName(category));
+    }
+  });
+}
+let finizeIconObserver;
+function startFinizeIconObserver(){
+  applyFinizeIconSystem(document);
+  if(finizeIconObserver) return;
+  let queued=false;
+  finizeIconObserver=new MutationObserver(()=>{
+    if(queued) return;
+    queued=true;
+    requestAnimationFrame(()=>{queued=false;applyFinizeIconSystem(document);});
+  });
+  finizeIconObserver.observe(document.body,{childList:true,subtree:true});
 }
 function dashboardSectionIconName(title){
   const t = String(title||'').toLowerCase();
@@ -6199,14 +6359,23 @@ function dashboardSectionIconName(title){
 }
 function categoryIconName(categorie){
   const c = String(categorie||'').toLowerCase();
-  if (/boodschap|supermarkt|eten/.test(c)) return 'cart';
+  if (/boodschap|supermarkt|eten|restaurant/.test(c)) return 'cart';
   if (/benzine|tank|brandstof/.test(c)) return 'fuel';
-  if (/uitje|entertainment|vrije tijd|hobby/.test(c)) return 'spark';
-  if (/hypotheek|huis|wonen|huur|gemeente|water|energie/.test(c)) return 'house';
+  if (/auto|vervoer|ov|trein|bus/.test(c)) return 'car';
+  if (/uitje|entertainment|vrije tijd|hobby|netflix|spotify|disney|prime/.test(c)) return 'spark';
+  if (/hypotheek|huis|wonen|huur|vve/.test(c)) return 'house';
+  if (/water|evides/.test(c)) return 'water';
+  if (/energie|eneco|gas|stroom|warmtepomp/.test(c)) return 'energy';
   if (/verzeker/.test(c)) return 'shield';
-  if (/internet|telefoon/.test(c)) return 'list';
-  if (/pensioen|beleg/.test(c)) return 'trend';
-  if (/auto|vervoer/.test(c)) return 'car';
+  if (/belasting|gemeente|waterschap/.test(c)) return 'tax';
+  if (/internet|wifi/.test(c)) return 'internet';
+  if (/telefoon|mobiel/.test(c)) return 'phone';
+  if (/pensioen/.test(c)) return 'pension';
+  if (/schuld|duo|lening|correctie/.test(c)) return 'debt';
+  if (/beleg|invest|aandeel/.test(c)) return 'trend';
+  if (/spaar|buffer/.test(c)) return 'piggy';
+  if (/inkom|salaris|teruggave|toeslag/.test(c)) return 'incomecard';
+  if (/huisdier|hond|kat/.test(c)) return 'heart';
   return 'more';
 }
 function goalIconName(goal){
@@ -6275,22 +6444,31 @@ function renderJointTransactionsCard(){
   return `<div class="card joint-two-column-card joint-transactions-card">${renderJointTransactionsCardHead()}<div class="joint-transactions-list">${rowsHtml || '<p class="joint-transactions-empty">Nog geen uitgaven deze maand.</p>'}</div><div class="joint-transactions-total"><span>Totaal uitgaven</span><strong>${eur(sumTransactions('gezamenlijk'))}</strong></div></div>`;
 }
 
+function legacyIconName(icon){
+  const map={'▤':'receipt','◈':'wallet','↗':'trend','◔':'budgetmeter','▥':'dashboard','◎':'target','€':'euro','⌘':'list','☁':'cloud','✈':'plane','⌂':'house'};
+  return map[String(icon||'').trim()] || (String(icon||'').includes('<svg') ? '' : String(icon||'').trim());
+}
+function renderIconContent(icon){
+  if(String(icon||'').includes('<svg')) return icon;
+  const name=legacyIconName(icon);
+  return iconSvg(name||'wallet');
+}
 function renderIconKpi(icon, color, label, value, sub, opts={}){
   const valClass = opts.valueClass ? ` ${opts.valueClass}` : '';
   return `<div class="card metric-card icon-kpi ${opts.span || 'span-3'}">
-    <div class="icon-kpi-top"><span class="icon-circle ${color}">${icon}</span><div class="metric-label">${label}</div></div>
+    <div class="icon-kpi-top"><span class="icon-circle ${color}">${renderIconContent(icon)}</span><div class="metric-label">${label}</div></div>
     <div class="metric-value${valClass}">${value}</div>
     ${sub ? `<div class="metric-sub">${sub}</div>` : ''}
   </div>`;
 }
 function renderStatusCard(icon, color, title, desc, extra=''){
   return `<div class="card status-card span-4">
-    <span class="icon-circle ${color}">${icon}</span>
+    <span class="icon-circle ${color}">${renderIconContent(icon)}</span>
     <div><h3>${title}</h3><p>${desc}</p>${extra}</div>
   </div>`;
 }
 function renderEmptyState(icon, title, text, action=''){
-  return `<div class="empty-state"><span class="icon-circle">${icon}</span><h4>${title}</h4><p>${text}</p>${action}</div>`;
+  return `<div class="empty-state"><span class="icon-circle">${renderIconContent(icon)}</span><h4>${title}</h4><p>${text}</p>${action}</div>`;
 }
 function renderPageHeading(title, subtitle){
   return `<div class="page-heading"><h2>${title}</h2>${subtitle ? `<p>${subtitle}</p>` : ''}</div>`;
@@ -8128,19 +8306,19 @@ function renderDashboard(){
         <div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-dion">${iconSvg('euro')}</span><span class="mobile-kpi-chevron">›</span></div>
         <div class="mobile-kpi-label">Inkomen Dion</div>
         <div class="mobile-kpi-value value pos">${eur(r.salarisDion)}</div>
-        <div class="mobile-kpi-edit-hint">✎ Tik om aan te passen</div>
+        <div class="mobile-kpi-edit-hint">${finizeIconWrap('edit')}<span>Tik om aan te passen</span></div>
       </button>
       <button type="button" class="card mobile-kpi-card mobile-kpi-card--editable" data-income-edit="dara" data-income-label="Dara">
         <div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-dara">${iconSvg('euro')}</span><span class="mobile-kpi-chevron">›</span></div>
         <div class="mobile-kpi-label">Inkomen Dara</div>
         <div class="mobile-kpi-value value pos">${eur(r.salarisDara)}</div>
-        <div class="mobile-kpi-edit-hint">✎ Tik om aan te passen</div>
+        <div class="mobile-kpi-edit-hint">${finizeIconWrap('edit')}<span>Tik om aan te passen</span></div>
       </button>
       <div class="card mobile-kpi-card static mobile-kpi-card-total-joint mobile-kpi-card--joint-total">
         <div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg('wallet')}</span></div>
         <div class="mobile-kpi-label">Totaal gezamenlijke rekening</div>
         <div class="mobile-kpi-value value pos">${eur(dashboardTotalIncome)}</div>
-        <div class="mobile-kpi-edit-hint mobile-kpi-edit-hint-placeholder" aria-hidden="true">✎ Tik om aan te passen</div>
+        <div class="mobile-kpi-edit-hint mobile-kpi-edit-hint-placeholder" aria-hidden="true">${finizeIconWrap('edit')}<span>Tik om aan te passen</span></div>
       </div>
       <div class="card mobile-kpi-card static mobile-kpi-card--budget">
         <div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg('chart')}</span></div>
@@ -9727,7 +9905,7 @@ function renderJointFirstRow(){
       </div>
       <div class="mobile-kpi-label">Sparen</div>
       <div class="mobile-kpi-value value pos">${eur(r.spaarpotDezeMaand)}</div>
-      <div class="mobile-kpi-edit-hint">✎ Tik om aan te passen</div>
+      <div class="mobile-kpi-edit-hint">${finizeIconWrap('edit')}<span>Tik om aan te passen</span></div>
     </button>
     <div class="mobile-kpi-card joint-kpi-card static joint-variable-card">
       <div class="mobile-kpi-top">
@@ -11324,7 +11502,7 @@ async function initializeApp(){
 initializeApp();
 
 </script>
-<script src="./update4.js?v=49-savings-pot-formula"></script>
+<script src="./update4.js?v=50-icon-system"></script>
 <script src="./update5.js?v=29"></script>
 <script>
 if ("serviceWorker" in navigator) {

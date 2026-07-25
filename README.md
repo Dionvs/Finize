@@ -148,3 +148,13 @@ De bankimportmodal gebruikt één betrouwbaar scrollvlak. Kop en actiebalk blijv
 - Alleen de persoonlijke spaarpotberekening aangepast.
 - Formule: zakgeld min persoonlijke vaste lasten min persoonlijk variabel budget.
 - Werkelijke variabele uitgaven blijven zichtbaar als realisatie, maar bepalen de geplande spaarpot niet.
+
+## v50 — consistente Finize-iconen
+
+- Eén centrale professionele SVG-iconenset voor desktop en mobiel.
+- Dezelfde betekenis gebruikt overal exact hetzelfde icoon.
+- Sidebar en mobiele bottomnavigation delen dezelfde iconenbron.
+- Dashboardkaarten, budgetcategorieën, vaste lasten en spaardoelen gebruiken dezelfde lijnstijl.
+- Toevoegen, bewerken, verwijderen, importeren, exporteren, opslaan en synchroniseren hebben vaste actie-iconen.
+- Unicode- en emoji-achtige categorie-iconen zijn vervangen door schaalbare SVG-lijniconen.
+- Financiële berekeningen, state, Firestore, importlogica en eventhandlers zijn niet functioneel gewijzigd.
