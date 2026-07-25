@@ -609,6 +609,7 @@
   }
 
   const UI={draft:null,visibleRows:60,root:null};
+  const ImportPerformance={pending:new Map(),chains:new Map(),syncPromise:null,syncRequested:false};
   function esc(value){return String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));}
   function euro(value){return new Intl.NumberFormat('nl-NL',{style:'currency',currency:'EUR'}).format(Number(value)||0);}
   function ownerLabel(value){return value==='gezamenlijk'?'Gezamenlijk':value==='dara'?'Dara':'Dion';}
@@ -646,20 +647,79 @@
     },{render:false});
     if(!ok)throw new Error('Importsamenvatting kon niet worden opgeslagen.');
   }
-  async function persistImportDraft(root,draft,{syncCloud=true,updateSummary=true}={}){
-    if(!plain(draft)||!draft.id)throw new Error('Importconcept mist een geldig ID.');
-    if(updateSummary)updateDraftSummary(draft);
-    else draft.updatedAt=new Date().toISOString();
-    await ImportStore.putImport(draft);
-    commitSummary(root,draft);
-    if(syncCloud){
-      await queueImportSync(draft);
-      flushImportSync(root).catch(error=>console.warn('Importsynchronisatie wordt later opnieuw geprobeerd.',error));
+  function updateImportSaveStatus(text,error=false){
+    const status=document.querySelector('#u4ImportModalRoot [data-u4-save-status]');
+    if(!status)return;
+    status.textContent=text;
+    status.classList.toggle('u4-error',Boolean(error));
+  }
+  function persistImportDraftImmediate(root,draft,{syncCloud=true,updateSummary=true}={}){
+    if(!plain(draft)||!draft.id)return Promise.reject(new Error('Importconcept mist een geldig ID.'));
+    const id=String(draft.id);
+    const previous=ImportPerformance.chains.get(id)||Promise.resolve();
+    const operation=previous.catch(()=>{}).then(async()=>{
+      if(updateSummary)updateDraftSummary(draft);
+      else draft.updatedAt=new Date().toISOString();
+      await ImportStore.putImport(draft);
+      commitSummary(root,draft);
+      if(syncCloud){
+        await queueImportSync(draft);
+        flushImportSync(root).catch(error=>console.warn('Importsynchronisatie wordt later opnieuw geprobeerd.',error));
+      }
+      return draft;
+    });
+    ImportPerformance.chains.set(id,operation);
+    operation.finally(()=>{if(ImportPerformance.chains.get(id)===operation)ImportPerformance.chains.delete(id);}).catch(()=>{});
+    return operation;
+  }
+  function scheduleImportDraftPersist(root,draft,{delay=400,syncCloud=true,updateSummary=true}={}){
+    const id=String(draft?.id||'');
+    if(!id)return Promise.reject(new Error('Importconcept mist een geldig ID.'));
+    let pending=ImportPerformance.pending.get(id);
+    if(!pending)pending={root,draft,syncCloud:false,updateSummary:false,timer:null,resolvers:[]};
+    pending.root=root;pending.draft=draft;
+    pending.syncCloud=pending.syncCloud||syncCloud;
+    pending.updateSummary=pending.updateSummary||updateSummary;
+    if(pending.timer)clearTimeout(pending.timer);
+    const promise=new Promise((resolve,reject)=>pending.resolvers.push({resolve,reject}));
+    pending.timer=setTimeout(()=>{
+      ImportPerformance.pending.delete(id);
+      updateImportSaveStatus('Wijzigingen lokaal opslaan…');
+      persistImportDraftImmediate(pending.root,pending.draft,{syncCloud:pending.syncCloud,updateSummary:pending.updateSummary}).then(value=>{
+        updateImportSaveStatus('Wijzigingen lokaal opgeslagen; cloudsync loopt op de achtergrond.');
+        pending.resolvers.forEach(item=>item.resolve(value));
+      }).catch(error=>{
+        updateImportSaveStatus(`Lokaal opslaan mislukt: ${error?.message||error}`,true);
+        pending.resolvers.forEach(item=>item.reject(error));
+      });
+    },Math.max(0,delay));
+    ImportPerformance.pending.set(id,pending);
+    return promise;
+  }
+  async function flushScheduledImportDraft(root,draft,{syncCloud=true,updateSummary=true}={}){
+    const id=String(draft?.id||'');
+    const pending=ImportPerformance.pending.get(id);
+    if(pending){
+      if(pending.timer)clearTimeout(pending.timer);
+      ImportPerformance.pending.delete(id);
+      pending.syncCloud=pending.syncCloud||syncCloud;
+      pending.updateSummary=pending.updateSummary||updateSummary;
+      try{
+        const value=await persistImportDraftImmediate(pending.root,pending.draft,{syncCloud:pending.syncCloud,updateSummary:pending.updateSummary});
+        pending.resolvers.forEach(item=>item.resolve(value));
+        return value;
+      }catch(error){
+        pending.resolvers.forEach(item=>item.reject(error));
+        throw error;
+      }
     }
-    return draft;
+    return persistImportDraftImmediate(root,draft,{syncCloud,updateSummary});
+  }
+  async function persistImportDraft(root,draft,options={}){
+    return persistImportDraftImmediate(root,draft,options);
   }
   async function saveDraft(root,draft,{sync=false}={}){
-    return persistImportDraft(root,draft,{syncCloud:sync,updateSummary:true});
+    return persistImportDraftImmediate(root,draft,{syncCloud:sync,updateSummary:true});
   }
   async function reconcileActiveImportReference(root,{localRead=id=>ImportStore.getImport(id)}={}){
     const activeId=String(root?.state?.activeImportId||'');
@@ -1408,14 +1468,33 @@
     });
   }
 
+  function renderDraftRowCard(root,draft,modal,rowId){
+    const row=draft.rows.find(item=>String(item.id)===String(rowId));
+    const current=modal.querySelector(`[data-u4-row="${rowId}"]`);
+    if(!row||!current)return false;
+    const detailsOpen=Boolean(current.querySelector('details[open]'));
+    const wrapper=document.createElement('div');
+    wrapper.innerHTML=rowHtml(root,row);
+    const replacement=wrapper.firstElementChild;
+    if(detailsOpen)replacement.querySelector('details')?.setAttribute('open','');
+    current.replaceWith(replacement);
+    return true;
+  }
+
   function bindDraftModal(root,draft,modal){
-    modal.querySelector('[data-u4-close]')?.addEventListener('click',closeDraft);
+    modal.querySelector('[data-u4-close]')?.addEventListener('click',async event=>{
+      const button=event.currentTarget;button.disabled=true;
+      updateImportSaveStatus('Laatste lokale wijzigingen opslaan…');
+      try{await flushScheduledImportDraft(root,draft,{syncCloud:true,updateSummary:true});closeDraft();}
+      catch(error){button.disabled=false;updateImportSaveStatus(`Sluiten uitgesteld: ${error?.message||error}`,true);}
+    });
     modal.querySelector('[data-u4-apply-profile]')?.addEventListener('click',async()=>{
       try{await applyProfile(root,draft,modal);}catch(error){alert(error.message);}
     });
-    modal.addEventListener('change',async event=>{
+    modal.addEventListener('change',event=>{
       const container=event.target.closest('[data-u4-row]');if(!container)return;
       const row=draft.rows.find(item=>item.id===container.dataset.u4Row);if(!row)return;
+      let rerender=false;
       if(event.target.dataset.u4Field){
         const field=event.target.dataset.u4Field;let value=event.target.value;
         if(field==='processedAmount')value=round2(Math.abs(Number(value)||0));
@@ -1424,8 +1503,8 @@
         if(field==='transactionType'&&value==='terugbetaling-voorschot'){
           const relation=repaymentRelation(root,row);
           row.processing.repaymentAllocations=relation?proposeRepaymentAllocations(root.state,relation.debtor,relation.creditor,row.processing.processedAmount):[];
-          await persistImportDraft(root,draft);renderDraftModal(root,draft);return;
         }
+        rerender=['transactionType','budgetOwner','category'].includes(field);
       }else if(event.target.hasAttribute('data-u4-row-certainty'))row.certainty=event.target.value;
       else if(event.target.dataset.u4SplitField){
         const split=row.processing.splits[Number(event.target.closest('[data-u4-split]').dataset.u4Split)];
@@ -1435,15 +1514,14 @@
         const allocation=row.processing.repaymentAllocations[Number(event.target.closest('[data-u4-allocation]').dataset.u4Allocation)];
         allocation[event.target.dataset.u4AllocationField]=round2(Math.abs(Number(event.target.value)||0));
       }
-      await persistImportDraft(root,draft);
-      if(event.target.dataset.u4Field&&['transactionType','budgetOwner','category'].includes(event.target.dataset.u4Field)){
-        renderDraftModalPreservingView(root,draft,modal,row.id);
-      }
+      if(rerender)renderDraftRowCard(root,draft,modal,row.id);
+      updateImportSaveStatus('Wijziging klaarzetten voor lokale opslag…');
+      scheduleImportDraftPersist(root,draft,{delay:350,syncCloud:true,updateSummary:true}).catch(error=>console.warn('Automatisch lokaal opslaan mislukt.',error));
     });
     modal.addEventListener('click',async event=>{
       const container=event.target.closest('[data-u4-row]');const row=container?draft.rows.find(item=>item.id===container.dataset.u4Row):null;
       if(event.target.closest('[data-u4-approve]')&&row){event.preventDefault();event.stopPropagation();await showMatchDialog(root,draft,row,modal);return;}
-      if(event.target.closest('[data-u4-reopen]')&&row){row.certainty='nakijken';await persistImportDraft(root,draft);renderDraftModal(root,draft);return;}
+      if(event.target.closest('[data-u4-reopen]')&&row){row.certainty='nakijken';renderDraftModalPreservingView(root,draft,modal,row.id);scheduleImportDraftPersist(root,draft,{delay:0}).catch(error=>console.warn('Opnieuw nakijken opslaan mislukt.',error));return;}
       if(event.target.closest('[data-u4-apply-bulk]')){
         const scope=modal.querySelector('[data-u4-bulk-scope]')?.value||'review';const owner=modal.querySelector('[data-u4-bulk-owner]')?.value||'';const category=modal.querySelector('[data-u4-bulk-category]')?.value||'';const type=modal.querySelector('[data-u4-bulk-type]')?.value||'';
         if(!owner&&!category&&!type){alert('Kies minimaal één veld om aan te passen.');return;}
@@ -1451,14 +1529,14 @@
         if(!targets.length){alert('Geen transacties binnen deze selectie.');return;}
         if(!confirm(`${targets.length} transacties aanpassen?`))return;
         targets.forEach(item=>{if(owner)item.processing.budgetOwner=owner;if(category)item.processing.category=category;if(type)item.processing.transactionType=type;});
-        await persistImportDraft(root,draft);renderDraftModal(root,draft);return;
+        renderDraftModal(root,draft);scheduleImportDraftPersist(root,draft,{delay:0}).catch(error=>console.warn('Bulkbewerking opslaan mislukt.',error));return;
       }
       if(event.target.closest('[data-u4-add-split]')&&row){
         row.processing.splits=row.processing.splits||[];row.processing.splits.push({id:uid('split'),amount:0,budgetOwner:row.processing.budgetOwner,category:row.processing.category,budgetItemId:'',savingsGoalId:'',advanceMode:'auto',include:true});
-        await persistImportDraft(root,draft);renderDraftModal(root,draft);return;
+        renderDraftModalPreservingView(root,draft,modal,row.id);scheduleImportDraftPersist(root,draft,{delay:0}).catch(error=>console.warn('Splitsregel opslaan mislukt.',error));return;
       }
       const remove=event.target.closest('[data-u4-remove-split]');
-      if(remove&&row){row.processing.splits.splice(Number(remove.dataset.u4RemoveSplit),1);await persistImportDraft(root,draft);renderDraftModal(root,draft);return;}
+      if(remove&&row){row.processing.splits.splice(Number(remove.dataset.u4RemoveSplit),1);renderDraftModalPreservingView(root,draft,modal,row.id);scheduleImportDraftPersist(root,draft,{delay:0}).catch(error=>console.warn('Splitsregel verwijderen opslaan mislukt.',error));return;}
       const saveButton=event.target.closest('[data-u4-save-concept]');
       if(saveButton){
         const status=modal.querySelector('[data-u4-save-status]');
@@ -1466,7 +1544,7 @@
         saveButton.textContent='Opslaan…';
         if(status)status.textContent='Concept wordt lokaal en in de cloud opgeslagen…';
         try{
-          await persistImportDraft(root,draft,{syncCloud:true,updateSummary:true});
+          await flushScheduledImportDraft(root,draft,{syncCloud:true,updateSummary:true});
           await flushImportSync(root);
           saveButton.textContent='Opgeslagen';
           if(status)status.textContent='Concept is lokaal en in de cloud opgeslagen.';
@@ -1562,30 +1640,40 @@
   }
 
   async function flushImportSync(root){
-    const cloud=root.CloudAdapter;
-    if(!cloud?.isConnected?.()&&cloud?.isConfigured?.()&&typeof cloud.connect==='function')await cloud.connect();
-    if(!cloud?.isConnected?.()||!cloud.modules?.firestore||!cloud.db)return false;
-    const firestore=cloud.modules.firestore;
-    for(const item of await ImportStore.listSync()){
-      const record=await ImportStore.getImport(item.importId);
-      if(!record){await ImportStore.deleteSync(item.id);continue;}
-      try{
-        const envelope=buildCloudImportEnvelope(record);
-        for(let index=0;index<envelope.chunks.length;index++){
-          const chunkRef=firestore.doc(cloud.db,'budgetPlanners','finize','imports',record.id,'chunks',String(index).padStart(4,'0'));
-          await firestore.setDoc(chunkRef,envelope.chunks[index],{merge:false});
+    ImportPerformance.syncRequested=true;
+    if(ImportPerformance.syncPromise)return ImportPerformance.syncPromise;
+    ImportPerformance.syncPromise=(async()=>{
+      let overall=true;
+      while(ImportPerformance.syncRequested){
+        ImportPerformance.syncRequested=false;
+        const cloud=root.CloudAdapter;
+        if(!cloud?.isConnected?.()&&cloud?.isConfigured?.()&&typeof cloud.connect==='function')await cloud.connect();
+        if(!cloud?.isConnected?.()||!cloud.modules?.firestore||!cloud.db)return false;
+        const firestore=cloud.modules.firestore;
+        for(const item of await ImportStore.listSync()){
+          const record=await ImportStore.getImport(item.importId);
+          if(!record){await ImportStore.deleteSync(item.id);continue;}
+          try{
+            const envelope=buildCloudImportEnvelope(record);
+            for(let index=0;index<envelope.chunks.length;index++){
+              const chunkRef=firestore.doc(cloud.db,'budgetPlanners','finize','imports',record.id,'chunks',String(index).padStart(4,'0'));
+              await firestore.setDoc(chunkRef,envelope.chunks[index],{merge:false});
+            }
+            const importRef=firestore.doc(cloud.db,'budgetPlanners','finize','imports',record.id);
+            await firestore.setDoc(importRef,envelope.header,{merge:false});
+            await ImportStore.deleteSync(item.id);
+          }catch(error){
+            const classified=classifyCloudError(error,'De import kon niet worden gesynchroniseerd.');
+            item.attempts=(item.attempts||0)+1;item.lastError=classified.message;item.lastErrorCode=classified.code;item.updatedAt=new Date().toISOString();
+            await ImportStore.putSync(item);
+            overall=false;
+            break;
+          }
         }
-        const importRef=firestore.doc(cloud.db,'budgetPlanners','finize','imports',record.id);
-        await firestore.setDoc(importRef,envelope.header,{merge:false});
-        await ImportStore.deleteSync(item.id);
-      }catch(error){
-        const classified=classifyCloudError(error,'De import kon niet worden gesynchroniseerd.');
-        item.attempts=(item.attempts||0)+1;item.lastError=classified.message;item.lastErrorCode=classified.code;item.updatedAt=new Date().toISOString();
-        await ImportStore.putSync(item);
-        return false;
       }
-    }
-    return true;
+      return overall;
+    })().finally(()=>{ImportPerformance.syncPromise=null;});
+    return ImportPerformance.syncPromise;
   }
 
   async function recoverJournal(root){
@@ -1662,5 +1750,5 @@
     Promise.resolve().then(()=>recoverJournal(root)).then(()=>reconcileActiveImportReference(root)).then(()=>flushImportSync(root)).catch(error=>console.warn('Update 4 opslaginitialisatie uitgesteld.',error));
   }
 
-  return {SCHEMA_VERSION,CLOUD_STORAGE_VERSION,CLOUD_READ_CONCURRENCY,OWNERS,IMPORT_STATUSES,normalizeIban,normalizeRule,normalizeTransaction,normalizeCore,validateCore,calculateGoalSavedAmount,reconcileGoalSavedAmounts,chunkRows,canonicalValue,rowsChecksum,buildCloudImportEnvelope,assembleCloudImport,mapWithConcurrency,classifyCloudError,fetchImportFromCloud,resolveImportDetails,reconcileActiveImportReference,deleteCloudImportBestEffort,discardImportConcept,normalizeText,matchIdentity,matchCandidates,detectDelimiter,parseDelimited,parseDate,parseAmount,detectFormat,inferMapping,hashText,fingerprint,organizationName,proposeType,recognitionProposal,classifyOriginal,parseBankCsv,findProfile,createImportDraft,updateDraftSummary,compactSummary,validateDraft,transactionKind,expenseImpact,financialRows,advanceForTransaction,savingsForTransaction,detectInternalPairs,directionalBalances,proposeRepaymentAllocations,planImportEffects,applyImportPlan,effectManifest,undoImportEffects,ImportStore,persistImportDraft,queueImportSync,flushImportSync,recoverJournal,install,round2,uid,clone};
+  return {SCHEMA_VERSION,CLOUD_STORAGE_VERSION,CLOUD_READ_CONCURRENCY,OWNERS,IMPORT_STATUSES,normalizeIban,normalizeRule,normalizeTransaction,normalizeCore,validateCore,calculateGoalSavedAmount,reconcileGoalSavedAmounts,chunkRows,canonicalValue,rowsChecksum,buildCloudImportEnvelope,assembleCloudImport,mapWithConcurrency,classifyCloudError,fetchImportFromCloud,resolveImportDetails,reconcileActiveImportReference,deleteCloudImportBestEffort,discardImportConcept,normalizeText,matchIdentity,matchCandidates,detectDelimiter,parseDelimited,parseDate,parseAmount,detectFormat,inferMapping,hashText,fingerprint,organizationName,proposeType,recognitionProposal,classifyOriginal,parseBankCsv,findProfile,createImportDraft,updateDraftSummary,compactSummary,validateDraft,transactionKind,expenseImpact,financialRows,advanceForTransaction,savingsForTransaction,detectInternalPairs,directionalBalances,proposeRepaymentAllocations,planImportEffects,applyImportPlan,effectManifest,undoImportEffects,ImportStore,persistImportDraft,scheduleImportDraftPersist,flushScheduledImportDraft,queueImportSync,flushImportSync,recoverJournal,install,round2,uid,clone};
 });

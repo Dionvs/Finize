@@ -66,3 +66,14 @@ De bankimportmodal gebruikt één betrouwbaar scrollvlak. Kop en actiebalk blijv
 - Lege velden worden veilig verwijderd in plaats van via JSON te worden gekloond.
 - De matchdialoog sluit en wordt eerst door de browser weggepaint voordat de volledige importlijst opnieuw wordt opgebouwd.
 - De volledige matchactie heeft een foutgrens die wijzigingen terugdraait en een zichtbare melding toont bij een onverwachte fout.
+
+
+## Update v38
+
+- Importbewerkingen worden 350 ms samengevoegd voordat IndexedDB wordt geschreven.
+- Per importconcept is maximaal één lokale write tegelijk actief.
+- Cloudsync gebruikt één centrale lock; overlappende uploads worden samengevoegd.
+- Een contextwijziging bouwt alleen de gewijzigde transactiekaart opnieuw op.
+- De knop Concept opslaan forceert direct lokale opslag en één cloudsync.
+- Bij Sluiten worden resterende lokale wijzigingen eerst geflusht; cloudsync vervolgt op de achtergrond.
+- Opslagstatus in de footer toont lokaal opslaan, achtergrondcloudsync en fouten.
