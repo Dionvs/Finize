@@ -86,3 +86,66 @@
   .u4-match-dialog{width:100%;max-height:92dvh;border-radius:22px 22px 0 0}
   .u4-match-actions>*{flex:1 1 0;min-height:46px}
 }
+
+/* v35: zelfstandige, leesbare matchdialog en betrouwbare mobiele actiebalk */
+.u4-match-overlay{
+  color:var(--text,#2f1f18);
+  background:rgba(37,28,22,.58);
+}
+.u4-match-dialog{
+  background:var(--card,#fffdfa) !important;
+  color:var(--text,#2f1f18) !important;
+  isolation:isolate;
+}
+.u4-match-head{
+  background:var(--card,#fffdfa) !important;
+  color:var(--text,#2f1f18) !important;
+}
+.u4-match-head h3{color:var(--text,#2f1f18) !important;}
+.u4-match-head p{color:var(--text-dim,#705f52) !important;}
+.u4-match-change{
+  background:var(--navy-deep,#edf3e6) !important;
+  color:var(--text,#2f1f18) !important;
+}
+.u4-match-list{background:var(--bg,#fbf4ea) !important;}
+.u4-match-row{
+  background:var(--card,#fffdfa) !important;
+  color:var(--text,#2f1f18) !important;
+}
+.u4-match-feedback{
+  min-height:0;
+  padding:0 16px;
+  background:var(--card,#fffdfa);
+  color:var(--text-dim,#705f52);
+  font-size:11px;
+  font-weight:700;
+}
+.u4-match-feedback:not(:empty){padding-top:8px;}
+.u4-match-actions{
+  position:relative;
+  z-index:2;
+  background:var(--card,#fffdfa) !important;
+  padding-bottom:calc(14px + env(safe-area-inset-bottom));
+}
+.u4-match-actions button:disabled,
+.u4-match-head button:disabled{opacity:.55;cursor:wait;transform:none;}
+@media(max-width:700px){
+  .u4-match-overlay{padding:0 !important;align-items:end !important;}
+  .u4-match-dialog{
+    width:100% !important;
+    max-height:calc(100dvh - env(safe-area-inset-top)) !important;
+    grid-template-rows:auto auto minmax(84px,1fr) auto auto !important;
+    border-radius:22px 22px 0 0 !important;
+    overflow:hidden !important;
+  }
+  .u4-match-head{padding:15px 16px 12px !important;}
+  .u4-match-head h3{font-size:19px !important;line-height:1.15 !important;}
+  .u4-match-list{padding:10px 12px !important;}
+  .u4-match-actions{
+    display:grid !important;
+    grid-template-columns:1fr 1fr !important;
+    gap:8px !important;
+    padding:10px 12px calc(10px + env(safe-area-inset-bottom)) !important;
+  }
+  .u4-match-actions>*{width:100% !important;min-height:48px !important;}
+}

@@ -52,11 +52,9 @@ De bankimportmodal gebruikt één betrouwbaar scrollvlak. Kop en actiebalk blijv
 - Transactietypen zijn gegroepeerd en opties worden contextafhankelijk getoond.
 - Interne overboekingen ondersteunen expliciete bron- en doelrekening, inclusief geld van spaar- naar betaalrekening.
 
+## Release v35 — matchdialog bugfix
 
-## Release v34 — reactieve importeditor en matchherstel
-
-- Contextafhankelijke velden worden direct vernieuwd na het wijzigen van transactietype, eigenaar of categorie.
-- Scrollpositie en geopende transactiedetails blijven bij deze vernieuwing behouden.
-- Matchherkenning gebruikt tegenrekening, afgeleide organisatienaam en volledige omschrijving.
-- Af- en bijschrijvingen blijven strikt gescheiden.
-- De vergelijkbare-transactiesdialoog wordt buiten het scrollvlak geplaatst, zodat deze niet kan worden afgekapt.
+- De match-pop-up heeft een zelfstandige, volledig dekkende achtergrond en leesbare tekstkleuren.
+- De actieknoppen blijven op mobiel zichtbaar boven de veilige schermrand.
+- Bevestigen is beschermd tegen dubbelklikken en toont een opslagstatus.
+- Bij een opslagfout worden tijdelijke wijzigingen teruggedraaid en blijft de pop-up bruikbaar.

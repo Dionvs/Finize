@@ -1214,14 +1214,64 @@
   }
   async function showMatchDialog(root,draft,source,modal){
     const matches=matchCandidates(draft,source);
-    if(!matches.length){source.certainty='zeker';await persistImportDraft(root,draft);renderDraftModalPreservingView(root,draft,modal,source.id);return;}
-    modal.querySelector('.u4-match-overlay')?.remove();
+    if(!matches.length){
+      const previous=source.certainty;
+      source.certainty='zeker';
+      try{
+        await persistImportDraft(root,draft);
+        renderDraftModalPreservingView(root,draft,modal,source.id);
+      }catch(error){
+        source.certainty=previous;
+        alert(`Goedkeuren is niet opgeslagen. Probeer het opnieuw.\n\n${error?.message||error}`);
+      }
+      return;
+    }
+    document.querySelector('.u4-match-overlay')?.remove();
     const overlay=document.createElement('div');overlay.className='u4-match-overlay';
-    overlay.innerHTML=`<div class="u4-match-dialog" role="dialog" aria-modal="true"><div class="u4-match-head"><div><h3>Vergelijkbare transacties gevonden</h3><p>${matches.length} mogelijke matches. Vink uit wat niet mee aangepast moet worden.</p></div><button type="button" class="ghost small" data-u4-match-close>Sluiten</button></div><div class="u4-match-change"><strong>Wordt toegepast</strong><span>${ownerLabel(source.processing.budgetOwner)} · ${esc(source.processing.category)} · ${esc(TYPE_GROUPS.flatMap(g=>g.items).find(item=>item[0]===source.processing.transactionType)?.[1]||source.processing.transactionType)} · Zeker</span></div><div class="u4-match-list">${matches.map(({row,score,reasons})=>`<label class="u4-match-row"><input type="checkbox" data-u4-match-id="${esc(row.id)}" ${score>=4?'checked':''}><span><strong>${esc(row.processing.processingDate)} · ${esc(row.bankOriginal.description||'Onbekend')}</strong><small>${euro(row.processing.processedAmount)} · ${esc(row.processing.category||'Ongecategoriseerd')} · ${esc(reasons.join(', '))}</small></span></label>`).join('')}</div><div class="u4-match-actions"><button type="button" class="ghost" data-u4-match-only>Alleen deze transactie</button><button type="button" class="primary" data-u4-match-apply>Geselecteerde aanpassen</button></div></div>`;
+    overlay.innerHTML=`<div class="u4-match-dialog" role="dialog" aria-modal="true" aria-labelledby="u4-match-title"><div class="u4-match-head"><div><h3 id="u4-match-title">Vergelijkbare transacties gevonden</h3><p>${matches.length} mogelijke matches. Vink uit wat niet mee aangepast moet worden.</p></div><button type="button" class="ghost small" data-u4-match-close>Sluiten</button></div><div class="u4-match-change"><strong>Wordt toegepast</strong><span>${ownerLabel(source.processing.budgetOwner)} · ${esc(source.processing.category)} · ${esc(TYPE_GROUPS.flatMap(g=>g.items).find(item=>item[0]===source.processing.transactionType)?.[1]||source.processing.transactionType)} · Zeker</span></div><div class="u4-match-list">${matches.map(({row,score,reasons})=>`<label class="u4-match-row"><input type="checkbox" data-u4-match-id="${esc(row.id)}" ${score>=4?'checked':''}><span><strong>${esc(row.processing.processingDate)} · ${esc(row.bankOriginal.description||'Onbekend')}</strong><small>${euro(row.processing.processedAmount)} · ${esc(row.processing.category||'Ongecategoriseerd')} · ${esc(reasons.join(', '))}</small></span></label>`).join('')}</div><div class="u4-match-feedback" data-u4-match-feedback aria-live="polite"></div><div class="u4-match-actions"><button type="button" class="ghost" data-u4-match-only>Alleen deze transactie</button><button type="button" class="primary" data-u4-match-apply>Geselecteerde aanpassen</button></div></div>`;
     document.body.appendChild(overlay);
-    const close=()=>overlay.remove();overlay.querySelector('[data-u4-match-close]').onclick=close;
-    overlay.querySelector('[data-u4-match-only]').onclick=async()=>{source.certainty='zeker';await persistImportDraft(root,draft);close();renderDraftModal(root,draft);};
-    overlay.querySelector('[data-u4-match-apply]').onclick=async()=>{source.certainty='zeker';overlay.querySelectorAll('[data-u4-match-id]:checked').forEach(input=>{const target=draft.rows.find(row=>row.id===input.dataset.u4MatchId);if(target){copiedProcessing(source,target);target.certainty='zeker';target.reasons=[];}});await persistImportDraft(root,draft);close();renderDraftModal(root,draft);};
+    const close=()=>overlay.remove();
+    overlay.querySelector('[data-u4-match-close]').onclick=close;
+    overlay.addEventListener('click',event=>{if(event.target===overlay)close();});
+    let busy=false;
+    const actionButtons=[...overlay.querySelectorAll('[data-u4-match-only],[data-u4-match-apply],[data-u4-match-close]')];
+    const feedback=overlay.querySelector('[data-u4-match-feedback]');
+    async function commitSelection(applyMatches,button){
+      if(busy)return;
+      busy=true;
+      const originalLabel=button.textContent;
+      actionButtons.forEach(item=>item.disabled=true);
+      button.textContent='Opslaan…';
+      feedback.textContent='Wijzigingen worden lokaal opgeslagen.';
+      const snapshots=new Map();
+      const remember=row=>snapshots.set(row.id,{processing:clone(row.processing),certainty:row.certainty,reasons:clone(row.reasons||[])});
+      remember(source);
+      source.certainty='zeker';source.reasons=[];
+      if(applyMatches){
+        overlay.querySelectorAll('[data-u4-match-id]:checked').forEach(input=>{
+          const target=draft.rows.find(row=>row.id===input.dataset.u4MatchId);
+          if(target){remember(target);copiedProcessing(source,target);target.certainty='zeker';target.reasons=[];}
+        });
+      }
+      try{
+        await persistImportDraft(root,draft);
+        feedback.textContent='Opgeslagen.';
+        close();
+        renderDraftModal(root,draft);
+      }catch(error){
+        snapshots.forEach((snapshot,id)=>{
+          const row=draft.rows.find(item=>item.id===id);
+          if(row){row.processing=snapshot.processing;row.certainty=snapshot.certainty;row.reasons=snapshot.reasons;}
+        });
+        busy=false;
+        actionButtons.forEach(item=>item.disabled=false);
+        button.textContent=originalLabel;
+        feedback.textContent='Opslaan mislukt. De transacties zijn niet aangepast.';
+        alert(`De selectie kon niet worden opgeslagen. Probeer het opnieuw.\n\n${error?.message||error}`);
+      }
+    }
+    overlay.querySelector('[data-u4-match-only]').onclick=event=>commitSelection(false,event.currentTarget);
+    overlay.querySelector('[data-u4-match-apply]').onclick=event=>commitSelection(true,event.currentTarget);
   }
   function profileEditor(root,draft){
     const profiles=root.state.accountProfiles||[];
