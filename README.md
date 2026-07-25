@@ -136,3 +136,8 @@ De bankimportmodal gebruikt één betrouwbaar scrollvlak. Kop en actiebalk blijv
 - De subdoelchevron is verkleind.
 - De chevron staat rechtsboven direct boven het voortgangspercentage.
 - Alleen de rechterkolom reserveert ruimte; de overige kaartinhoud blijft ongewijzigd.
+
+
+## v48
+- Spaardoeltekst en voortgangsbalken gebruiken een uniforme breedte.
+- Variabele budgetten worden via een losse bewerkkopie atomair opgeslagen voor de geselecteerde maand.

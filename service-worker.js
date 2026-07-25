@@ -1,10 +1,10 @@
-const CACHE_NAME = "finize-v44-savings-arrow-2";
+const CACHE_NAME = "finize-v48-goal-width-budget-save";
 
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./update4.js?v=44-arrow-2",
-  "./update4.css?v=44-arrow-2",
+  "./update4.js?v=48-goal-width-budget-save",
+  "./update4.css?v=48-goal-width-budget-save",
   "./update5.js?v=29",
   "./update5.css?v=29",
   "./finize-v4.html",

@@ -5214,6 +5214,24 @@ body.v4-app .modal-content{ min-width:0; }
 }
 .u2-goal-accordion .mobile-goal-row{border-bottom:0}
 .u2-goal-accordion .mobile-goal-side b{padding-top:15px}
+/* v48: iedere huidige en toekomstige spaardoelrij gebruikt dezelfde middenkolom. */
+body.v4-app[data-real-active-tab="spaardoelen"] .mobile-goal-row{
+  grid-template-columns:34px minmax(0,1fr) 64px !important;
+}
+body.v4-app[data-real-active-tab="spaardoelen"] .mobile-goal-main{
+  width:100% !important;
+  min-width:0 !important;
+}
+body.v4-app[data-real-active-tab="spaardoelen"] .mobile-goal-main > span,
+body.v4-app[data-real-active-tab="spaardoelen"] .mobile-goal-main > .progress-track{
+  width:100% !important;
+  max-width:none !important;
+  box-sizing:border-box !important;
+}
+body.v4-app[data-real-active-tab="spaardoelen"] .u2-goal-accordion>summary::after{
+  top:3px !important;
+  right:7px !important;
+}
 .u2-accordion-body{display:grid;gap:5px;margin:0 8px 8px;padding:8px;border-radius:10px;background:var(--surface-2)}
 .u2-accordion-child{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 8px;align-items:center;font-size:10px}
 .u2-accordion-child strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -5282,7 +5300,7 @@ body.v4-app .modal-content{ min-width:0; }
   .u3-budget-row span:nth-child(3),.u3-budget-row span:nth-child(4){display:none}
 }
 </style>
-<link rel="stylesheet" href="./update4.css?v=44-arrow-2">
+<link rel="stylesheet" href="./update4.css?v=48-goal-width-budget-save">
 <link rel="stylesheet" href="./update5.css?v=29">
 </head>
 <body class="v4-app">
@@ -9061,75 +9079,104 @@ function renderJointVariableBudgetEditorRows(rows){
 function openJointVariableCostsModal(focusLast=false, owner='gezamenlijk'){
   const modal = document.getElementById('incomeEditModal');
   const scenario = state.meta.scenario;
-  const scenarioData = getMonthlyScenarioData(scenario);
-  const rows = scenarioData[owner].variabel || (scenarioData[owner].variabel = []);
-  const rowsPath = `monthlyBudgets.${getSelectedMonth()}.${scenario}.${owner}Variabel`;
+  const month = getSelectedMonth();
+  ensureMonthData(month);
+  const key = `${owner}Variabel`;
+  const sourceRows = state.monthlyBudgets?.[month]?.[scenario]?.[key]
+    || state[scenario]?.[owner]?.variabel
+    || [];
+  let draftRows = clone(sourceRows).map(row=>({
+    ...row,
+    id: row.id || uid(),
+    categorie: String(row.categorie || 'Variabel'),
+    post: String(row.post || ''),
+    bedrag: round2(Number(row.bedrag)||0)
+  }));
   const name = ownerLabel(owner);
   const scenarioLabel = scenario === 'voor' ? 'Voor verkoop' : 'Na verkoop';
-  const total = ()=> round2(sumBedrag(rows));
+  const total = ()=> round2(sumBedrag(draftRows));
 
-  modal.innerHTML = `
-    <div class="modal joint-variable-fullscreen-editor" role="dialog" aria-modal="true" aria-label="Variabele lasten aanpassen">
-      <div class="joint-variable-editor-header">
-        <div>
-          <div class="section-kicker">${scenarioLabel} · ${monthLabel(getSelectedMonth())}</div>
-          <h2>${owner === 'gezamenlijk' ? 'Variabele lasten' : `${name} variabele lasten`}</h2>
-          <p>Pas maandbudgetten per categorie aan. Wijzigingen worden direct lokaal opgeslagen.</p>
+  const draw = (focusNewest=false)=>{
+    modal.innerHTML = `
+      <div class="modal joint-variable-fullscreen-editor" role="dialog" aria-modal="true" aria-label="Variabele lasten aanpassen">
+        <div class="joint-variable-editor-header">
+          <div>
+            <div class="section-kicker">${scenarioLabel} · ${monthLabel(month)}</div>
+            <h2>${owner === 'gezamenlijk' ? 'Variabele lasten' : `${name} variabele lasten`}</h2>
+            <p>Pas de maandbudgetten aan en bevestig ze met Opslaan.</p>
+          </div>
+          <button type="button" class="ghost joint-variable-editor-close" data-close-joint-variable-costs>Sluiten</button>
         </div>
-        <button type="button" class="ghost joint-variable-editor-close" data-close-joint-variable-costs>Sluiten</button>
-      </div>
-      <div class="joint-variable-editor-summary"><span>Totaal maandbudget</span><strong>${eur(total())}</strong></div>
-      <div class="joint-variable-editor-list">${rows.length ? renderJointVariableBudgetEditorRows(rows) : '<p class="hint" style="padding:10px;margin:0">Nog geen variabele budgetcategorieën.</p>'}</div>
-      <div class="joint-variable-editor-actions">
-        <button type="button" class="primary" data-variable-save>Opslaan</button>
-        <button type="button" class="ghost" data-variable-add>+ Categorie</button>
-      </div>
-    </div>`;
-  modal.classList.add('open','joint-variable-editor-open');
+        <div class="joint-variable-editor-summary"><span>Totaal maandbudget</span><strong>${eur(total())}</strong></div>
+        <div class="joint-variable-editor-list">${draftRows.length ? renderJointVariableBudgetEditorRows(draftRows) : '<p class="hint" style="padding:10px;margin:0">Nog geen variabele budgetcategorieën.</p>'}</div>
+        <div class="joint-variable-editor-actions">
+          <button type="button" class="primary" data-variable-save>Opslaan</button>
+          <button type="button" class="ghost" data-variable-add>+ Categorie</button>
+        </div>
+      </div>`;
+    modal.classList.add('open','joint-variable-editor-open');
 
-  const updateSummary = ()=>{
-    const summary = modal.querySelector('.joint-variable-editor-summary strong');
-    if (summary) summary.textContent = eur(total());
-  };
-  const close = ()=>{
-    modal.classList.remove('open','joint-variable-editor-open');
-    modal.innerHTML = '';
-    renderActiveTab();
-  };
-  modal.querySelectorAll('[data-close-joint-variable-costs]').forEach(btn=>btn.addEventListener('click', close));
-  const commitField = (el, saveNow=true)=>{
-    const row = rows.find(item=>item.id === el.dataset.variableId);
-    if (!row) return;
-    if (el.dataset.variableField === 'bedrag'){
-      const parsed = parseFloat(String(el.value).replace(',', '.'));
-      row.bedrag = Number.isFinite(parsed) ? round2(parsed) : 0;
-    } else {
-      row.post = el.value.trim();
-      row.categorie = 'Variabel';
-    }
-    if (saveNow) persist();
-    updateSummary();
-  };
-  modal.querySelectorAll('[data-variable-field]').forEach(el=> el.addEventListener('change', ()=>commitField(el)));
-  modal.querySelector('[data-variable-save]')?.addEventListener('click', ()=>{
-    modal.querySelectorAll('[data-variable-field]').forEach(el=>commitField(el, false));
-    persist();
-    showQuickToast('Variabele lasten opgeslagen');
-    close();
-  });
-  modal.querySelectorAll('[data-variable-remove]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      removeWithUndo(rowsPath, btn.dataset.variableRemove, 'Variabel budget verwijderd');
+    const syncDraftFromInputs = ()=>{
+      modal.querySelectorAll('[data-variable-field]').forEach(el=>{
+        const row = draftRows.find(item=>item.id === el.dataset.variableId);
+        if (!row) return;
+        if (el.dataset.variableField === 'bedrag'){
+          const parsed = parseFloat(String(el.value).replace(',', '.'));
+          row.bedrag = Number.isFinite(parsed) ? round2(parsed) : 0;
+        } else {
+          row.post = el.value.trim();
+          row.categorie = 'Variabel';
+        }
+      });
+      const summary = modal.querySelector('.joint-variable-editor-summary strong');
+      if (summary) summary.textContent = eur(total());
+    };
+    const close = ()=>{
+      modal.classList.remove('open','joint-variable-editor-open');
+      modal.innerHTML = '';
+      renderActiveTab();
+    };
+    modal.querySelector('[data-close-joint-variable-costs]')?.addEventListener('click', close);
+    modal.querySelectorAll('[data-variable-field]').forEach(el=>{
+      el.addEventListener('input', syncDraftFromInputs);
+      el.addEventListener('change', syncDraftFromInputs);
     });
-  });
-  modal.querySelector('[data-variable-add]')?.addEventListener('click', ()=>{
-    rows.push({id:uid(), categorie:'Variabel', post:'', bedrag:0});
-    persist();
-    openJointVariableCostsModal(true, owner);
-  });
-  if (focusLast){
-    requestAnimationFrame(()=> modal.querySelector('.joint-variable-editor-row:last-child input[data-variable-field="post"]')?.focus());
-  }
+    modal.querySelectorAll('[data-variable-remove]').forEach(btn=>btn.addEventListener('click',()=>{
+      syncDraftFromInputs();
+      draftRows = draftRows.filter(row=>row.id !== btn.dataset.variableRemove);
+      draw(false);
+    }));
+    modal.querySelector('[data-variable-add]')?.addEventListener('click',()=>{
+      syncDraftFromInputs();
+      draftRows.push({id:uid(), categorie:'Variabel', post:'', bedrag:0});
+      draw(true);
+    });
+    modal.querySelector('[data-variable-save]')?.addEventListener('click',()=>{
+      syncDraftFromInputs();
+      const cleaned = draftRows.map(row=>({
+        id: row.id || uid(),
+        categorie:'Variabel',
+        post:String(row.post||'').trim(),
+        bedrag:round2(Number(row.bedrag)||0)
+      }));
+      const saved = commitChange(()=>{
+        ensureMonthData(month);
+        state.monthlyBudgets[month] = state.monthlyBudgets[month] || {};
+        state.monthlyBudgets[month][scenario] = state.monthlyBudgets[month][scenario] || {};
+        state.monthlyBudgets[month][scenario][key] = clone(cleaned);
+      },{render:false});
+      if (!saved){
+        alert('De variabele budgetten konden niet worden opgeslagen. Probeer het opnieuw.');
+        return;
+      }
+      showQuickToast('Variabele lasten opgeslagen');
+      close();
+    });
+    if (focusNewest){
+      requestAnimationFrame(()=>modal.querySelector('.joint-variable-editor-row:last-child input[data-variable-field="post"]')?.focus());
+    }
+  };
+  draw(focusLast);
 }
 
 function openFixedExpenseAddModal(owner='gezamenlijk', draftSession=null){
@@ -11274,7 +11321,7 @@ async function initializeApp(){
 initializeApp();
 
 </script>
-<script src="./update4.js?v=44-arrow-2"></script>
+<script src="./update4.js?v=48-goal-width-budget-save"></script>
 <script src="./update5.js?v=29"></script>
 <script>
 if ("serviceWorker" in navigator) {
