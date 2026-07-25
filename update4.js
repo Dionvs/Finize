@@ -8,7 +8,7 @@
 })(typeof window!=='undefined'?window:globalThis,function(){
   'use strict';
 
-  const SCHEMA_VERSION=8;
+  const SCHEMA_VERSION=9;
   const DB_NAME='finize-imports-v1';
   const DB_VERSION=1;
   const IMPORT_STORE='imports';
@@ -835,10 +835,11 @@
       if(!OWNERS.includes(p.budgetOwner))errors.push({rowId:row.id,code:'owner',message:'Budgeteigenaar ontbreekt.'});
       if(p.savingsGoalId&&!goalExists(state,p.savingsGoalId))errors.push({rowId:row.id,code:'goal',message:'Het gekozen spaardoel bestaat niet meer.'});
       if(p.fixedExpenseId&&!fixedExists(state,p.fixedExpenseId))errors.push({rowId:row.id,code:'fixed',message:'De gekozen vaste last bestaat niet meer.'});
-      if((p.splits||[]).length){
-        const splitTotal=round2(p.splits.reduce((sum,split)=>sum+Number(split.amount||0),0));
+      const activeSplits=(p.splits||[]).filter(split=>Math.abs(Number(split.amount)||0)>.004);
+      if(activeSplits.length){
+        const splitTotal=round2(activeSplits.reduce((sum,split)=>sum+Number(split.amount||0),0));
         if(Math.abs(splitTotal-round2(p.processedAmount))>.004)errors.push({rowId:row.id,code:'splits',message:`De splitsregels zijn samen ${euro(splitTotal)}, maar deze transactie is ${euro(p.processedAmount)}. Pas de splitbedragen aan of verwijder de lege splitsregels.`});
-        p.splits.forEach(split=>{
+        activeSplits.forEach(split=>{
           if(!OWNERS.includes(split.budgetOwner)||!split.category)errors.push({rowId:row.id,code:'split-fields',message:'Iedere splitregel heeft een budgeteigenaar en categorie nodig.'});
           if(split.savingsGoalId&&!goalExists(state,split.savingsGoalId))errors.push({rowId:row.id,code:'split-goal',message:'Een spaardoel in een splitregel bestaat niet meer.'});
         });
@@ -849,17 +850,18 @@
   function transactionKind(type,include=true){
     if(!include||type==='niet-meetellen')return 'niet-meetellen';
     if(['salaris','vakantiegeld','nabetaling','vergoeding','belastingteruggave','overige-inkomsten'].includes(type))return 'inkomen';
-    if(['interne-overboeking','maandelijkse-bijdrage','extra-bijdrage','sparen','terugbetaling-voorschot'].includes(type))return 'interne-overboeking';
+    if(['interne-overboeking','naar-spaarrekening','van-spaarrekening','maandelijkse-bijdrage','extra-bijdrage','sparen','terugbetaling-voorschot'].includes(type))return 'interne-overboeking';
     if(type==='vaste-last')return 'vaste-last';
     return 'uitgave';
   }
   function expenseImpact(type,amount,include=true){
-    if(!include||['salaris','vakantiegeld','nabetaling','vergoeding','belastingteruggave','overige-inkomsten','interne-overboeking','maandelijkse-bijdrage','extra-bijdrage','sparen','terugbetaling-voorschot','vaste-last'].includes(type))return 0;
-    return type==='terugbetaling'?-Math.abs(amount):Math.abs(amount);
+    if(!include||['salaris','vakantiegeld','nabetaling','vergoeding','belastingteruggave','overige-inkomsten','interne-overboeking','naar-spaarrekening','van-spaarrekening','maandelijkse-bijdrage','extra-bijdrage','sparen','terugbetaling-voorschot','terugbetaling','vaste-last'].includes(type))return 0;
+    return Math.abs(amount);
   }
   function financialRows(row){
     const p=row.processing;
-    if((p.splits||[]).length)return p.splits.map((split,index)=>({
+    const activeSplits=(p.splits||[]).filter(split=>Math.abs(Number(split.amount)||0)>.004);
+    if(activeSplits.length)return activeSplits.map((split,index)=>({
       id:`${row.id}-split-${split.id||index+1}`,amount:round2(split.amount),budgetOwner:split.budgetOwner,category:split.category,
       budgetItemId:split.budgetItemId||'',savingsGoalId:split.savingsGoalId||'',advanceMode:split.advanceMode||'auto',include:split.include!==false,splitId:split.id||String(index+1),isFirst:index===0
     }));
@@ -1557,6 +1559,9 @@
         if(field==='processedAmount')value=round2(Math.abs(Number(value)||0));
         if(field==='include')value=value==='true';
         row.processing[field]=value;
+        if(field==='transactionType'){
+          row.processing.splits=(row.processing.splits||[]).filter(split=>Math.abs(Number(split.amount)||0)>.004);
+        }
         if(field==='transactionType'&&value==='terugbetaling-voorschot'){
           const relation=repaymentRelation(root,row);
           row.processing.repaymentAllocations=relation?proposeRepaymentAllocations(root.state,relation.debtor,relation.creditor,row.processing.processedAmount):[];

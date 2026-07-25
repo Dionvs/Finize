@@ -84,3 +84,21 @@ De bankimportmodal gebruikt één betrouwbaar scrollvlak. Kop en actiebalk blijv
 - Validatiefouten bij het verwerken van een bankimport worden in een klikbaar foutpaneel getoond.
 - **Open transactie** scrolt naar de juiste kaart, opent **Meer opties** en markeert de relevante splitsregels.
 - Splitfouten leggen nu duidelijk uit dat de som van de splits gelijk moet zijn aan het transactiebedrag.
+
+
+## Versie 40 — dashboard en transactielogica
+
+- Bottomnavigation gebruikt stabiele SVG-iconen in plaats van zware ingesloten PNG-bestanden.
+- Het gezamenlijke budgetoverzicht scrollt intern wanneer niet alle categorieën passen.
+- Budgetcategorieën openen een gefilterde lijst met de bijbehorende transacties.
+- Naar/van spaarrekening en interne overboekingen tellen niet meer als budgetuitgave of inkomen.
+- Extra inkomsten en teruggaven worden zichtbaar bij totaal inkomen, maar wijzigen de gezamenlijke verdelingsratio niet automatisch.
+- Lege, verborgen splitsregels blokkeren de verwerking niet meer.
+
+## Versie 41 — inkomen vanaf maand
+
+- Standaardsalaris en standaardteruggave kunnen vanaf de geselecteerde maand worden ingesteld.
+- De gekozen waarden gelden voor die maand en toekomstige maanden, totdat later een nieuwe standaard wordt ingesteld.
+- Optioneel kan een wijziging alleen voor de geselecteerde maand gelden.
+- CSV-inkomsten wijzigen de standaard niet en worden gekoppeld aan de rekeninghouder van het gebruikte rekeningprofiel.
+- Standaardteruggaven tellen mee in de verdeelbasis; incidentele CSV-inkomsten en teruggaven niet.

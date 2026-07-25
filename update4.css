@@ -164,3 +164,62 @@
 .u4-import-row.u4-validation-target .u4-split-list{padding:8px;border:1px solid rgba(159,70,57,.35);border-radius:12px;background:var(--red-bg)}
 @keyframes u4-validation-pulse{50%{transform:translateY(-2px)}}
 @media(max-width:700px){.u4-validation-overlay{padding:0;place-items:end stretch}.u4-validation-dialog{width:100%;max-height:92dvh;border-radius:22px 22px 0 0}.u4-validation-head{padding:14px}.u4-validation-item{grid-template-columns:1fr}.u4-validation-item b{justify-self:start}}
+
+/* v40 — dashboard navigation, scrollable budget card and transaction drill-down */
+.v4-bottom-nav .bottom-nav-btn .bn-icon svg{
+  width:100%;
+  height:100%;
+  display:block;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.8;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.budget-preview-card{
+  display:flex;
+  flex-direction:column;
+  min-height:0;
+}
+.budget-preview-card .scroll-area{
+  flex:1 1 auto;
+  min-height:0;
+  overflow-y:auto !important;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+  padding-right:3px;
+}
+.budget-preview-button{
+  width:100%;
+  border:0;
+  padding:0;
+  margin:0;
+  text-align:left;
+  background:transparent;
+  box-shadow:none;
+  color:inherit;
+  border-radius:12px;
+}
+.budget-preview-button:hover,
+.budget-preview-button:focus-visible{
+  transform:none;
+  box-shadow:none;
+  background:rgba(237,243,230,.5);
+  outline:2px solid rgba(124,142,73,.18);
+  outline-offset:2px;
+}
+.budget-transactions-modal{max-height:min(82vh,720px);display:flex;flex-direction:column;overflow:hidden}
+.budget-transactions-modal .modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+.budget-transactions-modal .modal-head h2,.budget-transactions-modal .modal-head p{margin:0}
+.budget-transactions-modal .modal-head p{margin-top:4px;color:var(--text-dim);font-size:12px}
+.budget-transactions-list{display:grid;gap:8px;overflow-y:auto;min-height:0;padding:12px 2px 2px;-webkit-overflow-scrolling:touch}
+.budget-transaction-row{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 12px;border:1px solid var(--border-soft);border-radius:13px;background:#fffdf9;box-shadow:none;text-align:left}
+.budget-transaction-row:hover{transform:none;box-shadow:none;background:#fff8f0}
+.budget-transaction-row span{min-width:0;display:grid;gap:3px}
+.budget-transaction-row strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.budget-transaction-row small{color:var(--text-dim)}
+.budget-transaction-row b{white-space:nowrap}
+@media(max-width:767px){
+  body.v4-app[data-active-tab="dashboard"] .budget-preview-card .scroll-area{max-height:none !important;height:auto !important}
+  .budget-transactions-modal{width:100%;max-height:78dvh;border-radius:22px 22px 0 0;margin-top:auto}
+}

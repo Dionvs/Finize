@@ -1,10 +1,10 @@
-const CACHE_NAME = "finize-v39-clickable-validation";
+const CACHE_NAME = "finize-v41-income-history";
 
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./update4.js?v=39",
-  "./update4.css?v=39",
+  "./update4.js?v=41",
+  "./update4.css?v=41",
   "./update5.js?v=29",
   "./update5.css?v=29",
   "./finize-v4.html",
