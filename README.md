@@ -51,3 +51,12 @@ De bankimportmodal gebruikt één betrouwbaar scrollvlak. Kop en actiebalk blijv
 - Bij vergelijkbare transacties verschijnt een selectievenster met individueel uitvinkbare matches.
 - Transactietypen zijn gegroepeerd en opties worden contextafhankelijk getoond.
 - Interne overboekingen ondersteunen expliciete bron- en doelrekening, inclusief geld van spaar- naar betaalrekening.
+
+
+## Release v34 — reactieve importeditor en matchherstel
+
+- Contextafhankelijke velden worden direct vernieuwd na het wijzigen van transactietype, eigenaar of categorie.
+- Scrollpositie en geopende transactiedetails blijven bij deze vernieuwing behouden.
+- Matchherkenning gebruikt tegenrekening, afgeleide organisatienaam en volledige omschrijving.
+- Af- en bijschrijvingen blijven strikt gescheiden.
+- De vergelijkbare-transactiesdialoog wordt buiten het scrollvlak geplaatst, zodat deze niet kan worden afgekapt.

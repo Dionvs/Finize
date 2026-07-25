@@ -1138,18 +1138,27 @@
   function transferType(type){return ['naar-spaarrekening','van-spaarrekening','interne-overboeking'].includes(type);}
   function profileOptions(root,current){return `<option value="">Kies rekening</option>${(root.state.accountProfiles||[]).map(profile=>option(profile.id,`${profile.name} · ${ownerLabel(profile.accountOwner)}`,current)).join('')}`;}
   function compactText(value){return String(value||'').toLocaleLowerCase('nl-NL').replace(/\s+/g,' ').trim();}
+  function matchIdentity(original){
+    const description=String(original?.rawDescription||original?.description||'');
+    return {
+      account:normalizeIban(original?.counterpartyAccount),
+      organization:compactText(original?.organization||original?.counterpartyName||organizationName(description)),
+      description:compactText(description)
+    };
+  }
   function matchCandidates(draft,source){
-    const src=source.bankOriginal||{};const direction=Number(src.amount)>=0?'in':'out';
+    const src=source.bankOriginal||{};
+    const sourceDirection=Number(src.amount)>=0?'in':'out';
+    const sourceIdentity=matchIdentity(src);
     return draft.rows.filter(row=>row!==source&&row.bankOriginal?.valid&&!row.duplicate).map(row=>{
-      const original=row.bankOriginal||{};if((Number(original.amount)>=0?'in':'out')!==direction)return null;
+      const original=row.bankOriginal||{};
+      if((Number(original.amount)>=0?'in':'out')!==sourceDirection)return null;
+      const identity=matchIdentity(original);
       let score=0;const reasons=[];
-      const srcAccount=normalizeIban(src.counterpartyAccount),account=normalizeIban(original.counterpartyAccount);
-      if(srcAccount&&account&&srcAccount===account){score+=5;reasons.push('zelfde tegenrekening');}
-      const srcOrg=compactText(src.organization||src.counterpartyName),org=compactText(original.organization||original.counterpartyName);
-      if(srcOrg&&org&&srcOrg===org){score+=3;reasons.push('zelfde organisatie');}
-      const srcDescription=compactText(src.description),description=compactText(original.description);
-      if(srcDescription&&description&&srcDescription===description){score+=2;reasons.push('zelfde omschrijving');}
-      return score>=2?{row,score,reasons}:null;
+      if(sourceIdentity.account&&identity.account&&sourceIdentity.account===identity.account){score+=6;reasons.push('zelfde tegenrekening');}
+      if(sourceIdentity.organization&&identity.organization&&sourceIdentity.organization===identity.organization){score+=4;reasons.push('zelfde organisatie');}
+      if(sourceIdentity.description&&identity.description&&sourceIdentity.description===identity.description){score+=3;reasons.push('zelfde omschrijving');}
+      return score>=3?{row,score,reasons}:null;
     }).filter(Boolean).sort((a,b)=>b.score-a.score||String(b.row.processing?.processingDate||'').localeCompare(String(a.row.processing?.processingDate||'')));
   }
   function copiedProcessing(source,target){
@@ -1203,13 +1212,13 @@
   function bulkEditor(root,draft){
     return `<section class="u4-section u4-bulk-section"><div class="u4-section-list"><h3>Meerdere transacties aanpassen</h3><p class="u4-muted">Pas één keuze in één keer toe. Handmatig aangepaste zekere transacties worden standaard overgeslagen.</p><div class="u4-profile-grid"><label>Toepassen op<select data-u4-bulk-scope><option value="review">Alleen Nakijken</option><option value="uncategorized">Alleen ongecategoriseerd</option><option value="all">Alle transacties</option></select></label><label>Budgeteigenaar<select data-u4-bulk-owner><option value="">Niet wijzigen</option>${OWNERS.map(owner=>option(owner,ownerLabel(owner),'')).join('')}</select></label><label>Categorie<select data-u4-bulk-category><option value="">Niet wijzigen</option>${categoryOptions(root,'gezamenlijk','')}</select></label><label>Transactie<select data-u4-bulk-type><option value="">Niet wijzigen</option>${typeOptions('')}</select></label></div><button type="button" class="ghost small" data-u4-apply-bulk>Voorbeeld en toepassen</button></div></section>`;
   }
-  function showMatchDialog(root,draft,source,modal){
+  async function showMatchDialog(root,draft,source,modal){
     const matches=matchCandidates(draft,source);
-    if(!matches.length){source.certainty='zeker';return persistImportDraft(root,draft).then(()=>renderDraftModal(root,draft));}
+    if(!matches.length){source.certainty='zeker';await persistImportDraft(root,draft);renderDraftModalPreservingView(root,draft,modal,source.id);return;}
     modal.querySelector('.u4-match-overlay')?.remove();
     const overlay=document.createElement('div');overlay.className='u4-match-overlay';
-    overlay.innerHTML=`<div class="u4-match-dialog" role="dialog" aria-modal="true"><div class="u4-match-head"><div><h3>Vergelijkbare transacties gevonden</h3><p>${matches.length} mogelijke matches. Vink uit wat niet mee aangepast moet worden.</p></div><button type="button" class="ghost small" data-u4-match-close>Sluiten</button></div><div class="u4-match-change"><strong>Wordt toegepast</strong><span>${ownerLabel(source.processing.budgetOwner)} · ${esc(source.processing.category)} · ${esc(TYPE_GROUPS.flatMap(g=>g.items).find(item=>item[0]===source.processing.transactionType)?.[1]||source.processing.transactionType)} · Zeker</span></div><div class="u4-match-list">${matches.map(({row,score,reasons})=>`<label class="u4-match-row"><input type="checkbox" data-u4-match-id="${esc(row.id)}" ${score>=5?'checked':''}><span><strong>${esc(row.processing.processingDate)} · ${esc(row.bankOriginal.description||'Onbekend')}</strong><small>${euro(row.processing.processedAmount)} · ${esc(row.processing.category||'Ongecategoriseerd')} · ${esc(reasons.join(', '))}</small></span></label>`).join('')}</div><div class="u4-match-actions"><button type="button" class="ghost" data-u4-match-only>Alleen deze transactie</button><button type="button" class="primary" data-u4-match-apply>Geselecteerde aanpassen</button></div></div>`;
-    modal.appendChild(overlay);
+    overlay.innerHTML=`<div class="u4-match-dialog" role="dialog" aria-modal="true"><div class="u4-match-head"><div><h3>Vergelijkbare transacties gevonden</h3><p>${matches.length} mogelijke matches. Vink uit wat niet mee aangepast moet worden.</p></div><button type="button" class="ghost small" data-u4-match-close>Sluiten</button></div><div class="u4-match-change"><strong>Wordt toegepast</strong><span>${ownerLabel(source.processing.budgetOwner)} · ${esc(source.processing.category)} · ${esc(TYPE_GROUPS.flatMap(g=>g.items).find(item=>item[0]===source.processing.transactionType)?.[1]||source.processing.transactionType)} · Zeker</span></div><div class="u4-match-list">${matches.map(({row,score,reasons})=>`<label class="u4-match-row"><input type="checkbox" data-u4-match-id="${esc(row.id)}" ${score>=4?'checked':''}><span><strong>${esc(row.processing.processingDate)} · ${esc(row.bankOriginal.description||'Onbekend')}</strong><small>${euro(row.processing.processedAmount)} · ${esc(row.processing.category||'Ongecategoriseerd')} · ${esc(reasons.join(', '))}</small></span></label>`).join('')}</div><div class="u4-match-actions"><button type="button" class="ghost" data-u4-match-only>Alleen deze transactie</button><button type="button" class="primary" data-u4-match-apply>Geselecteerde aanpassen</button></div></div>`;
+    document.body.appendChild(overlay);
     const close=()=>overlay.remove();overlay.querySelector('[data-u4-match-close]').onclick=close;
     overlay.querySelector('[data-u4-match-only]').onclick=async()=>{source.certainty='zeker';await persistImportDraft(root,draft);close();renderDraftModal(root,draft);};
     overlay.querySelector('[data-u4-match-apply]').onclick=async()=>{source.certainty='zeker';overlay.querySelectorAll('[data-u4-match-id]:checked').forEach(input=>{const target=draft.rows.find(row=>row.id===input.dataset.u4MatchId);if(target){copiedProcessing(source,target);target.certainty='zeker';target.reasons=[];}});await persistImportDraft(root,draft);close();renderDraftModal(root,draft);};
@@ -1315,6 +1324,20 @@
     });
     await saveDraft(root,draft,{sync:true});renderDraftModal(root,draft);
   }
+  function renderDraftModalPreservingView(root,draft,modal,rowId=''){
+    const scroller=modal.querySelector('.u4-import-modal');
+    const scrollTop=scroller?.scrollTop||0;
+    const openRows=[...modal.querySelectorAll('[data-u4-row] details[open]')].map(details=>details.closest('[data-u4-row]')?.dataset.u4Row).filter(Boolean);
+    renderDraftModal(root,draft);
+    const next=document.getElementById('u4ImportModalRoot');
+    requestAnimationFrame(()=>{
+      const nextScroller=next?.querySelector('.u4-import-modal');
+      if(nextScroller)nextScroller.scrollTop=scrollTop;
+      openRows.forEach(id=>next?.querySelector(`[data-u4-row="${id}"] details`)?.setAttribute('open',''));
+      if(rowId&&!openRows.includes(rowId))next?.querySelector(`[data-u4-row="${rowId}"]`)?.scrollIntoView({block:'nearest'});
+    });
+  }
+
   function bindDraftModal(root,draft,modal){
     modal.querySelector('[data-u4-close]')?.addEventListener('click',closeDraft);
     modal.querySelector('[data-u4-apply-profile]')?.addEventListener('click',async()=>{
@@ -1343,10 +1366,13 @@
         allocation[event.target.dataset.u4AllocationField]=round2(Math.abs(Number(event.target.value)||0));
       }
       await persistImportDraft(root,draft);
+      if(event.target.dataset.u4Field&&['transactionType','budgetOwner','category'].includes(event.target.dataset.u4Field)){
+        renderDraftModalPreservingView(root,draft,modal,row.id);
+      }
     });
     modal.addEventListener('click',async event=>{
       const container=event.target.closest('[data-u4-row]');const row=container?draft.rows.find(item=>item.id===container.dataset.u4Row):null;
-      if(event.target.closest('[data-u4-approve]')&&row){showMatchDialog(root,draft,row,modal);return;}
+      if(event.target.closest('[data-u4-approve]')&&row){event.preventDefault();event.stopPropagation();await showMatchDialog(root,draft,row,modal);return;}
       if(event.target.closest('[data-u4-reopen]')&&row){row.certainty='nakijken';await persistImportDraft(root,draft);renderDraftModal(root,draft);return;}
       if(event.target.closest('[data-u4-apply-bulk]')){
         const scope=modal.querySelector('[data-u4-bulk-scope]')?.value||'review';const owner=modal.querySelector('[data-u4-bulk-owner]')?.value||'';const category=modal.querySelector('[data-u4-bulk-category]')?.value||'';const type=modal.querySelector('[data-u4-bulk-type]')?.value||'';
@@ -1566,5 +1592,5 @@
     Promise.resolve().then(()=>recoverJournal(root)).then(()=>reconcileActiveImportReference(root)).then(()=>flushImportSync(root)).catch(error=>console.warn('Update 4 opslaginitialisatie uitgesteld.',error));
   }
 
-  return {SCHEMA_VERSION,CLOUD_STORAGE_VERSION,CLOUD_READ_CONCURRENCY,OWNERS,IMPORT_STATUSES,normalizeIban,normalizeRule,normalizeTransaction,normalizeCore,validateCore,calculateGoalSavedAmount,reconcileGoalSavedAmounts,chunkRows,canonicalValue,rowsChecksum,buildCloudImportEnvelope,assembleCloudImport,mapWithConcurrency,classifyCloudError,fetchImportFromCloud,resolveImportDetails,reconcileActiveImportReference,deleteCloudImportBestEffort,discardImportConcept,normalizeText,detectDelimiter,parseDelimited,parseDate,parseAmount,detectFormat,inferMapping,hashText,fingerprint,organizationName,proposeType,recognitionProposal,classifyOriginal,parseBankCsv,findProfile,createImportDraft,updateDraftSummary,compactSummary,validateDraft,transactionKind,expenseImpact,financialRows,advanceForTransaction,savingsForTransaction,detectInternalPairs,directionalBalances,proposeRepaymentAllocations,planImportEffects,applyImportPlan,effectManifest,undoImportEffects,ImportStore,persistImportDraft,queueImportSync,flushImportSync,recoverJournal,install,round2,uid,clone};
+  return {SCHEMA_VERSION,CLOUD_STORAGE_VERSION,CLOUD_READ_CONCURRENCY,OWNERS,IMPORT_STATUSES,normalizeIban,normalizeRule,normalizeTransaction,normalizeCore,validateCore,calculateGoalSavedAmount,reconcileGoalSavedAmounts,chunkRows,canonicalValue,rowsChecksum,buildCloudImportEnvelope,assembleCloudImport,mapWithConcurrency,classifyCloudError,fetchImportFromCloud,resolveImportDetails,reconcileActiveImportReference,deleteCloudImportBestEffort,discardImportConcept,normalizeText,matchIdentity,matchCandidates,detectDelimiter,parseDelimited,parseDate,parseAmount,detectFormat,inferMapping,hashText,fingerprint,organizationName,proposeType,recognitionProposal,classifyOriginal,parseBankCsv,findProfile,createImportDraft,updateDraftSummary,compactSummary,validateDraft,transactionKind,expenseImpact,financialRows,advanceForTransaction,savingsForTransaction,detectInternalPairs,directionalBalances,proposeRepaymentAllocations,planImportEffects,applyImportPlan,effectManifest,undoImportEffects,ImportStore,persistImportDraft,queueImportSync,flushImportSync,recoverJournal,install,round2,uid,clone};
 });
