@@ -124,3 +124,15 @@ De bankimportmodal gebruikt één betrouwbaar scrollvlak. Kop en actiebalk blijv
 - Spaardoelen gebruiken opnieuw de bestaande compacte kaartindeling; alleen de tekst toont nu de totale inleg deze maand.
 - Vaste lasten worden niet meer dubbel getoond of meegeteld in de transactielijsten.
 - Variabele budgetcategorieën zijn klikbaar voor Gezamenlijk, Dion en Dara en openen de bijbehorende transacties.
+
+## v44 spaardoelenpijl
+- Gebouwd rechtstreeks op v44.
+- Alleen het uitvouwpijltje van subdoelen is rechtsboven op de spaardoelenkaart geplaatst.
+- Het pijltje gebruikt dezelfde ronde chevronstijl als de overige accordions.
+- De kaartinhoud, berekeningen en overige weergaven zijn ongewijzigd.
+
+
+## v44 spaardoelenpijl – positiecorrectie
+- De subdoelchevron is verkleind.
+- De chevron staat rechtsboven direct boven het voortgangspercentage.
+- Alleen de rechterkolom reserveert ruimte; de overige kaartinhoud blijft ongewijzigd.

@@ -5186,11 +5186,34 @@ body.v4-app .modal-content{ min-width:0; }
 .u2-dashboard-extra{display:grid;gap:2px;font-size:8.5px;color:var(--text-dim);margin-top:3px}
 .u2-goal-accordion{border-bottom:1px solid var(--border-soft)}
 .u2-goal-accordion:last-child{border-bottom:0}
-.u2-goal-accordion>summary{list-style:none;cursor:pointer;position:relative;padding-right:22px}
+.u2-goal-accordion>summary{list-style:none;cursor:pointer;position:relative}
 .u2-goal-accordion>summary::-webkit-details-marker{display:none}
-.u2-goal-accordion>summary::after{content:"⌄";position:absolute;right:6px;top:50%;transform:translateY(-50%);color:var(--green);font-size:15px;font-weight:850;transition:transform .2s ease}
-.u2-goal-accordion[open]>summary::after{transform:translateY(-50%) rotate(180deg)}
+.u2-goal-accordion>summary::after{
+  content:"";
+  position:absolute;
+  top:3px;
+  right:7px;
+  width:14px;
+  height:14px;
+  border:1px solid rgba(220,203,184,.95);
+  border-radius:999px;
+  background-color:#fffaf4;
+  background-image:var(--finize-chevron);
+  background-repeat:no-repeat;
+  background-position:center;
+  background-size:8px 8px;
+  box-shadow:0 3px 8px rgba(86,56,31,.05);
+  pointer-events:none;
+  transform:rotate(0deg);
+  transition:transform .18s ease, background-color .18s ease, border-color .18s ease;
+}
+.u2-goal-accordion[open]>summary::after{
+  transform:rotate(180deg);
+  background-color:#edf3e6;
+  border-color:#cddab7;
+}
 .u2-goal-accordion .mobile-goal-row{border-bottom:0}
+.u2-goal-accordion .mobile-goal-side b{padding-top:15px}
 .u2-accordion-body{display:grid;gap:5px;margin:0 8px 8px;padding:8px;border-radius:10px;background:var(--surface-2)}
 .u2-accordion-child{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 8px;align-items:center;font-size:10px}
 .u2-accordion-child strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -5259,7 +5282,7 @@ body.v4-app .modal-content{ min-width:0; }
   .u3-budget-row span:nth-child(3),.u3-budget-row span:nth-child(4){display:none}
 }
 </style>
-<link rel="stylesheet" href="./update4.css?v=44">
+<link rel="stylesheet" href="./update4.css?v=44-arrow-2">
 <link rel="stylesheet" href="./update5.css?v=29">
 </head>
 <body class="v4-app">
@@ -11251,7 +11274,7 @@ async function initializeApp(){
 initializeApp();
 
 </script>
-<script src="./update4.js?v=44"></script>
+<script src="./update4.js?v=44-arrow-2"></script>
 <script src="./update5.js?v=29"></script>
 <script>
 if ("serviceWorker" in navigator) {
