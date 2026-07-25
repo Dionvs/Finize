@@ -102,3 +102,11 @@ De bankimportmodal gebruikt één betrouwbaar scrollvlak. Kop en actiebalk blijv
 - Optioneel kan een wijziging alleen voor de geselecteerde maand gelden.
 - CSV-inkomsten wijzigen de standaard niet en worden gekoppeld aan de rekeninghouder van het gebruikte rekeningprofiel.
 - Standaardteruggaven tellen mee in de verdeelbasis; incidentele CSV-inkomsten en teruggaven niet.
+
+
+## v42 – correctie inkomenshistorie
+
+- Voorkomt dat oudere Update-3-functies de nieuwe inkomenshistorie overschrijven.
+- Migreert oude maandwaarden nog maar één keer naar maandafwijkingen.
+- Een nieuwe standaard vanaf een maand vervangt oude toekomstige overrides voor die persoon.
+- Dashboard, persoonlijke tabbladen en verdeelsleutel gebruiken dezelfde inkomensbron.

@@ -5259,7 +5259,7 @@ body.v4-app .modal-content{ min-width:0; }
   .u3-budget-row span:nth-child(3),.u3-budget-row span:nth-child(4){display:none}
 }
 </style>
-<link rel="stylesheet" href="./update4.css?v=41">
+<link rel="stylesheet" href="./update4.css?v=42">
 <link rel="stylesheet" href="./update5.css?v=29">
 </head>
 <body class="v4-app">
@@ -5603,11 +5603,31 @@ function getIncomeDefaultsAt(person,month=getSelectedMonth()){
 function setIncomeDefaultsFromMonth(person,month,salary,refund){
   state.incomeDefaultsHistory=isPlainObject(state.incomeDefaultsHistory)?state.incomeDefaultsHistory:{};
   const rows=Array.isArray(state.incomeDefaultsHistory[person])?state.incomeDefaultsHistory[person]:[];
-  const entry={id:uid(),effectiveFrom:month,salary:round2(Number(salary)||0),refund:round2(Number(refund)||0),updatedAt:new Date().toISOString()};
+  const normalizedSalary=round2(Number(salary)||0);
+  const normalizedRefund=round2(Number(refund)||0);
+  const entry={id:uid(),effectiveFrom:month,salary:normalizedSalary,refund:normalizedRefund,updatedAt:new Date().toISOString()};
   const index=rows.findIndex(row=>row.effectiveFrom===month);
   if(index>=0)rows[index]={...rows[index],...entry,id:rows[index].id||entry.id}; else rows.push(entry);
   rows.sort((a,b)=>a.effectiveFrom.localeCompare(b.effectiveFrom));
   state.incomeDefaultsHistory[person]=rows;
+
+  // Een nieuwe standaard vanaf deze maand vervangt oude toekomstige maandafwijkingen.
+  // Alleen expliciet opnieuw ingestelde maandafwijkingen na deze handeling blijven bestaan.
+  Object.keys(state.monthlyIncomeOverrides||{}).filter(key=>key>=month).forEach(key=>{
+    if(isPlainObject(state.monthlyIncomeOverrides[key])){
+      delete state.monthlyIncomeOverrides[key][person];
+      if(!Object.keys(state.monthlyIncomeOverrides[key]).length)delete state.monthlyIncomeOverrides[key];
+    }
+  });
+  Object.keys(state.monthlyRefundOverrides||{}).filter(key=>key>=month).forEach(key=>{
+    if(isPlainObject(state.monthlyRefundOverrides[key])){
+      delete state.monthlyRefundOverrides[key][person];
+      if(!Object.keys(state.monthlyRefundOverrides[key]).length)delete state.monthlyRefundOverrides[key];
+    }
+  });
+  Object.keys(state.monthlyIncome||{}).filter(key=>key>=month).forEach(key=>{
+    if(isPlainObject(state.monthlyIncome[key]))state.monthlyIncome[key][person]=normalizedSalary;
+  });
 }
 function getDistributionIncomeParts(person,month=getSelectedMonth()){
   const defaults=getIncomeDefaultsAt(person,month);
@@ -5842,17 +5862,23 @@ function u3NormalizeState(target){
   target.monthlyIncomeOverrides=isPlainObject(target.monthlyIncomeOverrides)?target.monthlyIncomeOverrides:{};
   target.monthlyRefundOverrides=isPlainObject(target.monthlyRefundOverrides)?target.monthlyRefundOverrides:{};
   normalizeIncomeDefaults(target);
-  Object.entries(target.monthlyIncome||{}).forEach(([month,values])=>{
-    if(!isPlainObject(values))return;
-    const overrides=isPlainObject(target.monthlyIncomeOverrides[month])?target.monthlyIncomeOverrides[month]:{};
-    ['dion','dara'].forEach(owner=>{
-      if(!Object.prototype.hasOwnProperty.call(values,owner))return;
-      const value=Number(values[owner]);
-      const expected=Number(target.personen?.[owner]?.salaris)||0;
-      if(Number.isFinite(value)&&(value===0||round2(value)!==round2(expected)))overrides[owner]=round2(value);
+  // Migreer de oude maandwaarden slechts één keer. Zonder deze markering werden
+  // ze bij iedere start opnieuw als override aangemaakt en blokkeerden ze een
+  // nieuw standaardsalaris voor toekomstige maanden.
+  if(target.meta.incomeHistoryMigrated!==true){
+    Object.entries(target.monthlyIncome||{}).forEach(([month,values])=>{
+      if(!isPlainObject(values))return;
+      const overrides=isPlainObject(target.monthlyIncomeOverrides[month])?target.monthlyIncomeOverrides[month]:{};
+      ['dion','dara'].forEach(owner=>{
+        if(!Object.prototype.hasOwnProperty.call(values,owner))return;
+        const value=Number(values[owner]);
+        const expected=Number(target.personen?.[owner]?.salaris)||0;
+        if(Number.isFinite(value)&&(value===0||round2(value)!==round2(expected)))overrides[owner]=round2(value);
+      });
+      if(Object.keys(overrides).length)target.monthlyIncomeOverrides[month]=overrides;
     });
-    if(Object.keys(overrides).length)target.monthlyIncomeOverrides[month]=overrides;
-  });
+    target.meta.incomeHistoryMigrated=true;
+  }
   u3MigrateFixedExpenses(target);
   u3MigrateIncomeSources(target);
   ['voor','na'].forEach(scenario=>{
@@ -10568,8 +10594,11 @@ function resolveMonthlyIncome(owner,month=getSelectedMonth()){
   }
   const expected=round2(u3IncomeOccurrences(month).filter(row=>row.owner===owner).reduce((sum,row)=>sum+Number(row.amount||0),0));
   if(expected||owner==='gezamenlijk')return {amount:expected,source:expected?'expected':'none'};
-  const legacy=Number(state.personen?.[owner]?.salaris);
-  return Number.isFinite(legacy)?{amount:round2(legacy),source:'expected'}:{amount:0,source:'none'};
+  if(owner==='dion'||owner==='dara'){
+    const parts=getDistributionIncomeParts(owner,month);
+    return {amount:round2(parts.salary+parts.refund),source:'standard'};
+  }
+  return {amount:0,source:'none'};
 }
 function u3ActualIncome(month=getSelectedMonth(),financialFor=null){
   return resolveMonthlyIncome(financialFor||'total',month).amount;
@@ -11144,12 +11173,13 @@ getMonthlyScenarioData=function(scenario=state.meta.scenario){
   });
   return result;
 };
-getMonthlyBaseIncome=function(person){
-  const amount=u3IncomeForOwner(person,{type:'loon',distributionOnly:true});
-  return amount||Number(state.personen?.[person]?.salaris)||0;
+// Update 41/42: behoud de historische standaardwaarden. De oude Update-3
+// overrides hieronder mogen de nieuwe inkomenshistorie niet opnieuw vervangen.
+getMonthlyBaseIncome=function(person,month=getSelectedMonth()){
+  return getDistributionIncomeParts(person,month).salary;
 };
-sumVasteTeruggaven=function(person){
-  return u3IncomeForOwner(person,{distributionOnly:true})-u3IncomeForOwner(person,{type:'loon',distributionOnly:true});
+sumVasteTeruggaven=function(person,month=getSelectedMonth()){
+  return getDistributionIncomeParts(person,month).refund;
 };
 getMonthTransactions=function(owner=null,month=getSelectedMonth()){
   return (state.transactions||[]).filter(tx=>transactionMonth(tx)===month&&(tx.reviewStatus||'bevestigd')==='bevestigd'&&(!owner||(tx.financialFor||tx.owner)===owner));
@@ -11202,7 +11232,7 @@ async function initializeApp(){
 initializeApp();
 
 </script>
-<script src="./update4.js?v=41"></script>
+<script src="./update4.js?v=42"></script>
 <script src="./update5.js?v=29"></script>
 <script>
 if ("serviceWorker" in navigator) {
