@@ -5375,87 +5375,8 @@ button.icon-only-finize{width:34px;height:34px;padding:0!important;border-radius
   .v4-bottom-nav .bottom-nav-btn .bn-icon{padding:6px!important}
   .v4-bottom-nav .bottom-nav-btn.active .bn-icon{outline:none!important;box-shadow:inset 0 0 0 1px rgba(111,138,85,.16)!important}
 }
-
-/* v52 — één vaste progressiestrook voor ieder huidig en toekomstig spaardoel */
-@media(max-width:767px){
-  body.v4-app[data-real-active-tab="spaardoelen"] .mobile-goal-list{
-    width:100% !important;
-    min-width:0 !important;
-  }
-  body.v4-app[data-real-active-tab="spaardoelen"] .u2-goal-accordion,
-  body.v4-app[data-real-active-tab="spaardoelen"] .u2-goal-accordion > summary{
-    display:block !important;
-    width:100% !important;
-    min-width:0 !important;
-    box-sizing:border-box !important;
-  }
-  body.v4-app[data-real-active-tab="spaardoelen"] .mobile-goal-row{
-    display:grid !important;
-    width:100% !important;
-    min-width:0 !important;
-    grid-template-columns:30px minmax(0,1fr) 64px !important;
-    grid-template-rows:auto auto auto auto auto !important;
-    column-gap:8px !important;
-    box-sizing:border-box !important;
-  }
-  body.v4-app[data-real-active-tab="spaardoelen"] .mobile-goal-main{
-    display:contents !important;
-  }
-  body.v4-app[data-real-active-tab="spaardoelen"] .mobile-goal-icon{
-    grid-column:1 !important;
-    grid-row:1 !important;
-    align-self:start !important;
-  }
-  body.v4-app[data-real-active-tab="spaardoelen"] .mobile-goal-main > strong{
-    grid-column:2 !important;
-    grid-row:1 !important;
-    align-self:center !important;
-    min-width:0 !important;
-  }
-  body.v4-app[data-real-active-tab="spaardoelen"] .mobile-goal-progress-value{
-    grid-column:1 / 3 !important;
-    grid-row:2 !important;
-    display:block !important;
-    width:100% !important;
-    min-width:0 !important;
-    max-width:none !important;
-    box-sizing:border-box !important;
-  }
-  body.v4-app[data-real-active-tab="spaardoelen"] .mobile-goal-progress-track{
-    grid-column:1 / 3 !important;
-    grid-row:3 !important;
-    display:block !important;
-    width:100% !important;
-    min-width:0 !important;
-    max-width:none !important;
-    justify-self:stretch !important;
-    box-sizing:border-box !important;
-  }
-  body.v4-app[data-real-active-tab="spaardoelen"] .mobile-goal-needed{
-    grid-column:1 / 3 !important;
-    grid-row:4 !important;
-    min-width:0 !important;
-  }
-  body.v4-app[data-real-active-tab="spaardoelen"] .mobile-goal-main > .goal-inleg-breakdown{
-    grid-column:1 / 3 !important;
-    grid-row:5 !important;
-    width:100% !important;
-    min-width:0 !important;
-  }
-  body.v4-app[data-real-active-tab="spaardoelen"] .mobile-goal-date{
-    grid-column:1 / 3 !important;
-    grid-row:6 !important;
-    min-width:0 !important;
-  }
-  body.v4-app[data-real-active-tab="spaardoelen"] .mobile-goal-side{
-    grid-column:3 !important;
-    grid-row:1 / 7 !important;
-    align-self:stretch !important;
-    min-width:0 !important;
-  }
-}
 </style>
-<link rel="stylesheet" href="./update4.css?v=52-goal-progress-lane">
+<link rel="stylesheet" href="./update4.css?v=50-icon-system">
 <link rel="stylesheet" href="./update5.css?v=29">
 </head>
 <body class="v4-app">
@@ -8636,7 +8557,7 @@ function renderMobileGoalRow(item, owner){
   const goalImage = String(goalImageSource(goal) || '').replace(/'/g,'%27');
   const imageStyle = goalImage ? ` style="background-image:url('${goalImage}')"` : '';
   const iconToneClass = goalImage ? '' : ` tone-${owner === 'gezamenlijk' ? 'green' : owner}`;
-  return `<div class="mobile-goal-row"><span class="mobile-goal-icon${iconToneClass}${goalImage ? ' has-image' : ''}"${imageStyle}>${goalImage ? '' : goalIcon(goal)}</span><div class="mobile-goal-main"><strong>${textSafe(goal.naam || 'Spaardoel')}</strong><span class="mobile-goal-progress-value">${eur(saved)} van ${eur(target)}</span><div class="progress-track mobile-goal-progress-track"><div class="progress-fill" style="width:${progress}%"></div></div><em class="mobile-goal-needed">Nodig p/m: ${item.benodigdPerMaand === null ? '—' : eur(item.benodigdPerMaand)}</em>${goalMonthlyInlegText(item)}<em class="mobile-goal-date">Doel: ${goal.doeldatum ? formatDateNL(goal.doeldatum) : 'Geen einddatum'}</em></div><div class="mobile-goal-side"><b>${progress}%</b><button type="button" class="ghost small" data-open-goal-editor="${owner}:${textSafe(goal.id)}">Bekijk doel</button></div></div>`;
+  return `<div class="mobile-goal-row"><span class="mobile-goal-icon${iconToneClass}${goalImage ? ' has-image' : ''}"${imageStyle}>${goalImage ? '' : goalIcon(goal)}</span><div class="mobile-goal-main"><strong>${textSafe(goal.naam || 'Spaardoel')}</strong><span>${eur(saved)} van ${eur(target)}</span><div class="progress-track"><div class="progress-fill" style="width:${progress}%"></div></div><em class="mobile-goal-needed">Nodig p/m: ${item.benodigdPerMaand === null ? '—' : eur(item.benodigdPerMaand)}</em>${goalMonthlyInlegText(item)}<em>Doel: ${goal.doeldatum ? formatDateNL(goal.doeldatum) : 'Geen einddatum'}</em></div><div class="mobile-goal-side"><b>${progress}%</b><button type="button" class="ghost small" data-open-goal-editor="${owner}:${textSafe(goal.id)}">Bekijk doel</button></div></div>`;
 }
 function renderMobileGoalGroup(group){
   const items = calcGroep(group.doelen, group.pot, TODAY);
@@ -11581,7 +11502,7 @@ async function initializeApp(){
 initializeApp();
 
 </script>
-<script src="./update4.js?v=52-goal-progress-lane"></script>
+<script src="./update4.js?v=50-icon-system"></script>
 <script src="./update5.js?v=29"></script>
 <script>
 if ("serviceWorker" in navigator) {
