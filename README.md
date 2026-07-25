@@ -167,3 +167,11 @@ De bankimportmodal gebruikt één betrouwbaar scrollvlak. Kop en actiebalk blijv
 - Spaardoelen met subdoelen en gewone spaardoelen hebben exact dezelfde beschikbare breedte.
 - Nieuwe spaardoelen nemen automatisch dezelfde afmetingen over.
 - Iconen, berekeningen, opslag en overige weergaven zijn niet gewijzigd.
+
+
+## v52 — vaste spaardoel-progressiestrook
+
+- Bedragstekst en progressiebalk gebruiken één vaste strook over de icoon- en inhoudskolom.
+- Alle doelen hebben daardoor exact dezelfde balkbreedte, ook doelen met subdoelen.
+- Nieuwe doelen gebruiken automatisch dezelfde afmetingen.
+- De v50-iconenset en overige appwerking zijn ongewijzigd.
