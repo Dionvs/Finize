@@ -112,9 +112,15 @@ De bankimportmodal gebruikt één betrouwbaar scrollvlak. Kop en actiebalk blijv
 - Dashboard, persoonlijke tabbladen en verdeelsleutel gebruiken dezelfde inkomensbron.
 
 
-## v43 – sparen uit uitgaven en maandinleg spaardoelen
+## v44 – sparen uit uitgaven en maandinleg spaardoelen
 
 - Naar/van spaarrekening, interne overboekingen en spaardoeltransacties worden niet meer getoond in de uitgavenlijsten.
 - Ook oudere transacties met afwijkende schrijfwijzen worden als spaar- of interne overboeking herkend.
 - Spaardoelen tonen primair **Inleg deze maand**.
 - De uitsplitsing vaste inleg en naar rato staat in het doelvenster na het openen van een doel.
+
+
+## Update v44
+- Spaardoelen gebruiken opnieuw de bestaande compacte kaartindeling; alleen de tekst toont nu de totale inleg deze maand.
+- Vaste lasten worden niet meer dubbel getoond of meegeteld in de transactielijsten.
+- Variabele budgetcategorieën zijn klikbaar voor Gezamenlijk, Dion en Dara en openen de bijbehorende transacties.

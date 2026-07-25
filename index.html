@@ -5259,7 +5259,7 @@ body.v4-app .modal-content{ min-width:0; }
   .u3-budget-row span:nth-child(3),.u3-budget-row span:nth-child(4){display:none}
 }
 </style>
-<link rel="stylesheet" href="./update4.css?v=43">
+<link rel="stylesheet" href="./update4.css?v=44">
 <link rel="stylesheet" href="./update5.css?v=29">
 </head>
 <body class="v4-app">
@@ -6007,6 +6007,7 @@ function normalizedTransactionType(tx){
   if(/interne-?overboeking|eigen-?rekening/.test(joined))return 'interne-overboeking';
   if(/maandelijkse-?bijdrage/.test(joined))return 'maandelijkse-bijdrage';
   if(/extra-?bijdrage/.test(joined))return 'extra-bijdrage';
+  if(/vaste-?last|fixed-?expense/.test(joined))return 'vaste-last';
   if(/sparen|spaardoel/.test(joined))return 'sparen';
   return values.find(Boolean)||'';
 }
@@ -6014,8 +6015,9 @@ function isBudgetExpenseTransaction(tx){
   if(!tx||tx.processing?.include===false||tx.kind==='niet-meetellen')return false;
   const kind=String(tx.kind||'').toLocaleLowerCase('nl-NL').replace(/[ _]+/g,'-');
   const type=normalizedTransactionType(tx);
-  if(['inkomen','interne-overboeking','terugbetaling','niet-meetellen'].includes(kind))return false;
-  if(['sparen','naar-spaarrekening','van-spaarrekening','interne-overboeking','maandelijkse-bijdrage','extra-bijdrage','terugbetaling-voorschot','terugbetaling','niet-meetellen','salaris','vakantiegeld','nabetaling','vergoeding','belastingteruggave','overige-inkomsten'].includes(type))return false;
+  if(['inkomen','interne-overboeking','terugbetaling','niet-meetellen','vaste-last','fixed-expense'].includes(kind))return false;
+  if(tx.fixedExpenseId||tx.processing?.fixedExpenseId||tx.vasteLastId||tx.processing?.vasteLastId)return false;
+  if(['vaste-last','fixed-expense','sparen','naar-spaarrekening','van-spaarrekening','interne-overboeking','maandelijkse-bijdrage','extra-bijdrage','terugbetaling-voorschot','terugbetaling','niet-meetellen','salaris','vakantiegeld','nabetaling','vergoeding','belastingteruggave','overige-inkomsten'].includes(type))return false;
   return true;
 }
 function getTransactionExpenseImpact(tx){
@@ -6295,7 +6297,7 @@ function renderModernGoalCards(doelen, pot, owner, limit=null){
 }
 function goalMonthlyInlegText(item){
   const total=Number(item.werkelijkeInleg)||0;
-  return `<span class="goal-monthly-contribution"><span>Inleg deze maand</span><strong>${eur(total)}</strong><small>Tik voor vaste inleg en naar rato</small></span>`;
+  return `<span class="goal-inleg-breakdown"><b style="grid-column:1/-1"><span class="goal-inleg-label">Inleg deze maand</span><span class="goal-inleg-value">${eur(total)}</span></b></span>`;
 }
 function goalMonthlyInlegBreakdown(item){
   const fixed=Number(item.vasteInlegWerkelijk??item.doel.vasteInleg)||0;
@@ -8145,12 +8147,12 @@ function renderDashboard(){
   `;
 }
 function renderRecentTransactionsList(owner, limit=4){
-  const rows = getMonthTransactions(owner).sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,limit);
+  const rows = getMonthTransactions(owner).filter(isBudgetExpenseTransaction).sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,limit);
   if (!rows.length) return renderEmptyState('▤','Nog geen uitgaven deze maand.','Toegevoegde uitgaven verschijnen hier.', `<button class="ghost small" data-open-transaction>+ Uitgave toevoegen</button>`);
   return `<div class="summary-list">${rows.map(tx=>`<div class="summary-line"><span>${textSafe(tx.description || tx.category || 'Uitgave')}</span><strong class="value neg">${eur(Number(tx.amount)||0)} <span class="hint">· ${formatDateNL(tx.date)}</span></strong></div>`).join('')}</div>`;
 }
 function renderTransactionsTable(owner){
-  const rows = getMonthTransactions(owner).sort((a,b)=>String(b.date).localeCompare(String(a.date))).map(tx=>`
+  const rows = getMonthTransactions(owner).filter(isBudgetExpenseTransaction).sort((a,b)=>String(b.date).localeCompare(String(a.date))).map(tx=>`
     <tr>
       <td>${formatDateNL(tx.date)}</td>
       <td>${tx.category || 'Overig'}</td>
@@ -9598,22 +9600,22 @@ function renderJointFirstRow(){
   const variableRows = Array.from(variableBudgetMap.entries()).map(([key,row])=>{
     const used = usedByBudgetKey[key] || 0;
     const ratio = row.budget > 0 ? Math.min(1, used / row.budget) : 0;
-    return `<div class="budget-preview-item">
+    return `<button type="button" class="budget-preview-item budget-preview-button" data-open-budget-transactions="${textSafe(row.label)}" data-budget-owner="gezamenlijk" aria-label="Open transacties voor ${textSafe(row.label)}">
       <div class="budget-preview-thumb tone-green">${iconSvg(categoryIconName(row.label))}</div>
       <div class="budget-preview-main">
         <div class="budget-preview-top"><strong>${textSafe(row.label)}</strong><span><span class="neutral-amount">${eur(used)}</span> / <span class="neutral-amount">${eur(row.budget)}</span></span></div>
         <div class="progress-track budget-gradient"><div class="progress-fill budget-gradient" style="width:${Math.round(ratio*100)}%"></div></div>
       </div>
-    </div>`;
+    </button>`;
   });
   if (unassignedUsed > 0){
-    variableRows.push(`<div class="budget-preview-item joint-variable-unassigned">
+    variableRows.push(`<button type="button" class="budget-preview-item budget-preview-button joint-variable-unassigned" data-open-budget-transactions="Ongecategoriseerd" data-budget-owner="gezamenlijk">
       <div class="budget-preview-thumb">${iconSvg('more')}</div>
       <div class="budget-preview-main">
         <div class="budget-preview-top"><strong>Ongecategoriseerd</strong><span class="neutral-amount">${eur(unassignedUsed)}</span></div>
         <div class="progress-track"><div class="progress-fill" style="width:100%"></div></div>
       </div>
-    </div>`);
+    </button>`);
   }
   const vasteByCat = {};
   (scenarioData.gezamenlijk.vasteLasten||[]).forEach(row=>{
@@ -9712,8 +9714,8 @@ function renderPersonalFirstRow(owner){
   const used = {};
   let uncategorized = 0;
   getMonthTransactions(owner).forEach(tx=>{ const key=String(tx.category||'').trim().toLocaleLowerCase(); const impact=getTransactionExpenseImpact(tx); if (budgets.has(key)) used[key]=round2((used[key]||0)+impact); else uncategorized=round2(uncategorized+impact); });
-  const variableRows = [...budgets.entries()].map(([key,row])=>{ const amount=used[key]||0; const ratio=row.budget>0?Math.min(1,amount/row.budget):0; return `<div class="budget-preview-item"><div class="budget-preview-thumb tone-green">${iconSvg(categoryIconName(row.label))}</div><div class="budget-preview-main"><div class="budget-preview-top"><strong>${textSafe(row.label)}</strong><span>${eur(amount)} / ${eur(row.budget)}</span></div><div class="progress-track budget-gradient"><div class="progress-fill budget-gradient" style="width:${Math.round(ratio*100)}%"></div></div></div></div>`; });
-  if (uncategorized>0) variableRows.push(`<div class="budget-preview-item joint-variable-unassigned"><div class="budget-preview-thumb">${iconSvg('more')}</div><div class="budget-preview-main"><div class="budget-preview-top"><strong>Ongecategoriseerd</strong><span>${eur(uncategorized)}</span></div><div class="progress-track"><div class="progress-fill" style="width:100%"></div></div></div></div>`);
+  const variableRows = [...budgets.entries()].map(([key,row])=>{ const amount=used[key]||0; const ratio=row.budget>0?Math.min(1,amount/row.budget):0; return `<button type="button" class="budget-preview-item budget-preview-button" data-open-budget-transactions="${textSafe(row.label)}" data-budget-owner="${owner}" aria-label="Open transacties voor ${textSafe(row.label)}"><div class="budget-preview-thumb tone-green">${iconSvg(categoryIconName(row.label))}</div><div class="budget-preview-main"><div class="budget-preview-top"><strong>${textSafe(row.label)}</strong><span>${eur(amount)} / ${eur(row.budget)}</span></div><div class="progress-track budget-gradient"><div class="progress-fill budget-gradient" style="width:${Math.round(ratio*100)}%"></div></div></div></button>`; });
+  if (uncategorized>0) variableRows.push(`<button type="button" class="budget-preview-item budget-preview-button joint-variable-unassigned" data-open-budget-transactions="Ongecategoriseerd" data-budget-owner="${owner}"><div class="budget-preview-thumb">${iconSvg('more')}</div><div class="budget-preview-main"><div class="budget-preview-top"><strong>Ongecategoriseerd</strong><span>${eur(uncategorized)}</span></div><div class="progress-track"><div class="progress-fill" style="width:100%"></div></div></div></button>`);
   const fixed={}; (data.vasteLasten||[]).forEach(row=>{ const cat=normalizeCategoryName(row.categorie); fixed[cat]=round2((fixed[cat]||0)+effectiveBedrag(row)); });
   const fixedRows=Object.entries(fixed).sort((a,b)=>b[1]-a[1]).map(([cat,amount])=>{ const ratio=person.persoonlijkeVasteLasten>0?amount/person.persoonlijkeVasteLasten:0; return `<div class="progress-item"><div class="progress-item-icon tone-green">${iconSvg(jointFixedCategoryIconName(cat))}</div><div class="progress-top"><strong>${cat}</strong><span>${eur(amount)} · ${pct(ratio)}</span></div><div class="progress-track"><div class="progress-fill" style="width:${Math.round(ratio*100)}%"></div></div></div>`; }).join('');
   const variableBudget=sumBedrag(data.variabel||[]); const variablePct=variableBudget>0?Math.min(100,Math.round((person.variabeleUitgaven/variableBudget)*100)):0;
@@ -9754,10 +9756,10 @@ function parkMonthControlBeforeRender(){
   }
 }
 
-function openBudgetTransactionsModal(category){
+function openBudgetTransactionsModal(category,owner='gezamenlijk'){
   const modal=document.getElementById('transactionModal');
   const month=getSelectedMonth();
-  const rows=getMonthTransactions('gezamenlijk',month)
+  const rows=getMonthTransactions(owner,month)
     .filter(tx=>budgetCategoryMatches(tx,category) && Math.abs(getTransactionExpenseImpact(tx))>.004)
     .sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
   const total=round2(rows.reduce((sum,tx)=>sum+getTransactionExpenseImpact(tx),0));
@@ -9766,7 +9768,7 @@ function openBudgetTransactionsModal(category){
   const close=()=>{modal.classList.remove('open');modal.innerHTML='';};
   modal.querySelector('[data-close-budget-transactions]')?.addEventListener('click',close);
   modal.addEventListener('click',event=>{if(event.target===modal)close();},{once:true});
-  modal.querySelectorAll('[data-open-budget-transaction-id]').forEach(button=>button.addEventListener('click',()=>{const id=button.dataset.openBudgetTransactionId;close();openJointTransactionModal(id);}));
+  modal.querySelectorAll('[data-open-budget-transaction-id]').forEach(button=>button.addEventListener('click',()=>{const id=button.dataset.openBudgetTransactionId;close();owner==='gezamenlijk'?openJointTransactionModal(id):openPersonalTransactionModal(owner,id);}));
 }
 function renderActiveTab(){
   ensureMonthData(getSelectedMonth());
@@ -9818,7 +9820,7 @@ function renderActiveTab(){
     btn.addEventListener('click', openTotalIncomeEditModal);
   });
   root.querySelectorAll('[data-open-budget-transactions]').forEach(btn=>{
-    btn.addEventListener('click',()=>openBudgetTransactionsModal(btn.dataset.openBudgetTransactions));
+    btn.addEventListener('click',()=>openBudgetTransactionsModal(btn.dataset.openBudgetTransactions,btn.dataset.budgetOwner||'gezamenlijk'));
   });
   root.querySelectorAll('[data-open-goal-editor]').forEach(btn=>{
     btn.addEventListener('click',()=>{ const [owner,id]=btn.dataset.openGoalEditor.split(':'); openMobileGoalEditor(owner,id); });
@@ -10359,10 +10361,10 @@ function u2RenderGoalRow(item,owner){
   return `<article class="card u2-goal-card">
     <button class="u2-goal-main" type="button" data-open-goal-editor="${owner}:${textSafe(goal.id)}">
       <span class="u2-goal-image${image?' has-image':''}"${image?` style="background-image:url('${image}')"`:''}>${image?'':goalIcon(goal)}</span>
-      <span class="u2-goal-copy"><span class="u2-goal-title"><strong>${textSafe(goal.naam||'Spaardoel')}</strong><em class="u2-status ${item.status.key}">${item.status.label}</em></span><span>${eur(saved)} van ${eur(target)}</span><span class="progress-track"><span class="progress-fill" style="width:${progress}%"></span></span>${u2RenderChildSummary(goal)}${goalMonthlyInlegText(item)}</span>
+      <span class="u2-goal-copy"><span class="u2-goal-title"><strong>${textSafe(goal.naam||'Spaardoel')}</strong><em class="u2-status ${item.status.key}">${item.status.label}</em></span><span>${eur(saved)} van ${eur(target)}</span><span class="progress-track"><span class="progress-fill" style="width:${progress}%"></span></span>${u2RenderChildSummary(goal)}</span>
       <span class="u2-goal-side"><b>${progress}%</b><small>Nog ${eur(item.nogTeGaan)}</small></span>
     </button>
-    <div class="u2-prognosis"><span>Benodigd p/m <strong>${item.benodigdPerMaand===null?'—':eur(item.benodigdPerMaand)}</strong></span><span>Gemiddeld 6 mnd <strong>${item.historieGemiddelde===null?'Nog geen historie':eur(item.gemiddeldeInleg)}</strong></span><span>Verwacht gereed <strong>${u2DateLabel(item.verwachteEinddatum)}</strong></span></div>
+    <div class="u2-prognosis"><span>Inleg deze maand <strong>${eur(item.werkelijkeInleg)}</strong></span><span>Benodigd p/m <strong>${item.benodigdPerMaand===null?'—':eur(item.benodigdPerMaand)}</strong></span><span>Verwacht gereed <strong>${u2DateLabel(item.verwachteEinddatum)}</strong></span></div>
   </article>`;
 }
 const u2OriginalMobileSpaardoelen=renderMobileSpaardoelen;
@@ -11249,7 +11251,7 @@ async function initializeApp(){
 initializeApp();
 
 </script>
-<script src="./update4.js?v=43"></script>
+<script src="./update4.js?v=44"></script>
 <script src="./update5.js?v=29"></script>
 <script>
 if ("serviceWorker" in navigator) {
