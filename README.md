@@ -141,3 +141,10 @@ De bankimportmodal gebruikt één betrouwbaar scrollvlak. Kop en actiebalk blijv
 ## v48
 - Spaardoeltekst en voortgangsbalken gebruiken een uniforme breedte.
 - Variabele budgetten worden via een losse bewerkkopie atomair opgeslagen voor de geselecteerde maand.
+
+
+## v49
+
+- Alleen de persoonlijke spaarpotberekening aangepast.
+- Formule: zakgeld min persoonlijke vaste lasten min persoonlijk variabel budget.
+- Werkelijke variabele uitgaven blijven zichtbaar als realisatie, maar bepalen de geplande spaarpot niet.

@@ -5300,7 +5300,7 @@ body.v4-app[data-real-active-tab="spaardoelen"] .u2-goal-accordion>summary::afte
   .u3-budget-row span:nth-child(3),.u3-budget-row span:nth-child(4){display:none}
 }
 </style>
-<link rel="stylesheet" href="./update4.css?v=48-goal-width-budget-save">
+<link rel="stylesheet" href="./update4.css?v=49-savings-pot-formula">
 <link rel="stylesheet" href="./update5.css?v=29">
 </head>
 <body class="v4-app">
@@ -6728,10 +6728,13 @@ function calcScenario(state){
   }
   function persoonlijk(p, zakgeld){
     const persoonlijkeVasteLasten = sumEffective(s[p].vasteLasten);
+    const persoonlijkVariabelBudget = sumBedrag(s[p].variabel);
     const resterendVoorVariabel = round2(zakgeld - persoonlijkeVasteLasten);
     const variabeleUitgaven = sumTransactions(p);
-    const beschikbaarVoorSparen = round2(resterendVoorVariabel - variabeleUitgaven);
-    return { persoonlijkeVasteLasten, resterendVoorVariabel, variabeleUitgaven, beschikbaarVoorSparen };
+    // v49: de spaarpot is een planningsbedrag en gebruikt daarom het
+    // ingestelde variabele budget, niet de werkelijke transacties.
+    const beschikbaarVoorSparen = round2(zakgeld - persoonlijkeVasteLasten - persoonlijkVariabelBudget);
+    return { persoonlijkeVasteLasten, persoonlijkVariabelBudget, resterendVoorVariabel, variabeleUitgaven, beschikbaarVoorSparen };
   }
   const dion = { zakgeld: zakgeldDion, ...persoonlijk('dion', zakgeldDion) };
   const dara = { zakgeld: zakgeldDara, ...persoonlijk('dara', zakgeldDara) };
@@ -11321,7 +11324,7 @@ async function initializeApp(){
 initializeApp();
 
 </script>
-<script src="./update4.js?v=48-goal-width-budget-save"></script>
+<script src="./update4.js?v=49-savings-pot-formula"></script>
 <script src="./update5.js?v=29"></script>
 <script>
 if ("serviceWorker" in navigator) {
