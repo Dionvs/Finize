@@ -142,3 +142,8 @@ De bankimportmodal gebruikt één betrouwbaar scrollvlak. Kop en actiebalk blijv
 - Met **Alleen voor deze maand** kan een eenmalige budgetafwijking worden opgeslagen.
 - Bestaande maandbudgetten worden eenmalig gemigreerd naar budgethistorie, zodat eerdere instellingen behouden blijven.
 - De spaargeldberekening gebruikt het effectieve budget van de geselecteerde maand.
+
+
+## v47 visuele herstelrelease
+
+De tijdelijke v46 mobiele spaardoelen-override is verwijderd. De bestaande, eerder afgestemde kaartlayout is hersteld zonder de budgethistorie en berekeningen terug te draaien.
