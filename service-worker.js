@@ -1,10 +1,10 @@
-const CACHE_NAME = "finize-v50-icon-system";
+const CACHE_NAME = "finize-v51-goal-progress";
 
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./update4.js?v=50-icon-system",
-  "./update4.css?v=50-icon-system",
+  "./update4.js?v=51-goal-progress",
+  "./update4.css?v=51-goal-progress",
   "./update5.js?v=29",
   "./update5.css?v=29",
   "./finize-v4.html",

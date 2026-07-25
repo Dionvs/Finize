@@ -5375,8 +5375,45 @@ button.icon-only-finize{width:34px;height:34px;padding:0!important;border-radius
   .v4-bottom-nav .bottom-nav-btn .bn-icon{padding:6px!important}
   .v4-bottom-nav .bottom-nav-btn.active .bn-icon{outline:none!important;box-shadow:inset 0 0 0 1px rgba(111,138,85,.16)!important}
 }
+
+/* v51 — definitieve uniforme breedte voor alle spaardoelprogressie */
+@media(max-width:767px){
+  body.v4-app[data-real-active-tab="spaardoelen"] .mobile-goal-list{
+    width:100% !important;
+    min-width:0 !important;
+  }
+  body.v4-app[data-real-active-tab="spaardoelen"] .u2-goal-accordion,
+  body.v4-app[data-real-active-tab="spaardoelen"] .u2-goal-accordion > summary{
+    display:block !important;
+    width:100% !important;
+    min-width:0 !important;
+    box-sizing:border-box !important;
+  }
+  body.v4-app[data-real-active-tab="spaardoelen"] .mobile-goal-row{
+    width:100% !important;
+    min-width:0 !important;
+    grid-template-columns:30px minmax(0,1fr) 64px !important;
+    box-sizing:border-box !important;
+  }
+  body.v4-app[data-real-active-tab="spaardoelen"] .mobile-goal-main{
+    width:100% !important;
+    min-width:0 !important;
+    max-width:none !important;
+  }
+  body.v4-app[data-real-active-tab="spaardoelen"] .mobile-goal-main > span,
+  body.v4-app[data-real-active-tab="spaardoelen"] .mobile-goal-main > .progress-track{
+    display:block !important;
+    width:100% !important;
+    min-width:0 !important;
+    max-width:none !important;
+    box-sizing:border-box !important;
+  }
+  body.v4-app[data-real-active-tab="spaardoelen"] .mobile-goal-main > .progress-track{
+    justify-self:stretch !important;
+  }
+}
 </style>
-<link rel="stylesheet" href="./update4.css?v=50-icon-system">
+<link rel="stylesheet" href="./update4.css?v=51-goal-progress">
 <link rel="stylesheet" href="./update5.css?v=29">
 </head>
 <body class="v4-app">
@@ -11502,7 +11539,7 @@ async function initializeApp(){
 initializeApp();
 
 </script>
-<script src="./update4.js?v=50-icon-system"></script>
+<script src="./update4.js?v=51-goal-progress"></script>
 <script src="./update5.js?v=29"></script>
 <script>
 if ("serviceWorker" in navigator) {

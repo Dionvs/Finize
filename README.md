@@ -158,3 +158,12 @@ De bankimportmodal gebruikt één betrouwbaar scrollvlak. Kop en actiebalk blijv
 - Toevoegen, bewerken, verwijderen, importeren, exporteren, opslaan en synchroniseren hebben vaste actie-iconen.
 - Unicode- en emoji-achtige categorie-iconen zijn vervangen door schaalbare SVG-lijniconen.
 - Financiële berekeningen, state, Firestore, importlogica en eventhandlers zijn niet functioneel gewijzigd.
+
+
+## v51 — uniforme spaardoelprogressie
+
+- Gebouwd op de aangeleverde v50-iconenversie.
+- Alle spaardoelen gebruiken op mobiel dezelfde middenkolom voor bedragstekst en voortgangsbalk.
+- Spaardoelen met subdoelen en gewone spaardoelen hebben exact dezelfde beschikbare breedte.
+- Nieuwe spaardoelen nemen automatisch dezelfde afmetingen over.
+- Iconen, berekeningen, opslag en overige weergaven zijn niet gewijzigd.
