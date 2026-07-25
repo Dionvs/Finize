@@ -1,10 +1,10 @@
-const CACHE_NAME = "finize-v44-layout-and-expense-fix";
+const CACHE_NAME = "finize-v46-budget-history";
 
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./update4.js?v=44",
-  "./update4.css?v=44",
+  "./update4.js?v=46",
+  "./update4.css?v=46",
   "./update5.js?v=29",
   "./update5.css?v=29",
   "./finize-v4.html",

@@ -124,3 +124,21 @@ De bankimportmodal gebruikt één betrouwbaar scrollvlak. Kop en actiebalk blijv
 - Spaardoelen gebruiken opnieuw de bestaande compacte kaartindeling; alleen de tekst toont nu de totale inleg deze maand.
 - Vaste lasten worden niet meer dubbel getoond of meegeteld in de transactielijsten.
 - Variabele budgetcategorieën zijn klikbaar voor Gezamenlijk, Dion en Dara en openen de bijbehorende transacties.
+
+
+## Update v45
+
+- Uniforme spaardoelkaartindeling en uniforme subdoelchevron rechtsboven.
+- Variabele maandbudgetten worden atomair opgeslagen in `monthlyBudgets`.
+- Persoonlijk spaargeld wordt gepland als zakgeld minus vaste lasten minus variabele budgetten.
+
+
+## Update v46
+
+- Variabele budgetten gebruiken nu dezelfde historische werking als standaardsalaris.
+- Een wijziging geldt standaard vanaf de geselecteerde maand en voor alle toekomstige maanden.
+- Eerdere maanden blijven ongewijzigd.
+- Een latere wijziging vormt een nieuw startpunt.
+- Met **Alleen voor deze maand** kan een eenmalige budgetafwijking worden opgeslagen.
+- Bestaande maandbudgetten worden eenmalig gemigreerd naar budgethistorie, zodat eerdere instellingen behouden blijven.
+- De spaargeldberekening gebruikt het effectieve budget van de geselecteerde maand.
