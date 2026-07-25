@@ -1,10 +1,10 @@
-const CACHE_NAME = "finize-v38-import-performance";
+const CACHE_NAME = "finize-v39-clickable-validation";
 
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./update4.js?v=38",
-  "./update4.css?v=38",
+  "./update4.js?v=39",
+  "./update4.css?v=39",
   "./update5.js?v=29",
   "./update5.css?v=29",
   "./finize-v4.html",

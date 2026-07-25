@@ -77,3 +77,10 @@ De bankimportmodal gebruikt één betrouwbaar scrollvlak. Kop en actiebalk blijv
 - De knop Concept opslaan forceert direct lokale opslag en één cloudsync.
 - Bij Sluiten worden resterende lokale wijzigingen eerst geflusht; cloudsync vervolgt op de achtergrond.
 - Opslagstatus in de footer toont lokaal opslaan, achtergrondcloudsync en fouten.
+
+
+## Update v39
+
+- Validatiefouten bij het verwerken van een bankimport worden in een klikbaar foutpaneel getoond.
+- **Open transactie** scrolt naar de juiste kaart, opent **Meer opties** en markeert de relevante splitsregels.
+- Splitfouten leggen nu duidelijk uit dat de som van de splits gelijk moet zijn aan het transactiebedrag.

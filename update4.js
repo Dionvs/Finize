@@ -837,7 +837,7 @@
       if(p.fixedExpenseId&&!fixedExists(state,p.fixedExpenseId))errors.push({rowId:row.id,code:'fixed',message:'De gekozen vaste last bestaat niet meer.'});
       if((p.splits||[]).length){
         const splitTotal=round2(p.splits.reduce((sum,split)=>sum+Number(split.amount||0),0));
-        if(Math.abs(splitTotal-round2(p.processedAmount))>.004)errors.push({rowId:row.id,code:'splits',message:`Splitbedragen ${euro(splitTotal)} tellen niet op tot ${euro(p.processedAmount)}.`});
+        if(Math.abs(splitTotal-round2(p.processedAmount))>.004)errors.push({rowId:row.id,code:'splits',message:`De splitsregels zijn samen ${euro(splitTotal)}, maar deze transactie is ${euro(p.processedAmount)}. Pas de splitbedragen aan of verwijder de lege splitsregels.`});
         p.splits.forEach(split=>{
           if(!OWNERS.includes(split.budgetOwner)||!split.category)errors.push({rowId:row.id,code:'split-fields',message:'Iedere splitregel heeft een budgeteigenaar en categorie nodig.'});
           if(split.savingsGoalId&&!goalExists(state,split.savingsGoalId))errors.push({rowId:row.id,code:'split-goal',message:'Een spaardoel in een splitregel bestaat niet meer.'});
@@ -1121,7 +1121,7 @@
     const working=clone(root.state);
     undoImportEffects(working,draft);
     const plan=planImportEffects(draft,working);
-    if(!plan.ok){alert(`Correctie kan nog niet worden verwerkt:\n${plan.errors.slice(0,8).map(error=>`• ${error.message}`).join('\n')}`);return false;}
+    if(!plan.ok){showValidationErrors(root,draft,plan.errors,'Correctie kan nog niet worden verwerkt');return false;}
     const journal={id:`reconcile-${draft.id}-${Date.now()}`,importId:draft.id,operation:'reconcile',status:'pending',createdAt:new Date().toISOString()};
     await ImportStore.putJournal(journal);
     const ok=root.commitChange(()=>{undoImportEffects(root.state,draft);applyImportPlan(root.state,plan);},{render:false,mutationMode:'correction'});
@@ -1136,9 +1136,66 @@
   function processedSummaryHtml(plan){
     return `<div class="u4-import-summary"><div><span>Uitgaven</span><strong>${plan.counts.expenses}</strong></div><div><span>Inkomsten</span><strong>${plan.counts.income}</strong></div><div><span>Interne overboekingen</span><strong>${plan.counts.internal}</strong></div><div><span>Sparen</span><strong>${plan.counts.savings}</strong></div><div><span>Terugbetalingen</span><strong>${plan.counts.refunds}</strong></div><div><span>Voorschotten</span><strong>${plan.counts.advances}</strong></div><div><span>Ongecategoriseerd</span><strong>${plan.counts.uncategorized}</strong></div><div><span>Duplicaten</span><strong>${plan.duplicateCount}</strong></div></div><p><strong>Inkomsten ${euro(plan.totalIncome)}</strong> · uitgaven ${euro(plan.totalExpenses)}</p>`;
   }
+  function validationTargetLabel(draft,error){
+    if(!error?.rowId)return error?.code==='profile'?'Rekeningprofiel':'Importinstellingen';
+    const row=(draft.rows||[]).find(item=>String(item.id)===String(error.rowId));
+    if(!row)return 'Transactie';
+    const description=String(row.bankOriginal?.description||'Onbekende transactie').trim();
+    const date=String(row.processing?.processingDate||row.bankOriginal?.bankDate||'').trim();
+    const amount=euro(row.processing?.processedAmount??row.bankOriginal?.amount??0);
+    return `${date?`${date} · `:''}${description} · ${amount}`;
+  }
+  function findDraftRowElement(modal,rowId){
+    return [...(modal?.querySelectorAll?.('[data-u4-row]')||[])].find(element=>String(element.dataset.u4Row)===String(rowId))||null;
+  }
+  function focusValidationError(root,draft,error){
+    const modal=document.getElementById('u4ImportModalRoot');
+    document.querySelector('.u4-validation-overlay')?.remove();
+    if(!modal)return;
+    if(!error?.rowId){
+      const profile=modal.querySelector('[data-u4-profile-select]')||modal.querySelector('.u4-profile-grid');
+      profile?.scrollIntoView?.({behavior:'smooth',block:'center'});
+      profile?.focus?.({preventScroll:true});
+      return;
+    }
+    let row=findDraftRowElement(modal,error.rowId);
+    if(!row){
+      UI.visibleRows=Math.max(UI.visibleRows||0,(draft.rows||[]).length);
+      renderDraftModal(root,draft);
+      row=findDraftRowElement(document.getElementById('u4ImportModalRoot'),error.rowId);
+    }
+    if(!row)return;
+    const section=row.closest('details.u4-section');
+    if(section)section.open=true;
+    const more=row.querySelector('details');
+    if(more)more.open=true;
+    row.classList.add('u4-validation-target');
+    row.scrollIntoView({behavior:'smooth',block:'center'});
+    let target=null;
+    if(String(error.code).startsWith('split'))target=row.querySelector('[data-u4-split-field="amount"]')||row.querySelector('[data-u4-add-split]');
+    else if(error.code==='date')target=row.querySelector('[data-u4-field="processingDate"]');
+    else if(error.code==='amount')target=row.querySelector('[data-u4-field="processedAmount"]');
+    else if(error.code==='owner')target=row.querySelector('[data-u4-field="budgetOwner"]');
+    else if(error.code==='goal')target=row.querySelector('[data-u4-field="savingsGoalId"]');
+    else if(error.code==='fixed')target=row.querySelector('[data-u4-field="fixedExpenseId"]');
+    setTimeout(()=>{target?.focus?.({preventScroll:true});},350);
+    setTimeout(()=>row?.classList.remove('u4-validation-target'),3500);
+  }
+  function showValidationErrors(root,draft,errors,title='Import kan nog niet worden verwerkt'){
+    document.querySelector('.u4-validation-overlay')?.remove();
+    const overlay=document.createElement('div');
+    overlay.className='u4-validation-overlay';
+    const shown=(errors||[]).slice(0,12);
+    overlay.innerHTML=`<div class="u4-validation-dialog" role="dialog" aria-modal="true" aria-labelledby="u4-validation-title"><header class="u4-validation-head"><div><h3 id="u4-validation-title">${esc(title)}</h3><p>Pas de onderstaande punten aan. Klik op een fout om direct naar de juiste transactie te gaan.</p></div><button type="button" class="ghost small" data-u4-validation-close>Sluiten</button></header><div class="u4-validation-list">${shown.map((error,index)=>`<button type="button" class="u4-validation-item" data-u4-validation-index="${index}"><span><strong>${esc(validationTargetLabel(draft,error))}</strong><small>${esc(error.message)}</small></span><b>Open transactie</b></button>`).join('')}</div>${(errors||[]).length>shown.length?`<p class="u4-validation-more">Nog ${(errors||[]).length-shown.length} fout(en) worden zichtbaar nadat deze zijn opgelost.</p>`:''}</div>`;
+    document.body.appendChild(overlay);
+    const close=()=>overlay.remove();
+    overlay.querySelector('[data-u4-validation-close]')?.addEventListener('click',close);
+    overlay.addEventListener('click',event=>{if(event.target===overlay)close();});
+    overlay.querySelectorAll('[data-u4-validation-index]').forEach(button=>button.addEventListener('click',()=>focusValidationError(root,draft,shown[Number(button.dataset.u4ValidationIndex)])));
+  }
   async function processDraft(root,draft){
     const plan=planImportEffects(draft,root.state);
-    if(!plan.ok){alert(`Import kan nog niet worden verwerkt:\n${plan.errors.slice(0,8).map(error=>`• ${error.message}`).join('\n')}`);return false;}
+    if(!plan.ok){showValidationErrors(root,draft,plan.errors);return false;}
     const journal={id:`process-${draft.id}`,importId:draft.id,status:'pending',createdAt:new Date().toISOString(),transactionIds:plan.transactions.map(tx=>tx.id)};
     await ImportStore.putJournal(journal);
     const ok=root.commitChange(()=>applyImportPlan(root.state,plan),{render:false,mutationMode:'late-import'});

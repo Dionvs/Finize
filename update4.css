@@ -149,3 +149,18 @@
   }
   .u4-match-actions>*{width:100% !important;min-height:48px !important;}
 }
+
+/* v39: klikbare validatiefouten voor bankimport */
+.u4-validation-overlay{position:fixed;inset:0;z-index:10040;display:grid;place-items:center;padding:18px;background:rgba(37,28,22,.48);backdrop-filter:blur(4px)}
+.u4-validation-dialog{width:min(760px,100%);max-height:min(84dvh,820px);display:grid;grid-template-rows:auto minmax(0,1fr) auto;overflow:hidden;border:1px solid var(--border);border-radius:20px;background:#fffdfa;color:var(--text);box-shadow:0 28px 70px rgba(47,31,24,.25)}
+.u4-validation-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:16px 18px;border-bottom:1px solid var(--border);background:#fffdfa}
+.u4-validation-head h3,.u4-validation-head p{margin:0}.u4-validation-head h3{font-size:20px}.u4-validation-head p{margin-top:4px;color:var(--text-dim);font-size:12px;line-height:1.45}
+.u4-validation-list{display:grid;gap:8px;overflow:auto;padding:12px;background:var(--bg);overscroll-behavior:contain}
+.u4-validation-item{width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;padding:12px;text-align:left;border:1px solid #e7c9bd;border-radius:14px;background:#fff;color:var(--text);box-shadow:none}
+.u4-validation-item:hover{transform:none;background:#fff8f3;border-color:var(--red);box-shadow:none}
+.u4-validation-item span{display:grid;gap:4px;min-width:0}.u4-validation-item strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}.u4-validation-item small{color:var(--red);font-size:11.5px;line-height:1.4}.u4-validation-item b{color:var(--green);font-size:11px;white-space:nowrap}
+.u4-validation-more{margin:0;padding:10px 14px;border-top:1px solid var(--border);color:var(--text-dim);font-size:11px;background:#fffdfa}
+.u4-import-row.u4-validation-target{border-color:var(--red)!important;box-shadow:0 0 0 4px rgba(159,70,57,.14),0 12px 28px rgba(86,56,31,.10)!important;animation:u4-validation-pulse .7s ease 2}
+.u4-import-row.u4-validation-target .u4-split-list{padding:8px;border:1px solid rgba(159,70,57,.35);border-radius:12px;background:var(--red-bg)}
+@keyframes u4-validation-pulse{50%{transform:translateY(-2px)}}
+@media(max-width:700px){.u4-validation-overlay{padding:0;place-items:end stretch}.u4-validation-dialog{width:100%;max-height:92dvh;border-radius:22px 22px 0 0}.u4-validation-head{padding:14px}.u4-validation-item{grid-template-columns:1fr}.u4-validation-item b{justify-self:start}}
