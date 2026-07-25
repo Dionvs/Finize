@@ -58,3 +58,31 @@
   .u4-import-summary,.u4-row-grid,.u4-more-grid,.u4-profile-grid{grid-template-columns:1fr}
   .u4-row-grid .wide,.u4-more-grid .wide,.u4-profile-grid .wide{grid-column:auto}
 }
+
+/* v33 — full-screen bankimport workflow */
+.u4-row-approval{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.u4-context-block{padding:10px;border:1px solid var(--border-soft);border-radius:12px;background:#f8f4ed;display:grid;gap:7px}
+.u4-context-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.u4-context-grid label{display:grid;gap:4px}
+.u4-bulk-section{background:#fffaf1}
+.u4-match-overlay{position:fixed;inset:0;z-index:10020;display:grid;place-items:center;padding:18px;background:rgba(37,28,22,.48);backdrop-filter:blur(4px)}
+.u4-match-dialog{width:min(760px,100%);max-height:min(82dvh,820px);display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;overflow:hidden;border:1px solid var(--border);border-radius:20px;background:var(--surface);box-shadow:0 28px 70px rgba(47,31,24,.25)}
+.u4-match-head,.u4-match-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:14px 16px}
+.u4-match-head{border-bottom:1px solid var(--border)}
+.u4-match-head h3,.u4-match-head p{margin:0}
+.u4-match-head p{margin-top:3px;color:var(--text-dim);font-size:12px}
+.u4-match-change{display:grid;gap:3px;padding:10px 16px;background:#f4f7ee;border-bottom:1px solid var(--border-soft);font-size:12px}
+.u4-match-list{min-height:0;overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:8px 12px;display:grid;gap:7px}
+.u4-match-row{display:grid;grid-template-columns:22px minmax(0,1fr);gap:9px;align-items:start;padding:10px;border:1px solid var(--border-soft);border-radius:12px;background:#fffdf9;cursor:pointer}
+.u4-match-row input{margin-top:2px}
+.u4-match-row span{display:grid;gap:3px;min-width:0}
+.u4-match-row strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+.u4-match-row small{color:var(--text-dim);font-size:10px;line-height:1.35}
+.u4-match-actions{border-top:1px solid var(--border);justify-content:flex-end;background:#fffdfa}
+@media(max-width:700px){
+  .u4-row-approval{justify-content:flex-start}
+  .u4-context-grid{grid-template-columns:1fr}
+  .u4-match-overlay{padding:0;place-items:end stretch}
+  .u4-match-dialog{width:100%;max-height:92dvh;border-radius:22px 22px 0 0}
+  .u4-match-actions>*{flex:1 1 0;min-height:46px}
+}

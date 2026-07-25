@@ -1,10 +1,10 @@
-const CACHE_NAME = "finize-v32-modal-scroll";
+const CACHE_NAME = "finize-v33-bankimport-workflow";
 
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./update4.js?v=32",
-  "./update4.css?v=32",
+  "./update4.js?v=33",
+  "./update4.css?v=33",
   "./update5.js?v=29",
   "./update5.css?v=29",
   "./finize-v4.html",

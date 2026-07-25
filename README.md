@@ -41,3 +41,13 @@ De regels geven Finize toegang tot het hoofddocument en de aparte import- en chu
 ## Versie 32
 
 De bankimportmodal gebruikt één betrouwbaar scrollvlak. Kop en actiebalk blijven sticky zichtbaar, terwijl de volledige importinhoud ertussen kan worden gescrold.
+
+
+## Release v33 — bankimportworkflow
+
+- Full-screen import behoudt sticky kop en actiebalk met één betrouwbaar scrollvlak.
+- Bulk aanpassen voor transacties in Nakijken, ongecategoriseerd of de volledige import.
+- Goedkeuren vervangt de losse statuskeuze.
+- Bij vergelijkbare transacties verschijnt een selectievenster met individueel uitvinkbare matches.
+- Transactietypen zijn gegroepeerd en opties worden contextafhankelijk getoond.
+- Interne overboekingen ondersteunen expliciete bron- en doelrekening, inclusief geld van spaar- naar betaalrekening.
