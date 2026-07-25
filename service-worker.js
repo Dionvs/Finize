@@ -1,10 +1,10 @@
-const CACHE_NAME = "finize-v36-instant-match-save";
+const CACHE_NAME = "finize-v37-dialog-paint-fix";
 
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./update4.js?v=36",
-  "./update4.css?v=36",
+  "./update4.js?v=37",
+  "./update4.css?v=37",
   "./update5.js?v=29",
   "./update5.css?v=29",
   "./finize-v4.html",

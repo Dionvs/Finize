@@ -53,9 +53,16 @@ De bankimportmodal gebruikt één betrouwbaar scrollvlak. Kop en actiebalk blijv
 - Interne overboekingen ondersteunen expliciete bron- en doelrekening, inclusief geld van spaar- naar betaalrekening.
 
 
-## Update v36
+## Update v37
 
 - Matchbevestigingen sluiten direct en blokkeren niet langer op opslag of cloudsync.
 - Wijzigingen worden direct in de importweergave toegepast.
 - IndexedDB-opslag en Firestore-synchronisatie lopen daarna op de achtergrond.
 - Bij een lokale opslagfout wordt de wijziging teruggedraaid en gemeld.
+
+## Versie 37 — matchdialoog stabiliteit
+
+- Herstelt vastlopen op `Bezig…` wanneer optionele verwerkingsvelden ontbreken.
+- Lege velden worden veilig verwijderd in plaats van via JSON te worden gekloond.
+- De matchdialoog sluit en wordt eerst door de browser weggepaint voordat de volledige importlijst opnieuw wordt opgebouwd.
+- De volledige matchactie heeft een foutgrens die wijzigingen terugdraait en een zichtbare melding toont bij een onverwachte fout.

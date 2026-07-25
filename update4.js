@@ -1162,7 +1162,11 @@
     }).filter(Boolean).sort((a,b)=>b.score-a.score||String(b.row.processing?.processingDate||'').localeCompare(String(a.row.processing?.processingDate||'')));
   }
   function copiedProcessing(source,target){
-    ['budgetOwner','category','transactionType','budgetItemId','fixedExpenseId','fixedAmountMode','savingsGoalId','advanceMode','include','sourceAccountProfileId','destinationAccountProfileId'].forEach(field=>{target.processing[field]=clone(source.processing[field]);});
+    ['budgetOwner','category','transactionType','budgetItemId','fixedExpenseId','fixedAmountMode','savingsGoalId','advanceMode','include','sourceAccountProfileId','destinationAccountProfileId'].forEach(field=>{
+      const value=source.processing[field];
+      if(value===undefined)delete target.processing[field];
+      else target.processing[field]=clone(value);
+    });
   }
 
   function splitHtml(root,row,split,index){
@@ -1235,7 +1239,7 @@
     let busy=false;
     const actionButtons=[...overlay.querySelectorAll('[data-u4-match-only],[data-u4-match-apply],[data-u4-match-close]')];
     const feedback=overlay.querySelector('[data-u4-match-feedback]');
-    async function commitSelection(applyMatches,button){
+    function commitSelection(applyMatches,button){
       if(busy)return;
       busy=true;
       actionButtons.forEach(item=>item.disabled=true);
@@ -1243,27 +1247,48 @@
       feedback.textContent='Wijzigingen worden toegepast.';
       const snapshots=new Map();
       const remember=row=>snapshots.set(row.id,{processing:clone(row.processing),certainty:row.certainty,reasons:clone(row.reasons||[])});
-      remember(source);
-      source.certainty='zeker';source.reasons=[];
-      if(applyMatches){
-        overlay.querySelectorAll('[data-u4-match-id]:checked').forEach(input=>{
-          const target=draft.rows.find(row=>row.id===input.dataset.u4MatchId);
-          if(target){remember(target);copiedProcessing(source,target);target.certainty='zeker';target.reasons=[];}
+      try{
+        remember(source);
+        source.certainty='zeker';source.reasons=[];
+        if(applyMatches){
+          overlay.querySelectorAll('[data-u4-match-id]:checked').forEach(input=>{
+            const target=draft.rows.find(row=>row.id===input.dataset.u4MatchId);
+            if(target){remember(target);copiedProcessing(source,target);target.certainty='zeker';target.reasons=[];}
+          });
+        }
+
+        // Verwijder de dialog eerst en geef de browser minimaal één volledig frame om dit te tekenen.
+        // De zware her-render van de importlijst en opslag starten pas daarna.
+        close();
+        const scheduleAfterDialogPaint=callback=>{
+          if(typeof requestAnimationFrame==='function'){
+            requestAnimationFrame(()=>requestAnimationFrame(callback));
+          }else setTimeout(callback,0);
+        };
+        scheduleAfterDialogPaint(()=>{
+          renderDraftModalPreservingView(root,draft,modal,source.id);
+          setTimeout(()=>{
+            persistImportDraft(root,draft).catch(error=>{
+              snapshots.forEach((snapshot,id)=>{
+                const row=draft.rows.find(item=>item.id===id);
+                if(row){row.processing=snapshot.processing;row.certainty=snapshot.certainty;row.reasons=snapshot.reasons;}
+              });
+              renderDraftModalPreservingView(root,draft,document.getElementById('u4ImportModalRoot'),source.id);
+              alert(`De wijziging kon niet lokaal worden opgeslagen en is teruggedraaid. Probeer het opnieuw.\n\n${error?.message||error}`);
+            });
+          },0);
         });
-      }
-
-      // Sluit en render direct. Lokale opslag en cloudsync mogen de gebruiker niet blokkeren.
-      close();
-      renderDraftModalPreservingView(root,draft,modal,source.id);
-
-      Promise.resolve().then(()=>persistImportDraft(root,draft)).catch(error=>{
+      }catch(error){
         snapshots.forEach((snapshot,id)=>{
           const row=draft.rows.find(item=>item.id===id);
           if(row){row.processing=snapshot.processing;row.certainty=snapshot.certainty;row.reasons=snapshot.reasons;}
         });
-        renderDraftModalPreservingView(root,draft,document.getElementById('u4ImportModalRoot'),source.id);
-        alert(`De wijziging kon niet lokaal worden opgeslagen en is teruggedraaid. Probeer het opnieuw.\n\n${error?.message||error}`);
-      });
+        busy=false;
+        actionButtons.forEach(item=>item.disabled=false);
+        button.textContent=applyMatches?'Geselecteerde aanpassen':'Alleen deze transactie';
+        feedback.textContent=`Aanpassen mislukt: ${error?.message||error}`;
+        feedback.classList.add('u4-error');
+      }
     }
     overlay.querySelector('[data-u4-match-only]').onclick=event=>commitSelection(false,event.currentTarget);
     overlay.querySelector('[data-u4-match-apply]').onclick=event=>commitSelection(true,event.currentTarget);
