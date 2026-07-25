@@ -52,9 +52,10 @@ De bankimportmodal gebruikt één betrouwbaar scrollvlak. Kop en actiebalk blijv
 - Transactietypen zijn gegroepeerd en opties worden contextafhankelijk getoond.
 - Interne overboekingen ondersteunen expliciete bron- en doelrekening, inclusief geld van spaar- naar betaalrekening.
 
-## Release v35 — matchdialog bugfix
 
-- De match-pop-up heeft een zelfstandige, volledig dekkende achtergrond en leesbare tekstkleuren.
-- De actieknoppen blijven op mobiel zichtbaar boven de veilige schermrand.
-- Bevestigen is beschermd tegen dubbelklikken en toont een opslagstatus.
-- Bij een opslagfout worden tijdelijke wijzigingen teruggedraaid en blijft de pop-up bruikbaar.
+## Update v36
+
+- Matchbevestigingen sluiten direct en blokkeren niet langer op opslag of cloudsync.
+- Wijzigingen worden direct in de importweergave toegepast.
+- IndexedDB-opslag en Firestore-synchronisatie lopen daarna op de achtergrond.
+- Bij een lokale opslagfout wordt de wijziging teruggedraaid en gemeld.

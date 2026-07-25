@@ -1217,13 +1217,12 @@
     if(!matches.length){
       const previous=source.certainty;
       source.certainty='zeker';
-      try{
-        await persistImportDraft(root,draft);
-        renderDraftModalPreservingView(root,draft,modal,source.id);
-      }catch(error){
+      renderDraftModalPreservingView(root,draft,modal,source.id);
+      Promise.resolve().then(()=>persistImportDraft(root,draft)).catch(error=>{
         source.certainty=previous;
-        alert(`Goedkeuren is niet opgeslagen. Probeer het opnieuw.\n\n${error?.message||error}`);
-      }
+        renderDraftModalPreservingView(root,draft,document.getElementById('u4ImportModalRoot'),source.id);
+        alert(`Goedkeuren kon niet lokaal worden opgeslagen en is teruggedraaid. Probeer het opnieuw.\n\n${error?.message||error}`);
+      });
       return;
     }
     document.querySelector('.u4-match-overlay')?.remove();
@@ -1239,10 +1238,9 @@
     async function commitSelection(applyMatches,button){
       if(busy)return;
       busy=true;
-      const originalLabel=button.textContent;
       actionButtons.forEach(item=>item.disabled=true);
-      button.textContent='Opslaan…';
-      feedback.textContent='Wijzigingen worden lokaal opgeslagen.';
+      button.textContent='Bezig…';
+      feedback.textContent='Wijzigingen worden toegepast.';
       const snapshots=new Map();
       const remember=row=>snapshots.set(row.id,{processing:clone(row.processing),certainty:row.certainty,reasons:clone(row.reasons||[])});
       remember(source);
@@ -1253,22 +1251,19 @@
           if(target){remember(target);copiedProcessing(source,target);target.certainty='zeker';target.reasons=[];}
         });
       }
-      try{
-        await persistImportDraft(root,draft);
-        feedback.textContent='Opgeslagen.';
-        close();
-        renderDraftModal(root,draft);
-      }catch(error){
+
+      // Sluit en render direct. Lokale opslag en cloudsync mogen de gebruiker niet blokkeren.
+      close();
+      renderDraftModalPreservingView(root,draft,modal,source.id);
+
+      Promise.resolve().then(()=>persistImportDraft(root,draft)).catch(error=>{
         snapshots.forEach((snapshot,id)=>{
           const row=draft.rows.find(item=>item.id===id);
           if(row){row.processing=snapshot.processing;row.certainty=snapshot.certainty;row.reasons=snapshot.reasons;}
         });
-        busy=false;
-        actionButtons.forEach(item=>item.disabled=false);
-        button.textContent=originalLabel;
-        feedback.textContent='Opslaan mislukt. De transacties zijn niet aangepast.';
-        alert(`De selectie kon niet worden opgeslagen. Probeer het opnieuw.\n\n${error?.message||error}`);
-      }
+        renderDraftModalPreservingView(root,draft,document.getElementById('u4ImportModalRoot'),source.id);
+        alert(`De wijziging kon niet lokaal worden opgeslagen en is teruggedraaid. Probeer het opnieuw.\n\n${error?.message||error}`);
+      });
     }
     overlay.querySelector('[data-u4-match-only]').onclick=event=>commitSelection(false,event.currentTarget);
     overlay.querySelector('[data-u4-match-apply]').onclick=event=>commitSelection(true,event.currentTarget);
