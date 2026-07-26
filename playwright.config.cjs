@@ -6,6 +6,7 @@ module.exports = defineConfig({
   retries: 0,
   workers: 1,
   reporter: 'line',
+  snapshotPathTemplate: '{testDir}/{testFilePath}-snapshots/{arg}{ext}',
   use: {
     baseURL: 'http://127.0.0.1:4173',
     serviceWorkers: 'block'
