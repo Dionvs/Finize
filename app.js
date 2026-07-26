@@ -12,6 +12,10 @@
     console.error("Finize kon een achtergrondtaak niet afronden:", ((_c = event.reason) == null ? void 0 : _c.message) || String(event.reason || "Onbekende fout"));
   });
 
+  // src/ui/platform.js
+  var isIphone = /iPhone|iPod/i.test(navigator.userAgent || "");
+  document.documentElement.classList.toggle("finize-ios-phone", isIphone);
+
   // src/core/state.js
   function cloneState(value) {
     return JSON.parse(JSON.stringify(value));

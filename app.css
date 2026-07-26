@@ -5892,3 +5892,152 @@ body.v4-app .value.is-negative{color:var(--red) !important}
   .u5-goal-detail-image{width:180px}
   .u5-data-sections{grid-template-columns:1fr}
 }
+
+/* Finize bron: iphone.css */
+/*
+ * Uitsluitend iPhone: Android en de bestaande tablet/desktopweergave
+ * blijven hierdoor byte-voor-byte op hun huidige CSS-regels draaien.
+ */
+@media (max-width:767px){
+  html.finize-ios-phone{
+    -webkit-text-size-adjust:100%;
+    text-size-adjust:100%;
+  }
+
+  html.finize-ios-phone body.v4-app .mobile-kpi-grid,
+  html.finize-ios-phone body.v4-app[data-active-tab="dashboard"] .mobile-kpi-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+    gap:10px !important;
+  }
+
+  html.finize-ios-phone body.v4-app .mobile-kpi-grid > .mobile-kpi-card,
+  html.finize-ios-phone body.v4-app[data-active-tab="dashboard"] .mobile-kpi-grid > .mobile-kpi-card,
+  html.finize-ios-phone body.v4-app[data-real-active-tab="gezamenlijk"] .mobile-kpi-grid > .mobile-kpi-card{
+    aspect-ratio:auto !important;
+    width:100% !important;
+    height:auto !important;
+    min-height:118px !important;
+    padding:11px !important;
+    grid-template-rows:30px auto minmax(24px,1fr) auto !important;
+    overflow:hidden !important;
+  }
+
+  html.finize-ios-phone body.v4-app .mobile-kpi-top,
+  html.finize-ios-phone body.v4-app[data-active-tab="dashboard"] .mobile-kpi-top{
+    min-height:30px !important;
+    margin:0 0 7px !important;
+  }
+
+  html.finize-ios-phone body.v4-app .mobile-kpi-label,
+  html.finize-ios-phone body.v4-app[data-active-tab="dashboard"] .mobile-kpi-label,
+  html.finize-ios-phone body.v4-app[data-active-tab="dashboard"] .mobile-kpi-grid .mobile-kpi-card:nth-child(3) .mobile-kpi-label,
+  html.finize-ios-phone body.v4-app[data-real-active-tab="gezamenlijk"] .joint-fixed-costs-card .mobile-kpi-label,
+  html.finize-ios-phone body.v4-app[data-real-active-tab="gezamenlijk"] .joint-total-income-card .mobile-kpi-label,
+  html.finize-ios-phone body.v4-app[data-real-active-tab="gezamenlijk"] .joint-saving-card .mobile-kpi-label{
+    min-height:0 !important;
+    padding:0 !important;
+    margin:0 0 5px !important;
+    transform:none !important;
+    font-size:12px !important;
+    line-height:1.22 !important;
+    letter-spacing:-.01em !important;
+    white-space:normal !important;
+    overflow-wrap:anywhere;
+  }
+
+  html.finize-ios-phone body.v4-app .mobile-kpi-value,
+  html.finize-ios-phone body.v4-app[data-active-tab="dashboard"] .mobile-kpi-value,
+  html.finize-ios-phone body.v4-app[data-active-tab="dashboard"] .mobile-kpi-grid .mobile-kpi-card:nth-child(3) .mobile-kpi-value,
+  html.finize-ios-phone body.v4-app[data-real-active-tab="gezamenlijk"] .joint-fixed-costs-card .mobile-kpi-value,
+  html.finize-ios-phone body.v4-app[data-real-active-tab="gezamenlijk"] .joint-total-income-card .mobile-kpi-value,
+  html.finize-ios-phone body.v4-app[data-real-active-tab="gezamenlijk"] .joint-saving-card .mobile-kpi-value{
+    min-height:0 !important;
+    margin:2px 0 0 !important;
+    transform:none !important;
+    font-size:18px !important;
+    line-height:1.08 !important;
+    letter-spacing:-.025em !important;
+    white-space:nowrap !important;
+    overflow:hidden !important;
+    text-overflow:ellipsis !important;
+  }
+
+  html.finize-ios-phone body.v4-app .mobile-kpi-value.mobile-kpi-value-budget,
+  html.finize-ios-phone body.v4-app[data-active-tab="dashboard"] .mobile-kpi-value.mobile-kpi-value-budget{
+    min-height:0 !important;
+    font-size:14px !important;
+    line-height:1.15 !important;
+    white-space:normal !important;
+  }
+
+  html.finize-ios-phone body.v4-app .mobile-kpi-edit-hint,
+  html.finize-ios-phone body.v4-app[data-active-tab="dashboard"] .mobile-kpi-edit-hint{
+    padding-top:6px !important;
+    font-size:10.5px !important;
+    line-height:1.2 !important;
+    white-space:normal !important;
+  }
+
+  html.finize-ios-phone body.v4-app .mobile-goal-main strong{
+    font-size:12px !important;
+    line-height:1.2 !important;
+  }
+  html.finize-ios-phone body.v4-app .mobile-goal-main > span,
+  html.finize-ios-phone body.v4-app .mobile-goal-main > em,
+  html.finize-ios-phone body.v4-app .mobile-goal-needed{
+    font-size:10px !important;
+    line-height:1.2 !important;
+  }
+  html.finize-ios-phone body.v4-app .mobile-goal-side b{
+    font-size:11px !important;
+  }
+  html.finize-ios-phone body.v4-app .mobile-goal-side .ghost{
+    min-height:32px;
+    font-size:9.5px !important;
+  }
+
+  html.finize-ios-phone body.v4-app .mobile-savings-kpis{
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+    gap:8px !important;
+  }
+  html.finize-ios-phone body.v4-app .mobile-savings-kpis .card{
+    min-height:104px !important;
+    padding:10px !important;
+  }
+  html.finize-ios-phone body.v4-app .mobile-savings-kpis small{
+    font-size:10px !important;
+    line-height:1.2 !important;
+  }
+  html.finize-ios-phone body.v4-app .mobile-savings-kpis strong{
+    font-size:13px !important;
+  }
+  html.finize-ios-phone body.v4-app .mobile-savings-kpis em{
+    font-size:9.5px !important;
+    line-height:1.2 !important;
+  }
+
+  html.finize-ios-phone body.v4-app .v4-bottom-nav .bottom-nav-btn span:last-child{
+    font-size:9px !important;
+    letter-spacing:-.015em !important;
+  }
+
+  html.finize-ios-phone body.v4-app input:not([type="checkbox"]):not([type="radio"]),
+  html.finize-ios-phone body.v4-app select,
+  html.finize-ios-phone body.v4-app textarea{
+    font-size:16px !important;
+  }
+}
+
+@media (max-width:374px){
+  html.finize-ios-phone body.v4-app .mobile-kpi-grid > .mobile-kpi-card{
+    min-height:112px !important;
+    padding:10px !important;
+  }
+  html.finize-ios-phone body.v4-app .mobile-kpi-value,
+  html.finize-ios-phone body.v4-app[data-active-tab="dashboard"] .mobile-kpi-value{
+    font-size:17px !important;
+  }
+  html.finize-ios-phone body.v4-app .v4-bottom-nav .bottom-nav-btn span:last-child{
+    font-size:8px !important;
+  }
+}
