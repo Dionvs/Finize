@@ -1,3 +1,5 @@
+import { state, calcScenario, iconSvg, renderActiveTab } from "../core/runtime.js";
+
 (function(){
   'use strict';
 

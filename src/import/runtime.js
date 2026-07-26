@@ -1,10 +1,7 @@
 (function(root,factory){
   const api=factory();
-  if(typeof module!=='undefined'&&module.exports)module.exports=api;
-  else{
-    root.FinizeUpdate4Runtime=api;
-    api.install(root);
-  }
+  root.FinizeUpdate4Runtime=api;
+  api.install(root);
 })(typeof window!=='undefined'?window:globalThis,function(){
   'use strict';
 
@@ -1699,6 +1696,11 @@
       const wrapped=function(){const result=legacy.apply(this,arguments);queueMicrotask(()=>injectSettlementCard(root));return result;};
       wrapped.__u4Wrapped=true;root.renderActiveTab=wrapped;
     }
+    root.__finizeInstallUpdate4Hooks?.({
+      renderBankImportSection:root.renderBankImportSection,
+      bindBankImport:root.bindBankImport,
+      renderActiveTab:root.renderActiveTab
+    });
     root.FinizeUpdate4Process=draft=>processDraft(root,draft).catch(error=>{alert(error.message);return false;});
     if(root.state.activeImportId)ImportStore.getImport(root.state.activeImportId).then(draft=>{UI.draft=draft||null;}).catch(()=>{});
   }

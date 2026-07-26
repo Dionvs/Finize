@@ -6075,3 +6075,26 @@ async function initializeApp(){
   window.__finizeMaybeFinishBootstrap();
 }
 initializeApp();
+
+function installUpdate4Hooks(hooks={}){
+  if(typeof hooks.renderBankImportSection==='function')renderBankImportSection=hooks.renderBankImportSection;
+  if(typeof hooks.bindBankImport==='function')bindBankImport=hooks.bindBankImport;
+  if(typeof hooks.renderActiveTab==='function')renderActiveTab=hooks.renderActiveTab;
+}
+
+Object.assign(window,{
+  bankOwnerCategories,
+  bindBankImport,
+  commitChange,
+  DataAdapter,
+  getSelectedMonth,
+  localSave,
+  openTransactionModal,
+  renderActiveTab,
+  renderBankImportSection,
+  renderTransactionsTable,
+  safeImageUrl,
+  __finizeInstallUpdate4Hooks:installUpdate4Hooks
+});
+
+export { state, calcScenario, iconSvg, renderActiveTab };

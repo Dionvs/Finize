@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-const html = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+const html = require('./helpers/runtime-source.cjs');
 const start = html.indexOf('function calcScenario(state)');
 const end = html.indexOf('/* ---------- default data', start);
 assert.ok(start >= 0 && end > start, 'calcScenario is niet gevonden');

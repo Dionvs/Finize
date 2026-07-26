@@ -5,12 +5,9 @@ const path = require('node:path');
 const root = path.join(__dirname, '..');
 const markup = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const css = fs.readFileSync(path.join(root, 'app.css'), 'utf8');
-const js = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
+const js = require('./helpers/runtime-source.cjs');
 const html = markup + js;
-const presentationJs = js.slice(
-  js.indexOf('/* Finize v50 bron: 30-update5.js */'),
-  js.indexOf('/* Finize v50 bron: 40-service-worker-registration.js */')
-);
+const presentationJs = fs.readFileSync(path.join(root, 'src', 'ui', 'presentation.js'), 'utf8');
 const sw = fs.readFileSync(path.join(root, 'service-worker.js'), 'utf8');
 
 assert.match(markup, /app\.css/);

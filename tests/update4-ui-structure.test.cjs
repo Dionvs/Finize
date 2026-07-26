@@ -3,7 +3,7 @@ const fs=require('node:fs');
 const path=require('node:path');
 
 const markup=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
-const js=fs.readFileSync(path.join(__dirname,'..','app.js'),'utf8');
+const js=require('./helpers/runtime-source.cjs');
 const css=fs.readFileSync(path.join(__dirname,'..','app.css'),'utf8');
 const html=markup+js;
 

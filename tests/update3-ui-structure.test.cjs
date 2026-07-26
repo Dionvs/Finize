@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8')
-  + fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8')
+  + require('./helpers/runtime-source.cjs')
   + fs.readFileSync(path.join(__dirname, '..', 'app.css'), 'utf8');
 
 assert.equal((html.match(/<script\b/g) || []).length, (html.match(/<\/script>/g) || []).length, 'Ongebalanceerde script-tags');

@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
 
-const html = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+const html = require('./helpers/runtime-source.cjs');
 const impactStart = html.indexOf('function normalizedTransactionType');
 const impactEnd = html.indexOf('function sumTransactions', impactStart);
 const start = html.indexOf('function u3ConfirmedTransactions');

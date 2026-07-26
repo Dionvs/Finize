@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
 
-const html = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+const html = require('./helpers/runtime-source.cjs');
 const start = html.indexOf('/* ---------- Update 2: slimme spaardoelenplanner ---------- */');
 const end = html.indexOf('function u2ActiveChild', start);
 assert.ok(start >= 0 && end > start, 'Update 2 rekenmotor is niet gevonden');

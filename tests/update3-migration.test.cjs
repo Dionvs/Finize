@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
 
-const html = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+const html = require('./helpers/runtime-source.cjs');
 const start = html.indexOf('function normalizePersonDefaults');
 const end = html.indexOf('function normalizeBudgetState', start);
 assert.ok(start >= 0 && end > start, 'Update 3 migratielaag is niet gevonden');

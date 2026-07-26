@@ -4,7 +4,7 @@ const vm=require('node:vm');
 const path=require('node:path');
 const u4=require('../src/import/update4-runtime.cjs');
 
-const html=fs.readFileSync(path.join(__dirname,'..','app.js'),'utf8');
+const html=require('./helpers/runtime-source.cjs');
 const start=html.indexOf('function normalizedTransactionType');
 const end=html.indexOf('function sumTransactions',start);
 const context={Number,String,Math,round2:value=>Math.round((Number(value)+Number.EPSILON)*100)/100};

@@ -1,6 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { pathToFileURL } from "node:url";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -12,7 +13,6 @@ const styleSources = [
   ["styles", "import.css"],
   ["styles", "desktop.css"]
 ];
-const scriptFiles = ["00-bootstrap.js", "10-core.js", "20-update4.js", "30-update5.js", "40-service-worker-registration.js"];
 const normalize = value => value.replace(/\r\n/g, "\n").trim() + "\n";
 
 async function bundleSources(sources, label) {
@@ -23,13 +23,36 @@ async function bundleSources(sources, label) {
   return parts.join("\n");
 }
 
-async function bundleLegacy(folder, files, label) {
-  return bundleSources(files.map(file => [`legacy/${folder}`, file]), label);
+async function buildJavaScript() {
+  let esbuild;
+  try {
+    esbuild = await import("esbuild");
+  } catch (error) {
+    const localModules = process.env.FINIZE_TOOLING_NODE_MODULES;
+    if (!localModules) throw error;
+    esbuild = await import(pathToFileURL(path.join(localModules, "esbuild", "lib", "main.js")).href);
+  }
+  const result = await esbuild.build({
+    absWorkingDir: root,
+    entryPoints: ["src/app-entry.js"],
+    bundle: true,
+    write: false,
+    format: "iife",
+    platform: "browser",
+    target: ["es2020"],
+    sourcemap: false,
+    minify: false,
+    legalComments: "none",
+    treeShaking: false,
+    charset: "utf8",
+    logLevel: "silent"
+  });
+  return normalize(result.outputFiles[0].text);
 }
 
 const outputs = new Map([
   ["app.css", await bundleSources(styleSources, "Finize bron")],
-  ["app.js", await bundleLegacy("scripts", scriptFiles, "Finize v50 bron")]
+  ["app.js", await buildJavaScript()]
 ]);
 
 if (process.argv.includes("--check")) {

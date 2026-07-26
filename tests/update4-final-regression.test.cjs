@@ -3,7 +3,7 @@ const fs=require('node:fs');
 const path=require('node:path');
 
 const root=path.join(__dirname,'..');
-const html=fs.readFileSync(path.join(root,'index.html'),'utf8')+fs.readFileSync(path.join(root,'app.js'),'utf8');
+const html=fs.readFileSync(path.join(root,'index.html'),'utf8')+require('./helpers/runtime-source.cjs');
 const sw=fs.readFileSync(path.join(root,'service-worker.js'),'utf8');
 const progress=fs.readFileSync(path.join(root,'UPDATE-4-PROGRESS.md'),'utf8');
 
