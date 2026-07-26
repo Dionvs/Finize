@@ -1,5 +1,5 @@
 const assert=require('node:assert/strict');
-const u4=require('../update4.js');
+const u4=require('../src/import/update4-runtime.cjs');
 
 function snapshot(value){
   return {exists:()=>value!==undefined,data:()=>value};

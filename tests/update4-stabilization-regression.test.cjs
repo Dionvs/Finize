@@ -2,7 +2,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
 const path=require('node:path');
-const u4=require('../update4.js');
+const u4=require('../src/import/update4-runtime.cjs');
 
 const html=fs.readFileSync(path.join(__dirname,'..','app.js'),'utf8');
 const start=html.indexOf('function normalizedTransactionType');

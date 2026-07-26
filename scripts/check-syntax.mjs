@@ -10,7 +10,7 @@ const inlineScripts = [...html.matchAll(/<script(?![^>]*\bsrc=)(?:\s[^>]*)?>([\s
 const temp = await mkdtemp(path.join(os.tmpdir(), "finize-syntax-"));
 
 try {
-  const files = ["app.js", "update4.js", "update5.js", "service-worker.js"];
+  const files = ["app.js", "src/import/update4-runtime.cjs", "service-worker.js"];
   for (let index = 0; index < inlineScripts.length; index += 1) {
     const name = `inline-${index}.js`;
     await writeFile(path.join(temp, name), inlineScripts[index], "utf8");

@@ -4,3 +4,5 @@ node_modules/
 test-results/
 playwright-report/
 .cache/
+finize-mobile.html
+finize-v4.html

@@ -5,8 +5,6 @@ const APP_SHELL = [
   "./index.html",
   "./app.js?v=53-code-cleanup",
   "./app.css?v=53-code-cleanup",
-  "./finize-v4.html",
-  "./finize-mobile.html",
   "./manifest.json",
   "./icons/icon-192.png",
   "./icons/icon-512.png"

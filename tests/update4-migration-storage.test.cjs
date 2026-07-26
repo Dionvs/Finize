@@ -1,5 +1,5 @@
 const assert=require('node:assert/strict');
-const u4=require('../update4.js');
+const u4=require('../src/import/update4-runtime.cjs');
 
 const state={
   meta:{schemaVersion:4},

@@ -1,5 +1,5 @@
 const assert=require('node:assert/strict');
-const u4=require('../update4.js');
+const u4=require('../src/import/update4-runtime.cjs');
 
 const manual={id:'manual-1',date:'2026-07-04',amount:25,description:'Handmatig',accountOwner:'dion',budgetOwner:'dion'};
 const state=u4.normalizeCore({
