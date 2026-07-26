@@ -12,7 +12,7 @@ const sw = fs.readFileSync(path.join(root, 'service-worker.js'), 'utf8');
 
 assert.match(markup, /app\.css/);
 assert.match(markup, /app\.js/);
-assert.match(sw, /finize-v63-dashboard-income-total/);
+assert.match(sw, /finize-v65-budgetbewerking/);
 assert.match(js, /const dashboardTotalIncome = r\.totaalSalaris;/);
 assert.match(sw, /\.\/app\.css/);
 assert.match(sw, /\.\/app\.js/);
@@ -57,11 +57,13 @@ for (const className of presentationClasses) {
   assert.match(html, new RegExp(`class="[^"]*${className}`), `Presentatieklasse ontbreekt: ${className}`);
 }
 
-for (const marker of ['Inkomen Dion','Inkomen Dara','Totaal gezamenlijke rekening','Variabel gebruikt','Geplande verdeling','Werkelijk maandresultaat']) {
+for (const marker of ['Inkomen Dion','Inkomen Dara','Totaal gezamenlijke rekening','Variabel gebruikt','Geplande verdeling','Verdeling Dion / Dara']) {
   assert.match(html, new RegExp(marker), `Dashboardmarker ontbreekt: ${marker}`);
 }
-assert.match(html, /getMonthFinancialResult\(getSelectedMonth\(\)\)/);
-assert.match(html, /Deze realisatie verandert het vooraf berekende zakgeld niet/);
+assert.match(html, /getMonthFinancialResult\(key\)/);
+assert.doesNotMatch(html, /Werkelijk maandresultaat|Deze realisatie verandert het vooraf berekende zakgeld niet/);
+assert.match(html, /class="card span-6 u5-planned-flow"/);
+assert.match(html, /class="card span-6 u5-allowance-split"/);
 assert.match(html, /function renderRecurringFixedManage\(owner\)/);
 assert.match(html, /state\.recurringFixedExpenses\?\.\[scenario\]/);
 

@@ -153,7 +153,7 @@ body.v4-app .value.is-negative{color:var(--red) !important}
     transform:none !important;
   }
   body.v4-app .card:hover{transform:none !important}
-  .metric-value,.value,.u5-result-value,.u5-goal-detail-grid strong{font-variant-numeric:tabular-nums}
+  .metric-value,.value,.u5-goal-detail-grid strong{font-variant-numeric:tabular-nums}
   .u5-primary-kpis{
     grid-template-columns:repeat(2,minmax(0,1fr));
     gap:14px;
@@ -203,8 +203,6 @@ body.v4-app .value.is-negative{color:var(--red) !important}
   .u5-flow-list>div{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:10px 0;border-bottom:1px solid var(--border-soft)}
   .u5-flow-list>div:not(:first-child):not(.u5-flow-result) span::before{content:"−";display:inline-block;width:18px;color:var(--text-faint);font-weight:900;text-align:center}
   .u5-flow-list .u5-flow-result{margin-top:3px;padding:13px 12px;border:0;border-radius:12px;background:var(--green-bg);font-size:15px}
-  .u5-result-value{font-size:34px;font-weight:850;letter-spacing:-.025em;margin:8px 0 14px}
-  .u5-actual-result>.hint{margin:12px 0 0;line-height:1.45}
   .u5-allowance-split .allowance-return-body{max-width:720px;margin:0 auto}
   .u5-mobile-dashboard-preserved{display:none !important}
   .u5-goal-fallback{display:grid;place-items:center;align-content:center;min-height:150px;text-align:center;color:var(--text-faint)}

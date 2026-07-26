@@ -2793,9 +2793,6 @@ function renderDashboard(){
     spent: round2(yearData.reduce((s,m)=>s+m.spent,0)),
     saving: round2(yearData.reduce((s,m)=>s+m.saving,0)),
   };
-  const monthFinancialResult = getMonthFinancialResult(getSelectedMonth());
-  const actualMonthResult = round2(Number(monthFinancialResult?.remaining)||0);
-  const budgetDifference = round2(r.variabelBudgetTotaal - r.variabelTotaal);
   const CHART_H = 84;
   const monthBars = yearData.map(m=>{
     const isFuture = m.key > currentMonthKey;
@@ -2897,7 +2894,7 @@ function renderDashboard(){
       </div>
     </div>
     <div class="dashboard-grid u5-planning-realisation v4-desktop-only-grid">
-      <div class="card span-7 u5-planned-flow">
+      <div class="card span-6 u5-planned-flow">
         ${renderDashboardCardHead('Geplande verdeling', 'op basis van budgetten', 'green')}
         <div class="u5-flow-list">
           <div><span>Totaal inkomen</span><strong class="value pos">${eur(r.totaalSalaris)}</strong></div>
@@ -2907,16 +2904,7 @@ function renderDashboard(){
           <div class="u5-flow-result"><span>Zakgeld totaal</span><strong class="${totalZakgeld<0?'value neg':'value pos'}">${eur(totalZakgeld)}</strong></div>
         </div>
       </div>
-      <div class="card span-5 u5-actual-result">
-        ${renderDashboardCardHead('Werkelijk maandresultaat', 'realisatie', 'blue')}
-        <div class="u5-result-value ${actualMonthResult<0?'value neg':'value pos'}">${eur(actualMonthResult)}</div>
-        <div class="summary-list">
-          <div class="summary-line"><span>Werkelijk variabel besteed</span><strong>${eur(r.variabelTotaal)}</strong></div>
-          <div class="summary-line"><span>Budgetverschil</span><strong class="${budgetDifference<0?'value neg':budgetDifference>0?'value pos':''}">${eur(budgetDifference)}</strong></div>
-        </div>
-        <p class="hint">Deze realisatie verandert het vooraf berekende zakgeld niet.</p>
-      </div>
-      <div class="card span-12 u5-allowance-split">${renderDashboardCardHead('Verdeling Dion / Dara', 'bestaande verdelingsregels', 'terracotta')}${zakgeldCardBody}</div>
+      <div class="card span-6 u5-allowance-split">${renderDashboardCardHead('Verdeling Dion / Dara', 'bestaande verdelingsregels', 'terracotta')}${zakgeldCardBody}</div>
     </div>
     <div class="dashboard-grid dashboard-summary-row u5-mobile-dashboard-preserved">
       <div class="card span-6 joint-account-card">${renderDashboardCardHead('Gezamenlijke rekening', '', 'green')}<div class="summary-list"><div class="summary-line"><span>Totaal inkomen</span><strong class="value pos">${eur(dashboardTotalIncome)}</strong></div>${incomeBreakdown.extra ? `<div class="summary-line"><span>Waarvan extra / teruggaven</span><strong class="value pos">${eur(incomeBreakdown.extra)}</strong></div>` : ``}<div class="summary-line"><span>Vaste lasten + budgetten</span><strong class="value neg">${eur(r.gezamenlijkeLastenTotaal)}</strong></div><div class="summary-line joint-saving-line"><span>Gezamenlijk sparen</span><strong class="value pos">${eur(r.spaarpotDezeMaand)}</strong></div><div class="summary-line joint-remaining-line"><span>Resterend voor zakgeld</span><strong class="${jointRemaining<0?'value neg':'value pos'}">${eur(jointRemaining)}</strong></div></div></div>
@@ -3127,7 +3115,7 @@ function renderPersonOrJoint(tabId, key, label){
     ${renderPageHeading(`Gezamenlijk overzicht — ${monthLabel(getSelectedMonth())}`, pageGreeting)}
     ${jointKpis}
     <div class="dashboard-grid u5-joint-activity-row">
-      <div class="card span-5 u5-joint-budget-card"><div class="card-head"><h2>Budgetgebruik deze maand</h2><span class="hint">Dion / Dara</span></div>${renderBudgetUsageList()}</div>
+      <div class="card span-5 u5-joint-budget-card"><div class="card-head"><h2>Budgetgebruik deze maand</h2><button type="button" class="ghost small" data-open-owner-variable="gezamenlijk" aria-label="Gezamenlijke maandbudgetten wijzigen">Bewerken</button></div>${renderBudgetUsageList()}</div>
       ${transactionCard}
     </div>
     <div class="dashboard-grid">
@@ -3145,7 +3133,7 @@ function renderPersonOrJoint(tabId, key, label){
     ${renderPageHeading(`${label} overzicht — ${monthLabel(getSelectedMonth())}`, pageGreeting)}
     ${personalKpis}
     <div class="dashboard-grid u5-joint-activity-row">
-      <div class="card span-5 u5-joint-budget-card"><div class="card-head"><h2>Budgetgebruik deze maand</h2><span class="hint">${textSafe(label)}</span></div>${renderBudgetUsageList(key)}</div>
+      <div class="card span-5 u5-joint-budget-card"><div class="card-head"><h2>Budgetgebruik deze maand</h2><button type="button" class="ghost small" data-open-owner-variable="${key}" aria-label="Maandbudgetten van ${textSafe(label)} wijzigen">Bewerken</button></div>${renderBudgetUsageList(key)}</div>
       ${transactionCard}
     </div>
     <div class="dashboard-grid">
