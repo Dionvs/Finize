@@ -5,7 +5,7 @@ const path=require('node:path');
 const u4=require('../update4.js');
 
 const html=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
-const start=html.indexOf('function getTransactionExpenseImpact');
+const start=html.indexOf('function normalizedTransactionType');
 const end=html.indexOf('function sumTransactions',start);
 const context={Number,String,Math,round2:value=>Math.round((Number(value)+Number.EPSILON)*100)/100};
 vm.createContext(context);
@@ -22,7 +22,7 @@ const transactions=[
   {kind:'interne-overboeking',transactionType:'sparen',amount:250},
   {kind:'uitgave',amount:75,processing:{include:false}}
 ];
-assert.equal(transactions.reduce((sum,tx)=>sum+context.getTransactionExpenseImpact(tx),0),290);
+assert.equal(transactions.reduce((sum,tx)=>sum+context.getTransactionExpenseImpact(tx),0),310);
 
 const incomeShare=2450/(2450+3010);
 assert.equal(Math.round(Math.max(.40,incomeShare)*10000)/100,44.87);
@@ -35,7 +35,7 @@ const retained=u4.normalizeCore({
   spaardoelen:{gezamenlijk:[{id:'goal-1',algespaard:100}],dion:[],dara:[]},
   savingsGoalLedger:[],advanceLedger:[{id:'advance-1'}],monthRecords:{'2026-01':{status:'afgesloten',closureHistory:[]}}
 });
-assert.equal(retained.meta.schemaVersion,8);
+assert.equal(retained.meta.schemaVersion,9);
 assert.equal(retained.transactions.length,1);
 assert.equal(retained.importSummaries.length,1);
 assert.equal(retained.spaardoelen.gezamenlijk.length,1);

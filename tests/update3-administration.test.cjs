@@ -4,7 +4,7 @@ const vm = require('node:vm');
 const path = require('node:path');
 
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-const impactStart = html.indexOf('function getTransactionExpenseImpact');
+const impactStart = html.indexOf('function normalizedTransactionType');
 const impactEnd = html.indexOf('function sumTransactions', impactStart);
 const start = html.indexOf('function u3ConfirmedTransactions');
 const end = html.indexOf('const u3LegacyMonthlyScenarioData', start);
@@ -43,6 +43,7 @@ const context = {
   u3PlannedOccurrences:()=>[],
   ensureMonthData:()=>{},
   getTotalMonthlyIncome:()=>0,
+  getDistributionIncomeParts:()=>({salary:0,refund:0,total:0}),
   sumTransactions:()=>0,
   sumMaandTeruggaven:()=>0,
   u2ReconcileSavingsGoals:()=>{},

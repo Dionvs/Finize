@@ -25,6 +25,6 @@ assert.match(js,/class="manage-title">Onderling te verrekenen/,'Titel van verrek
 assert.match(js,/data-u4-open-settlement/,'Detailsactie voor verrekenen ontbreekt');
 assert.match(css,/#u4ImportModalRoot/);
 assert.match(css,/u4-cloud-spinner/);
-assert.match(css,/height:100dvh/);
+assert.match(css,/min-height:calc\(100dvh - 150px\)/);
 assert.match(css,/@media\(max-width:390px\)/);
 console.log('UPDATE4_UI_STRUCTURE_OK');
