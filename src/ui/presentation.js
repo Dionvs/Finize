@@ -1,4 +1,25 @@
-import { state, calcScenario, iconSvg, renderActiveTab } from "../core/runtime.js";
+import {
+  TODAY,
+  calcDoel,
+  calcGroep,
+  calcScenario,
+  eur,
+  formatDateNL,
+  getSelectedMonth,
+  goalIcon,
+  goalImageSource,
+  iconSvg,
+  monthLabel,
+  pct,
+  renderActiveTab,
+  renderDataTab,
+  renderGoalGroup,
+  renderIconKpi,
+  renderPageHeading,
+  safeImageUrl,
+  state,
+  textSafe
+} from "../core/runtime.js";
 
 (function(){
   'use strict';

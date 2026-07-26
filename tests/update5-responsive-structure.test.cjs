@@ -12,14 +12,18 @@ const sw = fs.readFileSync(path.join(root, 'service-worker.js'), 'utf8');
 
 assert.match(markup, /app\.css/);
 assert.match(markup, /app\.js/);
-assert.match(sw, /finize-v53-code-cleanup/);
+assert.match(sw, /finize-v63-dashboard-income-total/);
+assert.match(js, /const dashboardTotalIncome = r\.totaalSalaris;/);
 assert.match(sw, /\.\/app\.css/);
 assert.match(sw, /\.\/app\.js/);
 assert.match(html, /data-month-copy-previous/);
-assert.match(html, /class="card u5-primary-kpi u5-income-kpi tone-income" data-open-total-income/);
+assert.match(html, /data-income-edit="dion" data-income-label="Dion" aria-label="Inkomen van Dion aanpassen"/);
+assert.match(html, /data-income-edit="dara" data-income-label="Dara" aria-label="Inkomen van Dara aanpassen"/);
+assert.match(html, /data-u3-open="planning" data-u3-planning-owner="\$\{(?:owner|opts\.openFixedOwner)\}" aria-label="Vaste lasten van/);
+assert.match(html, /function u3OpenPlanning\(owner=''\)/);
 assert.match(html, /function openTotalIncomeEditModal\(\)/);
 assert.match(html, /Werkelijk inkomen aanpassen/);
-assert.match(html, /class="card metric-card income-metric span-12"/);
+assert.match(html, /u5-fixed-costs-overview/);
 assert.match(html, /function placeDesktopPageHeading\(root=/);
 assert.match(html, /Samen houden jullie grip op deze maand/);
 assert.match(html, /Jouw maand, jouw keuzes/);
@@ -53,7 +57,7 @@ for (const className of presentationClasses) {
   assert.match(html, new RegExp(`class="[^"]*${className}`), `Presentatieklasse ontbreekt: ${className}`);
 }
 
-for (const marker of ['Totaal inkomen','Gezamenlijk budget','Gezamenlijk sparen','Zakgeld totaal','Geplande verdeling','Werkelijk maandresultaat']) {
+for (const marker of ['Inkomen Dion','Inkomen Dara','Totaal gezamenlijke rekening','Variabel gebruikt','Geplande verdeling','Werkelijk maandresultaat']) {
   assert.match(html, new RegExp(marker), `Dashboardmarker ontbreekt: ${marker}`);
 }
 assert.match(html, /getMonthFinancialResult\(getSelectedMonth\(\)\)/);

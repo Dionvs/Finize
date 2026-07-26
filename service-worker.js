@@ -1,11 +1,11 @@
-const CACHE_NAME = "finize-v53-code-cleanup";
+const CACHE_NAME = "finize-v63-dashboard-income-total";
 const CACHE_PREFIX = "finize-";
 
 const CRITICAL_SHELL = [
   "./",
   "./index.html",
-  "./app.js?v=53-code-cleanup-final",
-  "./app.css?v=53-code-cleanup-final",
+  "./app.js?v=63-dashboard-income-total",
+  "./app.css?v=63-dashboard-income-total",
   "./manifest.json"
 ];
 

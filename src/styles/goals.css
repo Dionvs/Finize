@@ -98,6 +98,7 @@ body.v4-app[data-real-active-tab="spaardoelen"] .mobile-goal-row{
   grid-template-columns:34px minmax(0,1fr) 64px !important;
 }
 body.v4-app[data-real-active-tab="spaardoelen"] .mobile-goal-main{
+  grid-template-columns:minmax(0,1fr) 104px !important;
   width:100% !important;
   min-width:0 !important;
 }
@@ -106,6 +107,9 @@ body.v4-app[data-real-active-tab="spaardoelen"] .mobile-goal-main > .progress-tr
   width:100% !important;
   max-width:none !important;
   box-sizing:border-box !important;
+}
+body.v4-app[data-real-active-tab="spaardoelen"] .mobile-goal-main > span{
+  text-align:center;
 }
 body.v4-app[data-real-active-tab="spaardoelen"] .u2-goal-accordion>summary::after{
   top:3px !important;
