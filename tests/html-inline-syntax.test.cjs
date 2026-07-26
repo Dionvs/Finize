@@ -4,11 +4,11 @@ const path=require('node:path');
 
 const html=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
 const scripts=[...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)].map(match=>match[1]);
-assert.ok(scripts.length,'Geen inline JavaScript gevonden');
-scripts.forEach((source,index)=>{
-  assert.doesNotThrow(()=>new Function(source),`Inline script ${index+1} bevat ongeldige JavaScript`);
-});
+assert.equal(scripts.length,0,'index.html mag geen actieve inline JavaScript meer bevatten');
+assert.match(html,/<script src="\.\/app\.js\?v=53-code-cleanup"><\/script>/);
+assert.match(html,/<link rel="stylesheet" href="\.\/app\.css\?v=53-code-cleanup">/);
+assert.doesNotMatch(html,/update[45]\.(?:js|css)/);
 assert.equal((html.match(/<main\b/gi)||[]).length,1);
 assert.equal((html.match(/<body\b/gi)||[]).length,1);
 assert.equal((html.match(/<\/body>/gi)||[]).length,1);
-console.log('HTML_INLINE_SYNTAX_OK');
+console.log('HTML_RUNTIME_STRUCTURE_OK');

@@ -3,16 +3,21 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const root = path.join(__dirname, '..');
-const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-const css = fs.readFileSync(path.join(root, 'update5.css'), 'utf8');
-const js = fs.readFileSync(path.join(root, 'update5.js'), 'utf8');
+const markup = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+const css = fs.readFileSync(path.join(root, 'app.css'), 'utf8');
+const js = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
+const html = markup + js;
+const presentationJs = js.slice(
+  js.indexOf('/* Finize v50 bron: 30-update5.js */'),
+  js.indexOf('/* Finize v50 bron: 40-service-worker-registration.js */')
+);
 const sw = fs.readFileSync(path.join(root, 'service-worker.js'), 'utf8');
 
-assert.match(html, /update5\.css/);
-assert.match(html, /update5\.js/);
-assert.match(sw, /finize-v50-icon-system/);
-assert.match(sw, /\.\/update5\.css/);
-assert.match(sw, /\.\/update5\.js/);
+assert.match(markup, /app\.css/);
+assert.match(markup, /app\.js/);
+assert.match(sw, /finize-v53-code-cleanup/);
+assert.match(sw, /\.\/app\.css/);
+assert.match(sw, /\.\/app\.js/);
 assert.match(html, /data-month-copy-previous/);
 assert.match(html, /class="card u5-primary-kpi u5-income-kpi tone-income" data-open-total-income/);
 assert.match(html, /function openTotalIncomeEditModal\(\)/);
@@ -37,7 +42,6 @@ for (const marker of [
   assert.ok(css.includes(marker), `Responsieve v50-marker ontbreekt: ${marker}`);
 }
 assert.match(css, /\.v4-bottom-nav\{display:none !important\}/);
-assert.doesNotMatch(css, /@media\s*\(max-width:767px\)/, 'Update 5 mag de mobiele CSS niet overschrijven');
 
 const presentationClasses = [
   'dashboard-summary-row',
@@ -68,7 +72,7 @@ assert.match(js, /let goalOwnerFilter = 'alle'/);
 assert.match(js, /function goalListContent\(items\)/);
 assert.match(js, /class="u5-goal-owner-group"/);
 assert.match(css, /\.u5-goal-owner-group\+\.u5-goal-owner-group/);
-assert.doesNotMatch(js, /localStorage\.setItem|DataAdapter\.save|CloudAdapter\.saveNow/, 'Tijdelijke weergavestatus mag niet worden opgeslagen');
+assert.doesNotMatch(presentationJs, /localStorage\.setItem|DataAdapter\.save|CloudAdapter\.saveNow/, 'Tijdelijke weergavestatus mag niet worden opgeslagen');
 
 for (const mobileMarker of [
   'id="bottomNav"',

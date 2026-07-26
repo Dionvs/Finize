@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+const html = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
 const bindStart = html.indexOf('function bindInputs(root)');
 const bindEnd = html.indexOf('/* ---------- tabel-editor', bindStart);
 const bindings = html.slice(bindStart, bindEnd);

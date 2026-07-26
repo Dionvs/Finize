@@ -3,7 +3,7 @@ const fs=require('node:fs');
 const vm=require('node:vm');
 const path=require('node:path');
 
-const html=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
+const html=fs.readFileSync(path.join(__dirname,'..','app.js'),'utf8');
 function extractFunction(name){
   const start=html.indexOf(`function ${name}`);
   assert.ok(start>=0,`${name} ontbreekt`);
