@@ -19,7 +19,7 @@ function round2(value) {
   return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 }
 
-function runScenario(scenario, jointActual, personalActual = {}) {
+function runScenario(scenario, jointActual, personalActual = {}, savingOverrides = {}) {
   const monthly = {
     verdeling: {
       minimumDion: 0.4,
@@ -49,6 +49,7 @@ function runScenario(scenario, jointActual, personalActual = {}) {
     Number,
     Math,
     round2,
+    isPlainObject: value => !!value && typeof value === 'object' && !Array.isArray(value),
     getSelectedMonth: () => '2026-07',
     getDistributionIncomeParts: owner => ({
       salary: owner === 'dion' ? 3000 : 2000,
@@ -61,7 +62,10 @@ function runScenario(scenario, jointActual, personalActual = {}) {
   };
   vm.createContext(context);
   vm.runInContext(source, context);
-  return JSON.parse(JSON.stringify(context.calcScenario({ meta: { scenario } })));
+  return JSON.parse(JSON.stringify(context.calcScenario({
+    meta: { scenario },
+    monthlySavingOverrides: { '2026-07': savingOverrides }
+  })));
 }
 
 for (const scenario of ['voor', 'na']) {
@@ -100,5 +104,14 @@ assert.equal(daraBefore.dara.zakgeld, daraAfter.dara.zakgeld);
 assert.notEqual(daraBefore.dara.variabeleUitgaven, daraAfter.dara.variabeleUitgaven);
 assert.equal(daraBefore.dara.beschikbaarVoorSparen, daraAfter.dara.beschikbaarVoorSparen);
 assert.equal(daraBefore.dion.zakgeld, daraAfter.dion.zakgeld);
+
+const automaticSaving = runScenario('voor', 750);
+const manualSaving = runScenario('voor', 750, {}, { dion: 125, dara: 0 });
+assert.equal(manualSaving.dion.automatischBeschikbaarVoorSparen, automaticSaving.dion.beschikbaarVoorSparen);
+assert.equal(manualSaving.dion.beschikbaarVoorSparen, 125);
+assert.equal(manualSaving.dion.savingsSource, 'handmatig');
+assert.equal(manualSaving.dara.beschikbaarVoorSparen, 0, 'Een expliciete nul moet als handmatige spaarwaarde blijven gelden');
+assert.equal(manualSaving.dara.savingsSource, 'handmatig');
+assert.equal(manualSaving.dion.zakgeld, automaticSaving.dion.zakgeld, 'Een spaaroverride mag de zakgeldverdeling niet wijzigen');
 
 console.log('UPDATE5_ALLOWANCE_BUDGET_REGRESSION_OK');

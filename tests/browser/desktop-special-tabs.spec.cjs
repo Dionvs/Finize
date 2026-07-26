@@ -38,8 +38,17 @@ test('desktop spaardoelen en data back-up renderen volledig', async ({ page }) =
   const dionBudgetDialog = page.getByRole('dialog', { name: 'Variabele lasten aanpassen' });
   await expect(dionBudgetDialog.getByRole('heading', { name: 'Dion variabele lasten' })).toBeVisible();
   await expect(dionBudgetDialog.getByRole('spinbutton', { name: 'Maandbudget' }).first()).toBeVisible();
+  const budgetScope = dionBudgetDialog.getByRole('combobox', { name: 'Geldigheid' });
+  await expect(budgetScope).toHaveValue('from');
+  await expect(budgetScope.locator('option')).toHaveCount(2);
   await expect(dionBudgetDialog.getByRole('button', { name: 'Opslaan' })).toBeVisible();
   await dionBudgetDialog.getByRole('button', { name: 'Sluiten' }).click();
+  await page.getByRole('button', { name: 'Spaargeld van Dion voor deze maand aanpassen' }).click();
+  const personalSavingDialog = page.getByRole('dialog', { name: 'Spaargeld van Dion aanpassen' });
+  await expect(personalSavingDialog.getByText('Automatisch berekend')).toBeVisible();
+  await expect(personalSavingDialog.getByRole('spinbutton', { name: 'Eigen spaarbedrag voor deze maand' })).toBeVisible();
+  await expect(personalSavingDialog.getByRole('button', { name: 'Automatisch gebruiken' })).toBeVisible();
+  await personalSavingDialog.getByRole('button', { name: 'Annuleren' }).click();
   await expect(page.locator('.overview-kpi-row [data-u3-planning-owner="dion"]')).toBeVisible();
   await expect(page.locator('#tab-dion .u5-joint-activity-row')).toHaveCount(1);
   await expect(page.locator('#tab-dion .u5-fixed-costs-overview')).toBeVisible();

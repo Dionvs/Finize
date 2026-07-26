@@ -12,7 +12,7 @@ assert.match(html,/Werkelijk inkomen aanpassen/);
 assert.match(html,/Correctie nodig/);
 assert.match(html,/window\.CloudAdapter\s*=\s*CloudAdapter/);
 assert.match(html,/finize:cloud-connected/);
-assert.match(sw,/finize-v65-budgetbewerking/);
+assert.match(sw,/finize-v66-budgethistorie-sparen/);
 assert.match(sw,/\.\/app\.js/);
 assert.match(sw,/\.\/app\.css/);
 for(const file of ['update-4-datamodel.md','update-4-changelog.md','update-4-handmatig-testverslag.md']){

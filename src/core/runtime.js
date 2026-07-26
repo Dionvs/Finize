@@ -152,6 +152,8 @@ function ensureMonthData(month=getSelectedMonth()){
   state.monthlyIncomeOverrides = isPlainObject(state.monthlyIncomeOverrides) ? state.monthlyIncomeOverrides : {};
   state.monthlyRefundOverrides = isPlainObject(state.monthlyRefundOverrides) ? state.monthlyRefundOverrides : {};
   state.incomeDefaultsHistory = isPlainObject(state.incomeDefaultsHistory) ? state.incomeDefaultsHistory : {};
+  state.budgetDefaultsHistory = isPlainObject(state.budgetDefaultsHistory) ? state.budgetDefaultsHistory : {};
+  state.monthlySavingOverrides = isPlainObject(state.monthlySavingOverrides) ? state.monthlySavingOverrides : {};
   state.monthlyBudgets = isPlainObject(state.monthlyBudgets) ? state.monthlyBudgets : {};
   state.monthlyTeruggaven = isPlainObject(state.monthlyTeruggaven) ? state.monthlyTeruggaven : {};
   state.transactions = Array.isArray(state.transactions) ? state.transactions : [];
@@ -165,14 +167,14 @@ function ensureMonthData(month=getSelectedMonth()){
   ['voor','na'].forEach(scenario=>{
     if (!state.monthlyBudgets[month][scenario]){
       state.monthlyBudgets[month][scenario] = {
-        gezamenlijkVariabel: clone(state[scenario]?.gezamenlijk?.variabel || []),
-        dionVariabel: clone(state[scenario]?.dion?.variabel || []),
-        daraVariabel: clone(state[scenario]?.dara?.variabel || [])
+        gezamenlijkVariabel: getVariableBudgetDefaultsAt(scenario,'gezamenlijk',month),
+        dionVariabel: getVariableBudgetDefaultsAt(scenario,'dion',month),
+        daraVariabel: getVariableBudgetDefaultsAt(scenario,'dara',month)
       };
     }
     ['gezamenlijk','dion','dara'].forEach(owner=>{
       const key = `${owner}Variabel`;
-      if (!Array.isArray(state.monthlyBudgets[month][scenario][key])) state.monthlyBudgets[month][scenario][key] = clone(state[scenario]?.[owner]?.variabel || []);
+      if (!Array.isArray(state.monthlyBudgets[month][scenario][key])) state.monthlyBudgets[month][scenario][key] = getVariableBudgetDefaultsAt(scenario,owner,month);
     });
   });
 }
@@ -273,6 +275,48 @@ function getDistributionIncomeParts(person,month=getSelectedMonth()){
   const salaryOverride=state.monthlyIncomeOverrides?.[month]?.[person];
   const refundOverride=state.monthlyRefundOverrides?.[month]?.[person];
   return {salary:Number.isFinite(Number(salaryOverride))?round2(Number(salaryOverride)):defaults.salary,refund:Number.isFinite(Number(refundOverride))?round2(Number(refundOverride)):defaults.refund};
+}
+
+function normalizeBudgetDefaults(target){
+  target.budgetDefaultsHistory=isPlainObject(target.budgetDefaultsHistory)?target.budgetDefaultsHistory:{};
+  ['voor','na'].forEach(scenario=>{
+    target.budgetDefaultsHistory[scenario]=isPlainObject(target.budgetDefaultsHistory[scenario])?target.budgetDefaultsHistory[scenario]:{};
+    ['gezamenlijk','dion','dara'].forEach(owner=>{
+      const sourceRows=Array.isArray(target[scenario]?.[owner]?.variabel)?target[scenario][owner].variabel:[];
+      const history=Array.isArray(target.budgetDefaultsHistory[scenario][owner])?target.budgetDefaultsHistory[scenario][owner]:[];
+      const normalized=history.filter(isPlainObject).map(entry=>({
+        id:String(entry.id||uid()),
+        effectiveFrom:/^\d{4}-\d{2}$/.test(String(entry.effectiveFrom||''))?String(entry.effectiveFrom):'0000-01',
+        rows:clone(Array.isArray(entry.rows)?entry.rows:sourceRows),
+        updatedAt:String(entry.updatedAt||new Date(0).toISOString())
+      })).sort((a,b)=>a.effectiveFrom.localeCompare(b.effectiveFrom));
+      if(!normalized.length)normalized.push({id:uid(),effectiveFrom:'0000-01',rows:clone(sourceRows),updatedAt:new Date(0).toISOString()});
+      target.budgetDefaultsHistory[scenario][owner]=normalized;
+    });
+  });
+}
+function getVariableBudgetDefaultsAt(scenario,owner,month=getSelectedMonth(),target=state){
+  const history=Array.isArray(target?.budgetDefaultsHistory?.[scenario]?.[owner])?target.budgetDefaultsHistory[scenario][owner]:[];
+  const selected=history.filter(entry=>String(entry.effectiveFrom||'')<=month).sort((a,b)=>String(a.effectiveFrom).localeCompare(String(b.effectiveFrom))).pop();
+  return clone(Array.isArray(selected?.rows)?selected.rows:(target?.[scenario]?.[owner]?.variabel||[]));
+}
+function setVariableBudgetDefaultsFromMonth(scenario,owner,month,rows){
+  state.budgetDefaultsHistory=isPlainObject(state.budgetDefaultsHistory)?state.budgetDefaultsHistory:{};
+  state.budgetDefaultsHistory[scenario]=isPlainObject(state.budgetDefaultsHistory[scenario])?state.budgetDefaultsHistory[scenario]:{};
+  const history=Array.isArray(state.budgetDefaultsHistory[scenario][owner])?state.budgetDefaultsHistory[scenario][owner]:[];
+  const normalizedRows=clone(Array.isArray(rows)?rows:[]);
+  const entry={id:uid(),effectiveFrom:month,rows:normalizedRows,updatedAt:new Date().toISOString()};
+  const index=history.findIndex(item=>item.effectiveFrom===month);
+  if(index>=0)history[index]={...history[index],...entry,id:history[index].id||entry.id}; else history.push(entry);
+  history.sort((a,b)=>a.effectiveFrom.localeCompare(b.effectiveFrom));
+  state.budgetDefaultsHistory[scenario][owner]=history;
+  state[scenario][owner].variabel=clone(normalizedRows);
+
+  const budgetKey=`${owner}Variabel`;
+  Object.keys(state.monthlyBudgets||{}).filter(key=>key>=month).forEach(key=>{
+    const scenarioData=state.monthlyBudgets?.[key]?.[scenario];
+    if(isPlainObject(scenarioData))delete scenarioData[budgetKey];
+  });
 }
 
 /* ---------- Update 3: schema v4 en pure maandadministratie ---------- */
@@ -576,12 +620,14 @@ function normalizeBudgetState(candidate){
   normalized.meta.updatedBy = normalized.meta.updatedBy || getDeviceId();
   normalized.monthlyIncome = isPlainObject(normalized.monthlyIncome) ? normalized.monthlyIncome : {};
   normalized.monthlyBudgets = isPlainObject(normalized.monthlyBudgets) ? normalized.monthlyBudgets : {};
+  normalized.monthlySavingOverrides = isPlainObject(normalized.monthlySavingOverrides) ? normalized.monthlySavingOverrides : {};
   normalized.monthlyTeruggaven = isPlainObject(normalized.monthlyTeruggaven) ? normalized.monthlyTeruggaven : {};
   normalized.spaardoelGeschiedenis = isPlainObject(normalized.spaardoelGeschiedenis) ? normalized.spaardoelGeschiedenis : {};
   normalized.transactions = Array.isArray(normalized.transactions) ? normalized.transactions : [];
   normalized.bankImportRules = Array.isArray(normalized.bankImportRules) ? normalized.bankImportRules : [];
   normalizePersonDefaults(normalized);
   normalizeIncomeDefaults(normalized);
+  normalizeBudgetDefaults(normalized);
   u3NormalizeState(normalized);
   state = normalized;
   ensureMonthData(normalized.meta.selectedMonth);
@@ -1007,7 +1053,9 @@ function renderIconKpi(icon, color, label, value, sub, opts={}){
   const valClass = opts.valueClass ? ` ${opts.valueClass}` : '';
   const action = opts.openFixedOwner
     ? `button type="button" data-u3-open="planning" data-u3-planning-owner="${opts.openFixedOwner}" aria-label="Vaste lasten van ${textSafe(ownerLabel(opts.openFixedOwner))} wijzigen"`
-    : (opts.editSaving ? 'button type="button" data-saving-edit aria-label="Spaargeld van deze maand aanpassen"' : 'div');
+    : (opts.editSavingOwner
+      ? `button type="button" data-personal-saving-edit="${opts.editSavingOwner}" aria-label="Spaargeld van ${textSafe(ownerLabel(opts.editSavingOwner))} voor deze maand aanpassen"`
+      : (opts.editSaving ? 'button type="button" data-saving-edit aria-label="Spaargeld van deze maand aanpassen"' : 'div'));
   const tag = action.startsWith('button') ? 'button' : 'div';
   const attrs = tag === 'button' ? action.slice('button'.length) : '';
   return `<${tag}${attrs} class="card metric-card icon-kpi ${opts.span || 'span-3'}${tag === 'button' ? ' overview-kpi-action' : ''}">
@@ -1236,7 +1284,7 @@ function bankColumnIndex(headers, patterns){
 }
 function bankOwnerCategories(owner){
   const scenarioData = getMonthlyScenarioData(state.meta.scenario);
-  const rows = owner === 'gezamenlijk' ? scenarioData.gezamenlijk.variabel : (state[state.meta.scenario]?.[owner]?.variabel || []);
+  const rows = scenarioData?.[owner]?.variabel || [];
   const seen = new Set(); const categories = [];
   rows.forEach(row=>{
     const label = String(row.post || row.categorie || row || '').trim();
@@ -1313,33 +1361,6 @@ function personStatusBadge(amount){
   if (amount < 200) return '<span class="status-badge amber">Krap</span>';
   return '<span class="status-badge">Ruim</span>';
 }
-function copyPreviousMonth(){
-  const month = getSelectedMonth();
-  assertMonthMutationAllowed(month);
-  const prev = previousMonthKey(month);
-  const fallbackIncome = {dion:Number(state.personen?.dion?.salaris)||0, dara:Number(state.personen?.dara?.salaris)||0};
-  const existingIncome = !!state.monthlyIncome?.[month] && JSON.stringify(state.monthlyIncome[month]) !== JSON.stringify(fallbackIncome);
-  const defaultBudgets = {};
-  ['voor','na'].forEach(scenario=> defaultBudgets[scenario] = { gezamenlijkVariabel: state[scenario]?.gezamenlijk?.variabel || [] });
-  const existingBudgets = !!state.monthlyBudgets?.[month] && JSON.stringify(state.monthlyBudgets[month]) !== JSON.stringify(defaultBudgets);
-  const existingTransactions = (state.transactions||[]).some(tx=>transactionMonth(tx) === month);
-  ensureMonthData(prev);
-  const hasData = existingIncome || existingBudgets || existingTransactions;
-  if (hasData && !confirm('Deze maand heeft al maanddata. Inkomens en gezamenlijke budgetten overschrijven met vorige maand?')) return false;
-  ensureMonthData(month);
-  state.monthlyIncome[month] = clone(state.monthlyIncome[prev] || {
-    dion: Number(state.personen.dion.salaris)||0,
-    dara: Number(state.personen.dara.salaris)||0
-  });
-  state.monthlyBudgets[month] = clone(state.monthlyBudgets[prev] || {});
-  ['voor','na'].forEach(scenario=>{
-    if (!state.monthlyBudgets[month][scenario]){
-      state.monthlyBudgets[month][scenario] = { gezamenlijkVariabel: clone(state[scenario].gezamenlijk.variabel || []) };
-    }
-  });
-  return true;
-}
-
 /* ---------- rekenmotor ---------- */
 function monthsRemaining(targetDateStr, today){
   if (!targetDateStr) return null;
@@ -1477,8 +1498,15 @@ function calcScenario(state){
     const variabeleUitgaven = sumTransactions(p);
     // v49: de spaarpot is een planningsbedrag en gebruikt daarom het
     // ingestelde variabele budget, niet de werkelijke transacties.
-    const beschikbaarVoorSparen = round2(zakgeld - persoonlijkeVasteLasten - persoonlijkVariabelBudget);
-    return { persoonlijkeVasteLasten, persoonlijkVariabelBudget, resterendVoorVariabel, variabeleUitgaven, beschikbaarVoorSparen };
+    const automatischBeschikbaarVoorSparen = round2(zakgeld - persoonlijkeVasteLasten - persoonlijkVariabelBudget);
+    const monthOverrides=state.monthlySavingOverrides?.[selectedMonth];
+    const handmatigSparen=isPlainObject(monthOverrides)&&Object.prototype.hasOwnProperty.call(monthOverrides,p);
+    const beschikbaarVoorSparen=handmatigSparen?round2(Number(monthOverrides[p])||0):automatischBeschikbaarVoorSparen;
+    return {
+      persoonlijkeVasteLasten,persoonlijkVariabelBudget,resterendVoorVariabel,variabeleUitgaven,
+      automatischBeschikbaarVoorSparen,beschikbaarVoorSparen,
+      savingsSource:handmatigSparen?'handmatig':'automatisch'
+    };
   }
   const dion = { zakgeld: zakgeldDion, ...persoonlijk('dion', zakgeldDion) };
   const dara = { zakgeld: zakgeldDara, ...persoonlijk('dara', zakgeldDara) };
@@ -1633,6 +1661,8 @@ function defaultState(){
     },
     monthlyIncome: {},
     monthlyBudgets: {},
+    budgetDefaultsHistory: {},
+    monthlySavingOverrides: {},
     transactions: [],
     bankImportRules: [],
     recurringFixedExpenses: {voor:[],na:[]},
@@ -1822,6 +1852,11 @@ function ensurePersistentIds(target){
       ['gezamenlijkVariabel','dionVariabel','daraVariabel'].forEach(key=>ensureRowIds(monthData?.[scenario]?.[key]));
     });
   });
+  ['voor','na'].forEach(scenario=>{
+    ['gezamenlijk','dion','dara'].forEach(owner=>{
+      (target?.budgetDefaultsHistory?.[scenario]?.[owner]||[]).forEach(entry=>ensureRowIds(entry?.rows));
+    });
+  });
   Object.values(target?.monthlyTeruggaven || {}).forEach(monthData=>{
     ['gezamenlijk','dion','dara'].forEach(owner=>ensureRowIds(monthData?.[owner]));
   });
@@ -1947,6 +1982,12 @@ function validateBudgetState(candidate){
   }
   if (candidate.monthlyBudgets !== undefined && !isPlainObject(candidate.monthlyBudgets)){
     errors.push('monthlyBudgets moet een object zijn.');
+  }
+  if (candidate.budgetDefaultsHistory !== undefined && !isPlainObject(candidate.budgetDefaultsHistory)){
+    errors.push('budgetDefaultsHistory moet een object zijn.');
+  }
+  if (candidate.monthlySavingOverrides !== undefined && !isPlainObject(candidate.monthlySavingOverrides)){
+    errors.push('monthlySavingOverrides moet een object zijn.');
   }
   if (candidate.transactions !== undefined){
     validateRows(candidate.transactions, 'transactions', errors);
@@ -2317,6 +2358,7 @@ function commitChange(change, options={}){
         income:snapshot.monthlyIncome?.[month]||null,
         incomeOverrides:snapshot.monthlyIncomeOverrides?.[month]||null,
         budgets:snapshot.monthlyBudgets?.[month]||null,
+        savingOverrides:snapshot.monthlySavingOverrides?.[month]||null,
         refunds:snapshot.monthlyTeruggaven?.[month]||null,
         savings:(snapshot.savingsGoalLedger||[]).filter(row=>row.month===month),
         advances:(snapshot.advanceLedger||[]).filter(row=>row.month===month),
@@ -3082,7 +3124,6 @@ function renderPersonOrJoint(tabId, key, label){
       <div class="card-total"><span>Totaal uitgaven</span><span class="value neg">${eur(sumTransactions(key))}</span></div>
     </div>`;
 
-  const variabelBasePath = isJoint ? `monthlyBudgets.${getSelectedMonth()}.${state.meta.scenario}.gezamenlijkVariabel` : `${state.meta.scenario}.${key}.variabel`;
   const variableBudget = isJoint ? r.variabelBudgetTotaal : sumBedrag(data.variabel || []);
   const variableUsed = isJoint ? r.variabelTotaal : rr.variabeleUitgaven;
   const variablePct = variableBudget > 0 ? Math.min(100, Math.round((variableUsed / variableBudget) * 100)) : 0;
@@ -3098,7 +3139,7 @@ function renderPersonOrJoint(tabId, key, label){
     <div class="overview-kpi-row">
       ${renderIconKpi('€','green',`Totaal inkomen ${textSafe(label)}`, eur(totaalInkomen), monthLabel(getSelectedMonth()), {valueClass:'value pos'})}
       ${renderIconKpi('▤','blue','Vaste lasten', eur(rr.persoonlijkeVasteLasten), 'Klik om te wijzigen', {valueClass: rr.persoonlijkeVasteLasten>0?'value neg':'value pos', openFixedOwner:key})}
-      ${renderIconKpi('◎','green','Sparen', eur(rr.beschikbaarVoorSparen), availabilityBadge(rr.beschikbaarVoorSparen), {valueClass: rr.beschikbaarVoorSparen<0?'value neg':'value pos'})}
+      ${renderIconKpi('◎','green','Sparen', eur(rr.beschikbaarVoorSparen), `${rr.savingsSource==='handmatig'?'Handmatig':'Automatisch'} · klik om aan te passen`, {valueClass: rr.beschikbaarVoorSparen<0?'value neg':'value pos', editSavingOwner:key})}
       ${renderIconKpi('▥','blue','Variabel gebruikt', `${eur(variableUsed)} / ${eur(variableBudget)}`, `<span class="overview-budget-track" style="--used-pct:${variablePct}%"></span>`)}
     </div>` : '';
   const incomeManage = !isJoint ? `
@@ -3126,7 +3167,6 @@ function renderPersonOrJoint(tabId, key, label){
     </div>
     <div class="manage-stack">
       ${hypotheekCard ? renderManageSection('Beheer hypotheek', hypotheekCard, false) : ''}
-      ${renderManageSection('Beheer variabele budgetten', `<div class="card">${renderRowsTable(variabelBasePath, data.variabel)}</div>`, false)}
       ${renderManageSection('Sparen', `<div class="card">${savingsSummary}${renderGoalOverviewTable(doelenVoorGroep, spaarpotVoorGroep)}</div>`, false)}
     </div>
   ` : `
@@ -3144,7 +3184,6 @@ function renderPersonOrJoint(tabId, key, label){
     </div>
     <div class="manage-stack">
       ${renderManageSection('Inkomen en vaste teruggaven', incomeManage, false)}
-      ${renderManageSection('Persoonlijke categorieën', `<div class="card">${renderRowsTable(variabelBasePath, data.variabel)}</div>`, false)}
       ${renderManageSection('Spaardoelen tabeloverzicht', `<div class="card">${renderGoalOverviewTable(doelenVoorGroep, spaarpotVoorGroep)}</div>`, false)}
     </div>
   `;
@@ -3533,13 +3572,7 @@ function renderMonthSelect(){
         const classes = [key===selected ? 'active' : '', key===currentMonthKey ? 'current' : ''].filter(Boolean).join(' ');
         return `<button type="button" data-month-value="${key}" class="${classes}">${name}</button>`;
       }).join('')}
-    </div>
-    <details class="month-options-details">
-      <summary><span>Maandopties</span><span class="expand-chevron" aria-hidden="true"></span></summary>
-      <div class="month-options-body">
-        <button type="button" class="ghost small" data-month-copy-previous>Kopieer vorige maand</button>
-      </div>
-    </details>`;
+    </div>`;
 }
 function closeMonthPicker(){
   const control = document.getElementById('monthControl');
@@ -3888,6 +3921,7 @@ function openJointVariableCostsModal(focusLast=false, owner='gezamenlijk'){
   const name = ownerLabel(owner);
   const scenarioLabel = scenario === 'voor' ? 'Voor verkoop' : 'Na verkoop';
   const total = ()=> round2(sumBedrag(draftRows));
+  let saveScope = 'from';
 
   const draw = (focusNewest=false)=>{
     modal.innerHTML = `
@@ -3896,12 +3930,18 @@ function openJointVariableCostsModal(focusLast=false, owner='gezamenlijk'){
           <div>
             <div class="section-kicker">${scenarioLabel} · ${monthLabel(month)}</div>
             <h2>${owner === 'gezamenlijk' ? 'Variabele lasten' : `${name} variabele lasten`}</h2>
-            <p>Pas de maandbudgetten aan en bevestig ze met Opslaan.</p>
+            <p>Standaard gelden wijzigingen vanaf deze maand. Kies alleen deze maand voor een uitzondering.</p>
           </div>
           <button type="button" class="ghost joint-variable-editor-close" data-close-joint-variable-costs>Sluiten</button>
         </div>
         <div class="joint-variable-editor-summary"><span>Totaal maandbudget</span><strong>${eur(total())}</strong></div>
         <div class="joint-variable-editor-list">${draftRows.length ? renderJointVariableBudgetEditorRows(draftRows) : '<p class="hint" style="padding:10px;margin:0">Nog geen variabele budgetcategorieën.</p>'}</div>
+        <label class="income-sheet-field">Geldigheid
+          <select data-variable-scope>
+            <option value="from" ${saveScope==='from'?'selected':''}>Vanaf ${monthLabel(month)}</option>
+            <option value="once" ${saveScope==='once'?'selected':''}>Alleen ${monthLabel(month)}</option>
+          </select>
+        </label>
         <div class="joint-variable-editor-actions">
           <button type="button" class="primary" data-variable-save>Opslaan</button>
           <button type="button" class="ghost" data-variable-add>+ Categorie</button>
@@ -3930,6 +3970,7 @@ function openJointVariableCostsModal(focusLast=false, owner='gezamenlijk'){
       renderActiveTab();
     };
     modal.querySelector('[data-close-joint-variable-costs]')?.addEventListener('click', close);
+    modal.querySelector('[data-variable-scope]')?.addEventListener('change', event=>{ saveScope=event.target.value; });
     modal.querySelectorAll('[data-variable-field]').forEach(el=>{
       el.addEventListener('input', syncDraftFromInputs);
       el.addEventListener('change', syncDraftFromInputs);
@@ -3953,16 +3994,21 @@ function openJointVariableCostsModal(focusLast=false, owner='gezamenlijk'){
         bedrag:round2(Number(row.bedrag)||0)
       }));
       const saved = commitChange(()=>{
+        assertMonthMutationAllowed(month);
         ensureMonthData(month);
-        state.monthlyBudgets[month] = state.monthlyBudgets[month] || {};
-        state.monthlyBudgets[month][scenario] = state.monthlyBudgets[month][scenario] || {};
-        state.monthlyBudgets[month][scenario][key] = clone(cleaned);
+        if(saveScope==='once'){
+          state.monthlyBudgets[month] = state.monthlyBudgets[month] || {};
+          state.monthlyBudgets[month][scenario] = state.monthlyBudgets[month][scenario] || {};
+          state.monthlyBudgets[month][scenario][key] = clone(cleaned);
+        }else{
+          setVariableBudgetDefaultsFromMonth(scenario,owner,month,cleaned);
+        }
       },{render:false});
       if (!saved){
         alert('De variabele budgetten konden niet worden opgeslagen. Probeer het opnieuw.');
         return;
       }
-      showQuickToast('Variabele lasten opgeslagen');
+      showQuickToast(saveScope==='once'?'Maandbudget opgeslagen':'Budgetten vanaf deze maand opgeslagen');
       close();
     });
     if (focusNewest){
@@ -4282,6 +4328,63 @@ function openSavingEditModal(){
   });
 }
 
+function openPersonalSavingEditModal(owner){
+  if(!['dion','dara'].includes(owner))return;
+  const modal=document.getElementById('incomeEditModal');
+  const month=getSelectedMonth();
+  const result=calcScenario(state)[owner];
+  const automatic=round2(Number(result.automatischBeschikbaarVoorSparen)||0);
+  const monthOverrides=isPlainObject(state.monthlySavingOverrides?.[month])?state.monthlySavingOverrides[month]:{};
+  const hasOverride=Object.prototype.hasOwnProperty.call(monthOverrides,owner);
+  const current=hasOverride?round2(Number(monthOverrides[owner])||0):automatic;
+  const name=ownerLabel(owner);
+  modal.innerHTML=`
+    <div class="modal income-sheet" role="dialog" aria-modal="true" aria-label="Spaargeld van ${textSafe(name)} aanpassen">
+      <div class="income-sheet-handle"></div>
+      <div class="card-head"><h2>${textSafe(name)} sparen</h2><button class="danger-ghost" id="btnClosePersonalSaving" aria-label="Sluiten">&times;</button></div>
+      <div class="income-sheet-meta"><span>${textSafe(name)}</span><span>${monthLabel(month)}</span></div>
+      <div class="income-sheet-readonly"><span>Automatisch berekend</span><strong>${eur(automatic)}</strong></div>
+      <label class="income-sheet-field">Eigen spaarbedrag voor deze maand
+        <input id="personalSavingInput" type="number" step="0.01" inputmode="decimal" value="${current}">
+      </label>
+      <p class="hint">Dit bedrag overschrijft alleen in ${monthLabel(month)} de automatische berekening. Inkomen en zakgeldverdeling veranderen hierdoor niet.</p>
+      <div class="modal-actions">
+        <button class="ghost" id="btnUseAutomaticSaving">Automatisch gebruiken</button>
+        <button class="ghost" id="btnCancelPersonalSaving">Annuleren</button>
+        <button class="primary" id="btnSavePersonalSaving">Opslaan</button>
+      </div>
+    </div>`;
+  modal.classList.add('open');
+  const close=()=>{modal.classList.remove('open');modal.innerHTML='';};
+  const removeOverride=()=>{
+    const saved=commitChange(()=>{
+      assertMonthMutationAllowed(month);
+      if(isPlainObject(state.monthlySavingOverrides?.[month])){
+        delete state.monthlySavingOverrides[month][owner];
+        if(!Object.keys(state.monthlySavingOverrides[month]).length)delete state.monthlySavingOverrides[month];
+      }
+    },{render:false});
+    if(!saved)return;
+    close();renderActiveTab();showQuickToast('Automatisch sparen hersteld');
+  };
+  document.getElementById('btnClosePersonalSaving').addEventListener('click',close);
+  document.getElementById('btnCancelPersonalSaving').addEventListener('click',close);
+  document.getElementById('btnUseAutomaticSaving').addEventListener('click',removeOverride);
+  bindModalBackdrop(modal,close);
+  document.getElementById('btnSavePersonalSaving').addEventListener('click',()=>{
+    const value=bankAmount(document.getElementById('personalSavingInput').value);
+    if(!Number.isFinite(value)){alert('Vul een geldig spaarbedrag in.');return;}
+    const saved=commitChange(()=>{
+      assertMonthMutationAllowed(month);
+      state.monthlySavingOverrides=isPlainObject(state.monthlySavingOverrides)?state.monthlySavingOverrides:{};
+      state.monthlySavingOverrides[month]=isPlainObject(state.monthlySavingOverrides[month])?state.monthlySavingOverrides[month]:{};
+      state.monthlySavingOverrides[month][owner]=round2(value);
+    },{render:false});
+    if(!saved)return;
+    close();renderActiveTab();showQuickToast('Spaarbedrag voor deze maand opgeslagen');
+  });
+}
+
 
 function openIncomeEditModal(person, label){
   const modal = document.getElementById('incomeEditModal');
@@ -4579,7 +4682,7 @@ function renderPersonalFirstRow(owner){
   return `<div class="mobile-kpi-grid v4-mobile-only-grid joint-first-row" aria-label="${name} rij 1">
     <div class="mobile-kpi-card joint-kpi-card joint-total-income-card"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg('allowance')}</span></div><div class="mobile-kpi-label">Zakgeld</div><div class="mobile-kpi-value ${person.zakgeld<0?'value neg':'value pos'}">${eur(person.zakgeld)}</div><div class="mobile-kpi-edit-hint-placeholder">.</div></div>
     <div class="mobile-kpi-card joint-kpi-card joint-fixed-costs-card"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg('wallet')}</span></div><div class="mobile-kpi-label">Vaste lasten</div><div class="mobile-kpi-value value neg">${eur(person.persoonlijkeVasteLasten)}</div><div class="mobile-kpi-edit-hint-placeholder">.</div></div>
-    <div class="mobile-kpi-card joint-kpi-card joint-saving-card"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg('piggy')}</span></div><div class="mobile-kpi-label">Sparen deze maand</div><div class="mobile-kpi-value ${person.beschikbaarVoorSparen<0?'value neg':'value pos'}">${eur(person.beschikbaarVoorSparen)}</div><div class="mobile-kpi-edit-hint-placeholder">.</div></div>
+    <button type="button" class="mobile-kpi-card joint-kpi-card joint-saving-card" data-personal-saving-edit="${owner}" aria-label="Spaargeld van ${textSafe(name)} voor deze maand aanpassen"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg('piggy')}</span></div><div class="mobile-kpi-label">Sparen deze maand</div><div class="mobile-kpi-value ${person.beschikbaarVoorSparen<0?'value neg':'value pos'}">${eur(person.beschikbaarVoorSparen)}</div><div class="mobile-kpi-edit-hint">${person.savingsSource==='handmatig'?'Handmatig':'Tik om aan te passen'}</div></button>
     <div class="mobile-kpi-card joint-kpi-card static joint-variable-card"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg('chart')}</span></div><div class="mobile-kpi-label">Variabel gebruikt</div><div class="mobile-kpi-value mobile-kpi-value-budget neu">${eur(person.variabeleUitgaven)} / ${eur(variableBudget)}</div><div class="mobile-kpi-budget-track" style="--used-pct:${variablePct}%"></div></div>
   </div>
   <div class="card joint-fullwidth-card joint-fixed-category-card v4-mobile-only-block">${renderJointFixedCostsCardHead(owner)}<div class="joint-fixed-category-body">${fixedRows || '<p class="hint">Nog geen vaste lasten.</p>'}</div></div>
@@ -4696,6 +4799,9 @@ function renderActiveTab(){
       openSavingEditModal();
     });
   });
+  root.querySelectorAll('[data-personal-saving-edit]').forEach(btn=>{
+    btn.addEventListener('click', ()=>openPersonalSavingEditModal(btn.dataset.personalSavingEdit));
+  });
   root.querySelectorAll('[data-open-owner-fixed]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       openJointFixedCostsModal(false, btn.dataset.openOwnerFixed);
@@ -4729,14 +4835,6 @@ function renderActiveTab(){
       if (event.key === 'Enter' || event.key === ' '){
         event.preventDefault();
         openEditor(event);
-      }
-    });
-  });
-  root.querySelectorAll('[data-copy-previous-mobile]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      if (copyPreviousMonth()){
-        persist();
-        renderActiveTab();
       }
     });
   });
@@ -4827,16 +4925,6 @@ document.getElementById('monthPickerButton').addEventListener('click', (e)=>{
   else openMonthPicker();
 });
 document.getElementById('monthPickerPanel').addEventListener('click', (e)=>{
-  const copyBtn = e.target.closest('[data-month-copy-previous]');
-  if (copyBtn){
-    e.stopPropagation();
-    if (copyPreviousMonth()){
-      persist();
-      closeMonthPicker();
-      renderActiveTab();
-    }
-    return;
-  }
   const yearBtn = e.target.closest('[data-month-year]');
   if (yearBtn){
     const currentMonth = getSelectedMonth().slice(5,7);
