@@ -40,7 +40,7 @@ async function buildJavaScript() {
     write: false,
     format: "iife",
     platform: "browser",
-    target: ["es2020"],
+    target: ["es2018"],
     sourcemap: false,
     minify: false,
     legalComments: "none",
