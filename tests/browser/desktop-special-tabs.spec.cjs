@@ -13,6 +13,11 @@ test('desktop spaardoelen en data back-up renderen volledig', async ({ page }) =
 
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/');
+  const dashboardDistributionCards = page.locator('#tab-dashboard .u5-planning-realisation > .card');
+  await expect(dashboardDistributionCards).toHaveCount(2);
+  await expect(dashboardDistributionCards.nth(0)).toContainText('Geplande verdeling');
+  await expect(dashboardDistributionCards.nth(1)).toContainText('Verdeling Dion / Dara');
+  await expect(page.locator('#tab-dashboard')).not.toContainText('Werkelijk maandresultaat');
   const dashboardIncomeValues = await page.locator('#tab-dashboard .u5-primary-kpi .metric-value').allTextContents();
   expect(dashboardIncomeValues).toHaveLength(4);
   expect(parseEuro(dashboardIncomeValues[2])).toBeCloseTo(
@@ -29,7 +34,12 @@ test('desktop spaardoelen en data back-up renderen volledig', async ({ page }) =
   const dionBudget = page.locator('#tab-dion .card').filter({ hasText: 'Budgetgebruik deze maand' }).first();
   await expect(dionBudget).toBeVisible();
   await expect(dionBudget.locator('.progress-item').first()).toBeVisible();
-  await expect(dionBudget).toContainText('Dion');
+  await dionBudget.getByRole('button', { name: 'Maandbudgetten van Dion wijzigen' }).click();
+  const dionBudgetDialog = page.getByRole('dialog', { name: 'Variabele lasten aanpassen' });
+  await expect(dionBudgetDialog.getByRole('heading', { name: 'Dion variabele lasten' })).toBeVisible();
+  await expect(dionBudgetDialog.getByRole('spinbutton', { name: 'Maandbudget' }).first()).toBeVisible();
+  await expect(dionBudgetDialog.getByRole('button', { name: 'Opslaan' })).toBeVisible();
+  await dionBudgetDialog.getByRole('button', { name: 'Sluiten' }).click();
   await expect(page.locator('.overview-kpi-row [data-u3-planning-owner="dion"]')).toBeVisible();
   await expect(page.locator('#tab-dion .u5-joint-activity-row')).toHaveCount(1);
   await expect(page.locator('#tab-dion .u5-fixed-costs-overview')).toBeVisible();
@@ -49,13 +59,18 @@ test('desktop spaardoelen en data back-up renderen volledig', async ({ page }) =
   const daraBudget = page.locator('#tab-dara .card').filter({ hasText: 'Budgetgebruik deze maand' }).first();
   await expect(daraBudget).toBeVisible();
   await expect(daraBudget.locator('.progress-item').first()).toBeVisible();
-  await expect(daraBudget).toContainText('Dara');
+  await daraBudget.getByRole('button', { name: 'Maandbudgetten van Dara wijzigen' }).click();
+  await expect(page.getByRole('dialog', { name: 'Variabele lasten aanpassen' }).getByRole('heading', { name: 'Dara variabele lasten' })).toBeVisible();
+  await page.getByRole('dialog', { name: 'Variabele lasten aanpassen' }).getByRole('button', { name: 'Sluiten' }).click();
   await expect(page.locator('.overview-kpi-row [data-u3-planning-owner="dara"]')).toBeVisible();
   await expect(page.locator('#tab-dara .u5-fixed-costs-overview')).toBeVisible();
   await expect(page.locator('#tab-dara .u5-joint-goals-preview')).toBeVisible();
 
   await page.locator('.v4-sidebar [data-tab="gezamenlijk"]').click();
   await expect(page.locator('#tab-gezamenlijk .u5-joint-budget-card')).toBeVisible();
+  await page.locator('#tab-gezamenlijk .u5-joint-budget-card').getByRole('button', { name: 'Gezamenlijke maandbudgetten wijzigen' }).click();
+  await expect(page.getByRole('dialog', { name: 'Variabele lasten aanpassen' }).getByRole('heading', { name: 'Variabele lasten', exact: true })).toBeVisible();
+  await page.getByRole('dialog', { name: 'Variabele lasten aanpassen' }).getByRole('button', { name: 'Sluiten' }).click();
   await expect(page.locator('#tab-gezamenlijk')).not.toContainText('Recente gezamenlijke uitgaven');
   await expect(page.locator('.overview-kpi-row [data-u3-planning-owner="gezamenlijk"]')).toBeVisible();
   await expect(page.locator('#tab-gezamenlijk .u5-fixed-costs-overview')).toBeVisible();

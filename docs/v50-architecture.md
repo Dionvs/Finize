@@ -56,7 +56,7 @@ Er is geen externe API toegevoegd. Klassieke globals die door de bestaande runti
 
 ## PWA
 
-De cachemarker is `finize-v63-dashboard-income-total`. Alleen caches met de prefix `finize-` worden opgeruimd. Alleen navigatieverzoeken mogen offline op `index.html` terugvallen; ontbrekende scripts, CSS en afbeeldingen krijgen nooit HTML als vervanging. Optionele pictogrammen kunnen een installatie niet blokkeren.
+De cachemarker is `finize-v65-budgetbewerking`. Alleen caches met de prefix `finize-` worden opgeruimd. Alleen navigatieverzoeken mogen offline op `index.html` terugvallen; ontbrekende scripts, CSS en afbeeldingen krijgen nooit HTML als vervanging. Optionele pictogrammen kunnen een installatie niet blokkeren.
 
 ## Herstel en bewust behouden uitvoer
 
