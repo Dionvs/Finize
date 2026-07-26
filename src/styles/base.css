@@ -175,14 +175,13 @@ td.num{ text-align:right; }
 
 .donut-row{ display:flex; gap:14px; flex-wrap:wrap; }
 .donut{
-  width:108px; height:108px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  width:108px; height:108px; display:flex; align-items:center; justify-content:center;
   background: conic-gradient(var(--green) calc(var(--pct,0)*1%), #f0e2d2 0);
-  flex:0 0 auto;
 }
 .donut-inner{ width:78px; height:78px; border-radius:50%; background:var(--card); display:flex; align-items:center; justify-content:center; flex-direction:column; }
 .donut-inner b{ font-size:20px; }
 .donut-inner span{ font-size:11px; color:var(--text-faint); }
-.donut-wrap{ display:flex; flex-direction:column; align-items:center; gap:10px; width:142px; }
+.donut-wrap{ flex-direction:column; gap:10px; width:142px; }
 .donut-wrap .name{ font-size:14px; color:#705f52; text-align:center; line-height:1.45; }
 
 .goal{
@@ -495,7 +494,7 @@ td.num{ text-align:right; }
 .modal-grid .full{ grid-column:1/-1; }
 .modal-actions{ display:flex; justify-content:flex-end; gap:10px; margin-top:16px; flex-wrap:wrap; }
 .income-sheet{ width:min(440px,100%); }
-.income-sheet-handle{ display:none; }
+.income-sheet-handle{ }
 .income-sheet-meta{ display:flex; justify-content:space-between; color:var(--text-faint); font-size:12.5px; margin:2px 0 12px; }
 .income-sheet-total{ display:flex; justify-content:space-between; align-items:baseline; padding:10px 0; border-bottom:1px solid var(--border); margin-bottom:14px; }
 .income-sheet-total strong{ font-size:20px; }
@@ -912,26 +911,18 @@ body.v4-app .month-picker-btn:hover::after{
 
 
 body.v4-app[data-real-active-tab="gezamenlijk"] .joint-fixed-card-head{
-  align-items:center !important;
   gap:8px !important;
 }
 body.v4-app[data-real-active-tab="gezamenlijk"] .joint-fixed-edit-btn{
   width:32px !important;
   height:32px !important;
   min-width:32px !important;
-  padding:0 !important;
   border-radius:11px !important;
-  display:inline-flex !important;
-  align-items:center !important;
-  justify-content:center !important;
   color:var(--green) !important;
   background:var(--green-bg) !important;
   border-color:rgba(124,142,73,.18) !important;
-  box-shadow:none !important;
 }
 body.v4-app[data-real-active-tab="gezamenlijk"] .joint-fixed-edit-btn svg{
-  width:16px !important;
-  height:16px !important;
 }
 #incomeEditModal.joint-fixed-editor-open{
   align-items:stretch !important;
@@ -1754,7 +1745,7 @@ html, body{ overflow-x:hidden; }
   }
 
 
-  body.v4-app[data-active-tab="dashboard"] .mobile-title-block{ min-width:0; }
+  body.v4-app[data-active-tab="dashboard"] .mobile-title-block{ }
   body.v4-app[data-active-tab="dashboard"] .mobile-title-block h1{
     font-size:27px;
     line-height:.98;
@@ -1917,54 +1908,35 @@ html, body{ overflow-x:hidden; }
   }
   body.v4-app[data-active-tab="dashboard"] .budget-preview-item,
   body.v4-app[data-active-tab="dashboard"] .dashboard-goal-preview-item{
-    display:grid;
     grid-template-columns:42px minmax(0,1fr);
     gap:8px 10px;
-    align-items:start;
-    min-width:0;
   }
   body.v4-app[data-active-tab="dashboard"] .budget-preview-thumb,
   body.v4-app[data-active-tab="dashboard"] .dashboard-goal-preview-thumb{
     width:42px;
     height:42px;
-    border-radius:999px;
     flex:none;
-    display:flex;
-    align-items:center;
-    justify-content:center;
   }
   body.v4-app[data-active-tab="dashboard"] .budget-preview-main,
   body.v4-app[data-active-tab="dashboard"] .dashboard-goal-preview-main{
-    min-width:0;
-    display:grid;
     gap:6px;
   }
   body.v4-app[data-active-tab="dashboard"] .budget-preview-top,
   body.v4-app[data-active-tab="dashboard"] .dashboard-goal-preview-top,
   body.v4-app[data-active-tab="dashboard"] .dashboard-goal-preview-meta{
-    display:grid;
-    grid-template-columns:minmax(0,1fr) auto;
     align-items:end;
     gap:10px;
-    min-width:0;
   }
   body.v4-app[data-active-tab="dashboard"] .budget-preview-top strong,
   body.v4-app[data-active-tab="dashboard"] .dashboard-goal-preview-top strong{
     font-size:10.5px;
     line-height:1.15;
-    font-weight:900;
-    min-width:0;
-    overflow:hidden;
-    text-overflow:ellipsis;
-    white-space:nowrap;
   }
   body.v4-app[data-active-tab="dashboard"] .budget-preview-top span,
   body.v4-app[data-active-tab="dashboard"] .dashboard-goal-preview-top span,
   body.v4-app[data-active-tab="dashboard"] .dashboard-goal-preview-meta span{
     font-size:9px;
     line-height:1.15;
-    color:var(--text-dim);
-    white-space:nowrap;
   }
   body.v4-app[data-active-tab="dashboard"] .dashboard-goal-preview-meta span:first-child{
     color:var(--text-dim);
@@ -1973,15 +1945,10 @@ html, body{ overflow-x:hidden; }
   body.v4-app[data-active-tab="dashboard"] .budget-preview-main .progress-track,
   body.v4-app[data-active-tab="dashboard"] .dashboard-goal-preview-main .progress-track{
     height:10px;
-    border-radius:999px;
-    overflow:hidden;
-    background:#e9e1d4;
   }
   body.v4-app[data-active-tab="dashboard"] .budget-preview-main .progress-fill.budget-gradient{
-    background:linear-gradient(90deg, var(--green) 0%, var(--amber) 58%, var(--terracotta) 100%);
   }
   body.v4-app[data-active-tab="dashboard"] .dashboard-goal-preview-main .progress-fill.goal-positive{
-    background:linear-gradient(90deg, var(--green) 0%, var(--blue) 100%);
   }
   body.v4-app[data-active-tab="dashboard"] .dashboard-goals-preview-list{
     display:grid;
@@ -2327,10 +2294,6 @@ body.v4-app[data-real-active-tab="gezamenlijk"] .joint-first-row,
   }
 
   body.v4-app[data-real-active-tab="gezamenlijk"] .joint-two-column-row{
-    gap:6px !important;
-    row-gap:6px !important;
-    column-gap:6px !important;
-    padding:0 !important;
   }
 
   body.v4-app[data-real-active-tab="gezamenlijk"] .joint-two-column-row + .joint-single-card,
@@ -2345,9 +2308,7 @@ body.v4-app[data-real-active-tab="gezamenlijk"] .joint-first-row,
   }
 
   body.v4-app[data-real-active-tab="gezamenlijk"] .joint-accordion-stack{
-    gap:6px !important;
     row-gap:6px !important;
-    padding:0 !important;
   }
 
 body.v4-app[data-real-active-tab="gezamenlijk"] .joint-two-column-card{
@@ -2355,11 +2316,6 @@ body.v4-app[data-real-active-tab="gezamenlijk"] .joint-two-column-card{
   }
 
   body.v4-app[data-real-active-tab="gezamenlijk"] .joint-two-column-row{
-    margin:0 0 6px 0 !important;
-    gap:6px !important;
-    row-gap:6px !important;
-    column-gap:6px !important;
-    padding:0 !important;
   }
 
   body.v4-app[data-real-active-tab="gezamenlijk"] .joint-two-column-row + .joint-single-card{
@@ -2457,16 +2413,9 @@ body.v4-app .mobile-savings-kpis{
   }
 
 body.v4-app[data-active-tab="dashboard"] .v4-main{
-    width:100% !important;
-    max-width:none !important;
-    margin:0 !important;
     padding:10px 10px 108px !important;
   }
   body.v4-app[data-active-tab="dashboard"] #tab-dashboard{
-    margin:0 !important;
-    padding:0 !important;
-    width:100% !important;
-    max-width:none !important;
   }
 
 #monthControl .month-picker-btn{
@@ -2521,8 +2470,6 @@ body.v4-app[data-active-tab="dashboard"] .v4-main{
 
 
   body.v4-app[data-active-tab="dashboard"] .mobile-title-block{
-    flex:1 1 auto !important;
-    min-width:0 !important;
   }
 
   body.v4-app[data-active-tab="dashboard"] .mobile-title-block h1{
@@ -2530,16 +2477,13 @@ body.v4-app[data-active-tab="dashboard"] .v4-main{
     line-height:.88 !important;
     font-weight:950 !important;
     letter-spacing:-.07em !important;
-    margin:0 !important;
   }
 
   body.v4-app[data-active-tab="dashboard"] .mobile-title-block p{
     margin:8px 0 0 !important;
     font-size:clamp(21px,6vw,30px) !important;
-    line-height:1 !important;
     font-weight:850 !important;
     letter-spacing:-.045em !important;
-    color:var(--text-dim) !important;
   }
 
 body.v4-app[data-active-tab="dashboard"] .neutral-amount,
@@ -2580,42 +2524,30 @@ body.v4-app[data-active-tab="dashboard"] .summary-person-label{
 
 
   body.v4-app[data-active-tab="dashboard"] .mobile-title-block{
-    flex:1 1 auto !important;
-    min-width:0 !important;
   }
   body.v4-app[data-active-tab="dashboard"] .mobile-title-block h1{
-    font-size:27px !important;
     line-height:.98 !important;
     font-weight:900 !important;
     letter-spacing:-.055em !important;
-    margin:0 !important;
   }
   body.v4-app[data-active-tab="dashboard"] .mobile-title-block p{
-    margin:3px 0 0 !important;
-    font-size:13px !important;
     font-weight:700 !important;
     color:var(--text-dim) !important;
   }
 
 
   body.v4-app[data-active-tab="dashboard"] .mobile-add-expense{
-    display:none !important;
   }
 
 body.v4-app[data-active-tab="dashboard"] .v4-main{
     width:100% !important;
     max-width:390px !important;
     margin:0 auto !important;
-    padding:10px 10px 96px !important;
-    box-sizing:border-box !important;
   }
 
   body.v4-app[data-active-tab="dashboard"] #tab-dashboard{
-    width:100% !important;
     max-width:370px !important;
     margin:0 auto !important;
-    padding:0 !important;
-    box-sizing:border-box !important;
   }
 
   /* top app header */
@@ -2690,25 +2622,16 @@ body.v4-app[data-active-tab="dashboard"] .v4-main{
 
 
   body.v4-app[data-active-tab="dashboard"] .mobile-kpi-top{
-    margin-bottom:9px !important;
   }
 
   body.v4-app[data-active-tab="dashboard"] .mobile-kpi-icon{
-    width:31px !important;
-    height:31px !important;
   }
 
 
   body.v4-app[data-active-tab="dashboard"] .mobile-kpi-edit-hint{
-    margin-top:8px !important;
-    padding:0 !important;
-    font-size:8px !important;
-    line-height:1.1 !important;
   }
 
   body.v4-app[data-active-tab="dashboard"] .mobile-kpi-budget-track{
-    height:8px !important;
-    margin-top:8px !important;
   }
 
   /* two-column dashboard cards */
@@ -2754,9 +2677,6 @@ body.v4-app[data-active-tab="dashboard"] .v4-main{
 
 
   body.v4-app[data-active-tab="dashboard"] .metric-value{
-    font-size:19px !important;
-    line-height:1.05 !important;
-    margin:3px 0 9px !important;
   }
 
   body.v4-app[data-active-tab="dashboard"] .summary-list{
@@ -2764,14 +2684,10 @@ body.v4-app[data-active-tab="dashboard"] .v4-main{
   }
 
   body.v4-app[data-active-tab="dashboard"] .summary-line{
-    padding:4px 0 !important;
-    font-size:9.5px !important;
-    line-height:1.15 !important;
     gap:6px !important;
   }
 
   body.v4-app[data-active-tab="dashboard"] .summary-line strong{
-    font-size:9.5px !important;
   }
 
   body.v4-app[data-active-tab="dashboard"] .split-bar{
@@ -2887,22 +2803,13 @@ html,
   }
 
   body.v4-app[data-active-tab="dashboard"] .v4-main{
-    width:100vw !important;
-    max-width:none !important;
-    margin:0 !important;
     padding-left:10px !important;
     padding-right:10px !important;
     padding-top:10px !important;
     padding-bottom:96px !important;
-    box-sizing:border-box !important;
   }
 
   body.v4-app[data-active-tab="dashboard"] #tab-dashboard{
-    width:100% !important;
-    max-width:none !important;
-    margin:0 !important;
-    padding:0 !important;
-    box-sizing:border-box !important;
   }
 
 body.v4-app[data-active-tab="dashboard"] .dashboard-grid{ width:100% !important; }
@@ -2973,13 +2880,9 @@ body.v4-app[data-active-tab="dashboard"] .manage-stack{ box-sizing:border-box !i
 
   body.v4-app[data-active-tab="dashboard"] .mobile-kpi-edit-hint{
     margin-top:8px !important;
-    padding:0 !important;
-    font-size:8px !important;
-    line-height:1.1 !important;
   }
 
   body.v4-app[data-active-tab="dashboard"] .mobile-kpi-budget-track{
-    height:8px !important;
     margin-top:8px !important;
   }
 
@@ -3212,34 +3115,25 @@ body.v4-app[data-active-tab="dashboard"] .mobile-month-slot{
 
 
 body.v4-app[data-active-tab="dashboard"] .mobile-kpi-top{
-    margin:0 0 8px !important;
     min-height:32px !important;
     display:flex !important;
-    align-items:flex-start !important;
     justify-content:space-between !important;
   }
   body.v4-app[data-active-tab="dashboard"] .mobile-kpi-icon{
-    width:31px !important;
-    height:31px !important;
     border-radius:50% !important;
     box-shadow:inset 0 0 0 1px rgba(124,142,73,.12) !important;
   }
   body.v4-app[data-active-tab="dashboard"] .mobile-kpi-icon svg{
-    width:18px !important;
-    height:18px !important;
     stroke-width:1.75 !important;
   }
 
 
   body.v4-app[data-active-tab="dashboard"] .mobile-kpi-edit-hint{
-    margin-top:6px !important;
-    padding-top:0 !important;
     font-size:8px !important;
     line-height:1.1 !important;
   }
   body.v4-app[data-active-tab="dashboard"] .mobile-kpi-budget-track{
     height:8px !important;
-    margin-top:6px !important;
   }
 
 body.v4-app[data-active-tab="dashboard"] .mobile-kpi-top{
@@ -3265,7 +3159,6 @@ body.v4-app[data-active-tab="dashboard"] .mobile-kpi-top{
   }
 
   body.v4-app[data-active-tab="dashboard"] .mobile-kpi-budget-track{
-    margin-top:6px !important;
   }
 
 /*
@@ -3361,7 +3254,6 @@ body.v4-app[data-active-tab="dashboard"] .allowance-return-card .summary-list{
 
 
 body.v4-app[data-active-tab="dashboard"] .dashboard-goals-preview.v4-desktop-only-block{
-    display:none !important;
   }
 
   body.v4-app[data-active-tab="dashboard"] .dashboard-goals-preview.v4-mobile-only-block{
@@ -3501,10 +3393,7 @@ body.v4-app[data-active-tab="dashboard"] .mobile-kpi-grid{
   }
 
   body.v4-app[data-active-tab="dashboard"] .mobile-kpi-edit-hint{
-    margin-top:4px !important;
-    padding-top:0 !important;
-    font-size:7px !important; /* 1px smaller */
-    line-height:1.05 !important;
+    padding-top:0 !important; /* 1px smaller */
     letter-spacing:-.01em !important;
   }
 
@@ -3593,11 +3482,9 @@ body.v4-app[data-real-active-tab="gezamenlijk"] .joint-fullwidth-card{
 body.v4-app[data-real-active-tab="gezamenlijk"] .joint-two-column-row{
     display:grid !important;
     grid-template-columns:repeat(2,minmax(0,1fr)) !important;
-    gap:6px !important;
     width:100% !important;
     max-width:none !important;
     margin:0 0 6px !important;
-    align-items:stretch !important;
     box-sizing:border-box !important;
   }
 
@@ -3664,7 +3551,6 @@ body.v4-app[data-real-active-tab="gezamenlijk"] .joint-accordion-stack{
     min-height:54px !important;
     margin:0 !important;
     padding:0 !important;
-    border-radius:14px !important;
     box-sizing:border-box !important;
     overflow:hidden !important;
   }
@@ -3679,7 +3565,6 @@ body.v4-app[data-real-active-tab="gezamenlijk"] .joint-accordion-stack{
     gap:10px !important;
     list-style:none !important;
     cursor:pointer !important;
-    box-sizing:border-box !important;
   }
 
   body.v4-app[data-real-active-tab="gezamenlijk"] .joint-accordion-card summary::-webkit-details-marker{
@@ -3693,7 +3578,6 @@ body.v4-app[data-real-active-tab="gezamenlijk"] .joint-accordion-stack{
   body.v4-app[data-real-active-tab="gezamenlijk"] .joint-accordion-body{
     min-height:90px !important;
     padding:0 14px 14px !important;
-    box-sizing:border-box !important;
   }
 
 body.v4-app[data-real-active-tab="gezamenlijk"] .joint-accordion-card{
@@ -3762,18 +3646,9 @@ body.v4-app .v4-bottom-nav .bottom-nav-btn{
   }
 
 body.v4-app[data-active-tab="dashboard"] .mobile-kpi-edit-hint{
-    width:100% !important;
-    max-width:100% !important;
-    min-width:0 !important;
-    margin-top:4px !important;
-    padding:0 !important;
     font-size:6.2px !important;
     line-height:1 !important;
     letter-spacing:-.035em !important;
-    white-space:nowrap !important;
-    overflow:hidden !important;
-    text-overflow:clip !important;
-    box-sizing:border-box !important;
   }
 
   body.v4-app[data-active-tab="dashboard"] .mobile-kpi-card{
@@ -3873,7 +3748,6 @@ body.v4-app[data-real-active-tab="gezamenlijk"] .joint-fixed-costs-card{
     max-height:none !important;
     padding:7px 7px 6px !important;
     display:grid !important;
-    grid-template-rows:28px 36px minmax(0,1fr) auto !important;
     align-content:start !important;
     align-items:start !important;
     gap:0 !important;
@@ -4204,8 +4078,6 @@ body.v4-app[data-active-tab="dashboard"] .joint-account-card,
   }
 
   #incomeEditModal .joint-fixed-editor-list{
-    border-radius:14px !important;
-    overflow-x:hidden !important;
   }
 
   #incomeEditModal .joint-fixed-editor-table-head{
@@ -4224,7 +4096,6 @@ body.v4-app[data-active-tab="dashboard"] .joint-account-card,
     min-width:0 !important;
     width:100% !important;
     padding:6px 8px !important;
-    align-items:center !important;
   }
 
   #incomeEditModal .joint-fixed-editor-row-compact .joint-fixed-editor-row-icon{
@@ -4239,8 +4110,6 @@ body.v4-app[data-active-tab="dashboard"] .joint-account-card,
   }
 
   #incomeEditModal .joint-fixed-editor-row-compact .joint-fixed-editor-input{
-    height:28px !important;
-    min-height:28px !important;
     padding:4px 7px !important;
     border-radius:9px !important;
     font-size:10px !important;
