@@ -229,5 +229,6 @@
     renderActiveTab();
   });
 
-  renderActiveTab();
+  if(window.__finizeBootstrap)window.__finizeBootstrap.update5Ready=true;
+  window.__finizeMaybeFinishBootstrap?.();
 })();

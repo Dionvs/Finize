@@ -11500,6 +11500,22 @@ ensurePersistentIds(state);
 localSave(state);
 committedStateSnapshot=clone(state);
 
+window.__finizeBootstrap={
+  coreReady:false,
+  update4Ready:false,
+  update5Ready:false,
+  rendered:false,
+  initialRenderCount:0
+};
+window.__finizeMaybeFinishBootstrap=function(){
+  const bootstrap=window.__finizeBootstrap;
+  if(bootstrap.rendered||!bootstrap.coreReady||!bootstrap.update4Ready||!bootstrap.update5Ready)return false;
+  bootstrap.rendered=true;
+  bootstrap.initialRenderCount+=1;
+  renderActiveTab();
+  CloudAdapter.connect();
+  return true;
+};
 async function initializeApp(){
   try{
     const imagesMigrated = await GoalImageStore.initializeState(state);
@@ -11507,8 +11523,8 @@ async function initializeApp(){
   }catch(error){
     console.warn('Lokale spaardoelfoto-opslag kon niet worden voorbereid.', error);
   }
-  renderActiveTab();
-  CloudAdapter.connect();
+  window.__finizeBootstrap.coreReady=true;
+  window.__finizeMaybeFinishBootstrap();
 }
 initializeApp();
 
