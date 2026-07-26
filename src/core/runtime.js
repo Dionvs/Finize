@@ -947,10 +947,13 @@ function renderDashboardCardHead(title, hint='', tone='green'){
 }
 
 function ownerLabel(owner){ return owner === 'gezamenlijk' ? 'Gezamenlijk' : (state.personen?.[owner]?.naam || (owner === 'dion' ? 'Dion' : 'Dara')); }
-function renderJointFixedCostsCardHead(owner='gezamenlijk'){
+function renderJointFixedCostsCardHead(owner='gezamenlijk', options={}){
   const name = ownerLabel(owner);
+  const editAction = options.planning
+    ? `data-u3-open="planning" data-u3-planning-owner="${owner}" aria-label="Vaste lasten van ${textSafe(name)} wijzigen"`
+    : `data-open-owner-fixed="${owner}" aria-label="Vaste lasten aanpassen"`;
   return `<div class="card-head joint-fixed-card-head">
-    <div class="card-head-title">${iconBadge(dashboardSectionIconName('Vaste lasten verdeling'), 'green', 'card-head-icon')}<h2>${owner === 'gezamenlijk' ? 'Vaste lasten verdeling' : `${name} vaste lasten`}</h2><button type="button" class="joint-fixed-edit-btn" data-open-owner-fixed="${owner}" aria-label="Vaste lasten aanpassen">${iconSvg('receipt')}</button></div>
+    <div class="card-head-title">${iconBadge(dashboardSectionIconName('Vaste lasten verdeling'), 'green', 'card-head-icon')}<h2>${owner === 'gezamenlijk' ? 'Vaste lasten verdeling' : `${name} vaste lasten`}</h2><button type="button" class="joint-fixed-edit-btn" ${editAction}>${iconSvg('receipt')}</button></div>
   </div>`;
 }
 function renderJointVariableCostsCardHead(owner='gezamenlijk'){
@@ -1002,11 +1005,16 @@ function renderIconContent(icon){
 }
 function renderIconKpi(icon, color, label, value, sub, opts={}){
   const valClass = opts.valueClass ? ` ${opts.valueClass}` : '';
-  return `<div class="card metric-card icon-kpi ${opts.span || 'span-3'}">
+  const action = opts.openFixedOwner
+    ? `button type="button" data-u3-open="planning" data-u3-planning-owner="${opts.openFixedOwner}" aria-label="Vaste lasten van ${textSafe(ownerLabel(opts.openFixedOwner))} wijzigen"`
+    : (opts.editSaving ? 'button type="button" data-saving-edit aria-label="Spaargeld van deze maand aanpassen"' : 'div');
+  const tag = action.startsWith('button') ? 'button' : 'div';
+  const attrs = tag === 'button' ? action.slice('button'.length) : '';
+  return `<${tag}${attrs} class="card metric-card icon-kpi ${opts.span || 'span-3'}${tag === 'button' ? ' overview-kpi-action' : ''}">
     <div class="icon-kpi-top"><span class="icon-circle ${color}">${renderIconContent(icon)}</span><div class="metric-label">${label}</div></div>
     <div class="metric-value${valClass}">${value}</div>
     ${sub ? `<div class="metric-sub">${sub}</div>` : ''}
-  </div>`;
+  </${tag}>`;
 }
 function renderStatusCard(icon, color, title, desc, extra=''){
   return `<div class="card status-card span-4">
@@ -1060,6 +1068,17 @@ function renderModernGoalCards(doelen, pot, owner, limit=null){
   if (limit) items = items.slice(0, limit);
   if (!items.length) return '<p class="muted-empty">Nog geen spaardoelen.</p>';
   return `<div class="goal-card-grid">${items.map(item=>renderModernGoalCard(item, owner)).join('')}</div>`;
+}
+function renderDesktopGoalsPreview(doelen, pot, owner='gezamenlijk'){
+  const name = ownerLabel(owner);
+  const items = calcGroep(doelen || [], pot, TODAY).slice(0, 3);
+  return `<div class="card span-12 u5-joint-goals-preview">
+    <div class="card-head">
+      <h2>${owner === 'gezamenlijk' ? 'Spaardoelen preview' : `${name} spaardoelen`}</h2>
+      <button class="ghost small" data-tab-shortcut="spaardoelen">Bekijk alle doelen →</button>
+    </div>
+    <div class="mobile-goal-list">${items.length ? items.map(item=>renderMobileGoalRow(item, owner)).join('') : '<p class="muted-empty">Nog geen spaardoelen.</p>'}</div>
+  </div>`;
 }
 function goalMonthlyInlegText(item){
   const total=Number(item.werkelijkeInleg)||0;
@@ -2697,7 +2716,7 @@ function renderDashboard(){
   ];
   const totalZakgeld = round2(r.dion.zakgeld + r.dara.zakgeld);
   const incomeBreakdown = dashboardIncomeBreakdown(getSelectedMonth());
-  const dashboardTotalIncome = incomeBreakdown.total;
+  const dashboardTotalIncome = r.totaalSalaris;
   const jointRemaining = round2(r.totaalSalaris - r.gezamenlijkeLastenTotaal - r.spaarpotDezeMaand);
   const splitDion = totalZakgeld > 0 ? Math.max(0, r.dion.zakgeld / totalZakgeld) : .5;
   const variabelBudgetPct = r.variabelBudgetTotaal > 0 ? Math.min(100, Math.round((r.variabelTotaal / r.variabelBudgetTotaal) * 100)) : 0;
@@ -2846,10 +2865,10 @@ function renderDashboard(){
       </div>
     </div>
     <div class="u5-primary-kpis v4-desktop-only-grid" aria-label="Geplande financiële verdeling">
-      <button type="button" class="card u5-primary-kpi u5-income-kpi tone-income" data-open-total-income aria-label="Maandinkomen van Dion en Dara handmatig aanpassen"><div class="metric-label">Totaal inkomen</div><div class="metric-value value pos">${eur(dashboardTotalIncome)}</div><div class="metric-sub">Verdelingsinkomen ${eur(r.totaalSalaris)}${incomeBreakdown.extra ? ` · extra/teruggaven ${eur(incomeBreakdown.extra)}` : ''} · aanpassen</div></button>
-      <div class="card u5-primary-kpi tone-budget"><div class="metric-label">Gezamenlijk budget</div><div class="metric-value">${eur(r.gezamenlijkeLastenTotaal)}</div><div class="metric-sub">Vaste lasten + vooraf ingestelde budgetten</div></div>
-      <div class="card u5-primary-kpi tone-saving"><div class="metric-label">Gezamenlijk sparen</div><div class="metric-value value pos">${eur(r.spaarpotDezeMaand)}</div><div class="metric-sub">${monthLabel(getSelectedMonth())}</div></div>
-      <div class="card u5-primary-kpi tone-allowance"><div class="metric-label">Zakgeld totaal</div><div class="metric-value ${totalZakgeld<0?'value neg':'value pos'}">${eur(totalZakgeld)}</div><div class="metric-sub">Vooraf berekende overdracht</div></div>
+      <button type="button" class="card u5-primary-kpi tone-income" data-income-edit="dion" data-income-label="Dion" aria-label="Inkomen van Dion aanpassen"><div class="metric-label">Inkomen Dion</div><div class="metric-value value pos">${eur(r.salarisDion)}</div><div class="metric-sub">Klik om aan te passen</div></button>
+      <button type="button" class="card u5-primary-kpi tone-budget" data-income-edit="dara" data-income-label="Dara" aria-label="Inkomen van Dara aanpassen"><div class="metric-label">Inkomen Dara</div><div class="metric-value value pos">${eur(r.salarisDara)}</div><div class="metric-sub">Klik om aan te passen</div></button>
+      <div class="card u5-primary-kpi tone-saving"><div class="metric-label">Totaal gezamenlijke rekening</div><div class="metric-value value pos">${eur(dashboardTotalIncome)}</div><div class="metric-sub">Inkomen en vaste teruggaven</div></div>
+      <div class="card u5-primary-kpi tone-allowance u5-variable-kpi"><div class="metric-label">Variabel gebruikt</div><div class="metric-value neutral-amount">${eur(r.variabelTotaal)} / ${eur(r.variabelBudgetTotaal)}</div><div class="mobile-kpi-budget-track" style="--used-pct:${variabelBudgetPct}%" aria-label="Gezamenlijk variabel budget gebruikt: ${variabelBudgetPct}%"></div></div>
     </div>
     <div class="mobile-kpi-grid v4-mobile-only-grid">
       <button type="button" class="card mobile-kpi-card mobile-kpi-card--editable" data-income-edit="dion" data-income-label="Dion">
@@ -2940,17 +2959,45 @@ function renderTransactionsTable(owner){
     <tbody>${rows || emptyRow}</tbody>
   </table></div>`;
 }
-function renderBudgetUsageList(){
+function renderBudgetUsageList(owner='gezamenlijk'){
   const data = getMonthlyScenarioData(state.meta.scenario);
-  return `<div class="progress-list">${(data.gezamenlijk.variabel||[]).filter(row=>row.post || row.bedrag).map(row=>{
+  return `<div class="progress-list">${(data[owner]?.variabel||[]).filter(row=>row.post || row.bedrag).map(row=>{
     const budget = Number(row.bedrag)||0;
-    const used = sumTransactions('gezamenlijk', row.post);
+    const used = sumTransactions(owner, row.post);
     const status = budgetStatus(used, budget);
     return `<div class="progress-item">
       <div class="progress-top"><strong>${textSafe(row.post || row.categorie)}</strong><span><span class="neutral-amount">${eur(used)}</span> / <span class="neutral-amount">${eur(budget)}</span> <span class="status-badge ${status.cls}">${status.label}</span></span></div>
       <div class="progress-track"><div class="progress-fill" style="width:${Math.min(100, Math.round(status.ratio*100))}%"></div></div>
     </div>`;
   }).join('') || '<p class="hint">Nog geen budgetten.</p>'}</div>`;
+}
+
+function renderFixedCostsOverviewCard(owner, data, total){
+  const fixedByCategory = {};
+  (data?.vasteLasten || []).forEach(row=>{
+    const category = normalizeCategoryName(row.categorie);
+    fixedByCategory[category] = round2((fixedByCategory[category] || 0) + effectiveBedrag(row));
+  });
+  if (owner === 'gezamenlijk' && state.meta.scenario === 'na'){
+    (data?.hypotheek || []).forEach(row=>{
+      const category = normalizeCategoryName(row.categorie || 'Huis');
+      fixedByCategory[category] = round2((fixedByCategory[category] || 0) + effectiveBedrag(row));
+    });
+  }
+  const rows = Object.entries(fixedByCategory)
+    .sort((a,b)=>b[1]-a[1])
+    .map(([category, amount])=>{
+      const ratio = total > 0 ? Math.min(1, amount / total) : 0;
+      return `<div class="progress-item">
+        <div class="progress-item-icon tone-green">${iconSvg(jointFixedCategoryIconName(category))}</div>
+        <div class="progress-top"><strong>${textSafe(category)}</strong><span>${eur(amount)} · ${pct(ratio)}</span></div>
+        <div class="progress-track"><div class="progress-fill" style="width:${Math.round(ratio*100)}%"></div></div>
+      </div>`;
+    }).join('');
+  return `<div class="card span-12 u5-fixed-costs-overview">
+    ${renderJointFixedCostsCardHead(owner, {planning:true})}
+    <div class="u5-fixed-costs-overview-list">${rows || '<p class="hint">Nog geen vaste lasten.</p>'}</div>
+  </div>`;
 }
 
 function renderRecurringFixedManage(owner){
@@ -2976,6 +3023,31 @@ function renderRecurringFixedManage(owner){
 }
 
 /* ---------- gezamenlijk / dion / dara ---------- */
+function ownerVariableBudgetRows(owner, data){
+  const budgets = new Map();
+  (data?.variabel || []).forEach(row=>{
+    const label=String(row.post || row.categorie || '').trim();
+    if(label) budgets.set(label.toLocaleLowerCase(),{label,budget:Number(row.bedrag)||0});
+  });
+  const used = {};
+  let uncategorized = 0;
+  getMonthTransactions(owner).forEach(tx=>{
+    const key=String(tx.category||'').trim().toLocaleLowerCase();
+    const impact=getTransactionExpenseImpact(tx);
+    if (budgets.has(key)) used[key]=round2((used[key]||0)+impact);
+    else uncategorized=round2(uncategorized+impact);
+  });
+  const rows = [...budgets.entries()].map(([key,row])=>{
+    const amount=used[key]||0;
+    const ratio=row.budget>0?Math.min(1,amount/row.budget):0;
+    return `<button type="button" class="budget-preview-item budget-preview-button" data-open-budget-transactions="${textSafe(row.label)}" data-budget-owner="${owner}" aria-label="Open transacties voor ${textSafe(row.label)}"><div class="budget-preview-thumb tone-green">${iconSvg(categoryIconName(row.label))}</div><div class="budget-preview-main"><div class="budget-preview-top"><strong>${textSafe(row.label)}</strong><span>${eur(amount)} / ${eur(row.budget)}</span></div><div class="progress-track budget-gradient"><div class="progress-fill budget-gradient" style="width:${Math.round(ratio*100)}%"></div></div></div></button>`;
+  });
+  if (uncategorized>0){
+    rows.push(`<button type="button" class="budget-preview-item budget-preview-button joint-variable-unassigned" data-open-budget-transactions="Ongecategoriseerd" data-budget-owner="${owner}"><div class="budget-preview-thumb">${iconSvg('more')}</div><div class="budget-preview-main"><div class="budget-preview-top"><strong>Ongecategoriseerd</strong><span>${eur(uncategorized)}</span></div><div class="progress-track"><div class="progress-fill" style="width:100%"></div></div></div></button>`);
+  }
+  return rows;
+}
+
 function renderPersonOrJoint(tabId, key, label){
   const s = getMonthlyScenarioData(state.meta.scenario);
   const r = calcScenario(state);
@@ -3023,33 +3095,23 @@ function renderPersonOrJoint(tabId, key, label){
     </div>`;
 
   const variabelBasePath = isJoint ? `monthlyBudgets.${getSelectedMonth()}.${state.meta.scenario}.gezamenlijkVariabel` : `${state.meta.scenario}.${key}.variabel`;
-  const vasteTeruggavenTotal = round2((r.vasteTeruggavenDion||0) + (r.vasteTeruggavenDara||0));
-  const resterendBudget = round2(r.variabelBudgetTotaal - r.variabelTotaal);
-  const resterendPct = r.variabelBudgetTotaal > 0 ? Math.round((resterendBudget / r.variabelBudgetTotaal) * 100) : 0;
+  const variableBudget = isJoint ? r.variabelBudgetTotaal : sumBedrag(data.variabel || []);
+  const variableUsed = isJoint ? r.variabelTotaal : rr.variabeleUitgaven;
+  const variablePct = variableBudget > 0 ? Math.min(100, Math.round((variableUsed / variableBudget) * 100)) : 0;
 
   const jointKpis = isJoint ? `
     <div class="overview-kpi-row">
-      ${renderIconKpi('▤','green','Vaste lasten totaal', eur(r.vasteLastenTotaal), `Incl. teruggaven ${eur(vasteTeruggavenTotal)}`, {valueClass:'value neg'})}
-      ${renderIconKpi('◈','blue','Variabel budget', eur(r.variabelBudgetTotaal), 'Budget deze maand')}
-      ${renderIconKpi('↗','green','Uitgegeven deze maand', eur(r.variabelTotaal), `Van ${eur(r.variabelBudgetTotaal)}`, {valueClass:'value neg'})}
-      ${renderIconKpi('◔','blue','Resterend budget', eur(resterendBudget), `${resterendPct}% over`, {valueClass: resterendBudget<0?'value neg':'value pos'})}
+      ${renderIconKpi('€','green','Totaal gezamenlijk inkomen', eur(r.totaalSalaris), 'Dion en Dara samen', {valueClass:'value pos'})}
+      ${renderIconKpi('▤','blue','Vaste lasten totaal', eur(r.vasteLastenTotaal), 'Klik om te wijzigen', {valueClass:'value neg', openFixedOwner:'gezamenlijk'})}
+      ${renderIconKpi('◎','green','Sparen', eur(r.spaarpotDezeMaand), 'Klik om aan te passen', {valueClass:'value pos', editSaving:true})}
+      ${renderIconKpi('▥','blue','Variabel gebruikt', `${eur(variableUsed)} / ${eur(variableBudget)}`, `<span class="overview-budget-track" style="--used-pct:${variablePct}%"></span>`)}
     </div>` : '';
   const personalKpis = !isJoint ? `
     <div class="overview-kpi-row">
-      ${renderIconKpi('◈','green','Zakgeld ontvangen', eur(rr.zakgeld), monthLabel(getSelectedMonth()), {valueClass: rr.zakgeld<0?'value neg':'value pos'})}
-      ${renderIconKpi('▤','blue','Vaste lasten', eur(rr.persoonlijkeVasteLasten), 'terugkerend', {valueClass: rr.persoonlijkeVasteLasten>0?'value neg':'value pos'})}
-      ${renderIconKpi('▥','blue','Uitgaven deze maand', eur(rr.variabeleUitgaven), 'transacties', {valueClass:'value neg'})}
-      ${renderIconKpi('◎','green','Beschikbaar voor sparen/vrij gebruik', eur(rr.beschikbaarVoorSparen), availabilityBadge(rr.beschikbaarVoorSparen), {valueClass: rr.beschikbaarVoorSparen<0?'value neg':'value pos'})}
-    </div>` : '';
-  const personalIncomeCard = !isJoint ? `
-    <div class="card metric-card income-metric span-12">
-      <div class="metric-label">Totaal inkomen ${label}</div>
-      <div class="metric-value value pos">${eur(totaalInkomen)}</div>
-      <div class="metric-sub">Totaal naar gezamenlijke rekening</div>
-      <div class="income-breakdown">
-        <div><span>Basisinkomen</span><input class="inline-edit" type="number" step="0.01" data-month-income="${key}"></div>
-        <div><span>Vaste teruggaven</span><strong class="value pos">${eur(vasteTeruggaven)}</strong></div>
-      </div>
+      ${renderIconKpi('€','green',`Totaal inkomen ${textSafe(label)}`, eur(totaalInkomen), monthLabel(getSelectedMonth()), {valueClass:'value pos'})}
+      ${renderIconKpi('▤','blue','Vaste lasten', eur(rr.persoonlijkeVasteLasten), 'Klik om te wijzigen', {valueClass: rr.persoonlijkeVasteLasten>0?'value neg':'value pos', openFixedOwner:key})}
+      ${renderIconKpi('◎','green','Sparen', eur(rr.beschikbaarVoorSparen), availabilityBadge(rr.beschikbaarVoorSparen), {valueClass: rr.beschikbaarVoorSparen<0?'value neg':'value pos'})}
+      ${renderIconKpi('▥','blue','Variabel gebruikt', `${eur(variableUsed)} / ${eur(variableBudget)}`, `<span class="overview-budget-track" style="--used-pct:${variablePct}%"></span>`)}
     </div>` : '';
   const incomeManage = !isJoint ? `
     <div class="card">
@@ -3061,37 +3123,39 @@ function renderPersonOrJoint(tabId, key, label){
       </div>
     </div>
     ${refundsCard}` : '';
-
   document.getElementById(tabId).innerHTML = isJoint ? `
     ${renderPageHeading(`Gezamenlijk overzicht — ${monthLabel(getSelectedMonth())}`, pageGreeting)}
     ${jointKpis}
-    <div class="dashboard-grid">
-      <div class="card span-7"><div class="card-head"><h2>Budgetgebruik deze maand</h2><span class="hint">Dion / Dara</span></div>${renderBudgetUsageList()}</div>
-      <div class="card span-5"><div class="card-head"><h2>Recente gezamenlijke uitgaven</h2></div>${renderRecentTransactionsList('gezamenlijk',4)}</div>
+    <div class="dashboard-grid u5-joint-activity-row">
+      <div class="card span-5 u5-joint-budget-card"><div class="card-head"><h2>Budgetgebruik deze maand</h2><span class="hint">Dion / Dara</span></div>${renderBudgetUsageList()}</div>
+      ${transactionCard}
     </div>
     <div class="dashboard-grid">
-      ${transactionCard}
-      <div class="card span-5"><div class="card-head"><h2>Spaardoelen preview</h2><button class="ghost small" data-tab-shortcut="spaardoelen">Bekijk alle doelen →</button></div>${renderModernGoalCards(doelenVoorGroep, spaarpotVoorGroep, 'Gezamenlijk', 3)}</div>
+      ${renderFixedCostsOverviewCard(key, data, r.vasteLastenTotaal)}
+    </div>
+    <div class="dashboard-grid">
+      ${renderDesktopGoalsPreview(doelenVoorGroep, spaarpotVoorGroep, key)}
     </div>
     <div class="manage-stack">
       ${hypotheekCard ? renderManageSection('Beheer hypotheek', hypotheekCard, false) : ''}
-      ${renderManageSection('Beheer vaste lasten', renderRecurringFixedManage(key), false)}
       ${renderManageSection('Beheer variabele budgetten', `<div class="card">${renderRowsTable(variabelBasePath, data.variabel)}</div>`, false)}
       ${renderManageSection('Sparen', `<div class="card">${savingsSummary}${renderGoalOverviewTable(doelenVoorGroep, spaarpotVoorGroep)}</div>`, false)}
     </div>
   ` : `
     ${renderPageHeading(`${label} overzicht — ${monthLabel(getSelectedMonth())}`, pageGreeting)}
     ${personalKpis}
-    <div class="dashboard-grid">
-      ${personalIncomeCard}
+    <div class="dashboard-grid u5-joint-activity-row">
+      <div class="card span-5 u5-joint-budget-card"><div class="card-head"><h2>Budgetgebruik deze maand</h2><span class="hint">${textSafe(label)}</span></div>${renderBudgetUsageList(key)}</div>
+      ${transactionCard}
     </div>
     <div class="dashboard-grid">
-      ${transactionCard}
-      <div class="card span-5"><div class="card-head"><h2>Persoonlijke spaardoelen</h2></div>${renderModernGoalCards(doelenVoorGroep, spaarpotVoorGroep, label, 3)}</div>
+      ${renderFixedCostsOverviewCard(key, data, rr.persoonlijkeVasteLasten)}
+    </div>
+    <div class="dashboard-grid">
+      ${renderDesktopGoalsPreview(doelenVoorGroep, spaarpotVoorGroep, key)}
     </div>
     <div class="manage-stack">
       ${renderManageSection('Inkomen en vaste teruggaven', incomeManage, false)}
-      ${renderManageSection('Eigen vaste lasten', renderRecurringFixedManage(key), false)}
       ${renderManageSection('Persoonlijke categorieën', `<div class="card">${renderRowsTable(variabelBasePath, data.variabel)}</div>`, false)}
       ${renderManageSection('Spaardoelen tabeloverzicht', `<div class="card">${renderGoalOverviewTable(doelenVoorGroep, spaarpotVoorGroep)}</div>`, false)}
     </div>
@@ -4520,13 +4584,7 @@ function renderPersonalFirstRow(owner){
   const person = r[owner];
   const data = getMonthlyScenarioData(state.meta.scenario)[owner];
   const name = ownerLabel(owner);
-  const budgets = new Map();
-  (data.variabel || []).forEach(row=>{ const label=String(row.post || row.categorie || '').trim(); if(label) budgets.set(label.toLocaleLowerCase(),{label,budget:Number(row.bedrag)||0}); });
-  const used = {};
-  let uncategorized = 0;
-  getMonthTransactions(owner).forEach(tx=>{ const key=String(tx.category||'').trim().toLocaleLowerCase(); const impact=getTransactionExpenseImpact(tx); if (budgets.has(key)) used[key]=round2((used[key]||0)+impact); else uncategorized=round2(uncategorized+impact); });
-  const variableRows = [...budgets.entries()].map(([key,row])=>{ const amount=used[key]||0; const ratio=row.budget>0?Math.min(1,amount/row.budget):0; return `<button type="button" class="budget-preview-item budget-preview-button" data-open-budget-transactions="${textSafe(row.label)}" data-budget-owner="${owner}" aria-label="Open transacties voor ${textSafe(row.label)}"><div class="budget-preview-thumb tone-green">${iconSvg(categoryIconName(row.label))}</div><div class="budget-preview-main"><div class="budget-preview-top"><strong>${textSafe(row.label)}</strong><span>${eur(amount)} / ${eur(row.budget)}</span></div><div class="progress-track budget-gradient"><div class="progress-fill budget-gradient" style="width:${Math.round(ratio*100)}%"></div></div></div></button>`; });
-  if (uncategorized>0) variableRows.push(`<button type="button" class="budget-preview-item budget-preview-button joint-variable-unassigned" data-open-budget-transactions="Ongecategoriseerd" data-budget-owner="${owner}"><div class="budget-preview-thumb">${iconSvg('more')}</div><div class="budget-preview-main"><div class="budget-preview-top"><strong>Ongecategoriseerd</strong><span>${eur(uncategorized)}</span></div><div class="progress-track"><div class="progress-fill" style="width:100%"></div></div></div></button>`);
+  const variableRows = ownerVariableBudgetRows(owner,data);
   const fixed={}; (data.vasteLasten||[]).forEach(row=>{ const cat=normalizeCategoryName(row.categorie); fixed[cat]=round2((fixed[cat]||0)+effectiveBedrag(row)); });
   const fixedRows=Object.entries(fixed).sort((a,b)=>b[1]-a[1]).map(([cat,amount])=>{ const ratio=person.persoonlijkeVasteLasten>0?amount/person.persoonlijkeVasteLasten:0; return `<div class="progress-item"><div class="progress-item-icon tone-green">${iconSvg(jointFixedCategoryIconName(cat))}</div><div class="progress-top"><strong>${cat}</strong><span>${eur(amount)} · ${pct(ratio)}</span></div><div class="progress-track"><div class="progress-fill" style="width:${Math.round(ratio*100)}%"></div></div></div>`; }).join('');
   const variableBudget=sumBedrag(data.variabel||[]); const variablePct=variableBudget>0?Math.min(100,Math.round((person.variabeleUitgaven/variableBudget)*100)):0;
@@ -5799,7 +5857,7 @@ function renderU3AdminPanel(){
 function bindU3Admin(root){
   root.querySelectorAll('[data-u3-open]').forEach(button=>button.addEventListener('click',()=>{
     const view=button.dataset.u3Open;
-    if(view==='planning')u3OpenPlanning();
+    if(view==='planning')u3OpenPlanning(button.dataset.u3PlanningOwner||'');
     else if(view==='review')u3OpenReview();
     else if(view==='actual-income'){
       const month=getSelectedMonth();
@@ -5832,17 +5890,19 @@ function u3RecurringRows(kind){
   if(kind==='income')return state.recurringIncomeSources||[];
   return state.recurringFixedExpenses?.[state.meta.scenario]||[];
 }
-function u3OpenPlanning(){
-  const fixed=u3RecurringRows('fixed');
+function u3OpenPlanning(owner=''){
+  const planningOwner=U3_ACCOUNTS.includes(owner)?owner:'';
+  const fixed=u3RecurringRows('fixed').filter(item=>!planningOwner||(item.financialFor||item.rekening||'gezamenlijk')===planningOwner);
   const incomes=u3RecurringRows('income');
+  const ownerName=planningOwner?u3AccountLabel(planningOwner):'';
   const rows=(items,kind)=>items.map(item=>`<article class="u3-admin-row"><div class="u3-row-head"><div><strong>${textSafe(item.naam||'Zonder naam')}</strong><br><small>${u3AccountLabel(item.rekening)} → ${u3AccountLabel(item.financialFor||item.rekening)} · elke ${item.frequentieAantal} ${textSafe(item.frequentieEenheid)}</small></div><div><span class="u3-status ${item.actief!==false?'ok':''}">${item.actief!==false?'Actief':'Gestopt'}</span> <button class="ghost small" data-u3-edit-recurring="${kind}:${item.id}">Bewerken</button></div></div><div>${eur(u3AmountAt(item,getSelectedMonth()))} <small>· gemiddeld ${eur(u3MonthlyAverage(item))} p/m</small></div></article>`).join('');
-  const {modal}=u3AdminModal(`<div class="u3-admin-head"><div><div class="section-kicker">${monthLabel(getSelectedMonth())} · ${state.meta.scenario==='voor'?'Voor verkoop':'Na verkoop'}</div><h2>Planning beheren</h2><p>Bedragen kunnen voor één maand of vanaf deze maand wijzigen.</p></div><button class="ghost" data-u3-close>Sluiten</button></div>
+  const {modal}=u3AdminModal(`<div class="u3-admin-head"><div><div class="section-kicker">${monthLabel(getSelectedMonth())} · ${state.meta.scenario==='voor'?'Voor verkoop':'Na verkoop'}</div><h2>${planningOwner?`${textSafe(ownerName)} vaste lasten`:'Planning beheren'}</h2><p>${planningOwner?`Alleen de vaste lasten die financieel voor ${textSafe(ownerName)} zijn.`:'Bedragen kunnen voor één maand of vanaf deze maand wijzigen.'}</p></div><button class="ghost" data-u3-close>Sluiten</button></div>
     <div class="u3-steps">
-      <section class="u3-step"><div class="u3-step-head"><div><h3>Vaste lasten</h3><p>${fixed.length} terugkerende posten in dit scenario</p></div><button class="primary small" data-u3-add-recurring="fixed">+ Vaste last</button></div><div class="u3-admin-list">${rows(fixed,'fixed')||'<div class="u3-empty">Nog geen vaste lasten.</div>'}</div></section>
-      <section class="u3-step"><div class="u3-step-head"><div><h3>Inkomstenbronnen</h3><p>${incomes.length} terugkerende bronnen</p></div><button class="primary small" data-u3-add-recurring="income">+ Inkomstenbron</button></div><div class="u3-admin-list">${rows(incomes,'income')||'<div class="u3-empty">Nog geen inkomstenbronnen.</div>'}</div></section>
+      <section class="u3-step"><div class="u3-step-head"><div><h3>Vaste lasten</h3><p>${fixed.length} terugkerende posten${planningOwner?` voor ${textSafe(ownerName)}`:' in dit scenario'}</p></div><button class="primary small" data-u3-add-recurring="fixed">+ Vaste last</button></div><div class="u3-admin-list">${rows(fixed,'fixed')||'<div class="u3-empty">Nog geen vaste lasten.</div>'}</div></section>
+      ${planningOwner?'':`<section class="u3-step"><div class="u3-step-head"><div><h3>Inkomstenbronnen</h3><p>${incomes.length} terugkerende bronnen</p></div><button class="primary small" data-u3-add-recurring="income">+ Inkomstenbron</button></div><div class="u3-admin-list">${rows(incomes,'income')||'<div class="u3-empty">Nog geen inkomstenbronnen.</div>'}</div></section>`}
     </div>`);
-  modal.querySelectorAll('[data-u3-add-recurring]').forEach(button=>button.addEventListener('click',()=>u3OpenRecurringEditor(button.dataset.u3AddRecurring)));
-  modal.querySelectorAll('[data-u3-edit-recurring]').forEach(button=>button.addEventListener('click',()=>{const [kind,id]=button.dataset.u3EditRecurring.split(':');u3OpenRecurringEditor(kind,id);}));
+  modal.querySelectorAll('[data-u3-add-recurring]').forEach(button=>button.addEventListener('click',()=>u3OpenRecurringEditor(button.dataset.u3AddRecurring,'',{owner:planningOwner||'gezamenlijk',planningOwner})));
+  modal.querySelectorAll('[data-u3-edit-recurring]').forEach(button=>button.addEventListener('click',()=>{const [kind,id]=button.dataset.u3EditRecurring.split(':');u3OpenRecurringEditor(kind,id,{planningOwner});}));
 }
 function u3OpenRecurringEditor(kind,id='',defaults={}){
   const existing=u3RecurringRows(kind).find(item=>item.id===id);
@@ -5850,6 +5910,7 @@ function u3OpenRecurringEditor(kind,id='',defaults={}){
   const current=getSelectedMonth();
   const value=existing?u3AmountAt(existing,current):0;
   const defaultOwner=U3_ACCOUNTS.includes(defaults.owner)?defaults.owner:'gezamenlijk';
+  const planningOwner=U3_ACCOUNTS.includes(defaults.planningOwner)?defaults.planningOwner:'';
   const {modal}=u3AdminModal(`<div class="u3-admin-head"><div><div class="section-kicker">${income?'Inkomstenbron':'Vaste last'}</div><h2>${existing?'Bewerken':'Toevoegen'}</h2></div><button class="ghost" data-u3-close>Sluiten</button></div>
     <div class="u3-grid">
       <label class="full">Naam<input id="u3RecName" value="${textSafe(existing?.naam||'')}"></label>
@@ -5866,9 +5927,9 @@ function u3OpenRecurringEditor(kind,id='',defaults={}){
       <label class="u2-checkbox"><input id="u3RecActive" type="checkbox" ${existing?.actief!==false?'checked':''}> Actief</label>
     </div>
     <div class="modal-actions">${existing?'<button class="danger-ghost" id="u3RecDelete">Stoppen</button>':''}<button class="ghost" data-u3-back-planning>Terug</button><button class="primary" id="u3RecSave">Opslaan</button></div>`);
-  modal.querySelector('[data-u3-back-planning]')?.addEventListener('click',u3OpenPlanning);
+  modal.querySelector('[data-u3-back-planning]')?.addEventListener('click',()=>u3OpenPlanning(planningOwner));
   modal.querySelector('#u3RecDelete')?.addEventListener('click',()=>{
-    try{u3AssertMonthOpen();commitChange(()=>{existing.actief=false;existing.einddatum=existing.einddatum||u3IsoDate(new Date(`${current}-01T12:00:00`));},{render:false});u3OpenPlanning();}catch(error){alert(error.message);}
+    try{u3AssertMonthOpen();commitChange(()=>{existing.actief=false;existing.einddatum=existing.einddatum||u3IsoDate(new Date(`${current}-01T12:00:00`));},{render:false});u3OpenPlanning(planningOwner);}catch(error){alert(error.message);}
   });
   modal.querySelector('#u3RecSave').addEventListener('click',()=>{
     try{
@@ -5888,7 +5949,7 @@ function u3OpenRecurringEditor(kind,id='',defaults={}){
         else{delete item.monthOverrides[current];item.amountHistory=item.amountHistory.filter(row=>String(row.effectiveFrom).slice(0,7)!==current);item.amountHistory.push({id:`amount-${item.id}-${current}`,effectiveFrom:`${current}-01`,amount});}
         if(!existing)u3RecurringRows(kind).push(item);
       },{render:false});
-      u3OpenPlanning();
+      u3OpenPlanning(planningOwner);
     }catch(error){alert(error.message);}
   });
 }
@@ -6099,22 +6160,37 @@ Object.assign(window,{
 });
 
 export {
+  TODAY,
   state,
   assertMonthMutationAllowed,
+  calcDoel,
+  calcGroep,
   calcScenario,
   CloudAdapter,
   DataAdapter,
+  eur,
+  formatDateNL,
   getCalculationDateForSelectedMonth,
+  getSelectedMonth,
   getMonthFinancialResult,
   getTransactionExpenseImpact,
+  goalIcon,
+  goalImageSource,
   GoalImageStore,
   iconSvg,
   localSave,
   migrateBudgetState,
+  monthLabel,
   normalizeBudgetState,
   openTransactionModal,
+  pct,
   renderActiveTab,
+  renderDataTab,
+  renderGoalGroup,
+  renderIconKpi,
+  renderPageHeading,
   resolveMonthlyIncome,
   safeImageUrl,
+  textSafe,
   validateBudgetState
 };

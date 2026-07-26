@@ -21,7 +21,7 @@
   function round2(n) {
     return Math.round((n + Number.EPSILON) * 100) / 100;
   }
-  function eur2(n) {
+  function eur(n) {
     if (n === null || n === void 0 || isNaN(n)) return "€ -";
     const sign = n < 0 ? "-" : "";
     return sign + "€ " + Math.abs(n).toLocaleString("nl-NL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -31,7 +31,7 @@
     if (kind === "income") return Number(n) < 0 ? "value neg" : "value pos";
     return Number(n) < 0 ? "value neg" : "value pos";
   }
-  function pct2(n) {
+  function pct(n) {
     return Math.round((n || 0) * 1e3) / 10 + "%";
   }
   function percentInputValue(n) {
@@ -71,7 +71,7 @@
     target.splice(safeIndex, 0, item);
     return { item, sourcePath, targetPath, sourceIndex, targetIndex: safeIndex };
   }
-  function formatDateNL2(value) {
+  function formatDateNL(value) {
     if (!value) return "";
     const d = new Date(value);
     if (isNaN(d)) return value;
@@ -132,17 +132,17 @@
     const d = new Date(y, (m || 1) - 2, 1);
     return monthKey(d);
   }
-  function monthLabel2(key) {
+  function monthLabel(key) {
     const [y, m] = String(key || monthKey()).split("-").map(Number);
     const d = new Date(y, (m || 1) - 1, 1);
     return d.toLocaleDateString("nl-NL", { month: "long", year: "numeric" });
   }
-  function monthOptions(centerKey = getSelectedMonth2()) {
+  function monthOptions(centerKey = getSelectedMonth()) {
     const [y] = String(centerKey || monthKey()).split("-").map(Number);
     const years = [y - 1, y, y + 1];
     return years.flatMap((year) => Array.from({ length: 12 }, (_, i) => monthKey(new Date(year, i, 1))));
   }
-  function yearsWithMonthData(selected = getSelectedMonth2()) {
+  function yearsWithMonthData(selected = getSelectedMonth()) {
     const years = /* @__PURE__ */ new Set([String(selected).slice(0, 4), String(monthKey()).slice(0, 4)]);
     Object.keys(state.monthlyIncome || {}).forEach((key) => {
       if (/^\d{4}-\d{2}$/.test(key)) years.add(key.slice(0, 4));
@@ -159,7 +159,7 @@
   function transactionMonth(tx) {
     return String(tx.date || "").slice(0, 7);
   }
-  function getSelectedMonth2() {
+  function getSelectedMonth() {
     var _a;
     if (!((_a = state == null ? void 0 : state.meta) == null ? void 0 : _a.selectedMonth)) return monthKey();
     return state.meta.selectedMonth;
@@ -169,7 +169,7 @@
     state.meta.selectedMonth = value;
     ensureMonthData(value);
   }
-  function ensureMonthData(month = getSelectedMonth2()) {
+  function ensureMonthData(month = getSelectedMonth()) {
     var _a, _b, _c, _d;
     state.meta.selectedMonth = state.meta.selectedMonth || monthKey();
     state.monthlyIncome = isPlainObject(state.monthlyIncome) ? state.monthlyIncome : {};
@@ -266,7 +266,7 @@
       target.incomeDefaultsHistory[person] = normalized;
     });
   }
-  function getIncomeDefaultsAt(person, month = getSelectedMonth2()) {
+  function getIncomeDefaultsAt(person, month = getSelectedMonth()) {
     var _a, _b, _c, _d, _e, _f, _g;
     const rows = Array.isArray((_a = state.incomeDefaultsHistory) == null ? void 0 : _a[person]) ? state.incomeDefaultsHistory[person] : [];
     const selected = rows.filter((row) => String(row.effectiveFrom || "") <= month).sort((a, b) => String(a.effectiveFrom).localeCompare(String(b.effectiveFrom))).pop();
@@ -299,7 +299,7 @@
       if (isPlainObject(state.monthlyIncome[key])) state.monthlyIncome[key][person] = normalizedSalary;
     });
   }
-  function getDistributionIncomeParts(person, month = getSelectedMonth2()) {
+  function getDistributionIncomeParts(person, month = getSelectedMonth()) {
     var _a, _b, _c, _d;
     const defaults = getIncomeDefaultsAt(person, month);
     const salaryOverride = (_b = (_a = state.monthlyIncomeOverrides) == null ? void 0 : _a[month]) == null ? void 0 : _b[person];
@@ -374,7 +374,7 @@
     return dates;
   }
   function u3MonthlyAverage(item) {
-    const amount = Math.abs(u3AmountAt(item, getSelectedMonth2()));
+    const amount = Math.abs(u3AmountAt(item, getSelectedMonth()));
     const count = Math.max(1, Number(item == null ? void 0 : item.frequentieAantal) || 1);
     if ((item == null ? void 0 : item.frequentieEenheid) === "weken") return round2(amount * (365.2425 / 12) / (7 * count));
     if ((item == null ? void 0 : item.frequentieEenheid) === "jaren") return round2(amount / (12 * count));
@@ -645,20 +645,20 @@
     ensurePersistentIds(normalized);
     return normalized;
   }
-  function getMonthlyBaseIncome(person, month = getSelectedMonth2()) {
+  function getMonthlyBaseIncome(person, month = getSelectedMonth()) {
     ensureMonthData(month);
     return getDistributionIncomeParts(person, month).salary;
   }
-  function sumVasteTeruggaven(person, month = getSelectedMonth2()) {
+  function sumVasteTeruggaven(person, month = getSelectedMonth()) {
     ensureMonthData(month);
     return getDistributionIncomeParts(person, month).refund;
   }
-  function sumMaandTeruggaven(person, month = getSelectedMonth2()) {
+  function sumMaandTeruggaven(person, month = getSelectedMonth()) {
     var _a, _b;
     ensureMonthData(month);
     return sumBedrag(((_b = (_a = state.monthlyTeruggaven) == null ? void 0 : _a[month]) == null ? void 0 : _b[person]) || []);
   }
-  function getTotalMonthlyIncome(person, month = getSelectedMonth2()) {
+  function getTotalMonthlyIncome(person, month = getSelectedMonth()) {
     const parts = getDistributionIncomeParts(person, month);
     return round2(parts.salary + parts.refund + sumMaandTeruggaven(person, month));
   }
@@ -666,7 +666,7 @@
     return getMonthlyBaseIncome(person);
   }
   function setMonthlyIncome(person, amount) {
-    const month = getSelectedMonth2();
+    const month = getSelectedMonth();
     assertMonthMutationAllowed(month);
     ensureMonthData(month);
     state.monthlyIncomeOverrides[month] = isPlainObject(state.monthlyIncomeOverrides[month]) ? state.monthlyIncomeOverrides[month] : {};
@@ -675,7 +675,7 @@
   }
   function getMonthlyScenarioData(scenario = state.meta.scenario) {
     var _a, _b;
-    const month = getSelectedMonth2();
+    const month = getSelectedMonth();
     ensureMonthData(month);
     const base = state[scenario];
     const monthly = (_b = (_a = state.monthlyBudgets) == null ? void 0 : _a[month]) == null ? void 0 : _b[scenario];
@@ -695,7 +695,7 @@
       }
     };
   }
-  function getMonthTransactions(owner = null, month = getSelectedMonth2()) {
+  function getMonthTransactions(owner = null, month = getSelectedMonth()) {
     return (state.transactions || []).filter((tx) => transactionMonth(tx) === month && (!owner || tx.owner === owner));
   }
   function normalizedTransactionType(tx) {
@@ -727,7 +727,7 @@
     if (tx.expenseImpact !== null && tx.expenseImpact !== "" && Number.isFinite(stored)) return round2(Math.max(0, stored));
     return round2(Math.abs(Number(tx.amount) || 0));
   }
-  function sumTransactions(owner = null, category = null, month = getSelectedMonth2()) {
+  function sumTransactions(owner = null, category = null, month = getSelectedMonth()) {
     return round2(getMonthTransactions(owner, month).reduce((sum, tx) => {
       if (category) {
         const txCat = String(tx.category || "").toLowerCase();
@@ -737,7 +737,7 @@
       return sum + getTransactionExpenseImpact(tx);
     }, 0));
   }
-  function transactionsByCategory(owner, month = getSelectedMonth2()) {
+  function transactionsByCategory(owner, month = getSelectedMonth()) {
     const totals = {};
     getMonthTransactions(owner, month).forEach((tx) => {
       const key = tx.category || "Overig";
@@ -745,7 +745,7 @@
     });
     return totals;
   }
-  function dashboardIncomeBreakdown(month = getSelectedMonth2()) {
+  function dashboardIncomeBreakdown(month = getSelectedMonth()) {
     const distributionIncome = round2(calcScenario(state).totaalSalaris);
     const standard = { dion: getDistributionIncomeParts("dion", month), dara: getDistributionIncomeParts("dara", month) };
     const rows = (state.transactions || []).filter((tx) => {
@@ -787,19 +787,19 @@
     if (ratio >= 0.85) return { ratio, label: "Bijna vol", cls: "amber" };
     return { ratio, label: "Op schema", cls: "" };
   }
-  function textSafe2(value) {
+  function textSafe(value) {
     return String(value != null ? value : "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]);
   }
   function attrSafe(value) {
-    return textSafe2(value).replace(/`/g, "&#96;").replace(/[\u0000-\u001f\u007f]/g, "");
+    return textSafe(value).replace(/`/g, "&#96;").replace(/[\u0000-\u001f\u007f]/g, "");
   }
-  function safeImageUrl2(value) {
+  function safeImageUrl(value) {
     const source = String(value || "").trim();
     if (/^data:image\/(?:png|jpe?g|webp|gif);base64,[a-z0-9+/=\s]+$/i.test(source)) return source.replace(/\s+/g, "");
     if (/^blob:https?:\/\/[a-z0-9.-]+(?::\d+)?\/[a-z0-9-]+$/i.test(source)) return source;
     return "";
   }
-  function goalIcon2(goal) {
+  function goalIcon(goal) {
     return iconSvg(goalIconName(goal));
   }
   function goalThumbGradient(goal) {
@@ -1023,10 +1023,11 @@
     var _a, _b;
     return owner === "gezamenlijk" ? "Gezamenlijk" : ((_b = (_a = state.personen) == null ? void 0 : _a[owner]) == null ? void 0 : _b.naam) || (owner === "dion" ? "Dion" : "Dara");
   }
-  function renderJointFixedCostsCardHead(owner = "gezamenlijk") {
+  function renderJointFixedCostsCardHead(owner = "gezamenlijk", options = {}) {
     const name = ownerLabel(owner);
+    const editAction = options.planning ? `data-u3-open="planning" data-u3-planning-owner="${owner}" aria-label="Vaste lasten van ${textSafe(name)} wijzigen"` : `data-open-owner-fixed="${owner}" aria-label="Vaste lasten aanpassen"`;
     return `<div class="card-head joint-fixed-card-head">
-    <div class="card-head-title">${iconBadge(dashboardSectionIconName("Vaste lasten verdeling"), "green", "card-head-icon")}<h2>${owner === "gezamenlijk" ? "Vaste lasten verdeling" : `${name} vaste lasten`}</h2><button type="button" class="joint-fixed-edit-btn" data-open-owner-fixed="${owner}" aria-label="Vaste lasten aanpassen">${iconSvg("receipt")}</button></div>
+    <div class="card-head-title">${iconBadge(dashboardSectionIconName("Vaste lasten verdeling"), "green", "card-head-icon")}<h2>${owner === "gezamenlijk" ? "Vaste lasten verdeling" : `${name} vaste lasten`}</h2><button type="button" class="joint-fixed-edit-btn" ${editAction}>${iconSvg("receipt")}</button></div>
   </div>`;
   }
   function renderJointVariableCostsCardHead(owner = "gezamenlijk") {
@@ -1054,18 +1055,18 @@
   }
   function renderJointTransactionsCardHead() {
     return `<div class="card-head joint-transactions-card-head">
-    <div class="card-head-title"><h2>Gezamenlijke transacties <span>— ${monthLabel2(getSelectedMonth2())}</span></h2><button type="button" class="joint-transaction-add-btn" data-open-joint-transaction aria-label="Gezamenlijke uitgave toevoegen">${iconSvg("receipt")}</button></div>
+    <div class="card-head-title"><h2>Gezamenlijke transacties <span>— ${monthLabel(getSelectedMonth())}</span></h2><button type="button" class="joint-transaction-add-btn" data-open-joint-transaction aria-label="Gezamenlijke uitgave toevoegen">${iconSvg("receipt")}</button></div>
   </div>`;
   }
   function renderJointTransactionsCard() {
     const rows = getMonthTransactions("gezamenlijk").filter(isBudgetExpenseTransaction).sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
     const rowsHtml = rows.map((tx) => `<div class="joint-transaction-row" data-edit-joint-transaction="${attrSafe(tx.id)}" role="button" tabindex="0" aria-label="Transactie ${attrSafe(tx.description || tx.category || "bewerken")} bewerken">
-    <span class="joint-transaction-meta"><span class="joint-transaction-date" title="${formatDateNL2(tx.date)}">${formatDayMonth(tx.date)}</span><span class="joint-transaction-category" title="${textSafe2(tx.category || "Overig")}">${textSafe2(tx.category || "Overig")}</span></span>
-    <span class="joint-transaction-description"><span class="joint-transaction-description-text" title="${textSafe2(tx.description || "")}">${textSafe2(tx.description || "—")}</span>${tx.note ? `<span class="joint-transaction-note" title="${textSafe2(tx.note)}">${textSafe2(tx.note)}</span>` : ""}</span>
-    <strong class="joint-transaction-amount">${eur2(Number(tx.amount) || 0)}</strong>
+    <span class="joint-transaction-meta"><span class="joint-transaction-date" title="${formatDateNL(tx.date)}">${formatDayMonth(tx.date)}</span><span class="joint-transaction-category" title="${textSafe(tx.category || "Overig")}">${textSafe(tx.category || "Overig")}</span></span>
+    <span class="joint-transaction-description"><span class="joint-transaction-description-text" title="${textSafe(tx.description || "")}">${textSafe(tx.description || "—")}</span>${tx.note ? `<span class="joint-transaction-note" title="${textSafe(tx.note)}">${textSafe(tx.note)}</span>` : ""}</span>
+    <strong class="joint-transaction-amount">${eur(Number(tx.amount) || 0)}</strong>
     <button type="button" class="joint-transaction-delete" data-remove-transaction="${attrSafe(tx.id)}" aria-label="Transactie verwijderen">×</button>
   </div>`).join("");
-    return `<div class="card joint-two-column-card joint-transactions-card">${renderJointTransactionsCardHead()}<div class="joint-transactions-list">${rowsHtml || '<p class="joint-transactions-empty">Nog geen uitgaven deze maand.</p>'}</div><div class="joint-transactions-total"><span>Totaal uitgaven</span><strong>${eur2(sumTransactions("gezamenlijk"))}</strong></div></div>`;
+    return `<div class="card joint-two-column-card joint-transactions-card">${renderJointTransactionsCardHead()}<div class="joint-transactions-list">${rowsHtml || '<p class="joint-transactions-empty">Nog geen uitgaven deze maand.</p>'}</div><div class="joint-transactions-total"><span>Totaal uitgaven</span><strong>${eur(sumTransactions("gezamenlijk"))}</strong></div></div>`;
   }
   function legacyIconName(icon) {
     const map = { "▤": "receipt", "◈": "wallet", "↗": "trend", "◔": "budgetmeter", "▥": "dashboard", "◎": "target", "€": "euro", "⌘": "list", "☁": "cloud", "✈": "plane", "⌂": "house" };
@@ -1076,13 +1077,16 @@
     const name = legacyIconName(icon);
     return iconSvg(name || "wallet");
   }
-  function renderIconKpi2(icon, color, label, value, sub, opts = {}) {
+  function renderIconKpi(icon, color, label, value, sub, opts = {}) {
     const valClass = opts.valueClass ? ` ${opts.valueClass}` : "";
-    return `<div class="card metric-card icon-kpi ${opts.span || "span-3"}">
+    const action = opts.openFixedOwner ? `button type="button" data-u3-open="planning" data-u3-planning-owner="${opts.openFixedOwner}" aria-label="Vaste lasten van ${textSafe(ownerLabel(opts.openFixedOwner))} wijzigen"` : opts.editSaving ? 'button type="button" data-saving-edit aria-label="Spaargeld van deze maand aanpassen"' : "div";
+    const tag = action.startsWith("button") ? "button" : "div";
+    const attrs = tag === "button" ? action.slice("button".length) : "";
+    return `<${tag}${attrs} class="card metric-card icon-kpi ${opts.span || "span-3"}${tag === "button" ? " overview-kpi-action" : ""}">
     <div class="icon-kpi-top"><span class="icon-circle ${color}">${renderIconContent(icon)}</span><div class="metric-label">${label}</div></div>
     <div class="metric-value${valClass}">${value}</div>
     ${sub ? `<div class="metric-sub">${sub}</div>` : ""}
-  </div>`;
+  </${tag}>`;
   }
   function renderStatusCard(icon, color, title, desc, extra = "") {
     return `<div class="card status-card span-4">
@@ -1093,8 +1097,8 @@
   function renderEmptyState(icon, title, text, action = "") {
     return `<div class="empty-state"><span class="icon-circle">${renderIconContent(icon)}</span><h4>${title}</h4><p>${text}</p>${action}</div>`;
   }
-  function renderPageHeading2(title, subtitle) {
-    return `<div class="page-heading"><h2>${textSafe2(title)}</h2>${subtitle ? `<p>${textSafe2(subtitle)}</p>` : ""}</div>`;
+  function renderPageHeading(title, subtitle) {
+    return `<div class="page-heading"><h2>${textSafe(title)}</h2>${subtitle ? `<p>${textSafe(subtitle)}</p>` : ""}</div>`;
   }
   function goalStatusBadge(progress) {
     if (progress >= 1) return '<span class="status-badge">Op schema</span>';
@@ -1107,21 +1111,21 @@
     const algespaard = Number(doel.algespaard) || 0;
     const progress = doelbedrag > 0 ? Math.min(1, algespaard / doelbedrag) : 0;
     const barPct = Math.round(progress * 100);
-    const dateText = doel.doeldatum ? formatDateNL2(doel.doeldatum) : "Geen doeldatum";
-    const goalImage = safeImageUrl2(goalImageSource2(doel));
+    const dateText = doel.doeldatum ? formatDateNL(doel.doeldatum) : "Geen doeldatum";
+    const goalImage = safeImageUrl(goalImageSource(doel));
     const goalThumbStyle = goalImage ? `background-image:url('${goalImage}'); box-shadow:none;` : `background:${goalThumbGradient(doel)}; color:#fff; box-shadow:none;`;
     return `<div class="goal-card">
     <div class="goal-card-head">
       <div class="goal-card-title">
-        <div class="goal-thumb${goalImage ? " has-image" : ""}" style="${goalThumbStyle}">${goalImage ? "" : goalIcon2(doel)}</div>
+        <div class="goal-thumb${goalImage ? " has-image" : ""}" style="${goalThumbStyle}">${goalImage ? "" : goalIcon(doel)}</div>
         <div>
-          <h3>${textSafe2(doel.naam || "Spaardoel")}</h3>
-          <div class="goal-owner">${textSafe2(owner)}</div>
+          <h3>${textSafe(doel.naam || "Spaardoel")}</h3>
+          <div class="goal-owner">${textSafe(owner)}</div>
         </div>
       </div>
       ${goalStatusBadge(progress)}
     </div>
-    <div class="goal-money"><span>${eur2(algespaard)} van ${eur2(doelbedrag)}</span><strong>${barPct}%</strong></div>
+    <div class="goal-money"><span>${eur(algespaard)} van ${eur(doelbedrag)}</span><strong>${barPct}%</strong></div>
     <div class="progress-track"><div class="progress-fill" style="width:${barPct}%"></div></div>
     <div class="goal-card-foot">
       <span>Doel: ${dateText}</span>
@@ -1130,48 +1134,59 @@
   </div>`;
   }
   function renderModernGoalCards(doelen, pot, owner, limit = null) {
-    let items = calcGroep2(doelen || [], pot, TODAY2);
+    let items = calcGroep(doelen || [], pot, TODAY);
     if (limit) items = items.slice(0, limit);
     if (!items.length) return '<p class="muted-empty">Nog geen spaardoelen.</p>';
     return `<div class="goal-card-grid">${items.map((item) => renderModernGoalCard(item, owner)).join("")}</div>`;
   }
+  function renderDesktopGoalsPreview(doelen, pot, owner = "gezamenlijk") {
+    const name = ownerLabel(owner);
+    const items = calcGroep(doelen || [], pot, TODAY).slice(0, 3);
+    return `<div class="card span-12 u5-joint-goals-preview">
+    <div class="card-head">
+      <h2>${owner === "gezamenlijk" ? "Spaardoelen preview" : `${name} spaardoelen`}</h2>
+      <button class="ghost small" data-tab-shortcut="spaardoelen">Bekijk alle doelen →</button>
+    </div>
+    <div class="mobile-goal-list">${items.length ? items.map((item) => renderMobileGoalRow(item, owner)).join("") : '<p class="muted-empty">Nog geen spaardoelen.</p>'}</div>
+  </div>`;
+  }
   function goalMonthlyInlegText(item) {
     const total = Number(item.werkelijkeInleg) || 0;
-    return `<span class="goal-inleg-breakdown"><b style="grid-column:1/-1"><span class="goal-inleg-label">Inleg deze maand</span><span class="goal-inleg-value">${eur2(total)}</span></b></span>`;
+    return `<span class="goal-inleg-breakdown"><b style="grid-column:1/-1"><span class="goal-inleg-label">Inleg deze maand</span><span class="goal-inleg-value">${eur(total)}</span></b></span>`;
   }
   function goalMonthlyInlegBreakdown(item) {
     var _a;
     const fixed = Number((_a = item.vasteInlegWerkelijk) != null ? _a : item.doel.vasteInleg) || 0;
     const extra = Number(item.berekendeExtraInleg) || 0;
-    return `<span class="goal-inleg-breakdown"><b><span class="goal-inleg-label">Vast</span><span class="goal-inleg-value">${eur2(fixed)}</span></b><b><span class="goal-inleg-label">Naar rato</span><span class="goal-inleg-value">${eur2(extra)}</span></b></span>`;
+    return `<span class="goal-inleg-breakdown"><b><span class="goal-inleg-label">Vast</span><span class="goal-inleg-value">${eur(fixed)}</span></b><b><span class="goal-inleg-label">Naar rato</span><span class="goal-inleg-value">${eur(extra)}</span></b></span>`;
   }
   function goalNeededPerMonth(item) {
-    return `<span class="joint-savings-needed">Nodig p/m: ${item.benodigdPerMaand === null ? "—" : eur2(item.benodigdPerMaand)}</span>`;
+    return `<span class="joint-savings-needed">Nodig p/m: ${item.benodigdPerMaand === null ? "—" : eur(item.benodigdPerMaand)}</span>`;
   }
   function goalImageStyle(goal) {
-    const source = safeImageUrl2(goalImageSource2(goal));
+    const source = safeImageUrl(goalImageSource(goal));
     return source ? ` style="background-image:linear-gradient(rgba(35,45,30,.47),rgba(35,45,30,.62)),url('${source}')"` : "";
   }
   function goalImageIcon(goal) {
-    const source = safeImageUrl2(goalImageSource2(goal));
-    return `<span class="joint-savings-goal-icon${source ? " has-image" : ""}"${source ? ` style="background-image:url('${source}')"` : ""}>${source ? "" : goalIcon2(goal)}</span>`;
+    const source = safeImageUrl(goalImageSource(goal));
+    return `<span class="joint-savings-goal-icon${source ? " has-image" : ""}"${source ? ` style="background-image:url('${source}')"` : ""}>${source ? "" : goalIcon(goal)}</span>`;
   }
   function renderJointSavingsOverviewCard(owner = "gezamenlijk", savingPot = null) {
     const r = calcScenario(state);
     const name = ownerLabel(owner);
-    const goals = calcGroep2(state.spaardoelen[owner] || [], savingPot != null ? savingPot : r.spaarpotDezeMaand, TODAY2).sort((a, b) => {
+    const goals = calcGroep(state.spaardoelen[owner] || [], savingPot != null ? savingPot : r.spaarpotDezeMaand, TODAY).sort((a, b) => {
       if (!!a.doel.favoriet !== !!b.doel.favoriet) return a.doel.favoriet ? -1 : 1;
       return (a.doel.doeldatum ? new Date(a.doel.doeldatum).getTime() : Infinity) - (b.doel.doeldatum ? new Date(b.doel.doeldatum).getTime() : Infinity);
     });
     const primary = goals.length >= 2 ? goals.slice(0, Math.min(3, goals.length)) : [];
     const compact = goals.length >= 3 ? goals.slice(3) : goals.length === 1 ? goals : [];
     const primaryHtml = primary.map((item) => {
-      const goal = item.doel, target = Number(goal.doelbedrag) || 0, saved = Number(goal.algespaard) || 0, progress = target > 0 ? Math.min(100, Math.round(saved / target * 100)) : 0, hasImage = !!goalImageSource2(goal);
-      return `<button type="button" class="joint-savings-primary-goal${hasImage ? " has-image" : ""}" data-tab-shortcut="spaardoelen"${goalImageStyle(goal)}>${goalImageIcon(goal)}<strong title="${textSafe2(goal.naam || "Spaardoel")}">${textSafe2(goal.naam || "Spaardoel")}</strong><span>${eur2(saved)} / ${eur2(target)}</span><span class="joint-savings-progress"><i style="width:${progress}%"></i></span><em>${progress}%</em>${goalNeededPerMonth(item)}${goalMonthlyInlegText(item)}</button>`;
+      const goal = item.doel, target = Number(goal.doelbedrag) || 0, saved = Number(goal.algespaard) || 0, progress = target > 0 ? Math.min(100, Math.round(saved / target * 100)) : 0, hasImage = !!goalImageSource(goal);
+      return `<button type="button" class="joint-savings-primary-goal${hasImage ? " has-image" : ""}" data-tab-shortcut="spaardoelen"${goalImageStyle(goal)}>${goalImageIcon(goal)}<strong title="${textSafe(goal.naam || "Spaardoel")}">${textSafe(goal.naam || "Spaardoel")}</strong><span>${eur(saved)} / ${eur(target)}</span><span class="joint-savings-progress"><i style="width:${progress}%"></i></span><em>${progress}%</em>${goalNeededPerMonth(item)}${goalMonthlyInlegText(item)}</button>`;
     }).join("");
     const compactHtml = compact.length ? `<div class="joint-savings-rest-row">${compact.map((item) => {
       const goal = item.doel, target = Number(goal.doelbedrag) || 0, saved = Number(goal.algespaard) || 0, progress = target > 0 ? Math.min(100, Math.round(saved / target * 100)) : 0;
-      return `<button type="button" class="joint-savings-rest-goal" data-tab-shortcut="spaardoelen">${goalImageIcon(goal)}<span class="joint-savings-rest-copy"><strong title="${textSafe2(goal.naam || "Spaardoel")}">${textSafe2(goal.naam || "Spaardoel")}</strong><span>${eur2(saved)} / ${eur2(target)}</span>${goalNeededPerMonth(item)}${goalMonthlyInlegText(item)}</span><em>${progress}%</em></button>`;
+      return `<button type="button" class="joint-savings-rest-goal" data-tab-shortcut="spaardoelen">${goalImageIcon(goal)}<span class="joint-savings-rest-copy"><strong title="${textSafe(goal.naam || "Spaardoel")}">${textSafe(goal.naam || "Spaardoel")}</strong><span>${eur(saved)} / ${eur(target)}</span>${goalNeededPerMonth(item)}${goalMonthlyInlegText(item)}</span><em>${progress}%</em></button>`;
     }).join("")}</div>` : "";
     return `<div class="card joint-single-card joint-savings-overview-card" aria-label="${name} spaardoelen"><div class="card-head joint-savings-card-head"><div class="card-head-title">${iconBadge("piggy", "green", "card-head-icon")}<h2>${owner === "gezamenlijk" ? "Gezamenlijke spaardoelen" : `${name} spaardoelen`}</h2></div><button type="button" class="ghost small" data-tab-shortcut="spaardoelen">Alle doelen</button></div>${primary.length ? `<div class="joint-savings-primary-grid goal-count-${primary.length}">${primaryHtml}</div>` : ""}${compactHtml || (!primary.length ? `<p class="hint" style="margin:0">Nog geen spaardoelen van ${name}.</p>` : "")}</div>`;
   }
@@ -1182,12 +1197,12 @@
     const algespaard = Number(doel.algespaard) || 0;
     const progress = doelbedrag > 0 ? Math.min(1, algespaard / doelbedrag) : 0;
     const barPct = Math.round(progress * 100);
-    const dateText = doel.doeldatum ? formatDateNL2(doel.doeldatum) : "Geen doeldatum";
+    const dateText = doel.doeldatum ? formatDateNL(doel.doeldatum) : "Geen doeldatum";
     return `<div class="dashboard-goal-preview-item">
     <div class="dashboard-goal-preview-thumb tone-${ownerTone(owner)}">${iconSvg(goalIconName(doel))}</div>
     <div class="dashboard-goal-preview-main">
-      <div class="dashboard-goal-preview-top"><strong>${textSafe2(doel.naam || "Spaardoel")}</strong><span>${eur2(algespaard)} / ${eur2(doelbedrag)}</span></div>
-      <div class="dashboard-goal-preview-meta"><span>${textSafe2(owner)}</span><span>Doel: ${dateText}</span></div>
+      <div class="dashboard-goal-preview-top"><strong>${textSafe(doel.naam || "Spaardoel")}</strong><span>${eur(algespaard)} / ${eur(doelbedrag)}</span></div>
+      <div class="dashboard-goal-preview-meta"><span>${textSafe(owner)}</span><span>Doel: ${dateText}</span></div>
       <div class="progress-track goal-positive"><div class="progress-fill goal-positive" style="width:${barPct}%"></div></div>
     </div>
   </div>`;
@@ -1357,19 +1372,19 @@
     const ownerOptions = [["gezamenlijk", "Gezamenlijk"], ["dion", "Dion"], ["dara", "Dara"]].map(([value, label]) => `<option value="${value}" ${(draft == null ? void 0 : draft.owner) === value ? "selected" : ""}>${label}</option>`).join("");
     const base = `<div class="bank-import-actions"><button type="button" class="primary" data-open-general-transaction>+ Uitgave invullen</button><label class="ghost bank-csv-button">Bank-CSV importeren<input type="file" accept=".csv,text/csv" data-bank-csv-file></label><label class="bank-import-owner">Rekening<select data-bank-import-owner>${ownerOptions}</select></label></div><p class="hint bank-import-hint">Kies eerst de rekening. CSV-bestanden worden alleen lokaal gelezen en pas na controle opgeslagen.</p>`;
     if (!draft) return `<div class="bank-import-panel">${base}</div>`;
-    const mapSelect = (key, label) => `<label>${label}<select data-bank-map="${key}"><option value="-1">Kies kolom</option>${draft.headers.map((header, index) => `<option value="${index}" ${Number(draft.mapping[key]) === index ? "selected" : ""}>${textSafe2(header || `Kolom ${index + 1}`)}</option>`).join("")}</select></label>`;
+    const mapSelect = (key, label) => `<label>${label}<select data-bank-map="${key}"><option value="-1">Kies kolom</option>${draft.headers.map((header, index) => `<option value="${index}" ${Number(draft.mapping[key]) === index ? "selected" : ""}>${textSafe(header || `Kolom ${index + 1}`)}</option>`).join("")}</select></label>`;
     const rows = draft.rows || [];
     const rowsHtml = rows.map((row) => {
       const categories = row.positive ? ["Teruggave"] : bankOwnerCategories(draft.owner);
       const status = !row.valid ? "Niet leesbaar" : row.positive ? "Teruggave bij inkomen" : row.duplicate ? "Mogelijk dubbel" : "Klaar";
       return `<div class="bank-review-row ${row.positive ? "bank-credit" : ""} ${row.duplicate ? "bank-duplicate" : ""}" data-bank-row="${row.index}">
       <input type="checkbox" data-bank-select="${row.index}" ${row.selected ? "checked" : ""} ${!row.valid || row.duplicate ? "disabled" : ""} aria-label="Transactie selecteren">
-      <span class="bank-review-date">${row.date || "—"}</span><span class="bank-review-description" title="${textSafe2(row.description)}">${textSafe2(row.description || "Onbekend")}</span><strong class="bank-review-amount">${Number.isFinite(row.amount) ? eur2(Math.abs(row.amount)) : "—"}</strong>
-      <select data-bank-category="${row.index}" ${!row.valid ? "disabled" : ""}>${categories.map((category) => `<option value="${textSafe2(category)}" ${String(category).toLocaleLowerCase() === String(row.category).toLocaleLowerCase() ? "selected" : ""}>${textSafe2(category)}</option>`).join("")}</select>
+      <span class="bank-review-date">${row.date || "—"}</span><span class="bank-review-description" title="${textSafe(row.description)}">${textSafe(row.description || "Onbekend")}</span><strong class="bank-review-amount">${Number.isFinite(row.amount) ? eur(Math.abs(row.amount)) : "—"}</strong>
+      <select data-bank-category="${row.index}" ${!row.valid ? "disabled" : ""}>${categories.map((category) => `<option value="${textSafe(category)}" ${String(category).toLocaleLowerCase() === String(row.category).toLocaleLowerCase() ? "selected" : ""}>${textSafe(category)}</option>`).join("")}</select>
       <span class="bank-review-status">${status}</span><button type="button" class="ghost small" data-bank-import-row="${row.index}" ${!row.selected || row.duplicate ? "disabled" : ""}>Toevoegen</button>
     </div>`;
     }).join("");
-    return `<div class="bank-import-panel">${base}<div class="bank-mapping"><strong>${textSafe2(draft.fileName)}</strong><div>${mapSelect("date", "Datum")}${mapSelect("description", "Omschrijving")}${mapSelect("amount", "Bedrag")}${mapSelect("direction", "Af/bij (optioneel)")}</div></div><div class="bank-review-head"><strong>Controle vóór import</strong><span>${rows.filter((row) => row.selected).length} uitgaven geselecteerd</span></div><div class="bank-review-list">${rowsHtml || '<p class="hint">Geen regels gevonden.</p>'}</div><button type="button" class="primary bank-import-all" data-bank-import-all ${rows.some((row) => row.selected) ? "" : "disabled"}>Geselecteerde uitgaven importeren</button></div>`;
+    return `<div class="bank-import-panel">${base}<div class="bank-mapping"><strong>${textSafe(draft.fileName)}</strong><div>${mapSelect("date", "Datum")}${mapSelect("description", "Omschrijving")}${mapSelect("amount", "Bedrag")}${mapSelect("direction", "Af/bij (optioneel)")}</div></div><div class="bank-review-head"><strong>Controle vóór import</strong><span>${rows.filter((row) => row.selected).length} uitgaven geselecteerd</span></div><div class="bank-review-list">${rowsHtml || '<p class="hint">Geen regels gevonden.</p>'}</div><button type="button" class="primary bank-import-all" data-bank-import-all ${rows.some((row) => row.selected) ? "" : "disabled"}>Geselecteerde uitgaven importeren</button></div>`;
   }
   function renderAppSection(kicker, title, subtitle, content) {
     return `<section class="app-section">
@@ -1391,7 +1406,7 @@
   }
   function copyPreviousMonth() {
     var _a, _b, _c, _d, _e, _f;
-    const month = getSelectedMonth2();
+    const month = getSelectedMonth();
     assertMonthMutationAllowed(month);
     const prev = previousMonthKey(month);
     const fallbackIncome = { dion: Number((_b = (_a = state.personen) == null ? void 0 : _a.dion) == null ? void 0 : _b.salaris) || 0, dara: Number((_d = (_c = state.personen) == null ? void 0 : _c.dara) == null ? void 0 : _d.salaris) || 0 };
@@ -1439,7 +1454,7 @@
     const growth = Math.pow(1 + i, months);
     return current * growth + monthlyFixed * ((growth - 1) / i);
   }
-  function calcDoel2(doel, today) {
+  function calcDoel(doel, today) {
     const doelbedrag = Number(doel.doelbedrag) || 0;
     const algespaard = Number(doel.algespaard) || 0;
     const vasteInleg = Number(doel.vasteInleg) || 0;
@@ -1463,8 +1478,8 @@
     }
     return { nogTeGaan, voortgang, benodigdPerMaand, benodigdeExtraInleg, verwachteWaarde, months };
   }
-  function calcGroep2(doelen, spaarpotDezeMaand, today) {
-    const berekend = doelen.map((d) => ({ doel: d, ...calcDoel2(d, today) }));
+  function calcGroep(doelen, spaarpotDezeMaand, today) {
+    const berekend = doelen.map((d) => ({ doel: d, ...calcDoel(d, today) }));
     const potCents = Math.max(0, Math.round((Number(spaarpotDezeMaand) || 0) * 100));
     const vasteCents = berekend.map((b) => Math.min(
       Math.max(0, Math.round((Number(b.doel.vasteInleg) || 0) * 100)),
@@ -1516,7 +1531,7 @@
   }
   function calcScenario(state2) {
     const scenario = state2.meta.scenario;
-    const selectedMonth = getSelectedMonth2();
+    const selectedMonth = getSelectedMonth();
     const dionIncomeParts = getDistributionIncomeParts("dion", selectedMonth);
     const daraIncomeParts = getDistributionIncomeParts("dara", selectedMonth);
     const basisInkomenDion = dionIncomeParts.salary;
@@ -1872,7 +1887,7 @@
       return target;
     }
   };
-  function goalImageSource2(goal) {
+  function goalImageSource(goal) {
     return GoalImageStore.source(goal);
   }
   var DEFAULT_FIREBASE_CONFIG = {
@@ -2426,7 +2441,7 @@
   window.state = state;
   var committedStateSnapshot = cloneState(state);
   var activeTab = "dashboard";
-  var TODAY2 = /* @__PURE__ */ new Date();
+  var TODAY = /* @__PURE__ */ new Date();
   function commitChange(change, options = {}) {
     const before = cloneState(committedStateSnapshot || state);
     try {
@@ -2582,19 +2597,19 @@
     const useScroll = opts.fixedHeight !== false || (rows || []).length > 5;
     const moveOptions = opts.moveable ? moveTargetOptions(basePath) : null;
     const moveHead = moveOptions ? "<th>Van/naar</th>" : "";
-    const moveCol = (id) => moveOptions ? `<td><select class="move-select" data-move-row-id="${textSafe2(id)}" data-source-path="${basePath}" title="Verplaatsen naar">${moveOptions}</select></td>` : "";
+    const moveCol = (id) => moveOptions ? `<td><select class="move-select" data-move-row-id="${textSafe(id)}" data-source-path="${basePath}" title="Verplaatsen naar">${moveOptions}</select></td>` : "";
     const rowsHtml = sortedRowEntries(rows).map(({ row: r }) => {
       const eff = effectiveBedrag(r);
-      const jaarHint = r.jaarlijks ? `<div class="progress-label" style="text-align:left;margin-top:2px">≈ ${eur2(eff)}/mnd</div>` : "";
+      const jaarHint = r.jaarlijks ? `<div class="progress-label" style="text-align:left;margin-top:2px">≈ ${eur(eff)}/mnd</div>` : "";
       return `
     <tr>
       <td style="width:26px;text-align:center;font-size:15px">${categoryIcon(r.categorie)}</td>
-      <td><input type="text" data-item-path="${basePath}" data-item-id="${textSafe2(r.id)}" data-item-field="categorie" placeholder="Categorie"></td>
-      <td><input type="text" data-item-path="${basePath}" data-item-id="${textSafe2(r.id)}" data-item-field="post" placeholder="Omschrijving"></td>
-      <td class="num"><input type="number" step="0.01" data-item-path="${basePath}" data-item-id="${textSafe2(r.id)}" data-item-field="bedrag">${jaarHint}</td>
-      ${withJaar ? `<td style="text-align:center"><input type="checkbox" data-item-path="${basePath}" data-item-id="${textSafe2(r.id)}" data-item-field="jaarlijks" title="Bedrag is jaarlijks (wordt /12 gerekend)"></td>` : ""}
+      <td><input type="text" data-item-path="${basePath}" data-item-id="${textSafe(r.id)}" data-item-field="categorie" placeholder="Categorie"></td>
+      <td><input type="text" data-item-path="${basePath}" data-item-id="${textSafe(r.id)}" data-item-field="post" placeholder="Omschrijving"></td>
+      <td class="num"><input type="number" step="0.01" data-item-path="${basePath}" data-item-id="${textSafe(r.id)}" data-item-field="bedrag">${jaarHint}</td>
+      ${withJaar ? `<td style="text-align:center"><input type="checkbox" data-item-path="${basePath}" data-item-id="${textSafe(r.id)}" data-item-field="jaarlijks" title="Bedrag is jaarlijks (wordt /12 gerekend)"></td>` : ""}
       ${moveCol(r.id)}
-      <td class="row-actions"><button class="danger-ghost" data-remove-id="${textSafe2(r.id)}" data-remove-path="${basePath}" title="Verwijderen">×</button></td>
+      <td class="row-actions"><button class="danger-ghost" data-remove-id="${textSafe(r.id)}" data-remove-path="${basePath}" title="Verwijderen">×</button></td>
     </tr>`;
     }).join("");
     const colspan = 5 + (withJaar ? 1 : 0) + (moveOptions ? 1 : 0);
@@ -2606,7 +2621,7 @@
         ${withJaar ? '<th style="text-align:center" title="Bedrag is jaarlijks">Jaarlijks?</th>' : ""}${moveHead}<th></th>
       </tr></thead>
       <tbody>${rowsHtml || `<tr><td colspan="${colspan}" style="color:var(--text-faint)">Nog geen posten toegevoegd.</td></tr>`}</tbody>
-      <tfoot><tr class="tot-row"><td colspan="3">Totaal per maand</td><td class="num">${eur2(total)}</td>${withJaar ? "<td></td>" : ""}${moveOptions ? "<td></td>" : ""}<td></td></tr></tfoot>
+      <tfoot><tr class="tot-row"><td colspan="3">Totaal per maand</td><td class="num">${eur(total)}</td>${withJaar ? "<td></td>" : ""}${moveOptions ? "<td></td>" : ""}<td></td></tr></tfoot>
     </table>
     </div>
     <button class="ghost small add-row-btn" data-addrow="${basePath}">+ Post toevoegen</button>
@@ -2617,9 +2632,9 @@
     const useScroll = (rows || []).length > 5;
     const rowsHtml = (rows || []).map((r) => `
     <tr>
-      <td><input type="text" data-item-path="${basePath}" data-item-id="${textSafe2(r.id)}" data-item-field="omschrijving" placeholder="Omschrijving"></td>
-      <td class="num"><input type="number" step="0.01" data-item-path="${basePath}" data-item-id="${textSafe2(r.id)}" data-item-field="bedrag"></td>
-      <td class="row-actions"><button class="danger-ghost" data-remove-id="${textSafe2(r.id)}" data-remove-path="${basePath}" title="Verwijderen">×</button></td>
+      <td><input type="text" data-item-path="${basePath}" data-item-id="${textSafe(r.id)}" data-item-field="omschrijving" placeholder="Omschrijving"></td>
+      <td class="num"><input type="number" step="0.01" data-item-path="${basePath}" data-item-id="${textSafe(r.id)}" data-item-field="bedrag"></td>
+      <td class="row-actions"><button class="danger-ghost" data-remove-id="${textSafe(r.id)}" data-remove-path="${basePath}" title="Verwijderen">×</button></td>
     </tr>
   `).join("");
     return `
@@ -2627,7 +2642,7 @@
     <table>
       <thead><tr><th>Omschrijving</th><th style="text-align:right">Bedrag</th><th></th></tr></thead>
       <tbody>${rowsHtml || '<tr><td colspan="3" style="color:var(--text-faint)">Nog geen vaste teruggaven.</td></tr>'}</tbody>
-      <tfoot><tr class="tot-row"><td>Totaal per maand</td><td class="num">${eur2(total)}</td><td></td></tr></tfoot>
+      <tfoot><tr class="tot-row"><td>Totaal per maand</td><td class="num">${eur(total)}</td><td></td></tr></tfoot>
     </table>
     </div>
     <button class="ghost small add-row-btn" data-addrefund="${basePath}">+ Teruggave toevoegen</button>
@@ -2695,7 +2710,7 @@
     return [parts.join("."), idx];
   }
   function renderGoalOverviewTable(doelen, spaarpotDezeMaand) {
-    const berekend = calcGroep2(doelen, spaarpotDezeMaand, TODAY2);
+    const berekend = calcGroep(doelen, spaarpotDezeMaand, TODAY);
     const totaalDoelbedrag = round2(berekend.reduce((s, b) => s + (Number(b.doel.doelbedrag) || 0), 0));
     const totaalAlGespaard = round2(berekend.reduce((s, b) => s + (Number(b.doel.algespaard) || 0), 0));
     const totaalNogTeGaan = round2(berekend.reduce((s, b) => s + (b.nogTeGaan || 0), 0));
@@ -2706,16 +2721,16 @@
     const rows = berekend.map((b) => {
       const barPct = Math.min(100, Math.round((b.voortgang || 0) * 100));
       return `<tr>
-      <td>${textSafe2(b.doel.naam || "(naamloos)")}</td>
-      <td class="num">${eur2(Number(b.doel.doelbedrag) || 0)}</td>
-      <td class="num">${eur2(Number(b.doel.algespaard) || 0)}</td>
-      <td class="num">${eur2(b.nogTeGaan)}</td>
-      <td><div class="progress-track"><div class="progress-fill" style="width:${barPct}%"></div></div><div class="progress-label">${pct2(b.voortgang)}</div></td>
-      <td>${formatDateNL2(b.doel.doeldatum)}</td>
-      <td class="num">${b.benodigdPerMaand === null ? "—" : eur2(b.benodigdPerMaand)}</td>
-      <td class="num">${eur2(Number(b.doel.vasteInleg) || 0)}</td>
-      <td class="num">${eur2(b.berekendeExtraInleg || 0)}</td>
-      <td class="num">${eur2(b.werkelijkeInleg)}</td>
+      <td>${textSafe(b.doel.naam || "(naamloos)")}</td>
+      <td class="num">${eur(Number(b.doel.doelbedrag) || 0)}</td>
+      <td class="num">${eur(Number(b.doel.algespaard) || 0)}</td>
+      <td class="num">${eur(b.nogTeGaan)}</td>
+      <td><div class="progress-track"><div class="progress-fill" style="width:${barPct}%"></div></div><div class="progress-label">${pct(b.voortgang)}</div></td>
+      <td>${formatDateNL(b.doel.doeldatum)}</td>
+      <td class="num">${b.benodigdPerMaand === null ? "—" : eur(b.benodigdPerMaand)}</td>
+      <td class="num">${eur(Number(b.doel.vasteInleg) || 0)}</td>
+      <td class="num">${eur(b.berekendeExtraInleg || 0)}</td>
+      <td class="num">${eur(b.werkelijkeInleg)}</td>
     </tr>`;
     }).join("");
     return `<div class="goal-table-wrap"><table class="goal-table">
@@ -2727,52 +2742,52 @@
     </tr></thead>
     <tbody>${rows || `<tr><td colspan="10" style="color:var(--text-faint)">Nog geen spaardoelen. Voeg ze toe op het tabblad Spaardoelen.</td></tr>`}</tbody>
     <tfoot><tr>
-      <td>Totaal</td><td class="num">${eur2(totaalDoelbedrag)}</td><td class="num">${eur2(totaalAlGespaard)}</td>
-      <td class="num">${eur2(totaalNogTeGaan)}</td><td></td><td></td>
-      <td class="num">${eur2(totaalBenodigd)}</td><td class="num">${eur2(totaalVast)}</td>
-      <td class="num">${eur2(totaalExtra)}</td><td class="num">${eur2(totaalWerkelijk)}</td>
+      <td>Totaal</td><td class="num">${eur(totaalDoelbedrag)}</td><td class="num">${eur(totaalAlGespaard)}</td>
+      <td class="num">${eur(totaalNogTeGaan)}</td><td></td><td></td>
+      <td class="num">${eur(totaalBenodigd)}</td><td class="num">${eur(totaalVast)}</td>
+      <td class="num">${eur(totaalExtra)}</td><td class="num">${eur(totaalWerkelijk)}</td>
     </tr></tfoot>
   </table></div>`;
   }
-  function renderGoalGroup2(basePath, doelen, spaarpotDezeMaand) {
-    const berekend = calcGroep2(doelen, spaarpotDezeMaand, TODAY2);
+  function renderGoalGroup(basePath, doelen, spaarpotDezeMaand) {
+    const berekend = calcGroep(doelen, spaarpotDezeMaand, TODAY);
     const rows = berekend.map((b, i) => {
       const barPct = Math.min(100, Math.round((b.voortgang || 0) * 100));
       return `
     <tr>
       <td class="goal-favorite-cell">
         <label class="favorite-goal" title="Favoriet op dashboard">
-          <input type="checkbox" data-item-path="${basePath}" data-item-id="${textSafe2(b.doel.id)}" data-item-field="favoriet">
+          <input type="checkbox" data-item-path="${basePath}" data-item-id="${textSafe(b.doel.id)}" data-item-field="favoriet">
           <span>★</span>
         </label>
       </td>
       <td class="goal-order-cell">
         <div class="goal-order" aria-label="Volgorde wijzigen">
-          <button class="ghost small" data-move-goal="${basePath}|${textSafe2(b.doel.id)}|-1" title="Omhoog" ${i === 0 ? "disabled" : ""}>▲</button>
-          <button class="ghost small" data-move-goal="${basePath}|${textSafe2(b.doel.id)}|1" title="Omlaag" ${i === berekend.length - 1 ? "disabled" : ""}>▼</button>
+          <button class="ghost small" data-move-goal="${basePath}|${textSafe(b.doel.id)}|-1" title="Omhoog" ${i === 0 ? "disabled" : ""}>▲</button>
+          <button class="ghost small" data-move-goal="${basePath}|${textSafe(b.doel.id)}|1" title="Omlaag" ${i === berekend.length - 1 ? "disabled" : ""}>▼</button>
         </div>
       </td>
-      <td data-label="Spaardoel"><input type="text" data-item-path="${basePath}" data-item-id="${textSafe2(b.doel.id)}" data-item-field="naam" placeholder="Naam spaardoel">
+      <td data-label="Spaardoel"><input type="text" data-item-path="${basePath}" data-item-id="${textSafe(b.doel.id)}" data-item-field="naam" placeholder="Naam spaardoel">
         <label style="display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--text-dim);margin-top:5px">
-          <input type="checkbox" data-item-path="${basePath}" data-item-id="${textSafe2(b.doel.id)}" data-item-field="vastBedrag"> Vast bedrag
+          <input type="checkbox" data-item-path="${basePath}" data-item-id="${textSafe(b.doel.id)}" data-item-field="vastBedrag"> Vast bedrag
         </label>
       </td>
-      <td data-label="Doelbedrag" class="num"><input type="number" step="0.01" data-item-path="${basePath}" data-item-id="${textSafe2(b.doel.id)}" data-item-field="doelbedrag"></td>
-      <td data-label="Al gespaard" class="num"><input type="number" step="0.01" data-item-path="${basePath}" data-item-id="${textSafe2(b.doel.id)}" data-item-field="algespaard"></td>
-      <td data-label="Nog te gaan" class="num">${eur2(b.nogTeGaan)}</td>
-      <td data-label="Voortgang"><div class="progress-track"><div class="progress-fill" style="width:${barPct}%"></div></div><div class="progress-label">${pct2(b.voortgang)}</div></td>
-      <td data-label="Doeldatum"><input type="date" data-item-path="${basePath}" data-item-id="${textSafe2(b.doel.id)}" data-item-field="doeldatum"></td>
-      <td class="num">${b.benodigdPerMaand === null ? "—" : eur2(b.benodigdPerMaand)}</td>
-      <td data-label="Vaste inleg/mnd" class="num"><input type="number" step="0.01" data-item-path="${basePath}" data-item-id="${textSafe2(b.doel.id)}" data-item-field="vasteInleg"></td>
+      <td data-label="Doelbedrag" class="num"><input type="number" step="0.01" data-item-path="${basePath}" data-item-id="${textSafe(b.doel.id)}" data-item-field="doelbedrag"></td>
+      <td data-label="Al gespaard" class="num"><input type="number" step="0.01" data-item-path="${basePath}" data-item-id="${textSafe(b.doel.id)}" data-item-field="algespaard"></td>
+      <td data-label="Nog te gaan" class="num">${eur(b.nogTeGaan)}</td>
+      <td data-label="Voortgang"><div class="progress-track"><div class="progress-fill" style="width:${barPct}%"></div></div><div class="progress-label">${pct(b.voortgang)}</div></td>
+      <td data-label="Doeldatum"><input type="date" data-item-path="${basePath}" data-item-id="${textSafe(b.doel.id)}" data-item-field="doeldatum"></td>
+      <td class="num">${b.benodigdPerMaand === null ? "—" : eur(b.benodigdPerMaand)}</td>
+      <td data-label="Vaste inleg/mnd" class="num"><input type="number" step="0.01" data-item-path="${basePath}" data-item-id="${textSafe(b.doel.id)}" data-item-field="vasteInleg"></td>
       <td data-label="Verwacht rendement %" class="num">
-        <input type="number" step="0.01" data-percent="true" data-item-path="${basePath}" data-item-id="${textSafe2(b.doel.id)}" data-item-field="rendement">
-        <select data-item-path="${basePath}" data-item-id="${textSafe2(b.doel.id)}" data-item-field="rendementPeriode" style="width:100%;margin-top:5px">
+        <input type="number" step="0.01" data-percent="true" data-item-path="${basePath}" data-item-id="${textSafe(b.doel.id)}" data-item-field="rendement">
+        <select data-item-path="${basePath}" data-item-id="${textSafe(b.doel.id)}" data-item-field="rendementPeriode" style="width:100%;margin-top:5px">
           <option value="jaarlijks">Jaarlijks</option>
           <option value="maandelijks">Maandelijks</option>
         </select>
       </td>
-      <td class="num">${b.verwachteWaarde === null ? "—" : eur2(b.verwachteWaarde)}</td>
-      <td class="row-actions"><button class="danger-ghost" data-remove-id="${textSafe2(b.doel.id)}" data-remove-path="${basePath}" title="Verwijderen">×</button></td>
+      <td class="num">${b.verwachteWaarde === null ? "—" : eur(b.verwachteWaarde)}</td>
+      <td class="row-actions"><button class="danger-ghost" data-remove-id="${textSafe(b.doel.id)}" data-remove-path="${basePath}" title="Verwijderen">×</button></td>
     </tr>`;
     }).join("");
     const totBenodigd = round2(berekend.reduce((s, b) => s + (b.benodigdPerMaand || 0), 0));
@@ -2791,10 +2806,10 @@
       </tr></thead>
       <tbody>${rows || `<tr><td colspan="13" style="color:var(--text-faint)">Nog geen spaardoelen.</td></tr>`}</tbody>
       <tfoot><tr>
-        <td></td><td class="goal-order-cell"></td><td data-label="Spaardoel">Totaal</td><td data-label="Doelbedrag" class="num">${eur2(totDoelbedrag)}</td><td data-label="Al gespaard" class="num">${eur2(totAlGespaard)}</td>
-        <td class="num">${eur2(totNogTeGaan)}</td><td></td><td></td>
-        <td class="num">${eur2(totBenodigd)}</td><td class="num">${eur2(totVast)}</td><td></td>
-        <td class="num">${eur2(totVerwacht)}</td><td></td>
+        <td></td><td class="goal-order-cell"></td><td data-label="Spaardoel">Totaal</td><td data-label="Doelbedrag" class="num">${eur(totDoelbedrag)}</td><td data-label="Al gespaard" class="num">${eur(totAlGespaard)}</td>
+        <td class="num">${eur(totNogTeGaan)}</td><td></td><td></td>
+        <td class="num">${eur(totBenodigd)}</td><td class="num">${eur(totVast)}</td><td></td>
+        <td class="num">${eur(totVerwacht)}</td><td></td>
       </tr></tfoot>
     </table></div>
     <button class="ghost small add-row-btn" data-addgoal="${basePath}">+ Spaardoel toevoegen</button>
@@ -2825,37 +2840,37 @@
     rescueMonthControl();
     const r = calcScenario(state);
     const scenarioData = getMonthlyScenarioData(state.meta.scenario);
-    const gGoals = calcGroep2(state.spaardoelen.gezamenlijk, r.spaarpotDezeMaand, TODAY2);
-    const dionGoals = calcGroep2(state.spaardoelen.dion, r.dion.beschikbaarVoorSparen, TODAY2);
-    const daraGoals = calcGroep2(state.spaardoelen.dara, r.dara.beschikbaarVoorSparen, TODAY2);
+    const gGoals = calcGroep(state.spaardoelen.gezamenlijk, r.spaarpotDezeMaand, TODAY);
+    const dionGoals = calcGroep(state.spaardoelen.dion, r.dion.beschikbaarVoorSparen, TODAY);
+    const daraGoals = calcGroep(state.spaardoelen.dara, r.dara.beschikbaarVoorSparen, TODAY);
     const allGoals = [
       ...gGoals.map((g) => ({ ...g, owner: "Gezamenlijk" })),
       ...dionGoals.map((g) => ({ ...g, owner: "Dion" })),
       ...daraGoals.map((g) => ({ ...g, owner: "Dara" }))
     ];
     const totalZakgeld = round2(r.dion.zakgeld + r.dara.zakgeld);
-    const incomeBreakdown = dashboardIncomeBreakdown(getSelectedMonth2());
-    const dashboardTotalIncome = incomeBreakdown.total;
+    const incomeBreakdown = dashboardIncomeBreakdown(getSelectedMonth());
+    const dashboardTotalIncome = r.totaalSalaris;
     const jointRemaining = round2(r.totaalSalaris - r.gezamenlijkeLastenTotaal - r.spaarpotDezeMaand);
     const splitDion = totalZakgeld > 0 ? Math.max(0, r.dion.zakgeld / totalZakgeld) : 0.5;
     const variabelBudgetPct = r.variabelBudgetTotaal > 0 ? Math.min(100, Math.round(r.variabelTotaal / r.variabelBudgetTotaal * 100)) : 0;
     const zakgeldTekort = totalZakgeld <= 0 || r.dion.zakgeld < 0 || r.dara.zakgeld < 0;
     const zakgeldTekortBarClass = !zakgeldTekort ? "" : r.dion.zakgeld > 0 && r.dara.zakgeld <= 0 ? " split-bar-single-color-dion" : r.dara.zakgeld > 0 && r.dion.zakgeld <= 0 ? " split-bar-single-color-dara" : " split-bar-single-color";
-    const zakgeldCardBody = `<div class="allowance-return-body ${zakgeldTekort ? "allowance-return-body-short" : "allowance-return-body-split"}"><div class="metric-value">${eur2(totalZakgeld)}</div>
+    const zakgeldCardBody = `<div class="allowance-return-body ${zakgeldTekort ? "allowance-return-body-short" : "allowance-return-body-split"}"><div class="metric-value">${eur(totalZakgeld)}</div>
        <div class="split-bar${zakgeldTekortBarClass}"><span style="width:${zakgeldTekort ? 100 : Math.round(splitDion * 100)}%"></span><span style="width:${zakgeldTekort ? 0 : 100 - Math.round(splitDion * 100)}%"></span></div>
        <div class="summary-list">
-         <div class="summary-line"><span class="summary-person-label"><span class="person-dot dion"></span>Dion</span><strong class="${zakgeldTekort ? r.dion.zakgeld < 0 ? "value neg" : "value pos" : ""}">${eur2(r.dion.zakgeld)}${zakgeldTekort ? "" : ` · ${pct2(splitDion)}`}</strong></div>
-         <div class="summary-line"><span class="summary-person-label"><span class="person-dot dara"></span>Dara</span><strong class="${zakgeldTekort ? r.dara.zakgeld < 0 ? "value neg" : "value pos" : ""}">${eur2(r.dara.zakgeld)}${zakgeldTekort ? "" : ` · ${pct2(1 - splitDion)}`}</strong></div>
+         <div class="summary-line"><span class="summary-person-label"><span class="person-dot dion"></span>Dion</span><strong class="${zakgeldTekort ? r.dion.zakgeld < 0 ? "value neg" : "value pos" : ""}">${eur(r.dion.zakgeld)}${zakgeldTekort ? "" : ` · ${pct(splitDion)}`}</strong></div>
+         <div class="summary-line"><span class="summary-person-label"><span class="person-dot dara"></span>Dara</span><strong class="${zakgeldTekort ? r.dara.zakgeld < 0 ? "value neg" : "value pos" : ""}">${eur(r.dara.zakgeld)}${zakgeldTekort ? "" : ` · ${pct(1 - splitDion)}`}</strong></div>
        </div></div>`;
     const budgetRows = (scenarioData.gezamenlijk.variabel || []).filter((row) => row.post || row.bedrag).map((row) => {
       const budget = Number(row.bedrag) || 0;
       const used = sumTransactions("gezamenlijk", row.post);
       const ratio = budget > 0 ? Math.min(1, used / budget) : 0;
       const label = row.post || row.categorie || "Budget";
-      return `<button type="button" class="budget-preview-item budget-preview-button" data-open-budget-transactions="${textSafe2(label)}" aria-label="Open transacties voor ${textSafe2(label)}">
+      return `<button type="button" class="budget-preview-item budget-preview-button" data-open-budget-transactions="${textSafe(label)}" aria-label="Open transacties voor ${textSafe(label)}">
       <div class="budget-preview-thumb tone-green">${iconSvg(categoryIconName(label))}</div>
       <div class="budget-preview-main">
-        <div class="budget-preview-top"><strong>${textSafe2(label)}</strong><span><span class="neutral-amount">${eur2(used)}</span> / <span class="neutral-amount">${eur2(budget)}</span></span></div>
+        <div class="budget-preview-top"><strong>${textSafe(label)}</strong><span><span class="neutral-amount">${eur(used)}</span> / <span class="neutral-amount">${eur(budget)}</span></span></div>
         <div class="progress-track budget-gradient"><div class="progress-fill budget-gradient" style="width:${Math.round(ratio * 100)}%"></div></div>
       </div>
     </button>`;
@@ -2876,7 +2891,7 @@
       const ratio = r.vasteLastenTotaal > 0 ? amount / r.vasteLastenTotaal : 0;
       const note = state.meta.scenario === "na" && /huis|hypotheek|wonen/i.test(cat) && r.hypotheekBedrag > 0 ? '<span class="joint-fixed-note">Hypotheek 50/50</span>' : "";
       return `<div class="progress-item ${note ? "joint-fixed-has-note" : ""}">
-      <div class="progress-item-icon tone-green">${iconSvg(jointFixedCategoryIconName(cat))}</div><div class="progress-top"><strong>${cat}</strong><span>${eur2(amount)} · ${pct2(ratio)}</span></div>
+      <div class="progress-item-icon tone-green">${iconSvg(jointFixedCategoryIconName(cat))}</div><div class="progress-top"><strong>${cat}</strong><span>${eur(amount)} · ${pct(ratio)}</span></div>
       ${note}
       <div class="progress-track"><div class="progress-fill" style="width:${Math.round(ratio * 100)}%"></div></div>
     </div>`;
@@ -2893,7 +2908,7 @@
     });
     const goalCardsDesktop = favoriteGoals.length ? `<div class="dashboard-goals-preview-list">${favoriteGoals.slice(0, 4).map((g) => renderDashboardGoalPreviewCard(g)).join("")}</div>` : `<div class="u5-goal-fallback"><strong>Nog geen favoriete spaardoelen</strong><span>${allGoals.length} doelen beschikbaar</span></div>`;
     const goalCardsMobile = sortedGoals.length ? `<div class="dashboard-goals-preview-list">${sortedGoals.slice(0, 3).map((g) => renderDashboardGoalPreviewCard(g)).join("")}</div>` : "";
-    const year = Number(getSelectedMonth2().slice(0, 4));
+    const year = Number(getSelectedMonth().slice(0, 4));
     const yearData = Array.from({ length: 12 }, (_, i) => {
       var _a, _b;
       const key = monthKey(new Date(year, i, 1));
@@ -2904,24 +2919,24 @@
       return { key, name: ["Jan", "Feb", "Mrt", "Apr", "Mei", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dec"][i], income, spent, saving };
     });
     const maxYearValue = Math.max(1, ...yearData.flatMap((m) => [m.income, m.spent, m.saving]));
-    const currentMonthKey = monthKey(TODAY2);
+    const currentMonthKey = monthKey(TODAY);
     const yearTotals = {
       income: round2(yearData.reduce((s, m) => s + m.income, 0)),
       spent: round2(yearData.reduce((s, m) => s + m.spent, 0)),
       saving: round2(yearData.reduce((s, m) => s + m.saving, 0))
     };
-    const monthFinancialResult = getMonthFinancialResult(getSelectedMonth2());
+    const monthFinancialResult = getMonthFinancialResult(getSelectedMonth());
     const actualMonthResult = round2(Number(monthFinancialResult == null ? void 0 : monthFinancialResult.remaining) || 0);
     const budgetDifference = round2(r.variabelBudgetTotaal - r.variabelTotaal);
     const CHART_H = 84;
     const monthBars = yearData.map((m) => {
       const isFuture = m.key > currentMonthKey;
-      const active = m.key === getSelectedMonth2() ? " active" : "";
+      const active = m.key === getSelectedMonth() ? " active" : "";
       const futureCls = isFuture ? " future" : "";
       const hIncome = Math.max(2, Math.round(m.income / maxYearValue * CHART_H));
       const hSpent = Math.max(2, Math.round(m.spent / maxYearValue * CHART_H));
       const hSaving = Math.max(2, Math.round(m.saving / maxYearValue * CHART_H));
-      return `<div class="year-col${active}${futureCls}" title="${m.name}: inkomen ${eur2(m.income)}, uitgaven ${eur2(m.spent)}, sparen ${eur2(m.saving)}">
+      return `<div class="year-col${active}${futureCls}" title="${m.name}: inkomen ${eur(m.income)}, uitgaven ${eur(m.spent)}, sparen ${eur(m.saving)}">
       <div class="year-col-bars" style="height:${CHART_H}px">
         <span class="year-bar-v income" style="height:${hIncome}px"></span>
         <span class="year-bar-v spent" style="height:${hSpent}px"></span>
@@ -2934,20 +2949,20 @@
     <div class="card span-4 dash-status-card v4-desktop-only-block">
       ${renderDashboardCardHead(label, "", label === "Dion" ? "terracotta" : "blue")}
       <div class="summary-list">
-        <div class="summary-line"><span>Zakgeld ontvangen</span><strong class="${rr.zakgeld < 0 ? "value neg" : "value pos"}">${eur2(rr.zakgeld)}</strong></div>
-        <div class="summary-line"><span>Persoonlijke vaste lasten / correcties</span><strong class="value neg">${eur2(rr.persoonlijkeVasteLasten)}</strong></div>
-        <div class="summary-line"><span>Uitgaven deze maand</span><strong class="value neg">${eur2(rr.variabeleUitgaven)}</strong></div>
-        <div class="summary-line"><span>Beschikbaar voor sparen/vrij gebruik</span><strong class="${rr.beschikbaarVoorSparen < 0 ? "value neg" : "value pos"}">${eur2(rr.beschikbaarVoorSparen)}</strong></div>
+        <div class="summary-line"><span>Zakgeld ontvangen</span><strong class="${rr.zakgeld < 0 ? "value neg" : "value pos"}">${eur(rr.zakgeld)}</strong></div>
+        <div class="summary-line"><span>Persoonlijke vaste lasten / correcties</span><strong class="value neg">${eur(rr.persoonlijkeVasteLasten)}</strong></div>
+        <div class="summary-line"><span>Uitgaven deze maand</span><strong class="value neg">${eur(rr.variabeleUitgaven)}</strong></div>
+        <div class="summary-line"><span>Beschikbaar voor sparen/vrij gebruik</span><strong class="${rr.beschikbaarVoorSparen < 0 ? "value neg" : "value pos"}">${eur(rr.beschikbaarVoorSparen)}</strong></div>
       </div>
     </div>`;
     const jointSummary = `
     <div class="card span-4 dash-status-card v4-desktop-only-block">
       ${renderDashboardCardHead("Gezamenlijk", "", "green")}
       <div class="summary-list">
-        <div class="summary-line"><span>Vaste lasten + budgetten</span><strong class="value neg">${eur2(r.gezamenlijkeLastenTotaal)}</strong></div>
-        <div class="summary-line"><span>Variabel gebruikt</span><strong class="value neg">${eur2(r.variabelTotaal)}</strong></div>
-        <div class="summary-line"><span>Sparen</span><strong class="value pos">${eur2(r.spaarpotDezeMaand)}</strong></div>
-        <div class="summary-line"><span>Resterend voor zakgeld</span><strong class="${jointRemaining < 0 ? "value neg" : "value pos"}">${eur2(jointRemaining)}</strong></div>
+        <div class="summary-line"><span>Vaste lasten + budgetten</span><strong class="value neg">${eur(r.gezamenlijkeLastenTotaal)}</strong></div>
+        <div class="summary-line"><span>Variabel gebruikt</span><strong class="value neg">${eur(r.variabelTotaal)}</strong></div>
+        <div class="summary-line"><span>Sparen</span><strong class="value pos">${eur(r.spaarpotDezeMaand)}</strong></div>
+        <div class="summary-line"><span>Resterend voor zakgeld</span><strong class="${jointRemaining < 0 ? "value neg" : "value pos"}">${eur(jointRemaining)}</strong></div>
       </div>
     </div>`;
     document.getElementById("tab-dashboard").innerHTML = `
@@ -2965,7 +2980,7 @@
       <div class="mobile-title-scenario-row">
         <div class="mobile-title-block">
           <h1>Dashboard</h1>
-          <p>${monthLabel2(getSelectedMonth2())}</p>
+          <p>${monthLabel(getSelectedMonth())}</p>
         </div>
         <div class="scenario-toggle mobile-scenario-toggle" data-mobile-scenario>
           <button data-scenario="voor">Voor verkoop</button>
@@ -2981,34 +2996,34 @@
       </div>
     </div>
     <div class="u5-primary-kpis v4-desktop-only-grid" aria-label="Geplande financiële verdeling">
-      <button type="button" class="card u5-primary-kpi u5-income-kpi tone-income" data-open-total-income aria-label="Maandinkomen van Dion en Dara handmatig aanpassen"><div class="metric-label">Totaal inkomen</div><div class="metric-value value pos">${eur2(dashboardTotalIncome)}</div><div class="metric-sub">Verdelingsinkomen ${eur2(r.totaalSalaris)}${incomeBreakdown.extra ? ` · extra/teruggaven ${eur2(incomeBreakdown.extra)}` : ""} · aanpassen</div></button>
-      <div class="card u5-primary-kpi tone-budget"><div class="metric-label">Gezamenlijk budget</div><div class="metric-value">${eur2(r.gezamenlijkeLastenTotaal)}</div><div class="metric-sub">Vaste lasten + vooraf ingestelde budgetten</div></div>
-      <div class="card u5-primary-kpi tone-saving"><div class="metric-label">Gezamenlijk sparen</div><div class="metric-value value pos">${eur2(r.spaarpotDezeMaand)}</div><div class="metric-sub">${monthLabel2(getSelectedMonth2())}</div></div>
-      <div class="card u5-primary-kpi tone-allowance"><div class="metric-label">Zakgeld totaal</div><div class="metric-value ${totalZakgeld < 0 ? "value neg" : "value pos"}">${eur2(totalZakgeld)}</div><div class="metric-sub">Vooraf berekende overdracht</div></div>
+      <button type="button" class="card u5-primary-kpi tone-income" data-income-edit="dion" data-income-label="Dion" aria-label="Inkomen van Dion aanpassen"><div class="metric-label">Inkomen Dion</div><div class="metric-value value pos">${eur(r.salarisDion)}</div><div class="metric-sub">Klik om aan te passen</div></button>
+      <button type="button" class="card u5-primary-kpi tone-budget" data-income-edit="dara" data-income-label="Dara" aria-label="Inkomen van Dara aanpassen"><div class="metric-label">Inkomen Dara</div><div class="metric-value value pos">${eur(r.salarisDara)}</div><div class="metric-sub">Klik om aan te passen</div></button>
+      <div class="card u5-primary-kpi tone-saving"><div class="metric-label">Totaal gezamenlijke rekening</div><div class="metric-value value pos">${eur(dashboardTotalIncome)}</div><div class="metric-sub">Inkomen en vaste teruggaven</div></div>
+      <div class="card u5-primary-kpi tone-allowance u5-variable-kpi"><div class="metric-label">Variabel gebruikt</div><div class="metric-value neutral-amount">${eur(r.variabelTotaal)} / ${eur(r.variabelBudgetTotaal)}</div><div class="mobile-kpi-budget-track" style="--used-pct:${variabelBudgetPct}%" aria-label="Gezamenlijk variabel budget gebruikt: ${variabelBudgetPct}%"></div></div>
     </div>
     <div class="mobile-kpi-grid v4-mobile-only-grid">
       <button type="button" class="card mobile-kpi-card mobile-kpi-card--editable" data-income-edit="dion" data-income-label="Dion">
         <div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-dion">${iconSvg("euro")}</span><span class="mobile-kpi-chevron">›</span></div>
         <div class="mobile-kpi-label">Inkomen Dion</div>
-        <div class="mobile-kpi-value value pos">${eur2(r.salarisDion)}</div>
+        <div class="mobile-kpi-value value pos">${eur(r.salarisDion)}</div>
         <div class="mobile-kpi-edit-hint">${finizeIconWrap("edit")}<span>Tik om aan te passen</span></div>
       </button>
       <button type="button" class="card mobile-kpi-card mobile-kpi-card--editable" data-income-edit="dara" data-income-label="Dara">
         <div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-dara">${iconSvg("euro")}</span><span class="mobile-kpi-chevron">›</span></div>
         <div class="mobile-kpi-label">Inkomen Dara</div>
-        <div class="mobile-kpi-value value pos">${eur2(r.salarisDara)}</div>
+        <div class="mobile-kpi-value value pos">${eur(r.salarisDara)}</div>
         <div class="mobile-kpi-edit-hint">${finizeIconWrap("edit")}<span>Tik om aan te passen</span></div>
       </button>
       <div class="card mobile-kpi-card static mobile-kpi-card-total-joint mobile-kpi-card--joint-total">
         <div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg("wallet")}</span></div>
         <div class="mobile-kpi-label">Totaal gezamenlijke rekening</div>
-        <div class="mobile-kpi-value value pos">${eur2(dashboardTotalIncome)}</div>
+        <div class="mobile-kpi-value value pos">${eur(dashboardTotalIncome)}</div>
         <div class="mobile-kpi-edit-hint mobile-kpi-edit-hint-placeholder" aria-hidden="true">${finizeIconWrap("edit")}<span>Tik om aan te passen</span></div>
       </div>
       <div class="card mobile-kpi-card static mobile-kpi-card--budget">
         <div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg("chart")}</span></div>
         <div class="mobile-kpi-label">Variabel gebruikt</div>
-        <div class="mobile-kpi-value mobile-kpi-value-budget neutral-amount">${eur2(r.variabelTotaal)} / ${eur2(r.variabelBudgetTotaal)}</div>
+        <div class="mobile-kpi-value mobile-kpi-value-budget neutral-amount">${eur(r.variabelTotaal)} / ${eur(r.variabelBudgetTotaal)}</div>
         <div class="mobile-kpi-budget-track" style="--used-pct:${variabelBudgetPct}%" aria-label="Gezamenlijk variabel budget gebruikt: ${variabelBudgetPct}%"></div>
       </div>
     </div>
@@ -3016,26 +3031,26 @@
       <div class="card span-7 u5-planned-flow">
         ${renderDashboardCardHead("Geplande verdeling", "op basis van budgetten", "green")}
         <div class="u5-flow-list">
-          <div><span>Totaal inkomen</span><strong class="value pos">${eur2(r.totaalSalaris)}</strong></div>
-          <div><span>Vaste gezamenlijke lasten${r.hypotheekBedrag ? " + hypotheek" : ""}</span><strong>${eur2(r.vasteLastenTotaal)}</strong></div>
-          <div><span>Variabele kostenbudgetten</span><strong>${eur2(r.variabelBudgetTotaal)}</strong></div>
-          <div><span>Gezamenlijk sparen</span><strong>${eur2(r.spaarpotDezeMaand)}</strong></div>
-          <div class="u5-flow-result"><span>Zakgeld totaal</span><strong class="${totalZakgeld < 0 ? "value neg" : "value pos"}">${eur2(totalZakgeld)}</strong></div>
+          <div><span>Totaal inkomen</span><strong class="value pos">${eur(r.totaalSalaris)}</strong></div>
+          <div><span>Vaste gezamenlijke lasten${r.hypotheekBedrag ? " + hypotheek" : ""}</span><strong>${eur(r.vasteLastenTotaal)}</strong></div>
+          <div><span>Variabele kostenbudgetten</span><strong>${eur(r.variabelBudgetTotaal)}</strong></div>
+          <div><span>Gezamenlijk sparen</span><strong>${eur(r.spaarpotDezeMaand)}</strong></div>
+          <div class="u5-flow-result"><span>Zakgeld totaal</span><strong class="${totalZakgeld < 0 ? "value neg" : "value pos"}">${eur(totalZakgeld)}</strong></div>
         </div>
       </div>
       <div class="card span-5 u5-actual-result">
         ${renderDashboardCardHead("Werkelijk maandresultaat", "realisatie", "blue")}
-        <div class="u5-result-value ${actualMonthResult < 0 ? "value neg" : "value pos"}">${eur2(actualMonthResult)}</div>
+        <div class="u5-result-value ${actualMonthResult < 0 ? "value neg" : "value pos"}">${eur(actualMonthResult)}</div>
         <div class="summary-list">
-          <div class="summary-line"><span>Werkelijk variabel besteed</span><strong>${eur2(r.variabelTotaal)}</strong></div>
-          <div class="summary-line"><span>Budgetverschil</span><strong class="${budgetDifference < 0 ? "value neg" : budgetDifference > 0 ? "value pos" : ""}">${eur2(budgetDifference)}</strong></div>
+          <div class="summary-line"><span>Werkelijk variabel besteed</span><strong>${eur(r.variabelTotaal)}</strong></div>
+          <div class="summary-line"><span>Budgetverschil</span><strong class="${budgetDifference < 0 ? "value neg" : budgetDifference > 0 ? "value pos" : ""}">${eur(budgetDifference)}</strong></div>
         </div>
         <p class="hint">Deze realisatie verandert het vooraf berekende zakgeld niet.</p>
       </div>
       <div class="card span-12 u5-allowance-split">${renderDashboardCardHead("Verdeling Dion / Dara", "bestaande verdelingsregels", "terracotta")}${zakgeldCardBody}</div>
     </div>
     <div class="dashboard-grid dashboard-summary-row u5-mobile-dashboard-preserved">
-      <div class="card span-6 joint-account-card">${renderDashboardCardHead("Gezamenlijke rekening", "", "green")}<div class="summary-list"><div class="summary-line"><span>Totaal inkomen</span><strong class="value pos">${eur2(dashboardTotalIncome)}</strong></div>${incomeBreakdown.extra ? `<div class="summary-line"><span>Waarvan extra / teruggaven</span><strong class="value pos">${eur2(incomeBreakdown.extra)}</strong></div>` : ``}<div class="summary-line"><span>Vaste lasten + budgetten</span><strong class="value neg">${eur2(r.gezamenlijkeLastenTotaal)}</strong></div><div class="summary-line joint-saving-line"><span>Gezamenlijk sparen</span><strong class="value pos">${eur2(r.spaarpotDezeMaand)}</strong></div><div class="summary-line joint-remaining-line"><span>Resterend voor zakgeld</span><strong class="${jointRemaining < 0 ? "value neg" : "value pos"}">${eur2(jointRemaining)}</strong></div></div></div>
+      <div class="card span-6 joint-account-card">${renderDashboardCardHead("Gezamenlijke rekening", "", "green")}<div class="summary-list"><div class="summary-line"><span>Totaal inkomen</span><strong class="value pos">${eur(dashboardTotalIncome)}</strong></div>${incomeBreakdown.extra ? `<div class="summary-line"><span>Waarvan extra / teruggaven</span><strong class="value pos">${eur(incomeBreakdown.extra)}</strong></div>` : ``}<div class="summary-line"><span>Vaste lasten + budgetten</span><strong class="value neg">${eur(r.gezamenlijkeLastenTotaal)}</strong></div><div class="summary-line joint-saving-line"><span>Gezamenlijk sparen</span><strong class="value pos">${eur(r.spaarpotDezeMaand)}</strong></div><div class="summary-line joint-remaining-line"><span>Resterend voor zakgeld</span><strong class="${jointRemaining < 0 ? "value neg" : "value pos"}">${eur(jointRemaining)}</strong></div></div></div>
       <div class="card span-6 allowance-return-card">${renderDashboardCardHead("Zakgeld teruggestort", "Dion / Dara", "terracotta")}${zakgeldCardBody}</div>
       ${jointSummary}
       ${personSummary("Dion", r.dion)}
@@ -3049,22 +3064,22 @@
     <div class="manage-stack">
       ${renderU3AdminPanel()}
       ${renderManageSection("Bank import & uitgaven", renderBankImportSection(), bankImportOpen, 'data-dashboard-accordion="bank-import"')}
-      ${renderManageSection(`Jaaroverzicht ${year}`, `<div class="card"><div class="year-legend top"><span><i class="income-dot"></i>Inkomen</span><span><i class="spent-dot"></i>Uitgaven</span><span><i class="saving-dot"></i>Sparen</span></div><div class="year-summary"><div><span>Inkomen dit jaar</span><strong class="value pos">${eur2(yearTotals.income)}</strong></div><div><span>Uitgaven dit jaar</span><strong class="value neg">${eur2(yearTotals.spent)}</strong></div><div><span>Sparen dit jaar</span><strong class="value pos">${eur2(yearTotals.saving)}</strong></div></div><div class="year-chart">${monthBars}</div></div>`, false)}
+      ${renderManageSection(`Jaaroverzicht ${year}`, `<div class="card"><div class="year-legend top"><span><i class="income-dot"></i>Inkomen</span><span><i class="spent-dot"></i>Uitgaven</span><span><i class="saving-dot"></i>Sparen</span></div><div class="year-summary"><div><span>Inkomen dit jaar</span><strong class="value pos">${eur(yearTotals.income)}</strong></div><div><span>Uitgaven dit jaar</span><strong class="value neg">${eur(yearTotals.spent)}</strong></div><div><span>Sparen dit jaar</span><strong class="value pos">${eur(yearTotals.saving)}</strong></div></div><div class="year-chart">${monthBars}</div></div>`, false)}
     </div>
   `;
   }
   function renderRecentTransactionsList(owner, limit = 4) {
     const rows = getMonthTransactions(owner).filter(isBudgetExpenseTransaction).sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, limit);
     if (!rows.length) return renderEmptyState("▤", "Nog geen uitgaven deze maand.", "Toegevoegde uitgaven verschijnen hier.", `<button class="ghost small" data-open-transaction>+ Uitgave toevoegen</button>`);
-    return `<div class="summary-list">${rows.map((tx) => `<div class="summary-line"><span>${textSafe2(tx.description || tx.category || "Uitgave")}</span><strong class="value neg">${eur2(Number(tx.amount) || 0)} <span class="hint">· ${formatDateNL2(tx.date)}</span></strong></div>`).join("")}</div>`;
+    return `<div class="summary-list">${rows.map((tx) => `<div class="summary-line"><span>${textSafe(tx.description || tx.category || "Uitgave")}</span><strong class="value neg">${eur(Number(tx.amount) || 0)} <span class="hint">· ${formatDateNL(tx.date)}</span></strong></div>`).join("")}</div>`;
   }
   function renderTransactionsTable(owner) {
     const rows = getMonthTransactions(owner).filter(isBudgetExpenseTransaction).sort((a, b) => String(b.date).localeCompare(String(a.date))).map((tx) => `
     <tr>
-      <td>${formatDateNL2(tx.date)}</td>
-      <td>${textSafe2(tx.category || "Overig")}</td>
-      <td>${textSafe2(tx.description || "")}<div class="progress-label" style="text-align:left">${textSafe2(tx.note || "")}</div></td>
-      <td class="num"><span class="value neg">${eur2(Number(tx.amount) || 0)}</span></td>
+      <td>${formatDateNL(tx.date)}</td>
+      <td>${textSafe(tx.category || "Overig")}</td>
+      <td>${textSafe(tx.description || "")}<div class="progress-label" style="text-align:left">${textSafe(tx.note || "")}</div></td>
+      <td class="num"><span class="value neg">${eur(Number(tx.amount) || 0)}</span></td>
       <td class="row-actions"><button class="danger-ghost" data-remove-transaction="${attrSafe(tx.id)}" title="Verwijderen">×</button></td>
     </tr>`).join("");
     const emptyIcon = owner ? "⌘" : "▤";
@@ -3075,17 +3090,43 @@
     <tbody>${rows || emptyRow}</tbody>
   </table></div>`;
   }
-  function renderBudgetUsageList() {
+  function renderBudgetUsageList(owner = "gezamenlijk") {
+    var _a;
     const data = getMonthlyScenarioData(state.meta.scenario);
-    return `<div class="progress-list">${(data.gezamenlijk.variabel || []).filter((row) => row.post || row.bedrag).map((row) => {
+    return `<div class="progress-list">${(((_a = data[owner]) == null ? void 0 : _a.variabel) || []).filter((row) => row.post || row.bedrag).map((row) => {
       const budget = Number(row.bedrag) || 0;
-      const used = sumTransactions("gezamenlijk", row.post);
+      const used = sumTransactions(owner, row.post);
       const status = budgetStatus(used, budget);
       return `<div class="progress-item">
-      <div class="progress-top"><strong>${textSafe2(row.post || row.categorie)}</strong><span><span class="neutral-amount">${eur2(used)}</span> / <span class="neutral-amount">${eur2(budget)}</span> <span class="status-badge ${status.cls}">${status.label}</span></span></div>
+      <div class="progress-top"><strong>${textSafe(row.post || row.categorie)}</strong><span><span class="neutral-amount">${eur(used)}</span> / <span class="neutral-amount">${eur(budget)}</span> <span class="status-badge ${status.cls}">${status.label}</span></span></div>
       <div class="progress-track"><div class="progress-fill" style="width:${Math.min(100, Math.round(status.ratio * 100))}%"></div></div>
     </div>`;
     }).join("") || '<p class="hint">Nog geen budgetten.</p>'}</div>`;
+  }
+  function renderFixedCostsOverviewCard(owner, data, total) {
+    const fixedByCategory = {};
+    ((data == null ? void 0 : data.vasteLasten) || []).forEach((row) => {
+      const category = normalizeCategoryName(row.categorie);
+      fixedByCategory[category] = round2((fixedByCategory[category] || 0) + effectiveBedrag(row));
+    });
+    if (owner === "gezamenlijk" && state.meta.scenario === "na") {
+      ((data == null ? void 0 : data.hypotheek) || []).forEach((row) => {
+        const category = normalizeCategoryName(row.categorie || "Huis");
+        fixedByCategory[category] = round2((fixedByCategory[category] || 0) + effectiveBedrag(row));
+      });
+    }
+    const rows = Object.entries(fixedByCategory).sort((a, b) => b[1] - a[1]).map(([category, amount]) => {
+      const ratio = total > 0 ? Math.min(1, amount / total) : 0;
+      return `<div class="progress-item">
+        <div class="progress-item-icon tone-green">${iconSvg(jointFixedCategoryIconName(category))}</div>
+        <div class="progress-top"><strong>${textSafe(category)}</strong><span>${eur(amount)} · ${pct(ratio)}</span></div>
+        <div class="progress-track"><div class="progress-fill" style="width:${Math.round(ratio * 100)}%"></div></div>
+      </div>`;
+    }).join("");
+    return `<div class="card span-12 u5-fixed-costs-overview">
+    ${renderJointFixedCostsCardHead(owner, { planning: true })}
+    <div class="u5-fixed-costs-overview-list">${rows || '<p class="hint">Nog geen vaste lasten.</p>'}</div>
+  </div>`;
   }
   function renderRecurringFixedManage(owner) {
     var _a;
@@ -3094,21 +3135,45 @@
       const financialFor = item.financialFor || item.rekening || "gezamenlijk";
       return financialFor === owner && item.legacyKind !== "hypotheek";
     });
-    const month = getSelectedMonth2();
+    const month = getSelectedMonth();
     const total = round2(u3FixedOccurrences(month, scenario).filter((item) => {
       var _a2;
       return (item.financialFor || item.rekening || "gezamenlijk") === owner && ((_a2 = item.source) == null ? void 0 : _a2.legacyKind) !== "hypotheek";
     }).reduce((sum, item) => sum + (Number(item.amount) || 0), 0));
     const rowsHtml = rows.map((item) => `
     <div class="summary-line">
-      <span><strong>${textSafe2(item.naam || "Vaste last")}</strong><small class="hint">${textSafe2(item.categorie || "Overig")} · elke ${Math.max(1, Number(item.frequentieAantal) || 1)} ${textSafe2(item.frequentieEenheid || "maanden")}${item.actief === false ? " · gestopt" : ""}</small></span>
-      <span><strong>${eur2(u3AmountAt(item, month))}</strong><button type="button" class="ghost small" data-u3-edit-recurring="fixed:${textSafe2(item.id)}">Bewerken</button></span>
+      <span><strong>${textSafe(item.naam || "Vaste last")}</strong><small class="hint">${textSafe(item.categorie || "Overig")} · elke ${Math.max(1, Number(item.frequentieAantal) || 1)} ${textSafe(item.frequentieEenheid || "maanden")}${item.actief === false ? " · gestopt" : ""}</small></span>
+      <span><strong>${eur(u3AmountAt(item, month))}</strong><button type="button" class="ghost small" data-u3-edit-recurring="fixed:${textSafe(item.id)}">Bewerken</button></span>
     </div>`).join("");
     return `<div class="card">
     <div class="card-head"><div><h2>Terugkerende vaste lasten</h2><span class="hint">Bron van het maandbedrag</span></div><button type="button" class="primary small" data-u3-add-recurring="fixed" data-u3-recurring-owner="${owner}">+ Vaste last</button></div>
     <div class="summary-list">${rowsHtml || '<p class="hint">Nog geen vaste lasten toegevoegd.</p>'}</div>
-    <div class="card-total"><span>Totaal in ${monthLabel2(month)}</span><strong class="value neg">${eur2(total)}</strong></div>
+    <div class="card-total"><span>Totaal in ${monthLabel(month)}</span><strong class="value neg">${eur(total)}</strong></div>
   </div>`;
+  }
+  function ownerVariableBudgetRows(owner, data) {
+    const budgets = /* @__PURE__ */ new Map();
+    ((data == null ? void 0 : data.variabel) || []).forEach((row) => {
+      const label = String(row.post || row.categorie || "").trim();
+      if (label) budgets.set(label.toLocaleLowerCase(), { label, budget: Number(row.bedrag) || 0 });
+    });
+    const used = {};
+    let uncategorized = 0;
+    getMonthTransactions(owner).forEach((tx) => {
+      const key = String(tx.category || "").trim().toLocaleLowerCase();
+      const impact = getTransactionExpenseImpact(tx);
+      if (budgets.has(key)) used[key] = round2((used[key] || 0) + impact);
+      else uncategorized = round2(uncategorized + impact);
+    });
+    const rows = [...budgets.entries()].map(([key, row]) => {
+      const amount = used[key] || 0;
+      const ratio = row.budget > 0 ? Math.min(1, amount / row.budget) : 0;
+      return `<button type="button" class="budget-preview-item budget-preview-button" data-open-budget-transactions="${textSafe(row.label)}" data-budget-owner="${owner}" aria-label="Open transacties voor ${textSafe(row.label)}"><div class="budget-preview-thumb tone-green">${iconSvg(categoryIconName(row.label))}</div><div class="budget-preview-main"><div class="budget-preview-top"><strong>${textSafe(row.label)}</strong><span>${eur(amount)} / ${eur(row.budget)}</span></div><div class="progress-track budget-gradient"><div class="progress-fill budget-gradient" style="width:${Math.round(ratio * 100)}%"></div></div></div></button>`;
+    });
+    if (uncategorized > 0) {
+      rows.push(`<button type="button" class="budget-preview-item budget-preview-button joint-variable-unassigned" data-open-budget-transactions="Ongecategoriseerd" data-budget-owner="${owner}"><div class="budget-preview-thumb">${iconSvg("more")}</div><div class="budget-preview-main"><div class="budget-preview-top"><strong>Ongecategoriseerd</strong><span>${eur(uncategorized)}</span></div><div class="progress-track"><div class="progress-fill" style="width:100%"></div></div></div></button>`);
+    }
+    return rows;
   }
   function renderPersonOrJoint(tabId, key, label) {
     const s = getMonthlyScenarioData(state.meta.scenario);
@@ -3135,89 +3200,82 @@
     </div>` : "";
     const savingsSummary = isJoint ? `
     <div class="savings-head">
-      <div class="kpi"><div class="label">Maandelijkse lasten</div><div class="value">${eur2(r.gezamenlijkeLastenTotaal)}</div></div>
+      <div class="kpi"><div class="label">Maandelijkse lasten</div><div class="value">${eur(r.gezamenlijkeLastenTotaal)}</div></div>
       <div class="kpi">
         <div class="label">Spaargeld deze maand</div>
         <input type="number" step="0.01" data-path="${state.meta.scenario}.spaarpotDezeMaand" style="width:100%;font-size:16px;font-weight:700">
       </div>
     </div>` : `
     <div class="savings-head">
-      <div class="kpi ${rr.beschikbaarVoorSparen < 0 ? "neg" : "pos"}"><div class="label">Beschikbaar voor sparen</div><div class="value ${rr.beschikbaarVoorSparen < 0 ? "neg" : "pos"}">${eur2(rr.beschikbaarVoorSparen)}</div></div>
+      <div class="kpi ${rr.beschikbaarVoorSparen < 0 ? "neg" : "pos"}"><div class="label">Beschikbaar voor sparen</div><div class="value ${rr.beschikbaarVoorSparen < 0 ? "neg" : "pos"}">${eur(rr.beschikbaarVoorSparen)}</div></div>
     </div>`;
     const transactionCard = `
     <div class="card card-scroll span-7">
-      <div class="card-head"><h2>${isJoint ? "Gezamenlijke transacties" : "Persoonlijke uitgaven"} — ${monthLabel2(getSelectedMonth2())}</h2>${isJoint ? "" : '<button class="primary small" data-open-transaction>+ Uitgave toevoegen</button>'}</div>
+      <div class="card-head"><h2>${isJoint ? "Gezamenlijke transacties" : "Persoonlijke uitgaven"} — ${monthLabel(getSelectedMonth())}</h2>${isJoint ? "" : '<button class="primary small" data-open-transaction>+ Uitgave toevoegen</button>'}</div>
       ${renderTransactionsTable(key)}
-      <div class="card-total"><span>Totaal uitgaven</span><span class="value neg">${eur2(sumTransactions(key))}</span></div>
+      <div class="card-total"><span>Totaal uitgaven</span><span class="value neg">${eur(sumTransactions(key))}</span></div>
     </div>`;
-    const variabelBasePath = isJoint ? `monthlyBudgets.${getSelectedMonth2()}.${state.meta.scenario}.gezamenlijkVariabel` : `${state.meta.scenario}.${key}.variabel`;
-    const vasteTeruggavenTotal = round2((r.vasteTeruggavenDion || 0) + (r.vasteTeruggavenDara || 0));
-    const resterendBudget = round2(r.variabelBudgetTotaal - r.variabelTotaal);
-    const resterendPct = r.variabelBudgetTotaal > 0 ? Math.round(resterendBudget / r.variabelBudgetTotaal * 100) : 0;
+    const variabelBasePath = isJoint ? `monthlyBudgets.${getSelectedMonth()}.${state.meta.scenario}.gezamenlijkVariabel` : `${state.meta.scenario}.${key}.variabel`;
+    const variableBudget = isJoint ? r.variabelBudgetTotaal : sumBedrag(data.variabel || []);
+    const variableUsed = isJoint ? r.variabelTotaal : rr.variabeleUitgaven;
+    const variablePct = variableBudget > 0 ? Math.min(100, Math.round(variableUsed / variableBudget * 100)) : 0;
     const jointKpis = isJoint ? `
     <div class="overview-kpi-row">
-      ${renderIconKpi2("▤", "green", "Vaste lasten totaal", eur2(r.vasteLastenTotaal), `Incl. teruggaven ${eur2(vasteTeruggavenTotal)}`, { valueClass: "value neg" })}
-      ${renderIconKpi2("◈", "blue", "Variabel budget", eur2(r.variabelBudgetTotaal), "Budget deze maand")}
-      ${renderIconKpi2("↗", "green", "Uitgegeven deze maand", eur2(r.variabelTotaal), `Van ${eur2(r.variabelBudgetTotaal)}`, { valueClass: "value neg" })}
-      ${renderIconKpi2("◔", "blue", "Resterend budget", eur2(resterendBudget), `${resterendPct}% over`, { valueClass: resterendBudget < 0 ? "value neg" : "value pos" })}
+      ${renderIconKpi("€", "green", "Totaal gezamenlijk inkomen", eur(r.totaalSalaris), "Dion en Dara samen", { valueClass: "value pos" })}
+      ${renderIconKpi("▤", "blue", "Vaste lasten totaal", eur(r.vasteLastenTotaal), "Klik om te wijzigen", { valueClass: "value neg", openFixedOwner: "gezamenlijk" })}
+      ${renderIconKpi("◎", "green", "Sparen", eur(r.spaarpotDezeMaand), "Klik om aan te passen", { valueClass: "value pos", editSaving: true })}
+      ${renderIconKpi("▥", "blue", "Variabel gebruikt", `${eur(variableUsed)} / ${eur(variableBudget)}`, `<span class="overview-budget-track" style="--used-pct:${variablePct}%"></span>`)}
     </div>` : "";
     const personalKpis = !isJoint ? `
     <div class="overview-kpi-row">
-      ${renderIconKpi2("◈", "green", "Zakgeld ontvangen", eur2(rr.zakgeld), monthLabel2(getSelectedMonth2()), { valueClass: rr.zakgeld < 0 ? "value neg" : "value pos" })}
-      ${renderIconKpi2("▤", "blue", "Vaste lasten", eur2(rr.persoonlijkeVasteLasten), "terugkerend", { valueClass: rr.persoonlijkeVasteLasten > 0 ? "value neg" : "value pos" })}
-      ${renderIconKpi2("▥", "blue", "Uitgaven deze maand", eur2(rr.variabeleUitgaven), "transacties", { valueClass: "value neg" })}
-      ${renderIconKpi2("◎", "green", "Beschikbaar voor sparen/vrij gebruik", eur2(rr.beschikbaarVoorSparen), availabilityBadge(rr.beschikbaarVoorSparen), { valueClass: rr.beschikbaarVoorSparen < 0 ? "value neg" : "value pos" })}
-    </div>` : "";
-    const personalIncomeCard = !isJoint ? `
-    <div class="card metric-card income-metric span-12">
-      <div class="metric-label">Totaal inkomen ${label}</div>
-      <div class="metric-value value pos">${eur2(totaalInkomen)}</div>
-      <div class="metric-sub">Totaal naar gezamenlijke rekening</div>
-      <div class="income-breakdown">
-        <div><span>Basisinkomen</span><input class="inline-edit" type="number" step="0.01" data-month-income="${key}"></div>
-        <div><span>Vaste teruggaven</span><strong class="value pos">${eur2(vasteTeruggaven)}</strong></div>
-      </div>
+      ${renderIconKpi("€", "green", `Totaal inkomen ${textSafe(label)}`, eur(totaalInkomen), monthLabel(getSelectedMonth()), { valueClass: "value pos" })}
+      ${renderIconKpi("▤", "blue", "Vaste lasten", eur(rr.persoonlijkeVasteLasten), "Klik om te wijzigen", { valueClass: rr.persoonlijkeVasteLasten > 0 ? "value neg" : "value pos", openFixedOwner: key })}
+      ${renderIconKpi("◎", "green", "Sparen", eur(rr.beschikbaarVoorSparen), availabilityBadge(rr.beschikbaarVoorSparen), { valueClass: rr.beschikbaarVoorSparen < 0 ? "value neg" : "value pos" })}
+      ${renderIconKpi("▥", "blue", "Variabel gebruikt", `${eur(variableUsed)} / ${eur(variableBudget)}`, `<span class="overview-budget-track" style="--used-pct:${variablePct}%"></span>`)}
     </div>` : "";
     const incomeManage = !isJoint ? `
     <div class="card">
-      <div class="card-head"><h2>Inkomen</h2><span class="hint">${monthLabel2(getSelectedMonth2())}</span></div>
+      <div class="card-head"><h2>Inkomen</h2><span class="hint">${monthLabel(getSelectedMonth())}</span></div>
       <div class="summary-list">
         <div class="summary-line"><span>Basisinkomen deze maand</span><input class="inline-edit" type="number" step="0.01" data-month-income="${key}"></div>
-        <div class="summary-line"><span>Vaste teruggaven</span><strong class="value pos">${eur2(vasteTeruggaven)}</strong></div>
-        <div class="summary-line"><span>Totaal naar gezamenlijke rekening</span><strong class="value pos">${eur2(totaalInkomen)}</strong></div>
+        <div class="summary-line"><span>Vaste teruggaven</span><strong class="value pos">${eur(vasteTeruggaven)}</strong></div>
+        <div class="summary-line"><span>Totaal naar gezamenlijke rekening</span><strong class="value pos">${eur(totaalInkomen)}</strong></div>
       </div>
     </div>
     ${refundsCard}` : "";
     document.getElementById(tabId).innerHTML = isJoint ? `
-    ${renderPageHeading2(`Gezamenlijk overzicht — ${monthLabel2(getSelectedMonth2())}`, pageGreeting)}
+    ${renderPageHeading(`Gezamenlijk overzicht — ${monthLabel(getSelectedMonth())}`, pageGreeting)}
     ${jointKpis}
-    <div class="dashboard-grid">
-      <div class="card span-7"><div class="card-head"><h2>Budgetgebruik deze maand</h2><span class="hint">Dion / Dara</span></div>${renderBudgetUsageList()}</div>
-      <div class="card span-5"><div class="card-head"><h2>Recente gezamenlijke uitgaven</h2></div>${renderRecentTransactionsList("gezamenlijk", 4)}</div>
+    <div class="dashboard-grid u5-joint-activity-row">
+      <div class="card span-5 u5-joint-budget-card"><div class="card-head"><h2>Budgetgebruik deze maand</h2><span class="hint">Dion / Dara</span></div>${renderBudgetUsageList()}</div>
+      ${transactionCard}
     </div>
     <div class="dashboard-grid">
-      ${transactionCard}
-      <div class="card span-5"><div class="card-head"><h2>Spaardoelen preview</h2><button class="ghost small" data-tab-shortcut="spaardoelen">Bekijk alle doelen →</button></div>${renderModernGoalCards(doelenVoorGroep, spaarpotVoorGroep, "Gezamenlijk", 3)}</div>
+      ${renderFixedCostsOverviewCard(key, data, r.vasteLastenTotaal)}
+    </div>
+    <div class="dashboard-grid">
+      ${renderDesktopGoalsPreview(doelenVoorGroep, spaarpotVoorGroep, key)}
     </div>
     <div class="manage-stack">
       ${hypotheekCard ? renderManageSection("Beheer hypotheek", hypotheekCard, false) : ""}
-      ${renderManageSection("Beheer vaste lasten", renderRecurringFixedManage(key), false)}
       ${renderManageSection("Beheer variabele budgetten", `<div class="card">${renderRowsTable(variabelBasePath, data.variabel)}</div>`, false)}
       ${renderManageSection("Sparen", `<div class="card">${savingsSummary}${renderGoalOverviewTable(doelenVoorGroep, spaarpotVoorGroep)}</div>`, false)}
     </div>
   ` : `
-    ${renderPageHeading2(`${label} overzicht — ${monthLabel2(getSelectedMonth2())}`, pageGreeting)}
+    ${renderPageHeading(`${label} overzicht — ${monthLabel(getSelectedMonth())}`, pageGreeting)}
     ${personalKpis}
-    <div class="dashboard-grid">
-      ${personalIncomeCard}
+    <div class="dashboard-grid u5-joint-activity-row">
+      <div class="card span-5 u5-joint-budget-card"><div class="card-head"><h2>Budgetgebruik deze maand</h2><span class="hint">${textSafe(label)}</span></div>${renderBudgetUsageList(key)}</div>
+      ${transactionCard}
     </div>
     <div class="dashboard-grid">
-      ${transactionCard}
-      <div class="card span-5"><div class="card-head"><h2>Persoonlijke spaardoelen</h2></div>${renderModernGoalCards(doelenVoorGroep, spaarpotVoorGroep, label, 3)}</div>
+      ${renderFixedCostsOverviewCard(key, data, rr.persoonlijkeVasteLasten)}
+    </div>
+    <div class="dashboard-grid">
+      ${renderDesktopGoalsPreview(doelenVoorGroep, spaarpotVoorGroep, key)}
     </div>
     <div class="manage-stack">
       ${renderManageSection("Inkomen en vaste teruggaven", incomeManage, false)}
-      ${renderManageSection("Eigen vaste lasten", renderRecurringFixedManage(key), false)}
       ${renderManageSection("Persoonlijke categorieën", `<div class="card">${renderRowsTable(variabelBasePath, data.variabel)}</div>`, false)}
       ${renderManageSection("Spaardoelen tabeloverzicht", `<div class="card">${renderGoalOverviewTable(doelenVoorGroep, spaarpotVoorGroep)}</div>`, false)}
     </div>
@@ -3228,13 +3286,13 @@
     const target = Number(goal.doelbedrag) || 0;
     const saved = Number(goal.algespaard) || 0;
     const progress = Math.min(100, Math.round((item.voortgang || 0) * 100));
-    const goalImage = safeImageUrl2(goalImageSource2(goal));
+    const goalImage = safeImageUrl(goalImageSource(goal));
     const imageStyle = goalImage ? ` style="background-image:url('${goalImage}')"` : "";
     const iconToneClass = goalImage ? "" : ` tone-${owner === "gezamenlijk" ? "green" : owner}`;
-    return `<div class="mobile-goal-row"><span class="mobile-goal-icon${iconToneClass}${goalImage ? " has-image" : ""}"${imageStyle}>${goalImage ? "" : goalIcon2(goal)}</span><div class="mobile-goal-main"><strong>${textSafe2(goal.naam || "Spaardoel")}</strong><span>${eur2(saved)} van ${eur2(target)}</span><div class="progress-track"><div class="progress-fill" style="width:${progress}%"></div></div><em class="mobile-goal-needed">Nodig p/m: ${item.benodigdPerMaand === null ? "—" : eur2(item.benodigdPerMaand)}</em>${goalMonthlyInlegText(item)}<em>Doel: ${goal.doeldatum ? formatDateNL2(goal.doeldatum) : "Geen einddatum"}</em></div><div class="mobile-goal-side"><b>${progress}%</b><button type="button" class="ghost small" data-open-goal-editor="${owner}:${textSafe2(goal.id)}">Bekijk doel</button></div></div>`;
+    return `<div class="mobile-goal-row"><span class="mobile-goal-icon${iconToneClass}${goalImage ? " has-image" : ""}"${imageStyle}>${goalImage ? "" : goalIcon(goal)}</span><div class="mobile-goal-main"><strong>${textSafe(goal.naam || "Spaardoel")}</strong><span>${eur(saved)} van ${eur(target)}</span><div class="progress-track"><div class="progress-fill" style="width:${progress}%"></div></div><em class="mobile-goal-needed">Nodig p/m: ${item.benodigdPerMaand === null ? "—" : eur(item.benodigdPerMaand)}</em>${goalMonthlyInlegText(item)}<em>Doel: ${goal.doeldatum ? formatDateNL(goal.doeldatum) : "Geen einddatum"}</em></div><div class="mobile-goal-side"><b>${progress}%</b><button type="button" class="ghost small" data-open-goal-editor="${owner}:${textSafe(goal.id)}">Bekijk doel</button></div></div>`;
   }
   function renderMobileGoalGroup(group) {
-    const items = calcGroep2(group.doelen, group.pot, TODAY2);
+    const items = calcGroep(group.doelen, group.pot, TODAY);
     return `<section class="mobile-goal-section"><h2>${group.label}</h2><div class="card mobile-goal-list">${items.length ? items.map((item) => renderMobileGoalRow(item, group.key)).join("") : '<p class="hint">Nog geen spaardoelen.</p>'}</div></section>`;
   }
   function openMobileGoalEditor(owner, id) {
@@ -3244,12 +3302,12 @@
     if (!goal) return;
     const modal = document.getElementById("incomeEditModal");
     const name = ownerLabel(owner);
-    modal.innerHTML = `<div class="modal goal-detail-editor"><div class="joint-variable-editor-header"><div><div class="section-kicker">${name} · ${monthLabel2(getSelectedMonth2())}</div><h2>Spaardoel bewerken</h2></div><button type="button" class="ghost" data-close-goal-editor>Sluiten</button></div><div class="modal-grid"><label class="full">Naam<input id="goalEditName" type="text" value="${textSafe2(goal.naam || "")}"></label><label>Al gespaard<input id="goalEditSaved" type="number" step="0.01" inputmode="decimal" value="${Number(goal.algespaard) || 0}"></label><label>Doelbedrag<input id="goalEditTarget" type="number" step="0.01" inputmode="decimal" value="${Number(goal.doelbedrag) || 0}"></label><label>Doeldatum<input id="goalEditDate" type="date" value="${textSafe2(goal.doeldatum || "")}"></label><label>Vaste inleg p/m<input id="goalEditMonthly" type="number" step="0.01" inputmode="decimal" value="${Number(goal.vasteInleg) || 0}"></label><label class="goal-editor-fixed-only"><input id="goalEditFixedOnly" type="checkbox" ${goal.vastBedrag ? "checked" : ""}> Alleen vaste inleg <span>— niet meedoen met verdeling naar rato</span></label><label>Rendement %<input id="goalEditReturn" type="number" step="0.01" inputmode="decimal" value="${Math.round((Number(goal.rendement) || 0) * 1e4) / 100}"></label><label>Periode<select id="goalEditPeriod"><option value="jaarlijks" ${goal.rendementPeriode !== "maandelijks" ? "selected" : ""}>Jaarlijks</option><option value="maandelijks" ${goal.rendementPeriode === "maandelijks" ? "selected" : ""}>Maandelijks</option></select></label><label class="full goal-editor-favorite"><input id="goalEditFavorite" type="checkbox" ${goal.favoriet ? "checked" : ""}> Favoriet doel</label><section class="goal-calculation-card" id="goalEditCalculation"></section></div><div class="modal-actions"><button type="button" class="danger-ghost" id="goalEditDelete">Verwijderen</button><button type="button" class="primary" id="goalEditSave">Opslaan</button></div></div>`;
+    modal.innerHTML = `<div class="modal goal-detail-editor"><div class="joint-variable-editor-header"><div><div class="section-kicker">${name} · ${monthLabel(getSelectedMonth())}</div><h2>Spaardoel bewerken</h2></div><button type="button" class="ghost" data-close-goal-editor>Sluiten</button></div><div class="modal-grid"><label class="full">Naam<input id="goalEditName" type="text" value="${textSafe(goal.naam || "")}"></label><label>Al gespaard<input id="goalEditSaved" type="number" step="0.01" inputmode="decimal" value="${Number(goal.algespaard) || 0}"></label><label>Doelbedrag<input id="goalEditTarget" type="number" step="0.01" inputmode="decimal" value="${Number(goal.doelbedrag) || 0}"></label><label>Doeldatum<input id="goalEditDate" type="date" value="${textSafe(goal.doeldatum || "")}"></label><label>Vaste inleg p/m<input id="goalEditMonthly" type="number" step="0.01" inputmode="decimal" value="${Number(goal.vasteInleg) || 0}"></label><label class="goal-editor-fixed-only"><input id="goalEditFixedOnly" type="checkbox" ${goal.vastBedrag ? "checked" : ""}> Alleen vaste inleg <span>— niet meedoen met verdeling naar rato</span></label><label>Rendement %<input id="goalEditReturn" type="number" step="0.01" inputmode="decimal" value="${Math.round((Number(goal.rendement) || 0) * 1e4) / 100}"></label><label>Periode<select id="goalEditPeriod"><option value="jaarlijks" ${goal.rendementPeriode !== "maandelijks" ? "selected" : ""}>Jaarlijks</option><option value="maandelijks" ${goal.rendementPeriode === "maandelijks" ? "selected" : ""}>Maandelijks</option></select></label><label class="full goal-editor-favorite"><input id="goalEditFavorite" type="checkbox" ${goal.favoriet ? "checked" : ""}> Favoriet doel</label><section class="goal-calculation-card" id="goalEditCalculation"></section></div><div class="modal-actions"><button type="button" class="danger-ghost" id="goalEditDelete">Verwijderen</button><button type="button" class="primary" id="goalEditSave">Opslaan</button></div></div>`;
     modal.classList.add("open", "goal-detail-editor-open");
-    let goalImageData = String(goalImageSource2(goal) || "");
+    let goalImageData = String(goalImageSource(goal) || "");
     const imageField = document.createElement("label");
     imageField.className = "full goal-image-field";
-    goalImageData = safeImageUrl2(goalImageData);
+    goalImageData = safeImageUrl(goalImageData);
     imageField.innerHTML = `<span>Afbeelding</span><div class="goal-image-preview" ${goalImageData ? `style="background-image:url('${goalImageData}')"` : ""}>${goalImageData ? "" : "Geen afbeelding"}</div><input type="file" accept="image/*" id="goalEditImage"><small class="goal-image-status" id="goalEditImageStatus">Afbeeldingen worden automatisch verkleind voor betrouwbare opslag.</small><button type="button" class="ghost small" id="goalEditImageRemove" ${goalImageData ? "" : "disabled"}>Afbeelding verwijderen</button>`;
     modal.querySelector(".modal-grid").appendChild(imageField);
     const imagePreview = imageField.querySelector(".goal-image-preview");
@@ -3266,7 +3324,7 @@
       imageStatus.textContent = "Afbeelding verwerken…";
       try {
         goalImageData = await compressGoalImage(file);
-        goalImageData = safeImageUrl2(goalImageData);
+        goalImageData = safeImageUrl(goalImageData);
         imagePreview.style.backgroundImage = goalImageData ? `url('${goalImageData}')` : "";
         imagePreview.textContent = "";
         imageField.querySelector("#goalEditImageRemove").disabled = false;
@@ -3294,11 +3352,11 @@
       const drafts = state.spaardoelen[owner].map((item, itemIndex) => itemIndex === index ? draft : item);
       const r = calcScenario(state);
       const pot = owner === "gezamenlijk" ? r.spaarpotDezeMaand : r[owner].beschikbaarVoorSparen;
-      return calcGroep2(drafts, pot, TODAY2)[index];
+      return calcGroep(drafts, pot, TODAY)[index];
     };
     const renderCalculation = () => {
       const item = draftItem();
-      calculation.innerHTML = `<h3>Berekening deze maand</h3><div class="goal-calculation-total"><span>Nodig per maand</span><strong>${item.benodigdPerMaand === null ? "Geen einddatum" : eur2(item.benodigdPerMaand)}</strong></div><div class="goal-calculation-total"><span>Inleg deze maand</span><strong>${eur2(item.werkelijkeInleg)}</strong></div>${goalMonthlyInlegBreakdown(item)}<p class="goal-calculation-note">Spaargeld totaal ${eur2(item.spaarpotDezeMaand)} − vaste inleg ${eur2(item.totaalVasteInleg)} = ${eur2(item.extraPot)} voor verdeling naar rato.</p>`;
+      calculation.innerHTML = `<h3>Berekening deze maand</h3><div class="goal-calculation-total"><span>Nodig per maand</span><strong>${item.benodigdPerMaand === null ? "Geen einddatum" : eur(item.benodigdPerMaand)}</strong></div><div class="goal-calculation-total"><span>Inleg deze maand</span><strong>${eur(item.werkelijkeInleg)}</strong></div>${goalMonthlyInlegBreakdown(item)}<p class="goal-calculation-note">Spaargeld totaal ${eur(item.spaarpotDezeMaand)} − vaste inleg ${eur(item.totaalVasteInleg)} = ${eur(item.extraPot)} voor verdeling naar rato.</p>`;
     };
     ["goalEditSaved", "goalEditTarget", "goalEditDate", "goalEditMonthly", "goalEditReturn", "goalEditPeriod", "goalEditFixedOnly"].forEach((id2) => modal.querySelector("#" + id2).addEventListener("input", renderCalculation));
     renderCalculation();
@@ -3310,7 +3368,7 @@
     modal.querySelector("[data-close-goal-editor]").addEventListener("click", close);
     modal.querySelector("#goalEditSave").addEventListener("click", async () => {
       if (imageProcessing || saveButton.disabled) return;
-      const previousImage = goalImageSource2(goal);
+      const previousImage = goalImageSource(goal);
       saveButton.disabled = true;
       try {
         const imageReference = await GoalImageStore.storeOrFallback(id, goalImageData);
@@ -3352,14 +3410,14 @@
     const name = ownerLabel(owner);
     const r = calcScenario(state);
     const pot = owner === "gezamenlijk" ? r.spaarpotDezeMaand : r[owner].beschikbaarVoorSparen;
-    const items = calcGroep2(goals, pot, TODAY2);
+    const items = calcGroep(goals, pot, TODAY);
     const rows = items.map((item, index) => {
       const goal = item.doel;
-      const goalImage = safeImageUrl2(goalImageSource2(goal));
+      const goalImage = safeImageUrl(goalImageSource(goal));
       const imageStyle = goalImage ? ` style="background-image:url('${goalImage}')"` : "";
-      return `<div class="goal-manager-row" data-open-manager-goal="${attrSafe(goal.id)}" role="button" tabindex="0"><span class="goal-manager-goal-icon${goalImage ? " has-image" : ""}"${imageStyle}>${goalImage ? "" : goalIcon2(goal)}</span><span class="goal-manager-copy"><strong>${textSafe2(goal.naam || "Spaardoel")}</strong><small>${eur2(Number(goal.algespaard) || 0)} / ${eur2(Number(goal.doelbedrag) || 0)}</small></span><span class="goal-manager-metric"><span>Nodig p/m</span><b>${item.benodigdPerMaand === null ? "—" : eur2(item.benodigdPerMaand)}</b></span><span class="goal-manager-metric"><span>Deze maand</span><b>${eur2(item.werkelijkeInleg)}</b></span><span class="goal-manager-moves"><button type="button" data-move-manager-goal="${attrSafe(goal.id)}:-1" ${index === 0 ? "disabled" : ""} aria-label="Doel omhoog">▲</button><button type="button" data-move-manager-goal="${attrSafe(goal.id)}:1" ${index === items.length - 1 ? "disabled" : ""} aria-label="Doel omlaag">▼</button></span><button type="button" class="joint-fixed-row-delete-compact" data-remove-manager-goal="${attrSafe(goal.id)}" aria-label="Doel verwijderen">×</button></div>`;
+      return `<div class="goal-manager-row" data-open-manager-goal="${attrSafe(goal.id)}" role="button" tabindex="0"><span class="goal-manager-goal-icon${goalImage ? " has-image" : ""}"${imageStyle}>${goalImage ? "" : goalIcon(goal)}</span><span class="goal-manager-copy"><strong>${textSafe(goal.naam || "Spaardoel")}</strong><small>${eur(Number(goal.algespaard) || 0)} / ${eur(Number(goal.doelbedrag) || 0)}</small></span><span class="goal-manager-metric"><span>Nodig p/m</span><b>${item.benodigdPerMaand === null ? "—" : eur(item.benodigdPerMaand)}</b></span><span class="goal-manager-metric"><span>Deze maand</span><b>${eur(item.werkelijkeInleg)}</b></span><span class="goal-manager-moves"><button type="button" data-move-manager-goal="${attrSafe(goal.id)}:-1" ${index === 0 ? "disabled" : ""} aria-label="Doel omhoog">▲</button><button type="button" data-move-manager-goal="${attrSafe(goal.id)}:1" ${index === items.length - 1 ? "disabled" : ""} aria-label="Doel omlaag">▼</button></span><button type="button" class="joint-fixed-row-delete-compact" data-remove-manager-goal="${attrSafe(goal.id)}" aria-label="Doel verwijderen">×</button></div>`;
     }).join("");
-    modal.innerHTML = `<div class="modal goal-manager-editor"><div class="joint-variable-editor-header"><div><div class="section-kicker">${name} · ${monthLabel2(getSelectedMonth2())}</div><h2>Spaardoelen beheren</h2><p>Tik op een doel voor alle instellingen en de berekening.</p></div><button type="button" class="ghost" data-close-goal-manager>Sluiten</button></div><div class="goal-manager-list">${rows || '<p class="hint">Nog geen spaardoelen.</p>'}</div><div class="joint-variable-editor-actions"><button type="button" class="primary" data-close-goal-manager>Klaar</button><button type="button" class="ghost" data-add-manager-goal>+ Spaardoel</button></div></div>`;
+    modal.innerHTML = `<div class="modal goal-manager-editor"><div class="joint-variable-editor-header"><div><div class="section-kicker">${name} · ${monthLabel(getSelectedMonth())}</div><h2>Spaardoelen beheren</h2><p>Tik op een doel voor alle instellingen en de berekening.</p></div><button type="button" class="ghost" data-close-goal-manager>Sluiten</button></div><div class="goal-manager-list">${rows || '<p class="hint">Nog geen spaardoelen.</p>'}</div><div class="joint-variable-editor-actions"><button type="button" class="primary" data-close-goal-manager>Klaar</button><button type="button" class="ghost" data-add-manager-goal>+ Spaardoel</button></div></div>`;
     modal.classList.add("open", "goal-manager-editor-open");
     const close = () => {
       modal.classList.remove("open", "goal-manager-editor-open");
@@ -3402,7 +3460,7 @@
   function renderMobileSpaardoelen() {
     const r = calcScenario(state);
     const groups = [{ key: "gezamenlijk", label: "Gezamenlijk", pot: r.spaarpotDezeMaand, doelen: state.spaardoelen.gezamenlijk }, { key: "dion", label: "Dion", pot: r.dion.beschikbaarVoorSparen, doelen: state.spaardoelen.dion }, { key: "dara", label: "Dara", pot: r.dara.beschikbaarVoorSparen, doelen: state.spaardoelen.dara }];
-    const calculated = groups.map((group) => ({ ...group, items: calcGroep2(group.doelen, group.pot, TODAY2) }));
+    const calculated = groups.map((group) => ({ ...group, items: calcGroep(group.doelen, group.pot, TODAY) }));
     const all = calculated.flatMap((group) => group.items);
     const saved = round2(all.reduce((sum, item) => sum + (Number(item.doel.algespaard) || 0), 0));
     const target = round2(all.reduce((sum, item) => sum + (Number(item.doel.doelbedrag) || 0), 0));
@@ -3414,10 +3472,10 @@
       const ratio = target > 0 ? goalTarget / target : 0;
       return { label: group.label, saved: goalSaved, target: goalTarget, ratio, monthly: round2(group.items.reduce((sum, item) => sum + (item.werkelijkeInleg || 0), 0)) };
     });
-    const distribution = groupSummary.map((group) => `<div class="mobile-goal-summary-line"><span>${group.label}</span><i><b style="width:${Math.round(group.ratio * 100)}%"></b></i><strong>${eur2(group.target)} (${pct2(group.ratio)})</strong></div>`).join("");
-    const monthSummary = groupSummary.map((group) => `<div class="mobile-goal-summary-line"><span>${group.label}</span><i><b style="width:${monthly > 0 ? Math.round(group.monthly / monthly * 100) : 0}%"></b></i><strong>${eur2(group.monthly)}</strong></div>`).join("");
+    const distribution = groupSummary.map((group) => `<div class="mobile-goal-summary-line"><span>${group.label}</span><i><b style="width:${Math.round(group.ratio * 100)}%"></b></i><strong>${eur(group.target)} (${pct(group.ratio)})</strong></div>`).join("");
+    const monthSummary = groupSummary.map((group) => `<div class="mobile-goal-summary-line"><span>${group.label}</span><i><b style="width:${monthly > 0 ? Math.round(group.monthly / monthly * 100) : 0}%"></b></i><strong>${eur(group.monthly)}</strong></div>`).join("");
     const root = document.getElementById("tab-spaardoelen");
-    root.innerHTML = `${renderSharedEmptyTabHeader("Spaardoelen overzicht")}<div class="mobile-savings-overview"><div class="mobile-savings-kpis"><div class="card"><span>◈</span><small>Totaal gespaard</small><strong>${eur2(saved)}</strong><em>van ${eur2(target)}</em></div><div class="card"><span>◎</span><small>Totaal doelbedrag</small><strong>${eur2(target)}</strong><em>alle doelen samen</em></div><div class="card"><span>↗</span><small>Gemiddelde voortgang</small><strong>${pct2(average)}</strong><em>op basis van doelbedrag</em></div><div class="card"><span>€</span><small>Inleg deze maand</small><strong>${eur2(monthly)}</strong><em>${monthLabel2(getSelectedMonth2())}</em></div></div>${groups.map(renderMobileGoalGroup).join("")}<div class="mobile-savings-summary-grid"><div class="card"><h2>Verdeling van spaardoelen</h2>${distribution}<p>Percentages gebaseerd op totaal doelbedrag per groep.</p></div><div class="card"><h2>Inleg deze maand</h2>${monthSummary}<strong class="mobile-savings-month-total">${eur2(monthly)} totaal</strong></div></div><div class="manage-stack"><details class="manage-section"><summary><span class="manage-title">Spaardoelen beheren — Gezamenlijk</span><span class="expand-chevron"></span></summary><div class="manage-body"><div class="card">${renderGoalGroup2("spaardoelen.gezamenlijk", state.spaardoelen.gezamenlijk, r.spaarpotDezeMaand)}</div></div></details><details class="manage-section"><summary><span class="manage-title">Spaardoelen beheren — Dion</span><span class="expand-chevron"></span></summary><div class="manage-body"><div class="card">${renderGoalGroup2("spaardoelen.dion", state.spaardoelen.dion, r.dion.beschikbaarVoorSparen)}</div></div></details><details class="manage-section"><summary><span class="manage-title">Spaardoelen beheren — Dara</span><span class="expand-chevron"></span></summary><div class="manage-body"><div class="card">${renderGoalGroup2("spaardoelen.dara", state.spaardoelen.dara, r.dara.beschikbaarVoorSparen)}</div></div></details></div></div>`;
+    root.innerHTML = `${renderSharedEmptyTabHeader("Spaardoelen overzicht")}<div class="mobile-savings-overview"><div class="mobile-savings-kpis"><div class="card"><span>◈</span><small>Totaal gespaard</small><strong>${eur(saved)}</strong><em>van ${eur(target)}</em></div><div class="card"><span>◎</span><small>Totaal doelbedrag</small><strong>${eur(target)}</strong><em>alle doelen samen</em></div><div class="card"><span>↗</span><small>Gemiddelde voortgang</small><strong>${pct(average)}</strong><em>op basis van doelbedrag</em></div><div class="card"><span>€</span><small>Inleg deze maand</small><strong>${eur(monthly)}</strong><em>${monthLabel(getSelectedMonth())}</em></div></div>${groups.map(renderMobileGoalGroup).join("")}<div class="mobile-savings-summary-grid"><div class="card"><h2>Verdeling van spaardoelen</h2>${distribution}<p>Percentages gebaseerd op totaal doelbedrag per groep.</p></div><div class="card"><h2>Inleg deze maand</h2>${monthSummary}<strong class="mobile-savings-month-total">${eur(monthly)} totaal</strong></div></div><div class="manage-stack"><details class="manage-section"><summary><span class="manage-title">Spaardoelen beheren — Gezamenlijk</span><span class="expand-chevron"></span></summary><div class="manage-body"><div class="card">${renderGoalGroup("spaardoelen.gezamenlijk", state.spaardoelen.gezamenlijk, r.spaarpotDezeMaand)}</div></div></details><details class="manage-section"><summary><span class="manage-title">Spaardoelen beheren — Dion</span><span class="expand-chevron"></span></summary><div class="manage-body"><div class="card">${renderGoalGroup("spaardoelen.dion", state.spaardoelen.dion, r.dion.beschikbaarVoorSparen)}</div></div></details><details class="manage-section"><summary><span class="manage-title">Spaardoelen beheren — Dara</span><span class="expand-chevron"></span></summary><div class="manage-body"><div class="card">${renderGoalGroup("spaardoelen.dara", state.spaardoelen.dara, r.dara.beschikbaarVoorSparen)}</div></div></details></div></div>`;
     root.querySelectorAll(".manage-section").forEach((section, index) => {
       const owners = ["gezamenlijk", "dion", "dara"];
       const body = section.querySelector(".manage-body");
@@ -3431,31 +3489,31 @@
       { key: "dion", label: "Dion", pot: r.dion.beschikbaarVoorSparen, doelen: state.spaardoelen.dion },
       { key: "dara", label: "Dara", pot: r.dara.beschikbaarVoorSparen, doelen: state.spaardoelen.dara }
     ];
-    const all = groups.flatMap((g) => calcGroep2(g.doelen, g.pot, TODAY2).map((item) => ({ ...item, owner: g.label })));
+    const all = groups.flatMap((g) => calcGroep(g.doelen, g.pot, TODAY).map((item) => ({ ...item, owner: g.label })));
     const totaalGespaard = round2(all.reduce((s, b) => s + (Number(b.doel.algespaard) || 0), 0));
     const totaalDoel = round2(all.reduce((s, b) => s + (Number(b.doel.doelbedrag) || 0), 0));
     const gemiddelde = totaalDoel > 0 ? totaalGespaard / totaalDoel : 0;
     const inlegDezeMaand = round2(all.reduce((s, b) => s + (b.werkelijkeInleg || 0), 0));
     const groupCards = groups.map((g, i) => {
-      const berekend = calcGroep2(g.doelen, g.pot, TODAY2);
+      const berekend = calcGroep(g.doelen, g.pot, TODAY);
       const doel = round2(berekend.reduce((s, b) => s + (Number(b.doel.doelbedrag) || 0), 0));
       const gespaard = round2(berekend.reduce((s, b) => s + (Number(b.doel.algespaard) || 0), 0));
       const p = doel > 0 ? gespaard / doel : 0;
       return `<div class="card goal-group-block">
-      <div class="goal-group-title"><h3>${g.label}</h3><span class="status-badge">${pct2(p)}</span></div>
+      <div class="goal-group-title"><h3>${g.label}</h3><span class="status-badge">${pct(p)}</span></div>
       ${renderModernGoalCards(g.doelen, g.pot, g.label)}
-      <div class="card-total"><span>Totaal</span><span>${eur2(gespaard)} van ${eur2(doel)}</span></div>
+      <div class="card-total"><span>Totaal</span><span>${eur(gespaard)} van ${eur(doel)}</span></div>
     </div>`;
     }).join("");
     const distribution = groups.map((g) => {
-      const total = round2(calcGroep2(g.doelen, g.pot, TODAY2).reduce((s, b) => s + (Number(b.doel.doelbedrag) || 0), 0));
+      const total = round2(calcGroep(g.doelen, g.pot, TODAY).reduce((s, b) => s + (Number(b.doel.doelbedrag) || 0), 0));
       const ratio = totaalDoel > 0 ? total / totaalDoel : 0;
-      return `<div class="progress-item"><div class="progress-top"><strong>${g.label}</strong><span>${eur2(total)} · ${pct2(ratio)}</span></div><div class="progress-track"><div class="progress-fill" style="width:${Math.round(ratio * 100)}%"></div></div></div>`;
+      return `<div class="progress-item"><div class="progress-top"><strong>${g.label}</strong><span>${eur(total)} · ${pct(ratio)}</span></div><div class="progress-track"><div class="progress-fill" style="width:${Math.round(ratio * 100)}%"></div></div></div>`;
     }).join("");
     const inlegColors = ["var(--green)", "var(--blue)", "var(--terracotta)"];
     const inlegPerGroup = groups.map((g, i) => {
-      const items = calcGroep2(g.doelen, g.pot, TODAY2).filter((item) => item.owner === void 0 || true);
-      const inleg = round2(calcGroep2(g.doelen, g.pot, TODAY2).reduce((s, b) => s + (b.werkelijkeInleg || 0), 0));
+      const items = calcGroep(g.doelen, g.pot, TODAY).filter((item) => item.owner === void 0 || true);
+      const inleg = round2(calcGroep(g.doelen, g.pot, TODAY).reduce((s, b) => s + (b.werkelijkeInleg || 0), 0));
       return { label: g.label, inleg, color: inlegColors[i] };
     });
     let cursor = 0;
@@ -3468,17 +3526,17 @@
     const donutCard = `<div class="card span-6">
     <div class="card-head"><h2>Inleg deze maand</h2></div>
     <div class="donut-wrap">
-      <div class="donut" style="background:conic-gradient(${gradientStops})"><div class="donut-center">${eur2(inlegDezeMaand)}<span>totaal</span></div></div>
-      <div class="donut-legend">${inlegPerGroup.map((g) => `<div class="line"><span><span class="dot" style="background:${g.color}"></span>${g.label}</span><strong>${eur2(g.inleg)} ${inlegDezeMaand > 0 ? `(${Math.round(g.inleg / inlegDezeMaand * 100)}%)` : ""}</strong></div>`).join("")}</div>
+      <div class="donut" style="background:conic-gradient(${gradientStops})"><div class="donut-center">${eur(inlegDezeMaand)}<span>totaal</span></div></div>
+      <div class="donut-legend">${inlegPerGroup.map((g) => `<div class="line"><span><span class="dot" style="background:${g.color}"></span>${g.label}</span><strong>${eur(g.inleg)} ${inlegDezeMaand > 0 ? `(${Math.round(g.inleg / inlegDezeMaand * 100)}%)` : ""}</strong></div>`).join("")}</div>
     </div>
   </div>`;
     document.getElementById("tab-spaardoelen").innerHTML = `
-    ${renderPageHeading2(`Spaardoelen overzicht — ${monthLabel2(getSelectedMonth2())}`, "Elke maand een stap dichter bij wat jullie belangrijk vinden.")}
+    ${renderPageHeading(`Spaardoelen overzicht — ${monthLabel(getSelectedMonth())}`, "Elke maand een stap dichter bij wat jullie belangrijk vinden.")}
     <div class="overview-kpi-row cols-4">
-      ${renderIconKpi2("◈", "green", "Totaal gespaard", eur2(totaalGespaard), `van ${eur2(totaalDoel)}`, { valueClass: "value pos" })}
-      ${renderIconKpi2("◎", "blue", "Totaal doelbedrag", eur2(totaalDoel), "alle doelen samen")}
-      ${renderIconKpi2("↗", "green", "Gemiddelde voortgang", pct2(gemiddelde), "op basis van doelbedrag")}
-      ${renderIconKpi2("€", "blue", "Inleg deze maand", eur2(inlegDezeMaand), monthLabel2(getSelectedMonth2()))}
+      ${renderIconKpi("◈", "green", "Totaal gespaard", eur(totaalGespaard), `van ${eur(totaalDoel)}`, { valueClass: "value pos" })}
+      ${renderIconKpi("◎", "blue", "Totaal doelbedrag", eur(totaalDoel), "alle doelen samen")}
+      ${renderIconKpi("↗", "green", "Gemiddelde voortgang", pct(gemiddelde), "op basis van doelbedrag")}
+      ${renderIconKpi("€", "blue", "Inleg deze maand", eur(inlegDezeMaand), monthLabel(getSelectedMonth()))}
     </div>
     <div class="goal-groups-grid">${groupCards}</div>
     <div class="dashboard-grid">
@@ -3486,13 +3544,13 @@
       ${donutCard}
     </div>
     <div class="manage-stack">
-      ${renderManageSection("Spaardoelen beheren — Gezamenlijk", `<div class="card">${renderGoalGroup2("spaardoelen.gezamenlijk", state.spaardoelen.gezamenlijk, r.spaarpotDezeMaand)}</div>`, false)}
-      ${renderManageSection("Spaardoelen beheren — Dion", `<div class="card">${renderGoalGroup2("spaardoelen.dion", state.spaardoelen.dion, r.dion.beschikbaarVoorSparen)}</div>`, false)}
-      ${renderManageSection("Spaardoelen beheren — Dara", `<div class="card">${renderGoalGroup2("spaardoelen.dara", state.spaardoelen.dara, r.dara.beschikbaarVoorSparen)}</div>`, false)}
+      ${renderManageSection("Spaardoelen beheren — Gezamenlijk", `<div class="card">${renderGoalGroup("spaardoelen.gezamenlijk", state.spaardoelen.gezamenlijk, r.spaarpotDezeMaand)}</div>`, false)}
+      ${renderManageSection("Spaardoelen beheren — Dion", `<div class="card">${renderGoalGroup("spaardoelen.dion", state.spaardoelen.dion, r.dion.beschikbaarVoorSparen)}</div>`, false)}
+      ${renderManageSection("Spaardoelen beheren — Dara", `<div class="card">${renderGoalGroup("spaardoelen.dara", state.spaardoelen.dara, r.dara.beschikbaarVoorSparen)}</div>`, false)}
     </div>
   `;
   }
-  function renderDataTab2() {
+  function renderDataTab() {
     var _a;
     (_a = document.getElementById("tab-data")) == null ? void 0 : _a.classList.remove("mobile-data-page");
     const lastBackup = DataAdapter.loadBackup();
@@ -3502,7 +3560,7 @@
     const cloudConnected = CloudAdapter.isConnected();
     const cloudTitle = cloudConnected ? "Cloud status: verbonden" : CloudAdapter.isConfigured() ? "Cloud status: klaar om te verbinden" : "Cloud status: niet gekoppeld";
     document.getElementById("tab-data").innerHTML = `
-    ${renderPageHeading2("Data & back-up", "Alles veilig op één plek — lokaal én klaar voor een back-up.")}
+    ${renderPageHeading("Data & back-up", "Alles veilig op één plek — lokaal én klaar voor een back-up.")}
     <div class="dashboard-grid">
       ${renderStatusCard("✓", "green", "Lokale opslag actief", "Je data wordt lokaal in je browser opgeslagen.")}
       ${renderStatusCard("◷", "green", `Laatste back-up`, backupDesc, lastBackupDate ? `<span class="status-badge">${isToday ? "Actueel" : "Bewaard"}</span>` : "")}
@@ -3661,7 +3719,7 @@ service cloud.firestore {
     });
   }
   function renderMobileDataTab() {
-    renderDataTab2();
+    renderDataTab();
     const root = document.getElementById("tab-data");
     if (!root) return;
     root.classList.add("mobile-data-page");
@@ -3675,12 +3733,12 @@ service cloud.firestore {
     const button = document.getElementById("monthPickerButton");
     const panel = document.getElementById("monthPickerPanel");
     if (!button || !panel) return;
-    const selected = getSelectedMonth2();
+    const selected = getSelectedMonth();
     const [selectedYear, selectedMonth] = selected.split("-").map(Number);
     const yearOptions = yearsWithMonthData(selected);
     const currentMonthKey = monthKey();
     const monthNames = ["Jan", "Feb", "Mrt", "Apr", "Mei", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dec"];
-    button.textContent = monthLabel2(selected);
+    button.textContent = monthLabel(selected);
     button.setAttribute("aria-expanded", ((_a = document.getElementById("monthControl")) == null ? void 0 : _a.classList.contains("open")) ? "true" : "false");
     panel.innerHTML = `
     <div class="year-picker">
@@ -3726,7 +3784,7 @@ service cloud.firestore {
   }
   function openTransactionModal() {
     const modal = document.getElementById("transactionModal");
-    const today = getSelectedMonth2() + "-" + String((/* @__PURE__ */ new Date()).getDate()).padStart(2, "0");
+    const today = getSelectedMonth() + "-" + String((/* @__PURE__ */ new Date()).getDate()).padStart(2, "0");
     modal.innerHTML = `
     <div class="modal">
       <div class="card-head"><h2>Uitgave toevoegen</h2><button class="danger-ghost" id="btnCloseTransaction">×</button></div>
@@ -3782,9 +3840,9 @@ service cloud.firestore {
   }
   function openGeneralTransactionModal() {
     const modal = document.getElementById("transactionModal");
-    const today = getSelectedMonth2() + "-" + String((/* @__PURE__ */ new Date()).getDate()).padStart(2, "0");
+    const today = getSelectedMonth() + "-" + String((/* @__PURE__ */ new Date()).getDate()).padStart(2, "0");
     const ownerOptions = [["gezamenlijk", "Gezamenlijk"], ["dion", "Dion"], ["dara", "Dara"]];
-    const categoryOptions = (owner) => bankOwnerCategories(owner).map((category) => `<option value="${textSafe2(category)}">${textSafe2(category)}</option>`).join("");
+    const categoryOptions = (owner) => bankOwnerCategories(owner).map((category) => `<option value="${textSafe(category)}">${textSafe(category)}</option>`).join("");
     modal.innerHTML = `<div class="modal joint-transaction-fullscreen-editor general-transaction-editor">
     <div class="card-head"><h2>Transactie invullen</h2><button class="danger-ghost" id="btnCloseGeneralTransaction" aria-label="Sluiten">×</button></div>
     <div class="modal-grid"><label>Soort<select id="generalTxKind"><option value="uitgave">Uitgave</option><option value="inkomen">Inkomen</option></select></label><label>Bedrag<input id="generalTxAmount" type="number" step="0.01" inputmode="decimal" placeholder="0,00"></label><label>Datum<input id="generalTxDate" type="date" value="${today}"></label><label class="full">Omschrijving<input id="generalTxDescription" type="text" placeholder="Bijvoorbeeld Albert Heijn"></label><label>Fysieke rekening<select id="generalTxOwner">${ownerOptions.map(([value, label]) => `<option value="${value}">${label}</option>`).join("")}</select></label><label>Financieel voor<select id="generalTxFinancialFor">${ownerOptions.map(([value, label]) => `<option value="${value}">${label}</option>`).join("")}</select></label><label>Categorie<select id="generalTxCategory">${categoryOptions("gezamenlijk")}</select></label><label class="full">Notitie<input id="generalTxNote" type="text" placeholder="Optioneel"></label></div>
@@ -3910,21 +3968,21 @@ service cloud.firestore {
   }
   function openJointTransactionModal(transactionId = "") {
     const modal = document.getElementById("transactionModal");
-    const today = getSelectedMonth2() + "-" + String((/* @__PURE__ */ new Date()).getDate()).padStart(2, "0");
+    const today = getSelectedMonth() + "-" + String((/* @__PURE__ */ new Date()).getDate()).padStart(2, "0");
     const existing = (state.transactions || []).find((tx) => tx.id === transactionId && tx.owner === "gezamenlijk");
     const categories = jointVariableCategoryOptions((existing == null ? void 0 : existing.category) || "");
     const selectedCategory = (existing == null ? void 0 : existing.category) || categories[0] || "Overig";
     modal.innerHTML = `
     <div class="modal joint-transaction-fullscreen-editor">
       <div class="card-head"><h2>${existing ? "Gezamenlijke uitgave bewerken" : "Gezamenlijke uitgave"}</h2><button class="danger-ghost" id="btnCloseJointTransaction" aria-label="Sluiten">×</button></div>
-      <p class="hint" style="margin-top:-4px">${monthLabel2(getSelectedMonth2())} · wordt gekoppeld aan jullie variabele lasten</p>
+      <p class="hint" style="margin-top:-4px">${monthLabel(getSelectedMonth())} · wordt gekoppeld aan jullie variabele lasten</p>
       <div class="modal-grid">
         <label>Bedrag<input id="jointTxAmount" type="number" step="0.01" inputmode="decimal" placeholder="0,00" value="${existing ? Number(existing.amount) || "" : ""}"></label>
-        <label>Datum<input id="jointTxDate" type="date" value="${textSafe2((existing == null ? void 0 : existing.date) || today)}"></label>
-        <label class="full">Omschrijving<input id="jointTxDescription" type="text" placeholder="Bijvoorbeeld Albert Heijn" value="${textSafe2((existing == null ? void 0 : existing.description) || "")}"></label>
-        <label>Categorie<select id="jointTxCategory">${categories.map((category) => `<option value="${textSafe2(category)}" ${String(category).toLocaleLowerCase() === String(selectedCategory).toLocaleLowerCase() ? "selected" : ""}>${textSafe2(category)}</option>`).join("")}</select></label>
+        <label>Datum<input id="jointTxDate" type="date" value="${textSafe((existing == null ? void 0 : existing.date) || today)}"></label>
+        <label class="full">Omschrijving<input id="jointTxDescription" type="text" placeholder="Bijvoorbeeld Albert Heijn" value="${textSafe((existing == null ? void 0 : existing.description) || "")}"></label>
+        <label>Categorie<select id="jointTxCategory">${categories.map((category) => `<option value="${textSafe(category)}" ${String(category).toLocaleLowerCase() === String(selectedCategory).toLocaleLowerCase() ? "selected" : ""}>${textSafe(category)}</option>`).join("")}</select></label>
         <label>Eigenaar<select id="jointTxOwner"><option value="gezamenlijk">Gezamenlijk</option><option value="dion">Dion</option><option value="dara">Dara</option></select></label>
-        <label class="full">Notitie<input id="jointTxNote" type="text" placeholder="Optioneel" value="${textSafe2((existing == null ? void 0 : existing.note) || "")}"></label>
+        <label class="full">Notitie<input id="jointTxNote" type="text" placeholder="Optioneel" value="${textSafe((existing == null ? void 0 : existing.note) || "")}"></label>
       </div>
       <div class="modal-actions">
         <button class="ghost" id="btnCancelJointTransaction">Annuleren</button>
@@ -3986,7 +4044,7 @@ service cloud.firestore {
       toast.className = "quick-toast";
       document.body.appendChild(toast);
     }
-    toast.innerHTML = `<span>${textSafe2(message)}</span> <button type="button" class="quick-toast-undo">Ongedaan maken</button>`;
+    toast.innerHTML = `<span>${textSafe(message)}</span> <button type="button" class="quick-toast-undo">Ongedaan maken</button>`;
     toast.classList.add("show");
     clearTimeout(showQuickToast._t);
     const button = toast.querySelector(".quick-toast-undo");
@@ -4042,21 +4100,21 @@ service cloud.firestore {
     const body = sortedEntries.map(({ row }) => {
       const bedrag = Number(row.bedrag) || 0;
       const monthly = effectiveBedrag(row);
-      return `<div class="joint-fixed-editor-row joint-fixed-editor-row-compact ${kind === "mortgage" ? "joint-fixed-editor-row-mortgage" : ""}" ${rowAttr}="${textSafe2(row.id)}">
+      return `<div class="joint-fixed-editor-row joint-fixed-editor-row-compact ${kind === "mortgage" ? "joint-fixed-editor-row-mortgage" : ""}" ${rowAttr}="${textSafe(row.id)}">
       <span class="joint-fixed-editor-row-icon tone-green">${iconSvg(jointFixedCategoryIconName(row.categorie || row.post || "overig"))}</span>
-      <input class="joint-fixed-editor-input" type="text" ${fieldAttr}="categorie" ${idAttr}="${textSafe2(row.id)}" value="${textSafe2(row.categorie || "")}" placeholder="Categorie" aria-label="Categorie">
-      <input class="joint-fixed-editor-input" type="text" ${fieldAttr}="post" ${idAttr}="${textSafe2(row.id)}" value="${textSafe2(row.post || "")}" placeholder="Omschrijving" aria-label="Omschrijving">
+      <input class="joint-fixed-editor-input" type="text" ${fieldAttr}="categorie" ${idAttr}="${textSafe(row.id)}" value="${textSafe(row.categorie || "")}" placeholder="Categorie" aria-label="Categorie">
+      <input class="joint-fixed-editor-input" type="text" ${fieldAttr}="post" ${idAttr}="${textSafe(row.id)}" value="${textSafe(row.post || "")}" placeholder="Omschrijving" aria-label="Omschrijving">
       <div class="joint-fixed-editor-amount-cell">
-        <input class="joint-fixed-editor-input joint-fixed-editor-amount" type="number" step="0.01" inputmode="decimal" ${fieldAttr}="bedrag" ${idAttr}="${textSafe2(row.id)}" value="${bedrag}" aria-label="Bedrag">
-        <small>${row.jaarlijks ? `≈ ${eur2(monthly)}/mnd` : ""}</small>
+        <input class="joint-fixed-editor-input joint-fixed-editor-amount" type="number" step="0.01" inputmode="decimal" ${fieldAttr}="bedrag" ${idAttr}="${textSafe(row.id)}" value="${bedrag}" aria-label="Bedrag">
+        <small>${row.jaarlijks ? `≈ ${eur(monthly)}/mnd` : ""}</small>
       </div>
       <label class="joint-fixed-editor-check joint-fixed-editor-check-compact" aria-label="Jaarbedrag, reken per maand /12">
-        <input type="checkbox" ${fieldAttr}="jaarlijks" ${idAttr}="${textSafe2(row.id)}" ${row.jaarlijks ? "checked" : ""}>
+        <input type="checkbox" ${fieldAttr}="jaarlijks" ${idAttr}="${textSafe(row.id)}" ${row.jaarlijks ? "checked" : ""}>
         <span>${kind === "mortgage" ? "50/50" : ""}</span>
       </label>
-      ${kind === "fixed" ? `<select class="joint-fixed-editor-move" data-fixed-move-id="${textSafe2(row.id)}" data-fixed-source-path="${sourcePath}" aria-label="Verplaatsen naar">${moveOptions}</select>` : '<span class="joint-fixed-editor-mortgage-note">50/50</span>'}
-      <button type="button" class="joint-fixed-row-delete-compact" ${removeAttr}="${textSafe2(row.id)}" aria-label="Post verwijderen">×</button>
-      <div class="joint-fixed-editor-hint joint-fixed-editor-hint-compact">Gerekend als ${eur2(monthly)} per maand${note ? ` · ${note}` : ""}</div>
+      ${kind === "fixed" ? `<select class="joint-fixed-editor-move" data-fixed-move-id="${textSafe(row.id)}" data-fixed-source-path="${sourcePath}" aria-label="Verplaatsen naar">${moveOptions}</select>` : '<span class="joint-fixed-editor-mortgage-note">50/50</span>'}
+      <button type="button" class="joint-fixed-row-delete-compact" ${removeAttr}="${textSafe(row.id)}" aria-label="Post verwijderen">×</button>
+      <div class="joint-fixed-editor-hint joint-fixed-editor-hint-compact">Gerekend als ${eur(monthly)} per maand${note ? ` · ${note}` : ""}</div>
     </div>`;
     }).join("");
     return header + body;
@@ -4066,9 +4124,9 @@ service cloud.firestore {
       const label = row.post || row.categorie || "";
       return `<div class="joint-variable-editor-row">
       <span class="joint-variable-editor-icon">${iconSvg(categoryIconName(label))}</span>
-      <input type="text" data-variable-field="post" data-variable-id="${textSafe2(row.id)}" value="${textSafe2(label)}" placeholder="Categorie" aria-label="Categorie">
-      <input type="number" step="0.01" inputmode="decimal" data-variable-field="bedrag" data-variable-id="${textSafe2(row.id)}" value="${Number(row.bedrag) || 0}" aria-label="Maandbudget">
-      <button type="button" class="joint-variable-editor-delete" data-variable-remove="${textSafe2(row.id)}" aria-label="Categorie verwijderen">×</button>
+      <input type="text" data-variable-field="post" data-variable-id="${textSafe(row.id)}" value="${textSafe(label)}" placeholder="Categorie" aria-label="Categorie">
+      <input type="number" step="0.01" inputmode="decimal" data-variable-field="bedrag" data-variable-id="${textSafe(row.id)}" value="${Number(row.bedrag) || 0}" aria-label="Maandbudget">
+      <button type="button" class="joint-variable-editor-delete" data-variable-remove="${textSafe(row.id)}" aria-label="Categorie verwijderen">×</button>
     </div>`;
     }).join("");
   }
@@ -4076,7 +4134,7 @@ service cloud.firestore {
     var _a, _b, _c, _d, _e;
     const modal = document.getElementById("incomeEditModal");
     const scenario = state.meta.scenario;
-    const month = getSelectedMonth2();
+    const month = getSelectedMonth();
     ensureMonthData(month);
     const key = `${owner}Variabel`;
     const sourceRows = ((_c = (_b = (_a = state.monthlyBudgets) == null ? void 0 : _a[month]) == null ? void 0 : _b[scenario]) == null ? void 0 : _c[key]) || ((_e = (_d = state[scenario]) == null ? void 0 : _d[owner]) == null ? void 0 : _e.variabel) || [];
@@ -4096,13 +4154,13 @@ service cloud.firestore {
       <div class="modal joint-variable-fullscreen-editor" role="dialog" aria-modal="true" aria-label="Variabele lasten aanpassen">
         <div class="joint-variable-editor-header">
           <div>
-            <div class="section-kicker">${scenarioLabel} · ${monthLabel2(month)}</div>
+            <div class="section-kicker">${scenarioLabel} · ${monthLabel(month)}</div>
             <h2>${owner === "gezamenlijk" ? "Variabele lasten" : `${name} variabele lasten`}</h2>
             <p>Pas de maandbudgetten aan en bevestig ze met Opslaan.</p>
           </div>
           <button type="button" class="ghost joint-variable-editor-close" data-close-joint-variable-costs>Sluiten</button>
         </div>
-        <div class="joint-variable-editor-summary"><span>Totaal maandbudget</span><strong>${eur2(total())}</strong></div>
+        <div class="joint-variable-editor-summary"><span>Totaal maandbudget</span><strong>${eur(total())}</strong></div>
         <div class="joint-variable-editor-list">${draftRows.length ? renderJointVariableBudgetEditorRows(draftRows) : '<p class="hint" style="padding:10px;margin:0">Nog geen variabele budgetcategorieën.</p>'}</div>
         <div class="joint-variable-editor-actions">
           <button type="button" class="primary" data-variable-save>Opslaan</button>
@@ -4123,7 +4181,7 @@ service cloud.firestore {
           }
         });
         const summary = modal.querySelector(".joint-variable-editor-summary strong");
-        if (summary) summary.textContent = eur2(total());
+        if (summary) summary.textContent = eur(total());
       };
       const close = () => {
         modal.classList.remove("open", "joint-variable-editor-open");
@@ -4252,7 +4310,7 @@ service cloud.firestore {
     <div class="modal joint-fixed-fullscreen-editor" role="dialog" aria-modal="true" aria-label="Gezamenlijke vaste lasten aanpassen">
       <div class="joint-fixed-editor-header">
         <div>
-          <div class="section-kicker">${scenarioLabel} · ${monthLabel2(getSelectedMonth2())}</div>
+          <div class="section-kicker">${scenarioLabel} · ${monthLabel(getSelectedMonth())}</div>
           <h2>${owner === "gezamenlijk" ? "Gezamenlijke vaste lasten" : `${name} vaste lasten`}</h2>
           <p>${hasMortgage ? "Hypotheek staat in dit overzicht, maar wordt in de verdeling 50/50 gerekend." : "Voeg regels toe en bevestig alle wijzigingen met Opslaan."}</p>
         </div>
@@ -4260,7 +4318,7 @@ service cloud.firestore {
       </div>
       <div class="joint-fixed-editor-summary">
         <span>Totaal per maand</span>
-        <strong>${eur2(total)}</strong>
+        <strong>${eur(total)}</strong>
       </div>
       <div class="joint-fixed-editor-list">
         ${mortgageBlock}
@@ -4278,7 +4336,7 @@ service cloud.firestore {
     modal.classList.add("open", "joint-fixed-editor-open");
     const updateSummary = () => {
       const summary = modal.querySelector(".joint-fixed-editor-summary strong");
-      if (summary) summary.textContent = eur2(round2(sumEffective(rows) + (hasMortgage ? sumEffective(mortgageRows) : 0)));
+      if (summary) summary.textContent = eur(round2(sumEffective(rows) + (hasMortgage ? sumEffective(mortgageRows) : 0)));
     };
     const commitAllFields = () => {
       modal.querySelectorAll("[data-fixed-field], [data-mortgage-field]").forEach((el) => {
@@ -4455,17 +4513,17 @@ service cloud.firestore {
       <div class="card-head"><h2>Sparen aanpassen</h2><button class="danger-ghost" id="btnCloseSavingEdit">×</button></div>
       <div class="income-sheet-meta">
         <span>${scenarioLabel}</span>
-        <span>${monthLabel2(getSelectedMonth2())}</span>
+        <span>${monthLabel(getSelectedMonth())}</span>
       </div>
       <div class="income-sheet-total">
         <span>Sparen deze maand</span>
-        <strong id="savingEditPreviewTotal">${eur2(current)}</strong>
+        <strong id="savingEditPreviewTotal">${eur(current)}</strong>
       </div>
       <label class="income-sheet-field">Bedrag om deze maand te sparen
         <input id="savingEditInput" type="number" step="0.01" inputmode="decimal" value="${current}">
       </label>
       <div class="income-sheet-readonly">
-        <span>Wordt meegenomen in zakgeldberekening</span><strong>${eur2(current)}</strong>
+        <span>Wordt meegenomen in zakgeldberekening</span><strong>${eur(current)}</strong>
       </div>
       <div class="modal-actions">
         <button class="ghost" id="btnCancelSavingEdit">Annuleren</button>
@@ -4478,7 +4536,7 @@ service cloud.firestore {
     const preview = document.getElementById("savingEditPreviewTotal");
     input.addEventListener("input", () => {
       const parsed = parseFloat(String(input.value).replace(",", "."));
-      preview.textContent = eur2(round2(Number.isFinite(parsed) ? parsed : 0));
+      preview.textContent = eur(round2(Number.isFinite(parsed) ? parsed : 0));
     });
     document.getElementById("btnCloseSavingEdit").addEventListener("click", close);
     document.getElementById("btnCancelSavingEdit").addEventListener("click", close);
@@ -4503,18 +4561,18 @@ service cloud.firestore {
       <div class="card-head"><h2>Inkomen instellen</h2><button class="danger-ghost" id="btnCloseIncomeEdit">×</button></div>
       <div class="income-sheet-meta">
         <span>${label}</span>
-        <span>${monthLabel2(getSelectedMonth2())}</span>
+        <span>${monthLabel(getSelectedMonth())}</span>
       </div>
       <div class="income-sheet-total">
         <span>Totaal inkomen ${label}</span>
-        <strong>${eur2(totaal)}</strong>
+        <strong>${eur(totaal)}</strong>
       </div>
       <label class="income-sheet-field">Standaardsalaris vanaf deze maand
         <input id="incomeEditInput" type="number" step="0.01" inputmode="decimal" value="${basis}">
       </label>
       <label class="income-sheet-field">Standaardteruggave vanaf deze maand<input id="incomeRefundInput" type="number" step="0.01" inputmode="decimal" value="${teruggaven}"></label>
       <div class="income-sheet-readonly">
-        <span>Totaal naar gezamenlijke rekening</span><strong id="incomeEditPreviewTotal">${eur2(totaal)}</strong>
+        <span>Totaal naar gezamenlijke rekening</span><strong id="incomeEditPreviewTotal">${eur(totaal)}</strong>
       </div>
       <div class="modal-actions">
         <button class="ghost" id="btnCancelIncomeEdit">Annuleren</button>
@@ -4530,7 +4588,7 @@ service cloud.firestore {
       const parsed = parseFloat(String(input.value).replace(",", "."));
       const basisNow = Number.isFinite(parsed) ? parsed : 0;
       const refundNow = bankAmount(refundInput.value);
-      preview.textContent = eur2(round2(basisNow + (Number.isFinite(refundNow) ? refundNow : 0)));
+      preview.textContent = eur(round2(basisNow + (Number.isFinite(refundNow) ? refundNow : 0)));
     });
     refundInput.addEventListener("input", () => input.dispatchEvent(new Event("input")));
     document.getElementById("btnCloseIncomeEdit").addEventListener("click", close);
@@ -4539,7 +4597,7 @@ service cloud.firestore {
     document.getElementById("btnSaveIncomeEdit").addEventListener("click", () => {
       const parsed = parseFloat(String(input.value).replace(",", "."));
       const refund = bankAmount(refundInput.value);
-      setIncomeDefaultsFromMonth(person, getSelectedMonth2(), Number.isFinite(parsed) ? parsed : 0, Number.isFinite(refund) ? refund : 0);
+      setIncomeDefaultsFromMonth(person, getSelectedMonth(), Number.isFinite(parsed) ? parsed : 0, Number.isFinite(refund) ? refund : 0);
       persist();
       close();
       renderActiveTab();
@@ -4548,7 +4606,7 @@ service cloud.firestore {
   }
   function openTotalIncomeEditModal() {
     const modal = document.getElementById("incomeEditModal");
-    const month = getSelectedMonth2();
+    const month = getSelectedMonth();
     const dion = getDistributionIncomeParts("dion", month);
     const dara = getDistributionIncomeParts("dara", month);
     const actualIncomePresent = ["dion", "dara", "gezamenlijk"].some((owner) => u3ConfirmedTransactions(month).some((tx) => tx.kind === "inkomen" && u3IncomeTransactionOwner(tx) === owner));
@@ -4556,15 +4614,15 @@ service cloud.firestore {
     <div class="modal income-sheet">
       <div class="income-sheet-handle"></div>
       <div class="card-head"><h2>Inkomen instellen</h2><button class="danger-ghost" id="btnCloseTotalIncomeEdit" aria-label="Sluiten">&times;</button></div>
-      <div class="income-sheet-meta"><span>Dion en Dara</span><span>${monthLabel2(month)}</span></div>
+      <div class="income-sheet-meta"><span>Dion en Dara</span><span>${monthLabel(month)}</span></div>
       <p class="hint">Standaardbedragen gelden vanaf deze maand voor alle volgende maanden. CSV-inkomsten wijzigen deze standaard niet en worden alleen gekoppeld aan de rekeninghouder van het gebruikte rekeningprofiel.</p>
       ${actualIncomePresent ? '<div class="status-badge status-ok">Werkelijke CSV-inkomsten zijn voor deze maand zichtbaar</div>' : ""}
       <label class="income-sheet-field">Standaardsalaris Dion<input id="totalIncomeDion" type="number" step="0.01" inputmode="decimal" value="${dion.salary}"></label>
       <label class="income-sheet-field">Standaardteruggave Dion<input id="totalRefundDion" type="number" step="0.01" inputmode="decimal" value="${dion.refund}"></label>
       <label class="income-sheet-field">Standaardsalaris Dara<input id="totalIncomeDara" type="number" step="0.01" inputmode="decimal" value="${dara.salary}"></label>
       <label class="income-sheet-field">Standaardteruggave Dara<input id="totalRefundDara" type="number" step="0.01" inputmode="decimal" value="${dara.refund}"></label>
-      <label class="income-sheet-readonly" style="justify-content:flex-start;gap:10px"><input id="incomeOnlyThisMonth" type="checkbox"><span>Alleen voor ${monthLabel2(month)} aanpassen</span></label>
-      <div class="income-sheet-total"><span>Verdeelbasis</span><strong id="totalIncomePreview">${eur2(round2(dion.salary + dion.refund + dara.salary + dara.refund))}</strong></div>
+      <label class="income-sheet-readonly" style="justify-content:flex-start;gap:10px"><input id="incomeOnlyThisMonth" type="checkbox"><span>Alleen voor ${monthLabel(month)} aanpassen</span></label>
+      <div class="income-sheet-total"><span>Verdeelbasis</span><strong id="totalIncomePreview">${eur(round2(dion.salary + dion.refund + dara.salary + dara.refund))}</strong></div>
       <div class="modal-actions"><button class="ghost" id="btnCancelTotalIncomeEdit">Annuleren</button><button class="primary" id="btnSaveTotalIncomeEdit">Opslaan</button></div>
     </div>`;
     modal.classList.add("open");
@@ -4579,7 +4637,7 @@ service cloud.firestore {
       return Number.isFinite(parsed) ? round2(parsed) : 0;
     };
     const updatePreview = () => {
-      document.getElementById("totalIncomePreview").textContent = eur2(round2(inputs.reduce((sum, input) => sum + amount(input), 0)));
+      document.getElementById("totalIncomePreview").textContent = eur(round2(inputs.reduce((sum, input) => sum + amount(input), 0)));
     };
     inputs.forEach((input) => input.addEventListener("input", updatePreview));
     document.getElementById("btnCloseTotalIncomeEdit").addEventListener("click", close);
@@ -4631,7 +4689,7 @@ service cloud.firestore {
       <div class="mobile-title-scenario-row">
         <div class="mobile-title-block">
           <h1>Dashboard</h1>
-          <p>${monthLabel2(getSelectedMonth2())}</p>
+          <p>${monthLabel(getSelectedMonth())}</p>
         </div>
         <div class="scenario-toggle mobile-scenario-toggle" data-mobile-scenario>
           <button data-scenario="voor">Voor verkoop</button>
@@ -4689,10 +4747,10 @@ service cloud.firestore {
     const variableRows = Array.from(variableBudgetMap.entries()).map(([key, row]) => {
       const used = usedByBudgetKey[key] || 0;
       const ratio = row.budget > 0 ? Math.min(1, used / row.budget) : 0;
-      return `<button type="button" class="budget-preview-item budget-preview-button" data-open-budget-transactions="${textSafe2(row.label)}" data-budget-owner="gezamenlijk" aria-label="Open transacties voor ${textSafe2(row.label)}">
+      return `<button type="button" class="budget-preview-item budget-preview-button" data-open-budget-transactions="${textSafe(row.label)}" data-budget-owner="gezamenlijk" aria-label="Open transacties voor ${textSafe(row.label)}">
       <div class="budget-preview-thumb tone-green">${iconSvg(categoryIconName(row.label))}</div>
       <div class="budget-preview-main">
-        <div class="budget-preview-top"><strong>${textSafe2(row.label)}</strong><span><span class="neutral-amount">${eur2(used)}</span> / <span class="neutral-amount">${eur2(row.budget)}</span></span></div>
+        <div class="budget-preview-top"><strong>${textSafe(row.label)}</strong><span><span class="neutral-amount">${eur(used)}</span> / <span class="neutral-amount">${eur(row.budget)}</span></span></div>
         <div class="progress-track budget-gradient"><div class="progress-fill budget-gradient" style="width:${Math.round(ratio * 100)}%"></div></div>
       </div>
     </button>`;
@@ -4701,7 +4759,7 @@ service cloud.firestore {
       variableRows.push(`<button type="button" class="budget-preview-item budget-preview-button joint-variable-unassigned" data-open-budget-transactions="Ongecategoriseerd" data-budget-owner="gezamenlijk">
       <div class="budget-preview-thumb">${iconSvg("more")}</div>
       <div class="budget-preview-main">
-        <div class="budget-preview-top"><strong>Ongecategoriseerd</strong><span class="neutral-amount">${eur2(unassignedUsed)}</span></div>
+        <div class="budget-preview-top"><strong>Ongecategoriseerd</strong><span class="neutral-amount">${eur(unassignedUsed)}</span></div>
         <div class="progress-track"><div class="progress-fill" style="width:100%"></div></div>
       </div>
     </button>`);
@@ -4715,7 +4773,7 @@ service cloud.firestore {
     const vasteRows = vasteEntriesSorted.map(([cat, amount]) => {
       const ratio = r.overigeVasteLastenTotaal > 0 ? amount / r.overigeVasteLastenTotaal : 0;
       return `<div class="progress-item">
-      <div class="progress-item-icon tone-green">${iconSvg(jointFixedCategoryIconName(cat))}</div><div class="progress-top"><strong>${cat}</strong><span>${eur2(amount)} · ${pct2(ratio)}</span></div>
+      <div class="progress-item-icon tone-green">${iconSvg(jointFixedCategoryIconName(cat))}</div><div class="progress-top"><strong>${cat}</strong><span>${eur(amount)} · ${pct(ratio)}</span></div>
       <div class="progress-track"><div class="progress-fill" style="width:${Math.round(ratio * 100)}%"></div></div>
     </div>`;
     }).join("");
@@ -4725,7 +4783,7 @@ service cloud.firestore {
         <span class="mobile-kpi-icon tone-green">${iconSvg("jointfund")}</span>
       </div>
       <div class="mobile-kpi-label">Totaal gezamenlijk inkomen</div>
-      <div class="mobile-kpi-value value pos">${eur2(r.totaalSalaris)}</div>
+      <div class="mobile-kpi-value value pos">${eur(r.totaalSalaris)}</div>
       <div class="mobile-kpi-edit-hint-placeholder" aria-hidden="true">.</div>
     </div>
     <div class="mobile-kpi-card joint-kpi-card joint-fixed-costs-card">
@@ -4733,7 +4791,7 @@ service cloud.firestore {
         <span class="mobile-kpi-icon tone-green">${iconSvg("wallet")}</span>
       </div>
       <div class="mobile-kpi-label">Vaste lasten totaal</div>
-      <div class="mobile-kpi-value value neg">${eur2(r.vasteLastenTotaal)}</div>
+      <div class="mobile-kpi-value value neg">${eur(r.vasteLastenTotaal)}</div>
       <div class="mobile-kpi-edit-hint-placeholder" aria-hidden="true">.</div>
     </div>
     <button type="button" class="mobile-kpi-card joint-kpi-card joint-saving-card" data-saving-edit>
@@ -4742,7 +4800,7 @@ service cloud.firestore {
         <span class="mobile-kpi-chevron">›</span>
       </div>
       <div class="mobile-kpi-label">Sparen</div>
-      <div class="mobile-kpi-value value pos">${eur2(r.spaarpotDezeMaand)}</div>
+      <div class="mobile-kpi-value value pos">${eur(r.spaarpotDezeMaand)}</div>
       <div class="mobile-kpi-edit-hint">${finizeIconWrap("edit")}<span>Tik om aan te passen</span></div>
     </button>
     <div class="mobile-kpi-card joint-kpi-card static joint-variable-card">
@@ -4750,7 +4808,7 @@ service cloud.firestore {
         <span class="mobile-kpi-icon tone-green">${iconSvg("chart")}</span>
       </div>
       <div class="mobile-kpi-label">Variabel gebruikt</div>
-      <div class="mobile-kpi-value mobile-kpi-value-budget neu">${eur2(r.variabelTotaal)} / ${eur2(r.variabelBudgetTotaal)}</div>
+      <div class="mobile-kpi-value mobile-kpi-value-budget neu">${eur(r.variabelTotaal)} / ${eur(r.variabelBudgetTotaal)}</div>
       <div class="mobile-kpi-budget-track" style="--used-pct:${variabelBudgetPct}%" aria-label="Gezamenlijk variabel budget gebruikt: ${variabelBudgetPct}%"></div>
     </div>
   </div>
@@ -4768,22 +4826,22 @@ service cloud.firestore {
     const name = ownerLabel(owner);
     const rows = getMonthTransactions(owner).filter(isBudgetExpenseTransaction).sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
     const rowsHtml = rows.map((tx) => `<div class="joint-transaction-row" data-edit-personal-transaction="${attrSafe(tx.id)}" data-owner="${attrSafe(owner)}" role="button" tabindex="0" aria-label="Transactie bewerken">
-    <span class="joint-transaction-meta"><span class="joint-transaction-date">${formatDayMonth(tx.date)}</span><span class="joint-transaction-category">${textSafe2(tx.category || "Overig")}</span></span>
-    <span class="joint-transaction-description"><span class="joint-transaction-description-text">${textSafe2(tx.description || "—")}</span>${tx.note ? `<span class="joint-transaction-note">${textSafe2(tx.note)}</span>` : ""}</span>
-    <strong class="joint-transaction-amount">${eur2(Number(tx.amount) || 0)}</strong>
+    <span class="joint-transaction-meta"><span class="joint-transaction-date">${formatDayMonth(tx.date)}</span><span class="joint-transaction-category">${textSafe(tx.category || "Overig")}</span></span>
+    <span class="joint-transaction-description"><span class="joint-transaction-description-text">${textSafe(tx.description || "—")}</span>${tx.note ? `<span class="joint-transaction-note">${textSafe(tx.note)}</span>` : ""}</span>
+    <strong class="joint-transaction-amount">${eur(Number(tx.amount) || 0)}</strong>
     <button type="button" class="joint-transaction-delete" data-remove-transaction="${attrSafe(tx.id)}" aria-label="Transactie verwijderen">×</button>
   </div>`).join("");
     const total = round2(rows.reduce((sum, tx) => sum + getTransactionExpenseImpact(tx), 0));
-    return `<div class="card joint-two-column-card joint-transactions-card"><div class="card-head joint-transactions-card-head"><div class="card-head-title"><h2>${name} transacties <span>— ${monthLabel2(getSelectedMonth2())}</span></h2><button type="button" class="joint-transaction-add-btn" data-open-personal-transaction="${owner}" aria-label="Uitgave toevoegen">${iconSvg("receipt")}</button></div></div><div class="joint-transactions-list">${rowsHtml || '<p class="joint-transactions-empty">Nog geen uitgaven deze maand.</p>'}</div><div class="joint-transactions-total"><span>Totaal uitgaven</span><strong>${eur2(total)}</strong></div></div>`;
+    return `<div class="card joint-two-column-card joint-transactions-card"><div class="card-head joint-transactions-card-head"><div class="card-head-title"><h2>${name} transacties <span>— ${monthLabel(getSelectedMonth())}</span></h2><button type="button" class="joint-transaction-add-btn" data-open-personal-transaction="${owner}" aria-label="Uitgave toevoegen">${iconSvg("receipt")}</button></div></div><div class="joint-transactions-list">${rowsHtml || '<p class="joint-transactions-empty">Nog geen uitgaven deze maand.</p>'}</div><div class="joint-transactions-total"><span>Totaal uitgaven</span><strong>${eur(total)}</strong></div></div>`;
   }
   function openPersonalTransactionModal(owner, transactionId = "") {
     const modal = document.getElementById("transactionModal");
-    const today = getSelectedMonth2() + "-" + String((/* @__PURE__ */ new Date()).getDate()).padStart(2, "0");
+    const today = getSelectedMonth() + "-" + String((/* @__PURE__ */ new Date()).getDate()).padStart(2, "0");
     const existing = (state.transactions || []).find((tx) => tx.id === transactionId && tx.owner === owner);
     const categories = jointVariableCategoryOptions((existing == null ? void 0 : existing.category) || "", owner);
     const selected = (existing == null ? void 0 : existing.category) || categories[0] || "Overig";
     const name = ownerLabel(owner);
-    modal.innerHTML = `<div class="modal joint-transaction-fullscreen-editor"><div class="card-head"><h2>${existing ? `${name} uitgave bewerken` : `${name} uitgave`}</h2><button class="danger-ghost" id="btnClosePersonalTransaction">×</button></div><p class="hint" style="margin-top:-4px">${monthLabel2(getSelectedMonth2())} · wordt gekoppeld aan ${name}s variabele lasten</p><div class="modal-grid"><label>Bedrag<input id="personalTxAmount" type="number" step="0.01" inputmode="decimal" value="${existing ? Number(existing.amount) || "" : ""}"></label><label>Datum<input id="personalTxDate" type="date" value="${textSafe2((existing == null ? void 0 : existing.date) || today)}"></label><label class="full">Omschrijving<input id="personalTxDescription" type="text" value="${textSafe2((existing == null ? void 0 : existing.description) || "")}"></label><label>Categorie<select id="personalTxCategory">${categories.map((category) => `<option value="${textSafe2(category)}" ${String(category).toLowerCase() === String(selected).toLowerCase() ? "selected" : ""}>${textSafe2(category)}</option>`).join("")}</select></label><label>Eigenaar<select id="personalTxOwner"><option value="gezamenlijk">Gezamenlijk</option><option value="dion">Dion</option><option value="dara">Dara</option></select></label><label class="full">Notitie<input id="personalTxNote" type="text" value="${textSafe2((existing == null ? void 0 : existing.note) || "")}"></label></div><div class="modal-actions"><button class="ghost" id="btnCancelPersonalTransaction">Annuleren</button><button class="primary" id="btnSavePersonalTransaction">${existing ? "Wijzigingen opslaan" : "Uitgave opslaan"}</button></div></div>`;
+    modal.innerHTML = `<div class="modal joint-transaction-fullscreen-editor"><div class="card-head"><h2>${existing ? `${name} uitgave bewerken` : `${name} uitgave`}</h2><button class="danger-ghost" id="btnClosePersonalTransaction">×</button></div><p class="hint" style="margin-top:-4px">${monthLabel(getSelectedMonth())} · wordt gekoppeld aan ${name}s variabele lasten</p><div class="modal-grid"><label>Bedrag<input id="personalTxAmount" type="number" step="0.01" inputmode="decimal" value="${existing ? Number(existing.amount) || "" : ""}"></label><label>Datum<input id="personalTxDate" type="date" value="${textSafe((existing == null ? void 0 : existing.date) || today)}"></label><label class="full">Omschrijving<input id="personalTxDescription" type="text" value="${textSafe((existing == null ? void 0 : existing.description) || "")}"></label><label>Categorie<select id="personalTxCategory">${categories.map((category) => `<option value="${textSafe(category)}" ${String(category).toLowerCase() === String(selected).toLowerCase() ? "selected" : ""}>${textSafe(category)}</option>`).join("")}</select></label><label>Eigenaar<select id="personalTxOwner"><option value="gezamenlijk">Gezamenlijk</option><option value="dion">Dion</option><option value="dara">Dara</option></select></label><label class="full">Notitie<input id="personalTxNote" type="text" value="${textSafe((existing == null ? void 0 : existing.note) || "")}"></label></div><div class="modal-actions"><button class="ghost" id="btnCancelPersonalTransaction">Annuleren</button><button class="primary" id="btnSavePersonalTransaction">${existing ? "Wijzigingen opslaan" : "Uitgave opslaan"}</button></div></div>`;
     modal.classList.add("open", "joint-transaction-modal-open");
     const close = () => modal.classList.remove("open", "joint-transaction-modal-open");
     document.getElementById("personalTxOwner").value = (existing == null ? void 0 : existing.owner) || owner;
@@ -4821,25 +4879,7 @@ service cloud.firestore {
     const person = r[owner];
     const data = getMonthlyScenarioData(state.meta.scenario)[owner];
     const name = ownerLabel(owner);
-    const budgets = /* @__PURE__ */ new Map();
-    (data.variabel || []).forEach((row) => {
-      const label = String(row.post || row.categorie || "").trim();
-      if (label) budgets.set(label.toLocaleLowerCase(), { label, budget: Number(row.bedrag) || 0 });
-    });
-    const used = {};
-    let uncategorized = 0;
-    getMonthTransactions(owner).forEach((tx) => {
-      const key = String(tx.category || "").trim().toLocaleLowerCase();
-      const impact = getTransactionExpenseImpact(tx);
-      if (budgets.has(key)) used[key] = round2((used[key] || 0) + impact);
-      else uncategorized = round2(uncategorized + impact);
-    });
-    const variableRows = [...budgets.entries()].map(([key, row]) => {
-      const amount = used[key] || 0;
-      const ratio = row.budget > 0 ? Math.min(1, amount / row.budget) : 0;
-      return `<button type="button" class="budget-preview-item budget-preview-button" data-open-budget-transactions="${textSafe2(row.label)}" data-budget-owner="${owner}" aria-label="Open transacties voor ${textSafe2(row.label)}"><div class="budget-preview-thumb tone-green">${iconSvg(categoryIconName(row.label))}</div><div class="budget-preview-main"><div class="budget-preview-top"><strong>${textSafe2(row.label)}</strong><span>${eur2(amount)} / ${eur2(row.budget)}</span></div><div class="progress-track budget-gradient"><div class="progress-fill budget-gradient" style="width:${Math.round(ratio * 100)}%"></div></div></div></button>`;
-    });
-    if (uncategorized > 0) variableRows.push(`<button type="button" class="budget-preview-item budget-preview-button joint-variable-unassigned" data-open-budget-transactions="Ongecategoriseerd" data-budget-owner="${owner}"><div class="budget-preview-thumb">${iconSvg("more")}</div><div class="budget-preview-main"><div class="budget-preview-top"><strong>Ongecategoriseerd</strong><span>${eur2(uncategorized)}</span></div><div class="progress-track"><div class="progress-fill" style="width:100%"></div></div></div></button>`);
+    const variableRows = ownerVariableBudgetRows(owner, data);
     const fixed = {};
     (data.vasteLasten || []).forEach((row) => {
       const cat = normalizeCategoryName(row.categorie);
@@ -4847,15 +4887,15 @@ service cloud.firestore {
     });
     const fixedRows = Object.entries(fixed).sort((a, b) => b[1] - a[1]).map(([cat, amount]) => {
       const ratio = person.persoonlijkeVasteLasten > 0 ? amount / person.persoonlijkeVasteLasten : 0;
-      return `<div class="progress-item"><div class="progress-item-icon tone-green">${iconSvg(jointFixedCategoryIconName(cat))}</div><div class="progress-top"><strong>${cat}</strong><span>${eur2(amount)} · ${pct2(ratio)}</span></div><div class="progress-track"><div class="progress-fill" style="width:${Math.round(ratio * 100)}%"></div></div></div>`;
+      return `<div class="progress-item"><div class="progress-item-icon tone-green">${iconSvg(jointFixedCategoryIconName(cat))}</div><div class="progress-top"><strong>${cat}</strong><span>${eur(amount)} · ${pct(ratio)}</span></div><div class="progress-track"><div class="progress-fill" style="width:${Math.round(ratio * 100)}%"></div></div></div>`;
     }).join("");
     const variableBudget = sumBedrag(data.variabel || []);
     const variablePct = variableBudget > 0 ? Math.min(100, Math.round(person.variabeleUitgaven / variableBudget * 100)) : 0;
     return `<div class="mobile-kpi-grid v4-mobile-only-grid joint-first-row" aria-label="${name} rij 1">
-    <div class="mobile-kpi-card joint-kpi-card joint-total-income-card"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg("allowance")}</span></div><div class="mobile-kpi-label">Zakgeld</div><div class="mobile-kpi-value ${person.zakgeld < 0 ? "value neg" : "value pos"}">${eur2(person.zakgeld)}</div><div class="mobile-kpi-edit-hint-placeholder">.</div></div>
-    <div class="mobile-kpi-card joint-kpi-card joint-fixed-costs-card"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg("wallet")}</span></div><div class="mobile-kpi-label">Vaste lasten</div><div class="mobile-kpi-value value neg">${eur2(person.persoonlijkeVasteLasten)}</div><div class="mobile-kpi-edit-hint-placeholder">.</div></div>
-    <div class="mobile-kpi-card joint-kpi-card joint-saving-card"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg("piggy")}</span></div><div class="mobile-kpi-label">Sparen deze maand</div><div class="mobile-kpi-value ${person.beschikbaarVoorSparen < 0 ? "value neg" : "value pos"}">${eur2(person.beschikbaarVoorSparen)}</div><div class="mobile-kpi-edit-hint-placeholder">.</div></div>
-    <div class="mobile-kpi-card joint-kpi-card static joint-variable-card"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg("chart")}</span></div><div class="mobile-kpi-label">Variabel gebruikt</div><div class="mobile-kpi-value mobile-kpi-value-budget neu">${eur2(person.variabeleUitgaven)} / ${eur2(variableBudget)}</div><div class="mobile-kpi-budget-track" style="--used-pct:${variablePct}%"></div></div>
+    <div class="mobile-kpi-card joint-kpi-card joint-total-income-card"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg("allowance")}</span></div><div class="mobile-kpi-label">Zakgeld</div><div class="mobile-kpi-value ${person.zakgeld < 0 ? "value neg" : "value pos"}">${eur(person.zakgeld)}</div><div class="mobile-kpi-edit-hint-placeholder">.</div></div>
+    <div class="mobile-kpi-card joint-kpi-card joint-fixed-costs-card"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg("wallet")}</span></div><div class="mobile-kpi-label">Vaste lasten</div><div class="mobile-kpi-value value neg">${eur(person.persoonlijkeVasteLasten)}</div><div class="mobile-kpi-edit-hint-placeholder">.</div></div>
+    <div class="mobile-kpi-card joint-kpi-card joint-saving-card"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg("piggy")}</span></div><div class="mobile-kpi-label">Sparen deze maand</div><div class="mobile-kpi-value ${person.beschikbaarVoorSparen < 0 ? "value neg" : "value pos"}">${eur(person.beschikbaarVoorSparen)}</div><div class="mobile-kpi-edit-hint-placeholder">.</div></div>
+    <div class="mobile-kpi-card joint-kpi-card static joint-variable-card"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg("chart")}</span></div><div class="mobile-kpi-label">Variabel gebruikt</div><div class="mobile-kpi-value mobile-kpi-value-budget neu">${eur(person.variabeleUitgaven)} / ${eur(variableBudget)}</div><div class="mobile-kpi-budget-track" style="--used-pct:${variablePct}%"></div></div>
   </div>
   <div class="card joint-fullwidth-card joint-fixed-category-card v4-mobile-only-block">${renderJointFixedCostsCardHead(owner)}<div class="joint-fixed-category-body">${fixedRows || '<p class="hint">Nog geen vaste lasten.</p>'}</div></div>
   <div class="joint-two-column-row v4-mobile-only-grid"><div class="card joint-two-column-card joint-variable-overview-card">${renderJointVariableCostsCardHead(owner)}<div class="joint-variable-overview-list">${variableRows.join("") || '<p class="hint" style="margin:0">Nog geen variabele budgetten.</p>'}</div></div>${renderPersonalTransactionsCard(owner)}</div>
@@ -4871,7 +4911,7 @@ service cloud.firestore {
   function updateV4SidebarMeta() {
     const monthEl = document.getElementById("v4SidebarMonth");
     const scenarioEl = document.getElementById("v4SidebarScenario");
-    if (monthEl) monthEl.textContent = monthLabel2(getSelectedMonth2());
+    if (monthEl) monthEl.textContent = monthLabel(getSelectedMonth());
     if (scenarioEl) scenarioEl.textContent = (state.meta.scenario === "voor" ? "Voor verkoop" : "Na verkoop") + " scenario";
   }
   function parkMonthControlBeforeRender() {
@@ -4884,10 +4924,10 @@ service cloud.firestore {
   function openBudgetTransactionsModal(category, owner = "gezamenlijk") {
     var _a;
     const modal = document.getElementById("transactionModal");
-    const month = getSelectedMonth2();
+    const month = getSelectedMonth();
     const rows = getMonthTransactions(owner, month).filter((tx) => budgetCategoryMatches(tx, category) && Math.abs(getTransactionExpenseImpact(tx)) > 4e-3).sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
     const total = round2(rows.reduce((sum, tx) => sum + getTransactionExpenseImpact(tx), 0));
-    modal.innerHTML = `<div class="modal budget-transactions-modal"><div class="modal-head"><div><h2>${textSafe2(category)}</h2><p>${monthLabel2(month)} · ${rows.length} transactie${rows.length === 1 ? "" : "s"} · ${eur2(total)}</p></div><button type="button" class="ghost" data-close-budget-transactions>Sluiten</button></div><div class="budget-transactions-list">${rows.length ? rows.map((tx) => `<button type="button" class="budget-transaction-row" data-open-budget-transaction-id="${textSafe2(tx.id)}"><span><strong>${textSafe2(tx.description || tx.category || "Transactie")}</strong><small>${formatDateNL2(tx.date)} · ${textSafe2(tx.category || "Overig")}</small></span><b class="${getTransactionExpenseImpact(tx) < 0 ? "value pos" : "value neg"}">${eur2(getTransactionExpenseImpact(tx))}</b></button>`).join("") : '<p class="muted-empty">Geen budgettransacties in deze categorie.</p>'}</div></div>`;
+    modal.innerHTML = `<div class="modal budget-transactions-modal"><div class="modal-head"><div><h2>${textSafe(category)}</h2><p>${monthLabel(month)} · ${rows.length} transactie${rows.length === 1 ? "" : "s"} · ${eur(total)}</p></div><button type="button" class="ghost" data-close-budget-transactions>Sluiten</button></div><div class="budget-transactions-list">${rows.length ? rows.map((tx) => `<button type="button" class="budget-transaction-row" data-open-budget-transaction-id="${textSafe(tx.id)}"><span><strong>${textSafe(tx.description || tx.category || "Transactie")}</strong><small>${formatDateNL(tx.date)} · ${textSafe(tx.category || "Overig")}</small></span><b class="${getTransactionExpenseImpact(tx) < 0 ? "value pos" : "value neg"}">${eur(getTransactionExpenseImpact(tx))}</b></button>`).join("") : '<p class="muted-empty">Geen budgettransacties in deze categorie.</p>'}</div></div>`;
     modal.classList.add("open");
     const close = () => {
       modal.classList.remove("open");
@@ -4903,7 +4943,7 @@ service cloud.firestore {
   }
   function renderActiveTab() {
     var _a, _b, _c;
-    ensureMonthData(getSelectedMonth2());
+    ensureMonthData(getSelectedMonth());
     renderMonthSelect();
     updateV4SidebarMeta();
     document.body.dataset.activeTab = activeTab;
@@ -5117,7 +5157,7 @@ service cloud.firestore {
     }
     const yearBtn = e.target.closest("[data-month-year]");
     if (yearBtn) {
-      const currentMonth = getSelectedMonth2().slice(5, 7);
+      const currentMonth = getSelectedMonth().slice(5, 7);
       setSelectedMonth(yearBtn.dataset.monthYear + "-" + currentMonth);
       persist();
       renderActiveTab();
@@ -5207,7 +5247,7 @@ service cloud.firestore {
     if (target <= balance) return /* @__PURE__ */ new Date();
     if (!(monthly > 0)) return null;
     const rate = monthlyRateFromGoal(goal);
-    const reference = getCalculationDateForSelectedMonth(getSelectedMonth2(), goal.eigenaar || "gezamenlijk");
+    const reference = getCalculationDateForSelectedMonth(getSelectedMonth(), goal.eigenaar || "gezamenlijk");
     const date = new Date(reference.getFullYear(), reference.getMonth(), 1);
     for (let month = 1; month <= 1200; month++) {
       balance = balance * (1 + rate) + monthly;
@@ -5227,8 +5267,8 @@ service cloud.firestore {
     if (ratio >= 0.8) return { key: "bijna", label: "Bijna op schema" };
     return { key: "achter", label: "Achter op schema" };
   }
-  calcDoel2 = function(doel, today) {
-    today = getCalculationDateForSelectedMonth(getSelectedMonth2(), doel.eigenaar || "gezamenlijk");
+  calcDoel = function(doel, today) {
+    today = getCalculationDateForSelectedMonth(getSelectedMonth(), doel.eigenaar || "gezamenlijk");
     const doelbedrag = u2GoalTarget(doel);
     const algespaard = u2GoalSaved(doel);
     const vasteInleg = Math.max(0, Number(doel.vasteInleg) || 0);
@@ -5292,13 +5332,13 @@ service cloud.firestore {
     }
     return { output, remaining };
   }
-  calcGroep2 = function(doelen, spaarpotDezeMaand, today) {
+  calcGroep = function(doelen, spaarpotDezeMaand, today) {
     const berekend = doelen.map((d) => {
       if (Array.isArray(d.subdoelen) && d.subdoelen.length) {
         d.doelbedrag = u2GoalTarget(d);
         d.algespaard = u2GoalSaved(d);
       }
-      return { doel: d, ...calcDoel2(d, today) };
+      return { doel: d, ...calcDoel(d, today) };
     });
     const potCents = Math.max(0, Math.round((Number(spaarpotDezeMaand) || 0) * 100));
     const capacities = berekend.map((b) => Math.max(0, Math.round(b.nogTeGaan * 100)));
@@ -5374,7 +5414,7 @@ service cloud.firestore {
     state.savingsGoalLedger.push({
       id,
       goalId: goal.id,
-      month: getSelectedMonth2(),
+      month: getSelectedMonth(),
       plannedAmount: 0,
       actualAmount: null,
       effectiveAmount: difference,
@@ -5391,17 +5431,17 @@ service cloud.firestore {
     const result = calcScenario(state);
     return Math.max(0, round2(owner === "gezamenlijk" ? result.spaarpotDezeMaand : result[owner].beschikbaarVoorSparen));
   }
-  function u2HistoryKey(owner, month = getSelectedMonth2()) {
+  function u2HistoryKey(owner, month = getSelectedMonth()) {
     return `${owner}:${month}`;
   }
-  function u2IsProcessed(owner, month = getSelectedMonth2()) {
+  function u2IsProcessed(owner, month = getSelectedMonth()) {
     var _a;
     return !!((_a = state.spaardoelGeschiedenis) == null ? void 0 : _a[u2HistoryKey(owner, month)]);
   }
-  function getCalculationDateForSelectedMonth(selectedMonth = getSelectedMonth2(), owner = "gezamenlijk") {
+  function getCalculationDateForSelectedMonth(selectedMonth = getSelectedMonth(), owner = "gezamenlijk") {
     var _a;
     const match = String(selectedMonth || "").match(/^(\d{4})-(\d{2})$/);
-    if (!match) return new Date(TODAY2.getFullYear(), TODAY2.getMonth(), 1);
+    if (!match) return new Date(TODAY.getFullYear(), TODAY.getMonth(), 1);
     const record = (_a = state.monthRecords) == null ? void 0 : _a[selectedMonth];
     const processed = u2IsProcessed(owner, selectedMonth) || ["afgesloten", "correctie-nodig"].includes(record == null ? void 0 : record.status);
     return new Date(Number(match[1]), Number(match[2]) - 1 + (processed ? 1 : 0), 1, 12);
@@ -5414,7 +5454,7 @@ service cloud.firestore {
     return items.map((item, index) => round2((result.output.get(index) || 0) / 100));
   }
   function u2OpenProcessModal(owner) {
-    const month = getSelectedMonth2();
+    const month = getSelectedMonth();
     try {
       assertMonthMutationAllowed(month);
     } catch (error) {
@@ -5422,12 +5462,12 @@ service cloud.firestore {
       return;
     }
     if (u2IsProcessed(owner, month)) {
-      alert(`${monthLabel2(month)} is voor ${ownerLabel(owner)} al verwerkt.`);
+      alert(`${monthLabel(month)} is voor ${ownerLabel(owner)} al verwerkt.`);
       return;
     }
     const goals = state.spaardoelen[owner] || [];
     const pot = u2PotForOwner(owner);
-    const items = calcGroep2(goals, pot, TODAY2);
+    const items = calcGroep(goals, pot, TODAY);
     if (!goals.length) {
       alert("Voeg eerst minimaal één spaardoel toe.");
       return;
@@ -5438,17 +5478,17 @@ service cloud.firestore {
     const render = () => {
       var _a;
       const total = round2(amounts.reduce((sum, value) => sum + (Number(value) || 0), 0));
-      const rows = items.map((item, index) => `<label class="u2-process-row"><span><strong>${textSafe2(item.doel.naam)}</strong><small>Vast ${eur2(Number(item.doel.vasteInleg) || 0)} · nodig ${item.benodigdPerMaand === null ? "—" : eur2(item.benodigdPerMaand)}</small></span><input type="number" min="0" max="${item.nogTeGaan}" step="0.01" data-u2-process="${index}" value="${Number(amounts[index]).toFixed(2)}"></label>`).join("");
-      modal.innerHTML = `<div class="modal u2-process-modal"><div class="u2-modal-head"><div><div class="section-kicker">${ownerLabel(owner)}</div><h2>Spaarpot ${monthLabel2(month)}</h2></div><button class="ghost" data-u2-close>Sluiten</button></div>
+      const rows = items.map((item, index) => `<label class="u2-process-row"><span><strong>${textSafe(item.doel.naam)}</strong><small>Vast ${eur(Number(item.doel.vasteInleg) || 0)} · nodig ${item.benodigdPerMaand === null ? "—" : eur(item.benodigdPerMaand)}</small></span><input type="number" min="0" max="${item.nogTeGaan}" step="0.01" data-u2-process="${index}" value="${Number(amounts[index]).toFixed(2)}"></label>`).join("");
+      modal.innerHTML = `<div class="modal u2-process-modal"><div class="u2-modal-head"><div><div class="section-kicker">${ownerLabel(owner)}</div><h2>Spaarpot ${monthLabel(month)}</h2></div><button class="ghost" data-u2-close>Sluiten</button></div>
       ${insufficient ? `<div class="u2-warning"><strong>Onvoldoende spaargeld om alle vaste inleggen uit te voeren.</strong><span>Kies automatische ratoverdeling over de vaste inleggen of pas de bedragen zelf aan.</span><button class="ghost small" data-u2-fixed-ratio>Automatisch naar rato</button></div>` : ""}
       <div class="u2-process-list">${rows}</div>
-      <div class="u2-process-total"><span>Spaarpot ${eur2(pot)}</span><strong data-u2-total>${eur2(total)}</strong></div>
+      <div class="u2-process-total"><span>Spaarpot ${eur(pot)}</span><strong data-u2-total>${eur(total)}</strong></div>
       <p class="hint" data-u2-error></p>
       <div class="modal-actions"><button class="ghost" data-u2-close>Annuleren</button><button class="primary" data-u2-confirm>Spaarpot verwerken</button></div></div>`;
       modal.classList.add("open", "u2-process-open");
       const refresh = () => {
         const total2 = round2(amounts.reduce((sum, value) => sum + (Number(value) || 0), 0));
-        modal.querySelector("[data-u2-total]").textContent = eur2(total2);
+        modal.querySelector("[data-u2-total]").textContent = eur(total2);
         const error = modal.querySelector("[data-u2-error]");
         error.textContent = total2 > pot + 5e-3 ? "De verdeling is hoger dan de beschikbare spaarpot." : "";
       };
@@ -5518,7 +5558,7 @@ service cloud.firestore {
     var _a;
     const active = u2ActiveChild(goal);
     if (!((_a = goal.subdoelen) == null ? void 0 : _a.length)) return "";
-    return `<div class="u2-next-goal">${active ? `<span>Volgende doel</span><strong>${textSafe2(active.naam)} · nog ${eur2(Math.max(0, Number(active.doelbedrag) - Number(active.gespaard)))}</strong>` : "<strong>Alle subdoelen voltooid</strong>"}</div>`;
+    return `<div class="u2-next-goal">${active ? `<span>Volgende doel</span><strong>${textSafe(active.naam)} · nog ${eur(Math.max(0, Number(active.doelbedrag) - Number(active.gespaard)))}</strong>` : "<strong>Alle subdoelen voltooid</strong>"}</div>`;
   }
   var u2OriginalDashboardGoalPreviewCard = renderDashboardGoalPreviewCard;
   renderDashboardGoalPreviewCard = function(item) {
@@ -5526,12 +5566,12 @@ service cloud.firestore {
     const owner = item.owner || goal.owner || ownerLabel(goal.eigenaar || "gezamenlijk");
     const target = u2GoalTarget(goal), saved = u2GoalSaved(goal);
     const progress = target > 0 ? Math.min(1, saved / target) : 0;
-    const calculated = calcDoel2(goal, TODAY2);
+    const calculated = calcDoel(goal, TODAY);
     return `<div class="dashboard-goal-preview-item">
     <div class="dashboard-goal-preview-thumb tone-${ownerTone(owner)}">${goalImageIcon(goal)}</div>
     <div class="dashboard-goal-preview-main">
-      <div class="dashboard-goal-preview-top"><strong>${textSafe2(goal.naam || "Spaardoel")}</strong><span>${eur2(saved)} / ${eur2(target)}</span></div>
-      <div class="dashboard-goal-preview-meta"><span>${textSafe2(owner)}</span><span>Doel: ${goal.doeldatum ? formatDateNL2(goal.doeldatum) : "Geen doeldatum"}</span></div>
+      <div class="dashboard-goal-preview-top"><strong>${textSafe(goal.naam || "Spaardoel")}</strong><span>${eur(saved)} / ${eur(target)}</span></div>
+      <div class="dashboard-goal-preview-meta"><span>${textSafe(owner)}</span><span>Doel: ${goal.doeldatum ? formatDateNL(goal.doeldatum) : "Geen doeldatum"}</span></div>
       <div class="progress-track goal-positive"><div class="progress-fill goal-positive" style="width:${Math.round(progress * 100)}%"></div></div>
       <div class="u2-dashboard-extra">${u2RenderChildSummary(goal)}<span>Verwacht gereed: ${u2DateLabel(calculated.verwachteEinddatum)}</span></div>
     </div>
@@ -5540,14 +5580,14 @@ service cloud.firestore {
   function u2RenderGoalRow(item, owner) {
     const goal = item.doel;
     const target = u2GoalTarget(goal), saved = u2GoalSaved(goal), progress = target > 0 ? Math.min(100, Math.round(saved / target * 100)) : 0;
-    const image = safeImageUrl2(goalImageSource2(goal));
+    const image = safeImageUrl(goalImageSource(goal));
     return `<article class="card u2-goal-card">
-    <button class="u2-goal-main" type="button" data-open-goal-editor="${owner}:${textSafe2(goal.id)}">
-      <span class="u2-goal-image${image ? " has-image" : ""}"${image ? ` style="background-image:url('${image}')"` : ""}>${image ? "" : goalIcon2(goal)}</span>
-      <span class="u2-goal-copy"><span class="u2-goal-title"><strong>${textSafe2(goal.naam || "Spaardoel")}</strong><em class="u2-status ${item.status.key}">${item.status.label}</em></span><span>${eur2(saved)} van ${eur2(target)}</span><span class="progress-track"><span class="progress-fill" style="width:${progress}%"></span></span>${u2RenderChildSummary(goal)}</span>
-      <span class="u2-goal-side"><b>${progress}%</b><small>Nog ${eur2(item.nogTeGaan)}</small></span>
+    <button class="u2-goal-main" type="button" data-open-goal-editor="${owner}:${textSafe(goal.id)}">
+      <span class="u2-goal-image${image ? " has-image" : ""}"${image ? ` style="background-image:url('${image}')"` : ""}>${image ? "" : goalIcon(goal)}</span>
+      <span class="u2-goal-copy"><span class="u2-goal-title"><strong>${textSafe(goal.naam || "Spaardoel")}</strong><em class="u2-status ${item.status.key}">${item.status.label}</em></span><span>${eur(saved)} van ${eur(target)}</span><span class="progress-track"><span class="progress-fill" style="width:${progress}%"></span></span>${u2RenderChildSummary(goal)}</span>
+      <span class="u2-goal-side"><b>${progress}%</b><small>Nog ${eur(item.nogTeGaan)}</small></span>
     </button>
-    <div class="u2-prognosis"><span>Inleg deze maand <strong>${eur2(item.werkelijkeInleg)}</strong></span><span>Benodigd p/m <strong>${item.benodigdPerMaand === null ? "—" : eur2(item.benodigdPerMaand)}</strong></span><span>Verwacht gereed <strong>${u2DateLabel(item.verwachteEinddatum)}</strong></span></div>
+    <div class="u2-prognosis"><span>Inleg deze maand <strong>${eur(item.werkelijkeInleg)}</strong></span><span>Benodigd p/m <strong>${item.benodigdPerMaand === null ? "—" : eur(item.benodigdPerMaand)}</strong></span><span>Verwacht gereed <strong>${u2DateLabel(item.verwachteEinddatum)}</strong></span></div>
   </article>`;
   }
   var u2OriginalMobileSpaardoelen = renderMobileSpaardoelen;
@@ -5558,19 +5598,19 @@ service cloud.firestore {
       { key: "dion", label: "Dion", pot: Math.max(0, r.dion.beschikbaarVoorSparen) },
       { key: "dara", label: "Dara", pot: Math.max(0, r.dara.beschikbaarVoorSparen) }
     ];
-    const all = groups.flatMap((group) => calcGroep2(state.spaardoelen[group.key], group.pot, TODAY2));
+    const all = groups.flatMap((group) => calcGroep(state.spaardoelen[group.key], group.pot, TODAY));
     const saved = round2(all.reduce((sum, item) => sum + u2GoalSaved(item.doel), 0));
     const target = round2(all.reduce((sum, item) => sum + u2GoalTarget(item.doel), 0));
     const root = document.getElementById("tab-spaardoelen");
     root.innerHTML = `${renderSharedEmptyTabHeader("Slimme spaardoelen")}
     <div class="mobile-savings-overview u2-savings">
-      <div class="mobile-savings-kpis"><div class="card"><small>Totaal gespaard</small><strong>${eur2(saved)}</strong><em>van ${eur2(target)}</em></div><div class="card"><small>Totale voortgang</small><strong>${target > 0 ? Math.round(saved / target * 100) : 0}%</strong><em>alle hoofddoelen</em></div><div class="card"><small>Openstaand</small><strong>${eur2(Math.max(0, target - saved))}</strong><em>nog te sparen</em></div><div class="card"><small>Afgeronde maanden</small><strong>${Object.keys(state.spaardoelGeschiedenis || {}).length}</strong><em>in geschiedenis</em></div></div>
+      <div class="mobile-savings-kpis"><div class="card"><small>Totaal gespaard</small><strong>${eur(saved)}</strong><em>van ${eur(target)}</em></div><div class="card"><small>Totale voortgang</small><strong>${target > 0 ? Math.round(saved / target * 100) : 0}%</strong><em>alle hoofddoelen</em></div><div class="card"><small>Openstaand</small><strong>${eur(Math.max(0, target - saved))}</strong><em>nog te sparen</em></div><div class="card"><small>Afgeronde maanden</small><strong>${Object.keys(state.spaardoelGeschiedenis || {}).length}</strong><em>in geschiedenis</em></div></div>
       ${groups.map((group) => {
-      const items = calcGroep2(state.spaardoelen[group.key], group.pot, TODAY2);
+      const items = calcGroep(state.spaardoelen[group.key], group.pot, TODAY);
       const processed = u2IsProcessed(group.key);
-      return `<section class="u2-owner-section"><div class="u2-owner-head"><div><h2>${group.label}</h2><span>Spaarpot ${monthLabel2(getSelectedMonth2())}: ${eur2(group.pot)}</span></div><div><button class="ghost small" data-open-goal-manager="${group.key}">Doelen beheren</button><button class="primary small" data-u2-process-owner="${group.key}" ${processed ? "disabled" : ""}>${processed ? "Maand verwerkt" : "Spaarpot verwerken"}</button></div></div><div class="u2-goal-grid">${items.length ? items.map((item) => u2RenderGoalRow(item, group.key)).join("") : '<div class="card"><p class="hint">Nog geen spaardoelen.</p></div>'}</div></section>`;
+      return `<section class="u2-owner-section"><div class="u2-owner-head"><div><h2>${group.label}</h2><span>Spaarpot ${monthLabel(getSelectedMonth())}: ${eur(group.pot)}</span></div><div><button class="ghost small" data-open-goal-manager="${group.key}">Doelen beheren</button><button class="primary small" data-u2-process-owner="${group.key}" ${processed ? "disabled" : ""}>${processed ? "Maand verwerkt" : "Spaarpot verwerken"}</button></div></div><div class="u2-goal-grid">${items.length ? items.map((item) => u2RenderGoalRow(item, group.key)).join("") : '<div class="card"><p class="hint">Nog geen spaardoelen.</p></div>'}</div></section>`;
     }).join("")}
-      <details class="card u2-history"><summary><strong>Spaargeschiedenis</strong><span>${Object.keys(state.spaardoelGeschiedenis || {}).length} maanden</span></summary><div>${Object.values(state.spaardoelGeschiedenis || {}).sort((a, b) => String(b.maand).localeCompare(String(a.maand))).map((entry) => `<article><strong>${ownerLabel(entry.eigenaar)} · ${monthLabel2(entry.maand)}</strong><span>Spaarpot ${eur2(entry.spaarpot)} · verdeeld ${eur2(entry.verdeeld)} · onverdeeld ${eur2(entry.onverdeeld)}</span><small>${entry.transacties.map((tx) => `${textSafe2(tx.doelNaam)} ${eur2(tx.bedrag)}`).join(" · ")}</small></article>`).join("") || '<p class="hint">Nog geen maanden verwerkt.</p>'}</div></details>
+      <details class="card u2-history"><summary><strong>Spaargeschiedenis</strong><span>${Object.keys(state.spaardoelGeschiedenis || {}).length} maanden</span></summary><div>${Object.values(state.spaardoelGeschiedenis || {}).sort((a, b) => String(b.maand).localeCompare(String(a.maand))).map((entry) => `<article><strong>${ownerLabel(entry.eigenaar)} · ${monthLabel(entry.maand)}</strong><span>Spaarpot ${eur(entry.spaarpot)} · verdeeld ${eur(entry.verdeeld)} · onverdeeld ${eur(entry.onverdeeld)}</span><small>${entry.transacties.map((tx) => `${textSafe(tx.doelNaam)} ${eur(tx.bedrag)}`).join(" · ")}</small></article>`).join("") || '<p class="hint">Nog geen maanden verwerkt.</p>'}</div></details>
     </div>`;
     root.querySelectorAll("[data-u2-process-owner]").forEach((btn) => btn.addEventListener("click", () => u2OpenProcessModal(btn.dataset.u2ProcessOwner)));
   };
@@ -5580,8 +5620,8 @@ service cloud.firestore {
     const original = u2OriginalDashboardGoalPreviewCard(item);
     if (!((_a = goal.subdoelen) == null ? void 0 : _a.length)) return original;
     const active = u2ActiveChild(goal);
-    const calculated = calcDoel2(goal, TODAY2);
-    const extra = `<div class="u2-dashboard-extra"><span>${active ? `Volgende: ${textSafe2(active.naam)}` : "Alle subdoelen voltooid"}</span><span>Verwacht gereed: ${u2DateLabel(calculated.verwachteEinddatum)}</span></div>`;
+    const calculated = calcDoel(goal, TODAY);
+    const extra = `<div class="u2-dashboard-extra"><span>${active ? `Volgende: ${textSafe(active.naam)}` : "Alle subdoelen voltooid"}</span><span>Verwacht gereed: ${u2DateLabel(calculated.verwachteEinddatum)}</span></div>`;
     return original.replace(/\s*<\/div>\s*<\/div>\s*$/, `${extra}</div></div>`);
   };
   var u2OriginalMobileGoalRow = renderMobileGoalRow;
@@ -5596,9 +5636,9 @@ service cloud.firestore {
       const saved = Math.min(target, Math.max(0, Number(child.gespaard) || 0));
       const progress = target > 0 ? Math.min(100, Math.round(saved / target * 100)) : 0;
       const stateClass = child.voltooid ? "done" : (active == null ? void 0 : active.id) === child.id ? "active" : "";
-      return `<div class="u2-accordion-child ${stateClass}"><strong>${textSafe2(child.naam || "Subdoel")}</strong><span>${eur2(saved)} / ${eur2(target)}</span><div class="progress-track"><div class="progress-fill" style="width:${progress}%"></div></div></div>`;
+      return `<div class="u2-accordion-child ${stateClass}"><strong>${textSafe(child.naam || "Subdoel")}</strong><span>${eur(saved)} / ${eur(target)}</span><div class="progress-track"><div class="progress-fill" style="width:${progress}%"></div></div></div>`;
     }).join("");
-    const body = `<div class="u2-accordion-body">${children}<button type="button" class="ghost small u2-accordion-edit" data-open-goal-editor="${owner}:${textSafe2(goal.id)}">Subdoelen beheren</button></div>`;
+    const body = `<div class="u2-accordion-body">${children}<button type="button" class="ghost small u2-accordion-edit" data-open-goal-editor="${owner}:${textSafe(goal.id)}">Subdoelen beheren</button></div>`;
     return original.replace('<div class="mobile-goal-row">', '<details class="u2-goal-accordion"><summary><div class="mobile-goal-row">').replace(/\s*<\/div>\s*$/, `</div></summary>${body}</details>`);
   };
   renderMobileSpaardoelen = function() {
@@ -5617,11 +5657,11 @@ service cloud.firestore {
       const processed = u2IsProcessed(group.owner);
       const actions = document.createElement("div");
       actions.className = "u2-inline-actions";
-      actions.innerHTML = `<span>Spaarpot ${monthLabel2(getSelectedMonth2())}: ${eur2(group.pot)}</span><button type="button" class="ghost small" data-u2-process-owner="${group.owner}" ${processed ? "disabled" : ""}>${processed ? "Maand verwerkt" : "Spaarpot verwerken"}</button>`;
+      actions.innerHTML = `<span>Spaarpot ${monthLabel(getSelectedMonth())}: ${eur(group.pot)}</span><button type="button" class="ghost small" data-u2-process-owner="${group.owner}" ${processed ? "disabled" : ""}>${processed ? "Maand verwerkt" : "Spaarpot verwerken"}</button>`;
       (_a = section.querySelector("h2")) == null ? void 0 : _a.insertAdjacentElement("afterend", actions);
     });
     const history = Object.values(state.spaardoelGeschiedenis || {}).sort((a, b) => String(b.maand).localeCompare(String(a.maand)));
-    const historyHtml = `<div class="u2-history-list">${history.map((entry) => `<article><strong>${ownerLabel(entry.eigenaar)} Â· ${monthLabel2(entry.maand)}</strong><span>Spaarpot ${eur2(entry.spaarpot)} Â· verdeeld ${eur2(entry.verdeeld)} Â· onverdeeld ${eur2(entry.onverdeeld)}</span><small>${entry.transacties.map((tx) => `${textSafe2(tx.doelNaam)} ${eur2(tx.bedrag)}`).join(" Â· ")}</small></article>`).join("") || '<p class="hint">Nog geen maanden verwerkt.</p>'}</div>`;
+    const historyHtml = `<div class="u2-history-list">${history.map((entry) => `<article><strong>${ownerLabel(entry.eigenaar)} Â· ${monthLabel(entry.maand)}</strong><span>Spaarpot ${eur(entry.spaarpot)} Â· verdeeld ${eur(entry.verdeeld)} Â· onverdeeld ${eur(entry.onverdeeld)}</span><small>${entry.transacties.map((tx) => `${textSafe(tx.doelNaam)} ${eur(tx.bedrag)}`).join(" Â· ")}</small></article>`).join("") || '<p class="hint">Nog geen maanden verwerkt.</p>'}</div>`;
     root.insertAdjacentHTML("beforeend", `<div class="manage-stack u2-history-stack">${renderManageSection("Spaargeschiedenis", historyHtml, false)}</div>`);
     root.querySelectorAll(".u2-goal-accordion [data-open-goal-editor]").forEach((btn) => btn.addEventListener("click", (event) => {
       event.preventDefault();
@@ -5648,7 +5688,7 @@ service cloud.firestore {
     section.className = "full u2-subgoal-editor";
     const renderChildren = () => {
       var _a2;
-      section.innerHTML = `<div class="u2-subgoal-head"><div><h3>Subdoelen</h3><p>Er wordt altijd van boven naar beneden gespaard.</p></div><button type="button" class="ghost small" data-u2-add-child>+ Subdoel</button></div><div class="u2-subgoal-list">${drafts.map((child, index) => `<div class="u2-subgoal-row" draggable="true" data-u2-child="${index}"><span class="u2-drag" title="Sleep om te verplaatsen">⋮⋮</span><input aria-label="Naam subdoel" data-u2-child-name="${index}" value="${textSafe2(child.naam || "")}"><input aria-label="Doelbedrag subdoel" type="number" min="0" step="0.01" data-u2-child-target="${index}" value="${Number(child.doelbedrag) || 0}"><input aria-label="Link subdoel" type="url" data-u2-child-link="${index}" value="${textSafe2(child.link || "")}" placeholder="Optionele link"><span>${eur2(Number(child.gespaard) || 0)}</span><button type="button" class="ghost small" data-u2-child-up="${index}" ${index === 0 ? "disabled" : ""}>↑</button><button type="button" class="ghost small" data-u2-child-down="${index}" ${index === drafts.length - 1 ? "disabled" : ""}>↓</button><button type="button" class="danger-ghost" data-u2-child-remove="${index}">×</button></div>`).join("") || '<p class="hint">Nog geen subdoelen. Het hoofddoelbedrag blijft handmatig instelbaar.</p>'}</div>`;
+      section.innerHTML = `<div class="u2-subgoal-head"><div><h3>Subdoelen</h3><p>Er wordt altijd van boven naar beneden gespaard.</p></div><button type="button" class="ghost small" data-u2-add-child>+ Subdoel</button></div><div class="u2-subgoal-list">${drafts.map((child, index) => `<div class="u2-subgoal-row" draggable="true" data-u2-child="${index}"><span class="u2-drag" title="Sleep om te verplaatsen">⋮⋮</span><input aria-label="Naam subdoel" data-u2-child-name="${index}" value="${textSafe(child.naam || "")}"><input aria-label="Doelbedrag subdoel" type="number" min="0" step="0.01" data-u2-child-target="${index}" value="${Number(child.doelbedrag) || 0}"><input aria-label="Link subdoel" type="url" data-u2-child-link="${index}" value="${textSafe(child.link || "")}" placeholder="Optionele link"><span>${eur(Number(child.gespaard) || 0)}</span><button type="button" class="ghost small" data-u2-child-up="${index}" ${index === 0 ? "disabled" : ""}>↑</button><button type="button" class="ghost small" data-u2-child-down="${index}" ${index === drafts.length - 1 ? "disabled" : ""}>↓</button><button type="button" class="danger-ghost" data-u2-child-remove="${index}">×</button></div>`).join("") || '<p class="hint">Nog geen subdoelen. Het hoofddoelbedrag blijft handmatig instelbaar.</p>'}</div>`;
       targetInput.disabled = drafts.length > 0;
       if (drafts.length) targetInput.value = round2(drafts.reduce((sum, child) => sum + (Number(child.doelbedrag) || 0), 0));
       const sync = () => {
@@ -5769,20 +5809,20 @@ service cloud.firestore {
       if (newest && !newest.eigenaar) commitChange(() => Object.assign(newest, { eigenaar: owner, ratoVerdeling: true, subdoelen: [] }), { render: false });
     }, 0), true);
   };
-  function u3ConfirmedTransactions(month = getSelectedMonth2()) {
+  function u3ConfirmedTransactions(month = getSelectedMonth()) {
     return (state.transactions || []).filter((tx) => transactionMonth(tx) === month && (tx.reviewStatus || "bevestigd") === "bevestigd");
   }
-  function u3IncomeOccurrences(month = getSelectedMonth2()) {
+  function u3IncomeOccurrences(month = getSelectedMonth()) {
     return u3PlannedOccurrences(state.recurringIncomeSources || [], month).map((row) => {
       const source = (state.recurringIncomeSources || []).find((item) => item.id === row.itemId);
       return { ...row, source, type: (source == null ? void 0 : source.type) || "overig", owner: (source == null ? void 0 : source.eigenaar) || "gezamenlijk", meetellenVoorVerdeling: !!(source == null ? void 0 : source.meetellenVoorVerdeling) };
     });
   }
-  function u3FixedOccurrences(month = getSelectedMonth2(), scenario = state.meta.scenario) {
+  function u3FixedOccurrences(month = getSelectedMonth(), scenario = state.meta.scenario) {
     var _a;
     return u3PlannedOccurrences(((_a = state.recurringFixedExpenses) == null ? void 0 : _a[scenario]) || [], month);
   }
-  function u3LinkedActual(kind, occurrenceId, month = getSelectedMonth2()) {
+  function u3LinkedActual(kind, occurrenceId, month = getSelectedMonth()) {
     const field = kind === "income" ? "incomeOccurrenceId" : "fixedOccurrenceId";
     return u3ConfirmedTransactions(month).find((tx) => tx[field] === occurrenceId) || null;
   }
@@ -5791,14 +5831,14 @@ service cloud.firestore {
     return actual ? round2(Math.abs(Number(actual.amount) || 0)) : round2(occurrence.amount);
   }
   function u3IncomeForOwner(owner, options = {}) {
-    const month = options.month || getSelectedMonth2();
+    const month = options.month || getSelectedMonth();
     return round2(u3IncomeOccurrences(month).filter((row) => row.owner === owner && (options.type ? row.type === options.type : true) && (options.distributionOnly ? row.meetellenVoorVerdeling : true)).reduce((sum, row) => sum + u3IncomeOccurrenceValue(row), 0));
   }
   function u3IncomeTransactionOwner(tx) {
     const source = (state.recurringIncomeSources || []).find((item) => item.id === tx.incomeSourceId);
     return tx.accountOwner || tx.account || (source == null ? void 0 : source.eigenaar) || tx.budgetOwner || tx.financialFor || tx.owner || "gezamenlijk";
   }
-  function resolveMonthlyIncome(owner, month = getSelectedMonth2()) {
+  function resolveMonthlyIncome(owner, month = getSelectedMonth()) {
     var _a, _b, _c, _d;
     if (owner === "total") {
       const aggregate = (_a = state.actualIncomeOverrides) == null ? void 0 : _a[month];
@@ -5823,25 +5863,25 @@ service cloud.firestore {
     }
     return { amount: 0, source: "none" };
   }
-  function u3ActualIncome(month = getSelectedMonth2(), financialFor = null) {
+  function u3ActualIncome(month = getSelectedMonth(), financialFor = null) {
     return resolveMonthlyIncome(financialFor || "total", month).amount;
   }
-  function u3ActualExpenses(month = getSelectedMonth2(), financialFor = null) {
+  function u3ActualExpenses(month = getSelectedMonth(), financialFor = null) {
     return round2(u3ConfirmedTransactions(month).filter((tx) => !financialFor || (tx.financialFor || tx.owner) === financialFor).reduce((sum, tx) => sum + getTransactionExpenseImpact(tx), 0));
   }
-  function u3ExpectedIncome(month = getSelectedMonth2(), financialFor = null) {
+  function u3ExpectedIncome(month = getSelectedMonth(), financialFor = null) {
     return round2(u3IncomeOccurrences(month).filter((row) => !financialFor || row.financialFor === financialFor).reduce((sum, row) => sum + Number(row.amount || 0), 0));
   }
-  function u3PlannedFixedTotal(month = getSelectedMonth2(), financialFor = null) {
+  function u3PlannedFixedTotal(month = getSelectedMonth(), financialFor = null) {
     return round2(u3FixedOccurrences(month).filter((row) => !financialFor || row.financialFor === financialFor).reduce((sum, row) => sum + Number(row.amount || 0), 0));
   }
-  function u3VariableBudgets(owner, month = getSelectedMonth2(), scenario = state.meta.scenario) {
+  function u3VariableBudgets(owner, month = getSelectedMonth(), scenario = state.meta.scenario) {
     var _a, _b, _c;
     ensureMonthData(month);
     const key = `${owner}Variabel`;
     return ((_c = (_b = (_a = state.monthlyBudgets) == null ? void 0 : _a[month]) == null ? void 0 : _b[scenario]) == null ? void 0 : _c[key]) || [];
   }
-  function u3BudgetSummary(owner, month = getSelectedMonth2(), scenario = state.meta.scenario) {
+  function u3BudgetSummary(owner, month = getSelectedMonth(), scenario = state.meta.scenario) {
     const budgets = u3VariableBudgets(owner, month, scenario);
     const map = /* @__PURE__ */ new Map();
     const ensure = (label, budget = null) => {
@@ -5875,7 +5915,7 @@ service cloud.firestore {
       return { ...row, difference: round2(((_a = row.budget) != null ? _a : 0) - row.actual), status: row.budget === null ? "geen-budget" : row.actual > row.budget ? "overschreden" : "resterend" };
     });
   }
-  function u3ReserveDelta(owner, month = getSelectedMonth2(), scenario = state.meta.scenario) {
+  function u3ReserveDelta(owner, month = getSelectedMonth(), scenario = state.meta.scenario) {
     return round2(u3BudgetSummary(owner, month, scenario).reduce((sum, row) => sum + row.difference, 0));
   }
   function u3ReserveBalance(owner, throughMonth = "9999-12") {
@@ -5897,7 +5937,7 @@ service cloud.firestore {
       return sum;
     }, 0);
   }
-  function u3AccountControl(month = getSelectedMonth2()) {
+  function u3AccountControl(month = getSelectedMonth()) {
     const result = {};
     U3_ACCOUNTS.forEach((account) => {
       const opening = u3OpeningBalance(account, month);
@@ -5930,7 +5970,7 @@ service cloud.firestore {
   function u3OpenAdvances(month = null) {
     return (state.advanceLedger || []).filter((row) => row.status !== "voldaan" && Number(row.outstandingAmount) > 0 && (!month || row.month <= month));
   }
-  function u3NetAdvances(month = getSelectedMonth2()) {
+  function u3NetAdvances(month = getSelectedMonth()) {
     const pairs = /* @__PURE__ */ new Map();
     u3OpenAdvances(month).forEach((row) => {
       const forward = `${row.debtor}|${row.creditor}`;
@@ -5944,7 +5984,7 @@ service cloud.firestore {
     });
     return result;
   }
-  function u3MonthRecord(month = getSelectedMonth2()) {
+  function u3MonthRecord(month = getSelectedMonth()) {
     if (!isPlainObject(state.monthRecords[month])) state.monthRecords[month] = { month, status: "open", closedAt: "", reopenedAt: "", activeClosureId: "", closureHistory: [] };
     return state.monthRecords[month];
   }
@@ -5970,7 +6010,7 @@ service cloud.firestore {
     add("dara-sparen", "dara", "", Math.max(0, scenarioResult.dara.beschikbaarVoorSparen), "Dara spaarrekening");
     return drafts;
   }
-  function u3MonthSummary(month = getSelectedMonth2()) {
+  function u3MonthSummary(month = getSelectedMonth()) {
     const scenarioResult = calcScenario(state);
     const actualIncome = u3ActualIncome(month);
     const actualExpenses = u3ActualExpenses(month);
@@ -5998,7 +6038,7 @@ service cloud.firestore {
       state.meta.selectedMonth = previous;
     }
   }
-  function u3LiveFinancialSnapshot(month = getSelectedMonth2()) {
+  function u3LiveFinancialSnapshot(month = getSelectedMonth()) {
     return u3WithSelectedMonth(month, () => {
       const scenarioResult = calcScenario(state);
       const dionIncome = resolveMonthlyIncome("dion", month);
@@ -6048,7 +6088,7 @@ service cloud.firestore {
       };
     });
   }
-  function getMonthFinancialResult(month = getSelectedMonth2()) {
+  function getMonthFinancialResult(month = getSelectedMonth()) {
     var _a;
     const record = (_a = state.monthRecords) == null ? void 0 : _a[month];
     if (record && ["afgesloten", "correctie-nodig"].includes(record.status) && record.activeClosureId) {
@@ -6081,7 +6121,7 @@ service cloud.firestore {
     });
     u2ReconcileSavingsGoals();
   }
-  function u3CloseMonth(month = getSelectedMonth2(), actualBalances = {}, correctionAccounts = [], options = {}) {
+  function u3CloseMonth(month = getSelectedMonth(), actualBalances = {}, correctionAccounts = [], options = {}) {
     const pending = u3PendingReviews(month);
     if (pending.length && !options.force) return { requiresWarning: true, pendingCount: pending.length, month };
     const record = u3MonthRecord(month);
@@ -6125,7 +6165,7 @@ service cloud.firestore {
     record.closureHistory.push(closure);
     return closure;
   }
-  function u3ReopenMonth(month = getSelectedMonth2()) {
+  function u3ReopenMonth(month = getSelectedMonth()) {
     const record = u3MonthRecord(month);
     if (record.status !== "afgesloten") return false;
     const closure = record.closureHistory.find((item) => (item.closingId || item.id) === record.activeClosureId);
@@ -6197,17 +6237,17 @@ service cloud.firestore {
     else state.recognitionRules.unshift(next);
     state.recognitionRules = state.recognitionRules.slice(0, 300);
   }
-  function u3PendingReviews(month = getSelectedMonth2()) {
+  function u3PendingReviews(month = getSelectedMonth()) {
     return (state.transactionReviewQueue || []).filter((row) => (row.reviewStatus || "te-controleren") === "te-controleren" && String(row.date || "").slice(0, 7) === month);
   }
-  function assertMonthMutationAllowed(month = getSelectedMonth2(), mode = "direct") {
+  function assertMonthMutationAllowed(month = getSelectedMonth(), mode = "direct") {
     var _a, _b;
     const status = (_b = (_a = state.monthRecords) == null ? void 0 : _a[month]) == null ? void 0 : _b.status;
     if (!["afgesloten", "correctie-nodig"].includes(status)) return true;
     if (["reopen", "correction", "late-import"].includes(mode)) return true;
     throw new Error("Deze maand is afgesloten. Heropen de maand of maak een correctie om financiële gegevens te wijzigen.");
   }
-  function u3AssertMonthOpen(month = getSelectedMonth2()) {
+  function u3AssertMonthOpen(month = getSelectedMonth()) {
     return assertMonthMutationAllowed(month);
   }
   function u3AccountLabel(value) {
@@ -6227,7 +6267,7 @@ service cloud.firestore {
   }
   function renderU3AdminPanel() {
     var _a;
-    const month = getSelectedMonth2();
+    const month = getSelectedMonth();
     const summary = u3MonthSummary(month);
     const record = (_a = state.monthRecords) == null ? void 0 : _a[month];
     const pending = u3PendingReviews(month).length;
@@ -6238,10 +6278,10 @@ service cloud.firestore {
     const body = `<section class="card u3-admin-card">
     <div class="u3-admin-head"><p>Verwacht, werkelijk, rekeningen, reserve en onderlinge voorschotten</p><span class="u3-status ${status}">${statusLabel}</span></div>
     <div class="u3-admin-metrics">
-      <div class="u3-admin-metric"><span>Verwacht inkomen</span><strong>${eur2(summary.expectedIncome)}</strong></div>
-      <div class="u3-admin-metric"><span>Werkelijk inkomen</span><strong>${eur2(summary.actualIncome)}</strong></div>
-      <div class="u3-admin-metric"><span>Werkelijke uitgaven</span><strong>${eur2(summary.actualExpenses)}</strong></div>
-      <div class="u3-admin-metric"><span>Gezamenlijke rekening</span><strong>${eur2(control.gezamenlijk.calculatedEnd)}</strong></div>
+      <div class="u3-admin-metric"><span>Verwacht inkomen</span><strong>${eur(summary.expectedIncome)}</strong></div>
+      <div class="u3-admin-metric"><span>Werkelijk inkomen</span><strong>${eur(summary.actualIncome)}</strong></div>
+      <div class="u3-admin-metric"><span>Werkelijke uitgaven</span><strong>${eur(summary.actualExpenses)}</strong></div>
+      <div class="u3-admin-metric"><span>Gezamenlijke rekening</span><strong>${eur(control.gezamenlijk.calculatedEnd)}</strong></div>
     </div>
     <div class="u3-admin-actions">
       <button type="button" class="ghost small" data-u3-open="planning">Vaste lasten & inkomsten</button>
@@ -6257,10 +6297,10 @@ service cloud.firestore {
     root.querySelectorAll("[data-u3-open]").forEach((button) => button.addEventListener("click", () => {
       var _a, _b;
       const view = button.dataset.u3Open;
-      if (view === "planning") u3OpenPlanning();
+      if (view === "planning") u3OpenPlanning(button.dataset.u3PlanningOwner || "");
       else if (view === "review") u3OpenReview();
       else if (view === "actual-income") {
-        const month = getSelectedMonth2();
+        const month = getSelectedMonth();
         const current = (_b = (_a = state.actualIncomeOverrides) == null ? void 0 : _a[month]) == null ? void 0 : _b.total;
         const value = prompt(`Werkelijk inkomen voor ${month}. Laat leeg om de handmatige correctie te verwijderen.`, Number.isFinite(Number(current)) ? String(current) : String(u3ActualIncome(month)));
         if (value === null) return;
@@ -6290,45 +6330,48 @@ service cloud.firestore {
     if (kind === "income") return state.recurringIncomeSources || [];
     return ((_a = state.recurringFixedExpenses) == null ? void 0 : _a[state.meta.scenario]) || [];
   }
-  function u3OpenPlanning() {
-    const fixed = u3RecurringRows("fixed");
+  function u3OpenPlanning(owner = "") {
+    const planningOwner = U3_ACCOUNTS.includes(owner) ? owner : "";
+    const fixed = u3RecurringRows("fixed").filter((item) => !planningOwner || (item.financialFor || item.rekening || "gezamenlijk") === planningOwner);
     const incomes = u3RecurringRows("income");
-    const rows = (items, kind) => items.map((item) => `<article class="u3-admin-row"><div class="u3-row-head"><div><strong>${textSafe2(item.naam || "Zonder naam")}</strong><br><small>${u3AccountLabel(item.rekening)} → ${u3AccountLabel(item.financialFor || item.rekening)} · elke ${item.frequentieAantal} ${textSafe2(item.frequentieEenheid)}</small></div><div><span class="u3-status ${item.actief !== false ? "ok" : ""}">${item.actief !== false ? "Actief" : "Gestopt"}</span> <button class="ghost small" data-u3-edit-recurring="${kind}:${item.id}">Bewerken</button></div></div><div>${eur2(u3AmountAt(item, getSelectedMonth2()))} <small>· gemiddeld ${eur2(u3MonthlyAverage(item))} p/m</small></div></article>`).join("");
-    const { modal } = u3AdminModal(`<div class="u3-admin-head"><div><div class="section-kicker">${monthLabel2(getSelectedMonth2())} · ${state.meta.scenario === "voor" ? "Voor verkoop" : "Na verkoop"}</div><h2>Planning beheren</h2><p>Bedragen kunnen voor één maand of vanaf deze maand wijzigen.</p></div><button class="ghost" data-u3-close>Sluiten</button></div>
+    const ownerName = planningOwner ? u3AccountLabel(planningOwner) : "";
+    const rows = (items, kind) => items.map((item) => `<article class="u3-admin-row"><div class="u3-row-head"><div><strong>${textSafe(item.naam || "Zonder naam")}</strong><br><small>${u3AccountLabel(item.rekening)} → ${u3AccountLabel(item.financialFor || item.rekening)} · elke ${item.frequentieAantal} ${textSafe(item.frequentieEenheid)}</small></div><div><span class="u3-status ${item.actief !== false ? "ok" : ""}">${item.actief !== false ? "Actief" : "Gestopt"}</span> <button class="ghost small" data-u3-edit-recurring="${kind}:${item.id}">Bewerken</button></div></div><div>${eur(u3AmountAt(item, getSelectedMonth()))} <small>· gemiddeld ${eur(u3MonthlyAverage(item))} p/m</small></div></article>`).join("");
+    const { modal } = u3AdminModal(`<div class="u3-admin-head"><div><div class="section-kicker">${monthLabel(getSelectedMonth())} · ${state.meta.scenario === "voor" ? "Voor verkoop" : "Na verkoop"}</div><h2>${planningOwner ? `${textSafe(ownerName)} vaste lasten` : "Planning beheren"}</h2><p>${planningOwner ? `Alleen de vaste lasten die financieel voor ${textSafe(ownerName)} zijn.` : "Bedragen kunnen voor één maand of vanaf deze maand wijzigen."}</p></div><button class="ghost" data-u3-close>Sluiten</button></div>
     <div class="u3-steps">
-      <section class="u3-step"><div class="u3-step-head"><div><h3>Vaste lasten</h3><p>${fixed.length} terugkerende posten in dit scenario</p></div><button class="primary small" data-u3-add-recurring="fixed">+ Vaste last</button></div><div class="u3-admin-list">${rows(fixed, "fixed") || '<div class="u3-empty">Nog geen vaste lasten.</div>'}</div></section>
-      <section class="u3-step"><div class="u3-step-head"><div><h3>Inkomstenbronnen</h3><p>${incomes.length} terugkerende bronnen</p></div><button class="primary small" data-u3-add-recurring="income">+ Inkomstenbron</button></div><div class="u3-admin-list">${rows(incomes, "income") || '<div class="u3-empty">Nog geen inkomstenbronnen.</div>'}</div></section>
+      <section class="u3-step"><div class="u3-step-head"><div><h3>Vaste lasten</h3><p>${fixed.length} terugkerende posten${planningOwner ? ` voor ${textSafe(ownerName)}` : " in dit scenario"}</p></div><button class="primary small" data-u3-add-recurring="fixed">+ Vaste last</button></div><div class="u3-admin-list">${rows(fixed, "fixed") || '<div class="u3-empty">Nog geen vaste lasten.</div>'}</div></section>
+      ${planningOwner ? "" : `<section class="u3-step"><div class="u3-step-head"><div><h3>Inkomstenbronnen</h3><p>${incomes.length} terugkerende bronnen</p></div><button class="primary small" data-u3-add-recurring="income">+ Inkomstenbron</button></div><div class="u3-admin-list">${rows(incomes, "income") || '<div class="u3-empty">Nog geen inkomstenbronnen.</div>'}</div></section>`}
     </div>`);
-    modal.querySelectorAll("[data-u3-add-recurring]").forEach((button) => button.addEventListener("click", () => u3OpenRecurringEditor(button.dataset.u3AddRecurring)));
+    modal.querySelectorAll("[data-u3-add-recurring]").forEach((button) => button.addEventListener("click", () => u3OpenRecurringEditor(button.dataset.u3AddRecurring, "", { owner: planningOwner || "gezamenlijk", planningOwner })));
     modal.querySelectorAll("[data-u3-edit-recurring]").forEach((button) => button.addEventListener("click", () => {
       const [kind, id] = button.dataset.u3EditRecurring.split(":");
-      u3OpenRecurringEditor(kind, id);
+      u3OpenRecurringEditor(kind, id, { planningOwner });
     }));
   }
   function u3OpenRecurringEditor(kind, id = "", defaults = {}) {
     var _a, _b;
     const existing = u3RecurringRows(kind).find((item) => item.id === id);
     const income = kind === "income";
-    const current = getSelectedMonth2();
+    const current = getSelectedMonth();
     const value = existing ? u3AmountAt(existing, current) : 0;
     const defaultOwner = U3_ACCOUNTS.includes(defaults.owner) ? defaults.owner : "gezamenlijk";
+    const planningOwner = U3_ACCOUNTS.includes(defaults.planningOwner) ? defaults.planningOwner : "";
     const { modal } = u3AdminModal(`<div class="u3-admin-head"><div><div class="section-kicker">${income ? "Inkomstenbron" : "Vaste last"}</div><h2>${existing ? "Bewerken" : "Toevoegen"}</h2></div><button class="ghost" data-u3-close>Sluiten</button></div>
     <div class="u3-grid">
-      <label class="full">Naam<input id="u3RecName" value="${textSafe2((existing == null ? void 0 : existing.naam) || "")}"></label>
+      <label class="full">Naam<input id="u3RecName" value="${textSafe((existing == null ? void 0 : existing.naam) || "")}"></label>
       <label>Bedrag<input id="u3RecAmount" type="number" step="0.01" inputmode="decimal" value="${Number(value) || ""}"></label>
-      ${income ? `<label>Type<select id="u3RecCategory">${["loon", "toeslag", "vergoeding/teruggave", "overig"].map((value2) => `<option ${(existing == null ? void 0 : existing.type) === value2 ? "selected" : ""}>${value2}</option>`).join("")}</select></label>` : `<label>Categorie<input id="u3RecCategory" value="${textSafe2((existing == null ? void 0 : existing.categorie) || "Overig")}"></label>`}
+      ${income ? `<label>Type<select id="u3RecCategory">${["loon", "toeslag", "vergoeding/teruggave", "overig"].map((value2) => `<option ${(existing == null ? void 0 : existing.type) === value2 ? "selected" : ""}>${value2}</option>`).join("")}</select></label>` : `<label>Categorie<input id="u3RecCategory" value="${textSafe((existing == null ? void 0 : existing.categorie) || "Overig")}"></label>`}
       <label>Fysieke rekening<select id="u3RecAccount">${U3_ACCOUNTS.map((value2) => `<option value="${value2}" ${((existing == null ? void 0 : existing.rekening) || defaultOwner) === value2 ? "selected" : ""}>${u3AccountLabel(value2)}</option>`).join("")}</select></label>
       <label>Financieel voor<select id="u3RecFor">${U3_ACCOUNTS.map((value2) => `<option value="${value2}" ${((existing == null ? void 0 : existing.financialFor) || (existing == null ? void 0 : existing.rekening) || defaultOwner) === value2 ? "selected" : ""}>${u3AccountLabel(value2)}</option>`).join("")}</select></label>
       ${income ? `<label>Eigenaar<select id="u3RecOwner">${U3_ACCOUNTS.map((value2) => `<option value="${value2}" ${((existing == null ? void 0 : existing.eigenaar) || "gezamenlijk") === value2 ? "selected" : ""}>${u3AccountLabel(value2)}</option>`).join("")}</select></label><label class="u2-checkbox"><input id="u3RecDistribution" type="checkbox" ${(existing == null ? void 0 : existing.meetellenVoorVerdeling) !== false ? "checked" : ""}> Meetellen voor verdeling</label>` : ""}
       <label>Elke<input id="u3RecFrequency" type="number" min="1" step="1" value="${(existing == null ? void 0 : existing.frequentieAantal) || 1}"></label>
       <label>Frequentie<select id="u3RecUnit">${U3_FREQUENCY_UNITS.map((value2) => `<option value="${value2}" ${(existing == null ? void 0 : existing.frequentieEenheid) === value2 ? "selected" : ""}>${value2}</option>`).join("")}</select></label>
-      <label>Begindatum<input id="u3RecStart" type="date" value="${textSafe2((existing == null ? void 0 : existing.begindatum) || `${current}-01`)}"></label>
-      <label>Einddatum<input id="u3RecEnd" type="date" value="${textSafe2((existing == null ? void 0 : existing.einddatum) || "")}"></label>
-      <label>Bedrag wijzigen<select id="u3RecScope"><option value="from">Vanaf ${monthLabel2(current)}</option><option value="once">Alleen ${monthLabel2(current)}</option></select></label>
+      <label>Begindatum<input id="u3RecStart" type="date" value="${textSafe((existing == null ? void 0 : existing.begindatum) || `${current}-01`)}"></label>
+      <label>Einddatum<input id="u3RecEnd" type="date" value="${textSafe((existing == null ? void 0 : existing.einddatum) || "")}"></label>
+      <label>Bedrag wijzigen<select id="u3RecScope"><option value="from">Vanaf ${monthLabel(current)}</option><option value="once">Alleen ${monthLabel(current)}</option></select></label>
       <label class="u2-checkbox"><input id="u3RecActive" type="checkbox" ${(existing == null ? void 0 : existing.actief) !== false ? "checked" : ""}> Actief</label>
     </div>
     <div class="modal-actions">${existing ? '<button class="danger-ghost" id="u3RecDelete">Stoppen</button>' : ""}<button class="ghost" data-u3-back-planning>Terug</button><button class="primary" id="u3RecSave">Opslaan</button></div>`);
-    (_a = modal.querySelector("[data-u3-back-planning]")) == null ? void 0 : _a.addEventListener("click", u3OpenPlanning);
+    (_a = modal.querySelector("[data-u3-back-planning]")) == null ? void 0 : _a.addEventListener("click", () => u3OpenPlanning(planningOwner));
     (_b = modal.querySelector("#u3RecDelete")) == null ? void 0 : _b.addEventListener("click", () => {
       try {
         u3AssertMonthOpen();
@@ -6336,7 +6379,7 @@ service cloud.firestore {
           existing.actief = false;
           existing.einddatum = existing.einddatum || u3IsoDate(/* @__PURE__ */ new Date(`${current}-01T12:00:00`));
         }, { render: false });
-        u3OpenPlanning();
+        u3OpenPlanning(planningOwner);
       } catch (error) {
         alert(error.message);
       }
@@ -6376,16 +6419,16 @@ service cloud.firestore {
           }
           if (!existing) u3RecurringRows(kind).push(item);
         }, { render: false });
-        u3OpenPlanning();
+        u3OpenPlanning(planningOwner);
       } catch (error) {
         alert(error.message);
       }
     });
   }
   function u3ReviewOccurrenceOptions(row) {
-    const month = String(row.date || "").slice(0, 7) || getSelectedMonth2();
-    const fixed = u3FixedOccurrences(month).filter((item) => !u3LinkedActual("fixed", item.id, month)).map((item) => `<option value="fixed|${item.id}">Vaste last · ${textSafe2(item.naam)} · ${eur2(item.amount)}</option>`);
-    const incomes = u3IncomeOccurrences(month).filter((item) => !u3LinkedActual("income", item.id, month)).map((item) => `<option value="income|${item.id}">Inkomen · ${textSafe2(item.naam)} · ${eur2(item.amount)}</option>`);
+    const month = String(row.date || "").slice(0, 7) || getSelectedMonth();
+    const fixed = u3FixedOccurrences(month).filter((item) => !u3LinkedActual("fixed", item.id, month)).map((item) => `<option value="fixed|${item.id}">Vaste last · ${textSafe(item.naam)} · ${eur(item.amount)}</option>`);
+    const incomes = u3IncomeOccurrences(month).filter((item) => !u3LinkedActual("income", item.id, month)).map((item) => `<option value="income|${item.id}">Inkomen · ${textSafe(item.naam)} · ${eur(item.amount)}</option>`);
     return '<option value="">Geen koppeling</option>' + fixed.concat(incomes).join("");
   }
   function u3OpenReview() {
@@ -6395,17 +6438,17 @@ service cloud.firestore {
       const financialFor = (suggestion == null ? void 0 : suggestion.financialFor) || row.financialFor || row.account || "gezamenlijk";
       const category = (suggestion == null ? void 0 : suggestion.category) || row.category || "Overig";
       return `<article class="u3-admin-row" data-u3-review-row="${row.id}">
-      <div class="u3-row-head"><div><strong>${textSafe2(row.description || "Zonder omschrijving")}</strong><br><small>${textSafe2(row.date)} · ${u3AccountLabel(row.account)} · ${row.kind === "inkomen" ? "bijschrijving" : "afschrijving"}</small></div><strong class="${row.kind === "inkomen" ? "value pos" : "value neg"}">${eur2(Math.abs(Number(row.amount) || 0))}</strong></div>
+      <div class="u3-row-head"><div><strong>${textSafe(row.description || "Zonder omschrijving")}</strong><br><small>${textSafe(row.date)} · ${u3AccountLabel(row.account)} · ${row.kind === "inkomen" ? "bijschrijving" : "afschrijving"}</small></div><strong class="${row.kind === "inkomen" ? "value pos" : "value neg"}">${eur(Math.abs(Number(row.amount) || 0))}</strong></div>
       <div class="u3-review-fields">
         <label>Financieel voor<select data-u3-review-for>${U3_ACCOUNTS.map((value) => `<option value="${value}" ${financialFor === value ? "selected" : ""}>${u3AccountLabel(value)}</option>`).join("")}</select></label>
-        <label>Categorie<input data-u3-review-category value="${textSafe2(category)}"></label>
+        <label>Categorie<input data-u3-review-category value="${textSafe(category)}"></label>
         <label class="full">Koppeling<select data-u3-review-link>${u3ReviewOccurrenceOptions(row)}</select></label>
         <label class="u2-checkbox"><input type="checkbox" data-u3-review-advance ${(row.account || "gezamenlijk") !== financialFor ? "checked" : ""}> Voorschot/schuld bij afwijkende rekening</label>
       </div>
       <div class="u3-admin-actions"><button class="ghost small" data-u3-ignore-review="${row.id}">Negeren</button><button class="primary small" data-u3-confirm-review="${row.id}">Bevestigen</button></div>
     </article>`;
     }).join("");
-    const { modal } = u3AdminModal(`<div class="u3-admin-head"><div><div class="section-kicker">${monthLabel2(getSelectedMonth2())}</div><h2>Transacties controleren</h2><p>Suggesties worden nooit automatisch bevestigd.</p></div><button class="ghost" data-u3-close>Sluiten</button></div><div class="u3-admin-list">${rowHtml || '<div class="u3-empty">Alles is gecontroleerd.</div>'}</div>`);
+    const { modal } = u3AdminModal(`<div class="u3-admin-head"><div><div class="section-kicker">${monthLabel(getSelectedMonth())}</div><h2>Transacties controleren</h2><p>Suggesties worden nooit automatisch bevestigd.</p></div><button class="ghost" data-u3-close>Sluiten</button></div><div class="u3-admin-list">${rowHtml || '<div class="u3-empty">Alles is gecontroleerd.</div>'}</div>`);
     modal.querySelectorAll("[data-u3-ignore-review]").forEach((button) => button.addEventListener("click", () => {
       commitChange(() => {
         const row = state.transactionReviewQueue.find((item) => item.id === button.dataset.u3IgnoreReview);
@@ -6459,23 +6502,23 @@ service cloud.firestore {
   }
   function u3OpenClose() {
     var _a, _b, _c, _d;
-    const month = getSelectedMonth2();
+    const month = getSelectedMonth();
     const record = u3MonthRecord(month);
     const summary = u3MonthSummary(month);
     const control = u3AccountControl(month);
     const pending = u3PendingReviews(month).length;
     const budgets = U3_ACCOUNTS.flatMap((owner) => u3BudgetSummary(owner, month).map((row) => ({ ...row, owner })));
-    const budgetHtml = budgets.map((row) => `<div class="u3-budget-row"><strong>${u3AccountLabel(row.owner)} · ${textSafe2(row.category)}</strong><span>${row.budget === null ? "Geen budget ingesteld" : eur2(row.budget)}</span><span>${eur2(row.actual)}</span><span class="${row.difference < 0 ? "value neg" : "value pos"}">${eur2(row.difference)}</span></div>`).join("");
+    const budgetHtml = budgets.map((row) => `<div class="u3-budget-row"><strong>${u3AccountLabel(row.owner)} · ${textSafe(row.category)}</strong><span>${row.budget === null ? "Geen budget ingesteld" : eur(row.budget)}</span><span>${eur(row.actual)}</span><span class="${row.difference < 0 ? "value neg" : "value pos"}">${eur(row.difference)}</span></div>`).join("");
     const accounts = U3_ACCOUNTS.map((account) => {
       const setting = state.accountSettings[account];
       const row = control[account];
-      return `<div class="u3-account-row"><div><strong>${u3AccountLabel(account)}</strong><br><small>Administratief ${eur2(row.calculatedEnd)} · opening ${eur2(row.opening)}</small></div><input data-u3-actual="${account}" type="number" step="0.01" inputmode="decimal" placeholder="Banksaldo"><label class="u2-checkbox"><input data-u3-correct="${account}" type="checkbox"> corrigeer verschil</label>${(setting == null ? void 0 : setting.openingBalanceSet) ? "" : `<div><input data-u3-opening="${account}" type="number" step="0.01" placeholder="Openingssaldo"><button class="ghost small" data-u3-save-opening="${account}">Eenmalig vastleggen</button></div>`}</div>`;
+      return `<div class="u3-account-row"><div><strong>${u3AccountLabel(account)}</strong><br><small>Administratief ${eur(row.calculatedEnd)} · opening ${eur(row.opening)}</small></div><input data-u3-actual="${account}" type="number" step="0.01" inputmode="decimal" placeholder="Banksaldo"><label class="u2-checkbox"><input data-u3-correct="${account}" type="checkbox"> corrigeer verschil</label>${(setting == null ? void 0 : setting.openingBalanceSet) ? "" : `<div><input data-u3-opening="${account}" type="number" step="0.01" placeholder="Openingssaldo"><button class="ghost small" data-u3-save-opening="${account}">Eenmalig vastleggen</button></div>`}</div>`;
     }).join("");
-    const { modal } = u3AdminModal(`<div class="u3-admin-head"><div><div class="section-kicker">${monthLabel2(month)}</div><h2>Maandafsluiting</h2><p>Afgesloten geschiedenis blijft als onveranderlijke snapshot bewaard.</p></div><span class="u3-status ${record.status === "afgesloten" ? "closed" : pending ? "pending" : "ok"}">${record.status === "afgesloten" ? "Afgesloten" : pending ? `${pending} transacties open` : "Open"}</span><button class="ghost" data-u3-close>Sluiten</button></div>
+    const { modal } = u3AdminModal(`<div class="u3-admin-head"><div><div class="section-kicker">${monthLabel(month)}</div><h2>Maandafsluiting</h2><p>Afgesloten geschiedenis blijft als onveranderlijke snapshot bewaard.</p></div><span class="u3-status ${record.status === "afgesloten" ? "closed" : pending ? "pending" : "ok"}">${record.status === "afgesloten" ? "Afgesloten" : pending ? `${pending} transacties open` : "Open"}</span><button class="ghost" data-u3-close>Sluiten</button></div>
     <div class="u3-steps">
-      <section class="u3-step"><div class="u3-step-head"><div><h3>1. Controle</h3><p>Alleen ongecontroleerde transacties blokkeren.</p></div><span class="u3-status ${pending ? "warn" : "ok"}">${pending ? `${pending} te doen` : "Compleet"}</span></div><div class="u3-grid"><div>Verwacht inkomen<br><strong>${eur2(summary.expectedIncome)}</strong></div><div>Werkelijk inkomen<br><strong>${eur2(summary.actualIncome)}</strong></div><div>Geplande vaste lasten<br><strong>${eur2(summary.plannedFixed)}</strong></div><div>Werkelijke uitgaven<br><strong>${eur2(summary.actualExpenses)}</strong></div></div><div class="u3-budget-list">${budgetHtml || "<small>Geen variabele budgetten.</small>"}</div></section>
+      <section class="u3-step"><div class="u3-step-head"><div><h3>1. Controle</h3><p>Alleen ongecontroleerde transacties blokkeren.</p></div><span class="u3-status ${pending ? "warn" : "ok"}">${pending ? `${pending} te doen` : "Compleet"}</span></div><div class="u3-grid"><div>Verwacht inkomen<br><strong>${eur(summary.expectedIncome)}</strong></div><div>Werkelijk inkomen<br><strong>${eur(summary.actualIncome)}</strong></div><div>Geplande vaste lasten<br><strong>${eur(summary.plannedFixed)}</strong></div><div>Werkelijke uitgaven<br><strong>${eur(summary.actualExpenses)}</strong></div></div><div class="u3-budget-list">${budgetHtml || "<small>Geen variabele budgetten.</small>"}</div></section>
       <section class="u3-step"><div class="u3-step-head"><div><h3>2. Rekeningstanden</h3><p>Een verschil wijzigt alleen met een expliciete correctie het volgende saldo.</p></div></div>${accounts}</section>
-      <section class="u3-step"><div class="u3-step-head"><div><h3>3. Overboekingen</h3><p>Zakgeld, sparen en netto voorschotten worden als voorstellen klaargezet.</p></div></div>${u3NetAdvances(month).map((row) => `<div>${u3AccountLabel(row.debtor)} → ${u3AccountLabel(row.creditor)} <strong>${eur2(row.amount)}</strong></div>`).join("") || "<small>Geen openstaande voorschotten.</small>"}</section>
+      <section class="u3-step"><div class="u3-step-head"><div><h3>3. Overboekingen</h3><p>Zakgeld, sparen en netto voorschotten worden als voorstellen klaargezet.</p></div></div>${u3NetAdvances(month).map((row) => `<div>${u3AccountLabel(row.debtor)} → ${u3AccountLabel(row.creditor)} <strong>${eur(row.amount)}</strong></div>`).join("") || "<small>Geen openstaande voorschotten.</small>"}</section>
       <section class="u3-step"><div class="u3-step-head"><div><h3>4. Bevestigen</h3><p>Open bankcontroles geven een waarschuwing maar blokkeren afsluiten niet.</p></div></div><div class="modal-actions">${record.status === "afgesloten" ? '<button class="danger-ghost" id="u3ReopenMonth">Maand heropenen</button>' : pending ? '<button class="ghost" id="u3GoTransactions">Ga naar banktransacties</button><button class="primary" id="u3CloseMonthForce">Toch maand sluiten</button>' : '<button class="primary" id="u3CloseMonth">Maand afsluiten</button>'}</div></section>
     </div>`);
     modal.querySelectorAll("[data-u3-save-opening]").forEach((button) => button.addEventListener("click", () => {
@@ -6523,13 +6566,13 @@ service cloud.firestore {
     (_d = modal.querySelector("#u3CloseMonthForce")) == null ? void 0 : _d.addEventListener("click", () => closeMonth(true));
   }
   function u3OpenTransfers() {
-    const month = getSelectedMonth2();
+    const month = getSelectedMonth();
     const rows = (state.internalTransfers || []).filter((row) => row.month === month);
     const html = rows.map((row) => {
       var _a;
-      return `<article class="u3-admin-row"><div class="u3-transfer-row"><div><strong>${textSafe2(row.destination || row.type)}</strong><br><small>${u3AccountLabel(row.sourceAccount)}${row.targetAccount ? ` → ${u3AccountLabel(row.targetAccount)}` : ""} · ${row.status}</small></div><input data-u3-transfer-amount="${row.id}" type="number" step="0.01" value="${Number((_a = row.actualAmount) != null ? _a : row.calculatedAmount) || 0}" ${row.status === "uitgevoerd" ? "disabled" : ""}><button class="${row.status === "uitgevoerd" ? "ghost" : "primary"} small" data-u3-confirm-transfer="${row.id}" ${row.status === "uitgevoerd" ? "disabled" : ""}>${row.status === "uitgevoerd" ? "Uitgevoerd" : "Bevestig"}</button></div></article>`;
+      return `<article class="u3-admin-row"><div class="u3-transfer-row"><div><strong>${textSafe(row.destination || row.type)}</strong><br><small>${u3AccountLabel(row.sourceAccount)}${row.targetAccount ? ` → ${u3AccountLabel(row.targetAccount)}` : ""} · ${row.status}</small></div><input data-u3-transfer-amount="${row.id}" type="number" step="0.01" value="${Number((_a = row.actualAmount) != null ? _a : row.calculatedAmount) || 0}" ${row.status === "uitgevoerd" ? "disabled" : ""}><button class="${row.status === "uitgevoerd" ? "ghost" : "primary"} small" data-u3-confirm-transfer="${row.id}" ${row.status === "uitgevoerd" ? "disabled" : ""}>${row.status === "uitgevoerd" ? "Uitgevoerd" : "Bevestig"}</button></div></article>`;
     }).join("");
-    const { modal } = u3AdminModal(`<div class="u3-admin-head"><div><div class="section-kicker">${monthLabel2(month)}</div><h2>Interne overboekingen</h2><p>Uitvoering is handmatig; bevestigde aflossingen tellen niet als inkomen of uitgave.</p></div><button class="ghost" data-u3-close>Sluiten</button></div><div class="u3-admin-list">${html || '<div class="u3-empty">Nog geen voorstellen. Sluit de maand eerst af.</div>'}</div>`);
+    const { modal } = u3AdminModal(`<div class="u3-admin-head"><div><div class="section-kicker">${monthLabel(month)}</div><h2>Interne overboekingen</h2><p>Uitvoering is handmatig; bevestigde aflossingen tellen niet als inkomen of uitgave.</p></div><button class="ghost" data-u3-close>Sluiten</button></div><div class="u3-admin-list">${html || '<div class="u3-empty">Nog geen voorstellen. Sluit de maand eerst af.</div>'}</div>`);
     modal.querySelectorAll("[data-u3-confirm-transfer]").forEach((button) => button.addEventListener("click", () => {
       const id = button.dataset.u3ConfirmTransfer;
       const amount = bankAmount(modal.querySelector(`[data-u3-transfer-amount="${id}"]`).value);
@@ -6544,7 +6587,7 @@ service cloud.firestore {
   var u3LegacyMonthlyScenarioData = getMonthlyScenarioData;
   getMonthlyScenarioData = function(scenario = state.meta.scenario) {
     const base = u3LegacyMonthlyScenarioData(scenario);
-    const month = getSelectedMonth2();
+    const month = getSelectedMonth();
     const result = cloneState(base);
     U3_ACCOUNTS.forEach((account) => {
       const planned = u3FixedOccurrences(month, scenario).filter((row) => row.financialFor === account);
@@ -6554,13 +6597,13 @@ service cloud.firestore {
     });
     return result;
   };
-  getMonthlyBaseIncome = function(person, month = getSelectedMonth2()) {
+  getMonthlyBaseIncome = function(person, month = getSelectedMonth()) {
     return getDistributionIncomeParts(person, month).salary;
   };
-  sumVasteTeruggaven = function(person, month = getSelectedMonth2()) {
+  sumVasteTeruggaven = function(person, month = getSelectedMonth()) {
     return getDistributionIncomeParts(person, month).refund;
   };
-  getMonthTransactions = function(owner = null, month = getSelectedMonth2()) {
+  getMonthTransactions = function(owner = null, month = getSelectedMonth()) {
     return (state.transactions || []).filter((tx) => transactionMonth(tx) === month && (tx.reviewStatus || "bevestigd") === "bevestigd" && (!owner || (tx.financialFor || tx.owner) === owner));
   };
   window.FinizeUpdate3 = Object.freeze({
@@ -6586,7 +6629,7 @@ service cloud.firestore {
   });
   window.FinizeUpdate2 = Object.freeze({
     schemaVersion: U2_SCHEMA_VERSION,
-    calculateGroup: (goals, pot, today) => calcGroep2(cloneState(goals), pot, new Date(today)),
+    calculateGroup: (goals, pot, today) => calcGroep(cloneState(goals), pot, new Date(today)),
     normalizeSubgoals: (goal) => {
       const copy = cloneState(goal);
       u2NormalizeChildren(copy);
@@ -6635,13 +6678,13 @@ service cloud.firestore {
     bindBankImport,
     commitChange,
     DataAdapter,
-    getSelectedMonth: getSelectedMonth2,
+    getSelectedMonth,
     localSave,
     openTransactionModal,
     renderActiveTab,
     renderBankImportSection,
     renderTransactionsTable,
-    safeImageUrl: safeImageUrl2,
+    safeImageUrl,
     __finizeInstallUpdate4Hooks: installUpdate4Hooks
   });
 

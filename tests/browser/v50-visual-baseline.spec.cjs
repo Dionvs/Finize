@@ -15,11 +15,17 @@ const styleSelectors = [
   '.v4-bottom-nav'
 ];
 
+async function keepVisualFixtureLocal(page) {
+  await page.route('https://www.gstatic.com/firebasejs/**', route => route.abort());
+  await page.route('https://firestore.googleapis.com/**', route => route.abort());
+}
+
 test.skip(process.platform !== 'win32', 'De pixelbaseline gebruikt de Windows-letterrendering van de v50-baseline.');
 test.setTimeout(60_000);
 
 for (const width of widths) {
   test(`v50 visuele baseline op ${width}px`, async ({ page }) => {
+    await keepVisualFixtureLocal(page);
     await page.addInitScript(fixture => {
       localStorage.setItem('finize-budget-planner-v1', JSON.stringify(fixture));
       localStorage.setItem('finize-device-id', 'v50-visual-fixture');
@@ -37,6 +43,7 @@ for (const width of widths) {
 }
 
 test('v50 computed-style-contract', async ({ page }) => {
+  await keepVisualFixtureLocal(page);
   await page.addInitScript(fixture => {
     localStorage.setItem('finize-budget-planner-v1', JSON.stringify(fixture));
     localStorage.setItem('finize-device-id', 'v50-visual-fixture');
