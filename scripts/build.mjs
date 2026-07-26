@@ -11,6 +11,7 @@ const styleSources = [
   ["styles", "goals.css"],
   ["styles", "dashboard.css"],
   ["styles", "import.css"],
+  ["styles", "tablet.css"],
   ["styles", "desktop.css"]
 ];
 const normalize = value => value.replace(/\r\n/g, "\n").trim() + "\n";

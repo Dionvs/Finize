@@ -10,6 +10,7 @@ const files = [
   "src/styles/goals.css",
   "src/styles/dashboard.css",
   "src/styles/import.css",
+  "src/styles/tablet.css",
   "src/styles/desktop.css"
 ];
 
