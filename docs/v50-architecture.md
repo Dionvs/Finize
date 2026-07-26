@@ -1,28 +1,28 @@
-# Finize v50 — actieve architectuur
+# Finize v53 — actieve architectuur
 
-## Runtime en laadvolgorde
+## Runtime en build
 
-De v50-baseline laadt in deze volgorde:
+`index.html` bevat alleen markup en laadt `app.css` en `app.js`. De browser heeft geen buildserver nodig.
 
-1. twee inline stijlblokken uit `index.html`;
-2. `update4.css`;
-3. `update5.css`;
-4. de vroege foutregistratie uit `index.html`;
-5. de kernruntime uit `index.html`;
-6. `update4.js`;
-7. `update5.js`;
-8. de service-workerregistratie.
+- `src/app-entry.js` bepaalt de uitvoervolgorde.
+- `src/core/` bevat de state-, migratie-, validatie- en rekencontracten.
+- `src/storage/` bevat de lokale, cloud- en afbeeldingsopslagcontracten.
+- `src/import/` bevat parser, classificatie, importopslag, synchronisatie en UI-contracten.
+- `src/ui/` bevat rendering, presentatie, modals en iconen.
+- `src/styles/` bevat de actieve CSS-bronnen voor tokens, basis, dashboard, spaardoelen, import, tablet en desktop.
+- `scripts/build.mjs` bundelt JavaScript met esbuild en voegt CSS in vaste cascadevolgorde samen.
+- `app.js` en `app.css` zijn gegenereerd, gecommitteerd en byte-reproduceerbaar.
 
-De tijdelijke bronfragmenten onder `src/legacy/` bewaren exact deze cascade- en uitvoervolgorde. `scripts/build.mjs` maakt daar zonder timestamp of sourcemap de gecommitteerde `app.css` en `app.js` van. Tot de actieve omschakeling blijven de oorspronkelijke bestanden door `index.html` geladen.
+De build bevat geen timestamp en geen sourcemap. CI voert dezelfde Node 24-build uit en faalt als de gecommitteerde runtime afwijkt.
 
 ## State en financiële kern
 
 - `state` is de centrale, genormaliseerde budgetstate.
-- `commitChange` blijft de enige transactionele kern voor gevalideerde statewijzigingen.
-- Schema v9 blijft ongewijzigd.
-- De bestaande transacties, maandresultaten, afsluitsnapshots en verdelingsregels blijven de financiële bron van waarheid.
+- `commitChange` blijft de transactionele kern voor gevalideerde statewijzigingen.
+- Schema v9 en alle bestaande opslagvormen blijven ongewijzigd.
 - De verdeling vóór verkoop blijft `Math.max(0.40, inkomensaandeelDion)`.
 - De verdeling na verkoop blijft hypotheek 50/50 en overige gezamenlijke lasten naar rato van inkomen.
+- Bestaande transacties, maandresultaten, afsluitsnapshots en importeffecten blijven de financiële bron van waarheid.
 
 ## Opslagverantwoordelijkheden
 
@@ -41,37 +41,33 @@ De tijdelijke bronfragmenten onder `src/legacy/` bewaren exact deze cascade- en 
 
 Lokale importdetails blijven leidend. Cloudkopieën mogen lokale bewerkingen niet stilzwijgend overschrijven.
 
-## Compatibiliteitsfacades en globals
+## Compatibiliteit
 
-De volgende interne contracten blijven tijdens de modularisering bestaan:
+De bestaande interne contracten blijven beschikbaar:
 
 - `window.FinizeUpdate4`;
 - `window.FinizeUpdate5`;
-- `FinizeUpdate4Runtime`;
-- `FinizeUpdate4Process`;
+- `window.FinizeUpdate4Runtime`;
+- `window.FinizeUpdate4Process`;
 - `window.DataAdapter`;
 - `window.CloudAdapter`.
 
-Er wordt geen externe API toegevoegd. Functies worden pas uit globals gehaald nadat tests en de actieve bundle aantonen dat alle aanroepen via expliciete imports lopen.
+Er is geen externe API toegevoegd. Klassieke globals die door de bestaande runtime en regressietests nodig zijn, worden expliciet gepubliceerd.
 
-## Actief en legacy
+## PWA
 
-| Bestandsgroep | v50-status | Einddoel |
-|---|---|---|
-| `index.html` inline CSS/JS | actief | alleen markup en `app.*`-verwijzingen |
-| `update4.js/css` | actief | opgenomen in modules en bundle |
-| `update5.js/css` | actief | opgenomen in modules en bundle |
-| `app.js/css` | gegenereerd, nog niet actief | enige actieve runtime |
-| `src/legacy/` | tijdelijke bron | vervangen door echte modules |
-| `index-OLD.html`, `finize-v4.html`, `finize-mobile.html` | herstelkopieën | verwijderen na bewezen gelijkwaardigheid |
+De cachemarker is `finize-v53-code-cleanup`. Alleen caches met de prefix `finize-` worden opgeruimd. Alleen navigatieverzoeken mogen offline op `index.html` terugvallen; ontbrekende scripts, CSS en afbeeldingen krijgen nooit HTML als vervanging. Optionele pictogrammen kunnen een installatie niet blokkeren.
 
-## Bewust bevroren v50-uitvoer
+## Herstel en bewust behouden uitvoer
 
-De bekende mojibake en de bestaande spaardoel-progressiebalkafwijking zijn onderdeel van de visuele v50-baseline. Deze opschoning verandert ze niet.
+De tag `v50-audit-baseline`, de lokale Git-bundle en de back-up onder `backups/` vormen de herstelroute. De verwijderde legacy-HTML- en updatebestanden blijven via die route beschikbaar.
+
+De bekende mojibake en de bestaande spaardoel-progressiebalkafwijking zijn bewust onderdeel van de bevroren v50-uitvoer en zijn niet in deze technische opschoning aangepast.
 
 ## Uitgestelde risico's
 
-- Publieke Firestore-toegang blijft een bewust geaccepteerd privacyrisico, omdat authenticatie niet gewenst is.
+- Publieke Firestore-toegang blijft een geaccepteerd privacyrisico, omdat authenticatie niet gewenst is.
 - Het hoofdstate-document wordt niet opgesplitst.
 - Doelafbeeldingen krijgen geen nieuwe cloudopslag.
 - Er komen geen afzonderlijke opgeslagen schemaversies per opslaglaag.
+- Bestaande visueel noodzakelijke `!important`- en tabselectors blijven staan wanneer verwijderen de bevroren uitvoer verandert.

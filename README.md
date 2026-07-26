@@ -14,7 +14,7 @@ pnpm run build
 pnpm test
 ```
 
-De actieve GitHub Pages-runtime wordt reproduceerbaar gebouwd naar `app.js` en `app.css`. Tijdens de v50-opruiming zijn de bestaande runtimebestanden nog actief totdat hun gelijkwaardigheid volledig is bewezen.
+De actieve GitHub Pages-runtime wordt reproduceerbaar gebouwd naar `app.js` en `app.css`. `index.html` laadt uitsluitend deze twee runtimebestanden.
 
 ## PWA installeren
 
@@ -29,7 +29,7 @@ Gegevens worden lokaal opgeslagen in localStorage en IndexedDB. Als Firebase/Fir
 
 - `index.html`: actieve GitHub Pages-app.
 - `app.js` en `app.css`: reproduceerbare runtime-uitvoer.
-- `src/`: onderhoudbare broncode en tijdelijke volgordegetrouwe v50-fragmenten.
+- `src/`: onderhoudbare modules en componentgerichte stijlbronnen.
 - `service-worker.js` en `manifest.json`: PWA-bestanden.
 - `firestore.rules`: toegangsregels voor de hoofdstate, imports en importchunks.
 - `tests/`: financiële, opslag-, structuur- en browserregressies.
