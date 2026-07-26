@@ -1,0 +1,9 @@
+:root{
+  /* Compatibiliteitsaliases: de v50-computed styles blijven ongewijzigd. */
+  --surface:transparent;
+  --surface-2:transparent;
+  --soft-green:transparent;
+  --green-pale:transparent;
+  --cream:transparent;
+  --ink:var(--text);
+}

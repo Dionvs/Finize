@@ -16,13 +16,14 @@ const css = await readFile(path.join(root, "app.css"), "utf8");
 const ast = postcss.parse(css, { from: "app.css" });
 const defined = new Set();
 const used = new Set();
+const runtimeTokens = new Set(["--pct", "--used-pct"]);
 
 ast.walkDecls(decl => {
   if (decl.prop.startsWith("--")) defined.add(decl.prop);
   for (const match of decl.value.matchAll(/var\((--[\w-]+)/g)) used.add(match[1]);
 });
 
-const undefinedTokens = [...used].filter(token => !defined.has(token)).sort();
+const undefinedTokens = [...used].filter(token => !defined.has(token) && !runtimeTokens.has(token)).sort();
 if (undefinedTokens.length) {
   console.warn(`Bekende v50-tokens zonder definitie: ${undefinedTokens.join(", ")}`);
 }

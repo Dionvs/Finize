@@ -4,21 +4,31 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const styleFiles = ["00-core.css", "10-late.css", "20-update4.css", "30-update5.css"];
+const styleSources = [
+  ["styles", "tokens.css"],
+  ["legacy/styles", "00-core.css"],
+  ["legacy/styles", "10-late.css"],
+  ["legacy/styles", "20-update4.css"],
+  ["legacy/styles", "30-update5.css"]
+];
 const scriptFiles = ["00-bootstrap.js", "10-core.js", "20-update4.js", "30-update5.js", "40-service-worker-registration.js"];
 const normalize = value => value.replace(/\r\n/g, "\n").trim() + "\n";
 
-async function bundle(folder, files, label) {
-  const parts = await Promise.all(files.map(async file => {
-    const source = normalize(await readFile(path.join(root, "src", "legacy", folder, file), "utf8"));
+async function bundleSources(sources, label) {
+  const parts = await Promise.all(sources.map(async ([folder, file]) => {
+    const source = normalize(await readFile(path.join(root, "src", folder, file), "utf8"));
     return `/* ${label}: ${file} */\n${source}`;
   }));
   return parts.join("\n");
 }
 
+async function bundleLegacy(folder, files, label) {
+  return bundleSources(files.map(file => [`legacy/${folder}`, file]), label);
+}
+
 const outputs = new Map([
-  ["app.css", await bundle("styles", styleFiles, "Finize v50 bron")],
-  ["app.js", await bundle("scripts", scriptFiles, "Finize v50 bron")]
+  ["app.css", await bundleSources(styleSources, "Finize bron")],
+  ["app.js", await bundleLegacy("scripts", scriptFiles, "Finize v50 bron")]
 ]);
 
 if (process.argv.includes("--check")) {

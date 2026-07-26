@@ -1,4 +1,15 @@
-/* Finize v50 bron: 00-core.css */
+/* Finize bron: tokens.css */
+:root{
+  /* Compatibiliteitsaliases: de v50-computed styles blijven ongewijzigd. */
+  --surface:transparent;
+  --surface-2:transparent;
+  --soft-green:transparent;
+  --green-pale:transparent;
+  --cream:transparent;
+  --ink:var(--text);
+}
+
+/* Finize bron: 00-core.css */
 :root{
   --bg:#fbf4ea;
   --bg-soft:#f6eadc;
@@ -5105,7 +5116,7 @@ body.v4-app .modal-content{ min-width:0; }
   }
 }
 
-/* Finize v50 bron: 10-late.css */
+/* Finize bron: 10-late.css */
 /* Update 2 — slimme spaardoelen */
 .u2-savings{display:grid;gap:14px}
 .u2-owner-section{display:grid;gap:8px}
@@ -5363,7 +5374,7 @@ button.icon-only-finize{width:34px;height:34px;padding:0!important;border-radius
   .v4-bottom-nav .bottom-nav-btn.active .bn-icon{outline:none!important;box-shadow:inset 0 0 0 1px rgba(111,138,85,.16)!important}
 }
 
-/* Finize v50 bron: 20-update4.css */
+/* Finize bron: 20-update4.css */
 .u4-import-panel{display:grid;gap:12px}
 .u4-import-actions,.u4-import-summary,.u4-import-row-main,.u4-receipt-head,.u4-modal-head,.u4-modal-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .u4-import-actions input[type=file]{position:absolute;inline-size:1px;block-size:1px;opacity:0;pointer-events:none}
@@ -5590,7 +5601,7 @@ button.icon-only-finize{width:34px;height:34px;padding:0!important;border-radius
   .budget-transactions-modal{width:100%;max-height:78dvh;border-radius:22px 22px 0 0;margin-top:auto}
 }
 
-/* Finize v50 bron: 30-update5.css */
+/* Finize bron: 30-update5.css */
 /* Update 5: uitsluitend tablet- en desktop-presentatie. Mobiel onder 768px blijft leidend. */
 .u5-nav-icon{display:none}
 body.v4-app .value.is-negative{color:var(--red) !important}
