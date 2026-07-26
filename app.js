@@ -2289,6 +2289,7 @@ function commitChange(change, options={}){
   try{
     if (typeof change === 'function') change(state);
     else if (typeof change?.apply === 'function') change.apply(state);
+    if(JSON.stringify(before)===JSON.stringify(state))return true;
     Object.entries(before.monthRecords||{}).forEach(([month,record])=>{
       if(!['afgesloten','correctie-nodig'].includes(record?.status))return;
       const afterRecord=state.monthRecords?.[month];
@@ -2363,7 +2364,9 @@ function bindInputs(root){
     el.value = getMonthlyIncome(person);
     const commit = ()=>{
       const parsed = parseFloat(String(el.value).replace(',', '.'));
-      setMonthlyIncome(person, Number.isFinite(parsed) ? parsed : 0);
+      const value=Number.isFinite(parsed) ? parsed : 0;
+      if(round2(Number(getMonthlyIncome(person))||0)===round2(value))return;
+      setMonthlyIncome(person, value);
       persist();
       renderActiveTab();
     };
@@ -2385,12 +2388,12 @@ function bindInputs(root){
         if (el.dataset.percent === 'true') v = v / 100;
       }
       if (type === 'checkbox') v = el.checked;
+      if(JSON.stringify(getPath(state,path))===JSON.stringify(v))return;
       setPath(state, path, v);
       persist();
       renderActiveTab();
     };
     el.addEventListener('change', commit);
-    if (type === 'checkbox') el.addEventListener('click', commit);
   });
   root.querySelectorAll('[data-item-path][data-item-id][data-item-field]').forEach(el=>{
     const item = findItemById(el.dataset.itemPath, el.dataset.itemId);
@@ -2406,10 +2409,10 @@ function bindInputs(root){
         value = Number.isFinite(parsed) ? round2(parsed) : 0;
         if (el.dataset.percent === 'true') value /= 100;
       } else if (typeof value === 'string') value = value.trim();
+      if(JSON.stringify(item[field])===JSON.stringify(value))return;
       commitChange(()=>updateItemById(el.dataset.itemPath, el.dataset.itemId, {[field]:value}), {render:false});
     };
     el.addEventListener('change', save);
-    if (el.type !== 'checkbox') el.addEventListener('blur', save);
   });
 }
 
@@ -3498,6 +3501,14 @@ function openMonthPicker(){
   control.classList.add('open');
   document.getElementById('monthPickerButton')?.setAttribute('aria-expanded', 'true');
 }
+function bindModalBackdrop(modal,close){
+  modal.__finizeBackdropClose=close;
+  if(modal.dataset.finizeBackdropBound==='true')return;
+  modal.dataset.finizeBackdropBound='true';
+  modal.addEventListener('click',event=>{
+    if(event.target===modal)modal.__finizeBackdropClose?.();
+  });
+}
 function openTransactionModal(){
   const modal = document.getElementById('transactionModal');
   const today = getSelectedMonth() + '-' + String(new Date().getDate()).padStart(2,'0');
@@ -3527,7 +3538,7 @@ function openTransactionModal(){
   const close = ()=> modal.classList.remove('open');
   document.getElementById('btnCloseTransaction').addEventListener('click', close);
   document.getElementById('btnCancelTransaction').addEventListener('click', close);
-  modal.addEventListener('click', (e)=>{ if (e.target === modal) close(); }, {once:true});
+  bindModalBackdrop(modal,close);
   document.getElementById('btnSaveTransaction').addEventListener('click', ()=>{
     const saveButton = document.getElementById('btnSaveTransaction');
     if (saveButton.disabled) return;
@@ -3667,7 +3678,7 @@ function openJointTransactionModal(transactionId=''){
   const close = ()=> modal.classList.remove('open', 'joint-transaction-modal-open');
   document.getElementById('btnCloseJointTransaction').addEventListener('click', close);
   document.getElementById('btnCancelJointTransaction').addEventListener('click', close);
-  modal.addEventListener('click', event=>{ if (event.target === modal) close(); }, {once:true});
+  bindModalBackdrop(modal,close);
   document.getElementById('btnSaveJointTransaction').addEventListener('click', ()=>{
     const saveButton = document.getElementById('btnSaveJointTransaction');
     if (saveButton.disabled) return;
@@ -4208,7 +4219,7 @@ function openSavingEditModal(){
   });
   document.getElementById('btnCloseSavingEdit').addEventListener('click', close);
   document.getElementById('btnCancelSavingEdit').addEventListener('click', close);
-  modal.addEventListener('click', (e)=>{ if (e.target === modal) close(); }, {once:true});
+  bindModalBackdrop(modal,close);
   document.getElementById('btnSaveSavingEdit').addEventListener('click', ()=>{
     const parsed = parseFloat(String(input.value).replace(',', '.'));
     state[scenario].spaarpotDezeMaand = round2(Number.isFinite(parsed) ? parsed : 0);
@@ -4262,7 +4273,7 @@ function openIncomeEditModal(person, label){
   refundInput.addEventListener('input',()=>input.dispatchEvent(new Event('input')));
   document.getElementById('btnCloseIncomeEdit').addEventListener('click', close);
   document.getElementById('btnCancelIncomeEdit').addEventListener('click', close);
-  modal.addEventListener('click', (e)=>{ if (e.target === modal) close(); }, {once:true});
+  bindModalBackdrop(modal,close);
   document.getElementById('btnSaveIncomeEdit').addEventListener('click', ()=>{
     const parsed = parseFloat(String(input.value).replace(',', '.'));
     const refund=bankAmount(refundInput.value);
@@ -4304,7 +4315,7 @@ function openTotalIncomeEditModal(){
   inputs.forEach(input=>input.addEventListener('input',updatePreview));
   document.getElementById('btnCloseTotalIncomeEdit').addEventListener('click',close);
   document.getElementById('btnCancelTotalIncomeEdit').addEventListener('click',close);
-  modal.addEventListener('click',event=>{if(event.target===modal)close();},{once:true});
+  bindModalBackdrop(modal,close);
   document.getElementById('btnSaveTotalIncomeEdit').addEventListener('click',()=>{
     assertMonthMutationAllowed(month);ensureMonthData(month);
     const values={dion:{salary:amount(inputs[0]),refund:amount(inputs[1])},dara:{salary:amount(inputs[2]),refund:amount(inputs[3])}};
@@ -4567,7 +4578,7 @@ function openBudgetTransactionsModal(category,owner='gezamenlijk'){
   modal.classList.add('open');
   const close=()=>{modal.classList.remove('open');modal.innerHTML='';};
   modal.querySelector('[data-close-budget-transactions]')?.addEventListener('click',close);
-  modal.addEventListener('click',event=>{if(event.target===modal)close();},{once:true});
+  bindModalBackdrop(modal,close);
   modal.querySelectorAll('[data-open-budget-transaction-id]').forEach(button=>button.addEventListener('click',()=>{const id=button.dataset.openBudgetTransactionId;close();owner==='gezamenlijk'?openJointTransactionModal(id):openPersonalTransactionModal(owner,id);}));
 }
 function renderActiveTab(){
