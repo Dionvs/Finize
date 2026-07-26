@@ -48,7 +48,7 @@
   }
 
   function goalImageMarkup(goal, className){
-    const source = String(goalImageSource(goal) || '').replace(/'/g,'%27');
+    const source = safeImageUrl(goalImageSource(goal));
     const style = source ? ` style="background-image:url('${source}')"` : '';
     return `<span class="${className}${source?' has-image':''}"${style}>${source?'':goalIcon(goal)}</span>`;
   }

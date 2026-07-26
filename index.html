@@ -6183,6 +6183,15 @@ function budgetStatus(used, budget){
 function textSafe(value){
   return String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 }
+function attrSafe(value){
+  return textSafe(value).replace(/`/g,'&#96;').replace(/[\u0000-\u001f\u007f]/g,'');
+}
+function safeImageUrl(value){
+  const source=String(value||'').trim();
+  if(/^data:image\/(?:png|jpe?g|webp|gif);base64,[a-z0-9+/=\s]+$/i.test(source))return source.replace(/\s+/g,'');
+  if(/^blob:https?:\/\/[a-z0-9.-]+(?::\d+)?\/[a-z0-9-]+$/i.test(source))return source;
+  return '';
+}
 function goalIcon(goal){
   return iconSvg(goalIconName(goal));
 }
@@ -6435,11 +6444,11 @@ function renderJointTransactionsCardHead(){
 }
 function renderJointTransactionsCard(){
   const rows = getMonthTransactions('gezamenlijk').filter(isBudgetExpenseTransaction).sort((a,b)=>String(b.date || '').localeCompare(String(a.date || '')));
-  const rowsHtml = rows.map(tx=>`<div class="joint-transaction-row" data-edit-joint-transaction="${tx.id}" role="button" tabindex="0" aria-label="Transactie ${textSafe(tx.description || tx.category || 'bewerken')} bewerken">
+  const rowsHtml = rows.map(tx=>`<div class="joint-transaction-row" data-edit-joint-transaction="${attrSafe(tx.id)}" role="button" tabindex="0" aria-label="Transactie ${attrSafe(tx.description || tx.category || 'bewerken')} bewerken">
     <span class="joint-transaction-meta"><span class="joint-transaction-date" title="${formatDateNL(tx.date)}">${formatDayMonth(tx.date)}</span><span class="joint-transaction-category" title="${textSafe(tx.category || 'Overig')}">${textSafe(tx.category || 'Overig')}</span></span>
     <span class="joint-transaction-description"><span class="joint-transaction-description-text" title="${textSafe(tx.description || '')}">${textSafe(tx.description || '—')}</span>${tx.note ? `<span class="joint-transaction-note" title="${textSafe(tx.note)}">${textSafe(tx.note)}</span>` : ''}</span>
     <strong class="joint-transaction-amount">${eur(Number(tx.amount) || 0)}</strong>
-    <button type="button" class="joint-transaction-delete" data-remove-transaction="${tx.id}" aria-label="Transactie verwijderen">×</button>
+    <button type="button" class="joint-transaction-delete" data-remove-transaction="${attrSafe(tx.id)}" aria-label="Transactie verwijderen">×</button>
   </div>`).join('');
   return `<div class="card joint-two-column-card joint-transactions-card">${renderJointTransactionsCardHead()}<div class="joint-transactions-list">${rowsHtml || '<p class="joint-transactions-empty">Nog geen uitgaven deze maand.</p>'}</div><div class="joint-transactions-total"><span>Totaal uitgaven</span><strong>${eur(sumTransactions('gezamenlijk'))}</strong></div></div>`;
 }
@@ -6471,7 +6480,7 @@ function renderEmptyState(icon, title, text, action=''){
   return `<div class="empty-state"><span class="icon-circle">${renderIconContent(icon)}</span><h4>${title}</h4><p>${text}</p>${action}</div>`;
 }
 function renderPageHeading(title, subtitle){
-  return `<div class="page-heading"><h2>${title}</h2>${subtitle ? `<p>${subtitle}</p>` : ''}</div>`;
+  return `<div class="page-heading"><h2>${textSafe(title)}</h2>${subtitle ? `<p>${textSafe(subtitle)}</p>` : ''}</div>`;
 }
 function goalStatusBadge(progress){
   if (progress >= 1) return '<span class="status-badge">Op schema</span>';
@@ -6485,7 +6494,7 @@ function renderModernGoalCard(item, owner, opts={}){
   const progress = doelbedrag > 0 ? Math.min(1, algespaard / doelbedrag) : 0;
   const barPct = Math.round(progress * 100);
   const dateText = doel.doeldatum ? formatDateNL(doel.doeldatum) : 'Geen doeldatum';
-  const goalImage = String(goalImageSource(doel) || '').replace(/'/g,'%27');
+  const goalImage = safeImageUrl(goalImageSource(doel));
   const goalThumbStyle = goalImage
     ? `background-image:url('${goalImage}'); box-shadow:none;`
     : `background:${goalThumbGradient(doel)}; color:#fff; box-shadow:none;`;
@@ -6527,11 +6536,11 @@ function goalNeededPerMonth(item){
   return `<span class="joint-savings-needed">Nodig p/m: ${item.benodigdPerMaand === null ? '—' : eur(item.benodigdPerMaand)}</span>`;
 }
 function goalImageStyle(goal){
-  const source = String(goalImageSource(goal) || '').replace(/'/g,'%27');
+  const source = safeImageUrl(goalImageSource(goal));
   return source ? ` style="background-image:linear-gradient(rgba(35,45,30,.47),rgba(35,45,30,.62)),url('${source}')"` : '';
 }
 function goalImageIcon(goal){
-  const source = String(goalImageSource(goal) || '').replace(/'/g,'%27');
+  const source = safeImageUrl(goalImageSource(goal));
   return `<span class="joint-savings-goal-icon${source?' has-image':''}"${source ? ` style="background-image:url('${source}')"` : ''}>${source ? '' : goalIcon(goal)}</span>`;
 }
 function renderJointSavingsOverviewCard(owner='gezamenlijk', savingPot=null){
@@ -8017,7 +8026,7 @@ function renderGoalOverviewTable(doelen, spaarpotDezeMaand){
   const rows = berekend.map(b=>{
     const barPct = Math.min(100, Math.round((b.voortgang||0)*100));
     return `<tr>
-      <td>${b.doel.naam || '(naamloos)'}</td>
+      <td>${textSafe(b.doel.naam || '(naamloos)')}</td>
       <td class="num">${eur(Number(b.doel.doelbedrag)||0)}</td>
       <td class="num">${eur(Number(b.doel.algespaard)||0)}</td>
       <td class="num">${eur(b.nogTeGaan)}</td>
@@ -8380,10 +8389,10 @@ function renderTransactionsTable(owner){
   const rows = getMonthTransactions(owner).filter(isBudgetExpenseTransaction).sort((a,b)=>String(b.date).localeCompare(String(a.date))).map(tx=>`
     <tr>
       <td>${formatDateNL(tx.date)}</td>
-      <td>${tx.category || 'Overig'}</td>
-      <td>${tx.description || ''}<div class="progress-label" style="text-align:left">${tx.note || ''}</div></td>
+      <td>${textSafe(tx.category || 'Overig')}</td>
+      <td>${textSafe(tx.description || '')}<div class="progress-label" style="text-align:left">${textSafe(tx.note || '')}</div></td>
       <td class="num"><span class="value neg">${eur(Number(tx.amount)||0)}</span></td>
-      <td class="row-actions"><button class="danger-ghost" data-remove-transaction="${tx.id}" title="Verwijderen">×</button></td>
+      <td class="row-actions"><button class="danger-ghost" data-remove-transaction="${attrSafe(tx.id)}" title="Verwijderen">×</button></td>
     </tr>`).join('');
   const emptyIcon = owner ? '⌘' : '▤';
   const emptyText = owner ? `Je persoonlijke uitgaven verschijnen hier zodra je ze toevoegt.` : `Toegevoegde uitgaven verschijnen hier.`;
@@ -8400,7 +8409,7 @@ function renderBudgetUsageList(){
     const used = sumTransactions('gezamenlijk', row.post);
     const status = budgetStatus(used, budget);
     return `<div class="progress-item">
-      <div class="progress-top"><strong>${row.post || row.categorie}</strong><span><span class="neutral-amount">${eur(used)}</span> / <span class="neutral-amount">${eur(budget)}</span> <span class="status-badge ${status.cls}">${status.label}</span></span></div>
+      <div class="progress-top"><strong>${textSafe(row.post || row.categorie)}</strong><span><span class="neutral-amount">${eur(used)}</span> / <span class="neutral-amount">${eur(budget)}</span> <span class="status-badge ${status.cls}">${status.label}</span></span></div>
       <div class="progress-track"><div class="progress-fill" style="width:${Math.min(100, Math.round(status.ratio*100))}%"></div></div>
     </div>`;
   }).join('') || '<p class="hint">Nog geen budgetten.</p>'}</div>`;
@@ -8557,7 +8566,7 @@ function renderMobileGoalRow(item, owner){
   const target = Number(goal.doelbedrag)||0;
   const saved = Number(goal.algespaard)||0;
   const progress = Math.min(100, Math.round((item.voortgang||0)*100));
-  const goalImage = String(goalImageSource(goal) || '').replace(/'/g,'%27');
+  const goalImage = safeImageUrl(goalImageSource(goal));
   const imageStyle = goalImage ? ` style="background-image:url('${goalImage}')"` : '';
   const iconToneClass = goalImage ? '' : ` tone-${owner === 'gezamenlijk' ? 'green' : owner}`;
   return `<div class="mobile-goal-row"><span class="mobile-goal-icon${iconToneClass}${goalImage ? ' has-image' : ''}"${imageStyle}>${goalImage ? '' : goalIcon(goal)}</span><div class="mobile-goal-main"><strong>${textSafe(goal.naam || 'Spaardoel')}</strong><span>${eur(saved)} van ${eur(target)}</span><div class="progress-track"><div class="progress-fill" style="width:${progress}%"></div></div><em class="mobile-goal-needed">Nodig p/m: ${item.benodigdPerMaand === null ? '—' : eur(item.benodigdPerMaand)}</em>${goalMonthlyInlegText(item)}<em>Doel: ${goal.doeldatum ? formatDateNL(goal.doeldatum) : 'Geen einddatum'}</em></div><div class="mobile-goal-side"><b>${progress}%</b><button type="button" class="ghost small" data-open-goal-editor="${owner}:${textSafe(goal.id)}">Bekijk doel</button></div></div>`;
@@ -8577,7 +8586,8 @@ function openMobileGoalEditor(owner,id){
   let goalImageData = String(goalImageSource(goal) || '');
   const imageField = document.createElement('label');
   imageField.className = 'full goal-image-field';
-  imageField.innerHTML = `<span>Afbeelding</span><div class="goal-image-preview" ${goalImageData ? `style="background-image:url('${goalImageData.replace(/'/g,'%27')}')"` : ''}>${goalImageData ? '' : 'Geen afbeelding'}</div><input type="file" accept="image/*" id="goalEditImage"><small class="goal-image-status" id="goalEditImageStatus">Afbeeldingen worden automatisch verkleind voor betrouwbare opslag.</small><button type="button" class="ghost small" id="goalEditImageRemove" ${goalImageData ? '' : 'disabled'}>Afbeelding verwijderen</button>`;
+  goalImageData=safeImageUrl(goalImageData);
+  imageField.innerHTML = `<span>Afbeelding</span><div class="goal-image-preview" ${goalImageData ? `style="background-image:url('${goalImageData}')"` : ''}>${goalImageData ? '' : 'Geen afbeelding'}</div><input type="file" accept="image/*" id="goalEditImage"><small class="goal-image-status" id="goalEditImageStatus">Afbeeldingen worden automatisch verkleind voor betrouwbare opslag.</small><button type="button" class="ghost small" id="goalEditImageRemove" ${goalImageData ? '' : 'disabled'}>Afbeelding verwijderen</button>`;
   modal.querySelector('.modal-grid').appendChild(imageField);
   const imagePreview = imageField.querySelector('.goal-image-preview');
   const imageInput = imageField.querySelector('#goalEditImage');
@@ -8589,7 +8599,8 @@ function openMobileGoalEditor(owner,id){
     imageProcessing=true; saveButton.disabled=true; imageStatus.textContent='Afbeelding verwerken…';
     try{
       goalImageData=await compressGoalImage(file);
-      imagePreview.style.backgroundImage=`url('${goalImageData.replace(/'/g,'%27')}')`; imagePreview.textContent='';
+      goalImageData=safeImageUrl(goalImageData);
+      imagePreview.style.backgroundImage=goalImageData?`url('${goalImageData}')`:''; imagePreview.textContent='';
       imageField.querySelector('#goalEditImageRemove').disabled=false;
       imageStatus.textContent=`Klaar · ${Math.max(1,Math.round(dataUrlByteSize(goalImageData)/1024))} kB`;
     }catch(error){ event.target.value=''; imageStatus.textContent='Afbeelding verwerken mislukt.'; alert(error?.message || 'Afbeelding verwerken mislukt.'); }
@@ -8641,7 +8652,7 @@ function openMobileGoalManager(owner){
   const name = ownerLabel(owner);
   const r=calcScenario(state); const pot=owner==='gezamenlijk'?r.spaarpotDezeMaand:r[owner].beschikbaarVoorSparen;
   const items=calcGroep(goals,pot,TODAY);
-  const rows = items.map((item,index)=>{const goal=item.doel;const goalImage=String(goalImageSource(goal)||'').replace(/'/g,'%27');const imageStyle=goalImage?` style="background-image:url('${goalImage}')"`:'';return `<div class="goal-manager-row" data-open-manager-goal="${textSafe(goal.id)}" role="button" tabindex="0"><span class="goal-manager-goal-icon${goalImage?' has-image':''}"${imageStyle}>${goalImage?'':goalIcon(goal)}</span><span class="goal-manager-copy"><strong>${textSafe(goal.naam || 'Spaardoel')}</strong><small>${eur(Number(goal.algespaard)||0)} / ${eur(Number(goal.doelbedrag)||0)}</small></span><span class="goal-manager-metric"><span>Nodig p/m</span><b>${item.benodigdPerMaand === null ? '—' : eur(item.benodigdPerMaand)}</b></span><span class="goal-manager-metric"><span>Deze maand</span><b>${eur(item.werkelijkeInleg)}</b></span><span class="goal-manager-moves"><button type="button" data-move-manager-goal="${textSafe(goal.id)}:-1" ${index===0?'disabled':''} aria-label="Doel omhoog">▲</button><button type="button" data-move-manager-goal="${textSafe(goal.id)}:1" ${index===items.length-1?'disabled':''} aria-label="Doel omlaag">▼</button></span><button type="button" class="joint-fixed-row-delete-compact" data-remove-manager-goal="${textSafe(goal.id)}" aria-label="Doel verwijderen">×</button></div>`;}).join('');
+  const rows = items.map((item,index)=>{const goal=item.doel;const goalImage=safeImageUrl(goalImageSource(goal));const imageStyle=goalImage?` style="background-image:url('${goalImage}')"`:'';return `<div class="goal-manager-row" data-open-manager-goal="${attrSafe(goal.id)}" role="button" tabindex="0"><span class="goal-manager-goal-icon${goalImage?' has-image':''}"${imageStyle}>${goalImage?'':goalIcon(goal)}</span><span class="goal-manager-copy"><strong>${textSafe(goal.naam || 'Spaardoel')}</strong><small>${eur(Number(goal.algespaard)||0)} / ${eur(Number(goal.doelbedrag)||0)}</small></span><span class="goal-manager-metric"><span>Nodig p/m</span><b>${item.benodigdPerMaand === null ? '—' : eur(item.benodigdPerMaand)}</b></span><span class="goal-manager-metric"><span>Deze maand</span><b>${eur(item.werkelijkeInleg)}</b></span><span class="goal-manager-moves"><button type="button" data-move-manager-goal="${attrSafe(goal.id)}:-1" ${index===0?'disabled':''} aria-label="Doel omhoog">▲</button><button type="button" data-move-manager-goal="${attrSafe(goal.id)}:1" ${index===items.length-1?'disabled':''} aria-label="Doel omlaag">▼</button></span><button type="button" class="joint-fixed-row-delete-compact" data-remove-manager-goal="${attrSafe(goal.id)}" aria-label="Doel verwijderen">×</button></div>`;}).join('');
   modal.innerHTML=`<div class="modal goal-manager-editor"><div class="joint-variable-editor-header"><div><div class="section-kicker">${name} · ${monthLabel(getSelectedMonth())}</div><h2>Spaardoelen beheren</h2><p>Tik op een doel voor alle instellingen en de berekening.</p></div><button type="button" class="ghost" data-close-goal-manager>Sluiten</button></div><div class="goal-manager-list">${rows || '<p class="hint">Nog geen spaardoelen.</p>'}</div><div class="joint-variable-editor-actions"><button type="button" class="primary" data-close-goal-manager>Klaar</button><button type="button" class="ghost" data-add-manager-goal>+ Spaardoel</button></div></div>`;
   modal.classList.add('open','goal-manager-editor-open');
   const close=()=>{modal.classList.remove('open','goal-manager-editor-open');modal.innerHTML='';renderActiveTab();};
@@ -9941,11 +9952,11 @@ function renderJointFirstRow(){
 function renderPersonalTransactionsCard(owner){
   const name = ownerLabel(owner);
   const rows = getMonthTransactions(owner).filter(isBudgetExpenseTransaction).sort((a,b)=>String(b.date || '').localeCompare(String(a.date || '')));
-  const rowsHtml = rows.map(tx=>`<div class="joint-transaction-row" data-edit-personal-transaction="${tx.id}" data-owner="${owner}" role="button" tabindex="0" aria-label="Transactie bewerken">
+  const rowsHtml = rows.map(tx=>`<div class="joint-transaction-row" data-edit-personal-transaction="${attrSafe(tx.id)}" data-owner="${attrSafe(owner)}" role="button" tabindex="0" aria-label="Transactie bewerken">
     <span class="joint-transaction-meta"><span class="joint-transaction-date">${formatDayMonth(tx.date)}</span><span class="joint-transaction-category">${textSafe(tx.category || 'Overig')}</span></span>
     <span class="joint-transaction-description"><span class="joint-transaction-description-text">${textSafe(tx.description || '—')}</span>${tx.note ? `<span class="joint-transaction-note">${textSafe(tx.note)}</span>` : ''}</span>
     <strong class="joint-transaction-amount">${eur(Number(tx.amount) || 0)}</strong>
-    <button type="button" class="joint-transaction-delete" data-remove-transaction="${tx.id}" aria-label="Transactie verwijderen">×</button>
+    <button type="button" class="joint-transaction-delete" data-remove-transaction="${attrSafe(tx.id)}" aria-label="Transactie verwijderen">×</button>
   </div>`).join('');
   const total = round2(rows.reduce((sum, tx)=>sum + getTransactionExpenseImpact(tx), 0));
   return `<div class="card joint-two-column-card joint-transactions-card"><div class="card-head joint-transactions-card-head"><div class="card-head-title"><h2>${name} transacties <span>— ${monthLabel(getSelectedMonth())}</span></h2><button type="button" class="joint-transaction-add-btn" data-open-personal-transaction="${owner}" aria-label="Uitgave toevoegen">${iconSvg('receipt')}</button></div></div><div class="joint-transactions-list">${rowsHtml || '<p class="joint-transactions-empty">Nog geen uitgaven deze maand.</p>'}</div><div class="joint-transactions-total"><span>Totaal uitgaven</span><strong>${eur(total)}</strong></div></div>`;
@@ -10619,7 +10630,7 @@ renderDashboardGoalPreviewCard=function(item){
 function u2RenderGoalRow(item,owner){
   const goal=item.doel;
   const target=u2GoalTarget(goal),saved=u2GoalSaved(goal),progress=target>0?Math.min(100,Math.round(saved/target*100)):0;
-  const image=String(goalImageSource(goal)||'').replace(/'/g,'%27');
+  const image=safeImageUrl(goalImageSource(goal));
   return `<article class="card u2-goal-card">
     <button class="u2-goal-main" type="button" data-open-goal-editor="${owner}:${textSafe(goal.id)}">
       <span class="u2-goal-image${image?' has-image':''}"${image?` style="background-image:url('${image}')"`:''}>${image?'':goalIcon(goal)}</span>

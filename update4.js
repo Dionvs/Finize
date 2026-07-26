@@ -611,9 +611,10 @@
   const UI={draft:null,visibleRows:60,root:null};
   const ImportPerformance={pending:new Map(),chains:new Map(),syncPromise:null,syncRequested:false};
   function esc(value){return String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));}
+  function escAttr(value){return esc(value).replace(/`/g,'&#96;').replace(/[\u0000-\u001f\u007f]/g,'');}
   function euro(value){return new Intl.NumberFormat('nl-NL',{style:'currency',currency:'EUR'}).format(Number(value)||0);}
   function ownerLabel(value){return value==='gezamenlijk'?'Gezamenlijk':value==='dara'?'Dara':'Dion';}
-  function option(value,label,current){return `<option value="${esc(value)}" ${value===current?'selected':''}>${esc(label)}</option>`;}
+  function option(value,label,current){return `<option value="${escAttr(value)}" ${value===current?'selected':''}>${esc(label)}</option>`;}
   function updateDraftSummary(draft){
     const active=(draft.rows||[]).filter(row=>row.bankOriginal?.valid&&!row.duplicate);
     draft.summary={
@@ -1313,7 +1314,7 @@
   }
   function rowHtml(root,row){
     const p=row.processing;const original=row.bankOriginal;
-    return `<article class="u4-import-row" data-u4-row="${esc(row.id)}">
+    return `<article class="u4-import-row" data-u4-row="${escAttr(row.id)}">
       <div class="u4-import-row-main"><div><strong>${esc(original.description||'Onbekende transactie')}</strong><span class="u4-muted">${esc(p.processingDate)} · ${euro(p.processedAmount)}</span>${row.reasons?.length?`<div class="u4-row-reasons">${esc(row.reasons.join(' · '))}</div>`:''}</div><div class="u4-row-approval"><span class="u4-status ${row.certainty}">${row.certainty==='zeker'?'Zeker':'Nakijken'}</span>${row.certainty==='nakijken'?'<button type="button" class="primary small" data-u4-approve>✓ Goedkeuren</button>':'<button type="button" class="ghost small" data-u4-reopen>Opnieuw nakijken</button>'}</div></div>
       <div class="u4-row-grid">
         <label>Datum<input type="date" data-u4-field="processingDate" value="${esc(p.processingDate)}"></label>
