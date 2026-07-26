@@ -1,4 +1,4 @@
-/* Update 2 — slimme spaardoelen */
+/* Update 2 â€” slimme spaardoelen */
 .u2-savings{display:grid;gap:14px}
 .u2-owner-section{display:grid;gap:8px}
 .u2-owner-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
@@ -117,140 +117,9 @@ body.v4-app[data-real-active-tab="spaardoelen"] .u2-goal-accordion>summary::afte
 .u2-accordion-child span{color:var(--text-dim);white-space:nowrap}
 .u2-accordion-child .progress-track{grid-column:1/-1;height:4px}
 .u2-accordion-child.active strong{color:var(--green)}
-.u2-accordion-child.done strong::after{content:" ✓";color:var(--green)}
+.u2-accordion-child.done strong::after{content:" âœ“";color:var(--green)}
 .u2-accordion-edit{justify-self:end;margin-top:3px}
 .u2-editor-details{border:1px solid var(--border);border-radius:12px;overflow:hidden}
 .u2-editor-details>summary{padding:10px;cursor:pointer;font-size:11px;font-weight:850}
 .u2-editor-details>.manage-body{padding:0 10px 10px}
 .u2-editor-settings{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-/* Update 3 — financiële maandadministratie */
-.u3-admin-card{display:grid;gap:12px}
-.u3-admin-head,.u3-admin-actions,.u3-row-head,.u3-step-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
-.u3-admin-head h2,.u3-admin-head p,.u3-step-head h3,.u3-step-head p{margin:0}
-.u3-admin-head p,.u3-step-head p{font-size:10px;color:var(--text-dim)}
-.u3-status{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:4px 8px;font-size:9px;font-weight:850;background:var(--surface-2);color:var(--text-dim)}
-.u3-status.closed,.u3-status.ok{background:var(--soft-green);color:var(--green)}
-.u3-status.pending,.u3-status.warn{background:#fff3d9;color:#8b5f0c}
-.u3-admin-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}
-.u3-admin-metric{display:grid;gap:2px;padding:9px;border:1px solid var(--border-soft);border-radius:11px;background:var(--surface-2)}
-.u3-admin-metric span{font-size:9px;color:var(--text-dim)}
-.u3-admin-metric strong{font-size:13px}
-.u3-admin-actions{justify-content:flex-start}
-.u3-admin-modal{width:min(820px,100%);max-height:92vh;overflow:auto}
-.u3-admin-list{display:grid;gap:7px;margin:10px 0}
-.u3-admin-row{display:grid;gap:7px;padding:10px;border:1px solid var(--border);border-radius:12px;background:var(--surface)}
-.u3-admin-row small{color:var(--text-dim)}
-.u3-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
-.u3-grid label{display:grid;gap:5px;font-size:10px;color:var(--text-dim);font-weight:750}
-.u3-grid .full{grid-column:1/-1}
-.u3-steps{display:grid;gap:10px;margin-top:12px}
-.u3-step{display:grid;gap:8px;padding:12px;border:1px solid var(--border);border-radius:14px}
-.u3-account-row,.u3-transfer-row{display:grid;grid-template-columns:minmax(0,1fr) 120px auto;gap:8px;align-items:center}
-.u3-budget-list{display:grid;gap:5px}
-.u3-budget-row{display:grid;grid-template-columns:minmax(0,1fr) repeat(3,90px);gap:8px;font-size:10px;padding:6px 0;border-bottom:1px solid var(--border-soft)}
-.u3-budget-row:last-child{border-bottom:0}
-.u3-review-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
-.u3-review-fields label{display:grid;gap:4px;font-size:9px;color:var(--text-dim)}
-.u3-empty{padding:16px;text-align:center;color:var(--text-dim);font-size:11px}
-
-@media (max-width:767px){
-.goal-detail-editor>.joint-variable-editor-header{top:-12px;margin:-12px -12px 10px;padding:12px;background:rgba(255,250,244,.98)}
-  .u2-owner-head{align-items:flex-start;flex-direction:column}
-  .u2-owner-head>div:last-child{width:100%;justify-content:stretch}
-  .u2-owner-head button{flex:1}
-  .u2-goal-grid{grid-template-columns:1fr}
-  .u2-goal-main{grid-template-columns:44px 1fr auto;padding:10px}
-  .u2-goal-image{width:44px;height:44px}
-  .u2-prognosis{grid-template-columns:1fr}
-  .u2-subgoal-row{grid-template-columns:18px 1fr 90px 62px 28px 28px 28px}
-  .u2-subgoal-row input[type=url]{grid-column:2/5}
-  .u2-process-row{grid-template-columns:1fr 105px}
-
-.u2-inline-actions button{min-height:30px}
-  .u2-editor-settings{grid-template-columns:1fr}
-
-#incomeEditModal.u3-admin-open{align-items:stretch;padding:0}
-  #incomeEditModal .u3-admin-modal{width:100%;max-width:none;min-height:100dvh;max-height:none;border:0;border-radius:0;padding:12px 12px calc(12px + env(safe-area-inset-bottom))}
-  .u3-admin-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .u3-grid,.u3-review-fields{grid-template-columns:1fr}
-  .u3-grid .full{grid-column:auto}
-  .u3-account-row,.u3-transfer-row{grid-template-columns:1fr}
-  .u3-budget-row{grid-template-columns:1fr auto}
-  .u3-budget-row span:nth-child(3),.u3-budget-row span:nth-child(4){display:none}
-}
-
-/* Finize icon system — één consistente professionele lijnstijl */
-:root{
-  --icon-line:#51483f;
-  --icon-sage:#6f8a55;
-  --icon-blue:#5f82a8;
-  --icon-terra:#bd7659;
-  --icon-amber:#c99655;
-}
-.ui-svg,
-.u5-nav-icon svg,
-.bn-icon svg,
-.finize-action-icon svg{
-  display:block;
-  width:1em;
-  height:1em;
-  fill:none;
-  stroke:currentColor;
-  stroke-width:1.65;
-  stroke-linecap:round;
-  stroke-linejoin:round;
-  vector-effect:non-scaling-stroke;
-}
-.u5-nav-icon,
-.bn-icon,
-.icon-badge,
-.mobile-kpi-icon,
-.progress-item-icon,
-.budget-preview-thumb,
-.dashboard-goal-preview-thumb,
-.goal-thumb,
-.joint-fixed-editor-row-icon,
-.joint-variable-editor-icon{
-  color:var(--icon-line);
-}
-.u5-nav-icon{
-  width:34px !important;
-  height:34px !important;
-  min-width:34px;
-  display:inline-flex !important;
-  align-items:center;
-  justify-content:center;
-  border-radius:999px;
-  background:rgba(237,243,230,.8);
-  box-shadow:inset 0 0 0 1px rgba(111,138,85,.10);
-}
-.u5-nav-icon svg{width:18px;height:18px}
-.tab-btn[data-tab="dion"] .u5-nav-icon{background:rgba(233,241,251,.92);color:var(--icon-blue)}
-.tab-btn[data-tab="dara"] .u5-nav-icon{background:rgba(238,241,223,.92);color:var(--icon-sage)}
-.tab-btn[data-tab="spaardoelen"] .u5-nav-icon{background:rgba(247,230,218,.82);color:var(--icon-terra)}
-.tab-btn[data-tab="data"] .u5-nav-icon{background:rgba(233,241,251,.82);color:var(--icon-blue)}
-.tab-btn.active .u5-nav-icon{background:rgba(255,255,255,.76);color:currentColor;box-shadow:none}
-.bn-icon svg{width:18px !important;height:18px !important}
-.v4-bottom-nav .bottom-nav-btn[data-tab="dion"] .bn-icon{background:rgba(233,241,251,.82) !important;color:var(--icon-blue)}
-.v4-bottom-nav .bottom-nav-btn[data-tab="dara"] .bn-icon{background:rgba(238,241,223,.88) !important;color:var(--icon-sage)}
-.v4-bottom-nav .bottom-nav-btn[data-tab="spaardoelen"] .bn-icon{background:rgba(247,230,218,.82) !important;color:var(--icon-terra)}
-.icon-badge,.mobile-kpi-icon,.progress-item-icon,.budget-preview-thumb,.dashboard-goal-preview-thumb,.goal-thumb{
-  border:1px solid rgba(111,138,85,.10);
-}
-.tone-green{color:var(--icon-sage)!important}
-.tone-blue,.tone-dion{color:var(--icon-blue)!important}
-.tone-terracotta{color:var(--icon-terra)!important}
-.tone-dara{color:var(--icon-sage)!important}
-.finize-icon-cell{width:34px;text-align:center}
-.finize-icon-cell .ui-svg{width:18px;height:18px;margin:auto;color:var(--icon-line)}
-.finize-action-icon{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto}
-.finize-action-icon svg{width:15px;height:15px}
-button.has-finize-icon{display:inline-flex;align-items:center;justify-content:center;gap:7px}
-button.icon-only-finize{width:34px;height:34px;padding:0!important;border-radius:999px!important}
-.month-picker-btn::before{content:none!important}
-.month-picker-btn .finize-action-icon{color:var(--icon-sage)}
-@media(max-width:767px){
-  .u5-nav-icon{width:30px!important;height:30px!important;min-width:30px}
-  .v4-bottom-nav .bottom-nav-btn .bn-icon{padding:6px!important}
-  .v4-bottom-nav .bottom-nav-btn.active .bn-icon{outline:none!important;box-shadow:inset 0 0 0 1px rgba(111,138,85,.16)!important}
-}

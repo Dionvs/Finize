@@ -9,7 +9,7 @@
   --ink:var(--text);
 }
 
-/* Finize bron: 00-core.css */
+/* Finize bron: base.css */
 :root{
   --bg:#fbf4ea;
   --bg-soft:#f6eadc;
@@ -5116,8 +5116,8 @@ body.v4-app .modal-content{ min-width:0; }
   }
 }
 
-/* Finize bron: 10-late.css */
-/* Update 2 — slimme spaardoelen */
+/* Finize bron: goals.css */
+/* Update 2 â€” slimme spaardoelen */
 .u2-savings{display:grid;gap:14px}
 .u2-owner-section{display:grid;gap:8px}
 .u2-owner-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
@@ -5236,13 +5236,15 @@ body.v4-app[data-real-active-tab="spaardoelen"] .u2-goal-accordion>summary::afte
 .u2-accordion-child span{color:var(--text-dim);white-space:nowrap}
 .u2-accordion-child .progress-track{grid-column:1/-1;height:4px}
 .u2-accordion-child.active strong{color:var(--green)}
-.u2-accordion-child.done strong::after{content:" ✓";color:var(--green)}
+.u2-accordion-child.done strong::after{content:" âœ“";color:var(--green)}
 .u2-accordion-edit{justify-self:end;margin-top:3px}
 .u2-editor-details{border:1px solid var(--border);border-radius:12px;overflow:hidden}
 .u2-editor-details>summary{padding:10px;cursor:pointer;font-size:11px;font-weight:850}
 .u2-editor-details>.manage-body{padding:0 10px 10px}
 .u2-editor-settings{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-/* Update 3 — financiële maandadministratie */
+
+/* Finize bron: dashboard.css */
+/* Update 3 â€” financiÃ«le maandadministratie */
 .u3-admin-card{display:grid;gap:12px}
 .u3-admin-head,.u3-admin-actions,.u3-row-head,.u3-step-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .u3-admin-head h2,.u3-admin-head p,.u3-step-head h3,.u3-step-head p{margin:0}
@@ -5298,7 +5300,7 @@ body.v4-app[data-real-active-tab="spaardoelen"] .u2-goal-accordion>summary::afte
   .u3-budget-row span:nth-child(3),.u3-budget-row span:nth-child(4){display:none}
 }
 
-/* Finize icon system — één consistente professionele lijnstijl */
+/* Finize icon system â€” Ã©Ã©n consistente professionele lijnstijl */
 :root{
   --icon-line:#51483f;
   --icon-sage:#6f8a55;
@@ -5374,7 +5376,7 @@ button.icon-only-finize{width:34px;height:34px;padding:0!important;border-radius
   .v4-bottom-nav .bottom-nav-btn.active .bn-icon{outline:none!important;box-shadow:inset 0 0 0 1px rgba(111,138,85,.16)!important}
 }
 
-/* Finize bron: 20-update4.css */
+/* Finize bron: import.css */
 .u4-import-panel{display:grid;gap:12px}
 .u4-import-actions,.u4-import-summary,.u4-import-row-main,.u4-receipt-head,.u4-modal-head,.u4-modal-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .u4-import-actions input[type=file]{position:absolute;inline-size:1px;block-size:1px;opacity:0;pointer-events:none}
@@ -5601,7 +5603,7 @@ button.icon-only-finize{width:34px;height:34px;padding:0!important;border-radius
   .budget-transactions-modal{width:100%;max-height:78dvh;border-radius:22px 22px 0 0;margin-top:auto}
 }
 
-/* Finize bron: 30-update5.css */
+/* Finize bron: desktop.css */
 /* Update 5: uitsluitend tablet- en desktop-presentatie. Mobiel onder 768px blijft leidend. */
 .u5-nav-icon{display:none}
 body.v4-app .value.is-negative{color:var(--red) !important}

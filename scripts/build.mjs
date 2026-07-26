@@ -6,10 +6,11 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const styleSources = [
   ["styles", "tokens.css"],
-  ["legacy/styles", "00-core.css"],
-  ["legacy/styles", "10-late.css"],
-  ["legacy/styles", "20-update4.css"],
-  ["legacy/styles", "30-update5.css"]
+  ["styles", "base.css"],
+  ["styles", "goals.css"],
+  ["styles", "dashboard.css"],
+  ["styles", "import.css"],
+  ["styles", "desktop.css"]
 ];
 const scriptFiles = ["00-bootstrap.js", "10-core.js", "20-update4.js", "30-update5.js", "40-service-worker-registration.js"];
 const normalize = value => value.replace(/\r\n/g, "\n").trim() + "\n";
