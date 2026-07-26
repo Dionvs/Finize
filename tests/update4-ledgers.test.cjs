@@ -1,5 +1,5 @@
 const assert=require('node:assert/strict');
-const u4=require('../update4.js');
+const u4=require('../src/import/update4-runtime.cjs');
 
 const state=u4.normalizeCore({
   meta:{schemaVersion:4},accountProfiles:[],recognitionRules:[],transactions:[],

@@ -1,0 +1,74 @@
+{
+  "body": {
+    "display": "block",
+    "position": "static",
+    "color": "rgb(47, 31, 24)",
+    "backgroundColor": "rgba(0, 0, 0, 0)",
+    "fontSize": "16px",
+    "borderRadius": "0px",
+    "gridTemplateColumns": "none"
+  },
+  ".mobile-dashboard-header": {
+    "display": "block",
+    "position": "static",
+    "color": "rgb(47, 31, 24)",
+    "backgroundColor": "rgba(0, 0, 0, 0)",
+    "fontSize": "16px",
+    "borderRadius": "0px",
+    "gridTemplateColumns": "minmax(0px, 1fr) auto"
+  },
+  ".mobile-kpi-grid": {
+    "display": "grid",
+    "position": "static",
+    "color": "rgb(47, 31, 24)",
+    "backgroundColor": "rgba(0, 0, 0, 0)",
+    "fontSize": "16px",
+    "borderRadius": "0px",
+    "gridTemplateColumns": "88px 88px 88px 88px"
+  },
+  ".dashboard-grid": {
+    "display": "none",
+    "position": "static",
+    "color": "rgb(47, 31, 24)",
+    "backgroundColor": "rgba(0, 0, 0, 0)",
+    "fontSize": "16px",
+    "borderRadius": "0px",
+    "gridTemplateColumns": "repeat(2, minmax(0px, 1fr))"
+  },
+  ".joint-account-card": {
+    "display": "block",
+    "position": "static",
+    "color": "rgb(47, 31, 24)",
+    "backgroundColor": "rgb(255, 253, 250)",
+    "fontSize": "16px",
+    "borderRadius": "15px",
+    "gridTemplateColumns": "none"
+  },
+  ".allowance-return-card": {
+    "display": "flex",
+    "position": "static",
+    "color": "rgb(47, 31, 24)",
+    "backgroundColor": "rgb(255, 253, 250)",
+    "fontSize": "16px",
+    "borderRadius": "15px",
+    "gridTemplateColumns": "none"
+  },
+  ".dashboard-goals-preview": {
+    "display": "none",
+    "position": "static",
+    "color": "rgb(47, 31, 24)",
+    "backgroundColor": "rgb(255, 253, 250)",
+    "fontSize": "16px",
+    "borderRadius": "15px",
+    "gridTemplateColumns": "none"
+  },
+  ".v4-bottom-nav": {
+    "display": "flex",
+    "position": "fixed",
+    "color": "rgb(47, 31, 24)",
+    "backgroundColor": "rgba(255, 243, 230, 0.92)",
+    "fontSize": "16px",
+    "borderRadius": "24px",
+    "gridTemplateColumns": "none"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "name": "finize-v50-cleanup",
+  "version": "50.0.0",
+  "private": true,
+  "packageManager": "pnpm@11.9.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "check:generated": "node scripts/build.mjs --check",
+    "test:unit": "node scripts/run-node-tests.mjs",
+    "check:syntax": "node scripts/check-syntax.mjs",
+    "check:css": "node scripts/check-css.mjs",
+    "test:browser": "playwright test",
+    "test": "pnpm run test:unit && pnpm run check:syntax && pnpm run check:css && pnpm run check:generated && pnpm run test:browser"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.55.0",
+    "esbuild": "0.25.9",
+    "postcss": "8.5.6"
+  }
+}

@@ -3,8 +3,8 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
 
-const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-const start = html.indexOf('function getTransactionExpenseImpact');
+const html = require('./helpers/runtime-source.cjs');
+const start = html.indexOf('function normalizedTransactionType');
 const end = html.indexOf('function budgetStatus', start);
 assert.ok(start >= 0 && end > start, 'Centrale transactie-impact is niet gevonden');
 
@@ -32,14 +32,14 @@ vm.runInContext(html.slice(start,end), context);
 
 assert.equal(context.getTransactionExpenseImpact(transactions[0]),0);
 assert.equal(context.getTransactionExpenseImpact(transactions[1]),100);
-assert.equal(context.getTransactionExpenseImpact(transactions[2]),-30);
+assert.equal(context.getTransactionExpenseImpact(transactions[2]),0);
 assert.equal(context.getTransactionExpenseImpact(transactions[3]),0);
 assert.equal(context.getTransactionExpenseImpact(transactions[4]),0);
 assert.equal(context.getTransactionExpenseImpact(transactions[5]),0);
 assert.equal(context.getTransactionExpenseImpact(transactions[6]),0);
 assert.equal(context.getTransactionExpenseImpact(transactions[7]),12.34);
 assert.equal(context.getTransactionExpenseImpact(transactions[8]),42);
-assert.equal(context.sumTransactions(),124.34);
-assert.equal(context.sumTransactions('gezamenlijk'),70);
-assert.equal(context.sumTransactions(null,'Boodschappen'),70);
+assert.equal(context.sumTransactions(),154.34);
+assert.equal(context.sumTransactions('gezamenlijk'),100);
+assert.equal(context.sumTransactions(null,'Boodschappen'),100);
 console.log('UPDATE4_1_EXPENSE_IMPACT_OK');

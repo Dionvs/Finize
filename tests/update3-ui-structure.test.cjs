@@ -2,7 +2,9 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8')
+  + require('./helpers/runtime-source.cjs')
+  + fs.readFileSync(path.join(__dirname, '..', 'app.css'), 'utf8');
 
 assert.equal((html.match(/<script\b/g) || []).length, (html.match(/<\/script>/g) || []).length, 'Ongebalanceerde script-tags');
 assert.equal((html.match(/<details\b/g) || []).length, (html.match(/<\/details>/g) || []).length, 'Ongebalanceerde details-tags');

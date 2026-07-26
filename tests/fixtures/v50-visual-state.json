@@ -1,0 +1,5054 @@
+{
+  "meta": {
+    "scenario": "voor",
+    "selectedMonth": "2026-07",
+    "schemaVersion": 9,
+    "revision": 0,
+    "updatedAt": "2026-07-26T00:00:00.000Z",
+    "updatedBy": "v50-visual-fixture",
+    "incomeHistoryMigrated": true
+  },
+  "personen": {
+    "dion": {
+      "naam": "Dion",
+      "salaris": 2450,
+      "vasteTeruggaven": []
+    },
+    "dara": {
+      "naam": "Dara",
+      "salaris": 3010,
+      "vasteTeruggaven": []
+    }
+  },
+  "voor": {
+    "verdeling": {
+      "minimumDion": 0.4
+    },
+    "spaarpotDezeMaand": 0,
+    "gezamenlijk": {
+      "vasteLasten": [
+        {
+          "id": "id-fc9f0b91-ba31-4be4-979f-b0e3e504548d",
+          "categorie": "Huis",
+          "post": "Hypotheek",
+          "bedrag": 2000
+        },
+        {
+          "id": "id-32487633-fe14-4d49-bb0f-3f33f13c2caa",
+          "categorie": "Water",
+          "post": "Evides nieuw adres",
+          "bedrag": 20
+        },
+        {
+          "id": "id-7b7367a0-4d65-45d2-8277-807a36c56f15",
+          "categorie": "Water",
+          "post": "Evides oud adres",
+          "bedrag": 20
+        },
+        {
+          "id": "id-9709161e-b045-4a77-8cf6-4beab5fca7be",
+          "categorie": "Energie",
+          "post": "Eneco nieuw adres",
+          "bedrag": 32
+        },
+        {
+          "id": "id-39afe993-9fcd-4499-8999-46642b13d89b",
+          "categorie": "Energie",
+          "post": "Eneco oud adres",
+          "bedrag": 50
+        },
+        {
+          "id": "id-b884d180-ad7e-4fe5-8f83-74792738b16b",
+          "categorie": "Verzekeringen",
+          "post": "Woon nieuw adres",
+          "bedrag": 24.23
+        },
+        {
+          "id": "id-21e17ba4-98a0-47b8-a733-13799c963f97",
+          "categorie": "Verzekeringen",
+          "post": "Woon oud adres",
+          "bedrag": 9.29
+        },
+        {
+          "id": "id-7755e3c3-cbff-4214-87ee-eaad8234c2a1",
+          "categorie": "Belastingen",
+          "post": "Gemeente",
+          "bedrag": 83.96
+        },
+        {
+          "id": "id-c71eb903-1254-4217-bced-499bbc764e3a",
+          "categorie": "Belastingen",
+          "post": "Waterschap",
+          "bedrag": 37.22
+        },
+        {
+          "id": "id-c44fd3d2-2d40-44df-8ad9-75b09f455a0a",
+          "categorie": "Entertainment",
+          "post": "Netflix",
+          "bedrag": 15.99
+        },
+        {
+          "id": "id-52e2d1f6-df0c-488d-856d-7e68dc73505a",
+          "categorie": "Overig",
+          "post": "ING",
+          "bedrag": 4.55
+        },
+        {
+          "id": "id-95e712b1-f1c5-47d9-b2cc-9834a014dd80",
+          "categorie": "Overig",
+          "post": "Sportschool",
+          "bedrag": 62.95
+        }
+      ],
+      "variabel": [
+        {
+          "id": "id-b980c96c-ea19-44bb-a845-45406e16d90a",
+          "categorie": "Variabel",
+          "post": "Boodschappen",
+          "bedrag": 500
+        },
+        {
+          "id": "id-bb64593f-0ab6-40c0-a1ab-4c8a53bc3411",
+          "categorie": "Variabel",
+          "post": "Benzine",
+          "bedrag": 0
+        },
+        {
+          "id": "id-2dd01cc2-33fa-43ac-b786-f3d5d4a25791",
+          "categorie": "Variabel",
+          "post": "Uitjes",
+          "bedrag": 0
+        },
+        {
+          "id": "id-61778d40-f107-44fc-a2b6-1ed30b8cf588",
+          "categorie": "Variabel",
+          "post": "",
+          "bedrag": 0
+        },
+        {
+          "id": "id-372baf9c-f4ff-4549-b0a7-307499a45e64",
+          "categorie": "Variabel",
+          "post": "",
+          "bedrag": 0
+        },
+        {
+          "id": "id-3e421293-ba9e-4d5d-9f59-505526c7f103",
+          "categorie": "Variabel",
+          "post": "",
+          "bedrag": 0
+        },
+        {
+          "id": "id-8b40fbf6-56d5-4386-989e-dde131d4a616",
+          "categorie": "Variabel",
+          "post": "",
+          "bedrag": 0
+        }
+      ]
+    },
+    "dion": {
+      "vasteLasten": [
+        {
+          "id": "id-470afeca-7bf3-4957-a514-e5834f4268e9",
+          "categorie": "Verzekeringen",
+          "post": "Autoverzekering",
+          "bedrag": 28.89
+        },
+        {
+          "id": "id-ee4edf2c-d9b8-4487-a4c6-5f560b57a3a6",
+          "categorie": "Verzekeringen",
+          "post": "Zorgverzekering",
+          "bedrag": 191.45
+        },
+        {
+          "id": "id-0b07f01e-a2d7-4f7b-b95e-23759b1ed181",
+          "categorie": "Internet/telefoon",
+          "post": "Telefoon",
+          "bedrag": 7.5
+        },
+        {
+          "id": "id-fee8d21e-8fb0-4eb7-a889-fae3145a9fff",
+          "categorie": "Overig",
+          "post": "ANWB",
+          "bedrag": 8.58
+        },
+        {
+          "id": "id-916b27ad-f80a-4d31-8139-97c0b680e838",
+          "categorie": "Overig",
+          "post": "ING",
+          "bedrag": 3.9
+        },
+        {
+          "id": "id-fcd0305b-542c-47ed-8ac7-f43357a91e69",
+          "categorie": "Entertainment",
+          "post": "Spotify",
+          "bedrag": 6.99
+        },
+        {
+          "id": "id-e39bacc4-4786-4c6e-a471-9381754fab76",
+          "categorie": "Entertainment",
+          "post": "Prime",
+          "bedrag": 4.99
+        },
+        {
+          "id": "id-2c33d669-2ce2-48b6-8eb2-4b57245bbf17",
+          "categorie": "Belastingen",
+          "post": "Wegenbelasting",
+          "bedrag": 23
+        },
+        {
+          "id": "id-3db8fe17-e645-4d70-a3cf-a83baa275b0e",
+          "categorie": "Verzekeringen",
+          "post": "Reisverzekering",
+          "bedrag": 23.12
+        },
+        {
+          "id": "id-9c1a4799-82b2-4404-a8e6-388d07d1b2d5",
+          "categorie": "Inkomsten/Correcties",
+          "post": "Zorgtoeslag",
+          "bedrag": 0
+        },
+        {
+          "id": "id-2ff3bdf4-d77c-46c3-a620-b6871aa3aecf",
+          "categorie": "Schuld/Correcties",
+          "post": "DUO",
+          "bedrag": -324
+        },
+        {
+          "id": "id-daa2e612-dfa8-42f8-b454-5ff6f3f08979",
+          "categorie": "Belasting",
+          "post": "Belastingdienst",
+          "bedrag": 0
+        }
+      ],
+      "variabel": [
+        {
+          "id": "id-9bc3e8f7-e759-4fc9-a1cd-1a663a4eff31",
+          "categorie": "Variabel",
+          "post": "Eten buiten de deur",
+          "bedrag": 0
+        },
+        {
+          "id": "id-6b830267-ff18-44af-a749-854666d41bb2",
+          "categorie": "Variabel",
+          "post": "Benzine/vervoer",
+          "bedrag": 0
+        },
+        {
+          "id": "id-d2d40e3d-abb3-4778-a225-0ff6cc0a21d1",
+          "categorie": "Variabel",
+          "post": "Uitjes",
+          "bedrag": 0
+        },
+        {
+          "id": "id-44747774-6aaa-4662-ac38-b79df0c7133d",
+          "categorie": "Variabel",
+          "post": "Kleding/hobby",
+          "bedrag": 0
+        },
+        {
+          "id": "id-344b7bb5-b539-45bd-a270-fe44a68f7cd5",
+          "categorie": "Variabel",
+          "post": "Overig",
+          "bedrag": 0
+        }
+      ]
+    },
+    "dara": {
+      "vasteLasten": [
+        {
+          "id": "id-74bbdad2-becb-41da-b8d6-aef3bc3a255b",
+          "categorie": "Huis",
+          "post": "Hypotheek",
+          "bedrag": 907.51
+        },
+        {
+          "id": "id-24735090-ce48-4778-b5eb-45fb950fa33d",
+          "categorie": "Huis",
+          "post": "VVE",
+          "bedrag": 164.1
+        },
+        {
+          "id": "id-3c50ebe0-1413-4ddb-ac36-ef45106c0415",
+          "categorie": "Belastingen",
+          "post": "Wegenbelasting",
+          "bedrag": 23
+        },
+        {
+          "id": "id-aaa47812-3ffb-49b4-9afa-8fcb6ddd9cc6",
+          "categorie": "Belastingen",
+          "post": "Waterschap",
+          "bedrag": 37.22
+        },
+        {
+          "id": "id-b4300040-ce73-48d2-b5f0-b581ecb32182",
+          "categorie": "Belastingen",
+          "post": "Gemeente",
+          "bedrag": 83.96
+        },
+        {
+          "id": "id-431d2015-e3d8-4f2a-b70e-56b02e93843b",
+          "categorie": "Verzekeringen",
+          "post": "Zorgverzekering",
+          "bedrag": 225
+        },
+        {
+          "id": "id-6b44dbfb-594f-438f-a325-a8e60e14916c",
+          "categorie": "Verzekeringen",
+          "post": "Auto",
+          "bedrag": 43.59
+        },
+        {
+          "id": "id-5d91e429-deeb-4579-9cc0-6f6aa291adfa",
+          "categorie": "Verzekeringen",
+          "post": "Fiets p/j",
+          "bedrag": 9.66
+        },
+        {
+          "id": "id-25d40494-58dc-43b1-bc69-61ffab0fd37c",
+          "categorie": "Entertainment",
+          "post": "Prime",
+          "bedrag": 4.99
+        },
+        {
+          "id": "id-a00d1398-6362-452a-a565-05a1de77f6f4",
+          "categorie": "Entertainment",
+          "post": "Disney+",
+          "bedrag": 10.99
+        },
+        {
+          "id": "id-9f3c5ff8-05b3-431a-b151-7e5b2fdfd985",
+          "categorie": "Internet/telefoon",
+          "post": "Telefoon",
+          "bedrag": 10
+        },
+        {
+          "id": "id-5fb875e8-aa7a-4416-963f-f97ca18f6c7b",
+          "categorie": "Internet/telefoon",
+          "post": "Internet",
+          "bedrag": 32.5
+        },
+        {
+          "id": "id-fa1de2f0-0474-480b-8509-781a2faa13ba",
+          "categorie": "Overig",
+          "post": "ING",
+          "bedrag": 3.9
+        },
+        {
+          "id": "id-8e1d444f-5f87-4720-bd11-338e27bf1278",
+          "categorie": "Overig",
+          "post": "ANWB p/j",
+          "bedrag": 6
+        },
+        {
+          "id": "id-f3550a8c-17b0-4707-b0db-0dd9f0634a18",
+          "categorie": "Belasting",
+          "post": "Belastingteruggave",
+          "bedrag": -226
+        }
+      ],
+      "variabel": [
+        {
+          "id": "id-ee73df48-8b12-4ad3-98e8-0d005539e93f",
+          "categorie": "Variabel",
+          "post": "Eten buiten de deur",
+          "bedrag": 0
+        },
+        {
+          "id": "id-2ec661fa-77e4-4494-b4b1-d2e581897256",
+          "categorie": "Variabel",
+          "post": "Benzine/vervoer",
+          "bedrag": 0
+        },
+        {
+          "id": "id-b794c605-4552-4904-b737-9f0afae933a5",
+          "categorie": "Variabel",
+          "post": "Uitjes",
+          "bedrag": 0
+        },
+        {
+          "id": "id-b967fbf7-b5a2-47d0-aa17-2f08cfb5201e",
+          "categorie": "Variabel",
+          "post": "Kleding/hobby",
+          "bedrag": 0
+        },
+        {
+          "id": "id-8b16a90a-62dd-4289-b67e-c505bee5175c",
+          "categorie": "Variabel",
+          "post": "Overig",
+          "bedrag": 0
+        }
+      ]
+    }
+  },
+  "na": {
+    "verdeling": {
+      "hypotheekDion": 0.5
+    },
+    "spaarpotDezeMaand": 500,
+    "gezamenlijk": {
+      "hypotheek": [
+        {
+          "id": "id-4ff1bbee-99b7-415e-8e79-86cbd5d7bd44",
+          "categorie": "Huis",
+          "post": "Hypotheek",
+          "bedrag": 2000
+        }
+      ],
+      "vasteLasten": [
+        {
+          "id": "id-e551348f-71e0-4d5e-8bd1-801b3f05976b",
+          "categorie": "Water",
+          "post": "Evides",
+          "bedrag": 20
+        },
+        {
+          "id": "id-dfee3ed2-877f-4b43-a6a8-bd7f631ac66c",
+          "categorie": "Energie",
+          "post": "Eneco",
+          "bedrag": 75
+        },
+        {
+          "id": "id-3ee9f66e-52ec-434d-980d-5e715345fa00",
+          "categorie": "Verzekeringen",
+          "post": "Zorg Dara",
+          "bedrag": 225
+        },
+        {
+          "id": "id-acde8091-f7c7-4807-b8dc-8eb2938c8190",
+          "categorie": "Verzekeringen",
+          "post": "Zorg Dion",
+          "bedrag": 191.45
+        },
+        {
+          "id": "id-7ad2d88c-e46e-47ab-9821-7954778082eb",
+          "categorie": "Verzekeringen",
+          "post": "Woon",
+          "bedrag": 24.23
+        },
+        {
+          "id": "id-d1229245-0536-44dd-97c1-783eb6c15ef6",
+          "categorie": "Verzekeringen",
+          "post": "Auto Dara",
+          "bedrag": 43.59
+        },
+        {
+          "id": "id-ef8963f0-3958-4147-b354-736cba6e67a6",
+          "categorie": "Verzekeringen",
+          "post": "Auto Dion",
+          "bedrag": 28.89
+        },
+        {
+          "id": "id-559e8c18-a346-4eb6-88c8-b6f40c9b1dc8",
+          "categorie": "Verzekeringen",
+          "post": "Reis Dion",
+          "bedrag": 9.64
+        },
+        {
+          "id": "id-88995e5e-392d-46cf-902c-57a720f5a8d6",
+          "categorie": "Verzekeringen",
+          "post": "Fiets Dara",
+          "bedrag": 0
+        },
+        {
+          "id": "id-743262f8-b602-40a2-8361-e065d21e5c24",
+          "categorie": "Belastingen",
+          "post": "Weg Dara",
+          "bedrag": 23
+        },
+        {
+          "id": "id-85b1e7aa-bc7a-45dd-b5fd-03e0d3d473b6",
+          "categorie": "Belastingen",
+          "post": "Weg Dion",
+          "bedrag": 23
+        },
+        {
+          "id": "id-d9e1abe3-ae4e-4671-a7b5-0ff8243cde05",
+          "categorie": "Belastingen",
+          "post": "Gemeente",
+          "bedrag": 83.96
+        },
+        {
+          "id": "id-c8b2a333-ce2d-4a18-b40b-be76617a87a0",
+          "categorie": "Belastingen",
+          "post": "Waterschap",
+          "bedrag": 37.22
+        },
+        {
+          "id": "id-618e6f43-ac6a-4c68-8b01-4bf83df62477",
+          "categorie": "Internet/telefoon",
+          "post": "Internet",
+          "bedrag": 32.5
+        },
+        {
+          "id": "id-db7e18d9-f782-490e-8245-770e0aa24ebd",
+          "categorie": "Internet/telefoon",
+          "post": "Tel Dara",
+          "bedrag": 10
+        },
+        {
+          "id": "id-70b2f579-b7d1-4908-b2cc-99bea5dfff4e",
+          "categorie": "Internet/telefoon",
+          "post": "Tel Dion",
+          "bedrag": 7.5
+        },
+        {
+          "id": "id-0c90c26c-0512-4a19-8f81-0c3cdf589e56",
+          "categorie": "Entertainment",
+          "post": "Netflix",
+          "bedrag": 15.99
+        },
+        {
+          "id": "id-4bbc4c13-8a37-4a71-ac5a-1c5f158dcbcd",
+          "categorie": "Entertainment",
+          "post": "Disney+",
+          "bedrag": 10.99
+        },
+        {
+          "id": "id-34c9b28e-04d7-45ed-8cd6-5cac379af676",
+          "categorie": "Entertainment",
+          "post": "Spotify Dion",
+          "bedrag": 6.99
+        },
+        {
+          "id": "id-e012db43-0394-43ad-9d2b-7c114ed427f1",
+          "categorie": "Pensioen",
+          "post": "SPF pensioen",
+          "bedrag": 312
+        },
+        {
+          "id": "id-f86109e1-9d5c-45db-80b0-082a05926698",
+          "categorie": "Overig",
+          "post": "ANWB",
+          "bedrag": 18
+        },
+        {
+          "id": "id-97277816-baad-4159-a4bb-c8ba2b01db99",
+          "categorie": "Overig",
+          "post": "ING",
+          "bedrag": 4.55
+        },
+        {
+          "id": "id-06b04e01-04d6-4f4e-8ce8-8d04e9e79523",
+          "categorie": "Overig",
+          "post": "Sportschool",
+          "bedrag": 62.95
+        },
+        {
+          "id": "id-50b08eb5-54fa-4528-b205-928ceb33bd07",
+          "categorie": "Overig",
+          "post": "Waterpomp",
+          "bedrag": 17
+        }
+      ],
+      "variabel": [
+        {
+          "id": "id-7bcaa3c3-2d18-4e48-a21c-f8df036d9d83",
+          "categorie": "Variabel",
+          "post": "Boodschappen",
+          "bedrag": 500
+        },
+        {
+          "id": "id-457e7a70-c2e6-4cb8-bf82-a66cf8d75886",
+          "categorie": "Variabel",
+          "post": "Benzine",
+          "bedrag": 150
+        },
+        {
+          "id": "id-9ae994fa-101e-4909-984f-65de938e08d2",
+          "categorie": "Variabel",
+          "post": "Uitjes",
+          "bedrag": 0
+        },
+        {
+          "id": "id-d1d2016d-ea77-4510-a275-b9d2bd8c7135",
+          "categorie": "Variabel",
+          "post": "overig",
+          "bedrag": 100
+        },
+        {
+          "id": "id-020b1600-f39c-4f17-abf6-d56c84cc360a",
+          "categorie": "Variabel",
+          "post": "",
+          "bedrag": 0
+        },
+        {
+          "id": "id-6b052dfd-dc57-4531-972e-24907b158a60",
+          "categorie": "Variabel",
+          "post": "",
+          "bedrag": 0
+        },
+        {
+          "id": "id-3fab7a55-1f38-4fa1-afbe-34d933351331",
+          "categorie": "Variabel",
+          "post": "",
+          "bedrag": 0
+        },
+        {
+          "id": "id-46d05867-f3f8-4424-a391-fea2baad23fa",
+          "categorie": "Variabel",
+          "post": "",
+          "bedrag": 0
+        }
+      ]
+    },
+    "dion": {
+      "vasteLasten": [
+        {
+          "id": "id-b9557d99-68c9-41f7-a871-01888b4fc9fd",
+          "categorie": "Entertainment",
+          "post": "Prime",
+          "bedrag": 4.99
+        }
+      ],
+      "variabel": [
+        {
+          "id": "id-51fc5307-9594-4c91-a8b0-7ada2d888333",
+          "categorie": "Variabel",
+          "post": "Eten buiten de deur",
+          "bedrag": 0
+        }
+      ]
+    },
+    "dara": {
+      "vasteLasten": [
+        {
+          "id": "id-14e8a5c7-8c70-46f2-9cc0-358ba9b5666f",
+          "categorie": "Entertainment",
+          "post": "Prime",
+          "bedrag": 4.99
+        }
+      ],
+      "variabel": [
+        {
+          "id": "id-606e4178-53ee-4e72-8826-0e8337e8c594",
+          "categorie": "Variabel",
+          "post": "Eten buiten de deur",
+          "bedrag": 0
+        }
+      ]
+    }
+  },
+  "spaardoelen": {
+    "gezamenlijk": [
+      {
+        "id": "id-d39174ef-10f2-4ffc-a485-f60aa21a6b28",
+        "naam": "vakantie",
+        "doelbedrag": 5000,
+        "algespaard": 100,
+        "doeldatum": "2028-12-31",
+        "vasteInleg": 0,
+        "rendement": 0.0125,
+        "rendementPeriode": "jaarlijks",
+        "favoriet": false,
+        "eigenaar": "gezamenlijk",
+        "ratoVerdeling": true,
+        "subdoelen": []
+      },
+      {
+        "id": "id-80a3f4f3-deb3-4f05-9f56-02c9b48c39bf",
+        "naam": "buffer",
+        "doelbedrag": 10000,
+        "algespaard": 0,
+        "doeldatum": "2030-12-31",
+        "vasteInleg": 0,
+        "rendement": 0.0125,
+        "rendementPeriode": "jaarlijks",
+        "favoriet": false,
+        "eigenaar": "gezamenlijk",
+        "ratoVerdeling": true,
+        "subdoelen": []
+      },
+      {
+        "id": "id-0dce2031-c31c-4fa4-9660-3054eb51ce20",
+        "naam": "Beleggen",
+        "doelbedrag": 50000,
+        "algespaard": 17941,
+        "doeldatum": "2030-12-31",
+        "vasteInleg": 0,
+        "rendement": 0.08,
+        "vastBedrag": true,
+        "rendementPeriode": "jaarlijks",
+        "favoriet": false,
+        "eigenaar": "gezamenlijk",
+        "ratoVerdeling": false,
+        "subdoelen": []
+      }
+    ],
+    "dion": [
+      {
+        "id": "id-4f415739-3222-4fbb-93e1-7c0d7c349f58",
+        "naam": "koffie",
+        "doelbedrag": 300,
+        "algespaard": 6.77,
+        "doeldatum": "2026-12-31",
+        "vasteInleg": 0,
+        "rendement": 0.0125,
+        "rendementPeriode": "jaarlijks",
+        "favoriet": false,
+        "eigenaar": "dion",
+        "ratoVerdeling": true,
+        "subdoelen": []
+      },
+      {
+        "id": "id-476325bf-9aad-4ce2-8ab3-3dff37cc0369",
+        "naam": "buffer",
+        "doelbedrag": 5000,
+        "algespaard": 800,
+        "doeldatum": "2028-12-31",
+        "vasteInleg": 0,
+        "rendement": 0.0125,
+        "rendementPeriode": "jaarlijks",
+        "favoriet": false,
+        "eigenaar": "dion",
+        "ratoVerdeling": true,
+        "subdoelen": []
+      },
+      {
+        "id": "id-7a284dea-befc-40e9-aa12-2cb467fa943d",
+        "naam": "Beleggen",
+        "doelbedrag": 50000,
+        "algespaard": 17941,
+        "doeldatum": "2030-12-31",
+        "vasteInleg": 250,
+        "rendement": 0.08,
+        "vastBedrag": true,
+        "rendementPeriode": "jaarlijks",
+        "favoriet": false,
+        "eigenaar": "dion",
+        "ratoVerdeling": false,
+        "subdoelen": []
+      }
+    ],
+    "dara": []
+  },
+  "monthlyIncome": {
+    "2026-07": {
+      "dion": 2450,
+      "dara": 3010
+    },
+    "2026-01": {
+      "dion": 2450,
+      "dara": 3010
+    },
+    "2026-02": {
+      "dion": 2450,
+      "dara": 3010
+    },
+    "2026-03": {
+      "dion": 2450,
+      "dara": 3010
+    },
+    "2026-04": {
+      "dion": 2450,
+      "dara": 3010
+    },
+    "2026-05": {
+      "dion": 2450,
+      "dara": 3010
+    },
+    "2026-06": {
+      "dion": 2450,
+      "dara": 3010
+    },
+    "2026-08": {
+      "dion": 2450,
+      "dara": 3010
+    },
+    "2026-09": {
+      "dion": 2450,
+      "dara": 3010
+    },
+    "2026-10": {
+      "dion": 2450,
+      "dara": 3010
+    },
+    "2026-11": {
+      "dion": 2450,
+      "dara": 3010
+    },
+    "2026-12": {
+      "dion": 2450,
+      "dara": 3010
+    }
+  },
+  "monthlyBudgets": {
+    "2026-07": {
+      "voor": {
+        "gezamenlijkVariabel": [
+          {
+            "id": "id-b980c96c-ea19-44bb-a845-45406e16d90a",
+            "categorie": "Variabel",
+            "post": "Boodschappen",
+            "bedrag": 500
+          },
+          {
+            "id": "id-bb64593f-0ab6-40c0-a1ab-4c8a53bc3411",
+            "categorie": "Variabel",
+            "post": "Benzine",
+            "bedrag": 0
+          },
+          {
+            "id": "id-2dd01cc2-33fa-43ac-b786-f3d5d4a25791",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-61778d40-f107-44fc-a2b6-1ed30b8cf588",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-372baf9c-f4ff-4549-b0a7-307499a45e64",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-3e421293-ba9e-4d5d-9f59-505526c7f103",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-8b40fbf6-56d5-4386-989e-dde131d4a616",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          }
+        ],
+        "dionVariabel": [
+          {
+            "id": "id-9bc3e8f7-e759-4fc9-a1cd-1a663a4eff31",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          },
+          {
+            "id": "id-6b830267-ff18-44af-a749-854666d41bb2",
+            "categorie": "Variabel",
+            "post": "Benzine/vervoer",
+            "bedrag": 0
+          },
+          {
+            "id": "id-d2d40e3d-abb3-4778-a225-0ff6cc0a21d1",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-44747774-6aaa-4662-ac38-b79df0c7133d",
+            "categorie": "Variabel",
+            "post": "Kleding/hobby",
+            "bedrag": 0
+          },
+          {
+            "id": "id-344b7bb5-b539-45bd-a270-fe44a68f7cd5",
+            "categorie": "Variabel",
+            "post": "Overig",
+            "bedrag": 0
+          }
+        ],
+        "daraVariabel": [
+          {
+            "id": "id-ee73df48-8b12-4ad3-98e8-0d005539e93f",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          },
+          {
+            "id": "id-2ec661fa-77e4-4494-b4b1-d2e581897256",
+            "categorie": "Variabel",
+            "post": "Benzine/vervoer",
+            "bedrag": 0
+          },
+          {
+            "id": "id-b794c605-4552-4904-b737-9f0afae933a5",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-b967fbf7-b5a2-47d0-aa17-2f08cfb5201e",
+            "categorie": "Variabel",
+            "post": "Kleding/hobby",
+            "bedrag": 0
+          },
+          {
+            "id": "id-8b16a90a-62dd-4289-b67e-c505bee5175c",
+            "categorie": "Variabel",
+            "post": "Overig",
+            "bedrag": 0
+          }
+        ]
+      },
+      "na": {
+        "gezamenlijkVariabel": [
+          {
+            "id": "id-7bcaa3c3-2d18-4e48-a21c-f8df036d9d83",
+            "categorie": "Variabel",
+            "post": "Boodschappen",
+            "bedrag": 500
+          },
+          {
+            "id": "id-457e7a70-c2e6-4cb8-bf82-a66cf8d75886",
+            "categorie": "Variabel",
+            "post": "Benzine",
+            "bedrag": 150
+          },
+          {
+            "id": "id-9ae994fa-101e-4909-984f-65de938e08d2",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-d1d2016d-ea77-4510-a275-b9d2bd8c7135",
+            "categorie": "Variabel",
+            "post": "overig",
+            "bedrag": 100
+          },
+          {
+            "id": "id-020b1600-f39c-4f17-abf6-d56c84cc360a",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-6b052dfd-dc57-4531-972e-24907b158a60",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-3fab7a55-1f38-4fa1-afbe-34d933351331",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-46d05867-f3f8-4424-a391-fea2baad23fa",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          }
+        ],
+        "dionVariabel": [
+          {
+            "id": "id-51fc5307-9594-4c91-a8b0-7ada2d888333",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          }
+        ],
+        "daraVariabel": [
+          {
+            "id": "id-606e4178-53ee-4e72-8826-0e8337e8c594",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          }
+        ]
+      }
+    },
+    "2026-01": {
+      "voor": {
+        "gezamenlijkVariabel": [
+          {
+            "id": "id-b980c96c-ea19-44bb-a845-45406e16d90a",
+            "categorie": "Variabel",
+            "post": "Boodschappen",
+            "bedrag": 500
+          },
+          {
+            "id": "id-bb64593f-0ab6-40c0-a1ab-4c8a53bc3411",
+            "categorie": "Variabel",
+            "post": "Benzine",
+            "bedrag": 0
+          },
+          {
+            "id": "id-2dd01cc2-33fa-43ac-b786-f3d5d4a25791",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-61778d40-f107-44fc-a2b6-1ed30b8cf588",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-372baf9c-f4ff-4549-b0a7-307499a45e64",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-3e421293-ba9e-4d5d-9f59-505526c7f103",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-8b40fbf6-56d5-4386-989e-dde131d4a616",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          }
+        ],
+        "dionVariabel": [
+          {
+            "id": "id-9bc3e8f7-e759-4fc9-a1cd-1a663a4eff31",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          },
+          {
+            "id": "id-6b830267-ff18-44af-a749-854666d41bb2",
+            "categorie": "Variabel",
+            "post": "Benzine/vervoer",
+            "bedrag": 0
+          },
+          {
+            "id": "id-d2d40e3d-abb3-4778-a225-0ff6cc0a21d1",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-44747774-6aaa-4662-ac38-b79df0c7133d",
+            "categorie": "Variabel",
+            "post": "Kleding/hobby",
+            "bedrag": 0
+          },
+          {
+            "id": "id-344b7bb5-b539-45bd-a270-fe44a68f7cd5",
+            "categorie": "Variabel",
+            "post": "Overig",
+            "bedrag": 0
+          }
+        ],
+        "daraVariabel": [
+          {
+            "id": "id-ee73df48-8b12-4ad3-98e8-0d005539e93f",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          },
+          {
+            "id": "id-2ec661fa-77e4-4494-b4b1-d2e581897256",
+            "categorie": "Variabel",
+            "post": "Benzine/vervoer",
+            "bedrag": 0
+          },
+          {
+            "id": "id-b794c605-4552-4904-b737-9f0afae933a5",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-b967fbf7-b5a2-47d0-aa17-2f08cfb5201e",
+            "categorie": "Variabel",
+            "post": "Kleding/hobby",
+            "bedrag": 0
+          },
+          {
+            "id": "id-8b16a90a-62dd-4289-b67e-c505bee5175c",
+            "categorie": "Variabel",
+            "post": "Overig",
+            "bedrag": 0
+          }
+        ]
+      },
+      "na": {
+        "gezamenlijkVariabel": [
+          {
+            "id": "id-7bcaa3c3-2d18-4e48-a21c-f8df036d9d83",
+            "categorie": "Variabel",
+            "post": "Boodschappen",
+            "bedrag": 500
+          },
+          {
+            "id": "id-457e7a70-c2e6-4cb8-bf82-a66cf8d75886",
+            "categorie": "Variabel",
+            "post": "Benzine",
+            "bedrag": 150
+          },
+          {
+            "id": "id-9ae994fa-101e-4909-984f-65de938e08d2",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-d1d2016d-ea77-4510-a275-b9d2bd8c7135",
+            "categorie": "Variabel",
+            "post": "overig",
+            "bedrag": 100
+          },
+          {
+            "id": "id-020b1600-f39c-4f17-abf6-d56c84cc360a",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-6b052dfd-dc57-4531-972e-24907b158a60",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-3fab7a55-1f38-4fa1-afbe-34d933351331",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-46d05867-f3f8-4424-a391-fea2baad23fa",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          }
+        ],
+        "dionVariabel": [
+          {
+            "id": "id-51fc5307-9594-4c91-a8b0-7ada2d888333",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          }
+        ],
+        "daraVariabel": [
+          {
+            "id": "id-606e4178-53ee-4e72-8826-0e8337e8c594",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          }
+        ]
+      }
+    },
+    "2026-02": {
+      "voor": {
+        "gezamenlijkVariabel": [
+          {
+            "id": "id-b980c96c-ea19-44bb-a845-45406e16d90a",
+            "categorie": "Variabel",
+            "post": "Boodschappen",
+            "bedrag": 500
+          },
+          {
+            "id": "id-bb64593f-0ab6-40c0-a1ab-4c8a53bc3411",
+            "categorie": "Variabel",
+            "post": "Benzine",
+            "bedrag": 0
+          },
+          {
+            "id": "id-2dd01cc2-33fa-43ac-b786-f3d5d4a25791",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-61778d40-f107-44fc-a2b6-1ed30b8cf588",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-372baf9c-f4ff-4549-b0a7-307499a45e64",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-3e421293-ba9e-4d5d-9f59-505526c7f103",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-8b40fbf6-56d5-4386-989e-dde131d4a616",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          }
+        ],
+        "dionVariabel": [
+          {
+            "id": "id-9bc3e8f7-e759-4fc9-a1cd-1a663a4eff31",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          },
+          {
+            "id": "id-6b830267-ff18-44af-a749-854666d41bb2",
+            "categorie": "Variabel",
+            "post": "Benzine/vervoer",
+            "bedrag": 0
+          },
+          {
+            "id": "id-d2d40e3d-abb3-4778-a225-0ff6cc0a21d1",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-44747774-6aaa-4662-ac38-b79df0c7133d",
+            "categorie": "Variabel",
+            "post": "Kleding/hobby",
+            "bedrag": 0
+          },
+          {
+            "id": "id-344b7bb5-b539-45bd-a270-fe44a68f7cd5",
+            "categorie": "Variabel",
+            "post": "Overig",
+            "bedrag": 0
+          }
+        ],
+        "daraVariabel": [
+          {
+            "id": "id-ee73df48-8b12-4ad3-98e8-0d005539e93f",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          },
+          {
+            "id": "id-2ec661fa-77e4-4494-b4b1-d2e581897256",
+            "categorie": "Variabel",
+            "post": "Benzine/vervoer",
+            "bedrag": 0
+          },
+          {
+            "id": "id-b794c605-4552-4904-b737-9f0afae933a5",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-b967fbf7-b5a2-47d0-aa17-2f08cfb5201e",
+            "categorie": "Variabel",
+            "post": "Kleding/hobby",
+            "bedrag": 0
+          },
+          {
+            "id": "id-8b16a90a-62dd-4289-b67e-c505bee5175c",
+            "categorie": "Variabel",
+            "post": "Overig",
+            "bedrag": 0
+          }
+        ]
+      },
+      "na": {
+        "gezamenlijkVariabel": [
+          {
+            "id": "id-7bcaa3c3-2d18-4e48-a21c-f8df036d9d83",
+            "categorie": "Variabel",
+            "post": "Boodschappen",
+            "bedrag": 500
+          },
+          {
+            "id": "id-457e7a70-c2e6-4cb8-bf82-a66cf8d75886",
+            "categorie": "Variabel",
+            "post": "Benzine",
+            "bedrag": 150
+          },
+          {
+            "id": "id-9ae994fa-101e-4909-984f-65de938e08d2",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-d1d2016d-ea77-4510-a275-b9d2bd8c7135",
+            "categorie": "Variabel",
+            "post": "overig",
+            "bedrag": 100
+          },
+          {
+            "id": "id-020b1600-f39c-4f17-abf6-d56c84cc360a",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-6b052dfd-dc57-4531-972e-24907b158a60",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-3fab7a55-1f38-4fa1-afbe-34d933351331",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-46d05867-f3f8-4424-a391-fea2baad23fa",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          }
+        ],
+        "dionVariabel": [
+          {
+            "id": "id-51fc5307-9594-4c91-a8b0-7ada2d888333",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          }
+        ],
+        "daraVariabel": [
+          {
+            "id": "id-606e4178-53ee-4e72-8826-0e8337e8c594",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          }
+        ]
+      }
+    },
+    "2026-03": {
+      "voor": {
+        "gezamenlijkVariabel": [
+          {
+            "id": "id-b980c96c-ea19-44bb-a845-45406e16d90a",
+            "categorie": "Variabel",
+            "post": "Boodschappen",
+            "bedrag": 500
+          },
+          {
+            "id": "id-bb64593f-0ab6-40c0-a1ab-4c8a53bc3411",
+            "categorie": "Variabel",
+            "post": "Benzine",
+            "bedrag": 0
+          },
+          {
+            "id": "id-2dd01cc2-33fa-43ac-b786-f3d5d4a25791",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-61778d40-f107-44fc-a2b6-1ed30b8cf588",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-372baf9c-f4ff-4549-b0a7-307499a45e64",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-3e421293-ba9e-4d5d-9f59-505526c7f103",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-8b40fbf6-56d5-4386-989e-dde131d4a616",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          }
+        ],
+        "dionVariabel": [
+          {
+            "id": "id-9bc3e8f7-e759-4fc9-a1cd-1a663a4eff31",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          },
+          {
+            "id": "id-6b830267-ff18-44af-a749-854666d41bb2",
+            "categorie": "Variabel",
+            "post": "Benzine/vervoer",
+            "bedrag": 0
+          },
+          {
+            "id": "id-d2d40e3d-abb3-4778-a225-0ff6cc0a21d1",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-44747774-6aaa-4662-ac38-b79df0c7133d",
+            "categorie": "Variabel",
+            "post": "Kleding/hobby",
+            "bedrag": 0
+          },
+          {
+            "id": "id-344b7bb5-b539-45bd-a270-fe44a68f7cd5",
+            "categorie": "Variabel",
+            "post": "Overig",
+            "bedrag": 0
+          }
+        ],
+        "daraVariabel": [
+          {
+            "id": "id-ee73df48-8b12-4ad3-98e8-0d005539e93f",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          },
+          {
+            "id": "id-2ec661fa-77e4-4494-b4b1-d2e581897256",
+            "categorie": "Variabel",
+            "post": "Benzine/vervoer",
+            "bedrag": 0
+          },
+          {
+            "id": "id-b794c605-4552-4904-b737-9f0afae933a5",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-b967fbf7-b5a2-47d0-aa17-2f08cfb5201e",
+            "categorie": "Variabel",
+            "post": "Kleding/hobby",
+            "bedrag": 0
+          },
+          {
+            "id": "id-8b16a90a-62dd-4289-b67e-c505bee5175c",
+            "categorie": "Variabel",
+            "post": "Overig",
+            "bedrag": 0
+          }
+        ]
+      },
+      "na": {
+        "gezamenlijkVariabel": [
+          {
+            "id": "id-7bcaa3c3-2d18-4e48-a21c-f8df036d9d83",
+            "categorie": "Variabel",
+            "post": "Boodschappen",
+            "bedrag": 500
+          },
+          {
+            "id": "id-457e7a70-c2e6-4cb8-bf82-a66cf8d75886",
+            "categorie": "Variabel",
+            "post": "Benzine",
+            "bedrag": 150
+          },
+          {
+            "id": "id-9ae994fa-101e-4909-984f-65de938e08d2",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-d1d2016d-ea77-4510-a275-b9d2bd8c7135",
+            "categorie": "Variabel",
+            "post": "overig",
+            "bedrag": 100
+          },
+          {
+            "id": "id-020b1600-f39c-4f17-abf6-d56c84cc360a",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-6b052dfd-dc57-4531-972e-24907b158a60",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-3fab7a55-1f38-4fa1-afbe-34d933351331",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-46d05867-f3f8-4424-a391-fea2baad23fa",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          }
+        ],
+        "dionVariabel": [
+          {
+            "id": "id-51fc5307-9594-4c91-a8b0-7ada2d888333",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          }
+        ],
+        "daraVariabel": [
+          {
+            "id": "id-606e4178-53ee-4e72-8826-0e8337e8c594",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          }
+        ]
+      }
+    },
+    "2026-04": {
+      "voor": {
+        "gezamenlijkVariabel": [
+          {
+            "id": "id-b980c96c-ea19-44bb-a845-45406e16d90a",
+            "categorie": "Variabel",
+            "post": "Boodschappen",
+            "bedrag": 500
+          },
+          {
+            "id": "id-bb64593f-0ab6-40c0-a1ab-4c8a53bc3411",
+            "categorie": "Variabel",
+            "post": "Benzine",
+            "bedrag": 0
+          },
+          {
+            "id": "id-2dd01cc2-33fa-43ac-b786-f3d5d4a25791",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-61778d40-f107-44fc-a2b6-1ed30b8cf588",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-372baf9c-f4ff-4549-b0a7-307499a45e64",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-3e421293-ba9e-4d5d-9f59-505526c7f103",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-8b40fbf6-56d5-4386-989e-dde131d4a616",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          }
+        ],
+        "dionVariabel": [
+          {
+            "id": "id-9bc3e8f7-e759-4fc9-a1cd-1a663a4eff31",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          },
+          {
+            "id": "id-6b830267-ff18-44af-a749-854666d41bb2",
+            "categorie": "Variabel",
+            "post": "Benzine/vervoer",
+            "bedrag": 0
+          },
+          {
+            "id": "id-d2d40e3d-abb3-4778-a225-0ff6cc0a21d1",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-44747774-6aaa-4662-ac38-b79df0c7133d",
+            "categorie": "Variabel",
+            "post": "Kleding/hobby",
+            "bedrag": 0
+          },
+          {
+            "id": "id-344b7bb5-b539-45bd-a270-fe44a68f7cd5",
+            "categorie": "Variabel",
+            "post": "Overig",
+            "bedrag": 0
+          }
+        ],
+        "daraVariabel": [
+          {
+            "id": "id-ee73df48-8b12-4ad3-98e8-0d005539e93f",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          },
+          {
+            "id": "id-2ec661fa-77e4-4494-b4b1-d2e581897256",
+            "categorie": "Variabel",
+            "post": "Benzine/vervoer",
+            "bedrag": 0
+          },
+          {
+            "id": "id-b794c605-4552-4904-b737-9f0afae933a5",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-b967fbf7-b5a2-47d0-aa17-2f08cfb5201e",
+            "categorie": "Variabel",
+            "post": "Kleding/hobby",
+            "bedrag": 0
+          },
+          {
+            "id": "id-8b16a90a-62dd-4289-b67e-c505bee5175c",
+            "categorie": "Variabel",
+            "post": "Overig",
+            "bedrag": 0
+          }
+        ]
+      },
+      "na": {
+        "gezamenlijkVariabel": [
+          {
+            "id": "id-7bcaa3c3-2d18-4e48-a21c-f8df036d9d83",
+            "categorie": "Variabel",
+            "post": "Boodschappen",
+            "bedrag": 500
+          },
+          {
+            "id": "id-457e7a70-c2e6-4cb8-bf82-a66cf8d75886",
+            "categorie": "Variabel",
+            "post": "Benzine",
+            "bedrag": 150
+          },
+          {
+            "id": "id-9ae994fa-101e-4909-984f-65de938e08d2",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-d1d2016d-ea77-4510-a275-b9d2bd8c7135",
+            "categorie": "Variabel",
+            "post": "overig",
+            "bedrag": 100
+          },
+          {
+            "id": "id-020b1600-f39c-4f17-abf6-d56c84cc360a",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-6b052dfd-dc57-4531-972e-24907b158a60",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-3fab7a55-1f38-4fa1-afbe-34d933351331",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-46d05867-f3f8-4424-a391-fea2baad23fa",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          }
+        ],
+        "dionVariabel": [
+          {
+            "id": "id-51fc5307-9594-4c91-a8b0-7ada2d888333",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          }
+        ],
+        "daraVariabel": [
+          {
+            "id": "id-606e4178-53ee-4e72-8826-0e8337e8c594",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          }
+        ]
+      }
+    },
+    "2026-05": {
+      "voor": {
+        "gezamenlijkVariabel": [
+          {
+            "id": "id-b980c96c-ea19-44bb-a845-45406e16d90a",
+            "categorie": "Variabel",
+            "post": "Boodschappen",
+            "bedrag": 500
+          },
+          {
+            "id": "id-bb64593f-0ab6-40c0-a1ab-4c8a53bc3411",
+            "categorie": "Variabel",
+            "post": "Benzine",
+            "bedrag": 0
+          },
+          {
+            "id": "id-2dd01cc2-33fa-43ac-b786-f3d5d4a25791",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-61778d40-f107-44fc-a2b6-1ed30b8cf588",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-372baf9c-f4ff-4549-b0a7-307499a45e64",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-3e421293-ba9e-4d5d-9f59-505526c7f103",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-8b40fbf6-56d5-4386-989e-dde131d4a616",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          }
+        ],
+        "dionVariabel": [
+          {
+            "id": "id-9bc3e8f7-e759-4fc9-a1cd-1a663a4eff31",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          },
+          {
+            "id": "id-6b830267-ff18-44af-a749-854666d41bb2",
+            "categorie": "Variabel",
+            "post": "Benzine/vervoer",
+            "bedrag": 0
+          },
+          {
+            "id": "id-d2d40e3d-abb3-4778-a225-0ff6cc0a21d1",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-44747774-6aaa-4662-ac38-b79df0c7133d",
+            "categorie": "Variabel",
+            "post": "Kleding/hobby",
+            "bedrag": 0
+          },
+          {
+            "id": "id-344b7bb5-b539-45bd-a270-fe44a68f7cd5",
+            "categorie": "Variabel",
+            "post": "Overig",
+            "bedrag": 0
+          }
+        ],
+        "daraVariabel": [
+          {
+            "id": "id-ee73df48-8b12-4ad3-98e8-0d005539e93f",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          },
+          {
+            "id": "id-2ec661fa-77e4-4494-b4b1-d2e581897256",
+            "categorie": "Variabel",
+            "post": "Benzine/vervoer",
+            "bedrag": 0
+          },
+          {
+            "id": "id-b794c605-4552-4904-b737-9f0afae933a5",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-b967fbf7-b5a2-47d0-aa17-2f08cfb5201e",
+            "categorie": "Variabel",
+            "post": "Kleding/hobby",
+            "bedrag": 0
+          },
+          {
+            "id": "id-8b16a90a-62dd-4289-b67e-c505bee5175c",
+            "categorie": "Variabel",
+            "post": "Overig",
+            "bedrag": 0
+          }
+        ]
+      },
+      "na": {
+        "gezamenlijkVariabel": [
+          {
+            "id": "id-7bcaa3c3-2d18-4e48-a21c-f8df036d9d83",
+            "categorie": "Variabel",
+            "post": "Boodschappen",
+            "bedrag": 500
+          },
+          {
+            "id": "id-457e7a70-c2e6-4cb8-bf82-a66cf8d75886",
+            "categorie": "Variabel",
+            "post": "Benzine",
+            "bedrag": 150
+          },
+          {
+            "id": "id-9ae994fa-101e-4909-984f-65de938e08d2",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-d1d2016d-ea77-4510-a275-b9d2bd8c7135",
+            "categorie": "Variabel",
+            "post": "overig",
+            "bedrag": 100
+          },
+          {
+            "id": "id-020b1600-f39c-4f17-abf6-d56c84cc360a",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-6b052dfd-dc57-4531-972e-24907b158a60",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-3fab7a55-1f38-4fa1-afbe-34d933351331",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-46d05867-f3f8-4424-a391-fea2baad23fa",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          }
+        ],
+        "dionVariabel": [
+          {
+            "id": "id-51fc5307-9594-4c91-a8b0-7ada2d888333",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          }
+        ],
+        "daraVariabel": [
+          {
+            "id": "id-606e4178-53ee-4e72-8826-0e8337e8c594",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          }
+        ]
+      }
+    },
+    "2026-06": {
+      "voor": {
+        "gezamenlijkVariabel": [
+          {
+            "id": "id-b980c96c-ea19-44bb-a845-45406e16d90a",
+            "categorie": "Variabel",
+            "post": "Boodschappen",
+            "bedrag": 500
+          },
+          {
+            "id": "id-bb64593f-0ab6-40c0-a1ab-4c8a53bc3411",
+            "categorie": "Variabel",
+            "post": "Benzine",
+            "bedrag": 0
+          },
+          {
+            "id": "id-2dd01cc2-33fa-43ac-b786-f3d5d4a25791",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-61778d40-f107-44fc-a2b6-1ed30b8cf588",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-372baf9c-f4ff-4549-b0a7-307499a45e64",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-3e421293-ba9e-4d5d-9f59-505526c7f103",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-8b40fbf6-56d5-4386-989e-dde131d4a616",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          }
+        ],
+        "dionVariabel": [
+          {
+            "id": "id-9bc3e8f7-e759-4fc9-a1cd-1a663a4eff31",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          },
+          {
+            "id": "id-6b830267-ff18-44af-a749-854666d41bb2",
+            "categorie": "Variabel",
+            "post": "Benzine/vervoer",
+            "bedrag": 0
+          },
+          {
+            "id": "id-d2d40e3d-abb3-4778-a225-0ff6cc0a21d1",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-44747774-6aaa-4662-ac38-b79df0c7133d",
+            "categorie": "Variabel",
+            "post": "Kleding/hobby",
+            "bedrag": 0
+          },
+          {
+            "id": "id-344b7bb5-b539-45bd-a270-fe44a68f7cd5",
+            "categorie": "Variabel",
+            "post": "Overig",
+            "bedrag": 0
+          }
+        ],
+        "daraVariabel": [
+          {
+            "id": "id-ee73df48-8b12-4ad3-98e8-0d005539e93f",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          },
+          {
+            "id": "id-2ec661fa-77e4-4494-b4b1-d2e581897256",
+            "categorie": "Variabel",
+            "post": "Benzine/vervoer",
+            "bedrag": 0
+          },
+          {
+            "id": "id-b794c605-4552-4904-b737-9f0afae933a5",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-b967fbf7-b5a2-47d0-aa17-2f08cfb5201e",
+            "categorie": "Variabel",
+            "post": "Kleding/hobby",
+            "bedrag": 0
+          },
+          {
+            "id": "id-8b16a90a-62dd-4289-b67e-c505bee5175c",
+            "categorie": "Variabel",
+            "post": "Overig",
+            "bedrag": 0
+          }
+        ]
+      },
+      "na": {
+        "gezamenlijkVariabel": [
+          {
+            "id": "id-7bcaa3c3-2d18-4e48-a21c-f8df036d9d83",
+            "categorie": "Variabel",
+            "post": "Boodschappen",
+            "bedrag": 500
+          },
+          {
+            "id": "id-457e7a70-c2e6-4cb8-bf82-a66cf8d75886",
+            "categorie": "Variabel",
+            "post": "Benzine",
+            "bedrag": 150
+          },
+          {
+            "id": "id-9ae994fa-101e-4909-984f-65de938e08d2",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-d1d2016d-ea77-4510-a275-b9d2bd8c7135",
+            "categorie": "Variabel",
+            "post": "overig",
+            "bedrag": 100
+          },
+          {
+            "id": "id-020b1600-f39c-4f17-abf6-d56c84cc360a",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-6b052dfd-dc57-4531-972e-24907b158a60",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-3fab7a55-1f38-4fa1-afbe-34d933351331",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-46d05867-f3f8-4424-a391-fea2baad23fa",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          }
+        ],
+        "dionVariabel": [
+          {
+            "id": "id-51fc5307-9594-4c91-a8b0-7ada2d888333",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          }
+        ],
+        "daraVariabel": [
+          {
+            "id": "id-606e4178-53ee-4e72-8826-0e8337e8c594",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          }
+        ]
+      }
+    },
+    "2026-08": {
+      "voor": {
+        "gezamenlijkVariabel": [
+          {
+            "id": "id-b980c96c-ea19-44bb-a845-45406e16d90a",
+            "categorie": "Variabel",
+            "post": "Boodschappen",
+            "bedrag": 500
+          },
+          {
+            "id": "id-bb64593f-0ab6-40c0-a1ab-4c8a53bc3411",
+            "categorie": "Variabel",
+            "post": "Benzine",
+            "bedrag": 0
+          },
+          {
+            "id": "id-2dd01cc2-33fa-43ac-b786-f3d5d4a25791",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-61778d40-f107-44fc-a2b6-1ed30b8cf588",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-372baf9c-f4ff-4549-b0a7-307499a45e64",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-3e421293-ba9e-4d5d-9f59-505526c7f103",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-8b40fbf6-56d5-4386-989e-dde131d4a616",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          }
+        ],
+        "dionVariabel": [
+          {
+            "id": "id-9bc3e8f7-e759-4fc9-a1cd-1a663a4eff31",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          },
+          {
+            "id": "id-6b830267-ff18-44af-a749-854666d41bb2",
+            "categorie": "Variabel",
+            "post": "Benzine/vervoer",
+            "bedrag": 0
+          },
+          {
+            "id": "id-d2d40e3d-abb3-4778-a225-0ff6cc0a21d1",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-44747774-6aaa-4662-ac38-b79df0c7133d",
+            "categorie": "Variabel",
+            "post": "Kleding/hobby",
+            "bedrag": 0
+          },
+          {
+            "id": "id-344b7bb5-b539-45bd-a270-fe44a68f7cd5",
+            "categorie": "Variabel",
+            "post": "Overig",
+            "bedrag": 0
+          }
+        ],
+        "daraVariabel": [
+          {
+            "id": "id-ee73df48-8b12-4ad3-98e8-0d005539e93f",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          },
+          {
+            "id": "id-2ec661fa-77e4-4494-b4b1-d2e581897256",
+            "categorie": "Variabel",
+            "post": "Benzine/vervoer",
+            "bedrag": 0
+          },
+          {
+            "id": "id-b794c605-4552-4904-b737-9f0afae933a5",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-b967fbf7-b5a2-47d0-aa17-2f08cfb5201e",
+            "categorie": "Variabel",
+            "post": "Kleding/hobby",
+            "bedrag": 0
+          },
+          {
+            "id": "id-8b16a90a-62dd-4289-b67e-c505bee5175c",
+            "categorie": "Variabel",
+            "post": "Overig",
+            "bedrag": 0
+          }
+        ]
+      },
+      "na": {
+        "gezamenlijkVariabel": [
+          {
+            "id": "id-7bcaa3c3-2d18-4e48-a21c-f8df036d9d83",
+            "categorie": "Variabel",
+            "post": "Boodschappen",
+            "bedrag": 500
+          },
+          {
+            "id": "id-457e7a70-c2e6-4cb8-bf82-a66cf8d75886",
+            "categorie": "Variabel",
+            "post": "Benzine",
+            "bedrag": 150
+          },
+          {
+            "id": "id-9ae994fa-101e-4909-984f-65de938e08d2",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-d1d2016d-ea77-4510-a275-b9d2bd8c7135",
+            "categorie": "Variabel",
+            "post": "overig",
+            "bedrag": 100
+          },
+          {
+            "id": "id-020b1600-f39c-4f17-abf6-d56c84cc360a",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-6b052dfd-dc57-4531-972e-24907b158a60",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-3fab7a55-1f38-4fa1-afbe-34d933351331",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-46d05867-f3f8-4424-a391-fea2baad23fa",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          }
+        ],
+        "dionVariabel": [
+          {
+            "id": "id-51fc5307-9594-4c91-a8b0-7ada2d888333",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          }
+        ],
+        "daraVariabel": [
+          {
+            "id": "id-606e4178-53ee-4e72-8826-0e8337e8c594",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          }
+        ]
+      }
+    },
+    "2026-09": {
+      "voor": {
+        "gezamenlijkVariabel": [
+          {
+            "id": "id-b980c96c-ea19-44bb-a845-45406e16d90a",
+            "categorie": "Variabel",
+            "post": "Boodschappen",
+            "bedrag": 500
+          },
+          {
+            "id": "id-bb64593f-0ab6-40c0-a1ab-4c8a53bc3411",
+            "categorie": "Variabel",
+            "post": "Benzine",
+            "bedrag": 0
+          },
+          {
+            "id": "id-2dd01cc2-33fa-43ac-b786-f3d5d4a25791",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-61778d40-f107-44fc-a2b6-1ed30b8cf588",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-372baf9c-f4ff-4549-b0a7-307499a45e64",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-3e421293-ba9e-4d5d-9f59-505526c7f103",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-8b40fbf6-56d5-4386-989e-dde131d4a616",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          }
+        ],
+        "dionVariabel": [
+          {
+            "id": "id-9bc3e8f7-e759-4fc9-a1cd-1a663a4eff31",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          },
+          {
+            "id": "id-6b830267-ff18-44af-a749-854666d41bb2",
+            "categorie": "Variabel",
+            "post": "Benzine/vervoer",
+            "bedrag": 0
+          },
+          {
+            "id": "id-d2d40e3d-abb3-4778-a225-0ff6cc0a21d1",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-44747774-6aaa-4662-ac38-b79df0c7133d",
+            "categorie": "Variabel",
+            "post": "Kleding/hobby",
+            "bedrag": 0
+          },
+          {
+            "id": "id-344b7bb5-b539-45bd-a270-fe44a68f7cd5",
+            "categorie": "Variabel",
+            "post": "Overig",
+            "bedrag": 0
+          }
+        ],
+        "daraVariabel": [
+          {
+            "id": "id-ee73df48-8b12-4ad3-98e8-0d005539e93f",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          },
+          {
+            "id": "id-2ec661fa-77e4-4494-b4b1-d2e581897256",
+            "categorie": "Variabel",
+            "post": "Benzine/vervoer",
+            "bedrag": 0
+          },
+          {
+            "id": "id-b794c605-4552-4904-b737-9f0afae933a5",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-b967fbf7-b5a2-47d0-aa17-2f08cfb5201e",
+            "categorie": "Variabel",
+            "post": "Kleding/hobby",
+            "bedrag": 0
+          },
+          {
+            "id": "id-8b16a90a-62dd-4289-b67e-c505bee5175c",
+            "categorie": "Variabel",
+            "post": "Overig",
+            "bedrag": 0
+          }
+        ]
+      },
+      "na": {
+        "gezamenlijkVariabel": [
+          {
+            "id": "id-7bcaa3c3-2d18-4e48-a21c-f8df036d9d83",
+            "categorie": "Variabel",
+            "post": "Boodschappen",
+            "bedrag": 500
+          },
+          {
+            "id": "id-457e7a70-c2e6-4cb8-bf82-a66cf8d75886",
+            "categorie": "Variabel",
+            "post": "Benzine",
+            "bedrag": 150
+          },
+          {
+            "id": "id-9ae994fa-101e-4909-984f-65de938e08d2",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-d1d2016d-ea77-4510-a275-b9d2bd8c7135",
+            "categorie": "Variabel",
+            "post": "overig",
+            "bedrag": 100
+          },
+          {
+            "id": "id-020b1600-f39c-4f17-abf6-d56c84cc360a",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-6b052dfd-dc57-4531-972e-24907b158a60",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-3fab7a55-1f38-4fa1-afbe-34d933351331",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-46d05867-f3f8-4424-a391-fea2baad23fa",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          }
+        ],
+        "dionVariabel": [
+          {
+            "id": "id-51fc5307-9594-4c91-a8b0-7ada2d888333",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          }
+        ],
+        "daraVariabel": [
+          {
+            "id": "id-606e4178-53ee-4e72-8826-0e8337e8c594",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          }
+        ]
+      }
+    },
+    "2026-10": {
+      "voor": {
+        "gezamenlijkVariabel": [
+          {
+            "id": "id-b980c96c-ea19-44bb-a845-45406e16d90a",
+            "categorie": "Variabel",
+            "post": "Boodschappen",
+            "bedrag": 500
+          },
+          {
+            "id": "id-bb64593f-0ab6-40c0-a1ab-4c8a53bc3411",
+            "categorie": "Variabel",
+            "post": "Benzine",
+            "bedrag": 0
+          },
+          {
+            "id": "id-2dd01cc2-33fa-43ac-b786-f3d5d4a25791",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-61778d40-f107-44fc-a2b6-1ed30b8cf588",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-372baf9c-f4ff-4549-b0a7-307499a45e64",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-3e421293-ba9e-4d5d-9f59-505526c7f103",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-8b40fbf6-56d5-4386-989e-dde131d4a616",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          }
+        ],
+        "dionVariabel": [
+          {
+            "id": "id-9bc3e8f7-e759-4fc9-a1cd-1a663a4eff31",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          },
+          {
+            "id": "id-6b830267-ff18-44af-a749-854666d41bb2",
+            "categorie": "Variabel",
+            "post": "Benzine/vervoer",
+            "bedrag": 0
+          },
+          {
+            "id": "id-d2d40e3d-abb3-4778-a225-0ff6cc0a21d1",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-44747774-6aaa-4662-ac38-b79df0c7133d",
+            "categorie": "Variabel",
+            "post": "Kleding/hobby",
+            "bedrag": 0
+          },
+          {
+            "id": "id-344b7bb5-b539-45bd-a270-fe44a68f7cd5",
+            "categorie": "Variabel",
+            "post": "Overig",
+            "bedrag": 0
+          }
+        ],
+        "daraVariabel": [
+          {
+            "id": "id-ee73df48-8b12-4ad3-98e8-0d005539e93f",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          },
+          {
+            "id": "id-2ec661fa-77e4-4494-b4b1-d2e581897256",
+            "categorie": "Variabel",
+            "post": "Benzine/vervoer",
+            "bedrag": 0
+          },
+          {
+            "id": "id-b794c605-4552-4904-b737-9f0afae933a5",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-b967fbf7-b5a2-47d0-aa17-2f08cfb5201e",
+            "categorie": "Variabel",
+            "post": "Kleding/hobby",
+            "bedrag": 0
+          },
+          {
+            "id": "id-8b16a90a-62dd-4289-b67e-c505bee5175c",
+            "categorie": "Variabel",
+            "post": "Overig",
+            "bedrag": 0
+          }
+        ]
+      },
+      "na": {
+        "gezamenlijkVariabel": [
+          {
+            "id": "id-7bcaa3c3-2d18-4e48-a21c-f8df036d9d83",
+            "categorie": "Variabel",
+            "post": "Boodschappen",
+            "bedrag": 500
+          },
+          {
+            "id": "id-457e7a70-c2e6-4cb8-bf82-a66cf8d75886",
+            "categorie": "Variabel",
+            "post": "Benzine",
+            "bedrag": 150
+          },
+          {
+            "id": "id-9ae994fa-101e-4909-984f-65de938e08d2",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-d1d2016d-ea77-4510-a275-b9d2bd8c7135",
+            "categorie": "Variabel",
+            "post": "overig",
+            "bedrag": 100
+          },
+          {
+            "id": "id-020b1600-f39c-4f17-abf6-d56c84cc360a",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-6b052dfd-dc57-4531-972e-24907b158a60",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-3fab7a55-1f38-4fa1-afbe-34d933351331",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-46d05867-f3f8-4424-a391-fea2baad23fa",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          }
+        ],
+        "dionVariabel": [
+          {
+            "id": "id-51fc5307-9594-4c91-a8b0-7ada2d888333",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          }
+        ],
+        "daraVariabel": [
+          {
+            "id": "id-606e4178-53ee-4e72-8826-0e8337e8c594",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          }
+        ]
+      }
+    },
+    "2026-11": {
+      "voor": {
+        "gezamenlijkVariabel": [
+          {
+            "id": "id-b980c96c-ea19-44bb-a845-45406e16d90a",
+            "categorie": "Variabel",
+            "post": "Boodschappen",
+            "bedrag": 500
+          },
+          {
+            "id": "id-bb64593f-0ab6-40c0-a1ab-4c8a53bc3411",
+            "categorie": "Variabel",
+            "post": "Benzine",
+            "bedrag": 0
+          },
+          {
+            "id": "id-2dd01cc2-33fa-43ac-b786-f3d5d4a25791",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-61778d40-f107-44fc-a2b6-1ed30b8cf588",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-372baf9c-f4ff-4549-b0a7-307499a45e64",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-3e421293-ba9e-4d5d-9f59-505526c7f103",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-8b40fbf6-56d5-4386-989e-dde131d4a616",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          }
+        ],
+        "dionVariabel": [
+          {
+            "id": "id-9bc3e8f7-e759-4fc9-a1cd-1a663a4eff31",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          },
+          {
+            "id": "id-6b830267-ff18-44af-a749-854666d41bb2",
+            "categorie": "Variabel",
+            "post": "Benzine/vervoer",
+            "bedrag": 0
+          },
+          {
+            "id": "id-d2d40e3d-abb3-4778-a225-0ff6cc0a21d1",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-44747774-6aaa-4662-ac38-b79df0c7133d",
+            "categorie": "Variabel",
+            "post": "Kleding/hobby",
+            "bedrag": 0
+          },
+          {
+            "id": "id-344b7bb5-b539-45bd-a270-fe44a68f7cd5",
+            "categorie": "Variabel",
+            "post": "Overig",
+            "bedrag": 0
+          }
+        ],
+        "daraVariabel": [
+          {
+            "id": "id-ee73df48-8b12-4ad3-98e8-0d005539e93f",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          },
+          {
+            "id": "id-2ec661fa-77e4-4494-b4b1-d2e581897256",
+            "categorie": "Variabel",
+            "post": "Benzine/vervoer",
+            "bedrag": 0
+          },
+          {
+            "id": "id-b794c605-4552-4904-b737-9f0afae933a5",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-b967fbf7-b5a2-47d0-aa17-2f08cfb5201e",
+            "categorie": "Variabel",
+            "post": "Kleding/hobby",
+            "bedrag": 0
+          },
+          {
+            "id": "id-8b16a90a-62dd-4289-b67e-c505bee5175c",
+            "categorie": "Variabel",
+            "post": "Overig",
+            "bedrag": 0
+          }
+        ]
+      },
+      "na": {
+        "gezamenlijkVariabel": [
+          {
+            "id": "id-7bcaa3c3-2d18-4e48-a21c-f8df036d9d83",
+            "categorie": "Variabel",
+            "post": "Boodschappen",
+            "bedrag": 500
+          },
+          {
+            "id": "id-457e7a70-c2e6-4cb8-bf82-a66cf8d75886",
+            "categorie": "Variabel",
+            "post": "Benzine",
+            "bedrag": 150
+          },
+          {
+            "id": "id-9ae994fa-101e-4909-984f-65de938e08d2",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-d1d2016d-ea77-4510-a275-b9d2bd8c7135",
+            "categorie": "Variabel",
+            "post": "overig",
+            "bedrag": 100
+          },
+          {
+            "id": "id-020b1600-f39c-4f17-abf6-d56c84cc360a",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-6b052dfd-dc57-4531-972e-24907b158a60",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-3fab7a55-1f38-4fa1-afbe-34d933351331",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-46d05867-f3f8-4424-a391-fea2baad23fa",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          }
+        ],
+        "dionVariabel": [
+          {
+            "id": "id-51fc5307-9594-4c91-a8b0-7ada2d888333",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          }
+        ],
+        "daraVariabel": [
+          {
+            "id": "id-606e4178-53ee-4e72-8826-0e8337e8c594",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          }
+        ]
+      }
+    },
+    "2026-12": {
+      "voor": {
+        "gezamenlijkVariabel": [
+          {
+            "id": "id-b980c96c-ea19-44bb-a845-45406e16d90a",
+            "categorie": "Variabel",
+            "post": "Boodschappen",
+            "bedrag": 500
+          },
+          {
+            "id": "id-bb64593f-0ab6-40c0-a1ab-4c8a53bc3411",
+            "categorie": "Variabel",
+            "post": "Benzine",
+            "bedrag": 0
+          },
+          {
+            "id": "id-2dd01cc2-33fa-43ac-b786-f3d5d4a25791",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-61778d40-f107-44fc-a2b6-1ed30b8cf588",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-372baf9c-f4ff-4549-b0a7-307499a45e64",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-3e421293-ba9e-4d5d-9f59-505526c7f103",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-8b40fbf6-56d5-4386-989e-dde131d4a616",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          }
+        ],
+        "dionVariabel": [
+          {
+            "id": "id-9bc3e8f7-e759-4fc9-a1cd-1a663a4eff31",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          },
+          {
+            "id": "id-6b830267-ff18-44af-a749-854666d41bb2",
+            "categorie": "Variabel",
+            "post": "Benzine/vervoer",
+            "bedrag": 0
+          },
+          {
+            "id": "id-d2d40e3d-abb3-4778-a225-0ff6cc0a21d1",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-44747774-6aaa-4662-ac38-b79df0c7133d",
+            "categorie": "Variabel",
+            "post": "Kleding/hobby",
+            "bedrag": 0
+          },
+          {
+            "id": "id-344b7bb5-b539-45bd-a270-fe44a68f7cd5",
+            "categorie": "Variabel",
+            "post": "Overig",
+            "bedrag": 0
+          }
+        ],
+        "daraVariabel": [
+          {
+            "id": "id-ee73df48-8b12-4ad3-98e8-0d005539e93f",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          },
+          {
+            "id": "id-2ec661fa-77e4-4494-b4b1-d2e581897256",
+            "categorie": "Variabel",
+            "post": "Benzine/vervoer",
+            "bedrag": 0
+          },
+          {
+            "id": "id-b794c605-4552-4904-b737-9f0afae933a5",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-b967fbf7-b5a2-47d0-aa17-2f08cfb5201e",
+            "categorie": "Variabel",
+            "post": "Kleding/hobby",
+            "bedrag": 0
+          },
+          {
+            "id": "id-8b16a90a-62dd-4289-b67e-c505bee5175c",
+            "categorie": "Variabel",
+            "post": "Overig",
+            "bedrag": 0
+          }
+        ]
+      },
+      "na": {
+        "gezamenlijkVariabel": [
+          {
+            "id": "id-7bcaa3c3-2d18-4e48-a21c-f8df036d9d83",
+            "categorie": "Variabel",
+            "post": "Boodschappen",
+            "bedrag": 500
+          },
+          {
+            "id": "id-457e7a70-c2e6-4cb8-bf82-a66cf8d75886",
+            "categorie": "Variabel",
+            "post": "Benzine",
+            "bedrag": 150
+          },
+          {
+            "id": "id-9ae994fa-101e-4909-984f-65de938e08d2",
+            "categorie": "Variabel",
+            "post": "Uitjes",
+            "bedrag": 0
+          },
+          {
+            "id": "id-d1d2016d-ea77-4510-a275-b9d2bd8c7135",
+            "categorie": "Variabel",
+            "post": "overig",
+            "bedrag": 100
+          },
+          {
+            "id": "id-020b1600-f39c-4f17-abf6-d56c84cc360a",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-6b052dfd-dc57-4531-972e-24907b158a60",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-3fab7a55-1f38-4fa1-afbe-34d933351331",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          },
+          {
+            "id": "id-46d05867-f3f8-4424-a391-fea2baad23fa",
+            "categorie": "Variabel",
+            "post": "",
+            "bedrag": 0
+          }
+        ],
+        "dionVariabel": [
+          {
+            "id": "id-51fc5307-9594-4c91-a8b0-7ada2d888333",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          }
+        ],
+        "daraVariabel": [
+          {
+            "id": "id-606e4178-53ee-4e72-8826-0e8337e8c594",
+            "categorie": "Variabel",
+            "post": "Eten buiten de deur",
+            "bedrag": 0
+          }
+        ]
+      }
+    }
+  },
+  "transactions": [],
+  "bankImportRules": [],
+  "recurringFixedExpenses": {
+    "voor": [
+      {
+        "id": "fixed-voor-gezamenlijk-id-fc9f0b91-ba31-4be4-979f-b0e3e504548d",
+        "legacyKey": "voor:gezamenlijk:vasteLasten:id-fc9f0b91-ba31-4be4-979f-b0e3e504548d",
+        "naam": "Hypotheek",
+        "categorie": "Huis",
+        "bedrag": 2000,
+        "rekening": "gezamenlijk",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-fc9f0b91-ba31-4be4-979f-b0e3e504548d",
+            "effectiveFrom": "2026-07-01",
+            "amount": 2000
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "hypotheek",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "gezamenlijk"
+      },
+      {
+        "id": "fixed-voor-gezamenlijk-id-32487633-fe14-4d49-bb0f-3f33f13c2caa",
+        "legacyKey": "voor:gezamenlijk:vasteLasten:id-32487633-fe14-4d49-bb0f-3f33f13c2caa",
+        "naam": "Evides nieuw adres",
+        "categorie": "Water",
+        "bedrag": 20,
+        "rekening": "gezamenlijk",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-32487633-fe14-4d49-bb0f-3f33f13c2caa",
+            "effectiveFrom": "2026-07-01",
+            "amount": 20
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "evides nieuw adres",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "gezamenlijk"
+      },
+      {
+        "id": "fixed-voor-gezamenlijk-id-7b7367a0-4d65-45d2-8277-807a36c56f15",
+        "legacyKey": "voor:gezamenlijk:vasteLasten:id-7b7367a0-4d65-45d2-8277-807a36c56f15",
+        "naam": "Evides oud adres",
+        "categorie": "Water",
+        "bedrag": 20,
+        "rekening": "gezamenlijk",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-7b7367a0-4d65-45d2-8277-807a36c56f15",
+            "effectiveFrom": "2026-07-01",
+            "amount": 20
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "evides oud adres",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "gezamenlijk"
+      },
+      {
+        "id": "fixed-voor-gezamenlijk-id-9709161e-b045-4a77-8cf6-4beab5fca7be",
+        "legacyKey": "voor:gezamenlijk:vasteLasten:id-9709161e-b045-4a77-8cf6-4beab5fca7be",
+        "naam": "Eneco nieuw adres",
+        "categorie": "Energie",
+        "bedrag": 32,
+        "rekening": "gezamenlijk",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-9709161e-b045-4a77-8cf6-4beab5fca7be",
+            "effectiveFrom": "2026-07-01",
+            "amount": 32
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "eneco nieuw adres",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "gezamenlijk"
+      },
+      {
+        "id": "fixed-voor-gezamenlijk-id-39afe993-9fcd-4499-8999-46642b13d89b",
+        "legacyKey": "voor:gezamenlijk:vasteLasten:id-39afe993-9fcd-4499-8999-46642b13d89b",
+        "naam": "Eneco oud adres",
+        "categorie": "Energie",
+        "bedrag": 50,
+        "rekening": "gezamenlijk",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-39afe993-9fcd-4499-8999-46642b13d89b",
+            "effectiveFrom": "2026-07-01",
+            "amount": 50
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "eneco oud adres",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "gezamenlijk"
+      },
+      {
+        "id": "fixed-voor-gezamenlijk-id-b884d180-ad7e-4fe5-8f83-74792738b16b",
+        "legacyKey": "voor:gezamenlijk:vasteLasten:id-b884d180-ad7e-4fe5-8f83-74792738b16b",
+        "naam": "Woon nieuw adres",
+        "categorie": "Verzekeringen",
+        "bedrag": 24.23,
+        "rekening": "gezamenlijk",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-b884d180-ad7e-4fe5-8f83-74792738b16b",
+            "effectiveFrom": "2026-07-01",
+            "amount": 24.23
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "woon nieuw adres",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "gezamenlijk"
+      },
+      {
+        "id": "fixed-voor-gezamenlijk-id-21e17ba4-98a0-47b8-a733-13799c963f97",
+        "legacyKey": "voor:gezamenlijk:vasteLasten:id-21e17ba4-98a0-47b8-a733-13799c963f97",
+        "naam": "Woon oud adres",
+        "categorie": "Verzekeringen",
+        "bedrag": 9.29,
+        "rekening": "gezamenlijk",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-21e17ba4-98a0-47b8-a733-13799c963f97",
+            "effectiveFrom": "2026-07-01",
+            "amount": 9.29
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "woon oud adres",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "gezamenlijk"
+      },
+      {
+        "id": "fixed-voor-gezamenlijk-id-7755e3c3-cbff-4214-87ee-eaad8234c2a1",
+        "legacyKey": "voor:gezamenlijk:vasteLasten:id-7755e3c3-cbff-4214-87ee-eaad8234c2a1",
+        "naam": "Gemeente",
+        "categorie": "Belastingen",
+        "bedrag": 83.96,
+        "rekening": "gezamenlijk",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-7755e3c3-cbff-4214-87ee-eaad8234c2a1",
+            "effectiveFrom": "2026-07-01",
+            "amount": 83.96
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "gemeente",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "gezamenlijk"
+      },
+      {
+        "id": "fixed-voor-gezamenlijk-id-c71eb903-1254-4217-bced-499bbc764e3a",
+        "legacyKey": "voor:gezamenlijk:vasteLasten:id-c71eb903-1254-4217-bced-499bbc764e3a",
+        "naam": "Waterschap",
+        "categorie": "Belastingen",
+        "bedrag": 37.22,
+        "rekening": "gezamenlijk",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-c71eb903-1254-4217-bced-499bbc764e3a",
+            "effectiveFrom": "2026-07-01",
+            "amount": 37.22
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "waterschap",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "gezamenlijk"
+      },
+      {
+        "id": "fixed-voor-gezamenlijk-id-c44fd3d2-2d40-44df-8ad9-75b09f455a0a",
+        "legacyKey": "voor:gezamenlijk:vasteLasten:id-c44fd3d2-2d40-44df-8ad9-75b09f455a0a",
+        "naam": "Netflix",
+        "categorie": "Entertainment",
+        "bedrag": 15.99,
+        "rekening": "gezamenlijk",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-c44fd3d2-2d40-44df-8ad9-75b09f455a0a",
+            "effectiveFrom": "2026-07-01",
+            "amount": 15.99
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "netflix",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "gezamenlijk"
+      },
+      {
+        "id": "fixed-voor-gezamenlijk-id-52e2d1f6-df0c-488d-856d-7e68dc73505a",
+        "legacyKey": "voor:gezamenlijk:vasteLasten:id-52e2d1f6-df0c-488d-856d-7e68dc73505a",
+        "naam": "ING",
+        "categorie": "Overig",
+        "bedrag": 4.55,
+        "rekening": "gezamenlijk",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-52e2d1f6-df0c-488d-856d-7e68dc73505a",
+            "effectiveFrom": "2026-07-01",
+            "amount": 4.55
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "ing",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "gezamenlijk"
+      },
+      {
+        "id": "fixed-voor-gezamenlijk-id-95e712b1-f1c5-47d9-b2cc-9834a014dd80",
+        "legacyKey": "voor:gezamenlijk:vasteLasten:id-95e712b1-f1c5-47d9-b2cc-9834a014dd80",
+        "naam": "Sportschool",
+        "categorie": "Overig",
+        "bedrag": 62.95,
+        "rekening": "gezamenlijk",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-95e712b1-f1c5-47d9-b2cc-9834a014dd80",
+            "effectiveFrom": "2026-07-01",
+            "amount": 62.95
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "sportschool",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "gezamenlijk"
+      },
+      {
+        "id": "fixed-voor-dion-id-470afeca-7bf3-4957-a514-e5834f4268e9",
+        "legacyKey": "voor:dion:vasteLasten:id-470afeca-7bf3-4957-a514-e5834f4268e9",
+        "naam": "Autoverzekering",
+        "categorie": "Verzekeringen",
+        "bedrag": 28.89,
+        "rekening": "dion",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-470afeca-7bf3-4957-a514-e5834f4268e9",
+            "effectiveFrom": "2026-07-01",
+            "amount": 28.89
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "autoverzekering",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "dion"
+      },
+      {
+        "id": "fixed-voor-dion-id-ee4edf2c-d9b8-4487-a4c6-5f560b57a3a6",
+        "legacyKey": "voor:dion:vasteLasten:id-ee4edf2c-d9b8-4487-a4c6-5f560b57a3a6",
+        "naam": "Zorgverzekering",
+        "categorie": "Verzekeringen",
+        "bedrag": 191.45,
+        "rekening": "dion",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-ee4edf2c-d9b8-4487-a4c6-5f560b57a3a6",
+            "effectiveFrom": "2026-07-01",
+            "amount": 191.45
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "zorgverzekering",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "dion"
+      },
+      {
+        "id": "fixed-voor-dion-id-0b07f01e-a2d7-4f7b-b95e-23759b1ed181",
+        "legacyKey": "voor:dion:vasteLasten:id-0b07f01e-a2d7-4f7b-b95e-23759b1ed181",
+        "naam": "Telefoon",
+        "categorie": "Internet/telefoon",
+        "bedrag": 7.5,
+        "rekening": "dion",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-0b07f01e-a2d7-4f7b-b95e-23759b1ed181",
+            "effectiveFrom": "2026-07-01",
+            "amount": 7.5
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "telefoon",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "dion"
+      },
+      {
+        "id": "fixed-voor-dion-id-fee8d21e-8fb0-4eb7-a889-fae3145a9fff",
+        "legacyKey": "voor:dion:vasteLasten:id-fee8d21e-8fb0-4eb7-a889-fae3145a9fff",
+        "naam": "ANWB",
+        "categorie": "Overig",
+        "bedrag": 8.58,
+        "rekening": "dion",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-fee8d21e-8fb0-4eb7-a889-fae3145a9fff",
+            "effectiveFrom": "2026-07-01",
+            "amount": 8.58
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "anwb",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "dion"
+      },
+      {
+        "id": "fixed-voor-dion-id-916b27ad-f80a-4d31-8139-97c0b680e838",
+        "legacyKey": "voor:dion:vasteLasten:id-916b27ad-f80a-4d31-8139-97c0b680e838",
+        "naam": "ING",
+        "categorie": "Overig",
+        "bedrag": 3.9,
+        "rekening": "dion",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-916b27ad-f80a-4d31-8139-97c0b680e838",
+            "effectiveFrom": "2026-07-01",
+            "amount": 3.9
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "ing",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "dion"
+      },
+      {
+        "id": "fixed-voor-dion-id-fcd0305b-542c-47ed-8ac7-f43357a91e69",
+        "legacyKey": "voor:dion:vasteLasten:id-fcd0305b-542c-47ed-8ac7-f43357a91e69",
+        "naam": "Spotify",
+        "categorie": "Entertainment",
+        "bedrag": 6.99,
+        "rekening": "dion",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-fcd0305b-542c-47ed-8ac7-f43357a91e69",
+            "effectiveFrom": "2026-07-01",
+            "amount": 6.99
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "spotify",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "dion"
+      },
+      {
+        "id": "fixed-voor-dion-id-e39bacc4-4786-4c6e-a471-9381754fab76",
+        "legacyKey": "voor:dion:vasteLasten:id-e39bacc4-4786-4c6e-a471-9381754fab76",
+        "naam": "Prime",
+        "categorie": "Entertainment",
+        "bedrag": 4.99,
+        "rekening": "dion",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-e39bacc4-4786-4c6e-a471-9381754fab76",
+            "effectiveFrom": "2026-07-01",
+            "amount": 4.99
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "prime",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "dion"
+      },
+      {
+        "id": "fixed-voor-dion-id-2c33d669-2ce2-48b6-8eb2-4b57245bbf17",
+        "legacyKey": "voor:dion:vasteLasten:id-2c33d669-2ce2-48b6-8eb2-4b57245bbf17",
+        "naam": "Wegenbelasting",
+        "categorie": "Belastingen",
+        "bedrag": 23,
+        "rekening": "dion",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-2c33d669-2ce2-48b6-8eb2-4b57245bbf17",
+            "effectiveFrom": "2026-07-01",
+            "amount": 23
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "wegenbelasting",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "dion"
+      },
+      {
+        "id": "fixed-voor-dion-id-3db8fe17-e645-4d70-a3cf-a83baa275b0e",
+        "legacyKey": "voor:dion:vasteLasten:id-3db8fe17-e645-4d70-a3cf-a83baa275b0e",
+        "naam": "Reisverzekering",
+        "categorie": "Verzekeringen",
+        "bedrag": 23.12,
+        "rekening": "dion",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-3db8fe17-e645-4d70-a3cf-a83baa275b0e",
+            "effectiveFrom": "2026-07-01",
+            "amount": 23.12
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "reisverzekering",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "dion"
+      },
+      {
+        "id": "fixed-voor-dion-id-9c1a4799-82b2-4404-a8e6-388d07d1b2d5",
+        "legacyKey": "voor:dion:vasteLasten:id-9c1a4799-82b2-4404-a8e6-388d07d1b2d5",
+        "naam": "Zorgtoeslag",
+        "categorie": "Inkomsten/Correcties",
+        "bedrag": 0,
+        "rekening": "dion",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-9c1a4799-82b2-4404-a8e6-388d07d1b2d5",
+            "effectiveFrom": "2026-07-01",
+            "amount": 0
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "zorgtoeslag",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "dion"
+      },
+      {
+        "id": "fixed-voor-dion-id-2ff3bdf4-d77c-46c3-a620-b6871aa3aecf",
+        "legacyKey": "voor:dion:vasteLasten:id-2ff3bdf4-d77c-46c3-a620-b6871aa3aecf",
+        "naam": "DUO",
+        "categorie": "Schuld/Correcties",
+        "bedrag": -324,
+        "rekening": "dion",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-2ff3bdf4-d77c-46c3-a620-b6871aa3aecf",
+            "effectiveFrom": "2026-07-01",
+            "amount": -324
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "duo",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "dion"
+      },
+      {
+        "id": "fixed-voor-dion-id-daa2e612-dfa8-42f8-b454-5ff6f3f08979",
+        "legacyKey": "voor:dion:vasteLasten:id-daa2e612-dfa8-42f8-b454-5ff6f3f08979",
+        "naam": "Belastingdienst",
+        "categorie": "Belasting",
+        "bedrag": 0,
+        "rekening": "dion",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-daa2e612-dfa8-42f8-b454-5ff6f3f08979",
+            "effectiveFrom": "2026-07-01",
+            "amount": 0
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "belastingdienst",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "dion"
+      },
+      {
+        "id": "fixed-voor-dara-id-74bbdad2-becb-41da-b8d6-aef3bc3a255b",
+        "legacyKey": "voor:dara:vasteLasten:id-74bbdad2-becb-41da-b8d6-aef3bc3a255b",
+        "naam": "Hypotheek",
+        "categorie": "Huis",
+        "bedrag": 907.51,
+        "rekening": "dara",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-74bbdad2-becb-41da-b8d6-aef3bc3a255b",
+            "effectiveFrom": "2026-07-01",
+            "amount": 907.51
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "hypotheek",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "dara"
+      },
+      {
+        "id": "fixed-voor-dara-id-24735090-ce48-4778-b5eb-45fb950fa33d",
+        "legacyKey": "voor:dara:vasteLasten:id-24735090-ce48-4778-b5eb-45fb950fa33d",
+        "naam": "VVE",
+        "categorie": "Huis",
+        "bedrag": 164.1,
+        "rekening": "dara",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-24735090-ce48-4778-b5eb-45fb950fa33d",
+            "effectiveFrom": "2026-07-01",
+            "amount": 164.1
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "vve",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "dara"
+      },
+      {
+        "id": "fixed-voor-dara-id-3c50ebe0-1413-4ddb-ac36-ef45106c0415",
+        "legacyKey": "voor:dara:vasteLasten:id-3c50ebe0-1413-4ddb-ac36-ef45106c0415",
+        "naam": "Wegenbelasting",
+        "categorie": "Belastingen",
+        "bedrag": 23,
+        "rekening": "dara",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-3c50ebe0-1413-4ddb-ac36-ef45106c0415",
+            "effectiveFrom": "2026-07-01",
+            "amount": 23
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "wegenbelasting",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "dara"
+      },
+      {
+        "id": "fixed-voor-dara-id-aaa47812-3ffb-49b4-9afa-8fcb6ddd9cc6",
+        "legacyKey": "voor:dara:vasteLasten:id-aaa47812-3ffb-49b4-9afa-8fcb6ddd9cc6",
+        "naam": "Waterschap",
+        "categorie": "Belastingen",
+        "bedrag": 37.22,
+        "rekening": "dara",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-aaa47812-3ffb-49b4-9afa-8fcb6ddd9cc6",
+            "effectiveFrom": "2026-07-01",
+            "amount": 37.22
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "waterschap",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "dara"
+      },
+      {
+        "id": "fixed-voor-dara-id-b4300040-ce73-48d2-b5f0-b581ecb32182",
+        "legacyKey": "voor:dara:vasteLasten:id-b4300040-ce73-48d2-b5f0-b581ecb32182",
+        "naam": "Gemeente",
+        "categorie": "Belastingen",
+        "bedrag": 83.96,
+        "rekening": "dara",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-b4300040-ce73-48d2-b5f0-b581ecb32182",
+            "effectiveFrom": "2026-07-01",
+            "amount": 83.96
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "gemeente",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "dara"
+      },
+      {
+        "id": "fixed-voor-dara-id-431d2015-e3d8-4f2a-b70e-56b02e93843b",
+        "legacyKey": "voor:dara:vasteLasten:id-431d2015-e3d8-4f2a-b70e-56b02e93843b",
+        "naam": "Zorgverzekering",
+        "categorie": "Verzekeringen",
+        "bedrag": 225,
+        "rekening": "dara",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-431d2015-e3d8-4f2a-b70e-56b02e93843b",
+            "effectiveFrom": "2026-07-01",
+            "amount": 225
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "zorgverzekering",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "dara"
+      },
+      {
+        "id": "fixed-voor-dara-id-6b44dbfb-594f-438f-a325-a8e60e14916c",
+        "legacyKey": "voor:dara:vasteLasten:id-6b44dbfb-594f-438f-a325-a8e60e14916c",
+        "naam": "Auto",
+        "categorie": "Verzekeringen",
+        "bedrag": 43.59,
+        "rekening": "dara",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-6b44dbfb-594f-438f-a325-a8e60e14916c",
+            "effectiveFrom": "2026-07-01",
+            "amount": 43.59
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "auto",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "dara"
+      },
+      {
+        "id": "fixed-voor-dara-id-5d91e429-deeb-4579-9cc0-6f6aa291adfa",
+        "legacyKey": "voor:dara:vasteLasten:id-5d91e429-deeb-4579-9cc0-6f6aa291adfa",
+        "naam": "Fiets p/j",
+        "categorie": "Verzekeringen",
+        "bedrag": 9.66,
+        "rekening": "dara",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-5d91e429-deeb-4579-9cc0-6f6aa291adfa",
+            "effectiveFrom": "2026-07-01",
+            "amount": 9.66
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "fiets p j",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "dara"
+      },
+      {
+        "id": "fixed-voor-dara-id-25d40494-58dc-43b1-bc69-61ffab0fd37c",
+        "legacyKey": "voor:dara:vasteLasten:id-25d40494-58dc-43b1-bc69-61ffab0fd37c",
+        "naam": "Prime",
+        "categorie": "Entertainment",
+        "bedrag": 4.99,
+        "rekening": "dara",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-25d40494-58dc-43b1-bc69-61ffab0fd37c",
+            "effectiveFrom": "2026-07-01",
+            "amount": 4.99
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "prime",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "dara"
+      },
+      {
+        "id": "fixed-voor-dara-id-a00d1398-6362-452a-a565-05a1de77f6f4",
+        "legacyKey": "voor:dara:vasteLasten:id-a00d1398-6362-452a-a565-05a1de77f6f4",
+        "naam": "Disney+",
+        "categorie": "Entertainment",
+        "bedrag": 10.99,
+        "rekening": "dara",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-a00d1398-6362-452a-a565-05a1de77f6f4",
+            "effectiveFrom": "2026-07-01",
+            "amount": 10.99
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "disney",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "dara"
+      },
+      {
+        "id": "fixed-voor-dara-id-9f3c5ff8-05b3-431a-b151-7e5b2fdfd985",
+        "legacyKey": "voor:dara:vasteLasten:id-9f3c5ff8-05b3-431a-b151-7e5b2fdfd985",
+        "naam": "Telefoon",
+        "categorie": "Internet/telefoon",
+        "bedrag": 10,
+        "rekening": "dara",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-9f3c5ff8-05b3-431a-b151-7e5b2fdfd985",
+            "effectiveFrom": "2026-07-01",
+            "amount": 10
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "telefoon",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "dara"
+      },
+      {
+        "id": "fixed-voor-dara-id-5fb875e8-aa7a-4416-963f-f97ca18f6c7b",
+        "legacyKey": "voor:dara:vasteLasten:id-5fb875e8-aa7a-4416-963f-f97ca18f6c7b",
+        "naam": "Internet",
+        "categorie": "Internet/telefoon",
+        "bedrag": 32.5,
+        "rekening": "dara",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-5fb875e8-aa7a-4416-963f-f97ca18f6c7b",
+            "effectiveFrom": "2026-07-01",
+            "amount": 32.5
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "internet",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "dara"
+      },
+      {
+        "id": "fixed-voor-dara-id-fa1de2f0-0474-480b-8509-781a2faa13ba",
+        "legacyKey": "voor:dara:vasteLasten:id-fa1de2f0-0474-480b-8509-781a2faa13ba",
+        "naam": "ING",
+        "categorie": "Overig",
+        "bedrag": 3.9,
+        "rekening": "dara",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-fa1de2f0-0474-480b-8509-781a2faa13ba",
+            "effectiveFrom": "2026-07-01",
+            "amount": 3.9
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "ing",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "dara"
+      },
+      {
+        "id": "fixed-voor-dara-id-8e1d444f-5f87-4720-bd11-338e27bf1278",
+        "legacyKey": "voor:dara:vasteLasten:id-8e1d444f-5f87-4720-bd11-338e27bf1278",
+        "naam": "ANWB p/j",
+        "categorie": "Overig",
+        "bedrag": 6,
+        "rekening": "dara",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-8e1d444f-5f87-4720-bd11-338e27bf1278",
+            "effectiveFrom": "2026-07-01",
+            "amount": 6
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "anwb p j",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "dara"
+      },
+      {
+        "id": "fixed-voor-dara-id-f3550a8c-17b0-4707-b0db-0dd9f0634a18",
+        "legacyKey": "voor:dara:vasteLasten:id-f3550a8c-17b0-4707-b0db-0dd9f0634a18",
+        "naam": "Belastingteruggave",
+        "categorie": "Belasting",
+        "bedrag": -226,
+        "rekening": "dara",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-f3550a8c-17b0-4707-b0db-0dd9f0634a18",
+            "effectiveFrom": "2026-07-01",
+            "amount": -226
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "belastingteruggave",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "dara"
+      }
+    ],
+    "na": [
+      {
+        "id": "fixed-na-gezamenlijk-id-e551348f-71e0-4d5e-8bd1-801b3f05976b",
+        "legacyKey": "na:gezamenlijk:vasteLasten:id-e551348f-71e0-4d5e-8bd1-801b3f05976b",
+        "naam": "Evides",
+        "categorie": "Water",
+        "bedrag": 20,
+        "rekening": "gezamenlijk",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-e551348f-71e0-4d5e-8bd1-801b3f05976b",
+            "effectiveFrom": "2026-07-01",
+            "amount": 20
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "evides",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "gezamenlijk"
+      },
+      {
+        "id": "fixed-na-gezamenlijk-id-dfee3ed2-877f-4b43-a6a8-bd7f631ac66c",
+        "legacyKey": "na:gezamenlijk:vasteLasten:id-dfee3ed2-877f-4b43-a6a8-bd7f631ac66c",
+        "naam": "Eneco",
+        "categorie": "Energie",
+        "bedrag": 75,
+        "rekening": "gezamenlijk",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-dfee3ed2-877f-4b43-a6a8-bd7f631ac66c",
+            "effectiveFrom": "2026-07-01",
+            "amount": 75
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "eneco",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "gezamenlijk"
+      },
+      {
+        "id": "fixed-na-gezamenlijk-id-3ee9f66e-52ec-434d-980d-5e715345fa00",
+        "legacyKey": "na:gezamenlijk:vasteLasten:id-3ee9f66e-52ec-434d-980d-5e715345fa00",
+        "naam": "Zorg Dara",
+        "categorie": "Verzekeringen",
+        "bedrag": 225,
+        "rekening": "gezamenlijk",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-3ee9f66e-52ec-434d-980d-5e715345fa00",
+            "effectiveFrom": "2026-07-01",
+            "amount": 225
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "zorg dara",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "gezamenlijk"
+      },
+      {
+        "id": "fixed-na-gezamenlijk-id-acde8091-f7c7-4807-b8dc-8eb2938c8190",
+        "legacyKey": "na:gezamenlijk:vasteLasten:id-acde8091-f7c7-4807-b8dc-8eb2938c8190",
+        "naam": "Zorg Dion",
+        "categorie": "Verzekeringen",
+        "bedrag": 191.45,
+        "rekening": "gezamenlijk",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-acde8091-f7c7-4807-b8dc-8eb2938c8190",
+            "effectiveFrom": "2026-07-01",
+            "amount": 191.45
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "zorg dion",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "gezamenlijk"
+      },
+      {
+        "id": "fixed-na-gezamenlijk-id-7ad2d88c-e46e-47ab-9821-7954778082eb",
+        "legacyKey": "na:gezamenlijk:vasteLasten:id-7ad2d88c-e46e-47ab-9821-7954778082eb",
+        "naam": "Woon",
+        "categorie": "Verzekeringen",
+        "bedrag": 24.23,
+        "rekening": "gezamenlijk",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-7ad2d88c-e46e-47ab-9821-7954778082eb",
+            "effectiveFrom": "2026-07-01",
+            "amount": 24.23
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "woon",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "gezamenlijk"
+      },
+      {
+        "id": "fixed-na-gezamenlijk-id-d1229245-0536-44dd-97c1-783eb6c15ef6",
+        "legacyKey": "na:gezamenlijk:vasteLasten:id-d1229245-0536-44dd-97c1-783eb6c15ef6",
+        "naam": "Auto Dara",
+        "categorie": "Verzekeringen",
+        "bedrag": 43.59,
+        "rekening": "gezamenlijk",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-d1229245-0536-44dd-97c1-783eb6c15ef6",
+            "effectiveFrom": "2026-07-01",
+            "amount": 43.59
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "auto dara",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "gezamenlijk"
+      },
+      {
+        "id": "fixed-na-gezamenlijk-id-ef8963f0-3958-4147-b354-736cba6e67a6",
+        "legacyKey": "na:gezamenlijk:vasteLasten:id-ef8963f0-3958-4147-b354-736cba6e67a6",
+        "naam": "Auto Dion",
+        "categorie": "Verzekeringen",
+        "bedrag": 28.89,
+        "rekening": "gezamenlijk",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-ef8963f0-3958-4147-b354-736cba6e67a6",
+            "effectiveFrom": "2026-07-01",
+            "amount": 28.89
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "auto dion",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "gezamenlijk"
+      },
+      {
+        "id": "fixed-na-gezamenlijk-id-559e8c18-a346-4eb6-88c8-b6f40c9b1dc8",
+        "legacyKey": "na:gezamenlijk:vasteLasten:id-559e8c18-a346-4eb6-88c8-b6f40c9b1dc8",
+        "naam": "Reis Dion",
+        "categorie": "Verzekeringen",
+        "bedrag": 9.64,
+        "rekening": "gezamenlijk",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-559e8c18-a346-4eb6-88c8-b6f40c9b1dc8",
+            "effectiveFrom": "2026-07-01",
+            "amount": 9.64
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "reis dion",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "gezamenlijk"
+      },
+      {
+        "id": "fixed-na-gezamenlijk-id-88995e5e-392d-46cf-902c-57a720f5a8d6",
+        "legacyKey": "na:gezamenlijk:vasteLasten:id-88995e5e-392d-46cf-902c-57a720f5a8d6",
+        "naam": "Fiets Dara",
+        "categorie": "Verzekeringen",
+        "bedrag": 0,
+        "rekening": "gezamenlijk",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-88995e5e-392d-46cf-902c-57a720f5a8d6",
+            "effectiveFrom": "2026-07-01",
+            "amount": 0
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "fiets dara",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "gezamenlijk"
+      },
+      {
+        "id": "fixed-na-gezamenlijk-id-743262f8-b602-40a2-8361-e065d21e5c24",
+        "legacyKey": "na:gezamenlijk:vasteLasten:id-743262f8-b602-40a2-8361-e065d21e5c24",
+        "naam": "Weg Dara",
+        "categorie": "Belastingen",
+        "bedrag": 23,
+        "rekening": "gezamenlijk",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-743262f8-b602-40a2-8361-e065d21e5c24",
+            "effectiveFrom": "2026-07-01",
+            "amount": 23
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "weg dara",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "gezamenlijk"
+      },
+      {
+        "id": "fixed-na-gezamenlijk-id-85b1e7aa-bc7a-45dd-b5fd-03e0d3d473b6",
+        "legacyKey": "na:gezamenlijk:vasteLasten:id-85b1e7aa-bc7a-45dd-b5fd-03e0d3d473b6",
+        "naam": "Weg Dion",
+        "categorie": "Belastingen",
+        "bedrag": 23,
+        "rekening": "gezamenlijk",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-85b1e7aa-bc7a-45dd-b5fd-03e0d3d473b6",
+            "effectiveFrom": "2026-07-01",
+            "amount": 23
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "weg dion",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "gezamenlijk"
+      },
+      {
+        "id": "fixed-na-gezamenlijk-id-d9e1abe3-ae4e-4671-a7b5-0ff8243cde05",
+        "legacyKey": "na:gezamenlijk:vasteLasten:id-d9e1abe3-ae4e-4671-a7b5-0ff8243cde05",
+        "naam": "Gemeente",
+        "categorie": "Belastingen",
+        "bedrag": 83.96,
+        "rekening": "gezamenlijk",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-d9e1abe3-ae4e-4671-a7b5-0ff8243cde05",
+            "effectiveFrom": "2026-07-01",
+            "amount": 83.96
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "gemeente",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "gezamenlijk"
+      },
+      {
+        "id": "fixed-na-gezamenlijk-id-c8b2a333-ce2d-4a18-b40b-be76617a87a0",
+        "legacyKey": "na:gezamenlijk:vasteLasten:id-c8b2a333-ce2d-4a18-b40b-be76617a87a0",
+        "naam": "Waterschap",
+        "categorie": "Belastingen",
+        "bedrag": 37.22,
+        "rekening": "gezamenlijk",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-c8b2a333-ce2d-4a18-b40b-be76617a87a0",
+            "effectiveFrom": "2026-07-01",
+            "amount": 37.22
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "waterschap",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "gezamenlijk"
+      },
+      {
+        "id": "fixed-na-gezamenlijk-id-618e6f43-ac6a-4c68-8b01-4bf83df62477",
+        "legacyKey": "na:gezamenlijk:vasteLasten:id-618e6f43-ac6a-4c68-8b01-4bf83df62477",
+        "naam": "Internet",
+        "categorie": "Internet/telefoon",
+        "bedrag": 32.5,
+        "rekening": "gezamenlijk",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-618e6f43-ac6a-4c68-8b01-4bf83df62477",
+            "effectiveFrom": "2026-07-01",
+            "amount": 32.5
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "internet",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "gezamenlijk"
+      },
+      {
+        "id": "fixed-na-gezamenlijk-id-db7e18d9-f782-490e-8245-770e0aa24ebd",
+        "legacyKey": "na:gezamenlijk:vasteLasten:id-db7e18d9-f782-490e-8245-770e0aa24ebd",
+        "naam": "Tel Dara",
+        "categorie": "Internet/telefoon",
+        "bedrag": 10,
+        "rekening": "gezamenlijk",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-db7e18d9-f782-490e-8245-770e0aa24ebd",
+            "effectiveFrom": "2026-07-01",
+            "amount": 10
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "tel dara",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "gezamenlijk"
+      },
+      {
+        "id": "fixed-na-gezamenlijk-id-70b2f579-b7d1-4908-b2cc-99bea5dfff4e",
+        "legacyKey": "na:gezamenlijk:vasteLasten:id-70b2f579-b7d1-4908-b2cc-99bea5dfff4e",
+        "naam": "Tel Dion",
+        "categorie": "Internet/telefoon",
+        "bedrag": 7.5,
+        "rekening": "gezamenlijk",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-70b2f579-b7d1-4908-b2cc-99bea5dfff4e",
+            "effectiveFrom": "2026-07-01",
+            "amount": 7.5
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "tel dion",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "gezamenlijk"
+      },
+      {
+        "id": "fixed-na-gezamenlijk-id-0c90c26c-0512-4a19-8f81-0c3cdf589e56",
+        "legacyKey": "na:gezamenlijk:vasteLasten:id-0c90c26c-0512-4a19-8f81-0c3cdf589e56",
+        "naam": "Netflix",
+        "categorie": "Entertainment",
+        "bedrag": 15.99,
+        "rekening": "gezamenlijk",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-0c90c26c-0512-4a19-8f81-0c3cdf589e56",
+            "effectiveFrom": "2026-07-01",
+            "amount": 15.99
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "netflix",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "gezamenlijk"
+      },
+      {
+        "id": "fixed-na-gezamenlijk-id-4bbc4c13-8a37-4a71-ac5a-1c5f158dcbcd",
+        "legacyKey": "na:gezamenlijk:vasteLasten:id-4bbc4c13-8a37-4a71-ac5a-1c5f158dcbcd",
+        "naam": "Disney+",
+        "categorie": "Entertainment",
+        "bedrag": 10.99,
+        "rekening": "gezamenlijk",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-4bbc4c13-8a37-4a71-ac5a-1c5f158dcbcd",
+            "effectiveFrom": "2026-07-01",
+            "amount": 10.99
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "disney",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "gezamenlijk"
+      },
+      {
+        "id": "fixed-na-gezamenlijk-id-34c9b28e-04d7-45ed-8cd6-5cac379af676",
+        "legacyKey": "na:gezamenlijk:vasteLasten:id-34c9b28e-04d7-45ed-8cd6-5cac379af676",
+        "naam": "Spotify Dion",
+        "categorie": "Entertainment",
+        "bedrag": 6.99,
+        "rekening": "gezamenlijk",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-34c9b28e-04d7-45ed-8cd6-5cac379af676",
+            "effectiveFrom": "2026-07-01",
+            "amount": 6.99
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "spotify dion",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "gezamenlijk"
+      },
+      {
+        "id": "fixed-na-gezamenlijk-id-e012db43-0394-43ad-9d2b-7c114ed427f1",
+        "legacyKey": "na:gezamenlijk:vasteLasten:id-e012db43-0394-43ad-9d2b-7c114ed427f1",
+        "naam": "SPF pensioen",
+        "categorie": "Pensioen",
+        "bedrag": 312,
+        "rekening": "gezamenlijk",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-e012db43-0394-43ad-9d2b-7c114ed427f1",
+            "effectiveFrom": "2026-07-01",
+            "amount": 312
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "spf pensioen",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "gezamenlijk"
+      },
+      {
+        "id": "fixed-na-gezamenlijk-id-f86109e1-9d5c-45db-80b0-082a05926698",
+        "legacyKey": "na:gezamenlijk:vasteLasten:id-f86109e1-9d5c-45db-80b0-082a05926698",
+        "naam": "ANWB",
+        "categorie": "Overig",
+        "bedrag": 18,
+        "rekening": "gezamenlijk",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-f86109e1-9d5c-45db-80b0-082a05926698",
+            "effectiveFrom": "2026-07-01",
+            "amount": 18
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "anwb",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "gezamenlijk"
+      },
+      {
+        "id": "fixed-na-gezamenlijk-id-97277816-baad-4159-a4bb-c8ba2b01db99",
+        "legacyKey": "na:gezamenlijk:vasteLasten:id-97277816-baad-4159-a4bb-c8ba2b01db99",
+        "naam": "ING",
+        "categorie": "Overig",
+        "bedrag": 4.55,
+        "rekening": "gezamenlijk",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-97277816-baad-4159-a4bb-c8ba2b01db99",
+            "effectiveFrom": "2026-07-01",
+            "amount": 4.55
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "ing",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "gezamenlijk"
+      },
+      {
+        "id": "fixed-na-gezamenlijk-id-06b04e01-04d6-4f4e-8ce8-8d04e9e79523",
+        "legacyKey": "na:gezamenlijk:vasteLasten:id-06b04e01-04d6-4f4e-8ce8-8d04e9e79523",
+        "naam": "Sportschool",
+        "categorie": "Overig",
+        "bedrag": 62.95,
+        "rekening": "gezamenlijk",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-06b04e01-04d6-4f4e-8ce8-8d04e9e79523",
+            "effectiveFrom": "2026-07-01",
+            "amount": 62.95
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "sportschool",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "gezamenlijk"
+      },
+      {
+        "id": "fixed-na-gezamenlijk-id-50b08eb5-54fa-4528-b205-928ceb33bd07",
+        "legacyKey": "na:gezamenlijk:vasteLasten:id-50b08eb5-54fa-4528-b205-928ceb33bd07",
+        "naam": "Waterpomp",
+        "categorie": "Overig",
+        "bedrag": 17,
+        "rekening": "gezamenlijk",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-50b08eb5-54fa-4528-b205-928ceb33bd07",
+            "effectiveFrom": "2026-07-01",
+            "amount": 17
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "waterpomp",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "gezamenlijk"
+      },
+      {
+        "id": "fixed-na-gezamenlijk-id-4ff1bbee-99b7-415e-8e79-86cbd5d7bd44",
+        "legacyKey": "na:gezamenlijk:hypotheek:id-4ff1bbee-99b7-415e-8e79-86cbd5d7bd44",
+        "naam": "Hypotheek",
+        "categorie": "Huis",
+        "bedrag": 2000,
+        "rekening": "gezamenlijk",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-4ff1bbee-99b7-415e-8e79-86cbd5d7bd44",
+            "effectiveFrom": "2026-07-01",
+            "amount": 2000
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "hypotheek",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "hypotheek",
+        "financialFor": "gezamenlijk"
+      },
+      {
+        "id": "fixed-na-dion-id-b9557d99-68c9-41f7-a871-01888b4fc9fd",
+        "legacyKey": "na:dion:vasteLasten:id-b9557d99-68c9-41f7-a871-01888b4fc9fd",
+        "naam": "Prime",
+        "categorie": "Entertainment",
+        "bedrag": 4.99,
+        "rekening": "dion",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-b9557d99-68c9-41f7-a871-01888b4fc9fd",
+            "effectiveFrom": "2026-07-01",
+            "amount": 4.99
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "prime",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "dion"
+      },
+      {
+        "id": "fixed-na-dara-id-14e8a5c7-8c70-46f2-9cc0-358ba9b5666f",
+        "legacyKey": "na:dara:vasteLasten:id-14e8a5c7-8c70-46f2-9cc0-358ba9b5666f",
+        "naam": "Prime",
+        "categorie": "Entertainment",
+        "bedrag": 4.99,
+        "rekening": "dara",
+        "frequentieAantal": 1,
+        "frequentieEenheid": "maanden",
+        "begindatum": "2026-07-01",
+        "einddatum": "",
+        "actief": true,
+        "amountHistory": [
+          {
+            "id": "amount-id-14e8a5c7-8c70-46f2-9cc0-358ba9b5666f",
+            "effectiveFrom": "2026-07-01",
+            "amount": 4.99
+          }
+        ],
+        "monthOverrides": {},
+        "recognition": {
+          "text": "prime",
+          "counterparty": "",
+          "amountTolerance": 5
+        },
+        "legacyKind": "vasteLasten",
+        "financialFor": "dara"
+      }
+    ]
+  },
+  "recurringIncomeSources": [
+    {
+      "id": "income-loon-dion",
+      "naam": "Loon Dion",
+      "type": "loon",
+      "eigenaar": "dion",
+      "rekening": "gezamenlijk",
+      "financialFor": "gezamenlijk",
+      "verwachtBedrag": 2450,
+      "meetellenVoorVerdeling": true,
+      "frequentieAantal": 1,
+      "frequentieEenheid": "maanden",
+      "begindatum": "2026-07-01",
+      "einddatum": "",
+      "actief": true,
+      "amountHistory": [
+        {
+          "id": "amount-income-loon-dion",
+          "effectiveFrom": "2026-07-01",
+          "amount": 2450
+        }
+      ],
+      "monthOverrides": {},
+      "recognition": {
+        "text": "",
+        "counterparty": "",
+        "amountTolerance": 100
+      },
+      "legacyKind": "salary"
+    },
+    {
+      "id": "income-loon-dara",
+      "naam": "Loon Dara",
+      "type": "loon",
+      "eigenaar": "dara",
+      "rekening": "gezamenlijk",
+      "financialFor": "gezamenlijk",
+      "verwachtBedrag": 3010,
+      "meetellenVoorVerdeling": true,
+      "frequentieAantal": 1,
+      "frequentieEenheid": "maanden",
+      "begindatum": "2026-07-01",
+      "einddatum": "",
+      "actief": true,
+      "amountHistory": [
+        {
+          "id": "amount-income-loon-dara",
+          "effectiveFrom": "2026-07-01",
+          "amount": 3010
+        }
+      ],
+      "monthOverrides": {},
+      "recognition": {
+        "text": "",
+        "counterparty": "",
+        "amountTolerance": 100
+      },
+      "legacyKind": "salary"
+    }
+  ],
+  "transactionReviewQueue": [],
+  "recognitionRules": [],
+  "monthRecords": {},
+  "accountSettings": {
+    "gezamenlijk": {
+      "openingBalance": 0,
+      "effectiveMonth": "2026-07",
+      "openingBalanceSet": false
+    },
+    "dion": {
+      "openingBalance": 0,
+      "effectiveMonth": "2026-07",
+      "openingBalanceSet": false
+    },
+    "dara": {
+      "openingBalance": 0,
+      "effectiveMonth": "2026-07",
+      "openingBalanceSet": false
+    }
+  },
+  "reserveLedger": [],
+  "advanceLedger": [],
+  "internalTransfers": [],
+  "monthCorrections": [],
+  "monthlyTeruggaven": {
+    "2026-07": {
+      "dion": [],
+      "dara": [],
+      "gezamenlijk": []
+    },
+    "2026-01": {
+      "dion": [],
+      "dara": [],
+      "gezamenlijk": []
+    },
+    "2026-02": {
+      "dion": [],
+      "dara": [],
+      "gezamenlijk": []
+    },
+    "2026-03": {
+      "dion": [],
+      "dara": [],
+      "gezamenlijk": []
+    },
+    "2026-04": {
+      "dion": [],
+      "dara": [],
+      "gezamenlijk": []
+    },
+    "2026-05": {
+      "dion": [],
+      "dara": [],
+      "gezamenlijk": []
+    },
+    "2026-06": {
+      "dion": [],
+      "dara": [],
+      "gezamenlijk": []
+    },
+    "2026-08": {
+      "dion": [],
+      "dara": [],
+      "gezamenlijk": []
+    },
+    "2026-09": {
+      "dion": [],
+      "dara": [],
+      "gezamenlijk": []
+    },
+    "2026-10": {
+      "dion": [],
+      "dara": [],
+      "gezamenlijk": []
+    },
+    "2026-11": {
+      "dion": [],
+      "dara": [],
+      "gezamenlijk": []
+    },
+    "2026-12": {
+      "dion": [],
+      "dara": [],
+      "gezamenlijk": []
+    }
+  },
+  "spaardoelGeschiedenis": {},
+  "incomeDefaultsHistory": {
+    "dion": [
+      {
+        "id": "id-bace6c51-ccfb-478f-8319-a8ae709bde04",
+        "effectiveFrom": "0000-01",
+        "salary": 2450,
+        "refund": 0,
+        "updatedAt": "1970-01-01T00:00:00.000Z"
+      }
+    ],
+    "dara": [
+      {
+        "id": "id-3c43866c-6d67-4420-b35f-d2d3d54ac355",
+        "effectiveFrom": "0000-01",
+        "salary": 3010,
+        "refund": 0,
+        "updatedAt": "1970-01-01T00:00:00.000Z"
+      }
+    ]
+  },
+  "monthlyRefundOverrides": {},
+  "monthlyIncomeOverrides": {},
+  "accountProfiles": [],
+  "importSummaries": [],
+  "activeImportId": "",
+  "savingsGoalLedger": [
+    {
+      "id": "saving-opening-id-7a284dea-befc-40e9-aa12-2cb467fa943d",
+      "goalId": "id-7a284dea-befc-40e9-aa12-2cb467fa943d",
+      "month": "",
+      "plannedAmount": 0,
+      "actualAmount": null,
+      "effectiveAmount": 17941,
+      "status": "uitgevoerd",
+      "source": "legacy-opening",
+      "transactionId": "",
+      "active": true,
+      "createdAt": "1970-01-01T00:00:00.000Z",
+      "updatedAt": "1970-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "saving-opening-id-476325bf-9aad-4ce2-8ab3-3dff37cc0369",
+      "goalId": "id-476325bf-9aad-4ce2-8ab3-3dff37cc0369",
+      "month": "",
+      "plannedAmount": 0,
+      "actualAmount": null,
+      "effectiveAmount": 800,
+      "status": "uitgevoerd",
+      "source": "legacy-opening",
+      "transactionId": "",
+      "active": true,
+      "createdAt": "1970-01-01T00:00:00.000Z",
+      "updatedAt": "1970-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "saving-opening-id-4f415739-3222-4fbb-93e1-7c0d7c349f58",
+      "goalId": "id-4f415739-3222-4fbb-93e1-7c0d7c349f58",
+      "month": "",
+      "plannedAmount": 0,
+      "actualAmount": null,
+      "effectiveAmount": 6.77,
+      "status": "uitgevoerd",
+      "source": "legacy-opening",
+      "transactionId": "",
+      "active": true,
+      "createdAt": "1970-01-01T00:00:00.000Z",
+      "updatedAt": "1970-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "saving-opening-id-0dce2031-c31c-4fa4-9660-3054eb51ce20",
+      "goalId": "id-0dce2031-c31c-4fa4-9660-3054eb51ce20",
+      "month": "",
+      "plannedAmount": 0,
+      "actualAmount": null,
+      "effectiveAmount": 17941,
+      "status": "uitgevoerd",
+      "source": "legacy-opening",
+      "transactionId": "",
+      "active": true,
+      "createdAt": "1970-01-01T00:00:00.000Z",
+      "updatedAt": "1970-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "saving-opening-id-80a3f4f3-deb3-4f05-9f56-02c9b48c39bf",
+      "goalId": "id-80a3f4f3-deb3-4f05-9f56-02c9b48c39bf",
+      "month": "",
+      "plannedAmount": 0,
+      "actualAmount": null,
+      "effectiveAmount": 0,
+      "status": "uitgevoerd",
+      "source": "legacy-opening",
+      "transactionId": "",
+      "active": true,
+      "createdAt": "1970-01-01T00:00:00.000Z",
+      "updatedAt": "1970-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "saving-opening-id-d39174ef-10f2-4ffc-a485-f60aa21a6b28",
+      "goalId": "id-d39174ef-10f2-4ffc-a485-f60aa21a6b28",
+      "month": "",
+      "plannedAmount": 0,
+      "actualAmount": null,
+      "effectiveAmount": 100,
+      "status": "uitgevoerd",
+      "source": "legacy-opening",
+      "transactionId": "",
+      "active": true,
+      "createdAt": "1970-01-01T00:00:00.000Z",
+      "updatedAt": "1970-01-01T00:00:00.000Z"
+    }
+  ],
+  "manualTransactionReplacements": [],
+  "internalTransferPairs": [],
+  "advanceRepayments": [],
+  "actualIncomeOverrides": {}
+}

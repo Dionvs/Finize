@@ -1,7 +1,7 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
-const u4=require('../update4.js');
+const u4=require('../src/import/update4-runtime.cjs');
 
 const fixture=name=>fs.readFileSync(path.join(__dirname,'fixtures',name),'utf8');
 const profiles=[

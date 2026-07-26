@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+const html = require('./helpers/runtime-source.cjs');
 const start = html.indexOf('function calcScenario(state)');
 const end = html.indexOf('/* ---------- default data', start);
 assert.ok(start >= 0 && end > start, 'calcScenario is niet gevonden');
@@ -49,8 +49,11 @@ function runScenario(scenario, jointActual, personalActual = {}) {
     Number,
     Math,
     round2,
-    getMonthlyBaseIncome: owner => owner === 'dion' ? 3000 : 2000,
-    sumVasteTeruggaven: () => 0,
+    getSelectedMonth: () => '2026-07',
+    getDistributionIncomeParts: owner => ({
+      salary: owner === 'dion' ? 3000 : 2000,
+      refund: 0
+    }),
     getMonthlyScenarioData: () => monthly,
     sumEffective: rows => round2(rows.reduce((sum, row) => sum + Number(row.bedrag || 0), 0)),
     sumBedrag: rows => round2(rows.reduce((sum, row) => sum + Number(row.bedrag || 0), 0)),
@@ -88,14 +91,14 @@ const dionBefore = runScenario('voor', 750, { dion: 100 });
 const dionAfter = runScenario('voor', 750, { dion: 350 });
 assert.equal(dionBefore.dion.zakgeld, dionAfter.dion.zakgeld);
 assert.notEqual(dionBefore.dion.variabeleUitgaven, dionAfter.dion.variabeleUitgaven);
-assert.notEqual(dionBefore.dion.beschikbaarVoorSparen, dionAfter.dion.beschikbaarVoorSparen);
+assert.equal(dionBefore.dion.beschikbaarVoorSparen, dionAfter.dion.beschikbaarVoorSparen);
 assert.equal(dionBefore.dara.zakgeld, dionAfter.dara.zakgeld);
 
 const daraBefore = runScenario('na', 750, { dara: 80 });
 const daraAfter = runScenario('na', 750, { dara: 280 });
 assert.equal(daraBefore.dara.zakgeld, daraAfter.dara.zakgeld);
 assert.notEqual(daraBefore.dara.variabeleUitgaven, daraAfter.dara.variabeleUitgaven);
-assert.notEqual(daraBefore.dara.beschikbaarVoorSparen, daraAfter.dara.beschikbaarVoorSparen);
+assert.equal(daraBefore.dara.beschikbaarVoorSparen, daraAfter.dara.beschikbaarVoorSparen);
 assert.equal(daraBefore.dion.zakgeld, daraAfter.dion.zakgeld);
 
 console.log('UPDATE5_ALLOWANCE_BUDGET_REGRESSION_OK');

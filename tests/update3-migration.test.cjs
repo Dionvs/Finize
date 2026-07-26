@@ -3,8 +3,8 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
 
-const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-const start = html.indexOf('function u3RecognitionFromLegacy');
+const html = require('./helpers/runtime-source.cjs');
+const start = html.indexOf('function normalizePersonDefaults');
 const end = html.indexOf('function normalizeBudgetState', start);
 assert.ok(start >= 0 && end > start, 'Update 3 migratielaag is niet gevonden');
 
@@ -13,9 +13,10 @@ const context={
   console,Date,Math,Number,String,Array,Object,
   U3_ACCOUNTS:['gezamenlijk','dion','dara'],
   U3_FREQUENCY_UNITS:['weken','maanden','jaren'],
-  U3_SCHEMA_VERSION:8,
+  U3_SCHEMA_VERSION:9,
   isPlainObject:value=>value!==null&&typeof value==='object'&&!Array.isArray(value),
   round2:value=>Math.round((Number(value)+Number.EPSILON)*100)/100,
+  sumBedrag:rows=>rows.reduce((sum,row)=>sum+(Number(row.bedrag)||0),0),
   bankText:value=>String(value||'').trim().toLowerCase(),
   uid:()=>`generated-${++generated}`,
   monthKey:()=> '2026-07',
@@ -48,7 +49,7 @@ function fixture(version){
 
 for(const version of [1,2,3]){
   const migrated=context.u3NormalizeState(fixture(version));
-  assert.equal(migrated.meta.schemaVersion,8);
+  assert.equal(migrated.meta.schemaVersion,9);
   assert.equal(migrated.transactions[0].account,'dion');
   assert.equal(migrated.transactions[0].financialFor,'dion');
   assert.equal(migrated.transactions[0].reviewStatus,'bevestigd');

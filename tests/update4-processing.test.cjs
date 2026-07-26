@@ -1,7 +1,7 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
-const u4=require('../update4.js');
+const u4=require('../src/import/update4-runtime.cjs');
 
 const text=fs.readFileSync(path.join(__dirname,'fixtures','ing-dion.csv'),'utf8');
 const profile={id:'dion-ing',name:'ING Dion',identifier:'NL01INGB0000000001',bank:'ING',csvFormat:'ing',accountOwner:'dion'};

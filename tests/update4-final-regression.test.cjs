@@ -3,18 +3,18 @@ const fs=require('node:fs');
 const path=require('node:path');
 
 const root=path.join(__dirname,'..');
-const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+const html=fs.readFileSync(path.join(root,'index.html'),'utf8')+require('./helpers/runtime-source.cjs');
 const sw=fs.readFileSync(path.join(root,'service-worker.js'),'utf8');
 const progress=fs.readFileSync(path.join(root,'UPDATE-4-PROGRESS.md'),'utf8');
 
-assert.match(html,/U3_SCHEMA_VERSION\s*=\s*8/);
+assert.match(html,/U3_SCHEMA_VERSION\s*=\s*9/);
 assert.match(html,/Werkelijk inkomen aanpassen/);
 assert.match(html,/Correctie nodig/);
 assert.match(html,/window\.CloudAdapter\s*=\s*CloudAdapter/);
 assert.match(html,/finize:cloud-connected/);
-assert.match(sw,/finize-v28-personal-overview-cleanup/);
-assert.match(sw,/\.\/update4\.js/);
-assert.match(sw,/\.\/update4\.css/);
+assert.match(sw,/finize-v53-code-cleanup/);
+assert.match(sw,/\.\/app\.js/);
+assert.match(sw,/\.\/app\.css/);
 for(const file of ['update-4-datamodel.md','update-4-changelog.md','update-4-handmatig-testverslag.md']){
   assert.equal(fs.existsSync(path.join(root,'docs',file)),true,`${file} ontbreekt`);
 }
