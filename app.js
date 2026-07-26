@@ -10,6 +10,11 @@
     console.error("Finize kon een achtergrondtaak niet afronden:", event.reason?.message || String(event.reason || "Onbekende fout"));
   });
 
+  // src/core/state.js
+  function cloneState(value) {
+    return JSON.parse(JSON.stringify(value));
+  }
+
   // src/core/runtime.js
   function round2(n) {
     return Math.round((n + Number.EPSILON) * 100) / 100;
@@ -116,9 +121,6 @@
     for (const [re, label] of aliases) if (re.test(normalized)) return label;
     return raw.charAt(0).toUpperCase() + raw.slice(1);
   }
-  function clone(value) {
-    return JSON.parse(JSON.stringify(value));
-  }
   function monthKey(date = /* @__PURE__ */ new Date()) {
     return date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0");
   }
@@ -184,14 +186,14 @@
     ["voor", "na"].forEach((scenario) => {
       if (!state.monthlyBudgets[month][scenario]) {
         state.monthlyBudgets[month][scenario] = {
-          gezamenlijkVariabel: clone(state[scenario]?.gezamenlijk?.variabel || []),
-          dionVariabel: clone(state[scenario]?.dion?.variabel || []),
-          daraVariabel: clone(state[scenario]?.dara?.variabel || [])
+          gezamenlijkVariabel: cloneState(state[scenario]?.gezamenlijk?.variabel || []),
+          dionVariabel: cloneState(state[scenario]?.dion?.variabel || []),
+          daraVariabel: cloneState(state[scenario]?.dara?.variabel || [])
         };
       }
       ["gezamenlijk", "dion", "dara"].forEach((owner) => {
         const key = `${owner}Variabel`;
-        if (!Array.isArray(state.monthlyBudgets[month][scenario][key])) state.monthlyBudgets[month][scenario][key] = clone(state[scenario]?.[owner]?.variabel || []);
+        if (!Array.isArray(state.monthlyBudgets[month][scenario][key])) state.monthlyBudgets[month][scenario][key] = cloneState(state[scenario]?.[owner]?.variabel || []);
       });
     });
   }
@@ -1367,14 +1369,14 @@
     const hasData = existingIncome || existingBudgets || existingTransactions;
     if (hasData && !confirm("Deze maand heeft al maanddata. Inkomens en gezamenlijke budgetten overschrijven met vorige maand?")) return false;
     ensureMonthData(month);
-    state.monthlyIncome[month] = clone(state.monthlyIncome[prev] || {
+    state.monthlyIncome[month] = cloneState(state.monthlyIncome[prev] || {
       dion: Number(state.personen.dion.salaris) || 0,
       dara: Number(state.personen.dara.salaris) || 0
     });
-    state.monthlyBudgets[month] = clone(state.monthlyBudgets[prev] || {});
+    state.monthlyBudgets[month] = cloneState(state.monthlyBudgets[prev] || {});
     ["voor", "na"].forEach((scenario) => {
       if (!state.monthlyBudgets[month][scenario]) {
-        state.monthlyBudgets[month][scenario] = { gezamenlijkVariabel: clone(state[scenario].gezamenlijk.variabel || []) };
+        state.monthlyBudgets[month][scenario] = { gezamenlijkVariabel: cloneState(state[scenario].gezamenlijk.variabel || []) };
       }
     });
     return true;
@@ -1894,7 +1896,7 @@
     Object.values(target?.monthRecords || {}).forEach((record) => ensureRowIds(record?.closureHistory));
   }
   function migrateBudgetState(candidate) {
-    const original = clone(candidate);
+    const original = cloneState(candidate);
     const activeStateBeforeMigration = typeof state === "undefined" ? null : state;
     try {
       const fromVersion = Number(candidate?.meta?.schemaVersion) || 1;
@@ -2190,7 +2192,7 @@
         this.applyingRemote = true;
         state = normalizedRemote;
         window.state = state;
-        committedStateSnapshot = clone(state);
+        committedStateSnapshot = cloneState(state);
         try {
           await GoalImageStore.initializeState(state);
           localSave(state);
@@ -2210,7 +2212,7 @@
     },
     queueSave(state2) {
       if (this.applyingRemote) return;
-      this.pendingState = clone(state2);
+      this.pendingState = cloneState(state2);
       this.status = this.isConnected() ? "Opslaan…" : "Offline — lokaal bewaard";
       renderCloudStatus();
       if (!this.isConnected()) return;
@@ -2246,7 +2248,7 @@
       if (!this.isConnected()) return false;
       this.lastFailureRetryable = true;
       try {
-        const cloudSnapshot = clone(snapshot);
+        const cloudSnapshot = cloneState(snapshot);
         await GoalImageStore.expandStateForTransfer(cloudSnapshot);
         const payloadBytes = new Blob([JSON.stringify(cloudSnapshot)]).size;
         if (payloadBytes > 9e5) {
@@ -2364,11 +2366,11 @@
     throw error;
   }
   window.state = state;
-  var committedStateSnapshot = clone(state);
+  var committedStateSnapshot = cloneState(state);
   var activeTab = "dashboard";
   var TODAY2 = /* @__PURE__ */ new Date();
   function commitChange(change, options = {}) {
-    const before = clone(committedStateSnapshot || state);
+    const before = cloneState(committedStateSnapshot || state);
     try {
       if (typeof change === "function") change(state);
       else if (typeof change?.apply === "function") change.apply(state);
@@ -2402,13 +2404,13 @@
       const validation = validateBudgetState(state);
       if (!validation.ok) throw new Error(validation.errors.join(" "));
       if (!DataAdapter.save(state)) throw new Error("Lokale opslag is mislukt.");
-      committedStateSnapshot = clone(state);
+      committedStateSnapshot = cloneState(state);
       if (options.render !== false) renderCloudStatus();
       return true;
     } catch (e) {
       state = before;
       window.state = state;
-      committedStateSnapshot = clone(before);
+      committedStateSnapshot = cloneState(before);
       CloudAdapter.status = "Synchronisatie mislukt";
       renderCloudStatus();
       console.error("Wijziging opslaan mislukt", e);
@@ -3479,7 +3481,7 @@ service cloud.firestore {
   `;
     document.getElementById("btnExport").addEventListener("click", async () => {
       try {
-        const exportState = clone(state);
+        const exportState = cloneState(state);
         await GoalImageStore.expandStateForTransfer(exportState);
         downloadJson("dion-dara-budget-backup-" + (/* @__PURE__ */ new Date()).toISOString().slice(0, 10) + ".json", exportState);
       } catch (error) {
@@ -3510,7 +3512,7 @@ service cloud.firestore {
           DataAdapter.backup(state, "voor JSON-import");
           state = migratedImport;
           window.state = state;
-          committedStateSnapshot = clone(state);
+          committedStateSnapshot = cloneState(state);
           await GoalImageStore.initializeState(state);
           commitChange(() => {
           }, { render: false });
@@ -3541,7 +3543,7 @@ service cloud.firestore {
         DataAdapter.backup(state, "voor herstel lokale back-up");
         state = migratedBackup;
         window.state = state;
-        committedStateSnapshot = clone(state);
+        committedStateSnapshot = cloneState(state);
         await GoalImageStore.initializeState(state);
         commitChange(() => {
         }, { render: false });
@@ -3553,7 +3555,7 @@ service cloud.firestore {
         DataAdapter.backup(state, "voor alles wissen");
         state = normalizeBudgetState(defaultState());
         window.state = state;
-        committedStateSnapshot = clone(state);
+        committedStateSnapshot = cloneState(state);
         persist();
         renderActiveTab();
       }
@@ -3996,7 +3998,7 @@ service cloud.firestore {
     ensureMonthData(month);
     const key = `${owner}Variabel`;
     const sourceRows = state.monthlyBudgets?.[month]?.[scenario]?.[key] || state[scenario]?.[owner]?.variabel || [];
-    let draftRows = clone(sourceRows).map((row) => ({
+    let draftRows = cloneState(sourceRows).map((row) => ({
       ...row,
       id: row.id || uid(),
       categorie: String(row.categorie || "Variabel"),
@@ -4072,7 +4074,7 @@ service cloud.firestore {
           ensureMonthData(month);
           state.monthlyBudgets[month] = state.monthlyBudgets[month] || {};
           state.monthlyBudgets[month][scenario] = state.monthlyBudgets[month][scenario] || {};
-          state.monthlyBudgets[month][scenario][key] = clone(cleaned);
+          state.monthlyBudgets[month][scenario][key] = cloneState(cleaned);
         }, { render: false });
         if (!saved) {
           alert("De variabele budgetten konden niet worden opgeslagen. Probeer het opnieuw.");
@@ -4126,8 +4128,8 @@ service cloud.firestore {
       const item = { id: uid(), categorie: category, post, bedrag: round2(amount), jaarlijks: modal.querySelector("#fixedAddFrequency").value === "yearly" };
       const ok = commitChange(() => {
         if (draftSession) {
-          state[scenario][owner].vasteLasten = clone(draftSession.rows || []);
-          if (owner === "gezamenlijk" && scenario === "na") state[scenario][owner].hypotheek = clone(draftSession.mortgageRows || []);
+          state[scenario][owner].vasteLasten = cloneState(draftSession.rows || []);
+          if (owner === "gezamenlijk" && scenario === "na") state[scenario][owner].hypotheek = cloneState(draftSession.mortgageRows || []);
         }
         state[scenario][selectedOwner].vasteLasten.push(item);
       }, { render: false });
@@ -4145,7 +4147,7 @@ service cloud.firestore {
     const scenario = state.meta.scenario;
     const account = state[scenario][owner];
     const hasMortgage = owner === "gezamenlijk" && scenario === "na";
-    const session = draftSession && draftSession.scenario === scenario && draftSession.owner === owner ? draftSession : { scenario, owner, rows: clone(account.vasteLasten || []), mortgageRows: hasMortgage ? clone(account.hypotheek || []) : [], dirty: false };
+    const session = draftSession && draftSession.scenario === scenario && draftSession.owner === owner ? draftSession : { scenario, owner, rows: cloneState(account.vasteLasten || []), mortgageRows: hasMortgage ? cloneState(account.hypotheek || []) : [], dirty: false };
     const rows = session.rows;
     const mortgageRows = session.mortgageRows;
     const name = ownerLabel(owner);
@@ -4237,8 +4239,8 @@ service cloud.firestore {
         if (!targetPath || targetPath === sourcePath) return;
         const previousRows = account.vasteLasten;
         const previousMortgage = hasMortgage ? account.hypotheek : null;
-        account.vasteLasten = clone(rows);
-        if (hasMortgage) account.hypotheek = clone(mortgageRows);
+        account.vasteLasten = cloneState(rows);
+        if (hasMortgage) account.hypotheek = cloneState(mortgageRows);
         const source = getPath(state, sourcePath);
         const target = getPath(state, targetPath);
         if (!Array.isArray(source) || !Array.isArray(target)) {
@@ -4268,10 +4270,10 @@ service cloud.firestore {
         const id = btn.dataset.fixedRemove;
         const idx = rows.findIndex((row) => row.id === id);
         if (idx < 0) return;
-        const removed = clone(rows[idx]);
+        const removed = cloneState(rows[idx]);
         const nextRows = rows.filter((row) => row.id !== id);
         if (!commitChange(() => {
-          account.vasteLasten = clone(nextRows);
+          account.vasteLasten = cloneState(nextRows);
         }, { render: false })) return;
         rows.splice(idx, 1);
         session.dirty = false;
@@ -4291,10 +4293,10 @@ service cloud.firestore {
         const id = btn.dataset.mortgageRemove;
         const idx = mortgageRows.findIndex((row) => row.id === id);
         if (idx < 0) return;
-        const removed = clone(mortgageRows[idx]);
+        const removed = cloneState(mortgageRows[idx]);
         const nextRows = mortgageRows.filter((row) => row.id !== id);
         if (!commitChange(() => {
-          account.hypotheek = clone(nextRows);
+          account.hypotheek = cloneState(nextRows);
         }, { render: false })) return;
         mortgageRows.splice(idx, 1);
         session.dirty = false;
@@ -4317,8 +4319,8 @@ service cloud.firestore {
       rows.splice(0, rows.length, ...activeRows);
       const previousRows = account.vasteLasten;
       const previousMortgage = hasMortgage ? account.hypotheek : null;
-      account.vasteLasten = clone(rows);
-      if (hasMortgage) account.hypotheek = clone(mortgageRows);
+      account.vasteLasten = cloneState(rows);
+      if (hasMortgage) account.hypotheek = cloneState(mortgageRows);
       if (!persist()) {
         account.vasteLasten = previousRows;
         if (hasMortgage) account.hypotheek = previousMortgage;
@@ -5533,7 +5535,7 @@ service cloud.firestore {
     if (!goal || !modal.classList.contains("open")) return;
     const grid = modal.querySelector(".modal-grid");
     const targetInput = modal.querySelector("#goalEditTarget");
-    let drafts = clone(goal.subdoelen || []);
+    let drafts = cloneState(goal.subdoelen || []);
     const ownerField = document.createElement("label");
     ownerField.innerHTML = `Eigenaar<select id="u2GoalOwner">${U2_OWNERS.map((value) => `<option value="${value}" ${value === owner ? "selected" : ""}>${ownerLabel(value)}</option>`).join("")}</select>`;
     const ratioField = document.createElement("label");
@@ -5936,7 +5938,7 @@ service cloud.firestore {
     if (record && ["afgesloten", "correctie-nodig"].includes(record.status) && record.activeClosureId) {
       const closure = (record.closureHistory || []).find((item) => (item.closingId || item.id) === record.activeClosureId);
       if (closure) {
-        const snapshot = clone(closure.financialSnapshot || u3LegacyFinancialSnapshot(month, record, closure));
+        const snapshot = cloneState(closure.financialSnapshot || u3LegacyFinancialSnapshot(month, record, closure));
         snapshot.status = record.status;
         snapshot.pendingCorrectionTransactionIds = [...record.lateImportTransactionIds || []];
         return snapshot;
@@ -6000,7 +6002,7 @@ service cloud.firestore {
     const financialSnapshot = u3LiveFinancialSnapshot(month);
     financialSnapshot.status = "afgesloten";
     financialSnapshot.closedAt = (/* @__PURE__ */ new Date()).toISOString();
-    const closure = { id: closureId, closingId: closureId, month, version: revision, revision, status: "actief", createdAt: financialSnapshot.closedAt, supersedesClosingId: previous?.closingId || previous?.id || "", closedAt: financialSnapshot.closedAt, summary, financialSnapshot, accountControl, transferIds: drafts.filter((row) => row.calculatedAmount > 4e-3).map((row) => row.id), transferSnapshot: clone(drafts.filter((row) => row.calculatedAmount > 4e-3)), correctionIds: (state.monthCorrections || []).filter((row) => row.closureId === closureId).map((row) => row.id), updatedBy: getDeviceId() };
+    const closure = { id: closureId, closingId: closureId, month, version: revision, revision, status: "actief", createdAt: financialSnapshot.closedAt, supersedesClosingId: previous?.closingId || previous?.id || "", closedAt: financialSnapshot.closedAt, summary, financialSnapshot, accountControl, transferIds: drafts.filter((row) => row.calculatedAmount > 4e-3).map((row) => row.id), transferSnapshot: cloneState(drafts.filter((row) => row.calculatedAmount > 4e-3)), correctionIds: (state.monthCorrections || []).filter((row) => row.closureId === closureId).map((row) => row.id), updatedBy: getDeviceId() };
     record.status = "afgesloten";
     record.closedAt = closure.closedAt;
     record.activeClosureId = closureId;
@@ -6413,7 +6415,7 @@ service cloud.firestore {
   getMonthlyScenarioData = function(scenario = state.meta.scenario) {
     const base = u3LegacyMonthlyScenarioData(scenario);
     const month = getSelectedMonth2();
-    const result = clone(base);
+    const result = cloneState(base);
     U3_ACCOUNTS.forEach((account) => {
       const planned = u3FixedOccurrences(month, scenario).filter((row) => row.financialFor === account);
       result[account] = result[account] || {};
@@ -6433,10 +6435,10 @@ service cloud.firestore {
   };
   window.FinizeUpdate3 = Object.freeze({
     schemaVersion: U3_SCHEMA_VERSION,
-    occurrenceDates: (item, month) => u3OccurrenceDates(clone(item), month),
-    plannedOccurrences: (items, month) => u3PlannedOccurrences(clone(items), month),
-    amountAt: (item, dateOrMonth) => u3AmountAt(clone(item), dateOrMonth),
-    monthlyAverage: (item) => u3MonthlyAverage(clone(item)),
+    occurrenceDates: (item, month) => u3OccurrenceDates(cloneState(item), month),
+    plannedOccurrences: (items, month) => u3PlannedOccurrences(cloneState(items), month),
+    amountAt: (item, dateOrMonth) => u3AmountAt(cloneState(item), dateOrMonth),
+    monthlyAverage: (item) => u3MonthlyAverage(cloneState(item)),
     budgetSummary: (owner, month, scenario) => u3BudgetSummary(owner, month, scenario),
     monthSummary: (month) => u3MonthSummary(month),
     accountControl: (month) => u3AccountControl(month),
@@ -6449,14 +6451,14 @@ service cloud.firestore {
     closeMonth: (month, actualBalances, correctionAccounts) => u3CloseMonth(month, actualBalances, correctionAccounts),
     reopenMonth: (month) => u3ReopenMonth(month),
     confirmTransfer: (id, amount, date, status) => u3ConfirmTransfer(id, amount, date, status),
-    suggestRecognition: (description, account, amount) => clone(u3SuggestedRecognition(description, account, amount)),
-    normalize: (candidate) => u3NormalizeState(clone(candidate))
+    suggestRecognition: (description, account, amount) => cloneState(u3SuggestedRecognition(description, account, amount)),
+    normalize: (candidate) => u3NormalizeState(cloneState(candidate))
   });
   window.FinizeUpdate2 = Object.freeze({
     schemaVersion: U2_SCHEMA_VERSION,
-    calculateGroup: (goals, pot, today) => calcGroep2(clone(goals), pot, new Date(today)),
+    calculateGroup: (goals, pot, today) => calcGroep2(cloneState(goals), pot, new Date(today)),
     normalizeSubgoals: (goal) => {
-      const copy = clone(goal);
+      const copy = cloneState(goal);
       u2NormalizeChildren(copy);
       return copy;
     },
@@ -6465,7 +6467,7 @@ service cloud.firestore {
   u2NormalizeState(state);
   ensurePersistentIds(state);
   localSave(state);
-  committedStateSnapshot = clone(state);
+  committedStateSnapshot = cloneState(state);
   window.__finizeBootstrap = {
     coreReady: false,
     update4Ready: false,
@@ -6532,9 +6534,6 @@ service cloud.firestore {
     const IMPORT_STATUSES = ["concept", "verwerkt", "teruggedraaid", "correctie-nodig"];
     function plain(value) {
       return value !== null && typeof value === "object" && !Array.isArray(value);
-    }
-    function clone2(value) {
-      return JSON.parse(JSON.stringify(value));
     }
     function round22(value) {
       return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
@@ -6748,7 +6747,7 @@ service cloud.firestore {
         });
       },
       putImport(record) {
-        const next = clone2(record);
+        const next = cloneState(record);
         delete next.rawText;
         return this.request(IMPORT_STORE, "readwrite", (store) => store.put(next));
       },
@@ -6762,7 +6761,7 @@ service cloud.firestore {
         return this.request(IMPORT_STORE, "readonly", (store) => store.getAll());
       },
       putJournal(record) {
-        return this.request(JOURNAL_STORE, "readwrite", (store) => store.put(clone2(record)));
+        return this.request(JOURNAL_STORE, "readwrite", (store) => store.put(cloneState(record)));
       },
       getJournal(id) {
         return this.request(JOURNAL_STORE, "readonly", (store) => store.get(String(id)));
@@ -6771,7 +6770,7 @@ service cloud.firestore {
         return this.request(JOURNAL_STORE, "readonly", (store) => store.getAll());
       },
       putSync(record) {
-        return this.request(SYNC_STORE, "readwrite", (store) => store.put(clone2(record)));
+        return this.request(SYNC_STORE, "readwrite", (store) => store.put(cloneState(record)));
       },
       deleteSync(id) {
         return this.request(SYNC_STORE, "readwrite", (store) => store.delete(String(id)));
@@ -6812,7 +6811,7 @@ service cloud.firestore {
       if (!plain(record) || !record.id) throw new Error("Importrecord mist een ID.");
       const rows = Array.isArray(record.rows) ? record.rows : [];
       const chunks = chunkRows(rows);
-      const header = clone2(record);
+      const header = cloneState(record);
       delete header.rows;
       delete header.rawText;
       header.storageVersion = CLOUD_STORAGE_VERSION;
@@ -6820,7 +6819,7 @@ service cloud.firestore {
       header.chunkCount = chunks.length;
       header.rowsChecksum = rowsChecksum(rows);
       header.syncedAt = (/* @__PURE__ */ new Date()).toISOString();
-      return { header, chunks: chunks.map((chunk, index) => ({ index, rows: clone2(chunk) })) };
+      return { header, chunks: chunks.map((chunk, index) => ({ index, rows: cloneState(chunk) })) };
     }
     function cloudImportError(code, message) {
       const error = new Error(message);
@@ -6863,7 +6862,7 @@ service cloud.firestore {
       const rows = [];
       for (let index = 0; index < chunkCount; index++) {
         if (!byIndex.has(index)) throw cloudImportError("cloud-incomplete", "Een importdeel ontbreekt in de cloud.");
-        rows.push(...clone2(byIndex.get(index)));
+        rows.push(...cloneState(byIndex.get(index)));
       }
       if (rows.length !== rowCount) throw cloudImportError("cloud-incomplete", "Het aantal bankregels in de cloudkopie klopt niet.");
       if (Number(header.storageVersion) >= CLOUD_STORAGE_VERSION && !header.rowsChecksum) {
@@ -6872,7 +6871,7 @@ service cloud.firestore {
       if (header.rowsChecksum && rowsChecksum(rows) !== String(header.rowsChecksum)) {
         throw cloudImportError("cloud-checksum", "De controlecode van de cloudkopie klopt niet.");
       }
-      const record = clone2(header);
+      const record = cloneState(header);
       delete record.rawText;
       delete record.rowCount;
       delete record.chunkCount;
@@ -7601,8 +7600,8 @@ service cloud.firestore {
             importBatchId: draft.id,
             importTransactionId: row.id,
             splitId: part.splitId,
-            bankOriginal: clone2(row.bankOriginal),
-            processing: { ...clone2(p), processedAmount: part.amount, budgetOwner: part.budgetOwner, category: part.category, budgetItemId: part.budgetItemId, savingsGoalId: part.savingsGoalId, include: part.include },
+            bankOriginal: cloneState(row.bankOriginal),
+            processing: { ...cloneState(p), processedAmount: part.amount, budgetOwner: part.budgetOwner, category: part.category, budgetItemId: part.budgetItemId, savingsGoalId: part.savingsGoalId, include: part.include },
             expenseImpact: expenseImpact(type, part.amount, part.include),
             accountDelta: part.isFirst ? round22(row.bankOriginal.amount) : 0,
             fixedExpenseId: p.fixedExpenseId || "",
@@ -7635,7 +7634,7 @@ service cloud.firestore {
         });
         if (p.manualMatchId) {
           const manual = state2.transactions.find((tx) => tx.id === p.manualMatchId && !tx.importBatchId);
-          if (manual) replacements.push({ id: `replacement-${draft.id}-${manual.id}`, manualTransaction: clone2(manual), replacementTransactionId: transactions.find((tx) => tx.importTransactionId === row.id)?.id || "" });
+          if (manual) replacements.push({ id: `replacement-${draft.id}-${manual.id}`, manualTransaction: cloneState(manual), replacementTransactionId: transactions.find((tx) => tx.importTransactionId === row.id)?.id || "" });
         }
         if (p.fixedExpenseId && ["month", "from"].includes(p.fixedAmountMode)) {
           const found = findFixedItem(state2, p.fixedExpenseId);
@@ -7647,7 +7646,7 @@ service cloud.firestore {
               month: String(p.processingDate).slice(0, 7),
               mode: p.fixedAmountMode,
               amount: round22(p.processedAmount),
-              before: { amountHistory: clone2(found.item.amountHistory || []), monthOverrides: clone2(found.item.monthOverrides || {}) }
+              before: { amountHistory: cloneState(found.item.amountHistory || []), monthOverrides: cloneState(found.item.monthOverrides || {}) }
             });
           }
         }
@@ -7666,13 +7665,13 @@ service cloud.firestore {
       const transactionIds = new Set((state2.transactions || []).map((tx) => tx.id));
       plan.transactions.forEach((tx) => {
         if (!transactionIds.has(tx.id)) {
-          state2.transactions.push(clone2(tx));
+          state2.transactions.push(cloneState(tx));
           transactionIds.add(tx.id);
         }
       });
       state2.manualTransactionReplacements = state2.manualTransactionReplacements || [];
       plan.replacements.forEach((replacement) => {
-        if (!state2.manualTransactionReplacements.some((item) => item.id === replacement.id)) state2.manualTransactionReplacements.push(clone2(replacement));
+        if (!state2.manualTransactionReplacements.some((item) => item.id === replacement.id)) state2.manualTransactionReplacements.push(cloneState(replacement));
         state2.transactions = state2.transactions.filter((tx) => tx.id !== replacement.manualTransaction.id);
       });
       state2.savingsGoalLedger = state2.savingsGoalLedger || [];
@@ -7689,12 +7688,12 @@ service cloud.firestore {
             planned.updatedAt = entry.updatedAt;
           }
         }
-        state2.savingsGoalLedger.push(clone2(entry));
+        state2.savingsGoalLedger.push(cloneState(entry));
       });
       reconcileGoalSavedAmounts(state2, plan.savingsEntries.map((entry) => entry.goalId));
       state2.advanceLedger = state2.advanceLedger || [];
       plan.advances.forEach((entry) => {
-        if (!state2.advanceLedger.some((item) => item.id === entry.id)) state2.advanceLedger.push(clone2(entry));
+        if (!state2.advanceLedger.some((item) => item.id === entry.id)) state2.advanceLedger.push(cloneState(entry));
       });
       state2.advanceRepayments = state2.advanceRepayments || [];
       plan.repayments.forEach((repayment) => {
@@ -7708,11 +7707,11 @@ service cloud.firestore {
           advance.status = "voldaan";
         }
         advance.repaymentAllocationIds = [.../* @__PURE__ */ new Set([...advance.repaymentAllocationIds || [], repayment.id])];
-        state2.advanceRepayments.push({ ...clone2(repayment), amount: applied });
+        state2.advanceRepayments.push({ ...cloneState(repayment), amount: applied });
       });
       state2.internalTransferPairs = state2.internalTransferPairs || [];
       plan.internalPairs.forEach((pair) => {
-        if (!state2.internalTransferPairs.some((item) => item.id === pair.id)) state2.internalTransferPairs.push(clone2(pair));
+        if (!state2.internalTransferPairs.some((item) => item.id === pair.id)) state2.internalTransferPairs.push(cloneState(pair));
       });
       (plan.fixedAdjustments || []).forEach((adjustment) => {
         const found = findFixedItem(state2, adjustment.fixedExpenseId);
@@ -7739,7 +7738,7 @@ service cloud.firestore {
       if (summary) {
         summary.status = plan.affectedMonths.some((month) => state2.monthRecords?.[month]?.status === "correctie-nodig") ? "correctie-nodig" : "verwerkt";
         summary.processedAt = (/* @__PURE__ */ new Date()).toISOString();
-        summary.counts = clone2(plan.counts);
+        summary.counts = cloneState(plan.counts);
       }
       if (state2.activeImportId === plan.importId) state2.activeImportId = "";
       return plan;
@@ -7752,9 +7751,9 @@ service cloud.firestore {
         advanceIds: plan.advances.map((item) => item.id),
         repaymentIds: plan.repayments.map((item) => item.id),
         internalPairIds: plan.internalPairs.map((item) => item.id),
-        fixedAdjustments: clone2(plan.fixedAdjustments || []),
+        fixedAdjustments: cloneState(plan.fixedAdjustments || []),
         affectedMonths: plan.affectedMonths,
-        counts: clone2(plan.counts)
+        counts: cloneState(plan.counts)
       };
     }
     function undoImportEffects(state2, draft) {
@@ -7793,13 +7792,13 @@ service cloud.firestore {
       (manifest.fixedAdjustments || []).forEach((adjustment) => {
         const found = findFixedItem(state2, adjustment.fixedExpenseId);
         if (!found) return;
-        found.item.amountHistory = clone2(adjustment.before?.amountHistory || []);
-        found.item.monthOverrides = clone2(adjustment.before?.monthOverrides || {});
+        found.item.amountHistory = cloneState(adjustment.before?.amountHistory || []);
+        found.item.monthOverrides = cloneState(adjustment.before?.monthOverrides || {});
       });
       state2.manualTransactionReplacements = state2.manualTransactionReplacements || [];
       state2.manualTransactionReplacements.filter((item) => replacementIds.has(item.id)).forEach((replacement) => {
         if (replacement.manualTransaction && !state2.transactions.some((tx) => tx.id === replacement.manualTransaction.id)) {
-          state2.transactions.push(clone2(replacement.manualTransaction));
+          state2.transactions.push(cloneState(replacement.manualTransaction));
         }
       });
       state2.manualTransactionReplacements = state2.manualTransactionReplacements.filter((item) => !replacementIds.has(item.id));
@@ -7844,7 +7843,7 @@ service cloud.firestore {
       return true;
     }
     async function reconcileImport(root, draft) {
-      const working = clone2(root.state);
+      const working = cloneState(root.state);
       undoImportEffects(working, draft);
       const plan = planImportEffects(draft, working);
       if (!plan.ok) {
@@ -8073,7 +8072,7 @@ service cloud.firestore {
       ["budgetOwner", "category", "transactionType", "budgetItemId", "fixedExpenseId", "fixedAmountMode", "savingsGoalId", "advanceMode", "include", "sourceAccountProfileId", "destinationAccountProfileId"].forEach((field) => {
         const value = source.processing[field];
         if (value === void 0) delete target.processing[field];
-        else target.processing[field] = clone2(value);
+        else target.processing[field] = cloneState(value);
       });
     }
     function splitHtml(root, row, split, index) {
@@ -8159,7 +8158,7 @@ ${error?.message || error}`);
         button.textContent = "Bezig…";
         feedback.textContent = "Wijzigingen worden toegepast.";
         const snapshots = /* @__PURE__ */ new Map();
-        const remember = (row) => snapshots.set(row.id, { processing: clone2(row.processing), certainty: row.certainty, reasons: clone2(row.reasons || []) });
+        const remember = (row) => snapshots.set(row.id, { processing: cloneState(row.processing), certainty: row.certainty, reasons: cloneState(row.reasons || []) });
         try {
           remember(source);
           source.certainty = "zeker";
@@ -8728,7 +8727,7 @@ ${error?.message || error}`);
       }
       root.FinizeUpdate4 = Object.freeze({
         schemaVersion: SCHEMA_VERSION,
-        normalize: (candidate) => normalizeCore(clone2(candidate)),
+        normalize: (candidate) => normalizeCore(cloneState(candidate)),
         validate: (candidate) => validateCore(candidate),
         normalizeIban,
         chunkRows,
@@ -8763,8 +8762,9 @@ ${error?.message || error}`);
         flushImportSync(root).catch((error) => console.warn("Importsynchronisatie uitgesteld.", error));
       });
     }
-    return { SCHEMA_VERSION, CLOUD_STORAGE_VERSION, CLOUD_READ_CONCURRENCY, OWNERS, IMPORT_STATUSES, normalizeIban, normalizeRule, normalizeTransaction, normalizeCore, validateCore, calculateGoalSavedAmount, reconcileGoalSavedAmounts, chunkRows, canonicalValue, rowsChecksum, buildCloudImportEnvelope, assembleCloudImport, mapWithConcurrency, classifyCloudError, fetchImportFromCloud, resolveImportDetails, reconcileActiveImportReference, deleteCloudImportBestEffort, discardImportConcept, normalizeText, matchIdentity, matchCandidates, detectDelimiter, parseDelimited, parseDate, parseAmount, detectFormat, inferMapping, hashText, fingerprint, organizationName, proposeType, recognitionProposal, classifyOriginal, parseBankCsv, findProfile, createImportDraft, updateDraftSummary, compactSummary, validateDraft, transactionKind, expenseImpact, financialRows, advanceForTransaction, savingsForTransaction, detectInternalPairs, directionalBalances, proposeRepaymentAllocations, planImportEffects, applyImportPlan, effectManifest, undoImportEffects, ImportStore, persistImportDraft, scheduleImportDraftPersist, flushScheduledImportDraft, queueImportSync, flushImportSync, recoverJournal, install, round2: round22, uid: uid2, clone: clone2, testRenderDraftModal: renderDraftModal };
+    return { SCHEMA_VERSION, CLOUD_STORAGE_VERSION, CLOUD_READ_CONCURRENCY, OWNERS, IMPORT_STATUSES, normalizeIban, normalizeRule, normalizeTransaction, normalizeCore, validateCore, calculateGoalSavedAmount, reconcileGoalSavedAmounts, chunkRows, canonicalValue, rowsChecksum, buildCloudImportEnvelope, assembleCloudImport, mapWithConcurrency, classifyCloudError, fetchImportFromCloud, resolveImportDetails, reconcileActiveImportReference, deleteCloudImportBestEffort, discardImportConcept, normalizeText, matchIdentity, matchCandidates, detectDelimiter, parseDelimited, parseDate, parseAmount, detectFormat, inferMapping, hashText, fingerprint, organizationName, proposeType, recognitionProposal, classifyOriginal, parseBankCsv, findProfile, createImportDraft, updateDraftSummary, compactSummary, validateDraft, transactionKind, expenseImpact, financialRows, advanceForTransaction, savingsForTransaction, detectInternalPairs, directionalBalances, proposeRepaymentAllocations, planImportEffects, applyImportPlan, effectManifest, undoImportEffects, ImportStore, persistImportDraft, scheduleImportDraftPersist, flushScheduledImportDraft, queueImportSync, flushImportSync, recoverJournal, install, round2: round22, uid: uid2, clone: cloneState, testRenderDraftModal: renderDraftModal };
   });
+  var FinizeImportRuntime = globalThis.FinizeUpdate4Runtime;
 
   // src/ui/presentation.js
   (function() {

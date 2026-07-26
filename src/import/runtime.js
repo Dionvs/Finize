@@ -1,3 +1,5 @@
+import { cloneState as clone } from "../core/state.js";
+
 (function(root,factory){
   const api=factory();
   root.FinizeUpdate4Runtime=api;
@@ -17,7 +19,6 @@
   const IMPORT_STATUSES=['concept','verwerkt','teruggedraaid','correctie-nodig'];
 
   function plain(value){return value!==null&&typeof value==='object'&&!Array.isArray(value);}
-  function clone(value){return JSON.parse(JSON.stringify(value));}
   function round2(value){return Math.round((Number(value)+Number.EPSILON)*100)/100;}
   function normalizeIban(value){return String(value||'').toUpperCase().replace(/[^A-Z0-9]/g,'');}
   function validOwner(value){return OWNERS.includes(value)?value:'gezamenlijk';}
@@ -1830,3 +1831,6 @@
 
   return {SCHEMA_VERSION,CLOUD_STORAGE_VERSION,CLOUD_READ_CONCURRENCY,OWNERS,IMPORT_STATUSES,normalizeIban,normalizeRule,normalizeTransaction,normalizeCore,validateCore,calculateGoalSavedAmount,reconcileGoalSavedAmounts,chunkRows,canonicalValue,rowsChecksum,buildCloudImportEnvelope,assembleCloudImport,mapWithConcurrency,classifyCloudError,fetchImportFromCloud,resolveImportDetails,reconcileActiveImportReference,deleteCloudImportBestEffort,discardImportConcept,normalizeText,matchIdentity,matchCandidates,detectDelimiter,parseDelimited,parseDate,parseAmount,detectFormat,inferMapping,hashText,fingerprint,organizationName,proposeType,recognitionProposal,classifyOriginal,parseBankCsv,findProfile,createImportDraft,updateDraftSummary,compactSummary,validateDraft,transactionKind,expenseImpact,financialRows,advanceForTransaction,savingsForTransaction,detectInternalPairs,directionalBalances,proposeRepaymentAllocations,planImportEffects,applyImportPlan,effectManifest,undoImportEffects,ImportStore,persistImportDraft,scheduleImportDraftPersist,flushScheduledImportDraft,queueImportSync,flushImportSync,recoverJournal,install,round2,uid,clone,testRenderDraftModal:renderDraftModal};
 });
+
+const FinizeImportRuntime=globalThis.FinizeUpdate4Runtime;
+export { FinizeImportRuntime };

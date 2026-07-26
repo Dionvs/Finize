@@ -4,6 +4,8 @@
    originele Excel-werkboek (V29).
    ========================================================= */
 
+import { cloneState as clone } from "./state.js";
+
 /* ---------- helpers ---------- */
 function round2(n){ return Math.round((n + Number.EPSILON) * 100) / 100; }
 function eur(n){
@@ -106,7 +108,6 @@ function normalizeCategoryName(categorie){
   for (const [re, label] of aliases) if (re.test(normalized)) return label;
   return raw.charAt(0).toUpperCase() + raw.slice(1);
 }
-function clone(value){ return JSON.parse(JSON.stringify(value)); }
 function monthKey(date=new Date()){
   return date.getFullYear() + '-' + String(date.getMonth()+1).padStart(2,'0');
 }
@@ -6097,4 +6098,23 @@ Object.assign(window,{
   __finizeInstallUpdate4Hooks:installUpdate4Hooks
 });
 
-export { state, calcScenario, iconSvg, renderActiveTab };
+export {
+  state,
+  assertMonthMutationAllowed,
+  calcScenario,
+  CloudAdapter,
+  DataAdapter,
+  getCalculationDateForSelectedMonth,
+  getMonthFinancialResult,
+  getTransactionExpenseImpact,
+  GoalImageStore,
+  iconSvg,
+  localSave,
+  migrateBudgetState,
+  normalizeBudgetState,
+  openTransactionModal,
+  renderActiveTab,
+  resolveMonthlyIncome,
+  safeImageUrl,
+  validateBudgetState
+};
