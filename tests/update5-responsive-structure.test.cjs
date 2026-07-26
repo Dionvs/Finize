@@ -12,11 +12,16 @@ const sw = fs.readFileSync(path.join(root, 'service-worker.js'), 'utf8');
 
 assert.match(markup, /app\.css/);
 assert.match(markup, /app\.js/);
-assert.match(sw, /finize-v65-budgetbewerking/);
+assert.match(sw, /finize-v66-budgethistorie-sparen/);
 assert.match(js, /const dashboardTotalIncome = r\.totaalSalaris;/);
 assert.match(sw, /\.\/app\.css/);
 assert.match(sw, /\.\/app\.js/);
-assert.match(html, /data-month-copy-previous/);
+assert.doesNotMatch(html, /data-month-copy-previous|Kopieer vorige maand/);
+assert.match(html, /data-variable-scope/);
+assert.match(html, /setVariableBudgetDefaultsFromMonth\(scenario,owner,month,cleaned\)/);
+assert.match(html, /data-personal-saving-edit/);
+assert.match(html, /function openPersonalSavingEditModal\(owner\)/);
+assert.match(html, /Automatisch gebruiken/);
 assert.match(html, /data-income-edit="dion" data-income-label="Dion" aria-label="Inkomen van Dion aanpassen"/);
 assert.match(html, /data-income-edit="dara" data-income-label="Dara" aria-label="Inkomen van Dara aanpassen"/);
 assert.match(html, /data-u3-open="planning" data-u3-planning-owner="\$\{(?:owner|opts\.openFixedOwner)\}" aria-label="Vaste lasten van/);
