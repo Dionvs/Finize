@@ -1,0 +1,29 @@
+﻿ID;Prioriteit;Domein;Bestand;Regel/gebied;Bevinding;Risico;Voorgestelde actie;Verificatie
+SEC-001;P0;Security;firestore.rules;6-15;Firestore hoofdstate en importdata publiek lees-/schrijfbaar;Data kan door derden worden gelezen, aangepast of verwijderd;Ontwerp auth/household ACL, migreer, sluit daarna rules;"Auth test; ongeauth toegang geweigerd; twee bevoegde apparaten werken"
+SEC-002;P0;Security;index.html;8376-8401;Dynamische transactietekst niet consequent escaped;HTML-injectie via CSV/clouddata;Verplicht textSafe/DOM textContent voor user data;Injectiefixture wordt als tekst weergegeven
+STAB-001;P1;Stability;update4.js;1426-1583;Importmodal bindt opnieuw listeners aan persistent root;Dubbele acties, toenemende vertraging, vastlopers;Eenmalige eventdelegatie of AbortController;50 modalrenders houden exact 1 click/change handler
+STAB-002;P1;Stability;index.html;7811-7866;Checkbox change+click en velden change+blur;Dubbele commits, revisions en renders;"Eén event per inputtype; no-op guard";Eén interactie = één commit/revision
+STAB-003;P1;Stability;index.html;8981 e.v.;Conditionele backdrophandler met once:true;Backdrop sluit na interne klik soms niet meer;Expliciete teardown zonder once;Modal sluit na willekeurige interne interacties
+STAB-004;P1;Stability;index/update4/update5;bootstrap;Meerdere initiële renderActiveTab-aanroepen;Extra DOM-werk en racegevoeligheid;Eén bootstrap en eerste render;Exact één eerste render
+CSS-001;P1;CSS;index.html;inline style;81 dubbele selectors in dezelfde context;Kleine wijzigingen veroorzaken regressies;Componentgewijs actieve declaraties consolideren;Computed-style en screenshotdiff gelijk
+CSS-002;P1;CSS;index.html;inline style;1.621 !important-declaraties;Cascade niet onderhoudbaar;Specificiteit per component normaliseren;"Geen visuele diff; important-aantal daalt gecontroleerd"
+CSS-003;P1;CSS;index/update4.css;diverse;Ongedefinieerde custom properties;Declaraties vallen stil weg;Tokenregister maken en gericht vervangen;CI-check meldt 0 ongedefinieerde tokens
+CSS-004;P1;CSS;index.html;render/tab state;data-active-tab als dashboardstijl-hack;Dashboardregels lekken naar andere tabs;Echte tabclasses en componentclasses;Selectors hebben één tabbetekenis
+PERF-001;P1;Performance;index.html;7738-7787;Volledige state meerdere keren klonen per mutatie;Vertraging groeit met data;No-op guard, patches, gerichte validatie;Profielmeting op grote fixture
+DATA-001;P1;Data;index.html;CloudAdapter;Hoofdstate groeit als één Firestore-document;Limiet, zware uploads, last-write-wins;Later opdelen per domein/maand;Migratie roundtrip en conflictfixture
+DATA-002;P1;Data;index.html;GoalImageStore;Afbeeldingen als data-URL in cloudstate;Snelle payloadgroei;Afbeeldingen apart opslaan;Hoofdstate blijft onder limiet
+DATA-003;P1;Data;index/update4.js;schema;Core- en importschema gebruiken dezelfde meta-key;Versies kunnen elkaar terugzetten;Aparte schemaVersion per domein;Onafhankelijke migratietests
+JS-001;P2;JavaScript;index.html;meerdere blokken;Kernfuncties later opnieuw toegewezen;Actieve logica afhankelijk van laadvolgorde;Eén definitie en module-eigenaar;Callgraph en regressietests
+JS-002;P2;JavaScript;index.html;5129-5213;Kort na elkaar overschreven spaardoelenoverrides;Dode code en verwarring;Na coverage eerste overrideblokken verwijderen;Geen call/coverage en geen diff
+JS-003;P2;JavaScript;index/update4.js;"6580-6714;9044-9090;1688-1689";Oude inline importer naast huidige Update 4;Dubbele logica en onderhoudsrisico;Oude importer isoleren en later verwijderen;CSV-fixtures exact gelijk
+JS-004;P2;JavaScript;index/update4.js;helpers;Dubbele clone/round2/uid/owner helpers;Inconsistent gedrag mogelijk;Pure helpers centraliseren;Unit-tests voor helpercontract
+JS-005;P2;JavaScript;index.html;diverse;Functies met slechts één statische vermelding;Waarschijnlijk dode code;Runtime coverage vóór verwijderen;0 runtime calls en tests groen
+ENC-001;P2;Encoding;index.html;10694;Mojibake Â·;Onjuiste tekstweergave;UTF-8-normalisatie en CI-scan;Geen Â/Ã/� in bron
+PWA-001;P2;PWA;service-worker.js;26-35;Activate verwijdert alle origin-caches;Andere cachedata kan verdwijnen;Alleen finize-prefix verwijderen;Niet-Finize testcache blijft bestaan
+PWA-002;P2;PWA;service-worker.js;39-58;Assetfout krijgt index.html als fallback;MIME-/syntaxfouten;HTML fallback alleen voor navigatie;Mislukte JS-request krijgt geen HTML
+PWA-003;P2;PWA;service-worker.js;5-22;cache.addAll met legacy shellfiles;Eén ontbrekend bestand breekt install;Kritieke/optionele assets scheiden;Install slaagt bij optionele miss
+REPO-001;P2;Repository;Git history;recent;Veel commits heten Add files via upload;Slecht rollbacken en bisecten;Semantische commitmessages en tags;Wijzigingen herleidbaar per commit
+REPO-002;P2;Repository;root;n.v.t.;Geen package.json of lockfile;CI niet reproduceerbaar;Node 24 + pinned tooling;Lokale en CI-output gelijk
+REPO-003;P2;Repository;root/service worker;n.v.t.;Actieve en legacy bestanden gemengd;Onzeker wat veilig weg kan;Inventaris, archiveer na referentiecheck;Geen actieve referenties naar archive
+DOC-001;P3;Documentation;README.md;releaseblokken;README bevat handleiding en lange changelog;Moeilijk actueel te houden;README/CHANGELOG/docs splitsen;Elke info heeft één bron
+CI-001;P3;CI;.github/workflows;onbekend;Node 20 deprecation annotation;Toekomstige action-incompatibiliteit;Workflow lokaliseren en actions actualiseren;Run zonder annotation
