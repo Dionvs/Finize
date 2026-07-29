@@ -1897,9 +1897,16 @@
             const key = this.keyFromRef(raw);
             if (key) {
               try {
-                await this.get(key);
+                const image = await this.get(key);
+                if (!image) {
+                  console.warn("Ontbrekende spaardoelfotoverwijzing opgeruimd:", goal.id);
+                  goal.afbeelding = "";
+                  changed = true;
+                }
               } catch (error) {
-                console.error("Spaardoelfoto laden mislukt", error);
+                console.warn("Defecte spaardoelfotoverwijzing opgeruimd:", goal.id, error);
+                goal.afbeelding = "";
+                changed = true;
               }
             }
           }
@@ -1913,9 +1920,18 @@
         for (const goal of ((_a = target == null ? void 0 : target.spaardoelen) == null ? void 0 : _a[owner]) || []) {
           const key = this.keyFromRef(goal.afbeelding);
           if (!key) continue;
-          const image = await this.get(key);
-          if (!image) throw new Error("Een lokaal opgeslagen spaardoelfoto kon niet worden geladen.");
-          goal.afbeelding = image;
+          try {
+            const image = await this.get(key);
+            if (image) {
+              goal.afbeelding = image;
+            } else {
+              console.warn("Spaardoelfoto ontbreekt; overdracht gaat verder zonder foto:", goal.id);
+              goal.afbeelding = "";
+            }
+          } catch (error) {
+            console.warn("Spaardoelfoto kon niet worden geladen; overdracht gaat verder zonder foto:", goal.id, error);
+            goal.afbeelding = "";
+          }
         }
       }
       return target;
@@ -3651,7 +3667,7 @@ service cloud.firestore {
         downloadJson("dion-dara-budget-backup-" + (/* @__PURE__ */ new Date()).toISOString().slice(0, 10) + ".json", exportState);
       } catch (error) {
         console.error("Back-up exporteren mislukt", error);
-        alert("De back-up kon niet volledig worden gemaakt omdat een spaardoelfoto niet kon worden geladen.");
+        alert("De back-up kon niet worden gemaakt: " + ((error == null ? void 0 : error.message) || String(error)));
       }
     });
     document.getElementById("btnImport").addEventListener("click", () => document.getElementById("fileImport").click());
