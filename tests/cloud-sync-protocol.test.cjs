@@ -22,6 +22,22 @@ const { pathToFileURL } = require('node:url');
     error=>error.code===protocol.CLOUD_CONFLICT_CODE,
     'een nieuwere serverversie moet de lokale write blokkeren'
   );
+
+  const base = {
+    meta:{revision:10,updatedAt:'oud',updatedBy:'mobiel'},
+    incomeDefaultsHistory:{dion:[{id:'loon-dion',salary:2953}],dara:[{id:'loon-dara',salary:3250}]},
+    voorkeur:{thema:'licht'}
+  };
+  const local = structuredClone(base);
+  local.meta={revision:11,updatedAt:'lokaal',updatedBy:'laptop'};
+  local.incomeDefaultsHistory.dion[0].salary=2344;
+  const remote = structuredClone(base);
+  remote.meta={revision:12,updatedAt:'cloud',updatedBy:'mobiel'};
+  remote.voorkeur.thema='donker';
+  const rebased = protocol.rebaseLocalChanges(base,local,remote);
+  assert.equal(rebased.incomeDefaultsHistory.dion[0].salary,2344,'de zojuist gewijzigde lokale waarde mag niet terugvallen');
+  assert.equal(rebased.incomeDefaultsHistory.dara[0].salary,3250,'onaangeraakte waarden blijven uit de cloud komen');
+  assert.equal(rebased.voorkeur.thema,'donker','een gelijktijdige wijziging op een ander cloudveld blijft behouden');
   assert.throws(
     ()=>protocol.assertCloudBase({...documentData,state:{meta:{...state.meta,updatedBy:'laptop'}}},7,protocol.cloudStateSignature(state)),
     error=>error.code===protocol.CLOUD_CONFLICT_CODE,
@@ -35,7 +51,8 @@ const { pathToFileURL } = require('node:url');
   assert.doesNotMatch(runtime,/remoteRevision\s*<=\s*localRevision/,'apparaat-lokale revisions mogen clouddata niet meer blokkeren');
   assert.doesNotMatch(runtime,/btnUploadCloud|Lokale stand naar cloud zetten/,'een lokale stand mag niet handmatig over de cloud worden gezet');
   assert.match(runtime,/Cloudstand opnieuw laden/);
-  assert.match(runtime,/acceptRemote\(documentData, normalizedRemote, 'lokale wijzigingen voor cloudherstel'\)/);
+  assert.match(runtime,/rebasePendingOntoRemote\(documentData, normalizedRemote\)/);
+  assert.match(runtime,/rebaseLocalChanges\(base, localSnapshot, normalizedRemote\)/);
   assert.match(runtime,/async restoreBackup\(restoredState, backupReason\)/);
   assert.match(runtime,/const saved = await this\.saveNow\(restored\)/,'een back-up moet eerst door Firestore worden bevestigd');
   assert.match(runtime,/this\.writeInFlight = true;[\s\S]*const saved = await this\.saveNow\(restored\)/,'tijdens herstel mag een tussentijdse snapshot de schermstand niet vervangen');

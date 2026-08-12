@@ -10,7 +10,8 @@ import {
   assertCloudBase,
   cloudDocumentVersion,
   cloudStateSignature,
-  isStaleCloudSnapshot
+  isStaleCloudSnapshot,
+  rebaseLocalChanges
 } from "../storage/sync-protocol.mjs";
 
 /* ---------- helpers ---------- */
@@ -2109,7 +2110,7 @@ const CloudAdapter = {
   pendingState:null, writeInFlight:false, retryTimer:null, retryAttempt:0,
   lastConfirmedRevision:0, lastFailureRetryable:true,
   initialSyncComplete:false, cloudVersion:null, lastCloudSignature:'',
-  lastConfirmedCommitId:'', activeCommitId:'', conflict:false, remoteStateWaiting:null,
+  lastConfirmedCommitId:'', activeCommitId:'', conflict:false, remoteStateWaiting:null, confirmedState:null,
   config:loadFirebaseConfig(),
   statusText(){ return this.status; },
   isConfigured(){ return firebaseConfigIsComplete(this.config); },
@@ -2177,6 +2178,7 @@ const CloudAdapter = {
     this.lastCloudSignature = cloudStateSignature(normalizedRemote);
     this.lastConfirmedCommitId = String(documentData.commitId || '');
     this.lastConfirmedRevision = Number(normalizedRemote.meta?.revision) || 0;
+    this.confirmedState = clone(normalizedRemote);
     this.conflict = false;
     this.lastFailureRetryable = true;
     this.applyingRemote = true;
@@ -2193,6 +2195,38 @@ const CloudAdapter = {
     }
     DataAdapter.loadedFromStorage = true;
     this.status = 'Cloud opgeslagen';
+    renderActiveTab();
+    return true;
+  },
+  async rebasePendingOntoRemote(documentData, normalizedRemote, localSnapshot=this.pendingState, backupReason='lokale wijzigingen voor cloudherstel'){
+    if (!localSnapshot) return false;
+    const base = this.confirmedState || normalizedRemote;
+    const merged = rebaseLocalChanges(base, localSnapshot, normalizedRemote);
+    merged.meta = isPlainObject(merged.meta) ? merged.meta : {};
+    merged.meta.schemaVersion = U3_SCHEMA_VERSION;
+    merged.meta.revision = Math.max(
+      Number(normalizedRemote.meta?.revision) || 0,
+      Number(localSnapshot.meta?.revision) || 0
+    ) + 1;
+    merged.meta.updatedAt = new Date().toISOString();
+    merged.meta.updatedBy = getDeviceId();
+    const validation = validateBudgetState(merged);
+    if (!validation.ok) throw new Error(validation.errors.join(' '));
+    if (backupReason) DataAdapter.backup(state, backupReason);
+    clearTimeout(this.saveTimer);
+    this.cloudVersion = cloudDocumentVersion(documentData);
+    this.lastCloudSignature = cloudStateSignature(normalizedRemote);
+    this.lastConfirmedCommitId = String(documentData.commitId || '');
+    this.lastConfirmedRevision = Number(normalizedRemote.meta?.revision) || 0;
+    this.confirmedState = clone(normalizedRemote);
+    this.remoteStateWaiting = null;
+    this.initialSyncComplete = true;
+    state = merged;
+    window.state = state;
+    committedStateSnapshot = clone(state);
+    this.pendingState = clone(state);
+    localSave(state);
+    this.status = 'Opslaan…';
     renderActiveTab();
     return true;
   },
@@ -2252,6 +2286,7 @@ const CloudAdapter = {
         this.lastCloudSignature = remoteSignature;
         this.lastConfirmedCommitId = remoteCommitId;
         this.lastConfirmedRevision = remoteRevision;
+        this.confirmedState = clone(normalizedRemote);
         return;
       }
 
@@ -2265,8 +2300,14 @@ const CloudAdapter = {
       }
 
       if (this.pendingState && (!this.initialSyncComplete || cloudChanged)){
-        console.warn('Lokale wijzigingen zijn als nood-back-up bewaard; de cloudstand blijft leidend.');
-        await this.acceptRemote(documentData, normalizedRemote, 'lokale wijzigingen voor cloudherstel');
+        if (!this.initialSyncComplete){
+          console.warn('Lokale wijzigingen zijn als nood-back-up bewaard; de eerste cloudstand blijft leidend.');
+          await this.acceptRemote(documentData, normalizedRemote, 'lokale wijzigingen voor cloudherstel');
+          return;
+        }
+        console.warn('Lokale wijziging opnieuw toegepast op de nieuwste cloudstand.');
+        await this.rebasePendingOntoRemote(documentData, normalizedRemote);
+        this.flushQueue();
         return;
       }
 
@@ -2363,15 +2404,14 @@ const CloudAdapter = {
       this.lastCloudSignature = cloudStateSignature(cloudSnapshot);
       this.lastConfirmedCommitId = commitId;
       this.lastConfirmedRevision = Number(cloudSnapshot.meta?.revision)||0;
+      this.confirmedState = clone(cloudSnapshot);
       this.status = this.pendingState ? 'Opslaan…' : 'Cloud opgeslagen';
       renderCloudStatus();
       return true;
     }catch(e){
       if (e?.code === CLOUD_CONFLICT_CODE){
-        this.lastFailureRetryable = false;
-        DataAdapter.backup(state, 'lokale wijzigingen bij cloudconflict');
-        this.pendingState = null;
-        console.warn('Lokale stand niet naar de cloud geschreven; de nieuwste cloudstand wordt geladen.', e);
+        this.lastFailureRetryable = true;
+        console.warn('Cloud wijzigde tijdens opslaan; lokale wijziging wordt op de nieuwste cloudstand herhaald.', e);
         try{
           let latest = this.remoteStateWaiting;
           if (!latest){
@@ -2383,7 +2423,7 @@ const CloudAdapter = {
             if (!remoteValidation.ok) throw new Error(remoteValidation.errors.join(' '));
             latest = {documentData, normalizedRemote};
           }
-          await this.acceptRemote(latest.documentData, latest.normalizedRemote, null);
+          await this.rebasePendingOntoRemote(latest.documentData, latest.normalizedRemote, snapshot, 'lokale wijzigingen bij cloudconflict');
           return false;
         }catch(remoteError){
           this.conflict = true;
@@ -2782,9 +2822,6 @@ function handleTableClicks(root){
       try{if(tx)assertMonthMutationAllowed(transactionMonth(tx));}catch(error){alert(error.message);return;}
       removeWithUndo('transactions', id, 'Transactie verwijderd');
     });
-  });
-  root.querySelectorAll('[data-open-transaction]').forEach(btn=>{
-    btn.addEventListener('click', ()=> openTransactionModal());
   });
 }
 function splitLastIndex(pathWithIndex){
@@ -5109,6 +5146,11 @@ document.getElementById('saveStatus').addEventListener('click', ()=>{
   renderActiveTab();
 });
 document.body.addEventListener('click', (e)=>{
+  const transactionButton = e.target.closest('[data-open-transaction]');
+  if (transactionButton){
+    openTransactionModal();
+    return;
+  }
   const btn = e.target.closest('.scenario-toggle button[data-scenario]');
   if (!btn) return;
   state.meta.scenario = btn.dataset.scenario;

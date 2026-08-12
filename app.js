@@ -53,6 +53,63 @@
     if (incomingVersion < currentVersion) return true;
     return incomingVersion === currentVersion && !!currentSignature && cloudStateSignature(documentData == null ? void 0 : documentData.state) !== currentSignature;
   }
+  function copyValue(value) {
+    return value === void 0 ? void 0 : JSON.parse(JSON.stringify(value));
+  }
+  function sameValue(left, right) {
+    return JSON.stringify(left) === JSON.stringify(right);
+  }
+  function isPlainObject(value) {
+    return !!value && typeof value === "object" && !Array.isArray(value);
+  }
+  function isIdArray(...values) {
+    const rows = values.flat().filter((value) => value !== void 0);
+    return rows.length > 0 && rows.every((value) => isPlainObject(value) && typeof value.id === "string" && value.id);
+  }
+  function rebaseIdArray(base, local, remote) {
+    const baseById = new Map(base.map((item) => [item.id, item]));
+    const localById = new Map(local.map((item) => [item.id, item]));
+    const locallyDeleted = new Set(base.filter((item) => !localById.has(item.id)).map((item) => item.id));
+    const result = remote.filter((item) => !locallyDeleted.has(item.id)).map((item) => {
+      if (!localById.has(item.id)) return copyValue(item);
+      return rebaseLocalChanges(baseById.get(item.id), localById.get(item.id), item);
+    });
+    const resultIds = new Set(result.map((item) => item.id));
+    local.forEach((item) => {
+      if (!resultIds.has(item.id) && (!baseById.has(item.id) || !sameValue(item, baseById.get(item.id)))) {
+        result.push(copyValue(item));
+      }
+    });
+    return result;
+  }
+  function rebaseLocalChanges(base, local, remote) {
+    if (sameValue(local, base)) return copyValue(remote);
+    if (sameValue(remote, base)) return copyValue(local);
+    if (Array.isArray(base) && Array.isArray(local) && Array.isArray(remote)) {
+      return isIdArray(base, local, remote) ? rebaseIdArray(base, local, remote) : copyValue(local);
+    }
+    if (isPlainObject(base) && isPlainObject(local) && isPlainObject(remote)) {
+      const result = {};
+      const keys = /* @__PURE__ */ new Set([...Object.keys(base), ...Object.keys(local), ...Object.keys(remote)]);
+      keys.forEach((key) => {
+        const baseHas = Object.prototype.hasOwnProperty.call(base, key);
+        const localHas = Object.prototype.hasOwnProperty.call(local, key);
+        const remoteHas = Object.prototype.hasOwnProperty.call(remote, key);
+        if (baseHas && !localHas) return;
+        if (!baseHas && localHas) {
+          result[key] = copyValue(local[key]);
+          return;
+        }
+        if (!localHas) {
+          if (remoteHas) result[key] = copyValue(remote[key]);
+          return;
+        }
+        result[key] = rebaseLocalChanges(base[key], local[key], remoteHas ? remote[key] : void 0);
+      });
+      return result;
+    }
+    return copyValue(local);
+  }
 
   // src/core/runtime.js
   function round2(n) {
@@ -209,20 +266,20 @@
   function ensureMonthData(month = getSelectedMonth()) {
     var _a, _b, _c, _d;
     state.meta.selectedMonth = state.meta.selectedMonth || monthKey();
-    state.monthlyIncome = isPlainObject(state.monthlyIncome) ? state.monthlyIncome : {};
-    state.monthlyIncomeOverrides = isPlainObject(state.monthlyIncomeOverrides) ? state.monthlyIncomeOverrides : {};
-    state.monthlyRefundOverrides = isPlainObject(state.monthlyRefundOverrides) ? state.monthlyRefundOverrides : {};
-    state.incomeDefaultsHistory = isPlainObject(state.incomeDefaultsHistory) ? state.incomeDefaultsHistory : {};
-    state.budgetDefaultsHistory = isPlainObject(state.budgetDefaultsHistory) ? state.budgetDefaultsHistory : {};
-    state.monthlySavingOverrides = isPlainObject(state.monthlySavingOverrides) ? state.monthlySavingOverrides : {};
-    state.monthlyBudgets = isPlainObject(state.monthlyBudgets) ? state.monthlyBudgets : {};
-    state.monthlyTeruggaven = isPlainObject(state.monthlyTeruggaven) ? state.monthlyTeruggaven : {};
+    state.monthlyIncome = isPlainObject2(state.monthlyIncome) ? state.monthlyIncome : {};
+    state.monthlyIncomeOverrides = isPlainObject2(state.monthlyIncomeOverrides) ? state.monthlyIncomeOverrides : {};
+    state.monthlyRefundOverrides = isPlainObject2(state.monthlyRefundOverrides) ? state.monthlyRefundOverrides : {};
+    state.incomeDefaultsHistory = isPlainObject2(state.incomeDefaultsHistory) ? state.incomeDefaultsHistory : {};
+    state.budgetDefaultsHistory = isPlainObject2(state.budgetDefaultsHistory) ? state.budgetDefaultsHistory : {};
+    state.monthlySavingOverrides = isPlainObject2(state.monthlySavingOverrides) ? state.monthlySavingOverrides : {};
+    state.monthlyBudgets = isPlainObject2(state.monthlyBudgets) ? state.monthlyBudgets : {};
+    state.monthlyTeruggaven = isPlainObject2(state.monthlyTeruggaven) ? state.monthlyTeruggaven : {};
     state.transactions = Array.isArray(state.transactions) ? state.transactions : [];
     state.monthlyIncome[month] = state.monthlyIncome[month] || {
       dion: Number((_b = (_a = state.personen) == null ? void 0 : _a.dion) == null ? void 0 : _b.salaris) || 0,
       dara: Number((_d = (_c = state.personen) == null ? void 0 : _c.dara) == null ? void 0 : _d.salaris) || 0
     };
-    state.monthlyTeruggaven[month] = isPlainObject(state.monthlyTeruggaven[month]) ? state.monthlyTeruggaven[month] : { dion: [], dara: [], gezamenlijk: [] };
+    state.monthlyTeruggaven[month] = isPlainObject2(state.monthlyTeruggaven[month]) ? state.monthlyTeruggaven[month] : { dion: [], dara: [], gezamenlijk: [] };
     ["gezamenlijk", "dion", "dara"].forEach((owner) => {
       if (!Array.isArray(state.monthlyTeruggaven[month][owner])) state.monthlyTeruggaven[month][owner] = [];
     });
@@ -253,7 +310,7 @@
         goal.ratoVerdeling = !!goal.ratoVerdeling;
         goal.subdoelen = Array.isArray(goal.subdoelen) ? goal.subdoelen : [];
         let remaining = Math.max(0, Number(goal.algespaard) || 0);
-        goal.subdoelen = goal.subdoelen.filter(isPlainObject).map((child, index) => {
+        goal.subdoelen = goal.subdoelen.filter(isPlainObject2).map((child, index) => {
           const target = Math.max(0, Number(child.doelbedrag) || 0);
           const current = Number(child.gespaard);
           const saved = Number.isFinite(current) ? Math.min(target, Math.max(0, current)) : Math.min(target, remaining);
@@ -268,13 +325,13 @@
     });
   }
   function normalizePersonDefaults(target) {
-    target.personen = isPlainObject(target.personen) ? target.personen : {};
+    target.personen = isPlainObject2(target.personen) ? target.personen : {};
     ["dion", "dara"].forEach((person) => {
-      target.personen[person] = isPlainObject(target.personen[person]) ? target.personen[person] : {};
+      target.personen[person] = isPlainObject2(target.personen[person]) ? target.personen[person] : {};
       target.personen[person].naam = target.personen[person].naam || (person === "dion" ? "Dion" : "Dara");
       target.personen[person].salaris = Number(target.personen[person].salaris) || 0;
       const rows = Array.isArray(target.personen[person].vasteTeruggaven) ? target.personen[person].vasteTeruggaven : [];
-      target.personen[person].vasteTeruggaven = rows.filter(isPlainObject).map((row) => {
+      target.personen[person].vasteTeruggaven = rows.filter(isPlainObject2).map((row) => {
         var _a, _b;
         return {
           id: row.id || uid(),
@@ -285,14 +342,14 @@
     });
   }
   function normalizeIncomeDefaults(target) {
-    target.incomeDefaultsHistory = isPlainObject(target.incomeDefaultsHistory) ? target.incomeDefaultsHistory : {};
-    target.monthlyRefundOverrides = isPlainObject(target.monthlyRefundOverrides) ? target.monthlyRefundOverrides : {};
+    target.incomeDefaultsHistory = isPlainObject2(target.incomeDefaultsHistory) ? target.incomeDefaultsHistory : {};
+    target.monthlyRefundOverrides = isPlainObject2(target.monthlyRefundOverrides) ? target.monthlyRefundOverrides : {};
     ["dion", "dara"].forEach((person) => {
       var _a, _b, _c, _d;
       const fallbackSalary = round2(Number((_b = (_a = target.personen) == null ? void 0 : _a[person]) == null ? void 0 : _b.salaris) || 0);
       const fallbackRefund = round2(sumBedrag(((_d = (_c = target.personen) == null ? void 0 : _c[person]) == null ? void 0 : _d.vasteTeruggaven) || []));
       const rows = Array.isArray(target.incomeDefaultsHistory[person]) ? target.incomeDefaultsHistory[person] : [];
-      const normalized = rows.filter(isPlainObject).map((row) => ({
+      const normalized = rows.filter(isPlainObject2).map((row) => ({
         id: String(row.id || uid()),
         effectiveFrom: /^\d{4}-\d{2}$/.test(String(row.effectiveFrom || "")) ? String(row.effectiveFrom) : "0000-01",
         salary: round2(Number(row.salary) || 0),
@@ -310,7 +367,7 @@
     return { salary: round2(Number((_d = selected == null ? void 0 : selected.salary) != null ? _d : (_c = (_b = state.personen) == null ? void 0 : _b[person]) == null ? void 0 : _c.salaris) || 0), refund: round2(Number((_g = selected == null ? void 0 : selected.refund) != null ? _g : sumBedrag(((_f = (_e = state.personen) == null ? void 0 : _e[person]) == null ? void 0 : _f.vasteTeruggaven) || [])) || 0), effectiveFrom: (selected == null ? void 0 : selected.effectiveFrom) || "0000-01" };
   }
   function setIncomeDefaultsFromMonth(person, month, salary, refund) {
-    state.incomeDefaultsHistory = isPlainObject(state.incomeDefaultsHistory) ? state.incomeDefaultsHistory : {};
+    state.incomeDefaultsHistory = isPlainObject2(state.incomeDefaultsHistory) ? state.incomeDefaultsHistory : {};
     const rows = Array.isArray(state.incomeDefaultsHistory[person]) ? state.incomeDefaultsHistory[person] : [];
     const normalizedSalary = round2(Number(salary) || 0);
     const normalizedRefund = round2(Number(refund) || 0);
@@ -321,19 +378,19 @@
     rows.sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom));
     state.incomeDefaultsHistory[person] = rows;
     Object.keys(state.monthlyIncomeOverrides || {}).filter((key) => key >= month).forEach((key) => {
-      if (isPlainObject(state.monthlyIncomeOverrides[key])) {
+      if (isPlainObject2(state.monthlyIncomeOverrides[key])) {
         delete state.monthlyIncomeOverrides[key][person];
         if (!Object.keys(state.monthlyIncomeOverrides[key]).length) delete state.monthlyIncomeOverrides[key];
       }
     });
     Object.keys(state.monthlyRefundOverrides || {}).filter((key) => key >= month).forEach((key) => {
-      if (isPlainObject(state.monthlyRefundOverrides[key])) {
+      if (isPlainObject2(state.monthlyRefundOverrides[key])) {
         delete state.monthlyRefundOverrides[key][person];
         if (!Object.keys(state.monthlyRefundOverrides[key]).length) delete state.monthlyRefundOverrides[key];
       }
     });
     Object.keys(state.monthlyIncome || {}).filter((key) => key >= month).forEach((key) => {
-      if (isPlainObject(state.monthlyIncome[key])) state.monthlyIncome[key][person] = normalizedSalary;
+      if (isPlainObject2(state.monthlyIncome[key])) state.monthlyIncome[key][person] = normalizedSalary;
     });
   }
   function getDistributionIncomeParts(person, month = getSelectedMonth()) {
@@ -344,14 +401,14 @@
     return { salary: Number.isFinite(Number(salaryOverride)) ? round2(Number(salaryOverride)) : defaults.salary, refund: Number.isFinite(Number(refundOverride)) ? round2(Number(refundOverride)) : defaults.refund };
   }
   function normalizeBudgetDefaults(target) {
-    target.budgetDefaultsHistory = isPlainObject(target.budgetDefaultsHistory) ? target.budgetDefaultsHistory : {};
+    target.budgetDefaultsHistory = isPlainObject2(target.budgetDefaultsHistory) ? target.budgetDefaultsHistory : {};
     ["voor", "na"].forEach((scenario) => {
-      target.budgetDefaultsHistory[scenario] = isPlainObject(target.budgetDefaultsHistory[scenario]) ? target.budgetDefaultsHistory[scenario] : {};
+      target.budgetDefaultsHistory[scenario] = isPlainObject2(target.budgetDefaultsHistory[scenario]) ? target.budgetDefaultsHistory[scenario] : {};
       ["gezamenlijk", "dion", "dara"].forEach((owner) => {
         var _a, _b;
         const sourceRows = Array.isArray((_b = (_a = target[scenario]) == null ? void 0 : _a[owner]) == null ? void 0 : _b.variabel) ? target[scenario][owner].variabel : [];
         const history = Array.isArray(target.budgetDefaultsHistory[scenario][owner]) ? target.budgetDefaultsHistory[scenario][owner] : [];
-        const normalized = history.filter(isPlainObject).map((entry) => ({
+        const normalized = history.filter(isPlainObject2).map((entry) => ({
           id: String(entry.id || uid()),
           effectiveFrom: /^\d{4}-\d{2}$/.test(String(entry.effectiveFrom || "")) ? String(entry.effectiveFrom) : "0000-01",
           rows: cloneState(Array.isArray(entry.rows) ? entry.rows : sourceRows),
@@ -369,8 +426,8 @@
     return cloneState(Array.isArray(selected == null ? void 0 : selected.rows) ? selected.rows : ((_d = (_c = target == null ? void 0 : target[scenario]) == null ? void 0 : _c[owner]) == null ? void 0 : _d.variabel) || []);
   }
   function setVariableBudgetDefaultsFromMonth(scenario, owner, month, rows) {
-    state.budgetDefaultsHistory = isPlainObject(state.budgetDefaultsHistory) ? state.budgetDefaultsHistory : {};
-    state.budgetDefaultsHistory[scenario] = isPlainObject(state.budgetDefaultsHistory[scenario]) ? state.budgetDefaultsHistory[scenario] : {};
+    state.budgetDefaultsHistory = isPlainObject2(state.budgetDefaultsHistory) ? state.budgetDefaultsHistory : {};
+    state.budgetDefaultsHistory[scenario] = isPlainObject2(state.budgetDefaultsHistory[scenario]) ? state.budgetDefaultsHistory[scenario] : {};
     const history = Array.isArray(state.budgetDefaultsHistory[scenario][owner]) ? state.budgetDefaultsHistory[scenario][owner] : [];
     const normalizedRows = cloneState(Array.isArray(rows) ? rows : []);
     const entry = { id: uid(), effectiveFrom: month, rows: normalizedRows, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
@@ -384,7 +441,7 @@
     Object.keys(state.monthlyBudgets || {}).filter((key) => key >= month).forEach((key) => {
       var _a, _b;
       const scenarioData = (_b = (_a = state.monthlyBudgets) == null ? void 0 : _a[key]) == null ? void 0 : _b[scenario];
-      if (isPlainObject(scenarioData)) delete scenarioData[budgetKey];
+      if (isPlainObject2(scenarioData)) delete scenarioData[budgetKey];
     });
   }
   var U3_SCHEMA_VERSION = 9;
@@ -503,7 +560,7 @@
     return `${keys[0] || monthKey()}-01`;
   }
   function u3MigrateFixedExpenses(target) {
-    target.recurringFixedExpenses = isPlainObject(target.recurringFixedExpenses) ? target.recurringFixedExpenses : {};
+    target.recurringFixedExpenses = isPlainObject2(target.recurringFixedExpenses) ? target.recurringFixedExpenses : {};
     const start = u3LegacyStartMonth(target);
     ["voor", "na"].forEach((scenario) => {
       const existing = Array.isArray(target.recurringFixedExpenses[scenario]) ? target.recurringFixedExpenses[scenario] : [];
@@ -573,13 +630,13 @@
     item.begindatum = u3ParseDate(item.begindatum) ? item.begindatum : `${monthKey()}-01`;
     item.einddatum = u3ParseDate(item.einddatum) ? item.einddatum : "";
     item.actief = item.actief !== false;
-    item.amountHistory = Array.isArray(item.amountHistory) ? item.amountHistory.filter(isPlainObject) : [];
+    item.amountHistory = Array.isArray(item.amountHistory) ? item.amountHistory.filter(isPlainObject2) : [];
     if (!item.amountHistory.length) {
       const amount = round2(Number(kind === "income" ? item.verwachtBedrag : item.bedrag) || 0);
       item.amountHistory = [{ id: `amount-${item.id}`, effectiveFrom: item.begindatum, amount }];
     }
-    item.monthOverrides = isPlainObject(item.monthOverrides) ? item.monthOverrides : {};
-    item.recognition = isPlainObject(item.recognition) ? item.recognition : { text: "", counterparty: "", amountTolerance: 5 };
+    item.monthOverrides = isPlainObject2(item.monthOverrides) ? item.monthOverrides : {};
+    item.recognition = isPlainObject2(item.recognition) ? item.recognition : { text: "", counterparty: "", amountTolerance: 5 };
     if (kind === "income") {
       item.type = ["loon", "toeslag", "vergoeding/teruggave", "overig"].includes(item.type) ? item.type : "overig";
       item.eigenaar = U3_ACCOUNTS.includes(String(item.eigenaar).toLowerCase()) ? String(item.eigenaar).toLowerCase() : "gezamenlijk";
@@ -594,7 +651,7 @@
     return item;
   }
   function u3LegacyFinancialSnapshot(month, record, closure) {
-    const summary = isPlainObject(closure == null ? void 0 : closure.summary) ? closure.summary : {};
+    const summary = isPlainObject2(closure == null ? void 0 : closure.summary) ? closure.summary : {};
     const actualIncome = round2(Number(summary.actualIncome) || 0);
     const fixedExpenses = round2(Number(summary.plannedFixed) || 0);
     const variableTotal = round2(Number(summary.actualExpenses) || 0);
@@ -625,20 +682,20 @@
     closure.status = ["actief", "vervangen", "teruggedraaid"].includes(closure.status) ? closure.status : record.activeClosureId === closure.closingId ? "actief" : "vervangen";
     closure.createdAt = closure.createdAt || closure.closedAt || record.closedAt || (/* @__PURE__ */ new Date(0)).toISOString();
     closure.supersedesClosingId = String(closure.supersedesClosingId || "");
-    closure.financialSnapshot = isPlainObject(closure.financialSnapshot) ? closure.financialSnapshot : u3LegacyFinancialSnapshot(month, record, closure);
+    closure.financialSnapshot = isPlainObject2(closure.financialSnapshot) ? closure.financialSnapshot : u3LegacyFinancialSnapshot(month, record, closure);
     closure.financialSnapshot.month = month;
     closure.financialSnapshot.closedAt = closure.financialSnapshot.closedAt || closure.closedAt || record.closedAt || "";
     return closure;
   }
   function u3NormalizeState(target) {
-    target.meta = isPlainObject(target.meta) ? target.meta : {};
-    target.monthlyIncomeOverrides = isPlainObject(target.monthlyIncomeOverrides) ? target.monthlyIncomeOverrides : {};
-    target.monthlyRefundOverrides = isPlainObject(target.monthlyRefundOverrides) ? target.monthlyRefundOverrides : {};
+    target.meta = isPlainObject2(target.meta) ? target.meta : {};
+    target.monthlyIncomeOverrides = isPlainObject2(target.monthlyIncomeOverrides) ? target.monthlyIncomeOverrides : {};
+    target.monthlyRefundOverrides = isPlainObject2(target.monthlyRefundOverrides) ? target.monthlyRefundOverrides : {};
     normalizeIncomeDefaults(target);
     if (target.meta.incomeHistoryMigrated !== true) {
       Object.entries(target.monthlyIncome || {}).forEach(([month, values]) => {
-        if (!isPlainObject(values)) return;
-        const overrides = isPlainObject(target.monthlyIncomeOverrides[month]) ? target.monthlyIncomeOverrides[month] : {};
+        if (!isPlainObject2(values)) return;
+        const overrides = isPlainObject2(target.monthlyIncomeOverrides[month]) ? target.monthlyIncomeOverrides[month] : {};
         ["dion", "dara"].forEach((owner) => {
           var _a, _b;
           if (!Object.prototype.hasOwnProperty.call(values, owner)) return;
@@ -653,23 +710,23 @@
     u3MigrateFixedExpenses(target);
     u3MigrateIncomeSources(target);
     ["voor", "na"].forEach((scenario) => {
-      target.recurringFixedExpenses[scenario] = (target.recurringFixedExpenses[scenario] || []).filter(isPlainObject).map((item) => u3NormalizeRecurringItem(item, "fixed"));
+      target.recurringFixedExpenses[scenario] = (target.recurringFixedExpenses[scenario] || []).filter(isPlainObject2).map((item) => u3NormalizeRecurringItem(item, "fixed"));
     });
-    target.recurringIncomeSources = target.recurringIncomeSources.filter(isPlainObject).map((item) => u3NormalizeRecurringItem(item, "income"));
-    target.transactionReviewQueue = Array.isArray(target.transactionReviewQueue) ? target.transactionReviewQueue.filter(isPlainObject) : [];
-    target.recognitionRules = Array.isArray(target.recognitionRules) ? target.recognitionRules.filter(isPlainObject).map(u3RecognitionFromLegacy) : [];
+    target.recurringIncomeSources = target.recurringIncomeSources.filter(isPlainObject2).map((item) => u3NormalizeRecurringItem(item, "income"));
+    target.transactionReviewQueue = Array.isArray(target.transactionReviewQueue) ? target.transactionReviewQueue.filter(isPlainObject2) : [];
+    target.recognitionRules = Array.isArray(target.recognitionRules) ? target.recognitionRules.filter(isPlainObject2).map(u3RecognitionFromLegacy) : [];
     (target.bankImportRules || []).forEach((rule) => {
       const normalized = u3RecognitionFromLegacy(rule);
       if (normalized.text && !target.recognitionRules.some((item) => item.text === normalized.text && item.account === normalized.account)) target.recognitionRules.push(normalized);
     });
-    target.monthRecords = isPlainObject(target.monthRecords) ? target.monthRecords : {};
-    target.accountSettings = isPlainObject(target.accountSettings) ? target.accountSettings : {};
+    target.monthRecords = isPlainObject2(target.monthRecords) ? target.monthRecords : {};
+    target.accountSettings = isPlainObject2(target.accountSettings) ? target.accountSettings : {};
     U3_ACCOUNTS.forEach((account) => {
-      const row = isPlainObject(target.accountSettings[account]) ? target.accountSettings[account] : {};
+      const row = isPlainObject2(target.accountSettings[account]) ? target.accountSettings[account] : {};
       target.accountSettings[account] = { openingBalance: round2(Number(row.openingBalance) || 0), effectiveMonth: /^\d{4}-\d{2}$/.test(row.effectiveMonth) ? row.effectiveMonth : String(target.meta.selectedMonth || monthKey()), openingBalanceSet: row.openingBalanceSet === true };
     });
     ["reserveLedger", "advanceLedger", "internalTransfers", "monthCorrections"].forEach((key) => {
-      target[key] = Array.isArray(target[key]) ? target[key].filter(isPlainObject) : [];
+      target[key] = Array.isArray(target[key]) ? target[key].filter(isPlainObject2) : [];
     });
     target.transactions = Array.isArray(target.transactions) ? target.transactions : [];
     target.transactions.forEach((tx) => {
@@ -683,7 +740,7 @@
       tx.incomeOccurrenceId = tx.incomeOccurrenceId || "";
     });
     Object.entries(target.monthRecords).forEach(([month, record]) => {
-      if (!isPlainObject(record)) {
+      if (!isPlainObject2(record)) {
         delete target.monthRecords[month];
         return;
       }
@@ -691,7 +748,7 @@
       record.status = ["afgesloten", "correctie-nodig"].includes(record.status) ? record.status : "open";
       record.closedAt = record.closedAt || "";
       record.reopenedAt = record.reopenedAt || "";
-      record.closureHistory = (Array.isArray(record.closureHistory) ? record.closureHistory.filter(isPlainObject) : []).map((closure) => u3NormalizeClosureSnapshot(month, record, closure));
+      record.closureHistory = (Array.isArray(record.closureHistory) ? record.closureHistory.filter(isPlainObject2) : []).map((closure) => u3NormalizeClosureSnapshot(month, record, closure));
       record.activeClosureId = record.activeClosureId || "";
     });
     ["reserveLedger", "internalTransfers", "monthCorrections", "savingsGoalLedger"].forEach((key) => {
@@ -704,18 +761,18 @@
   }
   function normalizeBudgetState(candidate) {
     const normalized = candidate || defaultState();
-    normalized.meta = isPlainObject(normalized.meta) ? normalized.meta : {};
+    normalized.meta = isPlainObject2(normalized.meta) ? normalized.meta : {};
     normalized.meta.scenario = ["voor", "na"].includes(normalized.meta.scenario) ? normalized.meta.scenario : "voor";
     normalized.meta.selectedMonth = normalized.meta.selectedMonth || monthKey();
     normalized.meta.schemaVersion = Number(normalized.meta.schemaVersion) || U3_SCHEMA_VERSION;
     normalized.meta.revision = Math.max(0, Number(normalized.meta.revision) || 0);
     normalized.meta.updatedAt = normalized.meta.updatedAt || "";
     normalized.meta.updatedBy = normalized.meta.updatedBy || getDeviceId();
-    normalized.monthlyIncome = isPlainObject(normalized.monthlyIncome) ? normalized.monthlyIncome : {};
-    normalized.monthlyBudgets = isPlainObject(normalized.monthlyBudgets) ? normalized.monthlyBudgets : {};
-    normalized.monthlySavingOverrides = isPlainObject(normalized.monthlySavingOverrides) ? normalized.monthlySavingOverrides : {};
-    normalized.monthlyTeruggaven = isPlainObject(normalized.monthlyTeruggaven) ? normalized.monthlyTeruggaven : {};
-    normalized.spaardoelGeschiedenis = isPlainObject(normalized.spaardoelGeschiedenis) ? normalized.spaardoelGeschiedenis : {};
+    normalized.monthlyIncome = isPlainObject2(normalized.monthlyIncome) ? normalized.monthlyIncome : {};
+    normalized.monthlyBudgets = isPlainObject2(normalized.monthlyBudgets) ? normalized.monthlyBudgets : {};
+    normalized.monthlySavingOverrides = isPlainObject2(normalized.monthlySavingOverrides) ? normalized.monthlySavingOverrides : {};
+    normalized.monthlyTeruggaven = isPlainObject2(normalized.monthlyTeruggaven) ? normalized.monthlyTeruggaven : {};
+    normalized.spaardoelGeschiedenis = isPlainObject2(normalized.spaardoelGeschiedenis) ? normalized.spaardoelGeschiedenis : {};
     normalized.transactions = Array.isArray(normalized.transactions) ? normalized.transactions : [];
     normalized.bankImportRules = Array.isArray(normalized.bankImportRules) ? normalized.bankImportRules : [];
     normalizePersonDefaults(normalized);
@@ -752,7 +809,7 @@
     const month = getSelectedMonth();
     assertMonthMutationAllowed(month);
     ensureMonthData(month);
-    state.monthlyIncomeOverrides[month] = isPlainObject(state.monthlyIncomeOverrides[month]) ? state.monthlyIncomeOverrides[month] : {};
+    state.monthlyIncomeOverrides[month] = isPlainObject2(state.monthlyIncomeOverrides[month]) ? state.monthlyIncomeOverrides[month] : {};
     state.monthlyIncomeOverrides[month][person] = round2(Number(amount) || 0);
     state.monthlyIncome[month][person] = round2(Number(amount) || 0);
   }
@@ -1628,7 +1685,7 @@
       const variabeleUitgaven = sumTransactions(p);
       const automatischBeschikbaarVoorSparen = round2(zakgeld - persoonlijkeVasteLasten - persoonlijkVariabelBudget);
       const monthOverrides = (_a = state2.monthlySavingOverrides) == null ? void 0 : _a[selectedMonth];
-      const handmatigSparen = isPlainObject(monthOverrides) && Object.prototype.hasOwnProperty.call(monthOverrides, p);
+      const handmatigSparen = isPlainObject2(monthOverrides) && Object.prototype.hasOwnProperty.call(monthOverrides, p);
       const beschikbaarVoorSparen = handmatigSparen ? round2(Number(monthOverrides[p]) || 0) : automatischBeschikbaarVoorSparen;
       return {
         persoonlijkeVasteLasten,
@@ -1998,7 +2055,7 @@
     if (!Array.isArray(rows)) return;
     const seen = /* @__PURE__ */ new Set();
     rows.forEach((row) => {
-      if (!isPlainObject(row)) return;
+      if (!isPlainObject2(row)) return;
       if (!row.id || seen.has(row.id)) row.id = uid();
       seen.add(row.id);
     });
@@ -2078,7 +2135,7 @@
       if (activeStateBeforeMigration) state = activeStateBeforeMigration;
     }
   }
-  function isPlainObject(value) {
+  function isPlainObject2(value) {
     return value !== null && typeof value === "object" && !Array.isArray(value);
   }
   function validateRows(rows, label, errors) {
@@ -2088,7 +2145,7 @@
     }
     const ids = /* @__PURE__ */ new Set();
     rows.forEach((row, i) => {
-      if (!isPlainObject(row)) errors.push(label + "[" + i + "] is geen geldige regel.");
+      if (!isPlainObject2(row)) errors.push(label + "[" + i + "] is geen geldige regel.");
       else if (!row.id) errors.push(label + "[" + i + "] mist een ID.");
       else if (ids.has(row.id)) errors.push(label + " bevat een dubbele ID: " + row.id + ".");
       else ids.add(row.id);
@@ -2101,7 +2158,7 @@
     }
     validateRows(rows, label, errors);
     rows.forEach((goal, index) => {
-      if (!isPlainObject(goal)) return;
+      if (!isPlainObject2(goal)) return;
       if (goal.subdoelen !== void 0) validateRows(goal.subdoelen, `${label}[${index}].subdoelen`, errors);
       if (goal.eigenaar !== void 0 && !["gezamenlijk", "dion", "dara"].includes(goal.eigenaar)) {
         errors.push(`${label}[${index}].eigenaar is ongeldig.`);
@@ -2110,11 +2167,11 @@
   }
   function validateBudgetState(candidate) {
     const errors = [];
-    if (!isPlainObject(candidate)) {
+    if (!isPlainObject2(candidate)) {
       return { ok: false, errors: ["Het bestand bevat geen budgetplanner-gegevens."] };
     }
     ["meta", "personen", "voor", "na", "spaardoelen"].forEach((key) => {
-      if (!isPlainObject(candidate[key])) errors.push("Ontbrekend of ongeldig onderdeel: " + key + ".");
+      if (!isPlainObject2(candidate[key])) errors.push("Ontbrekend of ongeldig onderdeel: " + key + ".");
     });
     if (errors.length) return { ok: false, errors };
     if (!["voor", "na"].includes(candidate.meta.scenario)) {
@@ -2124,24 +2181,24 @@
       errors.push("Geselecteerde maand moet de vorm YYYY-MM hebben.");
     }
     ["dion", "dara"].forEach((person) => {
-      if (!isPlainObject(candidate.personen[person])) errors.push("Persoon ontbreekt: " + person + ".");
+      if (!isPlainObject2(candidate.personen[person])) errors.push("Persoon ontbreekt: " + person + ".");
       else if (candidate.personen[person].vasteTeruggaven !== void 0) {
         validateRows(candidate.personen[person].vasteTeruggaven, "personen." + person + ".vasteTeruggaven", errors);
       }
     });
     ["voor", "na"].forEach((scenario) => {
       const s = candidate[scenario];
-      if (!isPlainObject(s.verdeling)) errors.push(scenario + ".verdeling ontbreekt.");
-      if (!isPlainObject(s.gezamenlijk)) errors.push(scenario + ".gezamenlijk ontbreekt.");
-      if (!isPlainObject(s.dion)) errors.push(scenario + ".dion ontbreekt.");
-      if (!isPlainObject(s.dara)) errors.push(scenario + ".dara ontbreekt.");
-      if (isPlainObject(s.gezamenlijk)) {
+      if (!isPlainObject2(s.verdeling)) errors.push(scenario + ".verdeling ontbreekt.");
+      if (!isPlainObject2(s.gezamenlijk)) errors.push(scenario + ".gezamenlijk ontbreekt.");
+      if (!isPlainObject2(s.dion)) errors.push(scenario + ".dion ontbreekt.");
+      if (!isPlainObject2(s.dara)) errors.push(scenario + ".dara ontbreekt.");
+      if (isPlainObject2(s.gezamenlijk)) {
         validateRows(s.gezamenlijk.vasteLasten, scenario + ".gezamenlijk.vasteLasten", errors);
         validateRows(s.gezamenlijk.variabel, scenario + ".gezamenlijk.variabel", errors);
         if (scenario === "na") validateRows(s.gezamenlijk.hypotheek, "na.gezamenlijk.hypotheek", errors);
       }
       ["dion", "dara"].forEach((person) => {
-        if (isPlainObject(s[person])) {
+        if (isPlainObject2(s[person])) {
           validateRows(s[person].vasteLasten, scenario + "." + person + ".vasteLasten", errors);
           validateRows(s[person].variabel, scenario + "." + person + ".variabel", errors);
         }
@@ -2150,22 +2207,22 @@
     ["gezamenlijk", "dion", "dara"].forEach((group) => {
       validateGoalRows(candidate.spaardoelen[group], "spaardoelen." + group, errors);
     });
-    if (candidate.monthlyIncome !== void 0 && !isPlainObject(candidate.monthlyIncome)) {
+    if (candidate.monthlyIncome !== void 0 && !isPlainObject2(candidate.monthlyIncome)) {
       errors.push("monthlyIncome moet een object zijn.");
     }
-    if (candidate.monthlyBudgets !== void 0 && !isPlainObject(candidate.monthlyBudgets)) {
+    if (candidate.monthlyBudgets !== void 0 && !isPlainObject2(candidate.monthlyBudgets)) {
       errors.push("monthlyBudgets moet een object zijn.");
     }
-    if (candidate.budgetDefaultsHistory !== void 0 && !isPlainObject(candidate.budgetDefaultsHistory)) {
+    if (candidate.budgetDefaultsHistory !== void 0 && !isPlainObject2(candidate.budgetDefaultsHistory)) {
       errors.push("budgetDefaultsHistory moet een object zijn.");
     }
-    if (candidate.monthlySavingOverrides !== void 0 && !isPlainObject(candidate.monthlySavingOverrides)) {
+    if (candidate.monthlySavingOverrides !== void 0 && !isPlainObject2(candidate.monthlySavingOverrides)) {
       errors.push("monthlySavingOverrides moet een object zijn.");
     }
     if (candidate.transactions !== void 0) {
       validateRows(candidate.transactions, "transactions", errors);
     }
-    if (!isPlainObject(candidate.recurringFixedExpenses)) errors.push("recurringFixedExpenses moet een object zijn.");
+    if (!isPlainObject2(candidate.recurringFixedExpenses)) errors.push("recurringFixedExpenses moet een object zijn.");
     else ["voor", "na"].forEach((scenario) => validateRows(candidate.recurringFixedExpenses[scenario], `recurringFixedExpenses.${scenario}`, errors));
     validateRows(candidate.recurringIncomeSources, "recurringIncomeSources", errors);
     validateRows(candidate.transactionReviewQueue, "transactionReviewQueue", errors);
@@ -2174,12 +2231,12 @@
     validateRows(candidate.advanceLedger, "advanceLedger", errors);
     validateRows(candidate.internalTransfers, "internalTransfers", errors);
     validateRows(candidate.monthCorrections, "monthCorrections", errors);
-    if (!isPlainObject(candidate.monthRecords)) errors.push("monthRecords moet een object zijn.");
-    if (!isPlainObject(candidate.accountSettings)) errors.push("accountSettings moet een object zijn.");
+    if (!isPlainObject2(candidate.monthRecords)) errors.push("monthRecords moet een object zijn.");
+    if (!isPlainObject2(candidate.accountSettings)) errors.push("accountSettings moet een object zijn.");
     if (candidate.spaardoelGeschiedenis !== void 0) {
-      if (!isPlainObject(candidate.spaardoelGeschiedenis)) errors.push("spaardoelGeschiedenis moet een object zijn.");
+      if (!isPlainObject2(candidate.spaardoelGeschiedenis)) errors.push("spaardoelGeschiedenis moet een object zijn.");
       else Object.entries(candidate.spaardoelGeschiedenis).forEach(([key, entry]) => {
-        if (!isPlainObject(entry)) errors.push(`spaardoelGeschiedenis.${key} is ongeldig.`);
+        if (!isPlainObject2(entry)) errors.push(`spaardoelGeschiedenis.${key} is ongeldig.`);
         else {
           if (entry.id !== key) errors.push(`spaardoelGeschiedenis.${key} heeft een afwijkend ID.`);
           if (!/^(gezamenlijk|dion|dara):\d{4}-\d{2}$/.test(key)) errors.push(`spaardoelGeschiedenis.${key} heeft een ongeldige maand-ID.`);
@@ -2261,6 +2318,7 @@
     activeCommitId: "",
     conflict: false,
     remoteStateWaiting: null,
+    confirmedState: null,
     config: loadFirebaseConfig(),
     statusText() {
       return this.status;
@@ -2335,6 +2393,7 @@
       this.lastCloudSignature = cloudStateSignature(normalizedRemote);
       this.lastConfirmedCommitId = String(documentData.commitId || "");
       this.lastConfirmedRevision = Number((_a = normalizedRemote.meta) == null ? void 0 : _a.revision) || 0;
+      this.confirmedState = cloneState(normalizedRemote);
       this.conflict = false;
       this.lastFailureRetryable = true;
       this.applyingRemote = true;
@@ -2351,6 +2410,39 @@
       }
       DataAdapter.loadedFromStorage = true;
       this.status = "Cloud opgeslagen";
+      renderActiveTab();
+      return true;
+    },
+    async rebasePendingOntoRemote(documentData, normalizedRemote, localSnapshot = this.pendingState, backupReason = "lokale wijzigingen voor cloudherstel") {
+      var _a, _b, _c;
+      if (!localSnapshot) return false;
+      const base = this.confirmedState || normalizedRemote;
+      const merged = rebaseLocalChanges(base, localSnapshot, normalizedRemote);
+      merged.meta = isPlainObject2(merged.meta) ? merged.meta : {};
+      merged.meta.schemaVersion = U3_SCHEMA_VERSION;
+      merged.meta.revision = Math.max(
+        Number((_a = normalizedRemote.meta) == null ? void 0 : _a.revision) || 0,
+        Number((_b = localSnapshot.meta) == null ? void 0 : _b.revision) || 0
+      ) + 1;
+      merged.meta.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
+      merged.meta.updatedBy = getDeviceId();
+      const validation = validateBudgetState(merged);
+      if (!validation.ok) throw new Error(validation.errors.join(" "));
+      if (backupReason) DataAdapter.backup(state, backupReason);
+      clearTimeout(this.saveTimer);
+      this.cloudVersion = cloudDocumentVersion(documentData);
+      this.lastCloudSignature = cloudStateSignature(normalizedRemote);
+      this.lastConfirmedCommitId = String(documentData.commitId || "");
+      this.lastConfirmedRevision = Number((_c = normalizedRemote.meta) == null ? void 0 : _c.revision) || 0;
+      this.confirmedState = cloneState(normalizedRemote);
+      this.remoteStateWaiting = null;
+      this.initialSyncComplete = true;
+      state = merged;
+      window.state = state;
+      committedStateSnapshot = cloneState(state);
+      this.pendingState = cloneState(state);
+      localSave(state);
+      this.status = "Opslaan…";
       renderActiveTab();
       return true;
     },
@@ -2411,6 +2503,7 @@
           this.lastCloudSignature = remoteSignature;
           this.lastConfirmedCommitId = remoteCommitId;
           this.lastConfirmedRevision = remoteRevision;
+          this.confirmedState = cloneState(normalizedRemote);
           return;
         }
         const cloudChanged = this.initialSyncComplete && (remoteVersion !== this.cloudVersion || remoteSignature !== this.lastCloudSignature);
@@ -2421,8 +2514,14 @@
           return;
         }
         if (this.pendingState && (!this.initialSyncComplete || cloudChanged)) {
-          console.warn("Lokale wijzigingen zijn als nood-back-up bewaard; de cloudstand blijft leidend.");
-          await this.acceptRemote(documentData, normalizedRemote, "lokale wijzigingen voor cloudherstel");
+          if (!this.initialSyncComplete) {
+            console.warn("Lokale wijzigingen zijn als nood-back-up bewaard; de eerste cloudstand blijft leidend.");
+            await this.acceptRemote(documentData, normalizedRemote, "lokale wijzigingen voor cloudherstel");
+            return;
+          }
+          console.warn("Lokale wijziging opnieuw toegepast op de nieuwste cloudstand.");
+          await this.rebasePendingOntoRemote(documentData, normalizedRemote);
+          this.flushQueue();
           return;
         }
         if (this.pendingState || this.writeInFlight) {
@@ -2517,15 +2616,14 @@
         this.lastCloudSignature = cloudStateSignature(cloudSnapshot);
         this.lastConfirmedCommitId = commitId;
         this.lastConfirmedRevision = Number((_a = cloudSnapshot.meta) == null ? void 0 : _a.revision) || 0;
+        this.confirmedState = cloneState(cloudSnapshot);
         this.status = this.pendingState ? "Opslaan…" : "Cloud opgeslagen";
         renderCloudStatus();
         return true;
       } catch (e) {
         if ((e == null ? void 0 : e.code) === CLOUD_CONFLICT_CODE) {
-          this.lastFailureRetryable = false;
-          DataAdapter.backup(state, "lokale wijzigingen bij cloudconflict");
-          this.pendingState = null;
-          console.warn("Lokale stand niet naar de cloud geschreven; de nieuwste cloudstand wordt geladen.", e);
+          this.lastFailureRetryable = true;
+          console.warn("Cloud wijzigde tijdens opslaan; lokale wijziging wordt op de nieuwste cloudstand herhaald.", e);
           try {
             let latest = this.remoteStateWaiting;
             if (!latest) {
@@ -2537,7 +2635,7 @@
               if (!remoteValidation.ok) throw new Error(remoteValidation.errors.join(" "));
               latest = { documentData, normalizedRemote };
             }
-            await this.acceptRemote(latest.documentData, latest.normalizedRemote, null);
+            await this.rebasePendingOntoRemote(latest.documentData, latest.normalizedRemote, snapshot, "lokale wijzigingen bij cloudconflict");
             return false;
           } catch (remoteError) {
             this.conflict = true;
@@ -2569,7 +2667,7 @@
       const restored = cloneState(restoredState);
       ensurePersistentIds(restored);
       await GoalImageStore.initializeState(restored);
-      restored.meta = isPlainObject(restored.meta) ? restored.meta : {};
+      restored.meta = isPlainObject2(restored.meta) ? restored.meta : {};
       restored.meta.schemaVersion = U3_SCHEMA_VERSION;
       restored.meta.revision = Math.max(
         Number(restored.meta.revision) || 0,
@@ -2718,7 +2816,7 @@
         }
       });
       ensurePersistentIds(state);
-      state.meta = isPlainObject(state.meta) ? state.meta : {};
+      state.meta = isPlainObject2(state.meta) ? state.meta : {};
       state.meta.schemaVersion = U3_SCHEMA_VERSION;
       state.meta.revision = Math.max(0, Number(state.meta.revision) || 0) + 1;
       state.meta.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
@@ -2944,9 +3042,6 @@
         }
         removeWithUndo("transactions", id, "Transactie verwijderd");
       });
-    });
-    root.querySelectorAll("[data-open-transaction]").forEach((btn) => {
-      btn.addEventListener("click", () => openTransactionModal());
     });
   }
   function splitLastIndex(pathWithIndex) {
@@ -4807,7 +4902,7 @@ service cloud.firestore {
     const month = getSelectedMonth();
     const result = calcScenario(state)[owner];
     const automatic = round2(Number(result.automatischBeschikbaarVoorSparen) || 0);
-    const monthOverrides = isPlainObject((_a = state.monthlySavingOverrides) == null ? void 0 : _a[month]) ? state.monthlySavingOverrides[month] : {};
+    const monthOverrides = isPlainObject2((_a = state.monthlySavingOverrides) == null ? void 0 : _a[month]) ? state.monthlySavingOverrides[month] : {};
     const hasOverride = Object.prototype.hasOwnProperty.call(monthOverrides, owner);
     const current = hasOverride ? round2(Number(monthOverrides[owner]) || 0) : automatic;
     const name = ownerLabel(owner);
@@ -4836,7 +4931,7 @@ service cloud.firestore {
       const saved = commitChange(() => {
         var _a2;
         assertMonthMutationAllowed(month);
-        if (isPlainObject((_a2 = state.monthlySavingOverrides) == null ? void 0 : _a2[month])) {
+        if (isPlainObject2((_a2 = state.monthlySavingOverrides) == null ? void 0 : _a2[month])) {
           delete state.monthlySavingOverrides[month][owner];
           if (!Object.keys(state.monthlySavingOverrides[month]).length) delete state.monthlySavingOverrides[month];
         }
@@ -4858,8 +4953,8 @@ service cloud.firestore {
       }
       const saved = commitChange(() => {
         assertMonthMutationAllowed(month);
-        state.monthlySavingOverrides = isPlainObject(state.monthlySavingOverrides) ? state.monthlySavingOverrides : {};
-        state.monthlySavingOverrides[month] = isPlainObject(state.monthlySavingOverrides[month]) ? state.monthlySavingOverrides[month] : {};
+        state.monthlySavingOverrides = isPlainObject2(state.monthlySavingOverrides) ? state.monthlySavingOverrides : {};
+        state.monthlySavingOverrides[month] = isPlainObject2(state.monthlySavingOverrides[month]) ? state.monthlySavingOverrides[month] : {};
         state.monthlySavingOverrides[month][owner] = round2(value);
       }, { render: false });
       if (!saved) return;
@@ -4968,8 +5063,8 @@ service cloud.firestore {
       const values = { dion: { salary: amount(inputs[0]), refund: amount(inputs[1]) }, dara: { salary: amount(inputs[2]), refund: amount(inputs[3]) } };
       const onlyMonth = document.getElementById("incomeOnlyThisMonth").checked;
       if (onlyMonth) {
-        state.monthlyIncomeOverrides[month] = isPlainObject(state.monthlyIncomeOverrides[month]) ? state.monthlyIncomeOverrides[month] : {};
-        state.monthlyRefundOverrides[month] = isPlainObject(state.monthlyRefundOverrides[month]) ? state.monthlyRefundOverrides[month] : {};
+        state.monthlyIncomeOverrides[month] = isPlainObject2(state.monthlyIncomeOverrides[month]) ? state.monthlyIncomeOverrides[month] : {};
+        state.monthlyRefundOverrides[month] = isPlainObject2(state.monthlyRefundOverrides[month]) ? state.monthlyRefundOverrides[month] : {};
         ["dion", "dara"].forEach((person) => {
           state.monthlyIncomeOverrides[month][person] = values[person].salary;
           state.monthlyRefundOverrides[month][person] = values[person].refund;
@@ -5445,6 +5540,11 @@ service cloud.firestore {
     renderActiveTab();
   });
   document.body.addEventListener("click", (e) => {
+    const transactionButton = e.target.closest("[data-open-transaction]");
+    if (transactionButton) {
+      openTransactionModal();
+      return;
+    }
     const btn = e.target.closest(".scenario-toggle button[data-scenario]");
     if (!btn) return;
     state.meta.scenario = btn.dataset.scenario;
@@ -5493,7 +5593,7 @@ service cloud.firestore {
     return round2(children.length ? children.reduce((sum, child) => sum + Math.max(0, Number(child.gespaard) || 0), 0) : Math.max(0, Number(goal == null ? void 0 : goal.algespaard) || 0));
   }
   function u2NormalizeChildren(goal) {
-    const children = Array.isArray(goal.subdoelen) ? goal.subdoelen.filter(isPlainObject) : [];
+    const children = Array.isArray(goal.subdoelen) ? goal.subdoelen.filter(isPlainObject2) : [];
     let remaining = Math.max(0, Number(goal.algespaard) || 0);
     goal.subdoelen = children.map((child, index) => {
       const target = Math.max(0, Number(child.doelbedrag) || 0);
@@ -5516,9 +5616,9 @@ service cloud.firestore {
     }
   }
   function u2NormalizeState(target, fromVersion = Number(((_a) => (_a = target == null ? void 0 : target.meta) == null ? void 0 : _a.schemaVersion)()) || 1) {
-    target.spaardoelGeschiedenis = isPlainObject(target.spaardoelGeschiedenis) ? target.spaardoelGeschiedenis : {};
+    target.spaardoelGeschiedenis = isPlainObject2(target.spaardoelGeschiedenis) ? target.spaardoelGeschiedenis : {};
     U2_OWNERS.forEach((owner) => {
-      target.spaardoelen = isPlainObject(target.spaardoelen) ? target.spaardoelen : {};
+      target.spaardoelen = isPlainObject2(target.spaardoelen) ? target.spaardoelen : {};
       target.spaardoelen[owner] = Array.isArray(target.spaardoelen[owner]) ? target.spaardoelen[owner] : [];
       target.spaardoelen[owner].forEach((goal) => {
         goal.eigenaar = owner;
@@ -6155,7 +6255,7 @@ service cloud.firestore {
     const actualRows = u3ConfirmedTransactions(month).filter((tx) => tx.kind === "inkomen" && u3IncomeTransactionOwner(tx) === owner);
     if (actualRows.length) return { amount: round2(actualRows.reduce((sum, tx) => sum + Math.abs(Number(tx.amount) || 0), 0)), source: "actual" };
     const monthOverrides = (_d = state.monthlyIncomeOverrides) == null ? void 0 : _d[month];
-    if (isPlainObject(monthOverrides) && Object.prototype.hasOwnProperty.call(monthOverrides, owner)) {
+    if (isPlainObject2(monthOverrides) && Object.prototype.hasOwnProperty.call(monthOverrides, owner)) {
       return { amount: round2(Number(monthOverrides[owner]) || 0), source: "monthly-override" };
     }
     const expected = round2(u3IncomeOccurrences(month).filter((row) => row.owner === owner).reduce((sum, row) => sum + Number(row.amount || 0), 0));
@@ -6288,7 +6388,7 @@ service cloud.firestore {
     return result;
   }
   function u3MonthRecord(month = getSelectedMonth()) {
-    if (!isPlainObject(state.monthRecords[month])) state.monthRecords[month] = { month, status: "open", closedAt: "", reopenedAt: "", activeClosureId: "", closureHistory: [] };
+    if (!isPlainObject2(state.monthRecords[month])) state.monthRecords[month] = { month, status: "open", closedAt: "", reopenedAt: "", activeClosureId: "", closureHistory: [] };
     return state.monthRecords[month];
   }
   function u3DeterministicTransferId(closureId, type, source, target) {
@@ -6608,7 +6708,7 @@ service cloud.firestore {
         const value = prompt(`Werkelijk inkomen voor ${month}. Laat leeg om de handmatige correctie te verwijderen.`, Number.isFinite(Number(current)) ? String(current) : String(u3ActualIncome(month)));
         if (value === null) return;
         const ok = commitChange(() => {
-          state.actualIncomeOverrides = isPlainObject(state.actualIncomeOverrides) ? state.actualIncomeOverrides : {};
+          state.actualIncomeOverrides = isPlainObject2(state.actualIncomeOverrides) ? state.actualIncomeOverrides : {};
           if (!String(value).trim()) delete state.actualIncomeOverrides[month];
           else {
             const amount = round2(bankAmount(value));
@@ -6713,7 +6813,7 @@ service cloud.firestore {
             item.bedrag = amount;
           }
           item.amountHistory = Array.isArray(item.amountHistory) ? item.amountHistory : [];
-          item.monthOverrides = isPlainObject(item.monthOverrides) ? item.monthOverrides : {};
+          item.monthOverrides = isPlainObject2(item.monthOverrides) ? item.monthOverrides : {};
           if (modal.querySelector("#u3RecScope").value === "once") item.monthOverrides[current] = amount;
           else {
             delete item.monthOverrides[current];
