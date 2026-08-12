@@ -1,11 +1,11 @@
-const CACHE_NAME = "finize-v73-cloud-leidend";
+const CACHE_NAME = "finize-v74-atomair-herstel";
 const CACHE_PREFIX = "finize-";
 
 const CRITICAL_SHELL = [
   "./",
   "./index.html",
-  "./app.js?v=73-cloud-leidend",
-  "./app.css?v=73-cloud-leidend",
+  "./app.js?v=74-atomair-herstel",
+  "./app.css?v=74-atomair-herstel",
   "./manifest.json"
 ];
 

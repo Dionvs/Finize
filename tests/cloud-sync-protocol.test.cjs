@@ -32,7 +32,10 @@ const { pathToFileURL } = require('node:url');
   assert.doesNotMatch(runtime,/btnUploadCloud|Lokale stand naar cloud zetten/,'een lokale stand mag niet handmatig over de cloud worden gezet');
   assert.match(runtime,/Cloudstand opnieuw laden/);
   assert.match(runtime,/acceptRemote\(documentData, normalizedRemote, 'lokale wijzigingen voor cloudherstel'\)/);
-  assert.match(runtime,/committedStateSnapshot = stateBeforeImport/,'een herstelde JSON-back-up moet als nieuwe wijziging worden opgeslagen');
+  assert.match(runtime,/async restoreBackup\(restoredState, backupReason\)/);
+  assert.match(runtime,/const saved = await this\.saveNow\(restored\)/,'een back-up moet eerst door Firestore worden bevestigd');
+  assert.match(runtime,/await this\.acceptRemote\(\{/,'pas daarna mag de herstelde back-up de schermstand worden');
+  assert.match(runtime,/await CloudAdapter\.restoreBackup\(migratedImport/);
   assert.match(rules,/request\.resource\.data\.syncVersion\s*==\s*resource\.data\.syncVersion\s*\+\s*1/);
 
   console.log('Cloud-sync protocol blokkeert verouderde writes.');

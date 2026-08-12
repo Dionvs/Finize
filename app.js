@@ -2436,8 +2436,8 @@
         if (this.pendingState) return this.flushQueue();
         return true;
       }
-      if (!this.pendingState) this.pendingState = snapshot;
       if (!this.lastFailureRetryable) return false;
+      if (!this.pendingState) this.pendingState = snapshot;
       this.scheduleRetry();
       return false;
     },
@@ -2515,7 +2515,7 @@
               latest = { documentData, normalizedRemote };
             }
             await this.acceptRemote(latest.documentData, latest.normalizedRemote, null);
-            return true;
+            return false;
           } catch (remoteError) {
             this.conflict = true;
             this.status = "Synchronisatieconflict";
@@ -2530,6 +2530,41 @@
       } finally {
         this.activeCommitId = "";
       }
+    },
+    async restoreBackup(restoredState, backupReason) {
+      if (!this.isConnected()) {
+        const connected = await this.connect();
+        if (!connected) throw new Error("Maak eerst verbinding met de cloud om een back-up te herstellen.");
+      }
+      if (!this.initialSyncComplete || this.cloudVersion === null) {
+        throw new Error("Wacht tot de actuele cloudstand is geladen en probeer daarna opnieuw.");
+      }
+      if (this.writeInFlight || this.pendingState) {
+        throw new Error("Wacht tot de huidige wijziging in de cloud is opgeslagen.");
+      }
+      DataAdapter.backup(state, backupReason);
+      const restored = cloneState(restoredState);
+      ensurePersistentIds(restored);
+      await GoalImageStore.initializeState(restored);
+      restored.meta = isPlainObject(restored.meta) ? restored.meta : {};
+      restored.meta.schemaVersion = U3_SCHEMA_VERSION;
+      restored.meta.revision = Math.max(
+        Number(restored.meta.revision) || 0,
+        Number(this.lastConfirmedRevision) || 0
+      ) + 1;
+      restored.meta.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
+      restored.meta.updatedBy = getDeviceId();
+      const validation = validateBudgetState(restored);
+      if (!validation.ok) throw new Error(validation.errors.join(" "));
+      this.status = "Opslaan…";
+      renderCloudStatus();
+      const saved = await this.saveNow(restored);
+      if (!saved) throw new Error("De back-up is niet naar de cloud geschreven. De bestaande cloudstand is behouden.");
+      await this.acceptRemote({
+        syncVersion: this.cloudVersion,
+        commitId: this.lastConfirmedCommitId
+      }, restored, null);
+      return true;
     },
     async signOut() {
       if (this.unsubscribe) {
@@ -3817,16 +3852,8 @@ service cloud.firestore {
             e.target.value = "";
             return;
           }
-          DataAdapter.backup(state, "voor import van " + file.name);
-          const stateBeforeImport = cloneState(state);
-          state = migratedImport;
-          window.state = state;
-          committedStateSnapshot = stateBeforeImport;
-          await GoalImageStore.initializeState(state);
-          if (!commitChange(() => {
-          }, { render: false })) throw new Error("De geimporteerde back-up kon niet worden opgeslagen.");
-          renderActiveTab();
-          alert("Back-up geimporteerd.");
+          await CloudAdapter.restoreBackup(migratedImport, "voor import van " + file.name);
+          alert("Back-up hersteld en bevestigd door de cloud.");
         } catch (err) {
           alert("Kon dit bestand niet lezen: " + err.message);
         }
@@ -3848,18 +3875,12 @@ service cloud.firestore {
       }
       const label = backup.label || backup.savedAt || "onbekend moment";
       if (confirm("Laatste lokale nood-back-up herstellen van " + label + "? De huidige stand wordt eerst opnieuw als nood-back-up bewaard.")) {
-        DataAdapter.backup(state, "voor herstel lokale nood-back-up");
-        const stateBeforeRestore = cloneState(state);
-        state = migratedBackup;
-        window.state = state;
-        committedStateSnapshot = stateBeforeRestore;
-        await GoalImageStore.initializeState(state);
-        if (!commitChange(() => {
-        }, { render: false })) {
-          alert("De lokale nood-back-up kon niet worden hersteld.");
-          return;
+        try {
+          await CloudAdapter.restoreBackup(migratedBackup, "voor herstel lokale nood-back-up");
+          alert("Lokale nood-back-up hersteld en bevestigd door de cloud.");
+        } catch (error) {
+          alert("De lokale nood-back-up kon niet worden hersteld: " + ((error == null ? void 0 : error.message) || String(error)));
         }
-        renderActiveTab();
       }
     });
     document.getElementById("btnReset").addEventListener("click", () => {
