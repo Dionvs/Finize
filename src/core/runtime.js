@@ -11,7 +11,8 @@ import {
   cloudDocumentVersion,
   cloudStateSignature,
   isStaleCloudSnapshot,
-  rebaseLocalChanges
+  rebaseLocalChanges,
+  removeStaleIncomeOverrides
 } from "../storage/sync-protocol.mjs";
 
 /* ---------- helpers ---------- */
@@ -570,6 +571,7 @@ function u3NormalizeState(target){
     });
     target.meta.incomeHistoryMigrated=true;
   }
+  removeStaleIncomeOverrides(target);
   u3MigrateFixedExpenses(target);
   u3MigrateIncomeSources(target);
   ['voor','na'].forEach(scenario=>{
@@ -2169,6 +2171,7 @@ const CloudAdapter = {
       console.warn('Vertraagde oudere cloudsnapshot genegeerd.');
       return false;
     }
+    const normalizedCloudData = JSON.stringify(documentData.state) !== JSON.stringify(normalizedRemote);
     if (backupReason) DataAdapter.backup(state, backupReason);
     clearTimeout(this.saveTimer);
     this.pendingState = null;
@@ -2194,7 +2197,16 @@ const CloudAdapter = {
       this.applyingRemote = false;
     }
     DataAdapter.loadedFromStorage = true;
-    this.status = 'Cloud opgeslagen';
+    if (normalizedCloudData){
+      state.meta.revision = Math.max(Number(state.meta.revision) || 0, this.lastConfirmedRevision) + 1;
+      state.meta.updatedAt = new Date().toISOString();
+      state.meta.updatedBy = getDeviceId();
+      committedStateSnapshot = clone(state);
+      DataAdapter.save(state);
+      this.flushQueue();
+    }else{
+      this.status = 'Cloud opgeslagen';
+    }
     renderActiveTab();
     return true;
   },

@@ -36,6 +36,31 @@ export function isStaleCloudSnapshot(documentData, currentVersion, currentSignat
     && cloudStateSignature(documentData?.state) !== currentSignature;
 }
 
+export function removeStaleIncomeOverrides(target) {
+  let changed = false;
+  const histories = target?.incomeDefaultsHistory || {};
+  const overrides = target?.monthlyIncomeOverrides || {};
+  const monthlyIncome = target?.monthlyIncome || {};
+  Object.entries(overrides).forEach(([month, values]) => {
+    if (!isPlainObject(values)) return;
+    ["dion", "dara"].forEach(person => {
+      if (!Object.prototype.hasOwnProperty.call(values, person)) return;
+      const selected = (Array.isArray(histories[person]) ? histories[person] : [])
+        .filter(row => String(row?.effectiveFrom || "") <= month)
+        .sort((left, right) => String(left.effectiveFrom).localeCompare(String(right.effectiveFrom)))
+        .at(-1);
+      const storedMonthly = monthlyIncome?.[month]?.[person];
+      if (!selected || !Number.isFinite(Number(storedMonthly))) return;
+      if (Number(storedMonthly) === Number(selected.salary) && Number(values[person]) !== Number(selected.salary)) {
+        delete values[person];
+        changed = true;
+      }
+    });
+    if (!Object.keys(values).length) delete overrides[month];
+  });
+  return changed;
+}
+
 function copyValue(value) {
   return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 }

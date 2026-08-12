@@ -38,6 +38,15 @@ const { pathToFileURL } = require('node:url');
   assert.equal(rebased.incomeDefaultsHistory.dion[0].salary,2344,'de zojuist gewijzigde lokale waarde mag niet terugvallen');
   assert.equal(rebased.incomeDefaultsHistory.dara[0].salary,3250,'onaangeraakte waarden blijven uit de cloud komen');
   assert.equal(rebased.voorkeur.thema,'donker','een gelijktijdige wijziging op een ander cloudveld blijft behouden');
+
+  const inconsistentIncome = {
+    incomeDefaultsHistory:{dion:[{effectiveFrom:'2026-08',salary:2020}],dara:[]},
+    monthlyIncome:{'2026-08':{dion:2020}},
+    monthlyIncomeOverrides:{'2026-08':{dion:2629,dara:3250}}
+  };
+  assert.equal(protocol.removeStaleIncomeOverrides(inconsistentIncome),true);
+  assert.equal(Object.prototype.hasOwnProperty.call(inconsistentIncome.monthlyIncomeOverrides['2026-08'],'dion'),false,'oude maandafwijking mag een nieuw standaardinkomen niet overschrijven');
+  assert.equal(inconsistentIncome.monthlyIncomeOverrides['2026-08'].dara,3250,'niet-aantoonbaar verouderde afwijkingen blijven behouden');
   assert.throws(
     ()=>protocol.assertCloudBase({...documentData,state:{meta:{...state.meta,updatedBy:'laptop'}}},7,protocol.cloudStateSignature(state)),
     error=>error.code===protocol.CLOUD_CONFLICT_CODE,

@@ -53,6 +53,28 @@
     if (incomingVersion < currentVersion) return true;
     return incomingVersion === currentVersion && !!currentSignature && cloudStateSignature(documentData == null ? void 0 : documentData.state) !== currentSignature;
   }
+  function removeStaleIncomeOverrides(target) {
+    let changed = false;
+    const histories = (target == null ? void 0 : target.incomeDefaultsHistory) || {};
+    const overrides = (target == null ? void 0 : target.monthlyIncomeOverrides) || {};
+    const monthlyIncome = (target == null ? void 0 : target.monthlyIncome) || {};
+    Object.entries(overrides).forEach(([month, values]) => {
+      if (!isPlainObject(values)) return;
+      ["dion", "dara"].forEach((person) => {
+        var _a;
+        if (!Object.prototype.hasOwnProperty.call(values, person)) return;
+        const selected = (Array.isArray(histories[person]) ? histories[person] : []).filter((row) => String((row == null ? void 0 : row.effectiveFrom) || "") <= month).sort((left, right) => String(left.effectiveFrom).localeCompare(String(right.effectiveFrom))).at(-1);
+        const storedMonthly = (_a = monthlyIncome == null ? void 0 : monthlyIncome[month]) == null ? void 0 : _a[person];
+        if (!selected || !Number.isFinite(Number(storedMonthly))) return;
+        if (Number(storedMonthly) === Number(selected.salary) && Number(values[person]) !== Number(selected.salary)) {
+          delete values[person];
+          changed = true;
+        }
+      });
+      if (!Object.keys(values).length) delete overrides[month];
+    });
+    return changed;
+  }
   function copyValue(value) {
     return value === void 0 ? void 0 : JSON.parse(JSON.stringify(value));
   }
@@ -707,6 +729,7 @@
       });
       target.meta.incomeHistoryMigrated = true;
     }
+    removeStaleIncomeOverrides(target);
     u3MigrateFixedExpenses(target);
     u3MigrateIncomeSources(target);
     ["voor", "na"].forEach((scenario) => {
@@ -2384,6 +2407,7 @@
         console.warn("Vertraagde oudere cloudsnapshot genegeerd.");
         return false;
       }
+      const normalizedCloudData = JSON.stringify(documentData.state) !== JSON.stringify(normalizedRemote);
       if (backupReason) DataAdapter.backup(state, backupReason);
       clearTimeout(this.saveTimer);
       this.pendingState = null;
@@ -2409,7 +2433,16 @@
         this.applyingRemote = false;
       }
       DataAdapter.loadedFromStorage = true;
-      this.status = "Cloud opgeslagen";
+      if (normalizedCloudData) {
+        state.meta.revision = Math.max(Number(state.meta.revision) || 0, this.lastConfirmedRevision) + 1;
+        state.meta.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
+        state.meta.updatedBy = getDeviceId();
+        committedStateSnapshot = cloneState(state);
+        DataAdapter.save(state);
+        this.flushQueue();
+      } else {
+        this.status = "Cloud opgeslagen";
+      }
       renderActiveTab();
       return true;
     },

@@ -18,6 +18,7 @@ const context={
   round2:value=>Math.round((Number(value)+Number.EPSILON)*100)/100,
   sumBedrag:rows=>rows.reduce((sum,row)=>sum+(Number(row.bedrag)||0),0),
   bankText:value=>String(value||'').trim().toLowerCase(),
+  removeStaleIncomeOverrides:()=>false,
   uid:()=>`generated-${++generated}`,
   monthKey:()=> '2026-07',
   u3ParseDate:value=>/^\d{4}-\d{2}-\d{2}$/.test(String(value||''))?new Date(`${value}T12:00:00`):null
