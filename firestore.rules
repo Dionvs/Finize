@@ -2,7 +2,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // Finize gebruikt momenteel een gedeelde, niet-geauthenticeerde planner.
-    // Deze regels behouden het bestaande gedrag en staan ook de CSV-importdetails toe.
+    // Rootwrites moeten via het transactionele syncprotocol lopen.
     match /budgetPlanners/finize {
       allow read: if true;
       allow create: if request.resource.data.syncVersion == 1
