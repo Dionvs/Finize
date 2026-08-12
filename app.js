@@ -3735,12 +3735,21 @@
         <button class="ghost small" id="btnUploadCloud">⬆ Lokale stand naar cloud zetten</button>
         <button class="ghost small" id="btnFirebaseSignOut">⛓ Cloud loskoppelen</button>
       </div>
-      <pre>Firestore rules voor openbaar lezen en bewerken:
+      <pre>Firestore rules voor transactionele synchronisatie:
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /budgetPlanners/finize {
-      allow read, write: if true;
+      allow read: if true;
+      allow create: if request.resource.data.syncVersion == 1
+        &amp;&amp; request.resource.data.commitId is string;
+      allow update: if request.resource.data.syncVersion is int
+        &amp;&amp; request.resource.data.commitId is string
+        &amp;&amp; (
+          (!("syncVersion" in resource.data) &amp;&amp; request.resource.data.syncVersion == 1)
+          || ("syncVersion" in resource.data
+            &amp;&amp; request.resource.data.syncVersion == resource.data.syncVersion + 1)
+        );
       match /imports/{importId} {
         allow read, write: if true;
         match /chunks/{chunkId} {
