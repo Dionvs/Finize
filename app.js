@@ -12,9 +12,40 @@
     console.error("Finize kon een achtergrondtaak niet afronden:", ((_c = event.reason) == null ? void 0 : _c.message) || String(event.reason || "Onbekende fout"));
   });
 
+  // src/ui/platform.js
+  var isIphone = /iPhone|iPod/i.test(navigator.userAgent || "");
+  document.documentElement.classList.toggle("finize-ios-phone", isIphone);
+
   // src/core/state.js
   function cloneState(value) {
     return JSON.parse(JSON.stringify(value));
+  }
+
+  // src/storage/sync-protocol.mjs
+  var CLOUD_CONFLICT_CODE = "finize/cloud-conflict";
+  function cloudDocumentVersion(documentData) {
+    const value = Number(documentData == null ? void 0 : documentData.syncVersion);
+    return Number.isSafeInteger(value) && value >= 0 ? value : 0;
+  }
+  function cloudStateSignature(state2) {
+    const meta = (state2 == null ? void 0 : state2.meta) || {};
+    return [
+      Number(meta.revision) || 0,
+      String(meta.updatedAt || ""),
+      String(meta.updatedBy || "")
+    ].join("|");
+  }
+  function assertCloudBase(documentData, expectedVersion, expectedSignature) {
+    const actualVersion = cloudDocumentVersion(documentData);
+    const actualSignature = cloudStateSignature(documentData == null ? void 0 : documentData.state);
+    if (actualVersion !== expectedVersion || actualSignature !== expectedSignature) {
+      const error = new Error("De cloud is intussen op een ander apparaat gewijzigd.");
+      error.code = CLOUD_CONFLICT_CODE;
+      error.actualVersion = actualVersion;
+      error.actualSignature = actualSignature;
+      throw error;
+    }
+    return actualVersion;
   }
 
   // src/core/runtime.js
@@ -1893,9 +1924,16 @@
             const key = this.keyFromRef(raw);
             if (key) {
               try {
-                await this.get(key);
+                const image = await this.get(key);
+                if (!image) {
+                  console.warn("Ontbrekende spaardoelfotoverwijzing opgeruimd:", goal.id);
+                  goal.afbeelding = "";
+                  changed = true;
+                }
               } catch (error) {
-                console.error("Spaardoelfoto laden mislukt", error);
+                console.warn("Defecte spaardoelfotoverwijzing opgeruimd:", goal.id, error);
+                goal.afbeelding = "";
+                changed = true;
               }
             }
           }
@@ -1909,9 +1947,17 @@
         for (const goal of ((_a = target == null ? void 0 : target.spaardoelen) == null ? void 0 : _a[owner]) || []) {
           const key = this.keyFromRef(goal.afbeelding);
           if (!key) continue;
-          const image = await this.get(key);
-          if (!image) throw new Error("Een lokaal opgeslagen spaardoelfoto kon niet worden geladen.");
-          goal.afbeelding = image;
+          try {
+            const image = await this.get(key);
+            if (image) goal.afbeelding = image;
+            else {
+              console.warn("Spaardoelfoto ontbreekt; overdracht gaat verder zonder foto:", goal.id);
+              goal.afbeelding = "";
+            }
+          } catch (error) {
+            console.warn("Spaardoelfoto kon niet worden geladen; overdracht gaat verder zonder foto:", goal.id, error);
+            goal.afbeelding = "";
+          }
         }
       }
       return target;
@@ -2202,6 +2248,12 @@
     retryAttempt: 0,
     lastConfirmedRevision: 0,
     lastFailureRetryable: true,
+    initialSyncComplete: false,
+    cloudVersion: null,
+    lastCloudSignature: "",
+    lastConfirmedCommitId: "",
+    activeCommitId: "",
+    conflict: false,
     config: loadFirebaseConfig(),
     statusText() {
       return this.status;
@@ -2248,7 +2300,6 @@
         this.attachSnapshot();
         this.status = this.pendingState ? "Opslaan…" : "Lokaal opgeslagen";
         renderCloudStatus();
-        this.flushQueue();
         window.dispatchEvent(new CustomEvent("finize:cloud-connected"));
         return true;
       } catch (e) {
@@ -2262,13 +2313,19 @@
       if (this.unsubscribe || !this.docRef) return;
       const { firestore } = this.modules;
       this.unsubscribe = firestore.onSnapshot(this.docRef, async (snap) => {
-        var _a, _b, _c, _d;
+        var _a, _b;
         if (!snap.exists()) {
-          this.status = "Lokaal opgeslagen";
+          this.initialSyncComplete = true;
+          this.cloudVersion = 0;
+          this.lastCloudSignature = "";
+          this.lastConfirmedCommitId = "";
+          this.status = this.pendingState ? "Opslaan…" : "Lokaal opgeslagen";
           renderCloudStatus();
+          if (this.pendingState) this.flushQueue();
           return;
         }
-        const remote = snap.data().state;
+        const documentData = snap.data();
+        const remote = documentData.state;
         let normalizedRemote;
         try {
           normalizedRemote = migrateBudgetState(remote);
@@ -2285,22 +2342,56 @@
           renderCloudStatus();
           return;
         }
+        if ((_a = snap.metadata) == null ? void 0 : _a.hasPendingWrites) {
+          this.status = "Opslaan…";
+          renderCloudStatus();
+          return;
+        }
         const previousState = state;
-        const remoteRevision = Number((_a = normalizedRemote.meta) == null ? void 0 : _a.revision) || 0;
-        const localRevision = Number((_b = previousState.meta) == null ? void 0 : _b.revision) || 0;
-        const sameCommit = remoteRevision === localRevision && ((_c = normalizedRemote.meta) == null ? void 0 : _c.updatedBy) === ((_d = previousState.meta) == null ? void 0 : _d.updatedBy);
-        if (sameCommit) {
-          this.lastConfirmedRevision = Math.max(this.lastConfirmedRevision, remoteRevision);
-          this.status = "Cloud opgeslagen";
+        const remoteRevision = Number((_b = normalizedRemote.meta) == null ? void 0 : _b.revision) || 0;
+        const remoteVersion = cloudDocumentVersion(documentData);
+        const remoteSignature = cloudStateSignature(normalizedRemote);
+        const remoteCommitId = String(documentData.commitId || "");
+        const isOwnCommit = !!this.activeCommitId && remoteCommitId === this.activeCommitId;
+        if (isOwnCommit) {
+          this.initialSyncComplete = true;
+          this.cloudVersion = remoteVersion;
+          this.lastCloudSignature = remoteSignature;
+          this.lastConfirmedCommitId = remoteCommitId;
+          this.lastConfirmedRevision = remoteRevision;
+          return;
+        }
+        const cloudChanged = this.initialSyncComplete && (remoteVersion !== this.cloudVersion || remoteSignature !== this.lastCloudSignature);
+        if ((this.pendingState || this.writeInFlight) && cloudChanged) {
+          this.conflict = true;
+          this.lastFailureRetryable = false;
+          this.status = "Synchronisatieconflict";
+          console.warn("Cloudwijziging niet overschreven: er staan ook lokale wijzigingen klaar.");
           renderCloudStatus();
           return;
         }
-        const localIsFresh = !DataAdapter.loadedFromStorage && localRevision === 0;
-        if (this.pendingState || this.writeInFlight || !localIsFresh && remoteRevision <= localRevision) {
-          this.status = this.pendingState || this.writeInFlight ? "Opslaan…" : "Lokaal opgeslagen";
+        if ((this.pendingState || this.writeInFlight) && !this.initialSyncComplete) {
+          this.initialSyncComplete = true;
+          this.cloudVersion = remoteVersion;
+          this.lastCloudSignature = remoteSignature;
+          this.lastConfirmedCommitId = remoteCommitId;
+          this.conflict = true;
+          this.lastFailureRetryable = false;
+          this.status = "Synchronisatieconflict";
+          console.warn("Lokale wijziging tijdens de eerste cloudsynchronisatie is niet automatisch overschreven.");
           renderCloudStatus();
           return;
         }
+        if (this.pendingState || this.writeInFlight) {
+          this.status = "Opslaan…";
+          renderCloudStatus();
+          return;
+        }
+        this.initialSyncComplete = true;
+        this.cloudVersion = remoteVersion;
+        this.lastCloudSignature = remoteSignature;
+        this.lastConfirmedCommitId = remoteCommitId;
+        this.conflict = false;
         DataAdapter.backup(previousState, "voor Firestore-sync");
         this.applyingRemote = true;
         state = normalizedRemote;
@@ -2326,15 +2417,14 @@
     queueSave(state2) {
       if (this.applyingRemote) return;
       this.pendingState = cloneState(state2);
-      this.status = this.isConnected() ? "Opslaan…" : "Offline — lokaal bewaard";
+      this.status = this.conflict ? "Synchronisatieconflict" : this.isConnected() ? "Opslaan…" : "Offline — lokaal bewaard";
       renderCloudStatus();
-      if (!this.isConnected()) return;
+      if (!this.isConnected() || !this.initialSyncComplete || this.conflict) return;
       clearTimeout(this.saveTimer);
       this.saveTimer = setTimeout(() => this.flushQueue(), 350);
     },
     async flushQueue() {
-      var _a, _b;
-      if (this.writeInFlight || !this.isConnected() || !this.pendingState) return false;
+      if (this.writeInFlight || !this.isConnected() || !this.initialSyncComplete || this.conflict || !this.pendingState) return false;
       const snapshot = this.pendingState;
       this.pendingState = null;
       this.writeInFlight = true;
@@ -2346,10 +2436,8 @@
         if (this.pendingState) return this.flushQueue();
         return true;
       }
+      if (!this.pendingState) this.pendingState = snapshot;
       if (!this.lastFailureRetryable) return false;
-      if (!this.pendingState || Number((_a = this.pendingState.meta) == null ? void 0 : _a.revision) < Number((_b = snapshot.meta) == null ? void 0 : _b.revision)) {
-        this.pendingState = snapshot;
-      }
       this.scheduleRetry();
       return false;
     },
@@ -2359,9 +2447,13 @@
       this.retryTimer = setTimeout(() => this.flushQueue(), delay);
     },
     async saveNow(snapshot) {
-      var _a, _b, _c;
-      if (!this.isConnected()) return false;
+      var _a;
+      if (!this.isConnected() || !this.initialSyncComplete || this.cloudVersion === null || this.conflict) return false;
       this.lastFailureRetryable = true;
+      const expectedVersion = this.cloudVersion;
+      const expectedSignature = this.lastCloudSignature;
+      const commitId = uid();
+      this.activeCommitId = commitId;
       try {
         const cloudSnapshot = cloneState(snapshot);
         await GoalImageStore.expandStateForTransfer(cloudSnapshot);
@@ -2381,22 +2473,44 @@
           return false;
         }
         const { firestore } = this.modules;
-        await firestore.setDoc(this.docRef, {
-          state: cloudSnapshot,
-          updatedAt: firestore.serverTimestamp(),
-          revision: Number((_a = cloudSnapshot.meta) == null ? void 0 : _a.revision) || 0,
-          updatedBy: ((_b = cloudSnapshot.meta) == null ? void 0 : _b.updatedBy) || getDeviceId(),
-          app: "finize"
-        }, { merge: true });
-        this.lastConfirmedRevision = Number((_c = cloudSnapshot.meta) == null ? void 0 : _c.revision) || 0;
+        const nextVersion = await firestore.runTransaction(this.db, async (transaction) => {
+          var _a2, _b;
+          const currentSnapshot = await transaction.get(this.docRef);
+          const currentData = currentSnapshot.exists() ? currentSnapshot.data() : null;
+          const currentVersion = assertCloudBase(currentData, expectedVersion, expectedSignature);
+          const version = currentVersion + 1;
+          transaction.set(this.docRef, {
+            state: cloudSnapshot,
+            updatedAt: firestore.serverTimestamp(),
+            revision: Number((_a2 = cloudSnapshot.meta) == null ? void 0 : _a2.revision) || 0,
+            updatedBy: ((_b = cloudSnapshot.meta) == null ? void 0 : _b.updatedBy) || getDeviceId(),
+            app: "finize",
+            syncVersion: version,
+            commitId
+          }, { merge: true });
+          return version;
+        });
+        this.cloudVersion = nextVersion;
+        this.lastCloudSignature = cloudStateSignature(cloudSnapshot);
+        this.lastConfirmedCommitId = commitId;
+        this.lastConfirmedRevision = Number((_a = cloudSnapshot.meta) == null ? void 0 : _a.revision) || 0;
         this.status = this.pendingState ? "Opslaan…" : "Cloud opgeslagen";
         renderCloudStatus();
         return true;
       } catch (e) {
-        console.error("Firestore opslaan mislukt", e);
-        this.status = navigator.onLine ? "Synchronisatie mislukt" : "Offline — lokaal bewaard";
+        if ((e == null ? void 0 : e.code) === CLOUD_CONFLICT_CODE) {
+          this.conflict = true;
+          this.lastFailureRetryable = false;
+          this.status = "Synchronisatieconflict";
+          console.warn("Lokale stand niet naar de cloud geschreven vanwege een nieuwere cloudwijziging.", e);
+        } else {
+          console.error("Firestore opslaan mislukt", e);
+          this.status = navigator.onLine ? "Synchronisatie mislukt" : "Offline — lokaal bewaard";
+        }
         renderCloudStatus();
         return false;
+      } finally {
+        this.activeCommitId = "";
       }
     },
     async signOut() {
@@ -2407,6 +2521,12 @@
       this.app = null;
       this.db = null;
       this.docRef = null;
+      this.initialSyncComplete = false;
+      this.cloudVersion = null;
+      this.lastCloudSignature = "";
+      this.lastConfirmedCommitId = "";
+      this.activeCommitId = "";
+      this.conflict = false;
       this.status = "Offline — lokaal bewaard";
       renderCloudStatus();
     }
@@ -2546,7 +2666,7 @@
     if (cloud) cloud.textContent = CloudAdapter.statusText();
     const save = document.getElementById("saveStatus");
     const status = CloudAdapter.statusText();
-    const online = CloudAdapter.isConnected() && status !== "Synchronisatie mislukt";
+    const online = CloudAdapter.isConnected() && status !== "Synchronisatie mislukt" && status !== "Synchronisatieconflict";
     if (save) {
       save.textContent = status;
       save.title = status + " · klik voor back-up en cloud";
@@ -3647,7 +3767,7 @@ service cloud.firestore {
         downloadJson("dion-dara-budget-backup-" + (/* @__PURE__ */ new Date()).toISOString().slice(0, 10) + ".json", exportState);
       } catch (error) {
         console.error("Back-up exporteren mislukt", error);
-        alert("De back-up kon niet volledig worden gemaakt omdat een spaardoelfoto niet kon worden geladen.");
+        alert("De back-up kon niet worden gemaakt: " + ((error == null ? void 0 : error.message) || String(error)));
       }
     });
     document.getElementById("btnImport").addEventListener("click", () => document.getElementById("fileImport").click());

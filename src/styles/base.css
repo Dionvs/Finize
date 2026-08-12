@@ -95,6 +95,7 @@ button.small{ padding:4px 8px; font-size:12px; }
 .save-status[data-storage-status="Cloud opgeslagen"]::before{ background:var(--green); box-shadow:0 0 0 4px rgba(124,142,73,.12); }
 .save-status[data-storage-status="Offline — lokaal bewaard"]::before{ background:#958d84; box-shadow:0 0 0 4px rgba(149,141,132,.12); }
 .save-status[data-storage-status="Synchronisatie mislukt"]::before{ background:var(--red); box-shadow:0 0 0 4px rgba(159,70,57,.11); }
+.save-status[data-storage-status="Synchronisatieconflict"]::before{ background:var(--red); box-shadow:0 0 0 4px rgba(159,70,57,.11); }
 .save-status:hover{ color:var(--text); }
 
 .scenario-toggle{ display:flex; align-items:center; gap:4px; background:#fffdfa; border:1px solid var(--border); border-radius:18px; padding:4px; box-shadow:0 10px 26px rgba(86,56,31,.07); }
