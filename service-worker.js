@@ -1,11 +1,11 @@
-const CACHE_NAME = "finize-v74-atomair-herstel";
+const CACHE_NAME = "finize-v75-geen-terugrol";
 const CACHE_PREFIX = "finize-";
 
 const CRITICAL_SHELL = [
   "./",
   "./index.html",
-  "./app.js?v=74-atomair-herstel",
-  "./app.css?v=74-atomair-herstel",
+  "./app.js?v=75-geen-terugrol",
+  "./app.css?v=75-geen-terugrol",
   "./manifest.json"
 ];
 

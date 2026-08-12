@@ -26,3 +26,12 @@ export function assertCloudBase(documentData, expectedVersion, expectedSignature
   }
   return actualVersion;
 }
+
+export function isStaleCloudSnapshot(documentData, currentVersion, currentSignature) {
+  const incomingVersion = cloudDocumentVersion(documentData);
+  if (!Number.isSafeInteger(currentVersion) || currentVersion < 0) return false;
+  if (incomingVersion < currentVersion) return true;
+  return incomingVersion === currentVersion
+    && !!currentSignature
+    && cloudStateSignature(documentData?.state) !== currentSignature;
+}

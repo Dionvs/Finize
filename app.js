@@ -47,6 +47,12 @@
     }
     return actualVersion;
   }
+  function isStaleCloudSnapshot(documentData, currentVersion, currentSignature) {
+    const incomingVersion = cloudDocumentVersion(documentData);
+    if (!Number.isSafeInteger(currentVersion) || currentVersion < 0) return false;
+    if (incomingVersion < currentVersion) return true;
+    return incomingVersion === currentVersion && !!currentSignature && cloudStateSignature(documentData == null ? void 0 : documentData.state) !== currentSignature;
+  }
 
   // src/core/runtime.js
   function round2(n) {
@@ -2312,6 +2318,14 @@
     },
     async acceptRemote(documentData, normalizedRemote, backupReason = "voor Firestore-sync") {
       var _a;
+      if (this.initialSyncComplete && isStaleCloudSnapshot(
+        { ...documentData, state: normalizedRemote },
+        this.cloudVersion,
+        this.lastCloudSignature
+      )) {
+        console.warn("Vertraagde oudere cloudsnapshot genegeerd.");
+        return false;
+      }
       if (backupReason) DataAdapter.backup(state, backupReason);
       clearTimeout(this.saveTimer);
       this.pendingState = null;
@@ -2338,6 +2352,7 @@
       DataAdapter.loadedFromStorage = true;
       this.status = "Cloud opgeslagen";
       renderActiveTab();
+      return true;
     },
     attachSnapshot() {
       if (this.unsubscribe || !this.docRef) return;
@@ -2381,6 +2396,14 @@
         const remoteVersion = cloudDocumentVersion(documentData);
         const remoteSignature = cloudStateSignature(normalizedRemote);
         const remoteCommitId = String(documentData.commitId || "");
+        if (this.initialSyncComplete && isStaleCloudSnapshot(
+          { ...documentData, state: normalizedRemote },
+          this.cloudVersion,
+          this.lastCloudSignature
+        )) {
+          console.warn("Vertraagde oudere cloudsnapshot genegeerd.");
+          return;
+        }
         const isOwnCommit = !!this.activeCommitId && remoteCommitId === this.activeCommitId;
         if (isOwnCommit) {
           this.initialSyncComplete = true;
@@ -2557,14 +2580,19 @@
       const validation = validateBudgetState(restored);
       if (!validation.ok) throw new Error(validation.errors.join(" "));
       this.status = "Opslaan…";
+      this.writeInFlight = true;
       renderCloudStatus();
-      const saved = await this.saveNow(restored);
-      if (!saved) throw new Error("De back-up is niet naar de cloud geschreven. De bestaande cloudstand is behouden.");
-      await this.acceptRemote({
-        syncVersion: this.cloudVersion,
-        commitId: this.lastConfirmedCommitId
-      }, restored, null);
-      return true;
+      try {
+        const saved = await this.saveNow(restored);
+        if (!saved) throw new Error("De back-up is niet naar de cloud geschreven. De bestaande cloudstand is behouden.");
+        await this.acceptRemote({
+          syncVersion: this.cloudVersion,
+          commitId: this.lastConfirmedCommitId
+        }, restored, null);
+        return true;
+      } finally {
+        this.writeInFlight = false;
+      }
     },
     async signOut() {
       if (this.unsubscribe) {

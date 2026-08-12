@@ -12,6 +12,10 @@ const { pathToFileURL } = require('node:url');
   assert.equal(protocol.cloudDocumentVersion(documentData),7);
   assert.equal(protocol.cloudStateSignature(state),'4175|2026-08-11T18:56:02.952Z|mobile');
   assert.equal(protocol.assertCloudBase(documentData,7,protocol.cloudStateSignature(state)),7);
+  assert.equal(protocol.isStaleCloudSnapshot({...documentData,syncVersion:6},7,protocol.cloudStateSignature(state)),true,'een vertraagde lagere cloudversie moet worden genegeerd');
+  assert.equal(protocol.isStaleCloudSnapshot(documentData,7,protocol.cloudStateSignature(state)),false,'de bevestigde snapshot blijft geldig');
+  assert.equal(protocol.isStaleCloudSnapshot({...documentData,state:{meta:{...state.meta,updatedBy:'oud'}}},7,protocol.cloudStateSignature(state)),true,'dezelfde versie met andere inhoud mag niet terugrollen');
+  assert.equal(protocol.isStaleCloudSnapshot({...documentData,syncVersion:8},7,protocol.cloudStateSignature(state)),false,'een werkelijk nieuwere cloudversie blijft geldig');
 
   assert.throws(
     ()=>protocol.assertCloudBase({...documentData,syncVersion:8},7,protocol.cloudStateSignature(state)),
@@ -34,6 +38,8 @@ const { pathToFileURL } = require('node:url');
   assert.match(runtime,/acceptRemote\(documentData, normalizedRemote, 'lokale wijzigingen voor cloudherstel'\)/);
   assert.match(runtime,/async restoreBackup\(restoredState, backupReason\)/);
   assert.match(runtime,/const saved = await this\.saveNow\(restored\)/,'een back-up moet eerst door Firestore worden bevestigd');
+  assert.match(runtime,/this\.writeInFlight = true;[\s\S]*const saved = await this\.saveNow\(restored\)/,'tijdens herstel mag een tussentijdse snapshot de schermstand niet vervangen');
+  assert.match(runtime,/isStaleCloudSnapshot/,'vertraagde lagere snapshots moeten worden geweigerd');
   assert.match(runtime,/await this\.acceptRemote\(\{/,'pas daarna mag de herstelde back-up de schermstand worden');
   assert.match(runtime,/await CloudAdapter\.restoreBackup\(migratedImport/);
   assert.match(rules,/request\.resource\.data\.syncVersion\s*==\s*resource\.data\.syncVersion\s*\+\s*1/);
