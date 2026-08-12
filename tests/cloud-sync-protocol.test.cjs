@@ -29,6 +29,10 @@ const { pathToFileURL } = require('node:url');
   assert.match(runtime,/firestore\.runTransaction/,'cloudwrites moeten via een servertransactie lopen');
   assert.match(runtime,/assertCloudBase\(currentData, expectedVersion, expectedSignature\)/);
   assert.doesNotMatch(runtime,/remoteRevision\s*<=\s*localRevision/,'apparaat-lokale revisions mogen clouddata niet meer blokkeren');
+  assert.doesNotMatch(runtime,/btnUploadCloud|Lokale stand naar cloud zetten/,'een lokale stand mag niet handmatig over de cloud worden gezet');
+  assert.match(runtime,/Cloudstand opnieuw laden/);
+  assert.match(runtime,/acceptRemote\(documentData, normalizedRemote, 'lokale wijzigingen voor cloudherstel'\)/);
+  assert.match(runtime,/committedStateSnapshot = stateBeforeImport/,'een herstelde JSON-back-up moet als nieuwe wijziging worden opgeslagen');
   assert.match(rules,/request\.resource\.data\.syncVersion\s*==\s*resource\.data\.syncVersion\s*\+\s*1/);
 
   console.log('Cloud-sync protocol blokkeert verouderde writes.');

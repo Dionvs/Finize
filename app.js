@@ -990,7 +990,7 @@
       ["#btnExport, [data-export]", "download"],
       ["#btnImport, [data-import]", "upload"],
       ["#btnRestoreBackup, [data-restore]", "undo"],
-      ["#btnConnectFirebase, #btnUploadCloud, [data-sync]", "sync"],
+      ["#btnConnectFirebase, #btnReloadCloud, [data-sync]", "sync"],
       ["#btnSaveFirebaseConfig, #btnSaveTransaction, [data-save]", "check"],
       ["#btnCloseTransaction, #btnCancelTransaction, [data-close]", "close"]
     ];
@@ -2254,6 +2254,7 @@
     lastConfirmedCommitId: "",
     activeCommitId: "",
     conflict: false,
+    remoteStateWaiting: null,
     config: loadFirebaseConfig(),
     statusText() {
       return this.status;
@@ -2309,6 +2310,35 @@
         return false;
       }
     },
+    async acceptRemote(documentData, normalizedRemote, backupReason = "voor Firestore-sync") {
+      var _a;
+      if (backupReason) DataAdapter.backup(state, backupReason);
+      clearTimeout(this.saveTimer);
+      this.pendingState = null;
+      this.remoteStateWaiting = null;
+      this.initialSyncComplete = true;
+      this.cloudVersion = cloudDocumentVersion(documentData);
+      this.lastCloudSignature = cloudStateSignature(normalizedRemote);
+      this.lastConfirmedCommitId = String(documentData.commitId || "");
+      this.lastConfirmedRevision = Number((_a = normalizedRemote.meta) == null ? void 0 : _a.revision) || 0;
+      this.conflict = false;
+      this.lastFailureRetryable = true;
+      this.applyingRemote = true;
+      state = normalizedRemote;
+      window.state = state;
+      committedStateSnapshot = cloneState(state);
+      try {
+        await GoalImageStore.initializeState(state);
+        localSave(state);
+      } catch (e) {
+        console.error("lokale kopie Firestore-data opslaan mislukt", e);
+      } finally {
+        this.applyingRemote = false;
+      }
+      DataAdapter.loadedFromStorage = true;
+      this.status = "Cloud opgeslagen";
+      renderActiveTab();
+    },
     attachSnapshot() {
       if (this.unsubscribe || !this.docRef) return;
       const { firestore } = this.modules;
@@ -2347,7 +2377,6 @@
           renderCloudStatus();
           return;
         }
-        const previousState = state;
         const remoteRevision = Number((_b = normalizedRemote.meta) == null ? void 0 : _b.revision) || 0;
         const remoteVersion = cloudDocumentVersion(documentData);
         const remoteSignature = cloudStateSignature(normalizedRemote);
@@ -2362,24 +2391,15 @@
           return;
         }
         const cloudChanged = this.initialSyncComplete && (remoteVersion !== this.cloudVersion || remoteSignature !== this.lastCloudSignature);
-        if ((this.pendingState || this.writeInFlight) && cloudChanged) {
-          this.conflict = true;
-          this.lastFailureRetryable = false;
-          this.status = "Synchronisatieconflict";
-          console.warn("Cloudwijziging niet overschreven: er staan ook lokale wijzigingen klaar.");
+        if (this.writeInFlight && cloudChanged) {
+          this.remoteStateWaiting = { documentData, normalizedRemote };
+          this.status = "Opslaan…";
           renderCloudStatus();
           return;
         }
-        if ((this.pendingState || this.writeInFlight) && !this.initialSyncComplete) {
-          this.initialSyncComplete = true;
-          this.cloudVersion = remoteVersion;
-          this.lastCloudSignature = remoteSignature;
-          this.lastConfirmedCommitId = remoteCommitId;
-          this.conflict = true;
-          this.lastFailureRetryable = false;
-          this.status = "Synchronisatieconflict";
-          console.warn("Lokale wijziging tijdens de eerste cloudsynchronisatie is niet automatisch overschreven.");
-          renderCloudStatus();
+        if (this.pendingState && (!this.initialSyncComplete || cloudChanged)) {
+          console.warn("Lokale wijzigingen zijn als nood-back-up bewaard; de cloudstand blijft leidend.");
+          await this.acceptRemote(documentData, normalizedRemote, "lokale wijzigingen voor cloudherstel");
           return;
         }
         if (this.pendingState || this.writeInFlight) {
@@ -2387,27 +2407,7 @@
           renderCloudStatus();
           return;
         }
-        this.initialSyncComplete = true;
-        this.cloudVersion = remoteVersion;
-        this.lastCloudSignature = remoteSignature;
-        this.lastConfirmedCommitId = remoteCommitId;
-        this.conflict = false;
-        DataAdapter.backup(previousState, "voor Firestore-sync");
-        this.applyingRemote = true;
-        state = normalizedRemote;
-        window.state = state;
-        committedStateSnapshot = cloneState(state);
-        try {
-          await GoalImageStore.initializeState(state);
-          localSave(state);
-        } catch (e) {
-          console.error("lokale kopie Firestore-data opslaan mislukt", e);
-        }
-        DataAdapter.loadedFromStorage = true;
-        this.applyingRemote = false;
-        this.lastConfirmedRevision = remoteRevision;
-        this.status = "Cloud opgeslagen";
-        renderActiveTab();
+        await this.acceptRemote(documentData, normalizedRemote);
       }, (err) => {
         console.error("Firestore live-sync fout", err);
         this.status = navigator.onLine ? "Synchronisatie mislukt" : "Offline — lokaal bewaard";
@@ -2499,10 +2499,28 @@
         return true;
       } catch (e) {
         if ((e == null ? void 0 : e.code) === CLOUD_CONFLICT_CODE) {
-          this.conflict = true;
           this.lastFailureRetryable = false;
-          this.status = "Synchronisatieconflict";
-          console.warn("Lokale stand niet naar de cloud geschreven vanwege een nieuwere cloudwijziging.", e);
+          DataAdapter.backup(state, "lokale wijzigingen bij cloudconflict");
+          this.pendingState = null;
+          console.warn("Lokale stand niet naar de cloud geschreven; de nieuwste cloudstand wordt geladen.", e);
+          try {
+            let latest = this.remoteStateWaiting;
+            if (!latest) {
+              const freshSnapshot = await this.modules.firestore.getDoc(this.docRef);
+              if (!freshSnapshot.exists()) throw new Error("Het cloud-document ontbreekt.");
+              const documentData = freshSnapshot.data();
+              const normalizedRemote = migrateBudgetState(documentData.state);
+              const remoteValidation = validateBudgetState(normalizedRemote);
+              if (!remoteValidation.ok) throw new Error(remoteValidation.errors.join(" "));
+              latest = { documentData, normalizedRemote };
+            }
+            await this.acceptRemote(latest.documentData, latest.normalizedRemote, null);
+            return true;
+          } catch (remoteError) {
+            this.conflict = true;
+            this.status = "Synchronisatieconflict";
+            console.error("Nieuwste cloudstand kon na het conflict niet worden geladen.", remoteError);
+          }
         } else {
           console.error("Firestore opslaan mislukt", e);
           this.status = navigator.onLine ? "Synchronisatie mislukt" : "Offline — lokaal bewaard";
@@ -2527,6 +2545,7 @@
       this.lastConfirmedCommitId = "";
       this.activeCommitId = "";
       this.conflict = false;
+      this.remoteStateWaiting = null;
       this.status = "Offline — lokaal bewaard";
       renderCloudStatus();
     }
@@ -3732,7 +3751,7 @@
       <div class="toolbar" style="margin-top:8px">
         <button class="ghost small" id="btnSaveFirebaseConfig">💾 Firebase-config opslaan</button>
         <button class="primary small" id="btnConnectFirebase">☁ Verbinden met cloud</button>
-        <button class="ghost small" id="btnUploadCloud">⬆ Lokale stand naar cloud zetten</button>
+        <button class="ghost small" id="btnReloadCloud">↻ Cloudstand opnieuw laden</button>
         <button class="ghost small" id="btnFirebaseSignOut">⛓ Cloud loskoppelen</button>
       </div>
       <pre>Firestore rules voor transactionele synchronisatie:
@@ -3799,13 +3818,13 @@ service cloud.firestore {
             return;
           }
           DataAdapter.backup(state, "voor import van " + file.name);
-          DataAdapter.backup(state, "voor JSON-import");
+          const stateBeforeImport = cloneState(state);
           state = migratedImport;
           window.state = state;
-          committedStateSnapshot = cloneState(state);
+          committedStateSnapshot = stateBeforeImport;
           await GoalImageStore.initializeState(state);
-          commitChange(() => {
-          }, { render: false });
+          if (!commitChange(() => {
+          }, { render: false })) throw new Error("De geimporteerde back-up kon niet worden opgeslagen.");
           renderActiveTab();
           alert("Back-up geimporteerd.");
         } catch (err) {
@@ -3830,23 +3849,28 @@ service cloud.firestore {
       const label = backup.label || backup.savedAt || "onbekend moment";
       if (confirm("Laatste lokale nood-back-up herstellen van " + label + "? De huidige stand wordt eerst opnieuw als nood-back-up bewaard.")) {
         DataAdapter.backup(state, "voor herstel lokale nood-back-up");
-        DataAdapter.backup(state, "voor herstel lokale back-up");
+        const stateBeforeRestore = cloneState(state);
         state = migratedBackup;
         window.state = state;
-        committedStateSnapshot = cloneState(state);
+        committedStateSnapshot = stateBeforeRestore;
         await GoalImageStore.initializeState(state);
-        commitChange(() => {
-        }, { render: false });
+        if (!commitChange(() => {
+        }, { render: false })) {
+          alert("De lokale nood-back-up kon niet worden hersteld.");
+          return;
+        }
         renderActiveTab();
       }
     });
     document.getElementById("btnReset").addEventListener("click", () => {
       if (confirm("Weet je zeker dat je alle gegevens wilt wissen en opnieuw wilt beginnen? De huidige stand wordt eerst als lokale nood-back-up bewaard.")) {
         DataAdapter.backup(state, "voor alles wissen");
+        const stateBeforeReset = cloneState(state);
         state = normalizeBudgetState(defaultState());
         window.state = state;
-        committedStateSnapshot = cloneState(state);
-        persist();
+        committedStateSnapshot = stateBeforeReset;
+        if (!commitChange(() => {
+        }, { render: false })) return;
         renderActiveTab();
       }
     });
@@ -3862,13 +3886,24 @@ service cloud.firestore {
     document.getElementById("btnConnectFirebase").addEventListener("click", async () => {
       await CloudAdapter.connect();
     });
-    document.getElementById("btnUploadCloud").addEventListener("click", async () => {
+    document.getElementById("btnReloadCloud").addEventListener("click", async () => {
       if (!CloudAdapter.isConnected()) {
         const connected = await CloudAdapter.connect();
         if (!connected) return;
       }
-      if (confirm("Lokale stand naar Firestore schrijven? Dit overschrijft het Finize cloud-document.")) {
-        await CloudAdapter.saveNow(state);
+      if (!confirm("De actuele cloudstand opnieuw laden? De huidige lokale stand wordt eerst als nood-back-up bewaard.")) return;
+      try {
+        const freshSnapshot = await CloudAdapter.modules.firestore.getDoc(CloudAdapter.docRef);
+        if (!freshSnapshot.exists()) throw new Error("Het cloud-document ontbreekt.");
+        const documentData = freshSnapshot.data();
+        const normalizedRemote = migrateBudgetState(documentData.state);
+        const validation = validateBudgetState(normalizedRemote);
+        if (!validation.ok) throw new Error(validation.errors.join(" "));
+        await CloudAdapter.acceptRemote(documentData, normalizedRemote, "voor handmatig cloudherstel");
+      } catch (error) {
+        CloudAdapter.status = "Synchronisatie mislukt";
+        renderCloudStatus();
+        alert("De cloudstand kon niet opnieuw worden geladen: " + ((error == null ? void 0 : error.message) || String(error)));
       }
     });
     document.getElementById("btnFirebaseSignOut").addEventListener("click", async () => {
