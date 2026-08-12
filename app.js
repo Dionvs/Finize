@@ -2642,7 +2642,7 @@
             app: "finize",
             syncVersion: version,
             commitId
-          }, { merge: true });
+          });
           return version;
         });
         this.cloudVersion = nextVersion;

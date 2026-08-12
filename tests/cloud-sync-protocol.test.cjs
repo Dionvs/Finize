@@ -57,6 +57,7 @@ const { pathToFileURL } = require('node:url');
   const rules = fs.readFileSync(path.join(__dirname, '..', 'firestore.rules'),'utf8');
   assert.match(runtime,/firestore\.runTransaction/,'cloudwrites moeten via een servertransactie lopen');
   assert.match(runtime,/assertCloudBase\(currentData, expectedVersion, expectedSignature\)/);
+  assert.doesNotMatch(runtime,/transaction\.set\([\s\S]*?\{merge\s*:\s*true\}/,'het volledige state-document moet worden vervangen zodat verwijderde velden ook echt uit Firestore verdwijnen');
   assert.doesNotMatch(runtime,/remoteRevision\s*<=\s*localRevision/,'apparaat-lokale revisions mogen clouddata niet meer blokkeren');
   assert.doesNotMatch(runtime,/btnUploadCloud|Lokale stand naar cloud zetten/,'een lokale stand mag niet handmatig over de cloud worden gezet');
   assert.match(runtime,/Cloudstand opnieuw laden/);
