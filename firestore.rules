@@ -1,6 +1,68 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function verifiedAccount() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email is string;
+    }
+
+    function accountLinkPath() {
+      return /databases/$(database)/documents/accountLinks/$(request.auth.token.email.lower());
+    }
+
+    function hasAccountLink() {
+      return verifiedAccount() && exists(accountLinkPath());
+    }
+
+    function accountLink() {
+      return get(accountLinkPath()).data;
+    }
+
+    function linkedTo(householdId) {
+      return hasAccountLink() && accountLink().householdId == householdId;
+    }
+
+    // Een geverifieerd account kan uitsluitend zijn vooraf aangemaakte koppeling lezen.
+    // Rollen en huishoudens worden nooit door de browser aangemaakt of gewijzigd.
+    match /accountLinks/{email} {
+      allow get: if verifiedAccount() && email == request.auth.token.email.lower();
+      allow list, create, update, delete: if false;
+    }
+
+    match /households/{householdId} {
+      allow get: if linkedTo(householdId);
+      allow list, create, update, delete: if false;
+
+      match /members/{uid} {
+        allow read: if linkedTo(householdId);
+        allow create: if linkedTo(householdId)
+          && uid == request.auth.uid
+          && request.resource.data.keys().hasOnly([
+            'uid', 'email', 'householdId', 'role', 'displayName',
+            'sharePersonalTab', 'hiddenKpis', 'joinedAt', 'updatedAt'
+          ])
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.email == request.auth.token.email.lower()
+          && request.resource.data.householdId == householdId
+          && request.resource.data.role == accountLink().role
+          && request.resource.data.displayName == accountLink().displayName
+          && request.resource.data.sharePersonalTab == false
+          && request.resource.data.hiddenKpis is list
+          && request.resource.data.hiddenKpis.size() == 0;
+        allow update: if linkedTo(householdId)
+          && uid == request.auth.uid
+          && request.resource.data.uid == resource.data.uid
+          && request.resource.data.email == resource.data.email
+          && request.resource.data.householdId == resource.data.householdId
+          && request.resource.data.role == resource.data.role
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'displayName', 'sharePersonalTab', 'hiddenKpis', 'updatedAt'
+          ]);
+        allow delete: if false;
+      }
+    }
+
     // Finize gebruikt momenteel een gedeelde, niet-geauthenticeerde planner.
     // Rootwrites moeten via het transactionele syncprotocol lopen.
     match /budgetPlanners/finize {

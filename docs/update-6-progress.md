@@ -29,3 +29,29 @@ Status: lokaal afgerond en geverifieerd, nog niet gepubliceerd.
 - JavaScript-syntax, CSS, gegenereerde runtime en `git diff --check` zijn schoon.
 - Impeccable-detector: geen bevindingen.
 - Visueel geopend op desktop en 390px; geen overflow of browserconsolefouten.
+
+## Fase 2: beveiligde account- en huishoudkoppeling
+
+Status: lokaal afgerond en geverifieerd, nog niet gepubliceerd.
+
+### Opgeleverd
+
+- Firestore-lookup van een vooraf ingerichte accountkoppeling op genormaliseerd e-mailadres.
+- Alleen een ingelogd en geverifieerd account kan zijn eigen koppeling lezen.
+- De rol en het huishouden zijn alleen administratief in te richten en niet vanuit de browser te wijzigen.
+- Eerste beveiligde huishoudlidprofiel wordt bij de eerste geldige aanmelding aangemaakt.
+- Delen staat daarbij standaard uit en de lijst met verborgen KPI's start leeg.
+
+### Bewuste grens van fase 2
+
+- Auth blijft in de releaseconfiguratie uit.
+- De aangeleverde adressen blijven uitsluitend in het genegeerde lokale koppelbestand staan.
+- Het bestaande openbare `budgetPlanners/finize`-pad blijft tijdelijk intact; opslagmigratie volgt pas na een rekenkundige regressiecontrole.
+- Er is nog niets naar Firebase, GitHub of GitHub Pages gepubliceerd.
+
+### Verificatie
+
+- Firestore-regels compileren zonder fouten via een Firebase CLI dry-run.
+- 30 Node-tests geslaagd, inclusief account-, profiel- en regelcontracten.
+- 34 Playwright-browsertests geslaagd; de bestaande interface en auth-preview blijven stabiel.
+- JavaScript-syntax, CSS en de gegenereerde runtime zijn schoon en reproduceerbaar.

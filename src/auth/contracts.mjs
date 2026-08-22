@@ -19,6 +19,30 @@ export function normalizeAssignment(candidate){
   });
 }
 
+export function accountLinkDocumentId(email){
+  return normalizeAccountEmail(email);
+}
+
+export function memberProfileDocumentId(user){
+  return String(user?.uid || '').trim();
+}
+
+export function memberProfileSeed(user, assignment){
+  const normalizedAssignment = normalizeAssignment(assignment);
+  const uid = memberProfileDocumentId(user);
+  const email = normalizeAccountEmail(user?.email);
+  if (!normalizedAssignment || !uid || !email || !user?.emailVerified) return null;
+  return Object.freeze({
+    uid,
+    email,
+    householdId:normalizedAssignment.householdId,
+    role:normalizedAssignment.role,
+    displayName:normalizedAssignment.displayName,
+    sharePersonalTab:false,
+    hiddenKpis:[]
+  });
+}
+
 export function authAccessState(user, assignment){
   if (!user) return 'signed-out';
   if (!user.emailVerified) return 'unverified';

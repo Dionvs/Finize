@@ -7,7 +7,7 @@ FORM: Geërfde Operate-interface; lokaal uitgebreid zonder wijziging van het bes
 */
 
 import { AUTH_RELEASE_ENABLED, DEFAULT_FIREBASE_CONFIG, FIREBASE_SDK_VERSION } from '../config/firebase.js';
-import { authAccessState, normalizeAssignment, persistenceMode } from './contracts.mjs';
+import { accountLinkDocumentId, authAccessState, memberProfileSeed, normalizeAssignment, persistenceMode } from './contracts.mjs';
 
 const localPreview = ['localhost','127.0.0.1'].includes(location.hostname)
   && new URLSearchParams(location.search).get('auth-preview') === '1';
@@ -220,12 +220,26 @@ async function runAction(action){
 
 async function createFirebaseDriver(){
   const base = `https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}`;
-  const [appModule, authModule] = await Promise.all([
+  const [appModule, authModule, firestoreModule] = await Promise.all([
     import(`${base}/firebase-app.js`),
-    import(`${base}/firebase-auth.js`)
+    import(`${base}/firebase-auth.js`),
+    import(`${base}/firebase-firestore.js`)
   ]);
   const app = appModule.getApps().length ? appModule.getApps()[0] : appModule.initializeApp(DEFAULT_FIREBASE_CONFIG);
   const auth = authModule.getAuth(app);
+  const database = firestoreModule.getFirestore(app);
+
+  async function ensureMemberProfile(user, assignment){
+    const seed = memberProfileSeed(user, assignment);
+    if (!seed) return null;
+    const reference = firestoreModule.doc(database,'households',seed.householdId,'members',seed.uid);
+    const snapshot = await firestoreModule.getDoc(reference);
+    if (snapshot.exists()) return snapshot.data();
+    const now = firestoreModule.serverTimestamp();
+    await firestoreModule.setDoc(reference,{...seed,joinedAt:now,updatedAt:now});
+    return seed;
+  }
+
   return {
     initialize(onUser){ return authModule.onAuthStateChanged(auth, async user=>{
       currentUser = user;
@@ -243,8 +257,16 @@ async function createFirebaseDriver(){
     sendVerification(user){ return authModule.sendEmailVerification(user); },
     async reloadUser(user){ await authModule.reload(user); return auth.currentUser; },
     signOut(){ return authModule.signOut(auth); },
-    // Fase 3 vervangt dit door een beveiligde Firestore/callable lookup.
-    async loadAssignment(){ return null; }
+    async loadAssignment(user){
+      const documentId = accountLinkDocumentId(user?.email);
+      if (!user?.emailVerified || !documentId) return null;
+      const snapshot = await firestoreModule.getDoc(firestoreModule.doc(database,'accountLinks',documentId));
+      if (!snapshot.exists()) return null;
+      const assignment = normalizeAssignment(snapshot.data());
+      if (!assignment) return null;
+      await ensureMemberProfile(user,assignment);
+      return assignment;
+    }
   };
 }
 

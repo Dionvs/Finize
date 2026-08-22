@@ -47,6 +47,27 @@
       displayName: String(candidate.displayName || (candidate.role === "dara" ? "Dara" : "Dion")).trim()
     });
   }
+  function accountLinkDocumentId(email) {
+    return normalizeAccountEmail(email);
+  }
+  function memberProfileDocumentId(user) {
+    return String((user == null ? void 0 : user.uid) || "").trim();
+  }
+  function memberProfileSeed(user, assignment) {
+    const normalizedAssignment = normalizeAssignment(assignment);
+    const uid2 = memberProfileDocumentId(user);
+    const email = normalizeAccountEmail(user == null ? void 0 : user.email);
+    if (!normalizedAssignment || !uid2 || !email || !(user == null ? void 0 : user.emailVerified)) return null;
+    return Object.freeze({
+      uid: uid2,
+      email,
+      householdId: normalizedAssignment.householdId,
+      role: normalizedAssignment.role,
+      displayName: normalizedAssignment.displayName,
+      sharePersonalTab: false,
+      hiddenKpis: []
+    });
+  }
   function authAccessState(user, assignment) {
     if (!user) return "signed-out";
     if (!user.emailVerified) return "unverified";
@@ -259,12 +280,24 @@
   }
   async function createFirebaseDriver() {
     const base = `https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}`;
-    const [appModule, authModule] = await Promise.all([
+    const [appModule, authModule, firestoreModule] = await Promise.all([
       import(`${base}/firebase-app.js`),
-      import(`${base}/firebase-auth.js`)
+      import(`${base}/firebase-auth.js`),
+      import(`${base}/firebase-firestore.js`)
     ]);
     const app = appModule.getApps().length ? appModule.getApps()[0] : appModule.initializeApp(DEFAULT_FIREBASE_CONFIG);
     const auth = authModule.getAuth(app);
+    const database = firestoreModule.getFirestore(app);
+    async function ensureMemberProfile(user, assignment) {
+      const seed = memberProfileSeed(user, assignment);
+      if (!seed) return null;
+      const reference = firestoreModule.doc(database, "households", seed.householdId, "members", seed.uid);
+      const snapshot = await firestoreModule.getDoc(reference);
+      if (snapshot.exists()) return snapshot.data();
+      const now = firestoreModule.serverTimestamp();
+      await firestoreModule.setDoc(reference, { ...seed, joinedAt: now, updatedAt: now });
+      return seed;
+    }
     return {
       initialize(onUser) {
         return authModule.onAuthStateChanged(auth, async (user) => {
@@ -299,9 +332,15 @@
       signOut() {
         return authModule.signOut(auth);
       },
-      // Fase 3 vervangt dit door een beveiligde Firestore/callable lookup.
-      async loadAssignment() {
-        return null;
+      async loadAssignment(user) {
+        const documentId = accountLinkDocumentId(user == null ? void 0 : user.email);
+        if (!(user == null ? void 0 : user.emailVerified) || !documentId) return null;
+        const snapshot = await firestoreModule.getDoc(firestoreModule.doc(database, "accountLinks", documentId));
+        if (!snapshot.exists()) return null;
+        const assignment = normalizeAssignment(snapshot.data());
+        if (!assignment) return null;
+        await ensureMemberProfile(user, assignment);
+        return assignment;
       }
     };
   }

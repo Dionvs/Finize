@@ -16,5 +16,18 @@ const path = require('node:path');
     contract.normalizeAssignment({householdId:' dion-dara ',role:'dara',displayName:' Dara '}),
     {householdId:'dion-dara',role:'dara',displayName:'Dara'}
   );
+  assert.equal(contract.accountLinkDocumentId(' DARA@Example.COM '),'dara@example.com');
+  assert.equal(contract.memberProfileDocumentId({uid:' uid-123 '}),'uid-123');
+  assert.equal(contract.memberProfileSeed({uid:'uid-123',email:'Dion@Example.com',emailVerified:false},{householdId:'thuis',role:'dion'}),null);
+  assert.deepEqual(
+    contract.memberProfileSeed(
+      {uid:'uid-123',email:' Dion@Example.COM ',emailVerified:true},
+      {householdId:' thuis ',role:'dion',displayName:' Dion '}
+    ),
+    {
+      uid:'uid-123',email:'dion@example.com',householdId:'thuis',role:'dion',displayName:'Dion',
+      sharePersonalTab:false,hiddenKpis:[]
+    }
+  );
   console.log('UPDATE6_AUTH_CONTRACT_OK');
 })().catch(error=>{ console.error(error); process.exitCode=1; });
