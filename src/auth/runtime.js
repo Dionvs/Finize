@@ -39,14 +39,25 @@ function escapeHtml(value){
 
 function authErrorMessage(error){
   const code = String(error?.code || '');
-  if (code.includes('invalid-credential') || code.includes('wrong-password')) return 'Het e-mailadres of wachtwoord klopt niet.';
+  if (code.includes('invalid-credential') || code.includes('wrong-password')) return 'Het e-mailadres of wachtwoord klopt niet. Eerste keer? Kies Nieuw account aanmaken.';
   if (code.includes('email-already-in-use')) return 'Voor dit e-mailadres bestaat al een account. Log in of herstel je wachtwoord.';
   if (code.includes('weak-password')) return 'Kies een wachtwoord van minimaal zes tekens.';
   if (code.includes('invalid-email')) return 'Vul een geldig e-mailadres in.';
   if (code.includes('popup-closed')) return 'Google-inloggen is gesloten voordat het klaar was.';
+  if (code.includes('popup-blocked')) return 'De Google-pop-up is geblokkeerd. Sta pop-ups voor Finize toe en probeer opnieuw.';
   if (code.includes('network-request-failed')) return 'Er is geen verbinding. Controleer je internet en probeer opnieuw.';
   if (code.includes('too-many-requests')) return 'Er zijn te veel pogingen gedaan. Wacht even en probeer daarna opnieuw.';
   return String(error?.message || 'Inloggen is niet gelukt. Probeer het opnieuw.');
+}
+
+async function activateCredential(credential){
+  const user = credential?.user;
+  if (!user) return;
+  currentUser = user;
+  currentAssignment = user.emailVerified ? normalizeAssignment(await driver.loadAssignment(user)) : null;
+  currentMemberProfile = driver.getProfile?.() || currentMemberProfile;
+  currentHouseholdMembers = driver.getHouseholdMembers?.() || currentHouseholdMembers;
+  render();
 }
 
 function setFeedback(message='', tone='neutral'){
@@ -167,7 +178,7 @@ function bindSignInActions(){
   root.querySelector('[data-auth-google]')?.addEventListener('click', ()=>runAction(async()=>{
     const stay = root.querySelector('[data-auth-stay]')?.checked !== false;
     await driver.setPersistence(persistenceMode(stay));
-    await driver.signInGoogle({redirect:matchMedia('(max-width: 767px)').matches || matchMedia('(display-mode: standalone)').matches});
+    await activateCredential(await driver.signInGoogle());
   }));
   root.querySelector('[data-auth-reset]')?.addEventListener('click', ()=>{
     const email = root.querySelector('input[name="email"]')?.value.trim();
@@ -187,9 +198,10 @@ function bindSignInActions(){
       await driver.setPersistence(persistenceMode(form.elements.staySignedIn.checked));
       if (mode === 'register'){
         const credential = await driver.registerEmail(email, password);
-        await driver.sendVerification(credential?.user || currentUser);
+        await activateCredential(credential);
+        await driver.sendVerification(credential.user);
       }else{
-        await driver.signInEmail(email, password);
+        await activateCredential(await driver.signInEmail(email, password));
       }
     });
   });
@@ -266,12 +278,18 @@ async function createFirebaseDriver(){
     setPersistence(modeName){ return authModule.setPersistence(auth, modeName === 'local' ? authModule.browserLocalPersistence : authModule.browserSessionPersistence); },
     signInEmail(email,password){ return authModule.signInWithEmailAndPassword(auth,email,password); },
     registerEmail(email,password){ return authModule.createUserWithEmailAndPassword(auth,email,password); },
-    async signInGoogle({redirect}){
+    async signInGoogle(){
       const provider = new authModule.GoogleAuthProvider();
-      return redirect ? authModule.signInWithRedirect(auth,provider) : authModule.signInWithPopup(auth,provider);
+      provider.setCustomParameters({prompt:'select_account'});
+      return authModule.signInWithPopup(auth,provider);
     },
     sendPasswordReset(email){ return authModule.sendPasswordResetEmail(auth,email); },
-    sendVerification(user){ return authModule.sendEmailVerification(user); },
+    sendVerification(user){
+      const continueUrl = new URL(location.href);
+      continueUrl.search = '';
+      continueUrl.hash = '';
+      return authModule.sendEmailVerification(user,{url:continueUrl.toString(),handleCodeInApp:false});
+    },
     async reloadUser(user){ await authModule.reload(user); return auth.currentUser; },
     signOut(){ return authModule.signOut(auth); },
     async loadAssignment(user){

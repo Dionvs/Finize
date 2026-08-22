@@ -128,3 +128,22 @@ Status: live gepubliceerd en na de definitieve beveiligingsomschakeling geverifi
 - Zonder account geven het oude pad, het huishoudpad en accountkoppelingen alle drie 403.
 - De publieke pagina laadt release 79, toont het nieuwe inlogscherm en heeft **Ingelogd blijven** standaard aangevinkt.
 - De definitieve Firestore-regels zijn zonder compilatiefouten gepubliceerd.
+
+## Herstelronde: Google-login en e-mailverificatie
+
+Status: lokaal afgerond en geverifieerd, niet gepubliceerd.
+
+### Oorzaak en oplossing
+
+- Voor de twee gekoppelde adressen bestond nog geen Firebase Auth-account; zonder voltooide accountaanmaak kan geen verificatiemail worden verstuurd.
+- De geïnstalleerde mobiele PWA gebruikte voor Google een redirect via het Firebase-domein. Die route is vervangen door een directe Google-pop-up vanuit de gebruikersklik.
+- Na e-mailaccountaanmaak toont Finize direct het verificatiescherm en krijgt de bevestigingslink de Finize-pagina als expliciet terugkeeradres.
+- De foutmelding bij inloggen zonder bestaand e-mailaccount verwijst nu naar **Nieuw account aanmaken**.
+- Lokale browsertests kunnen niet meer onbedoeld de productiecloud benaderen; een expliciete `cloud-test=1` blijft beschikbaar voor gerichte cloudtests.
+
+### Verificatie
+
+- Beide gekoppelde rollen en huishoudkoppelingen bestaan; er waren nog geen Auth-accounts voor de gekoppelde adressen.
+- 31 Node-regressietests, syntaxcontrole, CSS-controle en reproduceerbare build geslaagd.
+- 39 Playwright-browsertests geslaagd, inclusief directe verificatiestap, Google zonder PWA-redirect en alle zeven visuele baselines.
+- Deze herstelronde blijft lokaal totdat publicatie expliciet wordt goedgekeurd.

@@ -1707,6 +1707,12 @@ let activeAuthSession = globalThis.FinizeAuth?.enabled ? null : {status:'disable
 
 function activeStorageKeys(){ return storageKeysForSession(activeAuthSession); }
 
+function cloudConnectionAllowed(){
+  const localRuntime = ['localhost','127.0.0.1'].includes(location.hostname);
+  const explicitCloudTest = new URLSearchParams(location.search).get('cloud-test') === '1';
+  return !localRuntime || explicitCloudTest;
+}
+
 const GoalImageStore = {
   dbPromise:null,
   cache:new Map(),
@@ -2128,6 +2134,11 @@ const CloudAdapter = {
     return this.modules;
   },
   async connect(){
+    if (!cloudConnectionAllowed()){
+      this.status = 'Offline — lokaal bewaard';
+      renderCloudStatus();
+      return false;
+    }
     if (this.isConnected()) return true;
     if (this.connectPromise) return this.connectPromise;
     this.connectPromise = this.connectOnce();
@@ -6641,7 +6652,7 @@ window.__finizeMaybeFinishBootstrap=function(){
   bootstrap.rendered=true;
   bootstrap.initialRenderCount+=1;
   renderActiveTab();
-  CloudAdapter.connect();
+  if (cloudConnectionAllowed()) CloudAdapter.connect();
   return true;
 };
 async function initializeApp(){

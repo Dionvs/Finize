@@ -96,14 +96,25 @@
   }
   function authErrorMessage(error) {
     const code = String((error == null ? void 0 : error.code) || "");
-    if (code.includes("invalid-credential") || code.includes("wrong-password")) return "Het e-mailadres of wachtwoord klopt niet.";
+    if (code.includes("invalid-credential") || code.includes("wrong-password")) return "Het e-mailadres of wachtwoord klopt niet. Eerste keer? Kies Nieuw account aanmaken.";
     if (code.includes("email-already-in-use")) return "Voor dit e-mailadres bestaat al een account. Log in of herstel je wachtwoord.";
     if (code.includes("weak-password")) return "Kies een wachtwoord van minimaal zes tekens.";
     if (code.includes("invalid-email")) return "Vul een geldig e-mailadres in.";
     if (code.includes("popup-closed")) return "Google-inloggen is gesloten voordat het klaar was.";
+    if (code.includes("popup-blocked")) return "De Google-pop-up is geblokkeerd. Sta pop-ups voor Finize toe en probeer opnieuw.";
     if (code.includes("network-request-failed")) return "Er is geen verbinding. Controleer je internet en probeer opnieuw.";
     if (code.includes("too-many-requests")) return "Er zijn te veel pogingen gedaan. Wacht even en probeer daarna opnieuw.";
     return String((error == null ? void 0 : error.message) || "Inloggen is niet gelukt. Probeer het opnieuw.");
+  }
+  async function activateCredential(credential) {
+    var _a2, _b;
+    const user = credential == null ? void 0 : credential.user;
+    if (!user) return;
+    currentUser = user;
+    currentAssignment = user.emailVerified ? normalizeAssignment(await driver.loadAssignment(user)) : null;
+    currentMemberProfile = ((_a2 = driver.getProfile) == null ? void 0 : _a2.call(driver)) || currentMemberProfile;
+    currentHouseholdMembers = ((_b = driver.getHouseholdMembers) == null ? void 0 : _b.call(driver)) || currentHouseholdMembers;
+    render();
   }
   function setFeedback(message = "", tone = "neutral") {
     const target = root == null ? void 0 : root.querySelector("[data-auth-feedback]");
@@ -220,7 +231,7 @@
       var _a3;
       const stay = ((_a3 = root.querySelector("[data-auth-stay]")) == null ? void 0 : _a3.checked) !== false;
       await driver.setPersistence(persistenceMode(stay));
-      await driver.signInGoogle({ redirect: matchMedia("(max-width: 767px)").matches || matchMedia("(display-mode: standalone)").matches });
+      await activateCredential(await driver.signInGoogle());
     }));
     (_c = root.querySelector("[data-auth-reset]")) == null ? void 0 : _c.addEventListener("click", () => {
       var _a3;
@@ -244,9 +255,10 @@
         await driver.setPersistence(persistenceMode(form.elements.staySignedIn.checked));
         if (mode === "register") {
           const credential = await driver.registerEmail(email, password);
-          await driver.sendVerification((credential == null ? void 0 : credential.user) || currentUser);
+          await activateCredential(credential);
+          await driver.sendVerification(credential.user);
         } else {
-          await driver.signInEmail(email, password);
+          await activateCredential(await driver.signInEmail(email, password));
         }
       });
     });
@@ -329,15 +341,19 @@
       registerEmail(email, password) {
         return authModule.createUserWithEmailAndPassword(auth, email, password);
       },
-      async signInGoogle({ redirect }) {
+      async signInGoogle() {
         const provider = new authModule.GoogleAuthProvider();
-        return redirect ? authModule.signInWithRedirect(auth, provider) : authModule.signInWithPopup(auth, provider);
+        provider.setCustomParameters({ prompt: "select_account" });
+        return authModule.signInWithPopup(auth, provider);
       },
       sendPasswordReset(email) {
         return authModule.sendPasswordResetEmail(auth, email);
       },
       sendVerification(user) {
-        return authModule.sendEmailVerification(user);
+        const continueUrl = new URL(location.href);
+        continueUrl.search = "";
+        continueUrl.hash = "";
+        return authModule.sendEmailVerification(user, { url: continueUrl.toString(), handleCodeInApp: false });
       },
       async reloadUser(user) {
         await authModule.reload(user);
@@ -2375,6 +2391,11 @@
   function activeStorageKeys() {
     return storageKeysForSession(activeAuthSession);
   }
+  function cloudConnectionAllowed() {
+    const localRuntime = ["localhost", "127.0.0.1"].includes(location.hostname);
+    const explicitCloudTest = new URLSearchParams(location.search).get("cloud-test") === "1";
+    return !localRuntime || explicitCloudTest;
+  }
   var GoalImageStore = {
     dbPromise: null,
     cache: /* @__PURE__ */ new Map(),
@@ -2823,6 +2844,11 @@
       return this.modules;
     },
     async connect() {
+      if (!cloudConnectionAllowed()) {
+        this.status = "Offline — lokaal bewaard";
+        renderCloudStatus();
+        return false;
+      }
       if (this.isConnected()) return true;
       if (this.connectPromise) return this.connectPromise;
       this.connectPromise = this.connectOnce();
@@ -7747,7 +7773,7 @@ service cloud.firestore {
     bootstrap.rendered = true;
     bootstrap.initialRenderCount += 1;
     renderActiveTab();
-    CloudAdapter.connect();
+    if (cloudConnectionAllowed()) CloudAdapter.connect();
     return true;
   };
   async function initializeApp() {
