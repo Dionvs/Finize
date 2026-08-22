@@ -8,6 +8,9 @@ test('transacties worden alleen vanuit persoonlijk en gezamenlijk toegevoegd', a
   await page.getByRole('button',{name:'+ Gezamenlijke uitgave'}).click();
   const modal = page.locator('#transactionModal');
   await expect(modal).toHaveClass(/open/);
+  await expect(modal.getByRole('heading',{name:'Uitgave toevoegen'})).toBeVisible();
+  await expect(modal.getByRole('button',{name:/Bankbestand importeren/})).toBeVisible();
+  await modal.getByRole('button',{name:/Handmatig invoeren/}).click();
   await expect(modal.getByRole('heading',{name:'Gezamenlijke uitgave'})).toBeVisible();
   await expect(modal.getByLabel('Eigenaar')).toHaveCount(0);
   await modal.locator('#btnCloseJointTransaction').click();
@@ -15,12 +18,27 @@ test('transacties worden alleen vanuit persoonlijk en gezamenlijk toegevoegd', a
 
   await page.locator('.v4-sidebar .tab-btn[data-tab="dion"]').click();
   await page.getByRole('button',{name:'+ Uitgave van Dion'}).click();
+  await expect(modal.getByRole('heading',{name:'Uitgave toevoegen'})).toBeVisible();
+  await modal.getByRole('button',{name:/Handmatig invoeren/}).click();
   await expect(modal.getByRole('heading',{name:'Dion uitgave'})).toBeVisible();
   await expect(modal.getByLabel('Eigenaar')).toHaveCount(0);
   await modal.locator('#personalTxAmount').fill('12.34');
   await modal.locator('#personalTxDescription').fill('Persoonlijke test');
   await modal.locator('#btnSavePersonalTransaction').click();
   await expect.poll(()=>page.evaluate(()=>window.state.transactions.at(-1)?.owner)).toBe('dion');
+});
+
+test('bankimport opent vanuit de gekozen uitgavenknop en staat niet op dashboard', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByText('Bank import & uitgaven',{exact:true})).toHaveCount(0);
+  await page.locator('.v4-sidebar .tab-btn[data-tab="dion"]').click();
+  await page.getByRole('button',{name:'+ Uitgave van Dion'}).click();
+  await page.locator('#transactionModal').getByRole('button',{name:/Bankbestand importeren/}).click();
+  const importModal=page.locator('#u4ImportModalRoot');
+  await expect(importModal).toHaveClass(/open/);
+  await expect(importModal.getByRole('heading',{name:'Bankimport'})).toBeVisible();
+  await expect(importModal).toContainText('Dion');
+  await expect(importModal.locator('[data-u4-file]')).toHaveCount(1);
 });
 
 test('zonder huishouden toont persoonlijk totaal alle inkomstenbronnen', async ({ page }) => {

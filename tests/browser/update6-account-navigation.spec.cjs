@@ -50,7 +50,7 @@ test('dashboard en gezamenlijk blijven voor ieder account bewerkbaar op desktop'
   await page.locator('.v4-sidebar .tab-btn[data-tab="gezamenlijk"]').click();
   await expect(page.locator('#tab-gezamenlijk .u6-readonly-banner')).toHaveCount(0);
   await expect(page.getByRole('button',{name:'Gezamenlijke maandbudgetten wijzigen'})).toBeEnabled();
-  await expect(page.locator('#tab-gezamenlijk input[data-path$="spaarpotDezeMaand"]')).toBeEnabled();
+  await expect(page.locator('#tab-gezamenlijk .u5-joint-goals-preview [data-saving-edit]')).toBeEnabled();
 
   await page.locator('.v4-sidebar .tab-btn[data-tab="dion"]').click();
   await expect(page.locator('#tab-dion .u6-readonly-banner')).toHaveCount(0);

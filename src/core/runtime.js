@@ -1174,13 +1174,17 @@ function renderModernGoalCards(doelen, pot, owner, limit=null){
 }
 function renderDesktopGoalsPreview(doelen, pot, owner='gezamenlijk'){
   const name = ownerLabel(owner);
-  const items = calcGroep(doelen || [], pot, TODAY).slice(0, 3);
+  const editAttribute = owner === 'gezamenlijk' ? 'data-saving-edit' : `data-personal-saving-edit="${owner}"`;
+  const editLabel = owner === 'gezamenlijk' ? 'Spaargeld van deze maand aanpassen' : `Spaargeld van ${name} voor deze maand aanpassen`;
   return `<div class="card span-12 u5-joint-goals-preview">
     <div class="card-head">
       <h2>${owner === 'gezamenlijk' ? 'Spaardoelen preview' : `${name} spaardoelen`}</h2>
-      <button class="ghost small" data-tab-shortcut="spaardoelen">Bekijk alle doelen →</button>
+      <div class="goals-preview-actions">
+        <button type="button" class="ghost small savings-month-button" ${editAttribute} aria-label="${textSafe(editLabel)}">Spaargeld deze maand <strong>${eur(pot)}</strong></button>
+        <button type="button" class="ghost small" data-tab-shortcut="spaardoelen">Bekijk alle doelen →</button>
+      </div>
     </div>
-    <div class="mobile-goal-list">${items.length ? items.map(item=>renderMobileGoalRow(item, owner)).join('') : '<p class="muted-empty">Nog geen spaardoelen.</p>'}</div>
+    ${renderGoalOverviewTable(doelen, pot)}
   </div>`;
 }
 function goalMonthlyInlegText(item){
@@ -3256,7 +3260,6 @@ function renderDashboard(){
     </div>
     <div class="manage-stack">
       ${renderU3AdminPanel()}
-      ${renderManageSection('Bank import & uitgaven', renderBankImportSection(), bankImportOpen, 'data-dashboard-accordion="bank-import"')}
       ${renderManageSection(`Jaaroverzicht ${year}`, `<div class="card"><div class="year-legend top"><span><i class="income-dot"></i>Inkomen</span><span><i class="spent-dot"></i>Uitgaven</span><span><i class="saving-dot"></i>Sparen</span></div><div class="year-summary"><div><span>Inkomen dit jaar</span><strong class="value pos">${eur(yearTotals.income)}</strong></div><div><span>Uitgaven dit jaar</span><strong class="value neg">${eur(yearTotals.spent)}</strong></div><div><span>Sparen dit jaar</span><strong class="value pos">${eur(yearTotals.saving)}</strong></div></div><div class="year-chart">${monthBars}</div></div>`, false)}
     </div>
   `;
@@ -3468,18 +3471,6 @@ function renderPersonOrJoint(tabId, key, label){
       <div class="card-head"><h2>Hypotheek</h2></div>
       ${renderRowsTable('na.gezamenlijk.hypotheek', data.hypotheek)}
     </div>` : '';
-  const savingsSummary = isJoint ? `
-    <div class="savings-head">
-      <div class="kpi"><div class="label">Maandelijkse lasten</div><div class="value">${eur(r.gezamenlijkeLastenTotaal)}</div></div>
-      <div class="kpi">
-        <div class="label">Spaargeld deze maand</div>
-        <input type="number" step="0.01" data-path="${state.meta.scenario}.spaarpotDezeMaand" style="width:100%;font-size:16px;font-weight:700">
-      </div>
-    </div>` : `
-    <div class="savings-head">
-      <div class="kpi ${rr.beschikbaarVoorSparen<0?'neg':'pos'}"><div class="label">Beschikbaar voor sparen</div><div class="value ${rr.beschikbaarVoorSparen<0?'neg':'pos'}">${eur(rr.beschikbaarVoorSparen)}</div></div>
-    </div>`;
-
   const transactionCard = `
     <div class="card card-scroll span-7">
       <div class="card-head"><h2>${isJoint?'Gezamenlijke transacties':'Persoonlijke uitgaven'} — ${monthLabel(getSelectedMonth())}</h2>${transactionAddButton(key)}</div>
@@ -3490,19 +3481,25 @@ function renderPersonOrJoint(tabId, key, label){
   const variableBudget = isJoint ? r.variabelBudgetTotaal : sumBedrag(data.variabel || []);
   const variableUsed = isJoint ? r.variabelTotaal : rr.variabeleUitgaven;
   const variablePct = variableBudget > 0 ? Math.min(100, Math.round((variableUsed / variableBudget) * 100)) : 0;
+  const remainingThisMonth = round2(
+    (isJoint ? r.totaalSalaris : personalIncome.total)
+    - (isJoint ? r.vasteLastenTotaal : rr.persoonlijkeVasteLasten)
+    - variableUsed
+    - spaarpotVoorGroep
+  );
 
   const jointKpis = isJoint ? `
     <div class="overview-kpi-row">
       ${renderIconKpi('€','green','Totaal gezamenlijk inkomen', eur(r.totaalSalaris), 'Dion en Dara samen', {valueClass:'value pos'})}
       ${renderIconKpi('▤','blue','Vaste lasten totaal', eur(r.vasteLastenTotaal), 'Klik om te wijzigen', {valueClass:'value neg', openFixedOwner:'gezamenlijk'})}
-      ${renderIconKpi('◎','green','Sparen', eur(r.spaarpotDezeMaand), 'Klik om aan te passen', {valueClass:'value pos', editSaving:true})}
+      ${renderIconKpi('◎','green','Over deze maand', eur(remainingThisMonth), 'Na vaste lasten, gebruikt budget en spaargeld', {valueClass:remainingThisMonth<0?'value neg':'value pos'})}
       ${renderIconKpi('▥','blue','Variabel gebruikt', `${eur(variableUsed)} / ${eur(variableBudget)}`, `<span class="overview-budget-track" style="--used-pct:${variablePct}%"></span>`)}
     </div>` : '';
   const personalKpis = !isJoint ? `
     <div class="overview-kpi-row">
       ${personalKpiVisible(key,'income')?renderIconKpi('€','green','Totaal inkomen', eur(personalIncome.total), renderPersonalIncomeSources(personalIncome), {valueClass:personalIncome.total<0?'value neg':'value pos',kpiId:'income'}):''}
       ${personalKpiVisible(key,'fixed')?renderIconKpi('▤','blue','Vaste lasten', eur(rr.persoonlijkeVasteLasten), 'Klik om te wijzigen', {valueClass: rr.persoonlijkeVasteLasten>0?'value neg':'value pos', openFixedOwner:key,kpiId:'fixed'}):''}
-      ${personalKpiVisible(key,'saving')?renderIconKpi('◎','green','Sparen', eur(rr.beschikbaarVoorSparen), `${rr.savingsSource==='handmatig'?'Handmatig':'Automatisch'} · klik om aan te passen`, {valueClass: rr.beschikbaarVoorSparen<0?'value neg':'value pos', editSavingOwner:key,kpiId:'saving'}):''}
+      ${personalKpiVisible(key,'saving')?renderIconKpi('◎','green','Over deze maand', eur(remainingThisMonth), 'Na vaste lasten, gebruikt budget en spaargeld', {valueClass:remainingThisMonth<0?'value neg':'value pos',kpiId:'saving'}):''}
       ${personalKpiVisible(key,'variable')?renderIconKpi('▥','blue','Variabel gebruikt', `${eur(variableUsed)} / ${eur(variableBudget)}`, `<span class="overview-budget-track" style="--used-pct:${variablePct}%"></span>`,{kpiId:'variable'}):''}
     </div>` : '';
   const incomeManage = !isJoint ? `
@@ -3530,7 +3527,6 @@ function renderPersonOrJoint(tabId, key, label){
     </div>
     <div class="manage-stack">
       ${hypotheekCard ? renderManageSection('Beheer hypotheek', hypotheekCard, false) : ''}
-      ${renderManageSection('Sparen', `<div class="card">${savingsSummary}${renderGoalOverviewTable(doelenVoorGroep, spaarpotVoorGroep)}</div>`, false)}
     </div>
   ` : `
     ${renderPageHeading(`${label} overzicht — ${monthLabel(getSelectedMonth())}`, pageGreeting)}
@@ -3547,7 +3543,6 @@ function renderPersonOrJoint(tabId, key, label){
     </div>
     <div class="manage-stack">
       ${renderManageSection('Inkomen en vaste teruggaven', incomeManage, false)}
-      ${renderManageSection('Spaardoelen tabeloverzicht', `<div class="card">${renderGoalOverviewTable(doelenVoorGroep, spaarpotVoorGroep)}</div>`, false)}
     </div>
   `;
   applyReadOnlyPersonalTab(document.getElementById(tabId),key);
@@ -4167,6 +4162,30 @@ function openJointTransactionModal(transactionId=''){
     }, {render:false})){ saveButton.disabled = false; return; }
     close();
     renderActiveTab();
+  });
+}
+
+function openTransactionEntryMenu(owner){
+  if (!['gezamenlijk','dion','dara'].includes(owner) || isReadOnlyPersonalTab(owner)) return;
+  const modal=document.getElementById('transactionModal');
+  const name=ownerLabel(owner);
+  const contextText=owner==='gezamenlijk'?'de gezamenlijke rekening':`${name}s persoonlijke overzicht`;
+  modal.innerHTML=`<div class="modal transaction-entry-menu">
+    <div class="card-head"><div><h2>Uitgave toevoegen</h2><p class="hint">Kies hoe je een uitgave toevoegt aan ${textSafe(contextText)}.</p></div><button type="button" class="danger-ghost" data-close-transaction-entry aria-label="Sluiten">×</button></div>
+    <div class="transaction-entry-options">
+      <button type="button" class="transaction-entry-option" data-entry-manual><span class="icon-circle green">${iconSvg('receipt')}</span><span><strong>Handmatig invoeren</strong><small>Voeg één uitgave toe met bedrag, datum en categorie.</small></span><span aria-hidden="true">›</span></button>
+      <button type="button" class="transaction-entry-option" data-entry-bank><span class="icon-circle blue">${iconSvg('upload')}</span><span><strong>Bankbestand importeren</strong><small>Importeer en controleer meerdere transacties uit een CSV-bestand.</small></span><span aria-hidden="true">›</span></button>
+    </div>
+  </div>`;
+  modal.classList.add('open');
+  const close=()=>{modal.classList.remove('open');modal.innerHTML='';};
+  modal.querySelector('[data-close-transaction-entry]').addEventListener('click',close);
+  bindModalBackdrop(modal,close);
+  modal.querySelector('[data-entry-manual]').addEventListener('click',()=>{close();owner==='gezamenlijk'?openJointTransactionModal():openPersonalTransactionModal(owner);});
+  modal.querySelector('[data-entry-bank]').addEventListener('click',()=>{
+    close();
+    if(typeof window.openBankImportForOwner==='function')window.openBankImportForOwner(owner);
+    else alert('Bankimport is nog niet beschikbaar. Vernieuw de app en probeer opnieuw.');
   });
 }
 
@@ -5128,7 +5147,7 @@ function renderSettings(){
   const kpis=[
     ['income','Totaal inkomen'],
     ['fixed','Vaste lasten'],
-    ['saving','Sparen'],
+    ['saving','Over deze maand'],
     ['variable','Variabel gebruikt']
   ];
   root.innerHTML=`
@@ -5275,11 +5294,11 @@ function renderActiveTab(){
   });
   root.querySelectorAll('[data-open-joint-transaction]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
-      openJointTransactionModal();
+      openTransactionEntryMenu('gezamenlijk');
     });
   });
   root.querySelectorAll('[data-open-personal-transaction]').forEach(btn=>{
-    btn.addEventListener('click', ()=>openPersonalTransactionModal(btn.dataset.openPersonalTransaction));
+    btn.addEventListener('click', ()=>openTransactionEntryMenu(btn.dataset.openPersonalTransaction));
   });
   root.querySelectorAll('[data-edit-personal-transaction]').forEach(row=>{
     const openEditor = event=>{ if (!event?.target.closest('button')) openPersonalTransactionModal(row.dataset.owner, row.dataset.editPersonalTransaction); };
@@ -6568,8 +6587,7 @@ function u3OpenClose(){
   modal.querySelector('#u3ReopenMonth')?.addEventListener('click',()=>{commitChange(()=>u3ReopenMonth(month),{render:false});u3OpenClose();});
   modal.querySelector('#u3GoTransactions')?.addEventListener('click',()=>{
     modal.closest('#incomeEditModal')?.classList.remove('open','u3-admin-open');
-    bankImportOpen=true;renderActiveTab();
-    [...document.querySelectorAll('.manage-section')].find(item=>item.querySelector('summary')?.textContent.includes('Bank import & uitgaven'))?.setAttribute('open','');
+    if(typeof window.openBankImportForOwner==='function')window.openBankImportForOwner('gezamenlijk');
   });
   const closeMonth=(force=false)=>{
     try{

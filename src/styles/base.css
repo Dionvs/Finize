@@ -392,6 +392,9 @@ td.num{ text-align:right; }
 .dashboard-grid > .card{ padding:17px; margin-bottom:0; }
 .dashboard-grid .card-head{ margin-bottom:12px; }
 .dashboard-grid .card-head h2{ font-size:17px; }
+.goals-preview-actions{ display:flex; align-items:center; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
+.savings-month-button{ display:inline-flex; align-items:center; gap:7px; }
+.savings-month-button strong{ color:var(--green); font-size:inherit; }
 .overview-kpi-row{ display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:12px; align-items:stretch; }
 .overview-kpi-row.cols-4{ grid-template-columns:repeat(4,minmax(0,1fr)); }
 .overview-kpi-row > .card{ margin-bottom:0; min-width:0; }
@@ -498,6 +501,17 @@ td.num{ text-align:right; }
 .modal-grid{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
 .modal-grid label{ display:grid; gap:5px; font-size:12px; color:var(--text-dim); font-weight:700; }
 .modal-grid .full{ grid-column:1/-1; }
+.transaction-entry-menu{ width:min(560px,100%); }
+.transaction-entry-menu .card-head{ align-items:flex-start; margin-bottom:16px; }
+.transaction-entry-menu .card-head p{ margin:5px 0 0; max-width:46ch; }
+.transaction-entry-options{ display:grid; gap:10px; }
+.transaction-entry-option{ display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:12px; width:100%; padding:14px; border:1px solid var(--border); border-radius:14px; background:var(--card); color:var(--text); text-align:left; box-shadow:none; }
+.transaction-entry-option:hover{ border-color:var(--green-soft); background:var(--green-bg); transform:none; }
+.transaction-entry-option:focus-visible{ outline:3px solid rgba(67,123,181,.25); outline-offset:2px; }
+.transaction-entry-option > span:nth-child(2){ display:grid; gap:3px; }
+.transaction-entry-option strong{ font-size:14px; }
+.transaction-entry-option small{ color:var(--text-faint); font-size:12px; line-height:1.35; }
+.transaction-entry-option > span:last-child{ color:var(--text-faint); font-size:24px; }
 .modal-actions{ display:flex; justify-content:flex-end; gap:10px; margin-top:16px; flex-wrap:wrap; }
 .income-sheet{ width:min(440px,100%); }
 .income-sheet-handle{ }
@@ -1541,6 +1555,9 @@ body.v4-app[data-real-active-tab="gezamenlijk"] .joint-fixed-edit-btn svg{
 }
 
 @media (max-width:767px){
+  #transactionModal:has(.transaction-entry-menu){ align-items:flex-end; padding:0; }
+  #transactionModal .transaction-entry-menu{ width:100%; border-radius:22px 22px 0 0; padding:18px 16px calc(18px + env(safe-area-inset-bottom)); }
+  .transaction-entry-option{ padding:13px 12px; }
 /* Mobiele app-shell en navigatie */
 body.v4-app{ padding:0 0 84px; }
   body.v4-app .topbar{ display:none; }

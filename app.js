@@ -1837,13 +1837,17 @@
   }
   function renderDesktopGoalsPreview(doelen, pot, owner = "gezamenlijk") {
     const name = ownerLabel(owner);
-    const items = calcGroep(doelen || [], pot, TODAY).slice(0, 3);
+    const editAttribute = owner === "gezamenlijk" ? "data-saving-edit" : `data-personal-saving-edit="${owner}"`;
+    const editLabel = owner === "gezamenlijk" ? "Spaargeld van deze maand aanpassen" : `Spaargeld van ${name} voor deze maand aanpassen`;
     return `<div class="card span-12 u5-joint-goals-preview">
     <div class="card-head">
       <h2>${owner === "gezamenlijk" ? "Spaardoelen preview" : `${name} spaardoelen`}</h2>
-      <button class="ghost small" data-tab-shortcut="spaardoelen">Bekijk alle doelen →</button>
+      <div class="goals-preview-actions">
+        <button type="button" class="ghost small savings-month-button" ${editAttribute} aria-label="${textSafe(editLabel)}">Spaargeld deze maand <strong>${eur(pot)}</strong></button>
+        <button type="button" class="ghost small" data-tab-shortcut="spaardoelen">Bekijk alle doelen →</button>
+      </div>
     </div>
-    <div class="mobile-goal-list">${items.length ? items.map((item) => renderMobileGoalRow(item, owner)).join("") : '<p class="muted-empty">Nog geen spaardoelen.</p>'}</div>
+    ${renderGoalOverviewTable(doelen, pot)}
   </div>`;
   }
   function goalMonthlyInlegText(item) {
@@ -3979,7 +3983,6 @@
     </div>
     <div class="manage-stack">
       ${renderU3AdminPanel()}
-      ${renderManageSection("Bank import & uitgaven", renderBankImportSection(), bankImportOpen, 'data-dashboard-accordion="bank-import"')}
       ${renderManageSection(`Jaaroverzicht ${year}`, `<div class="card"><div class="year-legend top"><span><i class="income-dot"></i>Inkomen</span><span><i class="spent-dot"></i>Uitgaven</span><span><i class="saving-dot"></i>Sparen</span></div><div class="year-summary"><div><span>Inkomen dit jaar</span><strong class="value pos">${eur(yearTotals.income)}</strong></div><div><span>Uitgaven dit jaar</span><strong class="value neg">${eur(yearTotals.spent)}</strong></div><div><span>Sparen dit jaar</span><strong class="value pos">${eur(yearTotals.saving)}</strong></div></div><div class="year-chart">${monthBars}</div></div>`, false)}
     </div>
   `;
@@ -4180,17 +4183,6 @@
       <div class="card-head"><h2>Hypotheek</h2></div>
       ${renderRowsTable("na.gezamenlijk.hypotheek", data.hypotheek)}
     </div>` : "";
-    const savingsSummary = isJoint ? `
-    <div class="savings-head">
-      <div class="kpi"><div class="label">Maandelijkse lasten</div><div class="value">${eur(r.gezamenlijkeLastenTotaal)}</div></div>
-      <div class="kpi">
-        <div class="label">Spaargeld deze maand</div>
-        <input type="number" step="0.01" data-path="${state.meta.scenario}.spaarpotDezeMaand" style="width:100%;font-size:16px;font-weight:700">
-      </div>
-    </div>` : `
-    <div class="savings-head">
-      <div class="kpi ${rr.beschikbaarVoorSparen < 0 ? "neg" : "pos"}"><div class="label">Beschikbaar voor sparen</div><div class="value ${rr.beschikbaarVoorSparen < 0 ? "neg" : "pos"}">${eur(rr.beschikbaarVoorSparen)}</div></div>
-    </div>`;
     const transactionCard = `
     <div class="card card-scroll span-7">
       <div class="card-head"><h2>${isJoint ? "Gezamenlijke transacties" : "Persoonlijke uitgaven"} — ${monthLabel(getSelectedMonth())}</h2>${transactionAddButton(key)}</div>
@@ -4200,18 +4192,21 @@
     const variableBudget = isJoint ? r.variabelBudgetTotaal : sumBedrag(data.variabel || []);
     const variableUsed = isJoint ? r.variabelTotaal : rr.variabeleUitgaven;
     const variablePct = variableBudget > 0 ? Math.min(100, Math.round(variableUsed / variableBudget * 100)) : 0;
+    const remainingThisMonth = round2(
+      (isJoint ? r.totaalSalaris : personalIncome.total) - (isJoint ? r.vasteLastenTotaal : rr.persoonlijkeVasteLasten) - variableUsed - spaarpotVoorGroep
+    );
     const jointKpis = isJoint ? `
     <div class="overview-kpi-row">
       ${renderIconKpi("€", "green", "Totaal gezamenlijk inkomen", eur(r.totaalSalaris), "Dion en Dara samen", { valueClass: "value pos" })}
       ${renderIconKpi("▤", "blue", "Vaste lasten totaal", eur(r.vasteLastenTotaal), "Klik om te wijzigen", { valueClass: "value neg", openFixedOwner: "gezamenlijk" })}
-      ${renderIconKpi("◎", "green", "Sparen", eur(r.spaarpotDezeMaand), "Klik om aan te passen", { valueClass: "value pos", editSaving: true })}
+      ${renderIconKpi("◎", "green", "Over deze maand", eur(remainingThisMonth), "Na vaste lasten, gebruikt budget en spaargeld", { valueClass: remainingThisMonth < 0 ? "value neg" : "value pos" })}
       ${renderIconKpi("▥", "blue", "Variabel gebruikt", `${eur(variableUsed)} / ${eur(variableBudget)}`, `<span class="overview-budget-track" style="--used-pct:${variablePct}%"></span>`)}
     </div>` : "";
     const personalKpis = !isJoint ? `
     <div class="overview-kpi-row">
       ${personalKpiVisible(key, "income") ? renderIconKpi("€", "green", "Totaal inkomen", eur(personalIncome.total), renderPersonalIncomeSources(personalIncome), { valueClass: personalIncome.total < 0 ? "value neg" : "value pos", kpiId: "income" }) : ""}
       ${personalKpiVisible(key, "fixed") ? renderIconKpi("▤", "blue", "Vaste lasten", eur(rr.persoonlijkeVasteLasten), "Klik om te wijzigen", { valueClass: rr.persoonlijkeVasteLasten > 0 ? "value neg" : "value pos", openFixedOwner: key, kpiId: "fixed" }) : ""}
-      ${personalKpiVisible(key, "saving") ? renderIconKpi("◎", "green", "Sparen", eur(rr.beschikbaarVoorSparen), `${rr.savingsSource === "handmatig" ? "Handmatig" : "Automatisch"} · klik om aan te passen`, { valueClass: rr.beschikbaarVoorSparen < 0 ? "value neg" : "value pos", editSavingOwner: key, kpiId: "saving" }) : ""}
+      ${personalKpiVisible(key, "saving") ? renderIconKpi("◎", "green", "Over deze maand", eur(remainingThisMonth), "Na vaste lasten, gebruikt budget en spaargeld", { valueClass: remainingThisMonth < 0 ? "value neg" : "value pos", kpiId: "saving" }) : ""}
       ${personalKpiVisible(key, "variable") ? renderIconKpi("▥", "blue", "Variabel gebruikt", `${eur(variableUsed)} / ${eur(variableBudget)}`, `<span class="overview-budget-track" style="--used-pct:${variablePct}%"></span>`, { kpiId: "variable" }) : ""}
     </div>` : "";
     const incomeManage = !isJoint ? `
@@ -4239,7 +4234,6 @@
     </div>
     <div class="manage-stack">
       ${hypotheekCard ? renderManageSection("Beheer hypotheek", hypotheekCard, false) : ""}
-      ${renderManageSection("Sparen", `<div class="card">${savingsSummary}${renderGoalOverviewTable(doelenVoorGroep, spaarpotVoorGroep)}</div>`, false)}
     </div>
   ` : `
     ${renderPageHeading(`${label} overzicht — ${monthLabel(getSelectedMonth())}`, pageGreeting)}
@@ -4256,7 +4250,6 @@
     </div>
     <div class="manage-stack">
       ${renderManageSection("Inkomen en vaste teruggaven", incomeManage, false)}
-      ${renderManageSection("Spaardoelen tabeloverzicht", `<div class="card">${renderGoalOverviewTable(doelenVoorGroep, spaarpotVoorGroep)}</div>`, false)}
     </div>
   `;
     applyReadOnlyPersonalTab(document.getElementById(tabId), key);
@@ -5005,6 +4998,35 @@ service cloud.firestore {
       }
       close();
       renderActiveTab();
+    });
+  }
+  function openTransactionEntryMenu(owner) {
+    if (!["gezamenlijk", "dion", "dara"].includes(owner) || isReadOnlyPersonalTab(owner)) return;
+    const modal = document.getElementById("transactionModal");
+    const name = ownerLabel(owner);
+    const contextText = owner === "gezamenlijk" ? "de gezamenlijke rekening" : `${name}s persoonlijke overzicht`;
+    modal.innerHTML = `<div class="modal transaction-entry-menu">
+    <div class="card-head"><div><h2>Uitgave toevoegen</h2><p class="hint">Kies hoe je een uitgave toevoegt aan ${textSafe(contextText)}.</p></div><button type="button" class="danger-ghost" data-close-transaction-entry aria-label="Sluiten">×</button></div>
+    <div class="transaction-entry-options">
+      <button type="button" class="transaction-entry-option" data-entry-manual><span class="icon-circle green">${iconSvg("receipt")}</span><span><strong>Handmatig invoeren</strong><small>Voeg één uitgave toe met bedrag, datum en categorie.</small></span><span aria-hidden="true">›</span></button>
+      <button type="button" class="transaction-entry-option" data-entry-bank><span class="icon-circle blue">${iconSvg("upload")}</span><span><strong>Bankbestand importeren</strong><small>Importeer en controleer meerdere transacties uit een CSV-bestand.</small></span><span aria-hidden="true">›</span></button>
+    </div>
+  </div>`;
+    modal.classList.add("open");
+    const close = () => {
+      modal.classList.remove("open");
+      modal.innerHTML = "";
+    };
+    modal.querySelector("[data-close-transaction-entry]").addEventListener("click", close);
+    bindModalBackdrop(modal, close);
+    modal.querySelector("[data-entry-manual]").addEventListener("click", () => {
+      close();
+      owner === "gezamenlijk" ? openJointTransactionModal() : openPersonalTransactionModal(owner);
+    });
+    modal.querySelector("[data-entry-bank]").addEventListener("click", () => {
+      close();
+      if (typeof window.openBankImportForOwner === "function") window.openBankImportForOwner(owner);
+      else alert("Bankimport is nog niet beschikbaar. Vernieuw de app en probeer opnieuw.");
     });
   }
   function showQuickToast(message) {
@@ -6027,7 +6049,7 @@ service cloud.firestore {
     const kpis = [
       ["income", "Totaal inkomen"],
       ["fixed", "Vaste lasten"],
-      ["saving", "Sparen"],
+      ["saving", "Over deze maand"],
       ["variable", "Variabel gebruikt"]
     ];
     root2.innerHTML = `
@@ -6182,11 +6204,11 @@ service cloud.firestore {
     });
     root2.querySelectorAll("[data-open-joint-transaction]").forEach((btn) => {
       btn.addEventListener("click", () => {
-        openJointTransactionModal();
+        openTransactionEntryMenu("gezamenlijk");
       });
     });
     root2.querySelectorAll("[data-open-personal-transaction]").forEach((btn) => {
-      btn.addEventListener("click", () => openPersonalTransactionModal(btn.dataset.openPersonalTransaction));
+      btn.addEventListener("click", () => openTransactionEntryMenu(btn.dataset.openPersonalTransaction));
     });
     root2.querySelectorAll("[data-edit-personal-transaction]").forEach((row) => {
       const openEditor = (event) => {
@@ -7684,14 +7706,9 @@ service cloud.firestore {
       u3OpenClose();
     });
     (_b = modal.querySelector("#u3GoTransactions")) == null ? void 0 : _b.addEventListener("click", () => {
-      var _a3, _b2;
+      var _a3;
       (_a3 = modal.closest("#incomeEditModal")) == null ? void 0 : _a3.classList.remove("open", "u3-admin-open");
-      bankImportOpen = true;
-      renderActiveTab();
-      (_b2 = [...document.querySelectorAll(".manage-section")].find((item) => {
-        var _a4;
-        return (_a4 = item.querySelector("summary")) == null ? void 0 : _a4.textContent.includes("Bank import & uitgaven");
-      })) == null ? void 0 : _b2.setAttribute("open", "");
+      if (typeof window.openBankImportForOwner === "function") window.openBankImportForOwner("gezamenlijk");
     });
     const closeMonth = (force = false) => {
       try {
@@ -8601,6 +8618,7 @@ service cloud.firestore {
         id: draft.id,
         fileName: draft.fileName,
         accountProfileId: draft.accountProfileId,
+        accountOwner: draft.accountOwner,
         bank: draft.bank,
         status: draft.status,
         importDate: draft.createdAt,
@@ -9409,10 +9427,15 @@ service cloud.firestore {
       });
       return [...groups.entries()].map(([month, items]) => `<section class="u4-import-month"><h3>${esc(importMonthLabel(month))}</h3><div class="u4-import-receipts">${items.map((summary) => renderReceipt(root2, summary)).join("")}</div></section>`).join("");
     }
-    function renderImportPanel(root2) {
+    function importSummaryOwner(root2, summary) {
+      var _a2;
+      return ((_a2 = (root2.state.accountProfiles || []).find((profile) => profile.id === summary.accountProfileId)) == null ? void 0 : _a2.accountOwner) || summary.accountOwner || "";
+    }
+    function renderImportPanel(root2, owner = "") {
       var _a2;
       const active = root2.state.activeImportId;
-      const summaries = (root2.state.importSummaries || []).slice().sort((a, b) => String(b.updatedAt || b.importDate).localeCompare(String(a.updatedAt || a.importDate)));
+      const allSummaries = (root2.state.importSummaries || []).slice().sort((a, b) => String(b.updatedAt || b.importDate).localeCompare(String(a.updatedAt || a.importDate)));
+      const summaries = owner ? allSummaries.filter((summary) => importSummaryOwner(root2, summary) === owner) : allSummaries;
       const current = summaries.find((item) => item.id === active);
       const selectedMonth = String(((_a2 = root2.state.meta) == null ? void 0 : _a2.selectedMonth) || "").slice(0, 7);
       const selectedSummaries = summaries.filter((summary) => summaryIncludesMonth(summary, selectedMonth));
@@ -9668,13 +9691,14 @@ ${(error == null ? void 0 : error.message) || error}`);
       overlay.querySelector("[data-u4-match-apply]").onclick = (event) => commitSelection(true, event.currentTarget);
     }
     function profileEditor(root2, draft) {
-      const profiles = root2.state.accountProfiles || [];
+      const profiles = (root2.state.accountProfiles || []).filter((profile) => !draft.entryOwner || profile.accountOwner === draft.entryOwner);
       const detected = [...new Set(draft.rows.map((row) => row.bankOriginal.accountIdentifier).filter(Boolean))][0] || "";
+      const profileOwner = draft.entryOwner || draft.accountOwner || "gezamenlijk";
       return `<section class="u4-section"><div class="u4-section-list"><h3>Rekeningprofiel</h3><div class="u4-profile-grid">
       <label class="wide">Bestaand profiel<select data-u4-profile-select><option value="">Nieuw profiel maken</option>${profiles.map((profile) => option(profile.id, profileDisplayLabel(profile), draft.accountProfileId)).join("")}</select></label>
       <label>Naam<input data-u4-profile-name value="${esc(draft.accountProfileId ? "" : `ING ${ownerLabel2(draft.accountOwner || "gezamenlijk")}`)}"></label>
       <label>IBAN/rekeningkenmerk<input data-u4-profile-identifier value="${esc(detected)}"></label>
-      <label>Rekeninghouder<select data-u4-profile-owner>${OWNERS.map((owner) => option(owner, ownerLabel2(owner), draft.accountOwner || "gezamenlijk")).join("")}</select></label>
+      ${draft.entryOwner ? `<label>Rekeninghouder<span class="u4-profile-owner-static">${esc(ownerLabel2(profileOwner))}</span><input type="hidden" data-u4-profile-owner value="${esc(profileOwner)}"></label>` : `<label>Rekeninghouder<select data-u4-profile-owner>${OWNERS.map((owner) => option(owner, ownerLabel2(owner), profileOwner)).join("")}</select></label>`}
       <label>Bank<input data-u4-profile-bank value="${esc(draft.bank || "ING")}"></label>
     </div><button type="button" class="primary small" data-u4-apply-profile>Profiel gebruiken</button></div></section>`;
     }
@@ -9761,6 +9785,7 @@ ${(error == null ? void 0 : error.message) || error}`);
     async function applyProfile(root2, draft, modal) {
       const selected = modal.querySelector("[data-u4-profile-select]").value;
       let profile = root2.state.accountProfiles.find((item) => item.id === selected);
+      if (profile && draft.entryOwner && profile.accountOwner !== draft.entryOwner) throw new Error(`Dit rekeningprofiel hoort bij ${ownerLabel2(profile.accountOwner)}. Open de juiste persoonlijke of gezamenlijke tab.`);
       if (!profile) {
         const name = modal.querySelector("[data-u4-profile-name]").value.trim();
         const identifier = normalizeIban(modal.querySelector("[data-u4-profile-identifier]").value);
@@ -9984,14 +10009,20 @@ ${(error == null ? void 0 : error.message) || error}`);
         }
       });
     }
-    function bindImportPanel(rootElement, root2) {
+    function bindImportPanel(rootElement, root2, owner = "") {
       var _a2, _b, _c;
       (_a2 = rootElement.querySelector("[data-u4-file]")) == null ? void 0 : _a2.addEventListener("change", (event) => {
         var _a3;
         const file = (_a3 = event.target.files) == null ? void 0 : _a3[0];
         if (!file) return;
         if (root2.state.activeImportId) {
+          const activeSummary = (root2.state.importSummaries || []).find((summary) => summary.id === root2.state.activeImportId);
+          const activeOwner = activeSummary ? importSummaryOwner(root2, activeSummary) : "";
           event.target.value = "";
+          if (owner && activeOwner && activeOwner !== owner) {
+            alert(`Er staat al een bankimport klaar voor ${ownerLabel2(activeOwner)}. Rond die eerst af vanuit de juiste tab.`);
+            return;
+          }
           openDraft(root2, root2.state.activeImportId);
           return;
         }
@@ -9999,6 +10030,17 @@ ${(error == null ? void 0 : error.message) || error}`);
         reader.onload = async (loaded) => {
           try {
             const draft = createImportDraft({ text: String(loaded.target.result || ""), fileName: file.name, profiles: root2.state.accountProfiles, rules: root2.state.recognitionRules, transactions: root2.state.transactions });
+            if (owner && draft.accountProfileId && draft.accountOwner !== owner) throw new Error(`Dit bankbestand hoort bij ${ownerLabel2(draft.accountOwner)}. Open de juiste persoonlijke of gezamenlijke tab.`);
+            if (owner) {
+              draft.entryOwner = owner;
+              if (!draft.accountProfileId) {
+                draft.accountOwner = owner;
+                draft.rows.forEach((row) => {
+                  row.accountOwner = owner;
+                  row.processing.budgetOwner = owner;
+                });
+              }
+            }
             UI.draft = draft;
             await saveDraft(root2, draft, { sync: true });
             root2.renderActiveTab();
@@ -10010,16 +10052,26 @@ ${(error == null ? void 0 : error.message) || error}`);
         reader.readAsText(file);
       });
       rootElement.querySelectorAll("[data-u4-open-concept],[data-u4-open-receipt]").forEach((button) => button.addEventListener("click", () => openDraft(root2, button.dataset.u4OpenConcept || button.dataset.u4OpenReceipt).catch((error) => alert(error.message))));
-      (_b = rootElement.querySelector("[data-u4-all-imports]")) == null ? void 0 : _b.addEventListener("click", () => renderImportHistory(root2));
+      (_b = rootElement.querySelector("[data-u4-all-imports]")) == null ? void 0 : _b.addEventListener("click", () => renderImportHistory(root2, owner));
       (_c = rootElement.querySelector("[data-u4-manage-rules]")) == null ? void 0 : _c.addEventListener("click", () => renderRules(root2));
     }
-    function renderImportHistory(root2) {
+    function renderImportHistory(root2, owner = "") {
       const modal = ensureModalRoot();
-      const summaries = (root2.state.importSummaries || []).slice().sort((a, b) => String(b.updatedAt || b.importDate).localeCompare(String(a.updatedAt || a.importDate)));
+      const allSummaries = (root2.state.importSummaries || []).slice().sort((a, b) => String(b.updatedAt || b.importDate).localeCompare(String(a.updatedAt || a.importDate)));
+      const summaries = owner ? allSummaries.filter((summary) => importSummaryOwner(root2, summary) === owner) : allSummaries;
       modal.innerHTML = `<div class="u4-import-modal"><header class="u4-modal-head"><h2>Alle imports</h2><button class="ghost" data-u4-close>Sluiten</button></header><main class="u4-modal-body"><div class="u4-import-history">${renderImportHistoryGroups(root2, summaries) || '<div class="u4-empty">Nog geen imports.</div>'}</div></main></div>`;
       modal.classList.add("open");
       modal.querySelector("[data-u4-close]").addEventListener("click", closeDraft);
       modal.querySelectorAll("[data-u4-open-receipt]").forEach((item) => item.addEventListener("click", () => openDraft(root2, item.dataset.u4OpenReceipt)));
+    }
+    function openBankImportForOwner(root2, owner) {
+      var _a2;
+      if (!OWNERS.includes(owner)) return;
+      const modal = ensureModalRoot();
+      modal.innerHTML = `<div class="u4-import-modal u4-entry-import-modal" role="dialog" aria-modal="true" aria-label="Bankimport voor ${esc(ownerLabel2(owner))}"><header class="u4-modal-head"><div><h2>Bankimport</h2><p>${esc(ownerLabel2(owner))} · ${esc(importMonthLabel(String(((_a2 = root2.state.meta) == null ? void 0 : _a2.selectedMonth) || "").slice(0, 7)))}</p></div><button type="button" class="ghost" data-u4-close>Sluiten</button></header><main class="u4-modal-body">${renderImportPanel(root2, owner)}</main></div>`;
+      modal.classList.add("open");
+      modal.querySelector("[data-u4-close]").addEventListener("click", closeDraft);
+      bindImportPanel(modal, root2, owner);
     }
     function renderRules(root2) {
       const modal = ensureModalRoot();
@@ -10081,6 +10133,7 @@ ${(error == null ? void 0 : error.message) || error}`);
       var _a2;
       root2.renderBankImportSection = () => renderImportPanel(root2);
       root2.bindBankImport = (element) => bindImportPanel(element, root2);
+      root2.openBankImportForOwner = (owner) => openBankImportForOwner(root2, owner);
       if (typeof root2.renderActiveTab === "function" && !root2.renderActiveTab.__u4Wrapped) {
         const legacy = root2.renderActiveTab;
         const wrapped = function() {

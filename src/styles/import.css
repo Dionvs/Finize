@@ -1,4 +1,5 @@
 .u4-import-panel{display:grid;gap:12px}
+.u4-profile-owner-static{display:flex;align-items:center;min-height:42px;padding:9px 11px;border:1px solid var(--border);border-radius:12px;background:var(--bg-soft);color:var(--text);font-weight:750}
 .u4-import-actions,.u4-import-summary,.u4-import-row-main,.u4-receipt-head,.u4-modal-head,.u4-modal-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .u4-import-actions input[type=file]{position:absolute;inline-size:1px;block-size:1px;opacity:0;pointer-events:none}
 .u4-concept-banner{padding:12px;border:1px solid #e0c994;border-radius:14px;background:#fff7df;color:#594715}

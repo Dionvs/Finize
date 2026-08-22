@@ -659,7 +659,7 @@ import { cloneState as clone } from "../core/state.js";
   function compactSummary(draft){
     updateDraftSummary(draft);
     return {
-      id:draft.id,fileName:draft.fileName,accountProfileId:draft.accountProfileId,bank:draft.bank,status:draft.status,
+      id:draft.id,fileName:draft.fileName,accountProfileId:draft.accountProfileId,accountOwner:draft.accountOwner,bank:draft.bank,status:draft.status,
       importDate:draft.createdAt,periodFrom:draft.periodFrom,periodTo:draft.periodTo,
       newCount:draft.summary.newCount,duplicateCount:draft.summary.duplicateCount,uncategorizedCount:draft.summary.uncategorizedCount||0,
       totalIncome:draft.summary.totalIncome,totalExpenses:draft.summary.totalExpenses,updatedAt:draft.updatedAt
@@ -1258,9 +1258,13 @@ import { cloneState as clone } from "../core/state.js";
     summaries.forEach(summary=>{const month=summaryMonth(summary);if(!groups.has(month))groups.set(month,[]);groups.get(month).push(summary);});
     return [...groups.entries()].map(([month,items])=>`<section class="u4-import-month"><h3>${esc(importMonthLabel(month))}</h3><div class="u4-import-receipts">${items.map(summary=>renderReceipt(root,summary)).join('')}</div></section>`).join('');
   }
-  function renderImportPanel(root){
+  function importSummaryOwner(root,summary){
+    return (root.state.accountProfiles||[]).find(profile=>profile.id===summary.accountProfileId)?.accountOwner||summary.accountOwner||'';
+  }
+  function renderImportPanel(root,owner=''){
     const active=root.state.activeImportId;
-    const summaries=(root.state.importSummaries||[]).slice().sort((a,b)=>String(b.updatedAt||b.importDate).localeCompare(String(a.updatedAt||a.importDate)));
+    const allSummaries=(root.state.importSummaries||[]).slice().sort((a,b)=>String(b.updatedAt||b.importDate).localeCompare(String(a.updatedAt||a.importDate)));
+    const summaries=owner?allSummaries.filter(summary=>importSummaryOwner(root,summary)===owner):allSummaries;
     const current=summaries.find(item=>item.id===active);
     const selectedMonth=String(root.state.meta?.selectedMonth||'').slice(0,7);
     const selectedSummaries=summaries.filter(summary=>summaryIncludesMonth(summary,selectedMonth));
@@ -1461,13 +1465,14 @@ import { cloneState as clone } from "../core/state.js";
     overlay.querySelector('[data-u4-match-apply]').onclick=event=>commitSelection(true,event.currentTarget);
   }
   function profileEditor(root,draft){
-    const profiles=root.state.accountProfiles||[];
+    const profiles=(root.state.accountProfiles||[]).filter(profile=>!draft.entryOwner||profile.accountOwner===draft.entryOwner);
     const detected=[...new Set(draft.rows.map(row=>row.bankOriginal.accountIdentifier).filter(Boolean))][0]||'';
+    const profileOwner=draft.entryOwner||draft.accountOwner||'gezamenlijk';
     return `<section class="u4-section"><div class="u4-section-list"><h3>Rekeningprofiel</h3><div class="u4-profile-grid">
       <label class="wide">Bestaand profiel<select data-u4-profile-select><option value="">Nieuw profiel maken</option>${profiles.map(profile=>option(profile.id,profileDisplayLabel(profile),draft.accountProfileId)).join('')}</select></label>
       <label>Naam<input data-u4-profile-name value="${esc(draft.accountProfileId?'':`ING ${ownerLabel(draft.accountOwner||'gezamenlijk')}`)}"></label>
       <label>IBAN/rekeningkenmerk<input data-u4-profile-identifier value="${esc(detected)}"></label>
-      <label>Rekeninghouder<select data-u4-profile-owner>${OWNERS.map(owner=>option(owner,ownerLabel(owner),draft.accountOwner||'gezamenlijk')).join('')}</select></label>
+      ${draft.entryOwner?`<label>Rekeninghouder<span class="u4-profile-owner-static">${esc(ownerLabel(profileOwner))}</span><input type="hidden" data-u4-profile-owner value="${esc(profileOwner)}"></label>`:`<label>Rekeninghouder<select data-u4-profile-owner>${OWNERS.map(owner=>option(owner,ownerLabel(owner),profileOwner)).join('')}</select></label>`}
       <label>Bank<input data-u4-profile-bank value="${esc(draft.bank||'ING')}"></label>
     </div><button type="button" class="primary small" data-u4-apply-profile>Profiel gebruiken</button></div></section>`;
   }
@@ -1545,6 +1550,7 @@ import { cloneState as clone } from "../core/state.js";
   async function applyProfile(root,draft,modal){
     const selected=modal.querySelector('[data-u4-profile-select]').value;
     let profile=root.state.accountProfiles.find(item=>item.id===selected);
+    if(profile&&draft.entryOwner&&profile.accountOwner!==draft.entryOwner)throw new Error(`Dit rekeningprofiel hoort bij ${ownerLabel(profile.accountOwner)}. Open de juiste persoonlijke of gezamenlijke tab.`);
     if(!profile){
       const name=modal.querySelector('[data-u4-profile-name]').value.trim();
       const identifier=normalizeIban(modal.querySelector('[data-u4-profile-identifier]').value);
@@ -1694,27 +1700,49 @@ import { cloneState as clone } from "../core/state.js";
       }
     });
   }
-  function bindImportPanel(rootElement,root){
+  function bindImportPanel(rootElement,root,owner=''){
     rootElement.querySelector('[data-u4-file]')?.addEventListener('change',event=>{
       const file=event.target.files?.[0];if(!file)return;
-      if(root.state.activeImportId){event.target.value='';openDraft(root,root.state.activeImportId);return;}
+      if(root.state.activeImportId){
+        const activeSummary=(root.state.importSummaries||[]).find(summary=>summary.id===root.state.activeImportId);
+        const activeOwner=activeSummary?importSummaryOwner(root,activeSummary):'';
+        event.target.value='';
+        if(owner&&activeOwner&&activeOwner!==owner){alert(`Er staat al een bankimport klaar voor ${ownerLabel(activeOwner)}. Rond die eerst af vanuit de juiste tab.`);return;}
+        openDraft(root,root.state.activeImportId);return;
+      }
       const reader=new FileReader();
       reader.onload=async loaded=>{
         try{
           const draft=createImportDraft({text:String(loaded.target.result||''),fileName:file.name,profiles:root.state.accountProfiles,rules:root.state.recognitionRules,transactions:root.state.transactions});
+          if(owner&&draft.accountProfileId&&draft.accountOwner!==owner)throw new Error(`Dit bankbestand hoort bij ${ownerLabel(draft.accountOwner)}. Open de juiste persoonlijke of gezamenlijke tab.`);
+          if(owner){
+            draft.entryOwner=owner;
+            if(!draft.accountProfileId){
+              draft.accountOwner=owner;
+              draft.rows.forEach(row=>{row.accountOwner=owner;row.processing.budgetOwner=owner;});
+            }
+          }
           UI.draft=draft;await saveDraft(root,draft,{sync:true});root.renderActiveTab();renderDraftModal(root,draft);
         }catch(error){alert(`CSV importeren mislukt: ${error.message}`);}
       };
       reader.readAsText(file);
     });
     rootElement.querySelectorAll('[data-u4-open-concept],[data-u4-open-receipt]').forEach(button=>button.addEventListener('click',()=>openDraft(root,button.dataset.u4OpenConcept||button.dataset.u4OpenReceipt).catch(error=>alert(error.message))));
-    rootElement.querySelector('[data-u4-all-imports]')?.addEventListener('click',()=>renderImportHistory(root));
+    rootElement.querySelector('[data-u4-all-imports]')?.addEventListener('click',()=>renderImportHistory(root,owner));
     rootElement.querySelector('[data-u4-manage-rules]')?.addEventListener('click',()=>renderRules(root));
   }
-  function renderImportHistory(root){
-    const modal=ensureModalRoot();const summaries=(root.state.importSummaries||[]).slice().sort((a,b)=>String(b.updatedAt||b.importDate).localeCompare(String(a.updatedAt||a.importDate)));
+  function renderImportHistory(root,owner=''){
+    const modal=ensureModalRoot();const allSummaries=(root.state.importSummaries||[]).slice().sort((a,b)=>String(b.updatedAt||b.importDate).localeCompare(String(a.updatedAt||a.importDate)));const summaries=owner?allSummaries.filter(summary=>importSummaryOwner(root,summary)===owner):allSummaries;
     modal.innerHTML=`<div class="u4-import-modal"><header class="u4-modal-head"><h2>Alle imports</h2><button class="ghost" data-u4-close>Sluiten</button></header><main class="u4-modal-body"><div class="u4-import-history">${renderImportHistoryGroups(root,summaries)||'<div class="u4-empty">Nog geen imports.</div>'}</div></main></div>`;
     modal.classList.add('open');modal.querySelector('[data-u4-close]').addEventListener('click',closeDraft);modal.querySelectorAll('[data-u4-open-receipt]').forEach(item=>item.addEventListener('click',()=>openDraft(root,item.dataset.u4OpenReceipt)));
+  }
+  function openBankImportForOwner(root,owner){
+    if(!OWNERS.includes(owner))return;
+    const modal=ensureModalRoot();
+    modal.innerHTML=`<div class="u4-import-modal u4-entry-import-modal" role="dialog" aria-modal="true" aria-label="Bankimport voor ${esc(ownerLabel(owner))}"><header class="u4-modal-head"><div><h2>Bankimport</h2><p>${esc(ownerLabel(owner))} · ${esc(importMonthLabel(String(root.state.meta?.selectedMonth||'').slice(0,7)))}</p></div><button type="button" class="ghost" data-u4-close>Sluiten</button></header><main class="u4-modal-body">${renderImportPanel(root,owner)}</main></div>`;
+    modal.classList.add('open');
+    modal.querySelector('[data-u4-close]').addEventListener('click',closeDraft);
+    bindImportPanel(modal,root,owner);
   }
   function renderRules(root){
     const modal=ensureModalRoot();const rules=root.state.recognitionRules||[];
@@ -1746,6 +1774,7 @@ import { cloneState as clone } from "../core/state.js";
   function installUI(root){
     root.renderBankImportSection=()=>renderImportPanel(root);
     root.bindBankImport=element=>bindImportPanel(element,root);
+    root.openBankImportForOwner=owner=>openBankImportForOwner(root,owner);
     if(typeof root.renderActiveTab==='function'&&!root.renderActiveTab.__u4Wrapped){
       const legacy=root.renderActiveTab;
       const wrapped=function(){const result=legacy.apply(this,arguments);queueMicrotask(()=>injectSettlementCard(root));return result;};

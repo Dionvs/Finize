@@ -78,3 +78,25 @@ test('importkaart toont geselecteerde maand en historie heeft maandkoppen', asyn
   expect(result.headings).toEqual(['augustus 2026','juli 2026']);
   expect(result.accountLabel).toBe('Betaalrekening · NL01TEST0000000001');
 });
+
+test('bankimport en historie blijven beperkt tot de gekozen rekeninghouder', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => {
+    state.meta.selectedMonth='2026-08';
+    state.accountProfiles=[
+      {id:'account-dion',name:'Dion rekening',identifier:'NL01DION',accountOwner:'dion'},
+      {id:'account-dara',name:'Dara rekening',identifier:'NL01DARA',accountOwner:'dara'}
+    ];
+    state.importSummaries=[
+      {id:'dion-import',accountProfileId:'account-dion',status:'verwerkt',periodFrom:'2026-08-01',periodTo:'2026-08-31',importDate:'2026-08-31',newCount:1,duplicateCount:0,totalExpenses:10},
+      {id:'dara-import',accountProfileId:'account-dara',status:'verwerkt',periodFrom:'2026-08-01',periodTo:'2026-08-31',importDate:'2026-08-31',newCount:1,duplicateCount:0,totalExpenses:20}
+    ];
+    openBankImportForOwner('dion');
+  });
+  const modal=page.locator('#u4ImportModalRoot');
+  await expect(modal).toContainText('Dion rekening');
+  await expect(modal).not.toContainText('Dara rekening');
+  await modal.locator('[data-u4-all-imports]').click();
+  await expect(modal).toContainText('Dion rekening');
+  await expect(modal).not.toContainText('Dara rekening');
+});

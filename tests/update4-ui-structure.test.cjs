@@ -9,14 +9,14 @@ const html=markup+js;
 
 assert.match(markup,/app\.css/);
 assert.match(markup,/app\.js/);
-assert.doesNotMatch(html,/v4-mobile-only-block">\$\{renderManageSection\('Bank import & uitgaven'/);
+assert.doesNotMatch(html,/renderManageSection\('Bank import & uitgaven'/);
 for(const marker of ['Bankimport controleren','Nakijken','Zeker','Meer opties','Alles verwerken','Herkenningsregels','Alle imports bekijken','Import uit cloud ophalen','Opnieuw proberen']){
   assert.match(js,new RegExp(marker),`UI-marker ontbreekt: ${marker}`);
 }
 assert.doesNotMatch(html,/section-kicker">Update 3/);
 assert.doesNotMatch(js,/section-kicker">Update 4/);
-assert.match(html,/data-dashboard-accordion="bank-import"/,'Bankimport mist een stabiele accordeonidentificatie');
-assert.match(html,/querySelector\('\[data-dashboard-accordion="bank-import"\]'\)/,'Bankimportstatus gebruikt geen stabiele accordeonselectie');
+assert.match(html,/function openTransactionEntryMenu\(owner\)/,'Keuzemenu voor handmatige invoer en bankimport ontbreekt');
+assert.match(js,/openBankImportForOwner/,'Eigenaargebonden bankimport ontbreekt');
 assert.match(html,/function bindDashboardAccordionKeyboard\(root\)/,'Centrale toetsenbordbediening voor dashboardaccordeons ontbreekt');
 assert.match(html,/\['Enter',' ','Spacebar'\]\.includes\(event\.key\)/,'Enter- en spatiebediening voor dashboardaccordeons ontbreekt');
 assert.match(html,/renderManageSection\('Maandadministratie',body,false,'data-dashboard-accordion="month-admin"'\)/,'Maandadministratie start niet als gesloten accordeon');

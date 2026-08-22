@@ -83,7 +83,12 @@ test('desktop spaardoelen en data back-up renderen volledig', async ({ page }) =
   await expect(page.locator('#tab-gezamenlijk')).not.toContainText('Recente gezamenlijke uitgaven');
   await expect(page.locator('.overview-kpi-row [data-u3-planning-owner="gezamenlijk"]')).toBeVisible();
   await expect(page.locator('#tab-gezamenlijk .u5-fixed-costs-overview')).toBeVisible();
-  await expect(page.locator('#tab-gezamenlijk .u5-joint-goals-preview')).toBeVisible();
+  const jointGoals=page.locator('#tab-gezamenlijk .u5-joint-goals-preview');
+  await expect(jointGoals).toBeVisible();
+  await expect(jointGoals.locator('.goal-table')).toBeVisible();
+  await expect(jointGoals.getByRole('button',{name:'Spaargeld van deze maand aanpassen'})).toBeVisible();
+  await expect(page.locator('#tab-gezamenlijk .overview-kpi-row')).toContainText('Over deze maand');
+  await expect(page.locator('#tab-gezamenlijk .manage-stack')).not.toContainText('Sparen');
   await expect(page.locator('#tab-gezamenlijk .manage-stack')).not.toContainText('Beheer vaste lasten');
 
   await page.locator('.v4-sidebar [data-tab="spaardoelen"]').click();
