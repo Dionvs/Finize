@@ -1,4 +1,4 @@
-const CACHE_NAME = "finize-v80-loginfix";
+const CACHE_NAME = "finize-v81-transacties-per-tab";
 const CACHE_PREFIX = "finize-";
 
 const CRITICAL_SHELL = [
