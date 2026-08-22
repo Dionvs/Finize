@@ -8,6 +8,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const styleSources = [
   ["styles", "tokens.css"],
   ["styles", "base.css"],
+  ["styles", "auth.css"],
   ["styles", "goals.css"],
   ["styles", "dashboard.css"],
   ["styles", "import.css"],

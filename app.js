@@ -16,6 +16,326 @@
   var isIphone = /iPhone|iPod/i.test(navigator.userAgent || "");
   document.documentElement.classList.toggle("finize-ios-phone", isIphone);
 
+  // src/config/firebase.js
+  var FIREBASE_SDK_VERSION = "11.10.0";
+  var DEFAULT_FIREBASE_CONFIG = Object.freeze({
+    apiKey: "AIzaSyCiJHGv9nlC_o4c2Xyj9UcyqHWW-YTxKfY",
+    authDomain: "financien-7dd43.firebaseapp.com",
+    projectId: "financien-7dd43",
+    storageBucket: "financien-7dd43.firebasestorage.app",
+    messagingSenderId: "487713041493",
+    appId: "1:487713041493:web:68c897ae2fa06afd5838dc",
+    measurementId: "G-X2EXXZDK7S"
+  });
+  var AUTH_RELEASE_ENABLED = false;
+
+  // src/auth/contracts.mjs
+  var FINIZE_ROLES = Object.freeze(["dion", "dara"]);
+  function normalizeAccountEmail(value) {
+    return String(value || "").trim().toLocaleLowerCase("en-US");
+  }
+  function persistenceMode(staySignedIn) {
+    return staySignedIn ? "local" : "session";
+  }
+  function normalizeAssignment(candidate) {
+    if (!candidate || !FINIZE_ROLES.includes(candidate.role)) return null;
+    const householdId = String(candidate.householdId || "").trim();
+    if (!householdId) return null;
+    return Object.freeze({
+      householdId,
+      role: candidate.role,
+      displayName: String(candidate.displayName || (candidate.role === "dara" ? "Dara" : "Dion")).trim()
+    });
+  }
+  function authAccessState(user, assignment) {
+    if (!user) return "signed-out";
+    if (!user.emailVerified) return "unverified";
+    return normalizeAssignment(assignment) ? "ready" : "unassigned";
+  }
+
+  // src/auth/runtime.js
+  var localPreview = ["localhost", "127.0.0.1"].includes(location.hostname) && new URLSearchParams(location.search).get("auth-preview") === "1";
+  var enabled = globalThis.__FINIZE_AUTH_ENABLED__ === true || localPreview || AUTH_RELEASE_ENABLED;
+  var root = document.getElementById("authRoot");
+  var resolveGate;
+  var currentUser = null;
+  var currentAssignment = null;
+  var mode = "login";
+  var busy = false;
+  var driver = null;
+  var gate = new Promise((resolve) => {
+    resolveGate = resolve;
+  });
+  globalThis.__finizeAuthGate = gate;
+  function escapeHtml(value) {
+    return String(value != null ? value : "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
+  }
+  function authErrorMessage(error) {
+    const code = String((error == null ? void 0 : error.code) || "");
+    if (code.includes("invalid-credential") || code.includes("wrong-password")) return "Het e-mailadres of wachtwoord klopt niet.";
+    if (code.includes("email-already-in-use")) return "Voor dit e-mailadres bestaat al een account. Log in of herstel je wachtwoord.";
+    if (code.includes("weak-password")) return "Kies een wachtwoord van minimaal zes tekens.";
+    if (code.includes("invalid-email")) return "Vul een geldig e-mailadres in.";
+    if (code.includes("popup-closed")) return "Google-inloggen is gesloten voordat het klaar was.";
+    if (code.includes("network-request-failed")) return "Er is geen verbinding. Controleer je internet en probeer opnieuw.";
+    if (code.includes("too-many-requests")) return "Er zijn te veel pogingen gedaan. Wacht even en probeer daarna opnieuw.";
+    return String((error == null ? void 0 : error.message) || "Inloggen is niet gelukt. Probeer het opnieuw.");
+  }
+  function setFeedback(message = "", tone = "neutral") {
+    const target = root == null ? void 0 : root.querySelector("[data-auth-feedback]");
+    if (!target) return;
+    target.textContent = message;
+    target.dataset.tone = tone;
+    target.hidden = !message;
+  }
+  function setBusy(nextBusy) {
+    busy = !!nextBusy;
+    root == null ? void 0 : root.querySelectorAll("button,input").forEach((element) => {
+      if (element.matches("[data-auth-stay]")) return;
+      element.disabled = busy;
+    });
+    root == null ? void 0 : root.setAttribute("aria-busy", String(busy));
+  }
+  function signInMarkup() {
+    const creating = mode === "register";
+    return `
+    <section class="auth-layout" aria-labelledby="authTitle">
+      <div class="auth-intro">
+        <img src="finize-logo.png" alt="Finize" class="auth-logo">
+        <div>
+          <p class="auth-kicker">Jullie financiën, vertrouwd bij elkaar</p>
+          <h1 id="authTitle">${creating ? "Maak je persoonlijke account" : "Welkom terug"}</h1>
+          <p>Log in voor je eigen overzicht en hetzelfde gezamenlijke huishouden dat je al kent.</p>
+        </div>
+        <ul class="auth-assurances" aria-label="Wat je kunt verwachten">
+          <li><span aria-hidden="true">✓</span> Dezelfde bedragen en verdelingen</li>
+          <li><span aria-hidden="true">✓</span> Je persoonlijke tab blijft van jou</li>
+          <li><span aria-hidden="true">✓</span> Veilig synchroniseren tussen apparaten</li>
+        </ul>
+      </div>
+      <div class="auth-panel">
+        <div class="auth-panel-head">
+          <h2>${creating ? "Account aanmaken" : "Inloggen"}</h2>
+          <p>${creating ? "Gebruik het e-mailadres dat aan Finize is gekoppeld." : "Ga verder met Google of je e-mailadres."}</p>
+        </div>
+        <button type="button" class="auth-google" data-auth-google>
+          <span class="auth-google-mark" aria-hidden="true">G</span>
+          Doorgaan met Google
+        </button>
+        <div class="auth-divider"><span>of met e-mail</span></div>
+        <form data-auth-form novalidate>
+          <label>E-mailadres
+            <input name="email" type="email" inputmode="email" autocomplete="email" required>
+          </label>
+          <label>Wachtwoord
+            <input name="password" type="password" autocomplete="${creating ? "new-password" : "current-password"}" minlength="6" required>
+          </label>
+          <label class="auth-stay">
+            <input data-auth-stay name="staySignedIn" type="checkbox" checked>
+            <span><strong>Ingelogd blijven</strong><small>Handig op je eigen telefoon of computer.</small></span>
+          </label>
+          <div class="auth-feedback" data-auth-feedback role="status" aria-live="polite" hidden></div>
+          <button type="submit" class="primary auth-submit">${creating ? "Account aanmaken" : "Inloggen"}</button>
+        </form>
+        <div class="auth-secondary-actions">
+          ${creating ? "" : '<button type="button" class="auth-text-button" data-auth-reset>Wachtwoord vergeten?</button>'}
+          <button type="button" class="auth-text-button" data-auth-toggle>${creating ? "Ik heb al een account" : "Nieuw account aanmaken"}</button>
+        </div>
+      </div>
+    </section>`;
+  }
+  function verificationMarkup() {
+    return `
+    <section class="auth-state-card" aria-labelledby="authTitle">
+      <div class="auth-state-icon" aria-hidden="true">@</div>
+      <p class="auth-kicker">Nog één stap</p>
+      <h1 id="authTitle">Bevestig je e-mailadres</h1>
+      <p>We hebben een bevestigingslink gestuurd naar <strong>${escapeHtml(currentUser == null ? void 0 : currentUser.email)}</strong>. Open de link en controleer daarna opnieuw.</p>
+      <div class="auth-feedback" data-auth-feedback role="status" aria-live="polite" hidden></div>
+      <div class="auth-state-actions">
+        <button type="button" class="primary" data-auth-check>Ik heb mijn e-mail bevestigd</button>
+        <button type="button" class="ghost" data-auth-resend>Link opnieuw sturen</button>
+        <button type="button" class="auth-text-button" data-auth-signout>Met een ander account inloggen</button>
+      </div>
+    </section>`;
+  }
+  function unassignedMarkup() {
+    return `
+    <section class="auth-state-card" aria-labelledby="authTitle">
+      <div class="auth-state-icon" aria-hidden="true">⌛</div>
+      <p class="auth-kicker">Account bevestigd</p>
+      <h1 id="authTitle">Je Finize-koppeling wordt voorbereid</h1>
+      <p><strong>${escapeHtml(currentUser == null ? void 0 : currentUser.email)}</strong> is veilig ingelogd, maar nog niet aan Dion of Dara gekoppeld. Probeer opnieuw nadat de huishoudkoppeling is gepubliceerd.</p>
+      <div class="auth-feedback" data-auth-feedback role="status" aria-live="polite" hidden></div>
+      <div class="auth-state-actions">
+        <button type="button" class="primary" data-auth-check>Opnieuw controleren</button>
+        <button type="button" class="auth-text-button" data-auth-signout>Uitloggen</button>
+      </div>
+    </section>`;
+  }
+  function bindCommonActions() {
+    var _a, _b, _c;
+    (_a = root.querySelector("[data-auth-signout]")) == null ? void 0 : _a.addEventListener("click", () => runAction(() => driver.signOut()));
+    (_b = root.querySelector("[data-auth-check]")) == null ? void 0 : _b.addEventListener("click", () => runAction(async () => {
+      currentUser = await driver.reloadUser(currentUser);
+      currentAssignment = (currentUser == null ? void 0 : currentUser.emailVerified) ? normalizeAssignment(await driver.loadAssignment(currentUser)) : null;
+      render();
+    }));
+    (_c = root.querySelector("[data-auth-resend]")) == null ? void 0 : _c.addEventListener("click", () => runAction(async () => {
+      await driver.sendVerification(currentUser);
+      setFeedback("Een nieuwe bevestigingslink is verstuurd.", "success");
+    }));
+  }
+  function bindSignInActions() {
+    var _a, _b, _c, _d;
+    (_a = root.querySelector("[data-auth-toggle]")) == null ? void 0 : _a.addEventListener("click", () => {
+      mode = mode === "login" ? "register" : "login";
+      render();
+    });
+    (_b = root.querySelector("[data-auth-google]")) == null ? void 0 : _b.addEventListener("click", () => runAction(async () => {
+      var _a2;
+      const stay = ((_a2 = root.querySelector("[data-auth-stay]")) == null ? void 0 : _a2.checked) !== false;
+      await driver.setPersistence(persistenceMode(stay));
+      await driver.signInGoogle({ redirect: matchMedia("(max-width: 767px)").matches || matchMedia("(display-mode: standalone)").matches });
+    }));
+    (_c = root.querySelector("[data-auth-reset]")) == null ? void 0 : _c.addEventListener("click", () => {
+      var _a2;
+      const email = (_a2 = root.querySelector('input[name="email"]')) == null ? void 0 : _a2.value.trim();
+      if (!email) {
+        setFeedback("Vul eerst je e-mailadres in.", "error");
+        return;
+      }
+      runAction(async () => {
+        await driver.sendPasswordReset(email);
+        setFeedback("Als dit adres bekend is, ontvang je een herstelmail.", "success");
+      });
+    });
+    (_d = root.querySelector("[data-auth-form]")) == null ? void 0 : _d.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      if (!form.reportValidity()) return;
+      runAction(async () => {
+        const email = form.elements.email.value.trim();
+        const password = form.elements.password.value;
+        await driver.setPersistence(persistenceMode(form.elements.staySignedIn.checked));
+        if (mode === "register") {
+          const credential = await driver.registerEmail(email, password);
+          await driver.sendVerification((credential == null ? void 0 : credential.user) || currentUser);
+        } else {
+          await driver.signInEmail(email, password);
+        }
+      });
+    });
+  }
+  function render() {
+    if (!root) return;
+    const access = authAccessState(currentUser, currentAssignment);
+    if (access === "ready") {
+      root.hidden = true;
+      document.body.classList.remove("auth-pending");
+      document.body.dataset.authRole = currentAssignment.role;
+      globalThis.dispatchEvent(new CustomEvent("finize:auth-ready", { detail: { user: currentUser, assignment: currentAssignment } }));
+      resolveGate == null ? void 0 : resolveGate({ status: "ready", user: currentUser, assignment: currentAssignment });
+      resolveGate = null;
+      return;
+    }
+    document.body.classList.add("auth-pending");
+    root.hidden = false;
+    root.innerHTML = access === "unverified" ? verificationMarkup() : access === "unassigned" ? unassignedMarkup() : signInMarkup();
+    bindCommonActions();
+    if (access === "signed-out") bindSignInActions();
+  }
+  async function runAction(action) {
+    if (busy) return;
+    setBusy(true);
+    setFeedback("Even bezig…");
+    try {
+      await action();
+    } catch (error) {
+      setFeedback(authErrorMessage(error), "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function createFirebaseDriver() {
+    const base = `https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}`;
+    const [appModule, authModule] = await Promise.all([
+      import(`${base}/firebase-app.js`),
+      import(`${base}/firebase-auth.js`)
+    ]);
+    const app = appModule.getApps().length ? appModule.getApps()[0] : appModule.initializeApp(DEFAULT_FIREBASE_CONFIG);
+    const auth = authModule.getAuth(app);
+    return {
+      initialize(onUser) {
+        return authModule.onAuthStateChanged(auth, async (user) => {
+          currentUser = user;
+          currentAssignment = (user == null ? void 0 : user.emailVerified) ? normalizeAssignment(await this.loadAssignment(user)) : null;
+          onUser();
+        });
+      },
+      setPersistence(modeName) {
+        return authModule.setPersistence(auth, modeName === "local" ? authModule.browserLocalPersistence : authModule.browserSessionPersistence);
+      },
+      signInEmail(email, password) {
+        return authModule.signInWithEmailAndPassword(auth, email, password);
+      },
+      registerEmail(email, password) {
+        return authModule.createUserWithEmailAndPassword(auth, email, password);
+      },
+      async signInGoogle({ redirect }) {
+        const provider = new authModule.GoogleAuthProvider();
+        return redirect ? authModule.signInWithRedirect(auth, provider) : authModule.signInWithPopup(auth, provider);
+      },
+      sendPasswordReset(email) {
+        return authModule.sendPasswordResetEmail(auth, email);
+      },
+      sendVerification(user) {
+        return authModule.sendEmailVerification(user);
+      },
+      async reloadUser(user) {
+        await authModule.reload(user);
+        return auth.currentUser;
+      },
+      signOut() {
+        return authModule.signOut(auth);
+      },
+      // Fase 3 vervangt dit door een beveiligde Firestore/callable lookup.
+      async loadAssignment() {
+        return null;
+      }
+    };
+  }
+  async function initialize() {
+    if (!enabled) {
+      root == null ? void 0 : root.setAttribute("hidden", "");
+      document.body.classList.remove("auth-pending");
+      resolveGate == null ? void 0 : resolveGate({ status: "disabled" });
+      resolveGate = null;
+      return;
+    }
+    try {
+      driver = globalThis.__FINIZE_AUTH_TEST_DRIVER__ || await createFirebaseDriver();
+      driver.initialize(() => render());
+    } catch (error) {
+      document.body.classList.add("auth-pending");
+      root.hidden = false;
+      root.innerHTML = `<section class="auth-state-card"><div class="auth-state-icon" aria-hidden="true">!</div><h1>Inloggen kon niet worden gestart</h1><p>${escapeHtml(authErrorMessage(error))}</p><button type="button" class="primary" onclick="location.reload()">Opnieuw proberen</button></section>`;
+    }
+  }
+  globalThis.FinizeAuth = {
+    get enabled() {
+      return enabled;
+    },
+    get user() {
+      return currentUser;
+    },
+    get assignment() {
+      return currentAssignment;
+    },
+    signOut: () => driver == null ? void 0 : driver.signOut()
+  };
+  initialize();
+
   // src/core/state.js
   function cloneState(value) {
     return JSON.parse(JSON.stringify(value));
@@ -1046,8 +1366,8 @@
   function finizeIconWrap(name, cls = "finize-action-icon") {
     return `<span class="${cls}" aria-hidden="true">${iconSvg(name)}</span>`;
   }
-  function applyFinizeIconSystem(root = document) {
-    root.querySelectorAll(".tab-btn[data-tab] .u5-nav-icon").forEach((slot) => {
+  function applyFinizeIconSystem(root2 = document) {
+    root2.querySelectorAll(".tab-btn[data-tab] .u5-nav-icon").forEach((slot) => {
       var _a;
       const tab = (_a = slot.closest("[data-tab]")) == null ? void 0 : _a.dataset.tab;
       const iconName = FINIZE_NAV_ICONS[tab] || "dashboard";
@@ -1055,7 +1375,7 @@
       slot.dataset.finizeIcon = iconName;
       slot.innerHTML = iconSvg(iconName);
     });
-    root.querySelectorAll(".bottom-nav-btn[data-tab] .bn-icon").forEach((slot) => {
+    root2.querySelectorAll(".bottom-nav-btn[data-tab] .bn-icon").forEach((slot) => {
       var _a;
       const tab = (_a = slot.closest("[data-tab]")) == null ? void 0 : _a.dataset.tab;
       const iconName = FINIZE_NAV_ICONS[tab] || "dashboard";
@@ -1063,7 +1383,7 @@
       slot.dataset.finizeIcon = iconName;
       slot.innerHTML = iconSvg(iconName);
     });
-    const monthButton = root.querySelector("#monthPickerButton");
+    const monthButton = root2.querySelector("#monthPickerButton");
     if (monthButton && !monthButton.querySelector(".finize-action-icon")) {
       const text = monthButton.textContent.trim();
       monthButton.innerHTML = finizeIconWrap("calendar") + `<span class="month-picker-label">${text}</span>`;
@@ -1081,13 +1401,13 @@
       ["#btnCloseTransaction, #btnCancelTransaction, [data-close]", "close"]
     ];
     buttonRules.forEach(([selector, name]) => {
-      root.querySelectorAll(selector).forEach((btn) => {
+      root2.querySelectorAll(selector).forEach((btn) => {
         if (!(btn instanceof HTMLElement) || btn.querySelector(":scope > .finize-action-icon")) return;
         btn.classList.add("has-finize-icon");
         btn.insertAdjacentHTML("afterbegin", finizeIconWrap(name));
       });
     });
-    root.querySelectorAll("button").forEach((btn) => {
+    root2.querySelectorAll("button").forEach((btn) => {
       if (btn.querySelector(":scope > .finize-action-icon")) return;
       const cue = `${btn.textContent || ""} ${btn.getAttribute("aria-label") || ""} ${btn.title || ""}`.toLowerCase();
       let name = "";
@@ -1103,7 +1423,7 @@
       btn.classList.add("has-finize-icon");
       btn.insertAdjacentHTML("afterbegin", finizeIconWrap(name));
     });
-    root.querySelectorAll("td:first-child").forEach((cell) => {
+    root2.querySelectorAll("td:first-child").forEach((cell) => {
       var _a, _b;
       const text = cell.textContent.trim();
       if (/^[⌂~⚡◆▤▶◌▣□€•…]$/.test(text)) {
@@ -1376,13 +1696,13 @@
     <div class="manage-body">${body}</div>
   </details>`;
   }
-  function bindDashboardAccordionKeyboard(root) {
-    if (!root || root.dataset.dashboardAccordionKeyboardBound === "true") return;
-    root.dataset.dashboardAccordionKeyboardBound = "true";
-    root.addEventListener("keydown", (event) => {
+  function bindDashboardAccordionKeyboard(root2) {
+    if (!root2 || root2.dataset.dashboardAccordionKeyboardBound === "true") return;
+    root2.dataset.dashboardAccordionKeyboardBound = "true";
+    root2.addEventListener("keydown", (event) => {
       var _a, _b;
       const summary = (_b = (_a = event.target).closest) == null ? void 0 : _b.call(_a, "[data-dashboard-accordion] > summary");
-      if (!summary || !root.contains(summary) || !["Enter", " ", "Spacebar"].includes(event.key)) return;
+      if (!summary || !root2.contains(summary) || !["Enter", " ", "Spacebar"].includes(event.key)) return;
       event.preventDefault();
       summary.parentElement.open = !summary.parentElement.open;
     });
@@ -1904,7 +2224,6 @@
   var MIGRATION_BACKUP_STORAGE_KEY = "finize-budget-planner-v1-pre-schema-v5";
   var DEVICE_ID_STORAGE_KEY = "finize-device-id";
   var FIREBASE_CONFIG_STORAGE_KEY = "finize-firebase-config";
-  var FIREBASE_SDK_VERSION = "11.10.0";
   var FIRESTORE_COLLECTION = "budgetPlanners";
   var FIRESTORE_DOC_ID = "finize";
   var GOAL_IMAGE_DB_NAME = "finize-goal-images-v1";
@@ -1937,10 +2256,10 @@
       });
       return this.dbPromise;
     },
-    async transact(mode, action) {
+    async transact(mode2, action) {
       const db = await this.open();
       return new Promise((resolve, reject) => {
-        const tx = db.transaction(GOAL_IMAGE_STORE_NAME, mode);
+        const tx = db.transaction(GOAL_IMAGE_STORE_NAME, mode2);
         const store = tx.objectStore(GOAL_IMAGE_STORE_NAME);
         try {
           action(store);
@@ -2052,15 +2371,6 @@
   function goalImageSource(goal) {
     return GoalImageStore.source(goal);
   }
-  var DEFAULT_FIREBASE_CONFIG = {
-    apiKey: "AIzaSyCiJHGv9nlC_o4c2Xyj9UcyqHWW-YTxKfY",
-    authDomain: "financien-7dd43.firebaseapp.com",
-    projectId: "financien-7dd43",
-    storageBucket: "financien-7dd43.firebasestorage.app",
-    messagingSenderId: "487713041493",
-    appId: "1:487713041493:web:68c897ae2fa06afd5838dc",
-    measurementId: "G-X2EXXZDK7S"
-  };
   function getDeviceId() {
     try {
       let id = localStorage.getItem(DEVICE_ID_STORAGE_KEY);
@@ -2891,8 +3201,8 @@
       pill.classList.toggle("offline", !online);
     });
   }
-  function bindInputs(root) {
-    root.querySelectorAll("[data-month-income]").forEach((el) => {
+  function bindInputs(root2) {
+    root2.querySelectorAll("[data-month-income]").forEach((el) => {
       const person = el.dataset.monthIncome;
       el.value = getMonthlyIncome(person);
       const commit = () => {
@@ -2905,7 +3215,7 @@
       };
       el.addEventListener("change", commit);
     });
-    root.querySelectorAll("[data-path]").forEach((el) => {
+    root2.querySelectorAll("[data-path]").forEach((el) => {
       const path = el.dataset.path;
       const type = el.type;
       const raw = getPath(state, path);
@@ -2927,7 +3237,7 @@
       };
       el.addEventListener("change", commit);
     });
-    root.querySelectorAll("[data-item-path][data-item-id][data-item-field]").forEach((el) => {
+    root2.querySelectorAll("[data-item-path][data-item-id][data-item-field]").forEach((el) => {
       var _a;
       const item = findItemById(el.dataset.itemPath, el.dataset.itemId);
       if (!item) return;
@@ -3024,29 +3334,29 @@
     <button class="ghost small add-row-btn" data-addrefund="${basePath}">+ Teruggave toevoegen</button>
   `;
   }
-  function handleTableClicks(root) {
-    root.querySelectorAll("[data-addrow]").forEach((btn) => {
+  function handleTableClicks(root2) {
+    root2.querySelectorAll("[data-addrow]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const path = btn.dataset.addrow;
         commitChange(() => getPath(state, path).push({ id: uid(), categorie: "", post: "", bedrag: 0 }), { render: false });
         renderActiveTab();
       });
     });
-    root.querySelectorAll("[data-addrefund]").forEach((btn) => {
+    root2.querySelectorAll("[data-addrefund]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const path = btn.dataset.addrefund;
         commitChange(() => getPath(state, path).push({ id: uid(), omschrijving: "", bedrag: 0 }), { render: false });
         renderActiveTab();
       });
     });
-    root.querySelectorAll("[data-remove-id][data-remove-path]").forEach((btn) => {
+    root2.querySelectorAll("[data-remove-id][data-remove-path]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const path = btn.dataset.removePath;
         const label = path.includes("spaardoelen") ? "Spaardoel verwijderd" : path.includes("variabel") ? "Variabel budget verwijderd" : path.toLowerCase().includes("teruggaven") ? "Teruggave verwijderd" : "Vaste last verwijderd";
         removeWithUndo(path, btn.dataset.removeId, label);
       });
     });
-    root.querySelectorAll("[data-move-row-id][data-source-path]").forEach((select) => {
+    root2.querySelectorAll("[data-move-row-id][data-source-path]").forEach((select) => {
       select.addEventListener("change", () => {
         const sourcePath = select.dataset.sourcePath;
         const targetPath = select.value;
@@ -3063,7 +3373,7 @@
         });
       });
     });
-    root.querySelectorAll("[data-remove-transaction]").forEach((btn) => {
+    root2.querySelectorAll("[data-remove-transaction]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const id = btn.dataset.removeTransaction;
         const tx = (state.transactions || []).find((item) => item.id === id);
@@ -3188,8 +3498,8 @@
     <button class="ghost small add-row-btn" data-addgoal="${basePath}">+ Spaardoel toevoegen</button>
   `;
   }
-  function handleGoalClicks(root) {
-    root.querySelectorAll("[data-move-goal]").forEach((btn) => {
+  function handleGoalClicks(root2) {
+    root2.querySelectorAll("[data-move-goal]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const [path, id, directionText] = btn.dataset.moveGoal.split("|");
         const direction = Number(directionText);
@@ -3201,7 +3511,7 @@
         renderActiveTab();
       });
     });
-    root.querySelectorAll("[data-addgoal]").forEach((btn) => {
+    root2.querySelectorAll("[data-addgoal]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const path = btn.dataset.addgoal;
         commitChange(() => getPath(state, path).push({ id: uid(), naam: "Nieuw doel", doelbedrag: 0, algespaard: 0, doeldatum: "", vasteInleg: 0, rendement: 0.0125, rendementPeriode: "jaarlijks", favoriet: false }), { render: false });
@@ -3832,9 +4142,9 @@
     });
     const distribution = groupSummary.map((group) => `<div class="mobile-goal-summary-line"><span>${group.label}</span><i><b style="width:${Math.round(group.ratio * 100)}%"></b></i><strong>${eur(group.target)} (${pct(group.ratio)})</strong></div>`).join("");
     const monthSummary = groupSummary.map((group) => `<div class="mobile-goal-summary-line"><span>${group.label}</span><i><b style="width:${monthly > 0 ? Math.round(group.monthly / monthly * 100) : 0}%"></b></i><strong>${eur(group.monthly)}</strong></div>`).join("");
-    const root = document.getElementById("tab-spaardoelen");
-    root.innerHTML = `${renderSharedEmptyTabHeader("Spaardoelen overzicht")}<div class="mobile-savings-overview"><div class="mobile-savings-kpis"><div class="card"><span>◈</span><small>Totaal gespaard</small><strong>${eur(saved)}</strong><em>van ${eur(target)}</em></div><div class="card"><span>◎</span><small>Totaal doelbedrag</small><strong>${eur(target)}</strong><em>alle doelen samen</em></div><div class="card"><span>↗</span><small>Gemiddelde voortgang</small><strong>${pct(average)}</strong><em>op basis van doelbedrag</em></div><div class="card"><span>€</span><small>Inleg deze maand</small><strong>${eur(monthly)}</strong><em>${monthLabel(getSelectedMonth())}</em></div></div>${groups.map(renderMobileGoalGroup).join("")}<div class="mobile-savings-summary-grid"><div class="card"><h2>Verdeling van spaardoelen</h2>${distribution}<p>Percentages gebaseerd op totaal doelbedrag per groep.</p></div><div class="card"><h2>Inleg deze maand</h2>${monthSummary}<strong class="mobile-savings-month-total">${eur(monthly)} totaal</strong></div></div><div class="manage-stack"><details class="manage-section"><summary><span class="manage-title">Spaardoelen beheren — Gezamenlijk</span><span class="expand-chevron"></span></summary><div class="manage-body"><div class="card">${renderGoalGroup("spaardoelen.gezamenlijk", state.spaardoelen.gezamenlijk, r.spaarpotDezeMaand)}</div></div></details><details class="manage-section"><summary><span class="manage-title">Spaardoelen beheren — Dion</span><span class="expand-chevron"></span></summary><div class="manage-body"><div class="card">${renderGoalGroup("spaardoelen.dion", state.spaardoelen.dion, r.dion.beschikbaarVoorSparen)}</div></div></details><details class="manage-section"><summary><span class="manage-title">Spaardoelen beheren — Dara</span><span class="expand-chevron"></span></summary><div class="manage-body"><div class="card">${renderGoalGroup("spaardoelen.dara", state.spaardoelen.dara, r.dara.beschikbaarVoorSparen)}</div></div></details></div></div>`;
-    root.querySelectorAll(".manage-section").forEach((section, index) => {
+    const root2 = document.getElementById("tab-spaardoelen");
+    root2.innerHTML = `${renderSharedEmptyTabHeader("Spaardoelen overzicht")}<div class="mobile-savings-overview"><div class="mobile-savings-kpis"><div class="card"><span>◈</span><small>Totaal gespaard</small><strong>${eur(saved)}</strong><em>van ${eur(target)}</em></div><div class="card"><span>◎</span><small>Totaal doelbedrag</small><strong>${eur(target)}</strong><em>alle doelen samen</em></div><div class="card"><span>↗</span><small>Gemiddelde voortgang</small><strong>${pct(average)}</strong><em>op basis van doelbedrag</em></div><div class="card"><span>€</span><small>Inleg deze maand</small><strong>${eur(monthly)}</strong><em>${monthLabel(getSelectedMonth())}</em></div></div>${groups.map(renderMobileGoalGroup).join("")}<div class="mobile-savings-summary-grid"><div class="card"><h2>Verdeling van spaardoelen</h2>${distribution}<p>Percentages gebaseerd op totaal doelbedrag per groep.</p></div><div class="card"><h2>Inleg deze maand</h2>${monthSummary}<strong class="mobile-savings-month-total">${eur(monthly)} totaal</strong></div></div><div class="manage-stack"><details class="manage-section"><summary><span class="manage-title">Spaardoelen beheren — Gezamenlijk</span><span class="expand-chevron"></span></summary><div class="manage-body"><div class="card">${renderGoalGroup("spaardoelen.gezamenlijk", state.spaardoelen.gezamenlijk, r.spaarpotDezeMaand)}</div></div></details><details class="manage-section"><summary><span class="manage-title">Spaardoelen beheren — Dion</span><span class="expand-chevron"></span></summary><div class="manage-body"><div class="card">${renderGoalGroup("spaardoelen.dion", state.spaardoelen.dion, r.dion.beschikbaarVoorSparen)}</div></div></details><details class="manage-section"><summary><span class="manage-title">Spaardoelen beheren — Dara</span><span class="expand-chevron"></span></summary><div class="manage-body"><div class="card">${renderGoalGroup("spaardoelen.dara", state.spaardoelen.dara, r.dara.beschikbaarVoorSparen)}</div></div></details></div></div>`;
+    root2.querySelectorAll(".manage-section").forEach((section, index) => {
       const owners = ["gezamenlijk", "dion", "dara"];
       const body = section.querySelector(".manage-body");
       if (body) body.innerHTML = `<button type="button" class="ghost mobile-goal-manage-open" data-open-goal-manager="${owners[index]}">Open full-screen beheer</button>`;
@@ -4089,12 +4399,12 @@ service cloud.firestore {
   }
   function renderMobileDataTab() {
     renderDataTab();
-    const root = document.getElementById("tab-data");
-    if (!root) return;
-    root.classList.add("mobile-data-page");
-    const heading = root.querySelector(".page-heading");
+    const root2 = document.getElementById("tab-data");
+    if (!root2) return;
+    root2.classList.add("mobile-data-page");
+    const heading = root2.querySelector(".page-heading");
     if (heading) heading.outerHTML = renderSharedEmptyTabHeader("Data & back-up") + '<p class="mobile-data-intro">Beheer je data, maak back-ups en synchroniseer optioneel met de cloud.</p>';
-    const infoParagraphs = root.querySelectorAll(".info-callout p");
+    const infoParagraphs = root2.querySelectorAll(".info-callout p");
     if (infoParagraphs[1]) infoParagraphs[1].textContent = "Cloud synchronisatie via Firebase is optioneel. De toegang wordt bepaald door je ingestelde Firestore-beveiligingsregels.";
   }
   function renderMonthSelect() {
@@ -4278,20 +4588,20 @@ service cloud.firestore {
     bankImportDraft = null;
     renderActiveTab();
   }
-  function bindBankImport(root) {
+  function bindBankImport(root2) {
     var _a, _b, _c, _d;
-    (_a = root.querySelector('[data-dashboard-accordion="bank-import"]')) == null ? void 0 : _a.addEventListener("toggle", (event) => {
+    (_a = root2.querySelector('[data-dashboard-accordion="bank-import"]')) == null ? void 0 : _a.addEventListener("toggle", (event) => {
       bankImportOpen = event.currentTarget.open;
     });
-    root.querySelectorAll("[data-open-general-transaction]").forEach((button) => button.addEventListener("click", openGeneralTransactionModal));
-    (_b = root.querySelector("[data-bank-import-owner]")) == null ? void 0 : _b.addEventListener("change", (event) => {
+    root2.querySelectorAll("[data-open-general-transaction]").forEach((button) => button.addEventListener("click", openGeneralTransactionModal));
+    (_b = root2.querySelector("[data-bank-import-owner]")) == null ? void 0 : _b.addEventListener("change", (event) => {
       if (!bankImportDraft) return;
       bankImportOpen = true;
       bankImportDraft.owner = event.target.value;
       bankParseDraft();
       renderActiveTab();
     });
-    (_c = root.querySelector("[data-bank-csv-file]")) == null ? void 0 : _c.addEventListener("change", (event) => {
+    (_c = root2.querySelector("[data-bank-csv-file]")) == null ? void 0 : _c.addEventListener("change", (event) => {
       var _a2;
       const file = (_a2 = event.target.files) == null ? void 0 : _a2[0];
       if (!file) return;
@@ -4308,13 +4618,13 @@ service cloud.firestore {
       };
       reader.readAsText(file);
     });
-    root.querySelectorAll("[data-bank-map]").forEach((select) => select.addEventListener("change", () => {
+    root2.querySelectorAll("[data-bank-map]").forEach((select) => select.addEventListener("change", () => {
       bankImportOpen = true;
       bankImportDraft.mapping[select.dataset.bankMap] = select.value;
       bankParseDraft();
       renderActiveTab();
     }));
-    root.querySelectorAll("[data-bank-select]").forEach((input) => input.addEventListener("change", () => {
+    root2.querySelectorAll("[data-bank-select]").forEach((input) => input.addEventListener("change", () => {
       const row = bankImportDraft == null ? void 0 : bankImportDraft.rows.find((item) => item.index === Number(input.dataset.bankSelect));
       if (row) {
         bankImportOpen = true;
@@ -4322,12 +4632,12 @@ service cloud.firestore {
         renderActiveTab();
       }
     }));
-    root.querySelectorAll("[data-bank-category]").forEach((select) => select.addEventListener("change", () => {
+    root2.querySelectorAll("[data-bank-category]").forEach((select) => select.addEventListener("change", () => {
       const row = bankImportDraft == null ? void 0 : bankImportDraft.rows.find((item) => item.index === Number(select.dataset.bankCategory));
       if (row) row.category = select.value;
     }));
-    (_d = root.querySelector("[data-bank-import-all]")) == null ? void 0 : _d.addEventListener("click", () => bankImportRows(bankImportDraft.rows.filter((row) => row.selected).map((row) => row.index)));
-    root.querySelectorAll("[data-bank-import-row]").forEach((button) => button.addEventListener("click", () => bankImportRows([Number(button.dataset.bankImportRow)])));
+    (_d = root2.querySelector("[data-bank-import-all]")) == null ? void 0 : _d.addEventListener("click", () => bankImportRows(bankImportDraft.rows.filter((row) => row.selected).map((row) => row.index)));
+    root2.querySelectorAll("[data-bank-import-row]").forEach((button) => button.addEventListener("click", () => bankImportRows([Number(button.dataset.bankImportRow)])));
   }
   function openJointTransactionModal(transactionId = "") {
     const modal = document.getElementById("transactionModal");
@@ -5409,75 +5719,75 @@ service cloud.firestore {
       document.body.dataset.realActiveTab = activeTab;
     }
     document.querySelectorAll(".scenario-toggle button[data-scenario]").forEach((b) => b.classList.toggle("active", b.dataset.scenario === state.meta.scenario));
-    const root = document.getElementById("tab-" + activeTab);
-    bindInputs(root);
-    handleTableClicks(root);
-    handleGoalClicks(root);
-    bindU3Admin(root);
+    const root2 = document.getElementById("tab-" + activeTab);
+    bindInputs(root2);
+    handleTableClicks(root2);
+    handleGoalClicks(root2);
+    bindU3Admin(root2);
     if (activeTab === "dashboard") {
-      bindDashboardAccordionKeyboard(root);
-      bindBankImport(root);
+      bindDashboardAccordionKeyboard(root2);
+      bindBankImport(root2);
     }
-    root.querySelectorAll("[data-tab-shortcut]").forEach((btn) => {
+    root2.querySelectorAll("[data-tab-shortcut]").forEach((btn) => {
       btn.addEventListener("click", () => {
         activeTab = btn.dataset.tabShortcut;
         renderActiveTab();
       });
     });
-    root.querySelectorAll("[data-income-edit]").forEach((btn) => {
+    root2.querySelectorAll("[data-income-edit]").forEach((btn) => {
       btn.addEventListener("click", () => {
         openIncomeEditModal(btn.dataset.incomeEdit, btn.dataset.incomeLabel);
       });
     });
-    root.querySelectorAll("[data-open-total-income]").forEach((btn) => {
+    root2.querySelectorAll("[data-open-total-income]").forEach((btn) => {
       btn.addEventListener("click", openTotalIncomeEditModal);
     });
-    root.querySelectorAll("[data-open-budget-transactions]").forEach((btn) => {
+    root2.querySelectorAll("[data-open-budget-transactions]").forEach((btn) => {
       btn.addEventListener("click", () => openBudgetTransactionsModal(btn.dataset.openBudgetTransactions, btn.dataset.budgetOwner || "gezamenlijk"));
     });
-    root.querySelectorAll("[data-open-goal-editor]").forEach((btn) => {
+    root2.querySelectorAll("[data-open-goal-editor]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const [owner, id] = btn.dataset.openGoalEditor.split(":");
         openMobileGoalEditor(owner, id);
       });
     });
-    root.querySelectorAll("[data-open-goal-manager]").forEach((btn) => {
+    root2.querySelectorAll("[data-open-goal-manager]").forEach((btn) => {
       btn.addEventListener("click", () => openMobileGoalManager(btn.dataset.openGoalManager));
     });
-    root.querySelectorAll(".mobile-savings-overview .manage-section").forEach((section, index) => {
+    root2.querySelectorAll(".mobile-savings-overview .manage-section").forEach((section, index) => {
       var _a2;
       (_a2 = section.querySelector("summary")) == null ? void 0 : _a2.addEventListener("click", (event) => {
         event.preventDefault();
         openMobileGoalManager(["gezamenlijk", "dion", "dara"][index]);
       });
     });
-    root.querySelectorAll("[data-saving-edit]").forEach((btn) => {
+    root2.querySelectorAll("[data-saving-edit]").forEach((btn) => {
       btn.addEventListener("click", () => {
         openSavingEditModal();
       });
     });
-    root.querySelectorAll("[data-personal-saving-edit]").forEach((btn) => {
+    root2.querySelectorAll("[data-personal-saving-edit]").forEach((btn) => {
       btn.addEventListener("click", () => openPersonalSavingEditModal(btn.dataset.personalSavingEdit));
     });
-    root.querySelectorAll("[data-open-owner-fixed]").forEach((btn) => {
+    root2.querySelectorAll("[data-open-owner-fixed]").forEach((btn) => {
       btn.addEventListener("click", () => {
         openJointFixedCostsModal(false, btn.dataset.openOwnerFixed);
       });
     });
-    root.querySelectorAll("[data-open-owner-variable]").forEach((btn) => {
+    root2.querySelectorAll("[data-open-owner-variable]").forEach((btn) => {
       btn.addEventListener("click", () => {
         openJointVariableCostsModal(false, btn.dataset.openOwnerVariable);
       });
     });
-    root.querySelectorAll("[data-open-joint-transaction]").forEach((btn) => {
+    root2.querySelectorAll("[data-open-joint-transaction]").forEach((btn) => {
       btn.addEventListener("click", () => {
         openJointTransactionModal();
       });
     });
-    root.querySelectorAll("[data-open-personal-transaction]").forEach((btn) => {
+    root2.querySelectorAll("[data-open-personal-transaction]").forEach((btn) => {
       btn.addEventListener("click", () => openPersonalTransactionModal(btn.dataset.openPersonalTransaction));
     });
-    root.querySelectorAll("[data-edit-personal-transaction]").forEach((row) => {
+    root2.querySelectorAll("[data-edit-personal-transaction]").forEach((row) => {
       const openEditor = (event) => {
         if (!(event == null ? void 0 : event.target.closest("button"))) openPersonalTransactionModal(row.dataset.owner, row.dataset.editPersonalTransaction);
       };
@@ -5489,7 +5799,7 @@ service cloud.firestore {
         }
       });
     });
-    root.querySelectorAll("[data-edit-joint-transaction]").forEach((row) => {
+    root2.querySelectorAll("[data-edit-joint-transaction]").forEach((row) => {
       const openEditor = (event) => {
         if (event == null ? void 0 : event.target.closest("button")) return;
         openJointTransactionModal(row.dataset.editJointTransaction);
@@ -5504,8 +5814,8 @@ service cloud.firestore {
     });
     renderCloudStatus();
     placeMonthControl();
-    placeDesktopPageHeading(root);
-    (_c = window.FinizeUpdate5) == null ? void 0 : _c.markNegativeValues(root);
+    placeDesktopPageHeading(root2);
+    (_c = window.FinizeUpdate5) == null ? void 0 : _c.markNegativeValues(root2);
   }
   function placeMonthControl() {
     const control = document.getElementById("monthControl");
@@ -5520,11 +5830,11 @@ service cloud.firestore {
       home.insertBefore(control, home.firstChild);
     }
   }
-  function placeDesktopPageHeading(root = document.getElementById("tab-" + activeTab)) {
+  function placeDesktopPageHeading(root2 = document.getElementById("tab-" + activeTab)) {
     const topbar = document.querySelector(".v4-main-topbar");
     if (!topbar) return;
     const parkedHeadings = [...topbar.querySelectorAll(":scope > .v4-dashboard-heading, :scope > .page-heading")];
-    const activeRoot = (root == null ? void 0 : root.id) === "tab-" + activeTab ? root : document.getElementById("tab-" + activeTab);
+    const activeRoot = (root2 == null ? void 0 : root2.id) === "tab-" + activeTab ? root2 : document.getElementById("tab-" + activeTab);
     const rootHeading = activeRoot == null ? void 0 : activeRoot.querySelector(":scope > .v4-dashboard-heading, :scope > .page-heading");
     const matchingParked = parkedHeadings.find((heading2) => heading2.dataset.headingOwner === activeTab);
     const heading = rootHeading || matchingParked;
@@ -5911,7 +6221,7 @@ service cloud.firestore {
     let amounts = items.map((item) => item.werkelijkeInleg);
     const insufficient = items.some((item) => item.onvoldoendeVasteInleg);
     const modal = document.getElementById("transactionModal");
-    const render = () => {
+    const render2 = () => {
       var _a;
       const total = round2(amounts.reduce((sum, value) => sum + (Number(value) || 0), 0));
       const rows = items.map((item, index) => `<label class="u2-process-row"><span><strong>${textSafe(item.doel.naam)}</strong><small>Vast ${eur(Number(item.doel.vasteInleg) || 0)} · nodig ${item.benodigdPerMaand === null ? "—" : eur(item.benodigdPerMaand)}</small></span><input type="number" min="0" max="${item.nogTeGaan}" step="0.01" data-u2-process="${index}" value="${Number(amounts[index]).toFixed(2)}"></label>`).join("");
@@ -5938,7 +6248,7 @@ service cloud.firestore {
       }));
       (_a = modal.querySelector("[data-u2-fixed-ratio]")) == null ? void 0 : _a.addEventListener("click", () => {
         amounts = u2FixedFallback(items, pot);
-        render();
+        render2();
       });
       modal.querySelector("[data-u2-confirm]").addEventListener("click", () => {
         const total2 = round2(amounts.reduce((sum, value) => sum + (Number(value) || 0), 0));
@@ -5988,7 +6298,7 @@ service cloud.firestore {
       });
       refresh();
     };
-    render();
+    render2();
   }
   function u2RenderChildSummary(goal) {
     var _a;
@@ -6037,8 +6347,8 @@ service cloud.firestore {
     const all = groups.flatMap((group) => calcGroep(state.spaardoelen[group.key], group.pot, TODAY));
     const saved = round2(all.reduce((sum, item) => sum + u2GoalSaved(item.doel), 0));
     const target = round2(all.reduce((sum, item) => sum + u2GoalTarget(item.doel), 0));
-    const root = document.getElementById("tab-spaardoelen");
-    root.innerHTML = `${renderSharedEmptyTabHeader("Slimme spaardoelen")}
+    const root2 = document.getElementById("tab-spaardoelen");
+    root2.innerHTML = `${renderSharedEmptyTabHeader("Slimme spaardoelen")}
     <div class="mobile-savings-overview u2-savings">
       <div class="mobile-savings-kpis"><div class="card"><small>Totaal gespaard</small><strong>${eur(saved)}</strong><em>van ${eur(target)}</em></div><div class="card"><small>Totale voortgang</small><strong>${target > 0 ? Math.round(saved / target * 100) : 0}%</strong><em>alle hoofddoelen</em></div><div class="card"><small>Openstaand</small><strong>${eur(Math.max(0, target - saved))}</strong><em>nog te sparen</em></div><div class="card"><small>Afgeronde maanden</small><strong>${Object.keys(state.spaardoelGeschiedenis || {}).length}</strong><em>in geschiedenis</em></div></div>
       ${groups.map((group) => {
@@ -6048,7 +6358,7 @@ service cloud.firestore {
     }).join("")}
       <details class="card u2-history"><summary><strong>Spaargeschiedenis</strong><span>${Object.keys(state.spaardoelGeschiedenis || {}).length} maanden</span></summary><div>${Object.values(state.spaardoelGeschiedenis || {}).sort((a, b) => String(b.maand).localeCompare(String(a.maand))).map((entry) => `<article><strong>${ownerLabel(entry.eigenaar)} · ${monthLabel(entry.maand)}</strong><span>Spaarpot ${eur(entry.spaarpot)} · verdeeld ${eur(entry.verdeeld)} · onverdeeld ${eur(entry.onverdeeld)}</span><small>${entry.transacties.map((tx) => `${textSafe(tx.doelNaam)} ${eur(tx.bedrag)}`).join(" · ")}</small></article>`).join("") || '<p class="hint">Nog geen maanden verwerkt.</p>'}</div></details>
     </div>`;
-    root.querySelectorAll("[data-u2-process-owner]").forEach((btn) => btn.addEventListener("click", () => u2OpenProcessModal(btn.dataset.u2ProcessOwner)));
+    root2.querySelectorAll("[data-u2-process-owner]").forEach((btn) => btn.addEventListener("click", () => u2OpenProcessModal(btn.dataset.u2ProcessOwner)));
   };
   renderDashboardGoalPreviewCard = function(item) {
     var _a;
@@ -6079,14 +6389,14 @@ service cloud.firestore {
   };
   renderMobileSpaardoelen = function() {
     u2OriginalMobileSpaardoelen();
-    const root = document.getElementById("tab-spaardoelen");
+    const root2 = document.getElementById("tab-spaardoelen");
     const result = calcScenario(state);
     const groups = [
       { owner: "gezamenlijk", pot: Math.max(0, Number(result.spaarpotDezeMaand) || 0) },
       { owner: "dion", pot: Math.max(0, Number(result.dion.beschikbaarVoorSparen) || 0) },
       { owner: "dara", pot: Math.max(0, Number(result.dara.beschikbaarVoorSparen) || 0) }
     ];
-    root.querySelectorAll(".mobile-goal-section").forEach((section, index) => {
+    root2.querySelectorAll(".mobile-goal-section").forEach((section, index) => {
       var _a;
       const group = groups[index];
       if (!group) return;
@@ -6098,12 +6408,12 @@ service cloud.firestore {
     });
     const history = Object.values(state.spaardoelGeschiedenis || {}).sort((a, b) => String(b.maand).localeCompare(String(a.maand)));
     const historyHtml = `<div class="u2-history-list">${history.map((entry) => `<article><strong>${ownerLabel(entry.eigenaar)} Â· ${monthLabel(entry.maand)}</strong><span>Spaarpot ${eur(entry.spaarpot)} Â· verdeeld ${eur(entry.verdeeld)} Â· onverdeeld ${eur(entry.onverdeeld)}</span><small>${entry.transacties.map((tx) => `${textSafe(tx.doelNaam)} ${eur(tx.bedrag)}`).join(" Â· ")}</small></article>`).join("") || '<p class="hint">Nog geen maanden verwerkt.</p>'}</div>`;
-    root.insertAdjacentHTML("beforeend", `<div class="manage-stack u2-history-stack">${renderManageSection("Spaargeschiedenis", historyHtml, false)}</div>`);
-    root.querySelectorAll(".u2-goal-accordion [data-open-goal-editor]").forEach((btn) => btn.addEventListener("click", (event) => {
+    root2.insertAdjacentHTML("beforeend", `<div class="manage-stack u2-history-stack">${renderManageSection("Spaargeschiedenis", historyHtml, false)}</div>`);
+    root2.querySelectorAll(".u2-goal-accordion [data-open-goal-editor]").forEach((btn) => btn.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
     }));
-    root.querySelectorAll("[data-u2-process-owner]").forEach((btn) => btn.addEventListener("click", () => u2OpenProcessModal(btn.dataset.u2ProcessOwner)));
+    root2.querySelectorAll("[data-u2-process-owner]").forEach((btn) => btn.addEventListener("click", () => u2OpenProcessModal(btn.dataset.u2ProcessOwner)));
   };
   var u2BaseGoalEditor = openMobileGoalEditor;
   openMobileGoalEditor = function(owner, id) {
@@ -6676,11 +6986,11 @@ service cloud.firestore {
   function u3PendingReviews(month = getSelectedMonth()) {
     return (state.transactionReviewQueue || []).filter((row) => (row.reviewStatus || "te-controleren") === "te-controleren" && String(row.date || "").slice(0, 7) === month);
   }
-  function assertMonthMutationAllowed(month = getSelectedMonth(), mode = "direct") {
+  function assertMonthMutationAllowed(month = getSelectedMonth(), mode2 = "direct") {
     var _a, _b;
     const status = (_b = (_a = state.monthRecords) == null ? void 0 : _a[month]) == null ? void 0 : _b.status;
     if (!["afgesloten", "correctie-nodig"].includes(status)) return true;
-    if (["reopen", "correction", "late-import"].includes(mode)) return true;
+    if (["reopen", "correction", "late-import"].includes(mode2)) return true;
     throw new Error("Deze maand is afgesloten. Heropen de maand of maak een correctie om financiële gegevens te wijzigen.");
   }
   function u3AssertMonthOpen(month = getSelectedMonth()) {
@@ -6729,8 +7039,8 @@ service cloud.firestore {
   </section>`;
     return renderManageSection("Maandadministratie", body, false, 'data-dashboard-accordion="month-admin"');
   }
-  function bindU3Admin(root) {
-    root.querySelectorAll("[data-u3-open]").forEach((button) => button.addEventListener("click", () => {
+  function bindU3Admin(root2) {
+    root2.querySelectorAll("[data-u3-open]").forEach((button) => button.addEventListener("click", () => {
       var _a, _b;
       const view = button.dataset.u3Open;
       if (view === "planning") u3OpenPlanning(button.dataset.u3PlanningOwner || "");
@@ -6753,10 +7063,10 @@ service cloud.firestore {
       } else if (view === "close") u3OpenClose();
       else if (view === "transfers") u3OpenTransfers();
     }));
-    root.querySelectorAll("[data-u3-add-recurring]").forEach((button) => button.addEventListener("click", () => {
+    root2.querySelectorAll("[data-u3-add-recurring]").forEach((button) => button.addEventListener("click", () => {
       u3OpenRecurringEditor(button.dataset.u3AddRecurring, "", { owner: button.dataset.u3RecurringOwner });
     }));
-    root.querySelectorAll("[data-u3-edit-recurring]").forEach((button) => button.addEventListener("click", () => {
+    root2.querySelectorAll("[data-u3-edit-recurring]").forEach((button) => button.addEventListener("click", () => {
       const [kind, id] = button.dataset.u3EditRecurring.split(":");
       u3OpenRecurringEditor(kind, id);
     }));
@@ -7087,6 +7397,17 @@ service cloud.firestore {
   window.__finizeMaybeFinishBootstrap = function() {
     const bootstrap = window.__finizeBootstrap;
     if (bootstrap.rendered || !bootstrap.coreReady || !bootstrap.update4Ready || !bootstrap.update5Ready) return false;
+    if (!bootstrap.authReady) {
+      if (!bootstrap.waitingForAuth) {
+        bootstrap.waitingForAuth = true;
+        Promise.resolve(window.__finizeAuthGate).then((session) => {
+          bootstrap.authReady = true;
+          bootstrap.authSession = session;
+          window.__finizeMaybeFinishBootstrap();
+        });
+      }
+      return false;
+    }
     bootstrap.rendered = true;
     bootstrap.initialRenderCount += 1;
     renderActiveTab();
@@ -7125,10 +7446,10 @@ service cloud.firestore {
   });
 
   // src/import/runtime.js
-  (function(root, factory) {
+  (function(root2, factory) {
     const api = factory();
-    root.FinizeUpdate4Runtime = api;
-    api.install(root);
+    root2.FinizeUpdate4Runtime = api;
+    api.install(root2);
   })(typeof window !== "undefined" ? window : globalThis, function() {
     "use strict";
     const SCHEMA_VERSION = 9;
@@ -7341,10 +7662,10 @@ service cloud.firestore {
         });
         return this.dbPromise;
       },
-      async request(storeName, mode, action) {
+      async request(storeName, mode2, action) {
         const db = await this.open();
         return new Promise((resolve, reject) => {
-          const tx = db.transaction(storeName, mode);
+          const tx = db.transaction(storeName, mode2);
           const store = tx.objectStore(storeName);
           let request;
           try {
@@ -7506,9 +7827,9 @@ service cloud.firestore {
       await Promise.all(Array.from({ length: Math.min(Math.max(1, limit), values.length || 1) }, worker));
       return result;
     }
-    async function fetchImportFromCloud(root, id) {
+    async function fetchImportFromCloud(root2, id) {
       var _a, _b, _c, _d, _e;
-      const cloud = root == null ? void 0 : root.CloudAdapter;
+      const cloud = root2 == null ? void 0 : root2.CloudAdapter;
       if (!((_a = cloud == null ? void 0 : cloud.isConnected) == null ? void 0 : _a.call(cloud))) {
         if (((_b = cloud == null ? void 0 : cloud.isConfigured) == null ? void 0 : _b.call(cloud)) && typeof cloud.connect === "function") await cloud.connect();
       }
@@ -7855,14 +8176,14 @@ service cloud.firestore {
         updatedAt: draft.updatedAt
       };
     }
-    function commitSummary(root, draft) {
+    function commitSummary(root2, draft) {
       const summary = compactSummary(draft);
-      const ok = root.commitChange(() => {
-        root.state.importSummaries = root.state.importSummaries || [];
-        const index = root.state.importSummaries.findIndex((item) => item.id === summary.id);
-        if (index >= 0) root.state.importSummaries[index] = summary;
-        else root.state.importSummaries.unshift(summary);
-        root.state.activeImportId = draft.status === "concept" ? draft.id : root.state.activeImportId === draft.id ? "" : root.state.activeImportId;
+      const ok = root2.commitChange(() => {
+        root2.state.importSummaries = root2.state.importSummaries || [];
+        const index = root2.state.importSummaries.findIndex((item) => item.id === summary.id);
+        if (index >= 0) root2.state.importSummaries[index] = summary;
+        else root2.state.importSummaries.unshift(summary);
+        root2.state.activeImportId = draft.status === "concept" ? draft.id : root2.state.activeImportId === draft.id ? "" : root2.state.activeImportId;
       }, { render: false });
       if (!ok) throw new Error("Importsamenvatting kon niet worden opgeslagen.");
     }
@@ -7872,7 +8193,7 @@ service cloud.firestore {
       status.textContent = text;
       status.classList.toggle("u4-error", Boolean(error));
     }
-    function persistImportDraftImmediate(root, draft, { syncCloud = true, updateSummary = true } = {}) {
+    function persistImportDraftImmediate(root2, draft, { syncCloud = true, updateSummary = true } = {}) {
       if (!plain(draft) || !draft.id) return Promise.reject(new Error("Importconcept mist een geldig ID."));
       const id = String(draft.id);
       const previous = ImportPerformance.chains.get(id) || Promise.resolve();
@@ -7881,10 +8202,10 @@ service cloud.firestore {
         if (updateSummary) updateDraftSummary(draft);
         else draft.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
         await ImportStore.putImport(draft);
-        commitSummary(root, draft);
+        commitSummary(root2, draft);
         if (syncCloud) {
           await queueImportSync(draft);
-          flushImportSync(root).catch((error) => console.warn("Importsynchronisatie wordt later opnieuw geprobeerd.", error));
+          flushImportSync(root2).catch((error) => console.warn("Importsynchronisatie wordt later opnieuw geprobeerd.", error));
         }
         return draft;
       });
@@ -7895,12 +8216,12 @@ service cloud.firestore {
       });
       return operation;
     }
-    function scheduleImportDraftPersist(root, draft, { delay = 400, syncCloud = true, updateSummary = true } = {}) {
+    function scheduleImportDraftPersist(root2, draft, { delay = 400, syncCloud = true, updateSummary = true } = {}) {
       const id = String((draft == null ? void 0 : draft.id) || "");
       if (!id) return Promise.reject(new Error("Importconcept mist een geldig ID."));
       let pending = ImportPerformance.pending.get(id);
-      if (!pending) pending = { root, draft, syncCloud: false, updateSummary: false, timer: null, resolvers: [] };
-      pending.root = root;
+      if (!pending) pending = { root: root2, draft, syncCloud: false, updateSummary: false, timer: null, resolvers: [] };
+      pending.root = root2;
       pending.draft = draft;
       pending.syncCloud = pending.syncCloud || syncCloud;
       pending.updateSummary = pending.updateSummary || updateSummary;
@@ -7920,7 +8241,7 @@ service cloud.firestore {
       ImportPerformance.pending.set(id, pending);
       return promise;
     }
-    async function flushScheduledImportDraft(root, draft, { syncCloud = true, updateSummary = true } = {}) {
+    async function flushScheduledImportDraft(root2, draft, { syncCloud = true, updateSummary = true } = {}) {
       const id = String((draft == null ? void 0 : draft.id) || "");
       const pending = ImportPerformance.pending.get(id);
       if (pending) {
@@ -7937,19 +8258,19 @@ service cloud.firestore {
           throw error;
         }
       }
-      return persistImportDraftImmediate(root, draft, { syncCloud, updateSummary });
+      return persistImportDraftImmediate(root2, draft, { syncCloud, updateSummary });
     }
-    async function persistImportDraft(root, draft, options = {}) {
-      return persistImportDraftImmediate(root, draft, options);
+    async function persistImportDraft(root2, draft, options = {}) {
+      return persistImportDraftImmediate(root2, draft, options);
     }
-    async function saveDraft(root, draft, { sync = false } = {}) {
-      return persistImportDraftImmediate(root, draft, { syncCloud: sync, updateSummary: true });
+    async function saveDraft(root2, draft, { sync = false } = {}) {
+      return persistImportDraftImmediate(root2, draft, { syncCloud: sync, updateSummary: true });
     }
-    async function reconcileActiveImportReference(root, { localRead = (id) => ImportStore.getImport(id) } = {}) {
+    async function reconcileActiveImportReference(root2, { localRead = (id) => ImportStore.getImport(id) } = {}) {
       var _a;
-      const activeId = String(((_a = root == null ? void 0 : root.state) == null ? void 0 : _a.activeImportId) || "");
+      const activeId = String(((_a = root2 == null ? void 0 : root2.state) == null ? void 0 : _a.activeImportId) || "");
       if (!activeId) return { action: "none", activeImportId: "" };
-      const summaries = root.state.importSummaries || [];
+      const summaries = root2.state.importSummaries || [];
       const summary = summaries.find((item) => String(item.id) === activeId);
       let local = null;
       try {
@@ -7959,24 +8280,24 @@ service cloud.firestore {
       }
       if (local) {
         if (local.status === "concept") {
-          if (!summary) commitSummary(root, local);
+          if (!summary) commitSummary(root2, local);
           return { action: summary ? "local" : "summary-restored", activeImportId: activeId };
         }
-        commitSummary(root, local);
+        commitSummary(root2, local);
         return { action: "cleared-finished", activeImportId: "" };
       }
       if (!summary || summary.status !== "concept") {
-        const ok = root.commitChange(() => {
-          if (root.state.activeImportId === activeId) root.state.activeImportId = "";
+        const ok = root2.commitChange(() => {
+          if (root2.state.activeImportId === activeId) root2.state.activeImportId = "";
         }, { render: false });
         if (!ok) throw new Error("De verouderde importblokkade kon niet worden hersteld.");
         return { action: "cleared-stale", activeImportId: "" };
       }
       return { action: "cloud-needed", activeImportId: activeId };
     }
-    async function deleteCloudImportBestEffort(root, id, record = null) {
+    async function deleteCloudImportBestEffort(root2, id, record = null) {
       var _a, _b, _c, _d;
-      const cloud = root == null ? void 0 : root.CloudAdapter;
+      const cloud = root2 == null ? void 0 : root2.CloudAdapter;
       try {
         if (!((_a = cloud == null ? void 0 : cloud.isConnected) == null ? void 0 : _a.call(cloud)) || !((_b = cloud.modules) == null ? void 0 : _b.firestore) || !cloud.db) return false;
         const firestore = cloud.modules.firestore;
@@ -8002,11 +8323,11 @@ service cloud.firestore {
         return false;
       }
     }
-    async function discardImportConcept(root, id, { cleanupCloud = true } = {}) {
+    async function discardImportConcept(root2, id, { cleanupCloud = true } = {}) {
       var _a, _b, _c, _d;
       const importId = String(id || "");
-      const summary = (((_a = root == null ? void 0 : root.state) == null ? void 0 : _a.importSummaries) || []).find((item) => String(item.id) === importId);
-      if (!importId || String(((_b = root == null ? void 0 : root.state) == null ? void 0 : _b.activeImportId) || "") !== importId || (summary == null ? void 0 : summary.status) !== "concept") {
+      const summary = (((_a = root2 == null ? void 0 : root2.state) == null ? void 0 : _a.importSummaries) || []).find((item) => String(item.id) === importId);
+      if (!importId || String(((_b = root2 == null ? void 0 : root2.state) == null ? void 0 : _b.activeImportId) || "") !== importId || (summary == null ? void 0 : summary.status) !== "concept") {
         throw new Error("Alleen het actieve, onverwerkte importconcept kan worden verwijderd.");
       }
       let local = null;
@@ -8017,9 +8338,9 @@ service cloud.firestore {
       }
       const journal = { id: `discard-${importId}`, operation: "discard", importId, status: "pending", createdAt: (/* @__PURE__ */ new Date()).toISOString() };
       await ImportStore.putJournal(journal);
-      const ok = root.commitChange(() => {
-        root.state.importSummaries = (root.state.importSummaries || []).filter((item) => String(item.id) !== importId);
-        if (root.state.activeImportId === importId) root.state.activeImportId = "";
+      const ok = root2.commitChange(() => {
+        root2.state.importSummaries = (root2.state.importSummaries || []).filter((item) => String(item.id) !== importId);
+        if (root2.state.activeImportId === importId) root2.state.activeImportId = "";
       }, { render: false });
       if (!ok) {
         journal.status = "rolled-back";
@@ -8035,14 +8356,14 @@ service cloud.firestore {
         localCleanup = false;
         journal.localCleanupError = String((error == null ? void 0 : error.message) || error);
       }
-      const cloudCleanup = cleanupCloud ? await deleteCloudImportBestEffort(root, importId, local) : false;
+      const cloudCleanup = cleanupCloud ? await deleteCloudImportBestEffort(root2, importId, local) : false;
       if (((_c = UI.draft) == null ? void 0 : _c.id) === importId) UI.draft = null;
       journal.status = localCleanup ? "completed" : "pending";
       if (localCleanup) journal.completedAt = (/* @__PURE__ */ new Date()).toISOString();
       journal.localCleanup = localCleanup;
       journal.cloudCleanup = cloudCleanup;
       await ImportStore.putJournal(journal);
-      (_d = root.renderActiveTab) == null ? void 0 : _d.call(root);
+      (_d = root2.renderActiveTab) == null ? void 0 : _d.call(root2);
       return { ok: true, localCleanup, cloudCleanup };
     }
     function goalExists(state2, id) {
@@ -8462,11 +8783,11 @@ service cloud.firestore {
       if (state2.activeImportId === draft.id) state2.activeImportId = "";
       return state2;
     }
-    async function undoImport(root, draft) {
+    async function undoImport(root2, draft) {
       if (draft.status === "teruggedraaid") return true;
       const journal = { id: `undo-${draft.id}`, importId: draft.id, operation: "undo", status: "pending", createdAt: (/* @__PURE__ */ new Date()).toISOString() };
       await ImportStore.putJournal(journal);
-      const ok = root.commitChange(() => undoImportEffects(root.state, draft), { render: false, mutationMode: "correction" });
+      const ok = root2.commitChange(() => undoImportEffects(root2.state, draft), { render: false, mutationMode: "correction" });
       if (!ok) {
         journal.status = "rolled-back";
         journal.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
@@ -8480,26 +8801,26 @@ service cloud.firestore {
       journal.status = "completed";
       journal.completedAt = (/* @__PURE__ */ new Date()).toISOString();
       await ImportStore.putJournal(journal);
-      flushImportSync(root).catch(() => {
+      flushImportSync(root2).catch(() => {
       });
-      root.renderActiveTab();
-      renderDraftModal(root, draft);
+      root2.renderActiveTab();
+      renderDraftModal(root2, draft);
       return true;
     }
-    async function reconcileImport(root, draft) {
+    async function reconcileImport(root2, draft) {
       var _a;
-      const working = cloneState(root.state);
+      const working = cloneState(root2.state);
       undoImportEffects(working, draft);
       const plan = planImportEffects(draft, working);
       if (!plan.ok) {
-        showValidationErrors(root, draft, plan.errors, "Correctie kan nog niet worden verwerkt");
+        showValidationErrors(root2, draft, plan.errors, "Correctie kan nog niet worden verwerkt");
         return false;
       }
       const journal = { id: `reconcile-${draft.id}-${Date.now()}`, importId: draft.id, operation: "reconcile", status: "pending", createdAt: (/* @__PURE__ */ new Date()).toISOString() };
       await ImportStore.putJournal(journal);
-      const ok = root.commitChange(() => {
-        undoImportEffects(root.state, draft);
-        applyImportPlan(root.state, plan);
+      const ok = root2.commitChange(() => {
+        undoImportEffects(root2.state, draft);
+        applyImportPlan(root2.state, plan);
       }, { render: false, mutationMode: "correction" });
       if (!ok) {
         journal.status = "rolled-back";
@@ -8507,7 +8828,7 @@ service cloud.firestore {
         await ImportStore.putJournal(journal);
         throw new Error("De correctie is volledig afgebroken omdat opslaan mislukte.");
       }
-      draft.status = ((_a = root.state.importSummaries.find((item) => item.id === draft.id)) == null ? void 0 : _a.status) || "verwerkt";
+      draft.status = ((_a = root2.state.importSummaries.find((item) => item.id === draft.id)) == null ? void 0 : _a.status) || "verwerkt";
       draft.correctedAt = (/* @__PURE__ */ new Date()).toISOString();
       draft.effectManifest = effectManifest(plan);
       await ImportStore.putImport(draft);
@@ -8515,10 +8836,10 @@ service cloud.firestore {
       journal.status = "completed";
       journal.completedAt = (/* @__PURE__ */ new Date()).toISOString();
       await ImportStore.putJournal(journal);
-      flushImportSync(root).catch(() => {
+      flushImportSync(root2).catch(() => {
       });
-      root.renderActiveTab();
-      renderDraftModal(root, draft);
+      root2.renderActiveTab();
+      renderDraftModal(root2, draft);
       return true;
     }
     function processedSummaryHtml(plan) {
@@ -8538,7 +8859,7 @@ service cloud.firestore {
       var _a;
       return [...((_a = modal == null ? void 0 : modal.querySelectorAll) == null ? void 0 : _a.call(modal, "[data-u4-row]")) || []].find((element) => String(element.dataset.u4Row) === String(rowId)) || null;
     }
-    function focusValidationError(root, draft, error) {
+    function focusValidationError(root2, draft, error) {
       var _a, _b, _c;
       const modal = document.getElementById("u4ImportModalRoot");
       (_a = document.querySelector(".u4-validation-overlay")) == null ? void 0 : _a.remove();
@@ -8552,7 +8873,7 @@ service cloud.firestore {
       let row = findDraftRowElement(modal, error.rowId);
       if (!row) {
         UI.visibleRows = Math.max(UI.visibleRows || 0, (draft.rows || []).length);
-        renderDraftModal(root, draft);
+        renderDraftModal(root2, draft);
         row = findDraftRowElement(document.getElementById("u4ImportModalRoot"), error.rowId);
       }
       if (!row) return;
@@ -8575,7 +8896,7 @@ service cloud.firestore {
       }, 350);
       setTimeout(() => row == null ? void 0 : row.classList.remove("u4-validation-target"), 3500);
     }
-    function showValidationErrors(root, draft, errors, title = "Import kan nog niet worden verwerkt") {
+    function showValidationErrors(root2, draft, errors, title = "Import kan nog niet worden verwerkt") {
       var _a, _b;
       (_a = document.querySelector(".u4-validation-overlay")) == null ? void 0 : _a.remove();
       const overlay = document.createElement("div");
@@ -8588,25 +8909,25 @@ service cloud.firestore {
       overlay.addEventListener("click", (event) => {
         if (event.target === overlay) close();
       });
-      overlay.querySelectorAll("[data-u4-validation-index]").forEach((button) => button.addEventListener("click", () => focusValidationError(root, draft, shown[Number(button.dataset.u4ValidationIndex)])));
+      overlay.querySelectorAll("[data-u4-validation-index]").forEach((button) => button.addEventListener("click", () => focusValidationError(root2, draft, shown[Number(button.dataset.u4ValidationIndex)])));
     }
-    async function processDraft(root, draft) {
+    async function processDraft(root2, draft) {
       var _a;
-      const plan = planImportEffects(draft, root.state);
+      const plan = planImportEffects(draft, root2.state);
       if (!plan.ok) {
-        showValidationErrors(root, draft, plan.errors);
+        showValidationErrors(root2, draft, plan.errors);
         return false;
       }
       const journal = { id: `process-${draft.id}`, importId: draft.id, status: "pending", createdAt: (/* @__PURE__ */ new Date()).toISOString(), transactionIds: plan.transactions.map((tx) => tx.id) };
       await ImportStore.putJournal(journal);
-      const ok = root.commitChange(() => applyImportPlan(root.state, plan), { render: false, mutationMode: "late-import" });
+      const ok = root2.commitChange(() => applyImportPlan(root2.state, plan), { render: false, mutationMode: "late-import" });
       if (!ok) {
         journal.status = "rolled-back";
         journal.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
         await ImportStore.putJournal(journal);
         throw new Error("De import is volledig teruggedraaid omdat opslaan mislukte.");
       }
-      draft.status = ((_a = root.state.importSummaries.find((item) => item.id === draft.id)) == null ? void 0 : _a.status) || "verwerkt";
+      draft.status = ((_a = root2.state.importSummaries.find((item) => item.id === draft.id)) == null ? void 0 : _a.status) || "verwerkt";
       draft.processedAt = (/* @__PURE__ */ new Date()).toISOString();
       draft.effectManifest = effectManifest(plan);
       await ImportStore.putImport(draft);
@@ -8614,22 +8935,22 @@ service cloud.firestore {
       journal.status = "completed";
       journal.completedAt = (/* @__PURE__ */ new Date()).toISOString();
       await ImportStore.putJournal(journal);
-      flushImportSync(root).catch(() => {
+      flushImportSync(root2).catch(() => {
       });
       const modal = ensureModalRoot();
       modal.innerHTML = `<div class="u4-import-modal"><header class="u4-modal-head"><h2>Import verwerkt</h2><button class="ghost" data-u4-close>Sluiten</button></header><main class="u4-modal-body">${processedSummaryHtml(plan)}</main></div>`;
       modal.querySelector("[data-u4-close]").addEventListener("click", () => {
         closeDraft();
-        root.renderActiveTab();
+        root2.renderActiveTab();
       });
       return true;
     }
     function renderReceipt(summary) {
       return `<article class="u4-receipt" data-u4-open-receipt="${esc(summary.id)}"><div class="u4-receipt-head"><div><strong>${esc(summary.fileName)}</strong><div class="u4-muted">${esc(summary.bank)} · ${esc(summary.periodFrom || "—")} t/m ${esc(summary.periodTo || "—")}</div></div><span class="u4-status ${esc(summary.status)}">${esc(summary.status)}</span></div><div class="u4-muted">${Number(summary.newCount) || 0} transacties · ${Number(summary.duplicateCount) || 0} duplicaten · ${euro(summary.totalExpenses)} uitgaven</div></article>`;
     }
-    function renderImportPanel(root) {
-      const active = root.state.activeImportId;
-      const summaries = (root.state.importSummaries || []).slice().sort((a, b) => String(b.updatedAt || b.importDate).localeCompare(String(a.updatedAt || a.importDate)));
+    function renderImportPanel(root2) {
+      const active = root2.state.activeImportId;
+      const summaries = (root2.state.importSummaries || []).slice().sort((a, b) => String(b.updatedAt || b.importDate).localeCompare(String(a.updatedAt || a.importDate)));
       const current = summaries.find((item) => item.id === active);
       return `<div class="u4-import-panel">
       <div class="u4-import-actions">
@@ -8650,25 +8971,25 @@ service cloud.firestore {
       }
       return modal;
     }
-    function categoryOptions(root, owner, current) {
+    function categoryOptions(root2, owner, current) {
       let categories = ["Ongecategoriseerd", "Overig", "Vaste lasten", "Boodschappen", "Entertainment", "Vervoer", "Kleding"];
       try {
-        if (typeof root.bankOwnerCategories === "function") categories = ["Ongecategoriseerd", ...root.bankOwnerCategories(owner)];
+        if (typeof root2.bankOwnerCategories === "function") categories = ["Ongecategoriseerd", ...root2.bankOwnerCategories(owner)];
       } catch (_) {
       }
       return [...new Set(categories)].map((value) => option(value, value, current)).join("");
     }
-    function goalOptions(root, current) {
+    function goalOptions(root2, current) {
       const rows = [];
       OWNERS.forEach((owner) => {
         var _a;
-        return (((_a = root.state.spaardoelen) == null ? void 0 : _a[owner]) || []).forEach((goal) => rows.push({ id: goal.id, label: `${ownerLabel2(owner)} · ${goal.naam}` }));
+        return (((_a = root2.state.spaardoelen) == null ? void 0 : _a[owner]) || []).forEach((goal) => rows.push({ id: goal.id, label: `${ownerLabel2(owner)} · ${goal.naam}` }));
       });
       return `<option value="">Geen spaardoel</option>${rows.map((row) => option(row.id, row.label, current)).join("")}`;
     }
-    function fixedOptions(root, current) {
+    function fixedOptions(root2, current) {
       var _a;
-      const rows = ((_a = root.state.recurringFixedExpenses) == null ? void 0 : _a[root.state.meta.scenario]) || [];
+      const rows = ((_a = root2.state.recurringFixedExpenses) == null ? void 0 : _a[root2.state.meta.scenario]) || [];
       return `<option value="">Geen vaste last</option>${rows.map((row) => option(row.id, `${ownerLabel2(row.financialFor || row.rekening)} · ${row.naam}`, current)).join("")}`;
     }
     const TYPE_GROUPS = [
@@ -8684,8 +9005,8 @@ service cloud.firestore {
     function transferType(type) {
       return ["naar-spaarrekening", "van-spaarrekening", "interne-overboeking"].includes(type);
     }
-    function profileOptions(root, current) {
-      return `<option value="">Kies rekening</option>${(root.state.accountProfiles || []).map((profile) => option(profile.id, `${profile.name} · ${ownerLabel2(profile.accountOwner)}`, current)).join("")}`;
+    function profileOptions(root2, current) {
+      return `<option value="">Kies rekening</option>${(root2.state.accountProfiles || []).map((profile) => option(profile.id, `${profile.name} · ${ownerLabel2(profile.accountOwner)}`, current)).join("")}`;
     }
     function compactText(value) {
       return String(value || "").toLocaleLowerCase("nl-NL").replace(/\s+/g, " ").trim();
@@ -8736,30 +9057,30 @@ service cloud.firestore {
         else target.processing[field] = cloneState(value);
       });
     }
-    function splitHtml(root, row, split, index) {
-      return `<div class="u4-split-row" data-u4-split="${index}"><input type="number" step="0.01" value="${Number(split.amount) || 0}" data-u4-split-field="amount" aria-label="Splitbedrag"><select data-u4-split-field="budgetOwner">${OWNERS.map((owner) => option(owner, ownerLabel2(owner), split.budgetOwner)).join("")}</select><select data-u4-split-field="category">${categoryOptions(root, split.budgetOwner, split.category)}</select><button type="button" class="danger-ghost small" data-u4-remove-split="${index}">×</button></div>`;
+    function splitHtml(root2, row, split, index) {
+      return `<div class="u4-split-row" data-u4-split="${index}"><input type="number" step="0.01" value="${Number(split.amount) || 0}" data-u4-split-field="amount" aria-label="Splitbedrag"><select data-u4-split-field="budgetOwner">${OWNERS.map((owner) => option(owner, ownerLabel2(owner), split.budgetOwner)).join("")}</select><select data-u4-split-field="category">${categoryOptions(root2, split.budgetOwner, split.category)}</select><button type="button" class="danger-ghost small" data-u4-remove-split="${index}">×</button></div>`;
     }
-    function repaymentRelation(root, row) {
-      const counter = (root.state.accountProfiles || []).find((profile) => normalizeIban(profile.identifier) === normalizeIban(row.bankOriginal.counterpartyAccount));
+    function repaymentRelation(root2, row) {
+      const counter = (root2.state.accountProfiles || []).find((profile) => normalizeIban(profile.identifier) === normalizeIban(row.bankOriginal.counterpartyAccount));
       if (!counter) return null;
       return row.bankOriginal.amount > 0 ? { debtor: counter.accountOwner, creditor: row.accountOwner } : { debtor: row.accountOwner, creditor: counter.accountOwner };
     }
-    function repaymentHtml(root, row) {
+    function repaymentHtml(root2, row) {
       if (row.processing.transactionType !== "terugbetaling-voorschot") return "";
-      const relation = repaymentRelation(root, row);
+      const relation = repaymentRelation(root2, row);
       if (!relation) return '<div class="u4-repayment-list u4-error">De tegenrekening hoort nog niet bij een bekend rekeningprofiel.</div>';
       const allocations = row.processing.repaymentAllocations || [];
       return `<div class="u4-repayment-list"><strong>${ownerLabel2(relation.debtor)} → ${ownerLabel2(relation.creditor)}</strong>${allocations.map((allocation, index) => {
-        const advance = (root.state.advanceLedger || []).find((item) => item.id === allocation.advanceId);
-        const tx = (root.state.transactions || []).find((item) => item.id === (advance == null ? void 0 : advance.transactionId));
+        const advance = (root2.state.advanceLedger || []).find((item) => item.id === allocation.advanceId);
+        const tx = (root2.state.transactions || []).find((item) => item.id === (advance == null ? void 0 : advance.transactionId));
         return `<div class="u4-repayment-row" data-u4-allocation="${index}"><span>${esc((tx == null ? void 0 : tx.description) || (advance == null ? void 0 : advance.transactionId) || "Voorschot")} · open ${euro(advance == null ? void 0 : advance.outstandingAmount)}</span><input type="number" step="0.01" value="${Number(allocation.amount) || 0}" data-u4-allocation-field="amount"></div>`;
       }).join("") || '<span class="u4-muted">Geen passend openstaand voorschot gevonden.</span>'}</div>`;
     }
-    function transferFieldsHtml(root, row) {
+    function transferFieldsHtml(root2, row) {
       if (!transferType(row.processing.transactionType)) return "";
-      return `<div class="u4-context-block wide"><strong>Interne overboeking</strong><div class="u4-context-grid"><label>Van rekening<select data-u4-field="sourceAccountProfileId">${profileOptions(root, row.processing.sourceAccountProfileId || "")}</select></label><label>Naar rekening<select data-u4-field="destinationAccountProfileId">${profileOptions(root, row.processing.destinationAccountProfileId || "")}</select></label></div><span class="u4-muted">Interne overboekingen tellen niet als inkomen of uitgave.</span></div>`;
+      return `<div class="u4-context-block wide"><strong>Interne overboeking</strong><div class="u4-context-grid"><label>Van rekening<select data-u4-field="sourceAccountProfileId">${profileOptions(root2, row.processing.sourceAccountProfileId || "")}</select></label><label>Naar rekening<select data-u4-field="destinationAccountProfileId">${profileOptions(root2, row.processing.destinationAccountProfileId || "")}</select></label></div><span class="u4-muted">Interne overboekingen tellen niet als inkomen of uitgave.</span></div>`;
     }
-    function rowHtml(root, row) {
+    function rowHtml(root2, row) {
       var _a;
       const p = row.processing;
       const original = row.bankOriginal;
@@ -8769,32 +9090,32 @@ service cloud.firestore {
         <label>Datum<input type="date" data-u4-field="processingDate" value="${esc(p.processingDate)}"></label>
         <label>Bedrag<input type="number" step="0.01" data-u4-field="processedAmount" value="${Number(p.processedAmount) || 0}"></label>
         <label>Budgeteigenaar<select data-u4-field="budgetOwner">${OWNERS.map((owner) => option(owner, ownerLabel2(owner), p.budgetOwner)).join("")}</select></label>
-        <label>Categorie<select data-u4-field="category">${categoryOptions(root, p.budgetOwner, p.category)}</select></label>
+        <label>Categorie<select data-u4-field="category">${categoryOptions(root2, p.budgetOwner, p.category)}</select></label>
         <label class="wide">Transactie<select data-u4-field="transactionType">${typeOptions(p.transactionType)}</select></label>
-        ${transferFieldsHtml(root, row)}
+        ${transferFieldsHtml(root2, row)}
       </div>
       <details><summary>Meer opties voor deze verwerking</summary><div class="u4-more-grid">
         <div class="u4-original wide">Origineel: ${esc(original.bankDate)} · ${euro(original.amount)}<br>${esc(original.accountIdentifier || "Geen rekeningkenmerk")} → ${esc(original.counterpartyAccount || "Geen tegenrekening")}<br>Regel ${Number(original.lineNumber) || "—"} · ${esc(original.fingerprint)}</div>
-        ${["uitgave", "terugbetaling"].includes(p.transactionType) ? `<label>Budgetpost<input data-u4-field="budgetItemId" value="${esc(p.budgetItemId)}"></label><label>Vaste last<select data-u4-field="fixedExpenseId">${fixedOptions(root, p.fixedExpenseId)}</select></label><label>Afwijkend vast bedrag<select data-u4-field="fixedAmountMode">${option("none", "Planning niet aanpassen", p.fixedAmountMode || "none")}${option("month", "Alleen deze maand", p.fixedAmountMode)}${option("from", "Vanaf deze maand", p.fixedAmountMode)}</select></label><label>Voorschot<select data-u4-field="advanceMode">${option("auto", "Automatisch bij andere eigenaar", p.advanceMode)}${option("none", "Geen voorschot", p.advanceMode)}${option("force", "Altijd voorschot", p.advanceMode)}</select></label>` : ""}
-        ${p.transactionType === "sparen" ? `<label>Spaardoel<select data-u4-field="savingsGoalId">${goalOptions(root, p.savingsGoalId)}</select></label>` : ""}
+        ${["uitgave", "terugbetaling"].includes(p.transactionType) ? `<label>Budgetpost<input data-u4-field="budgetItemId" value="${esc(p.budgetItemId)}"></label><label>Vaste last<select data-u4-field="fixedExpenseId">${fixedOptions(root2, p.fixedExpenseId)}</select></label><label>Afwijkend vast bedrag<select data-u4-field="fixedAmountMode">${option("none", "Planning niet aanpassen", p.fixedAmountMode || "none")}${option("month", "Alleen deze maand", p.fixedAmountMode)}${option("from", "Vanaf deze maand", p.fixedAmountMode)}</select></label><label>Voorschot<select data-u4-field="advanceMode">${option("auto", "Automatisch bij andere eigenaar", p.advanceMode)}${option("none", "Geen voorschot", p.advanceMode)}${option("force", "Altijd voorschot", p.advanceMode)}</select></label>` : ""}
+        ${p.transactionType === "sparen" ? `<label>Spaardoel<select data-u4-field="savingsGoalId">${goalOptions(root2, p.savingsGoalId)}</select></label>` : ""}
         <label>Meetellen<select data-u4-field="include">${option("true", "Meetellen", String(p.include))}${option("false", "Niet meetellen", String(p.include))}</select></label>
         <label class="wide">Notitie<input data-u4-field="note" value="${esc(p.note)}"></label>
-      ${repaymentHtml(root, row)}</div>${["uitgave", "terugbetaling"].includes(p.transactionType) ? `<div class="u4-split-list">${(p.splits || []).map((split, index) => splitHtml(root, row, split, index)).join("")}</div><button type="button" class="ghost small" data-u4-add-split>+ Splitsregel</button>` : ""}</details>
+      ${repaymentHtml(root2, row)}</div>${["uitgave", "terugbetaling"].includes(p.transactionType) ? `<div class="u4-split-list">${(p.splits || []).map((split, index) => splitHtml(root2, row, split, index)).join("")}</div><button type="button" class="ghost small" data-u4-add-split>+ Splitsregel</button>` : ""}</details>
     </article>`;
     }
-    function bulkEditor(root, draft) {
-      return `<section class="u4-section u4-bulk-section"><div class="u4-section-list"><h3>Meerdere transacties aanpassen</h3><p class="u4-muted">Pas één keuze in één keer toe. Handmatig aangepaste zekere transacties worden standaard overgeslagen.</p><div class="u4-profile-grid"><label>Toepassen op<select data-u4-bulk-scope><option value="review">Alleen Nakijken</option><option value="uncategorized">Alleen ongecategoriseerd</option><option value="all">Alle transacties</option></select></label><label>Budgeteigenaar<select data-u4-bulk-owner><option value="">Niet wijzigen</option>${OWNERS.map((owner) => option(owner, ownerLabel2(owner), "")).join("")}</select></label><label>Categorie<select data-u4-bulk-category><option value="">Niet wijzigen</option>${categoryOptions(root, "gezamenlijk", "")}</select></label><label>Transactie<select data-u4-bulk-type><option value="">Niet wijzigen</option>${typeOptions("")}</select></label></div><button type="button" class="ghost small" data-u4-apply-bulk>Voorbeeld en toepassen</button></div></section>`;
+    function bulkEditor(root2, draft) {
+      return `<section class="u4-section u4-bulk-section"><div class="u4-section-list"><h3>Meerdere transacties aanpassen</h3><p class="u4-muted">Pas één keuze in één keer toe. Handmatig aangepaste zekere transacties worden standaard overgeslagen.</p><div class="u4-profile-grid"><label>Toepassen op<select data-u4-bulk-scope><option value="review">Alleen Nakijken</option><option value="uncategorized">Alleen ongecategoriseerd</option><option value="all">Alle transacties</option></select></label><label>Budgeteigenaar<select data-u4-bulk-owner><option value="">Niet wijzigen</option>${OWNERS.map((owner) => option(owner, ownerLabel2(owner), "")).join("")}</select></label><label>Categorie<select data-u4-bulk-category><option value="">Niet wijzigen</option>${categoryOptions(root2, "gezamenlijk", "")}</select></label><label>Transactie<select data-u4-bulk-type><option value="">Niet wijzigen</option>${typeOptions("")}</select></label></div><button type="button" class="ghost small" data-u4-apply-bulk>Voorbeeld en toepassen</button></div></section>`;
     }
-    async function showMatchDialog(root, draft, source, modal) {
+    async function showMatchDialog(root2, draft, source, modal) {
       var _a, _b;
       const matches = matchCandidates(draft, source);
       if (!matches.length) {
         const previous = source.certainty;
         source.certainty = "zeker";
-        renderDraftModalPreservingView(root, draft, modal, source.id);
-        Promise.resolve().then(() => persistImportDraft(root, draft)).catch((error) => {
+        renderDraftModalPreservingView(root2, draft, modal, source.id);
+        Promise.resolve().then(() => persistImportDraft(root2, draft)).catch((error) => {
           source.certainty = previous;
-          renderDraftModalPreservingView(root, draft, document.getElementById("u4ImportModalRoot"), source.id);
+          renderDraftModalPreservingView(root2, draft, document.getElementById("u4ImportModalRoot"), source.id);
           alert(`Goedkeuren kon niet lokaal worden opgeslagen en is teruggedraaid. Probeer het opnieuw.
 
 ${(error == null ? void 0 : error.message) || error}`);
@@ -8811,12 +9132,12 @@ ${(error == null ? void 0 : error.message) || error}`);
       overlay.addEventListener("click", (event) => {
         if (event.target === overlay) close();
       });
-      let busy = false;
+      let busy2 = false;
       const actionButtons = [...overlay.querySelectorAll("[data-u4-match-only],[data-u4-match-apply],[data-u4-match-close]")];
       const feedback = overlay.querySelector("[data-u4-match-feedback]");
       function commitSelection(applyMatches, button) {
-        if (busy) return;
-        busy = true;
+        if (busy2) return;
+        busy2 = true;
         actionButtons.forEach((item) => item.disabled = true);
         button.textContent = "Bezig…";
         feedback.textContent = "Wijzigingen worden toegepast.";
@@ -8844,9 +9165,9 @@ ${(error == null ? void 0 : error.message) || error}`);
             } else setTimeout(callback, 0);
           };
           scheduleAfterDialogPaint(() => {
-            renderDraftModalPreservingView(root, draft, modal, source.id);
+            renderDraftModalPreservingView(root2, draft, modal, source.id);
             setTimeout(() => {
-              persistImportDraft(root, draft).catch((error) => {
+              persistImportDraft(root2, draft).catch((error) => {
                 snapshots.forEach((snapshot, id) => {
                   const row = draft.rows.find((item) => item.id === id);
                   if (row) {
@@ -8855,7 +9176,7 @@ ${(error == null ? void 0 : error.message) || error}`);
                     row.reasons = snapshot.reasons;
                   }
                 });
-                renderDraftModalPreservingView(root, draft, document.getElementById("u4ImportModalRoot"), source.id);
+                renderDraftModalPreservingView(root2, draft, document.getElementById("u4ImportModalRoot"), source.id);
                 alert(`De wijziging kon niet lokaal worden opgeslagen en is teruggedraaid. Probeer het opnieuw.
 
 ${(error == null ? void 0 : error.message) || error}`);
@@ -8871,7 +9192,7 @@ ${(error == null ? void 0 : error.message) || error}`);
               row.reasons = snapshot.reasons;
             }
           });
-          busy = false;
+          busy2 = false;
           actionButtons.forEach((item) => item.disabled = false);
           button.textContent = applyMatches ? "Geselecteerde aanpassen" : "Alleen deze transactie";
           feedback.textContent = `Aanpassen mislukt: ${(error == null ? void 0 : error.message) || error}`;
@@ -8881,8 +9202,8 @@ ${(error == null ? void 0 : error.message) || error}`);
       overlay.querySelector("[data-u4-match-only]").onclick = (event) => commitSelection(false, event.currentTarget);
       overlay.querySelector("[data-u4-match-apply]").onclick = (event) => commitSelection(true, event.currentTarget);
     }
-    function profileEditor(root, draft) {
-      const profiles = root.state.accountProfiles || [];
+    function profileEditor(root2, draft) {
+      const profiles = root2.state.accountProfiles || [];
       const detected = [...new Set(draft.rows.map((row) => row.bankOriginal.accountIdentifier).filter(Boolean))][0] || "";
       return `<section class="u4-section"><div class="u4-section-list"><h3>Rekeningprofiel</h3><div class="u4-profile-grid">
       <label class="wide">Bestaand profiel<select data-u4-profile-select><option value="">Nieuw profiel maken</option>${profiles.map((profile) => option(profile.id, `${profile.name} · ${ownerLabel2(profile.accountOwner)}`, draft.accountProfileId)).join("")}</select></label>
@@ -8892,7 +9213,7 @@ ${(error == null ? void 0 : error.message) || error}`);
       <label>Bank<input data-u4-profile-bank value="${esc(draft.bank || "ING")}"></label>
     </div><button type="button" class="primary small" data-u4-apply-profile>Profiel gebruiken</button></div></section>`;
     }
-    function renderDraftModal(root, draft) {
+    function renderDraftModal(root2, draft) {
       updateDraftSummary(draft);
       const isConcept = draft.status === "concept";
       const canCorrect = draft.status === "verwerkt" || draft.status === "correctie-nodig";
@@ -8902,16 +9223,16 @@ ${(error == null ? void 0 : error.message) || error}`);
       const modal = ensureModalRoot();
       modal.innerHTML = `<div class="u4-import-modal" role="dialog" aria-modal="true" aria-label="Bankimport controleren">
       <header class="u4-modal-head"><div><h2>${isConcept ? "Bankimport controleren" : "Importdetails"}</h2><p>${esc(draft.fileName)} · ${esc(draft.bank)} · ${esc(draft.periodFrom || "—")} t/m ${esc(draft.periodTo || "—")} · ${esc(draft.status)}</p></div><button type="button" class="ghost" data-u4-close>Sluiten</button></header>
-      <main class="u4-modal-body">${isConcept ? profileEditor(root, draft) + bulkEditor(root, draft) : ""}
+      <main class="u4-modal-body">${isConcept ? profileEditor(root2, draft) + bulkEditor(root2, draft) : ""}
         <div class="u4-import-summary"><div><span>Nieuw</span><strong>${draft.summary.newCount}</strong></div><div><span>Duplicaten</span><strong>${draft.summary.duplicateCount}</strong></div><div><span>Inkomsten</span><strong>${euro(draft.summary.totalIncome)}</strong></div><div><span>Uitgaven</span><strong>${euro(draft.summary.totalExpenses)}</strong></div></div>
-        <details class="u4-section" open><summary><span>Nakijken</span><span>${draft.summary.reviewCount}</span></summary><div class="u4-section-list">${review.map((row) => rowHtml(root, row)).join("") || '<div class="u4-empty">Geen transacties om na te kijken.</div>'}</div></details>
-        <details class="u4-section"><summary><span>Zeker</span><span>${draft.summary.sureCount}</span></summary><div class="u4-section-list">${sure.map((row) => rowHtml(root, row)).join("") || '<div class="u4-empty">Geen zekere transacties.</div>'}</div></details>
+        <details class="u4-section" open><summary><span>Nakijken</span><span>${draft.summary.reviewCount}</span></summary><div class="u4-section-list">${review.map((row) => rowHtml(root2, row)).join("") || '<div class="u4-empty">Geen transacties om na te kijken.</div>'}</div></details>
+        <details class="u4-section"><summary><span>Zeker</span><span>${draft.summary.sureCount}</span></summary><div class="u4-section-list">${sure.map((row) => rowHtml(root2, row)).join("") || '<div class="u4-empty">Geen zekere transacties.</div>'}</div></details>
         ${draft.summary.duplicateCount ? `<details class="u4-section"><summary><span>Eerder geïmporteerd — overgeslagen</span><span>${draft.summary.duplicateCount}</span></summary><div class="u4-section-list">${draft.rows.filter((row) => row.duplicate).map((row) => `<div class="u4-original">${esc(row.bankOriginal.bankDate)} · ${esc(row.bankOriginal.description)} · ${euro(row.bankOriginal.amount)}</div>`).join("")}</div></details>` : ""}
       </main>
       <footer class="u4-modal-actions"><span class="u4-muted" data-u4-save-status>${isConcept ? "Wijzigingen worden automatisch lokaal bewaard." : canCorrect ? "Aanpassingen worden pas financieel verwerkt na bevestiging." : "Deze import is financieel teruggedraaid."}</span>${canCorrect ? '<button type="button" class="danger-ghost" data-u4-undo>Import ongedaan maken</button><button type="button" class="primary" data-u4-reconcile>Wijzigingen verwerken</button>' : isConcept ? '<button type="button" class="ghost" data-u4-save-concept>Concept opslaan</button><button type="button" class="primary" data-u4-process>Alles verwerken</button>' : ""}</footer>
     </div>`;
       modal.classList.add("open");
-      bindDraftModal(root, draft, modal);
+      bindDraftModal(root2, draft, modal);
     }
     function cloudImportMessage(error) {
       if ((error == null ? void 0 : error.code) === "cloud-missing") return "Deze import is nog niet vanaf het bronapparaat naar de cloud gesynchroniseerd. Open Finize daar een keer met internetverbinding en probeer het daarna opnieuw.";
@@ -8920,23 +9241,23 @@ ${(error == null ? void 0 : error.message) || error}`);
       if ((error == null ? void 0 : error.code) === "cloud-offline") return "Deze import staat niet lokaal en de cloud is nu niet bereikbaar. Controleer de verbinding en probeer opnieuw.";
       return `De import kon niet worden geopend: ${(error == null ? void 0 : error.message) || error}`;
     }
-    function renderCloudImportState(root, id, error = null) {
+    function renderCloudImportState(root2, id, error = null) {
       var _a, _b, _c;
       const modal = ensureModalRoot();
-      const summary = (root.state.importSummaries || []).find((item) => String(item.id) === String(id));
-      const canDiscard = String(root.state.activeImportId || "") === String(id) && (summary == null ? void 0 : summary.status) === "concept";
+      const summary = (root2.state.importSummaries || []).find((item) => String(item.id) === String(id));
+      const canDiscard = String(root2.state.activeImportId || "") === String(id) && (summary == null ? void 0 : summary.status) === "concept";
       modal.innerHTML = `<div class="u4-import-modal u4-cloud-import-state" role="dialog" aria-modal="true" aria-label="Import uit cloud ophalen">
       <header class="u4-modal-head"><div><h2>${error ? "Import niet beschikbaar" : "Import uit cloud ophalen…"}</h2><p>${error ? "De lokale kopie ontbreekt. Finize probeert de veilig bewaarde importdetails te herstellen." : "De bankregels worden veilig op dit apparaat opgeslagen."}</p></div><button type="button" class="ghost" data-u4-close>Sluiten</button></header>
       <main class="u4-modal-body"><div class="u4-cloud-message">${error ? `<strong>Ophalen mislukt</strong><p>${esc(cloudImportMessage(error))}</p><div class="u4-cloud-actions"><button type="button" class="primary" data-u4-cloud-retry>Opnieuw proberen</button>${canDiscard ? '<button type="button" class="danger-ghost" data-u4-discard-concept>Concept verwijderen en nieuwe import toestaan</button>' : ""}</div>` : '<span class="u4-cloud-spinner" aria-hidden="true"></span><strong>Even geduld…</strong><p>Het oorspronkelijke CSV-bestand is niet nodig.</p>'}</div></main>
     </div>`;
       modal.classList.add("open");
       (_a = modal.querySelector("[data-u4-close]")) == null ? void 0 : _a.addEventListener("click", closeDraft);
-      (_b = modal.querySelector("[data-u4-cloud-retry]")) == null ? void 0 : _b.addEventListener("click", () => openDraft(root, id));
+      (_b = modal.querySelector("[data-u4-cloud-retry]")) == null ? void 0 : _b.addEventListener("click", () => openDraft(root2, id));
       (_c = modal.querySelector("[data-u4-discard-concept]")) == null ? void 0 : _c.addEventListener("click", async (event) => {
         if (!confirm("Dit onverwerkte importconcept verwijderen? De financiële administratie en verwerkte imports blijven behouden.")) return;
         event.currentTarget.disabled = true;
         try {
-          await discardImportConcept(root, id);
+          await discardImportConcept(root2, id);
           closeDraft();
           alert("Het vastgelopen importconcept is verwijderd. Je kunt nu een nieuw CSV-bestand kiezen.");
         } catch (discardError) {
@@ -8945,26 +9266,26 @@ ${(error == null ? void 0 : error.message) || error}`);
         }
       });
     }
-    async function openDraft(root, id) {
+    async function openDraft(root2, id) {
       let local;
       try {
         local = await ImportStore.getImport(id);
       } catch (error) {
-        renderCloudImportState(root, id, error);
+        renderCloudImportState(root2, id, error);
         return null;
       }
-      if (!local) renderCloudImportState(root, id);
+      if (!local) renderCloudImportState(root2, id);
       try {
         const resolved = await resolveImportDetails(id, {
           localRead: async () => local,
-          cloudRead: (importId) => fetchImportFromCloud(root, importId),
+          cloudRead: (importId) => fetchImportFromCloud(root2, importId),
           localWrite: (record) => ImportStore.putImport(record)
         });
         UI.draft = resolved.record;
-        renderDraftModal(root, resolved.record);
+        renderDraftModal(root2, resolved.record);
         return resolved.record;
       } catch (error) {
-        renderCloudImportState(root, id, error);
+        renderCloudImportState(root2, id, error);
         return null;
       }
     }
@@ -8972,16 +9293,16 @@ ${(error == null ? void 0 : error.message) || error}`);
       const modal = document.getElementById("u4ImportModalRoot");
       modal == null ? void 0 : modal.classList.remove("open");
     }
-    async function applyProfile(root, draft, modal) {
+    async function applyProfile(root2, draft, modal) {
       const selected = modal.querySelector("[data-u4-profile-select]").value;
-      let profile = root.state.accountProfiles.find((item) => item.id === selected);
+      let profile = root2.state.accountProfiles.find((item) => item.id === selected);
       if (!profile) {
         const name = modal.querySelector("[data-u4-profile-name]").value.trim();
         const identifier = normalizeIban(modal.querySelector("[data-u4-profile-identifier]").value);
         if (!name || !identifier) throw new Error("Vul een profielnaam en rekeningkenmerk in.");
         profile = { id: `account-${hashText(identifier)}`, name, identifier, bank: modal.querySelector("[data-u4-profile-bank]").value.trim() || "ING", csvFormat: draft.format, accountOwner: modal.querySelector("[data-u4-profile-owner]").value, createdAt: (/* @__PURE__ */ new Date()).toISOString(), updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
-        const ok = root.commitChange(() => {
-          root.state.accountProfiles.push(profile);
+        const ok = root2.commitChange(() => {
+          root2.state.accountProfiles.push(profile);
         }, { render: false });
         if (!ok) throw new Error("Rekeningprofiel opslaan mislukt.");
       }
@@ -8990,22 +9311,22 @@ ${(error == null ? void 0 : error.message) || error}`);
       draft.rows.forEach((row) => {
         row.accountProfileId = profile.id;
         row.accountOwner = profile.accountOwner;
-        const proposal = classifyOriginal(row.bankOriginal, profile, root.state.recognitionRules, root.state.accountProfiles);
+        const proposal = classifyOriginal(row.bankOriginal, profile, root2.state.recognitionRules, root2.state.accountProfiles);
         row.certainty = proposal.certainty;
         row.reasons = proposal.reasons;
         row.processing = { ...proposal.processing, ...row.processing, budgetOwner: row.processing.budgetOwner || profile.accountOwner };
       });
-      await saveDraft(root, draft, { sync: true });
-      renderDraftModal(root, draft);
+      await saveDraft(root2, draft, { sync: true });
+      renderDraftModal(root2, draft);
     }
-    function renderDraftModalPreservingView(root, draft, modal, rowId = "") {
+    function renderDraftModalPreservingView(root2, draft, modal, rowId = "") {
       const scroller = modal.querySelector(".u4-import-modal");
       const scrollTop = (scroller == null ? void 0 : scroller.scrollTop) || 0;
       const openRows = [...modal.querySelectorAll("[data-u4-row] details[open]")].map((details) => {
         var _a;
         return (_a = details.closest("[data-u4-row]")) == null ? void 0 : _a.dataset.u4Row;
       }).filter(Boolean);
-      renderDraftModal(root, draft);
+      renderDraftModal(root2, draft);
       const next = document.getElementById("u4ImportModalRoot");
       requestAnimationFrame(() => {
         var _a;
@@ -9018,29 +9339,29 @@ ${(error == null ? void 0 : error.message) || error}`);
         if (rowId && !openRows.includes(rowId)) (_a = next == null ? void 0 : next.querySelector(`[data-u4-row="${rowId}"]`)) == null ? void 0 : _a.scrollIntoView({ block: "nearest" });
       });
     }
-    function renderDraftRowCard(root, draft, modal, rowId) {
+    function renderDraftRowCard(root2, draft, modal, rowId) {
       var _a;
       const row = draft.rows.find((item) => String(item.id) === String(rowId));
       const current = modal.querySelector(`[data-u4-row="${rowId}"]`);
       if (!row || !current) return false;
       const detailsOpen = Boolean(current.querySelector("details[open]"));
       const wrapper = document.createElement("div");
-      wrapper.innerHTML = rowHtml(root, row);
+      wrapper.innerHTML = rowHtml(root2, row);
       const replacement = wrapper.firstElementChild;
       if (detailsOpen) (_a = replacement.querySelector("details")) == null ? void 0 : _a.setAttribute("open", "");
       current.replaceWith(replacement);
       return true;
     }
-    function bindDraftModal(root, draft, modal) {
+    function bindDraftModal(root2, draft, modal) {
       var _a, _b;
-      UI.root = root;
+      UI.root = root2;
       UI.draft = draft;
       (_a = modal.querySelector("[data-u4-close]")) == null ? void 0 : _a.addEventListener("click", async (event) => {
         const button = event.currentTarget;
         button.disabled = true;
         updateImportSaveStatus("Laatste lokale wijzigingen opslaan…");
         try {
-          await flushScheduledImportDraft(root, draft, { syncCloud: true, updateSummary: true });
+          await flushScheduledImportDraft(root2, draft, { syncCloud: true, updateSummary: true });
           closeDraft();
         } catch (error) {
           button.disabled = false;
@@ -9049,7 +9370,7 @@ ${(error == null ? void 0 : error.message) || error}`);
       });
       (_b = modal.querySelector("[data-u4-apply-profile]")) == null ? void 0 : _b.addEventListener("click", async () => {
         try {
-          await applyProfile(root, draft, modal);
+          await applyProfile(root2, draft, modal);
         } catch (error) {
           alert(error.message);
         }
@@ -9057,7 +9378,7 @@ ${(error == null ? void 0 : error.message) || error}`);
       if (modal.dataset.u4DraftDelegated === "true") return;
       modal.dataset.u4DraftDelegated = "true";
       modal.addEventListener("change", (event) => {
-        root = UI.root;
+        root2 = UI.root;
         draft = UI.draft;
         modal = ensureModalRoot();
         const container = event.target.closest("[data-u4-row]");
@@ -9075,8 +9396,8 @@ ${(error == null ? void 0 : error.message) || error}`);
             row.processing.splits = (row.processing.splits || []).filter((split) => Math.abs(Number(split.amount) || 0) > 4e-3);
           }
           if (field === "transactionType" && value === "terugbetaling-voorschot") {
-            const relation = repaymentRelation(root, row);
-            row.processing.repaymentAllocations = relation ? proposeRepaymentAllocations(root.state, relation.debtor, relation.creditor, row.processing.processedAmount) : [];
+            const relation = repaymentRelation(root2, row);
+            row.processing.repaymentAllocations = relation ? proposeRepaymentAllocations(root2.state, relation.debtor, relation.creditor, row.processing.processedAmount) : [];
           }
           rerender = ["transactionType", "budgetOwner", "category"].includes(field);
         } else if (event.target.hasAttribute("data-u4-row-certainty")) row.certainty = event.target.value;
@@ -9089,13 +9410,13 @@ ${(error == null ? void 0 : error.message) || error}`);
           const allocation = row.processing.repaymentAllocations[Number(event.target.closest("[data-u4-allocation]").dataset.u4Allocation)];
           allocation[event.target.dataset.u4AllocationField] = round22(Math.abs(Number(event.target.value) || 0));
         }
-        if (rerender) renderDraftRowCard(root, draft, modal, row.id);
+        if (rerender) renderDraftRowCard(root2, draft, modal, row.id);
         updateImportSaveStatus("Wijziging klaarzetten voor lokale opslag…");
-        scheduleImportDraftPersist(root, draft, { delay: 350, syncCloud: true, updateSummary: true }).catch((error) => console.warn("Automatisch lokaal opslaan mislukt.", error));
+        scheduleImportDraftPersist(root2, draft, { delay: 350, syncCloud: true, updateSummary: true }).catch((error) => console.warn("Automatisch lokaal opslaan mislukt.", error));
       });
       modal.addEventListener("click", async (event) => {
         var _a2, _b2, _c, _d;
-        root = UI.root;
+        root2 = UI.root;
         draft = UI.draft;
         modal = ensureModalRoot();
         const container = event.target.closest("[data-u4-row]");
@@ -9103,13 +9424,13 @@ ${(error == null ? void 0 : error.message) || error}`);
         if (event.target.closest("[data-u4-approve]") && row) {
           event.preventDefault();
           event.stopPropagation();
-          await showMatchDialog(root, draft, row, modal);
+          await showMatchDialog(root2, draft, row, modal);
           return;
         }
         if (event.target.closest("[data-u4-reopen]") && row) {
           row.certainty = "nakijken";
-          renderDraftModalPreservingView(root, draft, modal, row.id);
-          scheduleImportDraftPersist(root, draft, { delay: 0 }).catch((error) => console.warn("Opnieuw nakijken opslaan mislukt.", error));
+          renderDraftModalPreservingView(root2, draft, modal, row.id);
+          scheduleImportDraftPersist(root2, draft, { delay: 0 }).catch((error) => console.warn("Opnieuw nakijken opslaan mislukt.", error));
           return;
         }
         if (event.target.closest("[data-u4-apply-bulk]")) {
@@ -9135,22 +9456,22 @@ ${(error == null ? void 0 : error.message) || error}`);
             if (category) item.processing.category = category;
             if (type) item.processing.transactionType = type;
           });
-          renderDraftModal(root, draft);
-          scheduleImportDraftPersist(root, draft, { delay: 0 }).catch((error) => console.warn("Bulkbewerking opslaan mislukt.", error));
+          renderDraftModal(root2, draft);
+          scheduleImportDraftPersist(root2, draft, { delay: 0 }).catch((error) => console.warn("Bulkbewerking opslaan mislukt.", error));
           return;
         }
         if (event.target.closest("[data-u4-add-split]") && row) {
           row.processing.splits = row.processing.splits || [];
           row.processing.splits.push({ id: uid2("split"), amount: 0, budgetOwner: row.processing.budgetOwner, category: row.processing.category, budgetItemId: "", savingsGoalId: "", advanceMode: "auto", include: true });
-          renderDraftModalPreservingView(root, draft, modal, row.id);
-          scheduleImportDraftPersist(root, draft, { delay: 0 }).catch((error) => console.warn("Splitsregel opslaan mislukt.", error));
+          renderDraftModalPreservingView(root2, draft, modal, row.id);
+          scheduleImportDraftPersist(root2, draft, { delay: 0 }).catch((error) => console.warn("Splitsregel opslaan mislukt.", error));
           return;
         }
         const remove = event.target.closest("[data-u4-remove-split]");
         if (remove && row) {
           row.processing.splits.splice(Number(remove.dataset.u4RemoveSplit), 1);
-          renderDraftModalPreservingView(root, draft, modal, row.id);
-          scheduleImportDraftPersist(root, draft, { delay: 0 }).catch((error) => console.warn("Splitsregel verwijderen opslaan mislukt.", error));
+          renderDraftModalPreservingView(root2, draft, modal, row.id);
+          scheduleImportDraftPersist(root2, draft, { delay: 0 }).catch((error) => console.warn("Splitsregel verwijderen opslaan mislukt.", error));
           return;
         }
         const saveButton = event.target.closest("[data-u4-save-concept]");
@@ -9160,8 +9481,8 @@ ${(error == null ? void 0 : error.message) || error}`);
           saveButton.textContent = "Opslaan…";
           if (status) status.textContent = "Concept wordt lokaal en in de cloud opgeslagen…";
           try {
-            await flushScheduledImportDraft(root, draft, { syncCloud: true, updateSummary: true });
-            await flushImportSync(root);
+            await flushScheduledImportDraft(root2, draft, { syncCloud: true, updateSummary: true });
+            await flushImportSync(root2);
             saveButton.textContent = "Opgeslagen";
             if (status) status.textContent = "Concept is lokaal en in de cloud opgeslagen.";
             setTimeout(() => {
@@ -9178,60 +9499,60 @@ ${(error == null ? void 0 : error.message) || error}`);
           return;
         }
         if (event.target.closest("[data-u4-process]")) {
-          if (typeof root.FinizeUpdate4Process !== "function") {
+          if (typeof root2.FinizeUpdate4Process !== "function") {
             alert("De verwerkingslaag wordt in de volgende fase geactiveerd. Het concept blijft bewaard.");
             return;
           }
-          await root.FinizeUpdate4Process(draft);
+          await root2.FinizeUpdate4Process(draft);
         }
         if (event.target.closest("[data-u4-undo]")) {
-          if (confirm("Deze import en alle bijbehorende financiële gevolgen ongedaan maken?")) await undoImport(root, draft);
+          if (confirm("Deze import en alle bijbehorende financiële gevolgen ongedaan maken?")) await undoImport(root2, draft);
         }
         if (event.target.closest("[data-u4-reconcile]")) {
-          if (confirm("De bestaande import vervangen door deze aangepaste verwerking?")) await reconcileImport(root, draft);
+          if (confirm("De bestaande import vervangen door deze aangepaste verwerking?")) await reconcileImport(root2, draft);
         }
       });
     }
-    function bindImportPanel(rootElement, root) {
+    function bindImportPanel(rootElement, root2) {
       var _a, _b, _c;
       (_a = rootElement.querySelector("[data-u4-file]")) == null ? void 0 : _a.addEventListener("change", (event) => {
         var _a2;
         const file = (_a2 = event.target.files) == null ? void 0 : _a2[0];
         if (!file) return;
-        if (root.state.activeImportId) {
+        if (root2.state.activeImportId) {
           event.target.value = "";
-          openDraft(root, root.state.activeImportId);
+          openDraft(root2, root2.state.activeImportId);
           return;
         }
         const reader = new FileReader();
         reader.onload = async (loaded) => {
           try {
-            const draft = createImportDraft({ text: String(loaded.target.result || ""), fileName: file.name, profiles: root.state.accountProfiles, rules: root.state.recognitionRules, transactions: root.state.transactions });
+            const draft = createImportDraft({ text: String(loaded.target.result || ""), fileName: file.name, profiles: root2.state.accountProfiles, rules: root2.state.recognitionRules, transactions: root2.state.transactions });
             UI.draft = draft;
-            await saveDraft(root, draft, { sync: true });
-            root.renderActiveTab();
-            renderDraftModal(root, draft);
+            await saveDraft(root2, draft, { sync: true });
+            root2.renderActiveTab();
+            renderDraftModal(root2, draft);
           } catch (error) {
             alert(`CSV importeren mislukt: ${error.message}`);
           }
         };
         reader.readAsText(file);
       });
-      rootElement.querySelectorAll("[data-u4-open-concept],[data-u4-open-receipt]").forEach((button) => button.addEventListener("click", () => openDraft(root, button.dataset.u4OpenConcept || button.dataset.u4OpenReceipt).catch((error) => alert(error.message))));
-      (_b = rootElement.querySelector("[data-u4-all-imports]")) == null ? void 0 : _b.addEventListener("click", () => renderImportHistory(root));
-      (_c = rootElement.querySelector("[data-u4-manage-rules]")) == null ? void 0 : _c.addEventListener("click", () => renderRules(root));
+      rootElement.querySelectorAll("[data-u4-open-concept],[data-u4-open-receipt]").forEach((button) => button.addEventListener("click", () => openDraft(root2, button.dataset.u4OpenConcept || button.dataset.u4OpenReceipt).catch((error) => alert(error.message))));
+      (_b = rootElement.querySelector("[data-u4-all-imports]")) == null ? void 0 : _b.addEventListener("click", () => renderImportHistory(root2));
+      (_c = rootElement.querySelector("[data-u4-manage-rules]")) == null ? void 0 : _c.addEventListener("click", () => renderRules(root2));
     }
-    function renderImportHistory(root) {
+    function renderImportHistory(root2) {
       const modal = ensureModalRoot();
-      const summaries = (root.state.importSummaries || []).slice().sort((a, b) => String(b.updatedAt || b.importDate).localeCompare(String(a.updatedAt || a.importDate)));
+      const summaries = (root2.state.importSummaries || []).slice().sort((a, b) => String(b.updatedAt || b.importDate).localeCompare(String(a.updatedAt || a.importDate)));
       modal.innerHTML = `<div class="u4-import-modal"><header class="u4-modal-head"><h2>Alle imports</h2><button class="ghost" data-u4-close>Sluiten</button></header><main class="u4-modal-body"><div class="u4-import-receipts">${summaries.map(renderReceipt).join("") || '<div class="u4-empty">Nog geen imports.</div>'}</div></main></div>`;
       modal.classList.add("open");
       modal.querySelector("[data-u4-close]").addEventListener("click", closeDraft);
-      modal.querySelectorAll("[data-u4-open-receipt]").forEach((item) => item.addEventListener("click", () => openDraft(root, item.dataset.u4OpenReceipt)));
+      modal.querySelectorAll("[data-u4-open-receipt]").forEach((item) => item.addEventListener("click", () => openDraft(root2, item.dataset.u4OpenReceipt)));
     }
-    function renderRules(root) {
+    function renderRules(root2) {
       const modal = ensureModalRoot();
-      const rules = root.state.recognitionRules || [];
+      const rules = root2.state.recognitionRules || [];
       modal.innerHTML = `<div class="u4-import-modal"><header class="u4-modal-head"><div><h2>Herkenningsregels</h2><p>Eigenaren worden nooit in regels opgeslagen.</p></div><button class="ghost" data-u4-close>Sluiten</button></header><main class="u4-modal-body"><div class="u4-import-receipts">${rules.map((rule) => `<article class="u4-receipt" data-u4-rule="${esc(rule.id)}"><div class="u4-row-grid"><label>Type<select data-rule-field="level">${["counterparty", "description", "organization", "keyword", "prediction"].map((level) => option(level, level, rule.level)).join("")}</select></label><label class="wide">Waarde<input data-rule-field="value" value="${esc(rule.value)}"></label><label>Categorie<input data-rule-field="category" value="${esc(rule.category)}"></label><label><input type="checkbox" data-rule-field="enabled" ${rule.enabled !== false ? "checked" : ""}> Actief</label><label><input type="checkbox" data-rule-field="alwaysReview" ${rule.alwaysReview ? "checked" : ""}> Altijd Nakijken</label><button class="danger-ghost small" data-u4-delete-rule="${esc(rule.id)}">Verwijderen</button></div></article>`).join("") || '<div class="u4-empty">Nog geen herkenningsregels.</div>'}</div></main></div>`;
       modal.classList.add("open");
       modal.querySelector("[data-u4-close]").addEventListener("click", closeDraft);
@@ -9242,73 +9563,73 @@ ${(error == null ? void 0 : error.message) || error}`);
         if (!rule) return;
         const field = event.target.dataset.ruleField;
         rule[field] = event.target.type === "checkbox" ? event.target.checked : event.target.value;
-        root.commitChange(() => {
+        root2.commitChange(() => {
         }, { render: false });
       });
       modal.addEventListener("click", (event) => {
         const button = event.target.closest("[data-u4-delete-rule]");
         if (!button) return;
-        root.commitChange(() => {
-          root.state.recognitionRules = root.state.recognitionRules.filter((rule) => rule.id !== button.dataset.u4DeleteRule);
+        root2.commitChange(() => {
+          root2.state.recognitionRules = root2.state.recognitionRules.filter((rule) => rule.id !== button.dataset.u4DeleteRule);
         }, { render: false });
-        renderRules(root);
+        renderRules(root2);
       });
     }
-    function injectSettlementCard(root) {
+    function injectSettlementCard(root2) {
       var _a, _b;
       (_a = document.querySelector('[data-dashboard-accordion="settlement"]')) == null ? void 0 : _a.remove();
       (_b = document.querySelector(".u4-settlement-card")) == null ? void 0 : _b.remove();
       if (document.body.dataset.activeTab !== "dashboard") return;
       const target = document.querySelector("#tab-dashboard .manage-stack") || document.querySelector(".manage-stack");
       if (!target) return;
-      const balances = directionalBalances(root.state, root.state.meta.selectedMonth || "9999-12");
+      const balances = directionalBalances(root2.state, root2.state.meta.selectedMonth || "9999-12");
       const accordion = document.createElement("details");
       accordion.className = "manage-section";
       accordion.dataset.dashboardAccordion = "settlement";
       accordion.innerHTML = `<summary><span class="manage-title">Onderling te verrekenen</span><span class="expand-chevron" aria-hidden="true"></span></summary><div class="manage-body"><section class="card u4-settlement-card"><div class="card-head"><div></div><button type="button" class="ghost small" data-u4-open-settlement>Details</button></div><div class="u4-settlement-lines">${balances.map((row) => `<div class="u4-settlement-line"><span>${ownerLabel2(row.debtor)} → ${ownerLabel2(row.creditor)}</span><strong>${euro(row.amount)}</strong></div>`).join("") || '<span class="u4-muted">Geen openstaande voorschotten.</span>'}</div></section></div>`;
       target.prepend(accordion);
-      accordion.querySelector("[data-u4-open-settlement]").addEventListener("click", () => renderSettlementDetail(root));
+      accordion.querySelector("[data-u4-open-settlement]").addEventListener("click", () => renderSettlementDetail(root2));
     }
-    function renderSettlementDetail(root, filters = {}) {
+    function renderSettlementDetail(root2, filters = {}) {
       const modal = ensureModalRoot();
       const person = filters.person || "";
       const month = filters.month || "";
-      const advances = (root.state.advanceLedger || []).filter((row) => Number(row.outstandingAmount) > 0 && (!person || (row.debtor === person || row.creditor === person)) && (!month || row.month === month));
-      const months = [...new Set((root.state.advanceLedger || []).map((row) => row.month).filter(Boolean))].sort().reverse();
+      const advances = (root2.state.advanceLedger || []).filter((row) => Number(row.outstandingAmount) > 0 && (!person || (row.debtor === person || row.creditor === person)) && (!month || row.month === month));
+      const months = [...new Set((root2.state.advanceLedger || []).map((row) => row.month).filter(Boolean))].sort().reverse();
       modal.innerHTML = `<div class="u4-import-modal"><header class="u4-modal-head"><div><h2>Onderling te verrekenen</h2><p>Directionele saldi worden niet automatisch tegen elkaar weggestreept.</p></div><button class="ghost" data-u4-close>Sluiten</button></header><main class="u4-modal-body"><div class="u4-profile-grid"><label>Persoon<select data-u4-settlement-person><option value="">Iedereen</option>${OWNERS.map((owner) => option(owner, ownerLabel2(owner), person)).join("")}</select></label><label>Maand<select data-u4-settlement-month><option value="">Alle maanden</option>${months.map((value) => option(value, value, month)).join("")}</select></label></div><div class="u4-import-receipts">${advances.map((advance) => {
-        const tx = (root.state.transactions || []).find((item) => item.id === advance.transactionId);
+        const tx = (root2.state.transactions || []).find((item) => item.id === advance.transactionId);
         const paid = round22(Number(advance.originalAmount || 0) - Number(advance.outstandingAmount || 0));
         return `<article class="u4-receipt"><div class="u4-receipt-head"><div><strong>${esc((tx == null ? void 0 : tx.description) || "Voorschot")}</strong><div class="u4-muted">${esc((tx == null ? void 0 : tx.date) || advance.month)} · ${ownerLabel2(advance.debtor)} → ${ownerLabel2(advance.creditor)}</div></div><strong>${euro(advance.outstandingAmount)}</strong></div><div class="u4-muted">Oorspronkelijk ${euro(advance.originalAmount)} · afgelost ${euro(paid)}</div></article>`;
       }).join("") || '<div class="u4-empty">Geen openstaande voorschotten voor dit filter.</div>'}</div></main></div>`;
       modal.classList.add("open");
       modal.querySelector("[data-u4-close]").addEventListener("click", closeDraft);
-      modal.querySelector("[data-u4-settlement-person]").addEventListener("change", (event) => renderSettlementDetail(root, { person: event.target.value, month: modal.querySelector("[data-u4-settlement-month]").value }));
-      modal.querySelector("[data-u4-settlement-month]").addEventListener("change", (event) => renderSettlementDetail(root, { person: modal.querySelector("[data-u4-settlement-person]").value, month: event.target.value }));
+      modal.querySelector("[data-u4-settlement-person]").addEventListener("change", (event) => renderSettlementDetail(root2, { person: event.target.value, month: modal.querySelector("[data-u4-settlement-month]").value }));
+      modal.querySelector("[data-u4-settlement-month]").addEventListener("change", (event) => renderSettlementDetail(root2, { person: modal.querySelector("[data-u4-settlement-person]").value, month: event.target.value }));
     }
-    function installUI(root) {
+    function installUI(root2) {
       var _a;
-      root.renderBankImportSection = () => renderImportPanel(root);
-      root.bindBankImport = (element) => bindImportPanel(element, root);
-      if (typeof root.renderActiveTab === "function" && !root.renderActiveTab.__u4Wrapped) {
-        const legacy = root.renderActiveTab;
+      root2.renderBankImportSection = () => renderImportPanel(root2);
+      root2.bindBankImport = (element) => bindImportPanel(element, root2);
+      if (typeof root2.renderActiveTab === "function" && !root2.renderActiveTab.__u4Wrapped) {
+        const legacy = root2.renderActiveTab;
         const wrapped = function() {
           const result = legacy.apply(this, arguments);
-          queueMicrotask(() => injectSettlementCard(root));
+          queueMicrotask(() => injectSettlementCard(root2));
           return result;
         };
         wrapped.__u4Wrapped = true;
-        root.renderActiveTab = wrapped;
+        root2.renderActiveTab = wrapped;
       }
-      (_a = root.__finizeInstallUpdate4Hooks) == null ? void 0 : _a.call(root, {
-        renderBankImportSection: root.renderBankImportSection,
-        bindBankImport: root.bindBankImport,
-        renderActiveTab: root.renderActiveTab
+      (_a = root2.__finizeInstallUpdate4Hooks) == null ? void 0 : _a.call(root2, {
+        renderBankImportSection: root2.renderBankImportSection,
+        bindBankImport: root2.bindBankImport,
+        renderActiveTab: root2.renderActiveTab
       });
-      root.FinizeUpdate4Process = (draft) => processDraft(root, draft).catch((error) => {
+      root2.FinizeUpdate4Process = (draft) => processDraft(root2, draft).catch((error) => {
         alert(error.message);
         return false;
       });
-      if (root.state.activeImportId) ImportStore.getImport(root.state.activeImportId).then((draft) => {
+      if (root2.state.activeImportId) ImportStore.getImport(root2.state.activeImportId).then((draft) => {
         UI.draft = draft || null;
       }).catch(() => {
       });
@@ -9316,7 +9637,7 @@ ${(error == null ? void 0 : error.message) || error}`);
     async function queueImportSync(record) {
       await ImportStore.putSync({ id: record.id, importId: record.id, queuedAt: (/* @__PURE__ */ new Date()).toISOString(), attempts: 0 });
     }
-    async function flushImportSync(root) {
+    async function flushImportSync(root2) {
       ImportPerformance.syncRequested = true;
       if (ImportPerformance.syncPromise) return ImportPerformance.syncPromise;
       ImportPerformance.syncPromise = (async () => {
@@ -9324,7 +9645,7 @@ ${(error == null ? void 0 : error.message) || error}`);
         let overall = true;
         while (ImportPerformance.syncRequested) {
           ImportPerformance.syncRequested = false;
-          const cloud = root.CloudAdapter;
+          const cloud = root2.CloudAdapter;
           if (!((_a = cloud == null ? void 0 : cloud.isConnected) == null ? void 0 : _a.call(cloud)) && ((_b = cloud == null ? void 0 : cloud.isConfigured) == null ? void 0 : _b.call(cloud)) && typeof cloud.connect === "function") await cloud.connect();
           if (!((_c = cloud == null ? void 0 : cloud.isConnected) == null ? void 0 : _c.call(cloud)) || !((_d = cloud.modules) == null ? void 0 : _d.firestore) || !cloud.db) return false;
           const firestore = cloud.modules.firestore;
@@ -9361,12 +9682,12 @@ ${(error == null ? void 0 : error.message) || error}`);
       });
       return ImportPerformance.syncPromise;
     }
-    async function recoverJournal(root) {
+    async function recoverJournal(root2) {
       var _a, _b;
       const entries = await ImportStore.listJournal();
       for (const entry of entries.filter((item) => item.status === "pending")) {
         if (entry.operation === "discard") {
-          if (((_a = root.state) == null ? void 0 : _a.activeImportId) === entry.importId) {
+          if (((_a = root2.state) == null ? void 0 : _a.activeImportId) === entry.importId) {
             entry.status = "rolled-back";
           } else {
             try {
@@ -9378,7 +9699,7 @@ ${(error == null ? void 0 : error.message) || error}`);
               entry.localCleanupError = String((error == null ? void 0 : error.message) || error);
             }
             if (entry.localCleanup) {
-              entry.cloudCleanup = await deleteCloudImportBestEffort(root, entry.importId);
+              entry.cloudCleanup = await deleteCloudImportBestEffort(root2, entry.importId);
               entry.status = "completed";
               entry.completedAt = (/* @__PURE__ */ new Date()).toISOString();
             } else {
@@ -9389,27 +9710,27 @@ ${(error == null ? void 0 : error.message) || error}`);
           await ImportStore.putJournal(entry);
           continue;
         }
-        const processed = (((_b = root.state) == null ? void 0 : _b.transactions) || []).some((tx) => tx.importBatchId === entry.importId);
+        const processed = (((_b = root2.state) == null ? void 0 : _b.transactions) || []).some((tx) => tx.importBatchId === entry.importId);
         entry.status = entry.operation === "undo" ? !processed ? "completed" : "rolled-back" : processed ? "completed" : "rolled-back";
         entry.recoveredAt = (/* @__PURE__ */ new Date()).toISOString();
         await ImportStore.putJournal(entry);
       }
     }
-    function install(root) {
+    function install(root2) {
       var _a;
-      if (!(root == null ? void 0 : root.state)) return;
-      normalizeCore(root.state);
-      const validation = validateCore(root.state);
+      if (!(root2 == null ? void 0 : root2.state)) return;
+      normalizeCore(root2.state);
+      const validation = validateCore(root2.state);
       if (!validation.ok) {
         console.error("Update 4 migratie ongeldig", validation.errors);
         return;
       }
       try {
-        if (typeof root.localSave === "function") root.localSave(root.state);
+        if (typeof root2.localSave === "function") root2.localSave(root2.state);
       } catch (error) {
         console.error("Update 4 lokale migratie opslaan mislukt", error);
       }
-      root.FinizeUpdate4 = Object.freeze({
+      root2.FinizeUpdate4 = Object.freeze({
         schemaVersion: SCHEMA_VERSION,
         normalize: (candidate) => normalizeCore(cloneState(candidate)),
         validate: (candidate) => validateCore(candidate),
@@ -9432,19 +9753,19 @@ ${(error == null ? void 0 : error.message) || error}`);
         undoImportEffects,
         directionalBalances,
         proposeRepaymentAllocations,
-        calculateGoalSavedAmount: (goalId, candidate = root.state) => calculateGoalSavedAmount(candidate, goalId),
+        calculateGoalSavedAmount: (goalId, candidate = root2.state) => calculateGoalSavedAmount(candidate, goalId),
         importStore: ImportStore
       });
-      installUI(root);
-      if (!root.__finizeUpdate4CloudListener) {
-        root.__finizeUpdate4CloudListener = true;
-        (_a = root.addEventListener) == null ? void 0 : _a.call(root, "finize:cloud-connected", () => recoverJournal(root).then(() => flushImportSync(root)).catch((error) => console.warn("Importsynchronisatie uitgesteld.", error)));
+      installUI(root2);
+      if (!root2.__finizeUpdate4CloudListener) {
+        root2.__finizeUpdate4CloudListener = true;
+        (_a = root2.addEventListener) == null ? void 0 : _a.call(root2, "finize:cloud-connected", () => recoverJournal(root2).then(() => flushImportSync(root2)).catch((error) => console.warn("Importsynchronisatie uitgesteld.", error)));
       }
-      Promise.resolve().then(() => recoverJournal(root)).then(() => reconcileActiveImportReference(root)).catch((error) => console.warn("Update 4 opslaginitialisatie uitgesteld.", error)).finally(() => {
+      Promise.resolve().then(() => recoverJournal(root2)).then(() => reconcileActiveImportReference(root2)).catch((error) => console.warn("Update 4 opslaginitialisatie uitgesteld.", error)).finally(() => {
         var _a2;
-        if (root.__finizeBootstrap) root.__finizeBootstrap.update4Ready = true;
-        (_a2 = root.__finizeMaybeFinishBootstrap) == null ? void 0 : _a2.call(root);
-        flushImportSync(root).catch((error) => console.warn("Importsynchronisatie uitgesteld.", error));
+        if (root2.__finizeBootstrap) root2.__finizeBootstrap.update4Ready = true;
+        (_a2 = root2.__finizeMaybeFinishBootstrap) == null ? void 0 : _a2.call(root2);
+        flushImportSync(root2).catch((error) => console.warn("Importsynchronisatie uitgesteld.", error));
       });
     }
     return { SCHEMA_VERSION, CLOUD_STORAGE_VERSION, CLOUD_READ_CONCURRENCY, OWNERS, IMPORT_STATUSES, normalizeIban, normalizeRule, normalizeTransaction, normalizeCore, validateCore, calculateGoalSavedAmount, reconcileGoalSavedAmounts, chunkRows, canonicalValue, rowsChecksum, buildCloudImportEnvelope, assembleCloudImport, mapWithConcurrency, classifyCloudError, fetchImportFromCloud, resolveImportDetails, reconcileActiveImportReference, deleteCloudImportBestEffort, discardImportConcept, normalizeText, matchIdentity, matchCandidates, detectDelimiter, parseDelimited, parseDate, parseAmount, detectFormat, inferMapping, hashText, fingerprint, organizationName, proposeType, recognitionProposal, classifyOriginal, parseBankCsv, findProfile, createImportDraft, updateDraftSummary, compactSummary, validateDraft, transactionKind, expenseImpact, financialRows, advanceForTransaction, savingsForTransaction, detectInternalPairs, directionalBalances, proposeRepaymentAllocations, planImportEffects, applyImportPlan, effectManifest, undoImportEffects, ImportStore, persistImportDraft, scheduleImportDraftPersist, flushScheduledImportDraft, queueImportSync, flushImportSync, recoverJournal, install, round2: round22, uid: uid2, clone: cloneState, testRenderDraftModal: renderDraftModal };
@@ -9470,8 +9791,8 @@ ${(error == null ? void 0 : error.message) || error}`);
         }
       });
     }
-    function markNegativeValues(root = document) {
-      root.querySelectorAll(".value").forEach((element) => {
+    function markNegativeValues(root2 = document) {
+      root2.querySelectorAll(".value").forEach((element) => {
         element.classList.toggle("is-negative", /^[−-]\s*€/.test(element.textContent.trim()));
       });
     }
@@ -9570,16 +9891,16 @@ ${(error == null ? void 0 : error.message) || error}`);
       </section>`).join("")}
     </div>`;
     }
-    function bindGoalPresentation(root) {
-      root.querySelectorAll("[data-u5-goal-filter]").forEach((button) => button.addEventListener("click", () => {
+    function bindGoalPresentation(root2) {
+      root2.querySelectorAll("[data-u5-goal-filter]").forEach((button) => button.addEventListener("click", () => {
         goalOwnerFilter = button.dataset.u5GoalFilter;
         renderActiveTab();
       }));
-      root.querySelectorAll("[data-u5-select-goal]").forEach((button) => button.addEventListener("click", () => {
+      root2.querySelectorAll("[data-u5-select-goal]").forEach((button) => button.addEventListener("click", () => {
         selectedGoalRef = button.dataset.u5SelectGoal;
         renderActiveTab();
       }));
-      root.querySelectorAll("[data-u5-goal-view]").forEach((button) => button.addEventListener("click", () => {
+      root2.querySelectorAll("[data-u5-goal-view]").forEach((button) => button.addEventListener("click", () => {
         goalViewMode = button.dataset.u5GoalView;
         renderActiveTab();
       }));
@@ -9595,8 +9916,8 @@ ${(error == null ? void 0 : error.message) || error}`);
         return sum;
       }, { saved: 0, target: 0, monthly: 0 });
       const selection = selectedGoal(items);
-      const root = document.getElementById("tab-spaardoelen");
-      root.innerHTML = `${renderPageHeading(`Spaardoelen — ${monthLabel(getSelectedMonth())}`, "Elke maand een stap dichter bij wat jullie belangrijk vinden.")}
+      const root2 = document.getElementById("tab-spaardoelen");
+      root2.innerHTML = `${renderPageHeading(`Spaardoelen — ${monthLabel(getSelectedMonth())}`, "Elke maand een stap dichter bij wat jullie belangrijk vinden.")}
       <div class="overview-kpi-row cols-4 u5-goal-kpis">
         ${renderIconKpi("◇", "green", "Totaal gespaard", eur(totals.saved), `van ${eur(totals.target)}`, { valueClass: "value pos" })}
         ${renderIconKpi("◎", "blue", "Totaal doelbedrag", eur(totals.target), "alle doelen samen")}
@@ -9620,7 +9941,7 @@ ${(error == null ? void 0 : error.message) || error}`);
         </aside>
         ${goalDetail(selection.selected)}
       </div>`}`;
-      bindGoalPresentation(root);
+      bindGoalPresentation(root2);
     }
     function makeDataCard(title, description, className) {
       const card = document.createElement("section");
@@ -9630,9 +9951,9 @@ ${(error == null ? void 0 : error.message) || error}`);
     }
     function renderData() {
       renderDataTab();
-      const root = document.getElementById("tab-data");
-      root.classList.add("u5-data-page");
-      const cards = [...root.querySelectorAll(":scope > .card")];
+      const root2 = document.getElementById("tab-data");
+      root2.classList.add("u5-data-page");
+      const cards = [...root2.querySelectorAll(":scope > .card")];
       const backupCard = cards.find((card) => card.querySelector("#btnExport"));
       const firestoreCard = cards.find((card) => card.querySelector("#firebaseConfigInput"));
       if (!backupCard || !firestoreCard) return;

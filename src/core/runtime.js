@@ -5,6 +5,7 @@
    ========================================================= */
 
 import { cloneState as clone } from "./state.js";
+import { DEFAULT_FIREBASE_CONFIG, FIREBASE_SDK_VERSION } from "../config/firebase.js";
 import {
   CLOUD_CONFLICT_CODE,
   assertCloudBase,
@@ -1694,7 +1695,6 @@ const BACKUP_STORAGE_KEY = 'finize-budget-planner-v1-last-good-backup';
 const MIGRATION_BACKUP_STORAGE_KEY = 'finize-budget-planner-v1-pre-schema-v5';
 const DEVICE_ID_STORAGE_KEY = 'finize-device-id';
 const FIREBASE_CONFIG_STORAGE_KEY = 'finize-firebase-config';
-const FIREBASE_SDK_VERSION = '11.10.0';
 const FIRESTORE_COLLECTION = 'budgetPlanners';
 const FIRESTORE_DOC_ID = 'finize';
 const GOAL_IMAGE_DB_NAME = 'finize-goal-images-v1';
@@ -1831,16 +1831,6 @@ const GoalImageStore = {
 };
 
 function goalImageSource(goal){ return GoalImageStore.source(goal); }
-
-const DEFAULT_FIREBASE_CONFIG = {
-  apiKey: 'AIzaSyCiJHGv9nlC_o4c2Xyj9UcyqHWW-YTxKfY',
-  authDomain: 'financien-7dd43.firebaseapp.com',
-  projectId: 'financien-7dd43',
-  storageBucket: 'financien-7dd43.firebasestorage.app',
-  messagingSenderId: '487713041493',
-  appId: '1:487713041493:web:68c897ae2fa06afd5838dc',
-  measurementId: 'G-X2EXXZDK7S'
-};
 
 function getDeviceId(){
   try{
@@ -6447,6 +6437,17 @@ window.__finizeBootstrap={
 window.__finizeMaybeFinishBootstrap=function(){
   const bootstrap=window.__finizeBootstrap;
   if(bootstrap.rendered||!bootstrap.coreReady||!bootstrap.update4Ready||!bootstrap.update5Ready)return false;
+  if(!bootstrap.authReady){
+    if(!bootstrap.waitingForAuth){
+      bootstrap.waitingForAuth=true;
+      Promise.resolve(window.__finizeAuthGate).then(session=>{
+        bootstrap.authReady=true;
+        bootstrap.authSession=session;
+        window.__finizeMaybeFinishBootstrap();
+      });
+    }
+    return false;
+  }
   bootstrap.rendered=true;
   bootstrap.initialRenderCount+=1;
   renderActiveTab();
