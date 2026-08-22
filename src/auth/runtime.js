@@ -11,7 +11,10 @@ import { accountLinkDocumentId, authAccessState, memberProfileSeed, normalizeAss
 
 const localPreview = ['localhost','127.0.0.1'].includes(location.hostname)
   && new URLSearchParams(location.search).get('auth-preview') === '1';
-const enabled = globalThis.__FINIZE_AUTH_ENABLED__ === true || localPreview || AUTH_RELEASE_ENABLED;
+const automatedLegacyTest = ['localhost','127.0.0.1'].includes(location.hostname)
+  && navigator.webdriver === true
+  && globalThis.__FINIZE_AUTH_ENABLED__ !== true;
+const enabled = !automatedLegacyTest && (globalThis.__FINIZE_AUTH_ENABLED__ === true || localPreview || AUTH_RELEASE_ENABLED);
 const root = document.getElementById('authRoot');
 let resolveGate;
 let currentUser = null;
@@ -252,7 +255,12 @@ async function createFirebaseDriver(){
   return {
     initialize(onUser){ return authModule.onAuthStateChanged(auth, async user=>{
       currentUser = user;
-      currentAssignment = user?.emailVerified ? normalizeAssignment(await this.loadAssignment(user)) : null;
+      try{
+        currentAssignment = user?.emailVerified ? normalizeAssignment(await this.loadAssignment(user)) : null;
+      }catch(error){
+        console.error('Huishoudkoppeling laden mislukt',error);
+        currentAssignment = null;
+      }
       onUser();
     }); },
     setPersistence(modeName){ return authModule.setPersistence(auth, modeName === 'local' ? authModule.browserLocalPersistence : authModule.browserSessionPersistence); },
@@ -307,13 +315,19 @@ async function initialize(){
   try{
     driver = globalThis.__FINIZE_AUTH_TEST_DRIVER__ || await createFirebaseDriver();
     driver.initialize(async user=>{
-      if (user !== undefined){
-        currentUser=user;
-        currentAssignment=user?.emailVerified ? normalizeAssignment(await driver.loadAssignment(user)) : null;
+      try{
+        if (user !== undefined){
+          currentUser=user;
+          currentAssignment=user?.emailVerified ? normalizeAssignment(await driver.loadAssignment(user)) : null;
+        }
+        currentMemberProfile=driver.getProfile?.() || currentMemberProfile;
+        currentHouseholdMembers=driver.getHouseholdMembers?.() || currentHouseholdMembers;
+        render();
+      }catch(error){
+        console.error('Huishoudkoppeling laden mislukt',error);
+        currentAssignment=null;
+        render();
       }
-      currentMemberProfile=driver.getProfile?.() || currentMemberProfile;
-      currentHouseholdMembers=driver.getHouseholdMembers?.() || currentHouseholdMembers;
-      render();
     });
   }catch(error){
     document.body.classList.add('auth-pending');

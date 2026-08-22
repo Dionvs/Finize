@@ -10,6 +10,6 @@ export const DEFAULT_FIREBASE_CONFIG = Object.freeze({
   measurementId: 'G-X2EXXZDK7S'
 });
 
-// Fase 1 blijft uit tot accountkoppeling en beveiligingsregels samen live gaan.
-// Browser- en emulatortests activeren de laag via window.__FINIZE_AUTH_ENABLED__.
-export const AUTH_RELEASE_ENABLED = false;
+// Update 6 gebruikt uitsluitend vooraf gekoppelde, geverifieerde accounts.
+// Lokale browsertests kunnen de laag daarnaast via window.__FINIZE_AUTH_ENABLED__ activeren.
+export const AUTH_RELEASE_ENABLED = true;

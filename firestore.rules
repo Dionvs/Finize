@@ -92,25 +92,16 @@ service cloud.firestore {
       }
     }
 
-    // Finize gebruikt momenteel een gedeelde, niet-geauthenticeerde planner.
-    // Rootwrites moeten via het transactionele syncprotocol lopen.
+    // Het oude openbare pad blijft alleen als herstelbron bestaan.
+    // Release 79 leest en schrijft uitsluitend via het beveiligde huishouden.
     match /budgetPlanners/finize {
-      allow read: if true;
-      allow create: if request.resource.data.syncVersion == 1
-        && request.resource.data.commitId is string;
-      allow update: if request.resource.data.syncVersion is int
-        && request.resource.data.commitId is string
-        && (
-          (!("syncVersion" in resource.data) && request.resource.data.syncVersion == 1)
-          || ("syncVersion" in resource.data
-            && request.resource.data.syncVersion == resource.data.syncVersion + 1)
-        );
+      allow read, create, update, delete: if false;
 
       match /imports/{importId} {
-        allow read, write: if true;
+        allow read, write: if false;
 
         match /chunks/{chunkId} {
-          allow read, write: if true;
+          allow read, write: if false;
         }
       }
     }

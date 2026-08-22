@@ -104,3 +104,24 @@ Status: lokaal afgerond en geverifieerd, nog niet gepubliceerd.
 - Firestore-regels compileren zonder fouten via een Firebase CLI dry-run.
 - Impeccable-detector: geen bevindingen.
 - Inlogscherm daadwerkelijk geopend; semantiek, checkbox **Ingelogd blijven** en visuele hiërarchie gecontroleerd.
+
+## Fase 5: live-migratie en release 79
+
+Status: cloudmigratie afgerond; releasecode klaar voor publicatie.
+
+### Opgeleverd
+
+- Lokale herstelkopie van het bestaande Firestore-document, vijf importheaders, vijf importchunks en de Auth-configuratie.
+- Bestaande state exact gekopieerd naar het beveiligde huishoudpad: syncversie 77, revisie 4254.
+- Beide aangeleverde adressen buiten Git gekoppeld aan de juiste rol en hetzelfde huishouden.
+- Google en e-mail/wachtwoord ingeschakeld; GitHub Pages-domein toegevoegd aan de toegestane Auth-domeinen.
+- Release 79 activeert de accountlaag en een nieuwe service-worker-cache.
+- Definitieve regels sluiten het oude openbare document en de oude importsubcollecties.
+
+### Verificatie voor publicatie
+
+- De beveiligde state is veld voor veld gelijk aan het bestaande document.
+- Alle vijf importheaders en vijf chunks zijn gekopieerd of exact gelijk bevonden.
+- Een tijdelijk geverifieerd testaccount kon uitsluitend de eigen koppeling en het gekoppelde huishouden lezen; de andere koppeling gaf 403.
+- Het tijdelijke testaccount en de tijdelijke koppeling zijn na de controle verwijderd.
+- De definitieve Firestore-regels compileren zonder fouten in dry-run.

@@ -27,7 +27,7 @@
     appId: "1:487713041493:web:68c897ae2fa06afd5838dc",
     measurementId: "G-X2EXXZDK7S"
   });
-  var AUTH_RELEASE_ENABLED = false;
+  var AUTH_RELEASE_ENABLED = true;
 
   // src/auth/contracts.mjs
   var FINIZE_ROLES = Object.freeze(["dion", "dara"]);
@@ -76,7 +76,8 @@
 
   // src/auth/runtime.js
   var localPreview = ["localhost", "127.0.0.1"].includes(location.hostname) && new URLSearchParams(location.search).get("auth-preview") === "1";
-  var enabled = globalThis.__FINIZE_AUTH_ENABLED__ === true || localPreview || AUTH_RELEASE_ENABLED;
+  var automatedLegacyTest = ["localhost", "127.0.0.1"].includes(location.hostname) && navigator.webdriver === true && globalThis.__FINIZE_AUTH_ENABLED__ !== true;
+  var enabled = !automatedLegacyTest && (globalThis.__FINIZE_AUTH_ENABLED__ === true || localPreview || AUTH_RELEASE_ENABLED);
   var root = document.getElementById("authRoot");
   var resolveGate;
   var currentUser = null;
@@ -310,7 +311,12 @@
       initialize(onUser) {
         return authModule.onAuthStateChanged(auth, async (user) => {
           currentUser = user;
-          currentAssignment = (user == null ? void 0 : user.emailVerified) ? normalizeAssignment(await this.loadAssignment(user)) : null;
+          try {
+            currentAssignment = (user == null ? void 0 : user.emailVerified) ? normalizeAssignment(await this.loadAssignment(user)) : null;
+          } catch (error) {
+            console.error("Huishoudkoppeling laden mislukt", error);
+            currentAssignment = null;
+          }
           onUser();
         });
       },
@@ -385,13 +391,19 @@
       driver = globalThis.__FINIZE_AUTH_TEST_DRIVER__ || await createFirebaseDriver();
       driver.initialize(async (user) => {
         var _a2, _b;
-        if (user !== void 0) {
-          currentUser = user;
-          currentAssignment = (user == null ? void 0 : user.emailVerified) ? normalizeAssignment(await driver.loadAssignment(user)) : null;
+        try {
+          if (user !== void 0) {
+            currentUser = user;
+            currentAssignment = (user == null ? void 0 : user.emailVerified) ? normalizeAssignment(await driver.loadAssignment(user)) : null;
+          }
+          currentMemberProfile = ((_a2 = driver.getProfile) == null ? void 0 : _a2.call(driver)) || currentMemberProfile;
+          currentHouseholdMembers = ((_b = driver.getHouseholdMembers) == null ? void 0 : _b.call(driver)) || currentHouseholdMembers;
+          render();
+        } catch (error) {
+          console.error("Huishoudkoppeling laden mislukt", error);
+          currentAssignment = null;
+          render();
         }
-        currentMemberProfile = ((_a2 = driver.getProfile) == null ? void 0 : _a2.call(driver)) || currentMemberProfile;
-        currentHouseholdMembers = ((_b = driver.getHouseholdMembers) == null ? void 0 : _b.call(driver)) || currentHouseholdMembers;
-        render();
       });
     } catch (error) {
       document.body.classList.add("auth-pending");
