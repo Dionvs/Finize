@@ -1,13 +1,41 @@
 const { expect, test } = require('@playwright/test');
 
-test('vaste knop Uitgave toevoegen opent de transactiemodal', async ({ page }) => {
+test('transacties worden alleen vanuit persoonlijk en gezamenlijk toegevoegd', async ({ page }) => {
   await page.goto('/');
-  await page.locator('#topActionsHome [data-open-transaction]').click();
+  await expect(page.locator('[data-open-transaction], [data-open-general-transaction]')).toHaveCount(0);
+
+  await page.locator('.v4-sidebar .tab-btn[data-tab="gezamenlijk"]').click();
+  await page.getByRole('button',{name:'+ Gezamenlijke uitgave'}).click();
   const modal = page.locator('#transactionModal');
   await expect(modal).toHaveClass(/open/);
-  await expect(modal.locator('#txAmount')).toBeVisible();
-  await modal.locator('#btnCloseTransaction').click();
+  await expect(modal.getByRole('heading',{name:'Gezamenlijke uitgave'})).toBeVisible();
+  await expect(modal.getByLabel('Eigenaar')).toHaveCount(0);
+  await modal.locator('#btnCloseJointTransaction').click();
   await expect(modal).not.toHaveClass(/open/);
+
+  await page.locator('.v4-sidebar .tab-btn[data-tab="dion"]').click();
+  await page.getByRole('button',{name:'+ Uitgave van Dion'}).click();
+  await expect(modal.getByRole('heading',{name:'Dion uitgave'})).toBeVisible();
+  await expect(modal.getByLabel('Eigenaar')).toHaveCount(0);
+  await modal.locator('#personalTxAmount').fill('12.34');
+  await modal.locator('#personalTxDescription').fill('Persoonlijke test');
+  await modal.locator('#btnSavePersonalTransaction').click();
+  await expect.poll(()=>page.evaluate(()=>window.state.transactions.at(-1)?.owner)).toBe('dion');
+});
+
+test('zonder huishouden toont persoonlijk totaal alle inkomstenbronnen', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => {
+    const month=window.state.meta.selectedMonth;
+    window.state.transactions.push({id:'standalone-income-test',date:month+'-12',owner:'dion',kind:'inkomen',transactionType:'overige-inkomsten',amount:40,description:'Los inkomen'});
+    window.renderActiveTab();
+  });
+  await page.locator('.v4-sidebar .tab-btn[data-tab="dion"]').click();
+  const card=page.locator('#tab-dion .overview-kpi-row [data-personal-kpi="income"]');
+  await expect(card).toContainText('Totaal inkomen');
+  await expect(card).toContainText('Salaris');
+  await expect(card).toContainText('Overige inkomsten');
+  await expect(card).not.toContainText('Zakgeld');
 });
 
 test('opgeslagen inkomen valt niet terug door een nieuwere cloudsnapshot', async ({ page }) => {

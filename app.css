@@ -420,6 +420,11 @@ td.num{ text-align:right; }
 .metric-label{ color:var(--text-dim); font-size:13px; font-weight:700; }
 .metric-value{ font-size:22px; font-weight:800; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
 .metric-sub{ color:var(--text-faint); font-size:12px; line-height:1.35; }
+.personal-income-sources{ display:grid; gap:4px; width:100%; padding-top:7px; border-top:1px solid var(--border-soft); }
+.personal-income-sources div{ display:flex; align-items:center; justify-content:space-between; gap:8px; min-width:0; color:var(--text-faint); font-size:11px; line-height:1.25; }
+.personal-income-sources span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.personal-income-sources strong{ color:var(--text-dim); font-weight:750; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.metric-sub > .personal-income-sources{ margin-top:-2px; }
 .inline-edit{ width:100%; font-size:22px !important; font-weight:800 !important; text-align:left !important; }
 .income-metric{ gap:7px; justify-content:flex-start; }
 .income-metric .metric-label{ color:var(--text); font-size:13.5px; }
@@ -1609,20 +1614,6 @@ body.v4-app{ padding:0 0 84px; }
     grid-column:1/-1;
     width:100%;
   }
-  .v4-main-topbar .primary[data-open-transaction]{
-    position:fixed;
-    right:14px;
-    bottom:calc(78px + env(safe-area-inset-bottom));
-    z-index:45;
-    width:auto;
-    min-height:44px;
-    padding:12px 16px;
-    border-radius:999px;
-    background:var(--green);
-    border-color:var(--green);
-    box-shadow:0 14px 26px rgba(63,43,30,.22);
-  }
-  body.v4-app[data-active-tab="dashboard"] .v4-main-topbar .primary[data-open-transaction]{ display:none; }
   .overview-kpi-row{ grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
   .overview-kpi-row > :nth-child(5){ grid-column:1/-1; }
   .v4-dashboard-heading{
@@ -1709,6 +1700,7 @@ body.v4-app{ padding:0 0 84px; }
   .mobile-kpi-chevron{ color:var(--text-faint); font-size:18px; }
   .mobile-kpi-label{ font-size:14px; font-weight:750; color:var(--text-dim); margin-bottom:4px; }
   .mobile-kpi-value{ font-size:22px; font-weight:800; color:var(--text); }
+  .mobile-kpi-card .personal-income-sources{ margin-top:9px; }
   .mobile-kpi-edit-hint{ margin-top:auto; padding-top:8px; font-size:12px; color:var(--green); font-weight:700; }
 
   /* row layout: stack by default, pair up from 600px */
@@ -5586,6 +5578,9 @@ button.icon-only-finize{width:34px;height:34px;padding:0!important;border-radius
   body.v4-app[data-active-tab="dashboard"] .budget-preview-card .scroll-area{max-height:none !important;height:auto !important}
   .budget-transactions-modal{width:100%;max-height:78dvh;border-radius:22px 22px 0 0;margin-top:auto}
 }
+.u4-import-history{ display:grid; gap:18px; }
+.u4-import-month{ display:grid; gap:9px; }
+.u4-import-month h3{ margin:0; padding:0 2px 7px; border-bottom:1px solid var(--border-soft); color:var(--text-dim); font-size:14px; text-transform:capitalize; }
 
 /* Finize bron: tablet.css */
 /* Update 5: uitsluitend tablet- en desktop-presentatie. Mobiel onder 768px blijft leidend. */
@@ -5724,12 +5719,6 @@ body.v4-app .value.is-negative{color:var(--red) !important}
     gap:7px !important;
   }
   .v4-main-topbar .scenario-toggle{grid-column:auto !important;width:auto !important}
-  .v4-main-topbar .primary[data-open-transaction]{
-    position:static !important;
-    min-height:42px;
-    padding:10px 15px !important;
-    border-radius:12px !important;
-  }
   .v4-bottom-nav{display:none !important}
   body.v4-app .wrap{max-width:1480px !important;margin:0 auto !important;padding:0 !important}
   .v4-dashboard-heading{display:none !important}

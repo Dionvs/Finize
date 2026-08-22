@@ -134,12 +134,6 @@ body.v4-app .value.is-negative{color:var(--red) !important}
     gap:7px !important;
   }
   .v4-main-topbar .scenario-toggle{grid-column:auto !important;width:auto !important}
-  .v4-main-topbar .primary[data-open-transaction]{
-    position:static !important;
-    min-height:42px;
-    padding:10px 15px !important;
-    border-radius:12px !important;
-  }
   .v4-bottom-nav{display:none !important}
   body.v4-app .wrap{max-width:1480px !important;margin:0 auto !important;padding:0 !important}
   .v4-dashboard-heading{display:none !important}

@@ -86,7 +86,8 @@ for (const mobileMarker of [
   'id="bottomNav"',
   'function renderMobileSpaardoelen()',
   'function openMobileGoalEditor(owner,id)',
-  'class="primary mobile-add-expense"',
+  'data-open-joint-transaction',
+  'data-open-personal-transaction',
   'id="mobileMonthSlot"'
 ]) {
   assert.ok(html.includes(mobileMarker), `Mobiele marker ontbreekt: ${mobileMarker}`);

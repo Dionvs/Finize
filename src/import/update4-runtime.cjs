@@ -431,6 +431,12 @@
     if(!match)return '';
     return `${match[3].length===2?'20'+match[3]:match[3]}-${match[2].padStart(2,'0')}-${match[1].padStart(2,'0')}`;
   }
+  function displayDate(value){
+    const normalized=parseDate(value);
+    if(!normalized)return String(value||'');
+    const [year,month,day]=normalized.split('-');
+    return `${day}-${month}-${year}`;
+  }
 
   function parseAmount(value){
     let text=String(value??'').trim().replace(/\s/g,'').replace(/€|EUR/gi,'');
@@ -632,6 +638,11 @@
   function escAttr(value){return esc(value).replace(/`/g,'&#96;').replace(/[\u0000-\u001f\u007f]/g,'');}
   function euro(value){return new Intl.NumberFormat('nl-NL',{style:'currency',currency:'EUR'}).format(Number(value)||0);}
   function ownerLabel(value){return value==='gezamenlijk'?'Gezamenlijk':value==='dara'?'Dara':'Dion';}
+  function profileDisplayLabel(profile){
+    const title=String(profile?.name||profile?.bank||'Rekening').trim();
+    const identifier=String(profile?.identifier||'').trim();
+    return identifier?`${title} · ${identifier}`:title;
+  }
   function option(value,label,current){return `<option value="${escAttr(value)}" ${value===current?'selected':''}>${esc(label)}</option>`;}
   function updateDraftSummary(draft){
     const active=(draft.rows||[]).filter(row=>row.bankOriginal?.valid&&!row.duplicate);
@@ -1229,21 +1240,40 @@
     const modal=ensureModalRoot();modal.innerHTML=`<div class="u4-import-modal"><header class="u4-modal-head"><h2>Import verwerkt</h2><button class="ghost" data-u4-close>Sluiten</button></header><main class="u4-modal-body">${processedSummaryHtml(plan)}</main></div>`;modal.querySelector('[data-u4-close]').addEventListener('click',()=>{closeDraft();root.renderActiveTab();});
     return true;
   }
-  function renderReceipt(summary){
-    return `<article class="u4-receipt" data-u4-open-receipt="${esc(summary.id)}"><div class="u4-receipt-head"><div><strong>${esc(summary.fileName)}</strong><div class="u4-muted">${esc(summary.bank)} · ${esc(summary.periodFrom||'—')} t/m ${esc(summary.periodTo||'—')}</div></div><span class="u4-status ${esc(summary.status)}">${esc(summary.status)}</span></div><div class="u4-muted">${Number(summary.newCount)||0} transacties · ${Number(summary.duplicateCount)||0} duplicaten · ${euro(summary.totalExpenses)} uitgaven</div></article>`;
+  function renderReceipt(root,summary){
+    const profile=(root.state.accountProfiles||[]).find(item=>item.id===summary.accountProfileId);
+    const accountTitle=profileDisplayLabel(profile||{name:summary.bank||'Rekening'});
+    return `<article class="u4-receipt" data-u4-open-receipt="${esc(summary.id)}"><div class="u4-receipt-head"><div><strong>${esc(accountTitle)}</strong></div><span class="u4-status ${esc(summary.status)}">${esc(summary.status)}</span></div><div class="u4-muted">${Number(summary.newCount)||0} transacties · ${Number(summary.duplicateCount)||0} duplicaten · ${euro(summary.totalExpenses)} uitgaven</div></article>`;
+  }
+  function summaryMonth(summary){return String(summary.periodFrom||summary.importDate||summary.updatedAt||'').slice(0,7);}
+  function summaryIncludesMonth(summary,month){
+    const from=String(summary.periodFrom||summary.importDate||'').slice(0,7);
+    const to=String(summary.periodTo||summary.periodFrom||summary.importDate||'').slice(0,7);
+    return !!from&&from<=month&&(!to||to>=month);
+  }
+  function importMonthLabel(month){
+    if(!/^\d{4}-\d{2}$/.test(month))return 'Zonder maand';
+    return new Intl.DateTimeFormat('nl-NL',{month:'long',year:'numeric'}).format(new Date(`${month}-01T12:00:00`));
+  }
+  function renderImportHistoryGroups(root,summaries){
+    const groups=new Map();
+    summaries.forEach(summary=>{const month=summaryMonth(summary);if(!groups.has(month))groups.set(month,[]);groups.get(month).push(summary);});
+    return [...groups.entries()].map(([month,items])=>`<section class="u4-import-month"><h3>${esc(importMonthLabel(month))}</h3><div class="u4-import-receipts">${items.map(summary=>renderReceipt(root,summary)).join('')}</div></section>`).join('');
   }
   function renderImportPanel(root){
     const active=root.state.activeImportId;
     const summaries=(root.state.importSummaries||[]).slice().sort((a,b)=>String(b.updatedAt||b.importDate).localeCompare(String(a.updatedAt||a.importDate)));
     const current=summaries.find(item=>item.id===active);
+    const selectedMonth=String(root.state.meta?.selectedMonth||'').slice(0,7);
+    const selectedSummaries=summaries.filter(summary=>summaryIncludesMonth(summary,selectedMonth));
     return `<div class="u4-import-panel">
       <div class="u4-import-actions">
         <label class="primary">Bank-CSV importeren<input type="file" accept=".csv,text/csv" data-u4-file></label>
         <button type="button" class="ghost small" data-u4-manage-rules>Herkenningsregels</button>
       </div>
       ${current?`<button type="button" class="u4-concept-banner" data-u4-open-concept="${esc(current.id)}"><strong>Bankimport nog niet verwerkt</strong><br>${Number(current.newCount)||0} transacties klaar om te controleren</button>`:'<p class="hint">ING wordt automatisch herkend. Andere CSV-bestanden kunnen via kolomherkenning worden ingelezen.</p>'}
-      <div class="u4-import-receipts">${summaries.slice(0,3).map(renderReceipt).join('')||'<div class="u4-empty">Nog geen imports.</div>'}</div>
-      ${summaries.length>3?'<button type="button" class="ghost small" data-u4-all-imports>Alle imports bekijken</button>':''}
+      <div class="u4-import-receipts">${selectedSummaries.map(summary=>renderReceipt(root,summary)).join('')||`<div class="u4-empty">Geen imports in ${esc(importMonthLabel(selectedMonth))}.</div>`}</div>
+      ${summaries.length?'<button type="button" class="ghost small" data-u4-all-imports>Alle imports bekijken</button>':''}
     </div>`;
   }
   function ensureModalRoot(){
@@ -1261,9 +1291,10 @@
     OWNERS.forEach(owner=>(root.state.spaardoelen?.[owner]||[]).forEach(goal=>rows.push({id:goal.id,label:`${ownerLabel(owner)} · ${goal.naam}`})));
     return `<option value="">Geen spaardoel</option>${rows.map(row=>option(row.id,row.label,current)).join('')}`;
   }
-  function fixedOptions(root,current){
+  function fixedOptions(root,owner,current){
     const rows=root.state.recurringFixedExpenses?.[root.state.meta.scenario]||[];
-    return `<option value="">Geen vaste last</option>${rows.map(row=>option(row.id,`${ownerLabel(row.financialFor||row.rekening)} · ${row.naam}`,current)).join('')}`;
+    const matching=rows.filter(row=>(row.financialFor||row.rekening||'gezamenlijk')===owner);
+    return `<option value="">Geen vaste last</option>${matching.map(row=>option(row.id,row.naam,current)).join('')}`;
   }
   const TYPE_GROUPS=[
     {label:'Uitgaven',items:[['uitgave','Gewone uitgave'],['terugbetaling','Terugbetaling aankoop'],['niet-meetellen','Niet meetellen']]},
@@ -1274,7 +1305,7 @@
   const TYPES=TYPE_GROUPS.flatMap(group=>group.items.map(item=>item[0]));
   function typeOptions(current){return TYPE_GROUPS.map(group=>`<optgroup label="${esc(group.label)}">${group.items.map(([value,label])=>option(value,label,current)).join('')}</optgroup>`).join('');}
   function transferType(type){return ['naar-spaarrekening','van-spaarrekening','interne-overboeking'].includes(type);}
-  function profileOptions(root,current){return `<option value="">Kies rekening</option>${(root.state.accountProfiles||[]).map(profile=>option(profile.id,`${profile.name} · ${ownerLabel(profile.accountOwner)}`,current)).join('')}`;}
+  function profileOptions(root,current){return `<option value="">Kies rekening</option>${(root.state.accountProfiles||[]).map(profile=>option(profile.id,profileDisplayLabel(profile),current)).join('')}`;}
   function compactText(value){return String(value||'').toLocaleLowerCase('nl-NL').replace(/\s+/g,' ').trim();}
   function matchIdentity(original){
     const description=String(original?.rawDescription||original?.description||'');
@@ -1333,7 +1364,7 @@
   function rowHtml(root,row){
     const p=row.processing;const original=row.bankOriginal;
     return `<article class="u4-import-row" data-u4-row="${escAttr(row.id)}">
-      <div class="u4-import-row-main"><div><strong>${esc(original.description||'Onbekende transactie')}</strong><span class="u4-muted">${esc(p.processingDate)} · ${euro(p.processedAmount)}</span>${row.reasons?.length?`<div class="u4-row-reasons">${esc(row.reasons.join(' · '))}</div>`:''}</div><div class="u4-row-approval"><span class="u4-status ${row.certainty}">${row.certainty==='zeker'?'Zeker':'Nakijken'}</span>${row.certainty==='nakijken'?'<button type="button" class="primary small" data-u4-approve>✓ Goedkeuren</button>':'<button type="button" class="ghost small" data-u4-reopen>Opnieuw nakijken</button>'}</div></div>
+      <div class="u4-import-row-main"><div><strong>${esc(original.description||'Onbekende transactie')}</strong><span class="u4-muted">${esc(displayDate(p.processingDate))} · ${euro(p.processedAmount)}</span>${row.reasons?.length?`<div class="u4-row-reasons">${esc(row.reasons.join(' · '))}</div>`:''}</div><div class="u4-row-approval"><span class="u4-status ${row.certainty}">${row.certainty==='zeker'?'Zeker':'Nakijken'}</span>${row.certainty==='nakijken'?'<button type="button" class="primary small" data-u4-approve>✓ Goedkeuren</button>':'<button type="button" class="ghost small" data-u4-reopen>Opnieuw nakijken</button>'}</div></div>
       <div class="u4-row-grid">
         <label>Datum<input type="date" data-u4-field="processingDate" value="${esc(p.processingDate)}"></label>
         <label>Bedrag<input type="number" step="0.01" data-u4-field="processedAmount" value="${Number(p.processedAmount)||0}"></label>
@@ -1343,8 +1374,8 @@
         ${transferFieldsHtml(root,row)}
       </div>
       <details><summary>Meer opties voor deze verwerking</summary><div class="u4-more-grid">
-        <div class="u4-original wide">Origineel: ${esc(original.bankDate)} · ${euro(original.amount)}<br>${esc(original.accountIdentifier||'Geen rekeningkenmerk')} → ${esc(original.counterpartyAccount||'Geen tegenrekening')}<br>Regel ${Number(original.lineNumber)||'—'} · ${esc(original.fingerprint)}</div>
-        ${['uitgave','terugbetaling'].includes(p.transactionType)?`<label>Budgetpost<input data-u4-field="budgetItemId" value="${esc(p.budgetItemId)}"></label><label>Vaste last<select data-u4-field="fixedExpenseId">${fixedOptions(root,p.fixedExpenseId)}</select></label><label>Afwijkend vast bedrag<select data-u4-field="fixedAmountMode">${option('none','Planning niet aanpassen',p.fixedAmountMode||'none')}${option('month','Alleen deze maand',p.fixedAmountMode)}${option('from','Vanaf deze maand',p.fixedAmountMode)}</select></label><label>Voorschot<select data-u4-field="advanceMode">${option('auto','Automatisch bij andere eigenaar',p.advanceMode)}${option('none','Geen voorschot',p.advanceMode)}${option('force','Altijd voorschot',p.advanceMode)}</select></label>`:''}
+        <div class="u4-original wide">Origineel: ${esc(displayDate(original.bankDate))} · ${euro(original.amount)}<br>${esc(original.accountIdentifier||'Geen rekeningkenmerk')} → ${esc(original.counterpartyAccount||'Geen tegenrekening')}<br>Regel ${Number(original.lineNumber)||'—'} · ${esc(original.fingerprint)}</div>
+        ${['uitgave','terugbetaling'].includes(p.transactionType)?`<label>Budgetpost<input data-u4-field="budgetItemId" value="${esc(p.budgetItemId)}"></label><label>Vaste last<select data-u4-field="fixedExpenseId">${fixedOptions(root,p.budgetOwner,p.fixedExpenseId)}</select></label><label>Afwijkend vast bedrag<select data-u4-field="fixedAmountMode">${option('none','Planning niet aanpassen',p.fixedAmountMode||'none')}${option('month','Alleen deze maand',p.fixedAmountMode)}${option('from','Vanaf deze maand',p.fixedAmountMode)}</select></label><label>Voorschot<select data-u4-field="advanceMode">${option('auto','Automatisch bij andere eigenaar',p.advanceMode)}${option('none','Geen voorschot',p.advanceMode)}${option('force','Altijd voorschot',p.advanceMode)}</select></label>`:''}
         ${p.transactionType==='sparen'?`<label>Spaardoel<select data-u4-field="savingsGoalId">${goalOptions(root,p.savingsGoalId)}</select></label>`:''}
         <label>Meetellen<select data-u4-field="include">${option('true','Meetellen',String(p.include))}${option('false','Niet meetellen',String(p.include))}</select></label>
         <label class="wide">Notitie<input data-u4-field="note" value="${esc(p.note)}"></label>
@@ -1369,7 +1400,7 @@
     }
     document.querySelector('.u4-match-overlay')?.remove();
     const overlay=document.createElement('div');overlay.className='u4-match-overlay';
-    overlay.innerHTML=`<div class="u4-match-dialog" role="dialog" aria-modal="true" aria-labelledby="u4-match-title"><div class="u4-match-head"><div><h3 id="u4-match-title">Vergelijkbare transacties gevonden</h3><p>${matches.length} mogelijke matches. Vink uit wat niet mee aangepast moet worden.</p></div><button type="button" class="ghost small" data-u4-match-close>Sluiten</button></div><div class="u4-match-change"><strong>Wordt toegepast</strong><span>${ownerLabel(source.processing.budgetOwner)} · ${esc(source.processing.category)} · ${esc(TYPE_GROUPS.flatMap(g=>g.items).find(item=>item[0]===source.processing.transactionType)?.[1]||source.processing.transactionType)} · Zeker</span></div><div class="u4-match-list">${matches.map(({row,score,reasons})=>`<label class="u4-match-row"><input type="checkbox" data-u4-match-id="${esc(row.id)}" ${score>=4?'checked':''}><span><strong>${esc(row.processing.processingDate)} · ${esc(row.bankOriginal.description||'Onbekend')}</strong><small>${euro(row.processing.processedAmount)} · ${esc(row.processing.category||'Ongecategoriseerd')} · ${esc(reasons.join(', '))}</small></span></label>`).join('')}</div><div class="u4-match-feedback" data-u4-match-feedback aria-live="polite"></div><div class="u4-match-actions"><button type="button" class="ghost" data-u4-match-only>Alleen deze transactie</button><button type="button" class="primary" data-u4-match-apply>Geselecteerde aanpassen</button></div></div>`;
+    overlay.innerHTML=`<div class="u4-match-dialog" role="dialog" aria-modal="true" aria-labelledby="u4-match-title"><div class="u4-match-head"><div><h3 id="u4-match-title">Vergelijkbare transacties gevonden</h3><p>${matches.length} mogelijke matches. Vink uit wat niet mee aangepast moet worden.</p></div><button type="button" class="ghost small" data-u4-match-close>Sluiten</button></div><div class="u4-match-change"><strong>Wordt toegepast</strong><span>${ownerLabel(source.processing.budgetOwner)} · ${esc(source.processing.category)} · ${esc(TYPE_GROUPS.flatMap(g=>g.items).find(item=>item[0]===source.processing.transactionType)?.[1]||source.processing.transactionType)} · Zeker</span></div><div class="u4-match-list">${matches.map(({row,score,reasons})=>`<label class="u4-match-row"><input type="checkbox" data-u4-match-id="${esc(row.id)}" ${score>=4?'checked':''}><span><strong>${esc(displayDate(row.processing.processingDate))} · ${esc(row.bankOriginal.description||'Onbekend')}</strong><small>${euro(row.processing.processedAmount)} · ${esc(row.processing.category||'Ongecategoriseerd')} · ${esc(reasons.join(', '))}</small></span></label>`).join('')}</div><div class="u4-match-feedback" data-u4-match-feedback aria-live="polite"></div><div class="u4-match-actions"><button type="button" class="ghost" data-u4-match-only>Alleen deze transactie</button><button type="button" class="primary" data-u4-match-apply>Geselecteerde aanpassen</button></div></div>`;
     document.body.appendChild(overlay);
     const close=()=>overlay.remove();
     overlay.querySelector('[data-u4-match-close]').onclick=close;
@@ -1435,7 +1466,7 @@
     const profiles=root.state.accountProfiles||[];
     const detected=[...new Set(draft.rows.map(row=>row.bankOriginal.accountIdentifier).filter(Boolean))][0]||'';
     return `<section class="u4-section"><div class="u4-section-list"><h3>Rekeningprofiel</h3><div class="u4-profile-grid">
-      <label class="wide">Bestaand profiel<select data-u4-profile-select><option value="">Nieuw profiel maken</option>${profiles.map(profile=>option(profile.id,`${profile.name} · ${ownerLabel(profile.accountOwner)}`,draft.accountProfileId)).join('')}</select></label>
+      <label class="wide">Bestaand profiel<select data-u4-profile-select><option value="">Nieuw profiel maken</option>${profiles.map(profile=>option(profile.id,profileDisplayLabel(profile),draft.accountProfileId)).join('')}</select></label>
       <label>Naam<input data-u4-profile-name value="${esc(draft.accountProfileId?'':`ING ${ownerLabel(draft.accountOwner||'gezamenlijk')}`)}"></label>
       <label>IBAN/rekeningkenmerk<input data-u4-profile-identifier value="${esc(detected)}"></label>
       <label>Rekeninghouder<select data-u4-profile-owner>${OWNERS.map(owner=>option(owner,ownerLabel(owner),draft.accountOwner||'gezamenlijk')).join('')}</select></label>
@@ -1451,12 +1482,12 @@
     const sure=active.filter(row=>row.certainty==='zeker').slice(0,UI.visibleRows);
     const modal=ensureModalRoot();
     modal.innerHTML=`<div class="u4-import-modal" role="dialog" aria-modal="true" aria-label="Bankimport controleren">
-      <header class="u4-modal-head"><div><h2>${isConcept?'Bankimport controleren':'Importdetails'}</h2><p>${esc(draft.fileName)} · ${esc(draft.bank)} · ${esc(draft.periodFrom||'—')} t/m ${esc(draft.periodTo||'—')} · ${esc(draft.status)}</p></div><button type="button" class="ghost" data-u4-close>Sluiten</button></header>
+      <header class="u4-modal-head"><div><h2>${isConcept?'Bankimport controleren':'Importdetails'}</h2><p>${esc(draft.fileName)} · ${esc(draft.bank)} · ${esc(displayDate(draft.periodFrom)||'—')} t/m ${esc(displayDate(draft.periodTo)||'—')} · ${esc(draft.status)}</p></div><button type="button" class="ghost" data-u4-close>Sluiten</button></header>
       <main class="u4-modal-body">${isConcept?profileEditor(root,draft)+bulkEditor(root,draft):''}
         <div class="u4-import-summary"><div><span>Nieuw</span><strong>${draft.summary.newCount}</strong></div><div><span>Duplicaten</span><strong>${draft.summary.duplicateCount}</strong></div><div><span>Inkomsten</span><strong>${euro(draft.summary.totalIncome)}</strong></div><div><span>Uitgaven</span><strong>${euro(draft.summary.totalExpenses)}</strong></div></div>
         <details class="u4-section" open><summary><span>Nakijken</span><span>${draft.summary.reviewCount}</span></summary><div class="u4-section-list">${review.map(row=>rowHtml(root,row)).join('')||'<div class="u4-empty">Geen transacties om na te kijken.</div>'}</div></details>
         <details class="u4-section"><summary><span>Zeker</span><span>${draft.summary.sureCount}</span></summary><div class="u4-section-list">${sure.map(row=>rowHtml(root,row)).join('')||'<div class="u4-empty">Geen zekere transacties.</div>'}</div></details>
-        ${draft.summary.duplicateCount?`<details class="u4-section"><summary><span>Eerder geïmporteerd — overgeslagen</span><span>${draft.summary.duplicateCount}</span></summary><div class="u4-section-list">${draft.rows.filter(row=>row.duplicate).map(row=>`<div class="u4-original">${esc(row.bankOriginal.bankDate)} · ${esc(row.bankOriginal.description)} · ${euro(row.bankOriginal.amount)}</div>`).join('')}</div></details>`:''}
+        ${draft.summary.duplicateCount?`<details class="u4-section"><summary><span>Eerder geïmporteerd — overgeslagen</span><span>${draft.summary.duplicateCount}</span></summary><div class="u4-section-list">${draft.rows.filter(row=>row.duplicate).map(row=>`<div class="u4-original">${esc(displayDate(row.bankOriginal.bankDate))} · ${esc(row.bankOriginal.description)} · ${euro(row.bankOriginal.amount)}</div>`).join('')}</div></details>`:''}
       </main>
       <footer class="u4-modal-actions"><span class="u4-muted" data-u4-save-status>${isConcept?'Wijzigingen worden automatisch lokaal bewaard.':canCorrect?'Aanpassingen worden pas financieel verwerkt na bevestiging.':'Deze import is financieel teruggedraaid.'}</span>${canCorrect?'<button type="button" class="danger-ghost" data-u4-undo>Import ongedaan maken</button><button type="button" class="primary" data-u4-reconcile>Wijzigingen verwerken</button>':isConcept?'<button type="button" class="ghost" data-u4-save-concept>Concept opslaan</button><button type="button" class="primary" data-u4-process>Alles verwerken</button>':''}</footer>
     </div>`;
@@ -1583,6 +1614,11 @@
         if(field==='processedAmount')value=round2(Math.abs(Number(value)||0));
         if(field==='include')value=value==='true';
         row.processing[field]=value;
+        if(field==='budgetOwner'&&row.processing.fixedExpenseId){
+          const fixedRows=root.state.recurringFixedExpenses?.[root.state.meta.scenario]||[];
+          const selectedFixed=fixedRows.find(item=>item.id===row.processing.fixedExpenseId);
+          if(!selectedFixed||(selectedFixed.financialFor||selectedFixed.rekening||'gezamenlijk')!==value)row.processing.fixedExpenseId='';
+        }
         if(field==='transactionType'){
           row.processing.splits=(row.processing.splits||[]).filter(split=>Math.abs(Number(split.amount)||0)>.004);
         }
@@ -1679,7 +1715,7 @@
   }
   function renderImportHistory(root){
     const modal=ensureModalRoot();const summaries=(root.state.importSummaries||[]).slice().sort((a,b)=>String(b.updatedAt||b.importDate).localeCompare(String(a.updatedAt||a.importDate)));
-    modal.innerHTML=`<div class="u4-import-modal"><header class="u4-modal-head"><h2>Alle imports</h2><button class="ghost" data-u4-close>Sluiten</button></header><main class="u4-modal-body"><div class="u4-import-receipts">${summaries.map(renderReceipt).join('')||'<div class="u4-empty">Nog geen imports.</div>'}</div></main></div>`;
+    modal.innerHTML=`<div class="u4-import-modal"><header class="u4-modal-head"><h2>Alle imports</h2><button class="ghost" data-u4-close>Sluiten</button></header><main class="u4-modal-body"><div class="u4-import-history">${renderImportHistoryGroups(root,summaries)||'<div class="u4-empty">Nog geen imports.</div>'}</div></main></div>`;
     modal.classList.add('open');modal.querySelector('[data-u4-close]').addEventListener('click',closeDraft);modal.querySelectorAll('[data-u4-open-receipt]').forEach(item=>item.addEventListener('click',()=>openDraft(root,item.dataset.u4OpenReceipt)));
   }
   function renderRules(root){
