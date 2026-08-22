@@ -1,11 +1,11 @@
-const CACHE_NAME = "finize-v81-transacties-per-tab";
+const CACHE_NAME = "finize-v82-bankimport-spaargeld";
 const CACHE_PREFIX = "finize-";
 
 const CRITICAL_SHELL = [
   "./",
   "./index.html",
-  "./app.js?v=80-loginfix",
-  "./app.css?v=80-loginfix",
+  "./app.js?v=82-bankimport-spaargeld",
+  "./app.css?v=82-bankimport-spaargeld",
   "./manifest.json"
 ];
 
