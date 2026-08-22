@@ -2,13 +2,13 @@
   // src/core/early-errors.js
   window.__finizeEarlyErrors = [];
   window.addEventListener("error", (event) => {
-    var _a;
-    window.__finizeEarlyErrors.push({ type: "error", message: String(event.message || ""), filename: String(event.filename || ""), line: Number(event.lineno || 0), column: Number(event.colno || 0), stack: String(((_a = event.error) == null ? void 0 : _a.stack) || "") });
+    var _a2;
+    window.__finizeEarlyErrors.push({ type: "error", message: String(event.message || ""), filename: String(event.filename || ""), line: Number(event.lineno || 0), column: Number(event.colno || 0), stack: String(((_a2 = event.error) == null ? void 0 : _a2.stack) || "") });
     console.error("Finize kon niet volledig starten:", event.message, event.filename ? `${event.filename}:${event.lineno || 0}` : "");
   });
   window.addEventListener("unhandledrejection", (event) => {
-    var _a, _b, _c;
-    window.__finizeEarlyErrors.push({ type: "rejection", message: String(((_a = event.reason) == null ? void 0 : _a.message) || event.reason || ""), stack: String(((_b = event.reason) == null ? void 0 : _b.stack) || "") });
+    var _a2, _b, _c;
+    window.__finizeEarlyErrors.push({ type: "rejection", message: String(((_a2 = event.reason) == null ? void 0 : _a2.message) || event.reason || ""), stack: String(((_b = event.reason) == null ? void 0 : _b.stack) || "") });
     console.error("Finize kon een achtergrondtaak niet afronden:", ((_c = event.reason) == null ? void 0 : _c.message) || String(event.reason || "Onbekende fout"));
   });
 
@@ -195,8 +195,8 @@
     </section>`;
   }
   function bindCommonActions() {
-    var _a, _b, _c;
-    (_a = root.querySelector("[data-auth-signout]")) == null ? void 0 : _a.addEventListener("click", () => runAction(() => driver.signOut()));
+    var _a2, _b, _c;
+    (_a2 = root.querySelector("[data-auth-signout]")) == null ? void 0 : _a2.addEventListener("click", () => runAction(() => driver.signOut()));
     (_b = root.querySelector("[data-auth-check]")) == null ? void 0 : _b.addEventListener("click", () => runAction(async () => {
       currentUser = await driver.reloadUser(currentUser);
       currentAssignment = (currentUser == null ? void 0 : currentUser.emailVerified) ? normalizeAssignment(await driver.loadAssignment(currentUser)) : null;
@@ -208,20 +208,20 @@
     }));
   }
   function bindSignInActions() {
-    var _a, _b, _c, _d;
-    (_a = root.querySelector("[data-auth-toggle]")) == null ? void 0 : _a.addEventListener("click", () => {
+    var _a2, _b, _c, _d;
+    (_a2 = root.querySelector("[data-auth-toggle]")) == null ? void 0 : _a2.addEventListener("click", () => {
       mode = mode === "login" ? "register" : "login";
       render();
     });
     (_b = root.querySelector("[data-auth-google]")) == null ? void 0 : _b.addEventListener("click", () => runAction(async () => {
-      var _a2;
-      const stay = ((_a2 = root.querySelector("[data-auth-stay]")) == null ? void 0 : _a2.checked) !== false;
+      var _a3;
+      const stay = ((_a3 = root.querySelector("[data-auth-stay]")) == null ? void 0 : _a3.checked) !== false;
       await driver.setPersistence(persistenceMode(stay));
       await driver.signInGoogle({ redirect: matchMedia("(max-width: 767px)").matches || matchMedia("(display-mode: standalone)").matches });
     }));
     (_c = root.querySelector("[data-auth-reset]")) == null ? void 0 : _c.addEventListener("click", () => {
-      var _a2;
-      const email = (_a2 = root.querySelector('input[name="email"]')) == null ? void 0 : _a2.value.trim();
+      var _a3;
+      const email = (_a3 = root.querySelector('input[name="email"]')) == null ? void 0 : _a3.value.trim();
       if (!email) {
         setFeedback("Vul eerst je e-mailadres in.", "error");
         return;
@@ -420,10 +420,10 @@
     Object.entries(overrides).forEach(([month, values]) => {
       if (!isPlainObject(values)) return;
       ["dion", "dara"].forEach((person) => {
-        var _a;
+        var _a2;
         if (!Object.prototype.hasOwnProperty.call(values, person)) return;
         const selected = (Array.isArray(histories[person]) ? histories[person] : []).filter((row) => String((row == null ? void 0 : row.effectiveFrom) || "") <= month).sort((left, right) => String(left.effectiveFrom).localeCompare(String(right.effectiveFrom))).at(-1);
-        const storedMonthly = (_a = monthlyIncome == null ? void 0 : monthlyIncome[month]) == null ? void 0 : _a[person];
+        const storedMonthly = (_a2 = monthlyIncome == null ? void 0 : monthlyIncome[month]) == null ? void 0 : _a2[person];
         if (!selected || !Number.isFinite(Number(storedMonthly))) return;
         if (Number(storedMonthly) === Number(selected.salary) && Number(values[person]) !== Number(selected.salary)) {
           delete values[person];
@@ -492,7 +492,56 @@
     return copyValue(local);
   }
 
+  // src/storage/account-scope.mjs
+  var LEGACY_STORAGE_KEY = "finize-budget-planner-v1";
+  var LEGACY_BACKUP_KEY = "finize-budget-planner-v1-last-good-backup";
+  var LEGACY_MIGRATION_KEY = "finize-budget-planner-v1-pre-schema-v5";
+  function cleanSegment(value) {
+    return String(value || "").trim().replace(/[^a-zA-Z0-9_-]/g, "_");
+  }
+  function normalizeAccountSession(session) {
+    var _a2, _b, _c;
+    if ((session == null ? void 0 : session.status) === "disabled") return Object.freeze({ mode: "legacy" });
+    const uid2 = cleanSegment((_a2 = session == null ? void 0 : session.user) == null ? void 0 : _a2.uid);
+    const householdId = cleanSegment((_b = session == null ? void 0 : session.assignment) == null ? void 0 : _b.householdId);
+    const role = cleanSegment((_c = session == null ? void 0 : session.assignment) == null ? void 0 : _c.role);
+    if ((session == null ? void 0 : session.status) !== "ready" || !uid2 || !householdId || !["dion", "dara"].includes(role)) return null;
+    return Object.freeze({ mode: "account", uid: uid2, householdId, role });
+  }
+  function storageKeysForSession(session) {
+    const scope = normalizeAccountSession(session);
+    if (!scope) return null;
+    if (scope.mode === "legacy") return Object.freeze({
+      state: LEGACY_STORAGE_KEY,
+      backup: LEGACY_BACKUP_KEY,
+      migration: LEGACY_MIGRATION_KEY
+    });
+    const suffix = `${scope.householdId}:${scope.uid}`;
+    return Object.freeze({
+      state: `${LEGACY_STORAGE_KEY}:account:${suffix}`,
+      backup: `${LEGACY_BACKUP_KEY}:account:${suffix}`,
+      migration: `${LEGACY_MIGRATION_KEY}:account:${suffix}`
+    });
+  }
+  function cloudBudgetDocumentPath(session) {
+    const scope = normalizeAccountSession(session);
+    if (!scope) return null;
+    return scope.mode === "legacy" ? Object.freeze(["budgetPlanners", "finize"]) : Object.freeze(["households", scope.householdId, "budgetState", "current"]);
+  }
+  function cloudImportDocumentPath(session, importId) {
+    const scope = normalizeAccountSession(session);
+    const id = cleanSegment(importId);
+    if (!scope || !id) return null;
+    return scope.mode === "legacy" ? Object.freeze(["budgetPlanners", "finize", "imports", id]) : Object.freeze(["households", scope.householdId, "imports", id]);
+  }
+  function cloudImportChunkPath(session, importId, chunkId) {
+    const parent = cloudImportDocumentPath(session, importId);
+    const id = cleanSegment(chunkId);
+    return parent && id ? Object.freeze([...parent, "chunks", id]) : null;
+  }
+
   // src/core/runtime.js
+  var _a;
   function round2(n) {
     return Math.round((n + Number.EPSILON) * 100) / 100;
   }
@@ -514,8 +563,8 @@
     return round2((Number(n) || 0) * 100);
   }
   function uid() {
-    var _a;
-    if ((_a = globalThis.crypto) == null ? void 0 : _a.randomUUID) return "id-" + globalThis.crypto.randomUUID();
+    var _a2;
+    if ((_a2 = globalThis.crypto) == null ? void 0 : _a2.randomUUID) return "id-" + globalThis.crypto.randomUUID();
     return "id-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
   }
   function findItemById(path, id) {
@@ -635,8 +684,8 @@
     return String(tx.date || "").slice(0, 7);
   }
   function getSelectedMonth() {
-    var _a;
-    if (!((_a = state == null ? void 0 : state.meta) == null ? void 0 : _a.selectedMonth)) return monthKey();
+    var _a2;
+    if (!((_a2 = state == null ? void 0 : state.meta) == null ? void 0 : _a2.selectedMonth)) return monthKey();
     return state.meta.selectedMonth;
   }
   function setSelectedMonth(value) {
@@ -645,7 +694,7 @@
     ensureMonthData(value);
   }
   function ensureMonthData(month = getSelectedMonth()) {
-    var _a, _b, _c, _d;
+    var _a2, _b, _c, _d;
     state.meta.selectedMonth = state.meta.selectedMonth || monthKey();
     state.monthlyIncome = isPlainObject2(state.monthlyIncome) ? state.monthlyIncome : {};
     state.monthlyIncomeOverrides = isPlainObject2(state.monthlyIncomeOverrides) ? state.monthlyIncomeOverrides : {};
@@ -657,7 +706,7 @@
     state.monthlyTeruggaven = isPlainObject2(state.monthlyTeruggaven) ? state.monthlyTeruggaven : {};
     state.transactions = Array.isArray(state.transactions) ? state.transactions : [];
     state.monthlyIncome[month] = state.monthlyIncome[month] || {
-      dion: Number((_b = (_a = state.personen) == null ? void 0 : _a.dion) == null ? void 0 : _b.salaris) || 0,
+      dion: Number((_b = (_a2 = state.personen) == null ? void 0 : _a2.dion) == null ? void 0 : _b.salaris) || 0,
       dara: Number((_d = (_c = state.personen) == null ? void 0 : _c.dara) == null ? void 0 : _d.salaris) || 0
     };
     state.monthlyTeruggaven[month] = isPlainObject2(state.monthlyTeruggaven[month]) ? state.monthlyTeruggaven[month] : { dion: [], dara: [], gezamenlijk: [] };
@@ -681,8 +730,8 @@
   }
   function normalizeGoalDefaults() {
     ["gezamenlijk", "dion", "dara"].forEach((group) => {
-      var _a;
-      (((_a = state.spaardoelen) == null ? void 0 : _a[group]) || []).forEach((goal) => {
+      var _a2;
+      (((_a2 = state.spaardoelen) == null ? void 0 : _a2[group]) || []).forEach((goal) => {
         if (!goal.rendementPeriode) goal.rendementPeriode = "jaarlijks";
         if (!["jaarlijks", "maandelijks"].includes(goal.rendementPeriode)) goal.rendementPeriode = "jaarlijks";
         if (goal.favoriet === void 0) goal.favoriet = false;
@@ -713,10 +762,10 @@
       target.personen[person].salaris = Number(target.personen[person].salaris) || 0;
       const rows = Array.isArray(target.personen[person].vasteTeruggaven) ? target.personen[person].vasteTeruggaven : [];
       target.personen[person].vasteTeruggaven = rows.filter(isPlainObject2).map((row) => {
-        var _a, _b;
+        var _a2, _b;
         return {
           id: row.id || uid(),
-          omschrijving: (_b = (_a = row.omschrijving) != null ? _a : row.post) != null ? _b : "",
+          omschrijving: (_b = (_a2 = row.omschrijving) != null ? _a2 : row.post) != null ? _b : "",
           bedrag: Number(row.bedrag) || 0
         };
       });
@@ -726,8 +775,8 @@
     target.incomeDefaultsHistory = isPlainObject2(target.incomeDefaultsHistory) ? target.incomeDefaultsHistory : {};
     target.monthlyRefundOverrides = isPlainObject2(target.monthlyRefundOverrides) ? target.monthlyRefundOverrides : {};
     ["dion", "dara"].forEach((person) => {
-      var _a, _b, _c, _d;
-      const fallbackSalary = round2(Number((_b = (_a = target.personen) == null ? void 0 : _a[person]) == null ? void 0 : _b.salaris) || 0);
+      var _a2, _b, _c, _d;
+      const fallbackSalary = round2(Number((_b = (_a2 = target.personen) == null ? void 0 : _a2[person]) == null ? void 0 : _b.salaris) || 0);
       const fallbackRefund = round2(sumBedrag(((_d = (_c = target.personen) == null ? void 0 : _c[person]) == null ? void 0 : _d.vasteTeruggaven) || []));
       const rows = Array.isArray(target.incomeDefaultsHistory[person]) ? target.incomeDefaultsHistory[person] : [];
       const normalized = rows.filter(isPlainObject2).map((row) => ({
@@ -742,8 +791,8 @@
     });
   }
   function getIncomeDefaultsAt(person, month = getSelectedMonth()) {
-    var _a, _b, _c, _d, _e, _f, _g;
-    const rows = Array.isArray((_a = state.incomeDefaultsHistory) == null ? void 0 : _a[person]) ? state.incomeDefaultsHistory[person] : [];
+    var _a2, _b, _c, _d, _e, _f, _g;
+    const rows = Array.isArray((_a2 = state.incomeDefaultsHistory) == null ? void 0 : _a2[person]) ? state.incomeDefaultsHistory[person] : [];
     const selected = rows.filter((row) => String(row.effectiveFrom || "") <= month).sort((a, b) => String(a.effectiveFrom).localeCompare(String(b.effectiveFrom))).pop();
     return { salary: round2(Number((_d = selected == null ? void 0 : selected.salary) != null ? _d : (_c = (_b = state.personen) == null ? void 0 : _b[person]) == null ? void 0 : _c.salaris) || 0), refund: round2(Number((_g = selected == null ? void 0 : selected.refund) != null ? _g : sumBedrag(((_f = (_e = state.personen) == null ? void 0 : _e[person]) == null ? void 0 : _f.vasteTeruggaven) || [])) || 0), effectiveFrom: (selected == null ? void 0 : selected.effectiveFrom) || "0000-01" };
   }
@@ -775,9 +824,9 @@
     });
   }
   function getDistributionIncomeParts(person, month = getSelectedMonth()) {
-    var _a, _b, _c, _d;
+    var _a2, _b, _c, _d;
     const defaults = getIncomeDefaultsAt(person, month);
-    const salaryOverride = (_b = (_a = state.monthlyIncomeOverrides) == null ? void 0 : _a[month]) == null ? void 0 : _b[person];
+    const salaryOverride = (_b = (_a2 = state.monthlyIncomeOverrides) == null ? void 0 : _a2[month]) == null ? void 0 : _b[person];
     const refundOverride = (_d = (_c = state.monthlyRefundOverrides) == null ? void 0 : _c[month]) == null ? void 0 : _d[person];
     return { salary: Number.isFinite(Number(salaryOverride)) ? round2(Number(salaryOverride)) : defaults.salary, refund: Number.isFinite(Number(refundOverride)) ? round2(Number(refundOverride)) : defaults.refund };
   }
@@ -786,8 +835,8 @@
     ["voor", "na"].forEach((scenario) => {
       target.budgetDefaultsHistory[scenario] = isPlainObject2(target.budgetDefaultsHistory[scenario]) ? target.budgetDefaultsHistory[scenario] : {};
       ["gezamenlijk", "dion", "dara"].forEach((owner) => {
-        var _a, _b;
-        const sourceRows = Array.isArray((_b = (_a = target[scenario]) == null ? void 0 : _a[owner]) == null ? void 0 : _b.variabel) ? target[scenario][owner].variabel : [];
+        var _a2, _b;
+        const sourceRows = Array.isArray((_b = (_a2 = target[scenario]) == null ? void 0 : _a2[owner]) == null ? void 0 : _b.variabel) ? target[scenario][owner].variabel : [];
         const history = Array.isArray(target.budgetDefaultsHistory[scenario][owner]) ? target.budgetDefaultsHistory[scenario][owner] : [];
         const normalized = history.filter(isPlainObject2).map((entry) => ({
           id: String(entry.id || uid()),
@@ -801,8 +850,8 @@
     });
   }
   function getVariableBudgetDefaultsAt(scenario, owner, month = getSelectedMonth(), target = state) {
-    var _a, _b, _c, _d;
-    const history = Array.isArray((_b = (_a = target == null ? void 0 : target.budgetDefaultsHistory) == null ? void 0 : _a[scenario]) == null ? void 0 : _b[owner]) ? target.budgetDefaultsHistory[scenario][owner] : [];
+    var _a2, _b, _c, _d;
+    const history = Array.isArray((_b = (_a2 = target == null ? void 0 : target.budgetDefaultsHistory) == null ? void 0 : _a2[scenario]) == null ? void 0 : _b[owner]) ? target.budgetDefaultsHistory[scenario][owner] : [];
     const selected = history.filter((entry) => String(entry.effectiveFrom || "") <= month).sort((a, b) => String(a.effectiveFrom).localeCompare(String(b.effectiveFrom))).pop();
     return cloneState(Array.isArray(selected == null ? void 0 : selected.rows) ? selected.rows : ((_d = (_c = target == null ? void 0 : target[scenario]) == null ? void 0 : _c[owner]) == null ? void 0 : _d.variabel) || []);
   }
@@ -820,8 +869,8 @@
     state[scenario][owner].variabel = cloneState(normalizedRows);
     const budgetKey = `${owner}Variabel`;
     Object.keys(state.monthlyBudgets || {}).filter((key) => key >= month).forEach((key) => {
-      var _a, _b;
-      const scenarioData = (_b = (_a = state.monthlyBudgets) == null ? void 0 : _a[key]) == null ? void 0 : _b[scenario];
+      var _a2, _b;
+      const scenarioData = (_b = (_a2 = state.monthlyBudgets) == null ? void 0 : _a2[key]) == null ? void 0 : _b[scenario];
       if (isPlainObject2(scenarioData)) delete scenarioData[budgetKey];
     });
   }
@@ -856,12 +905,12 @@
     return u3AnchoredDate(start.getFullYear() + count, start.getMonth(), start.getDate());
   }
   function u3AmountAt(item, dateOrMonth) {
-    var _a, _b, _c;
+    var _a2, _b, _c;
     const key = String(dateOrMonth || "").slice(0, 7);
     if ((item == null ? void 0 : item.monthOverrides) && Number.isFinite(Number(item.monthOverrides[key]))) return round2(Number(item.monthOverrides[key]));
     const histories = Array.isArray(item == null ? void 0 : item.amountHistory) ? item.amountHistory : [];
     const selected = histories.filter((row) => String(row.effectiveFrom || "").slice(0, 7) <= key).sort((a, b) => String(a.effectiveFrom).localeCompare(String(b.effectiveFrom))).pop();
-    const fallback = (_b = (_a = item == null ? void 0 : item.bedrag) != null ? _a : item == null ? void 0 : item.verwachtBedrag) != null ? _b : 0;
+    const fallback = (_b = (_a2 = item == null ? void 0 : item.bedrag) != null ? _a2 : item == null ? void 0 : item.verwachtBedrag) != null ? _b : 0;
     return round2(Number((_c = selected == null ? void 0 : selected.amount) != null ? _c : fallback) || 0);
   }
   function u3OccurrenceDates(item, month) {
@@ -932,11 +981,11 @@
     };
   }
   function u3LegacyStartMonth(target) {
-    var _a;
+    var _a2;
     const keys = [
       ...Object.keys((target == null ? void 0 : target.monthlyIncome) || {}),
       ...Object.keys((target == null ? void 0 : target.monthlyBudgets) || {}),
-      String(((_a = target == null ? void 0 : target.meta) == null ? void 0 : _a.selectedMonth) || "")
+      String(((_a2 = target == null ? void 0 : target.meta) == null ? void 0 : _a2.selectedMonth) || "")
     ].filter((key) => /^\d{4}-\d{2}$/.test(key)).sort();
     return `${keys[0] || monthKey()}-01`;
   }
@@ -947,8 +996,8 @@
       const existing = Array.isArray(target.recurringFixedExpenses[scenario]) ? target.recurringFixedExpenses[scenario] : [];
       const ids = new Set(existing.map((item) => item.legacyKey).filter(Boolean));
       U3_ACCOUNTS.forEach((account) => {
-        var _a, _b, _c, _d;
-        const groups = [{ kind: "vasteLasten", rows: ((_b = (_a = target == null ? void 0 : target[scenario]) == null ? void 0 : _a[account]) == null ? void 0 : _b.vasteLasten) || [] }];
+        var _a2, _b, _c, _d;
+        const groups = [{ kind: "vasteLasten", rows: ((_b = (_a2 = target == null ? void 0 : target[scenario]) == null ? void 0 : _a2[account]) == null ? void 0 : _b.vasteLasten) || [] }];
         if (scenario === "na" && account === "gezamenlijk") groups.push({ kind: "hypotheek", rows: ((_d = (_c = target == null ? void 0 : target.na) == null ? void 0 : _c.gezamenlijk) == null ? void 0 : _d.hypotheek) || [] });
         groups.forEach((group) => group.rows.forEach((row) => {
           const legacyKey = `${scenario}:${account}:${group.kind}:${row.id}`;
@@ -981,10 +1030,10 @@
     const existingIds = new Set(target.recurringIncomeSources.map((item) => item.id));
     const start = u3LegacyStartMonth(target);
     ["dion", "dara"].forEach((owner) => {
-      var _a, _b, _c, _d;
+      var _a2, _b, _c, _d;
       const salaryId = `income-loon-${owner}`;
       if (!existingIds.has(salaryId)) {
-        const base = round2(Number((_b = (_a = target == null ? void 0 : target.personen) == null ? void 0 : _a[owner]) == null ? void 0 : _b.salaris) || 0);
+        const base = round2(Number((_b = (_a2 = target == null ? void 0 : target.personen) == null ? void 0 : _a2[owner]) == null ? void 0 : _b.salaris) || 0);
         const source = { id: salaryId, naam: `Loon ${owner === "dion" ? "Dion" : "Dara"}`, type: "loon", eigenaar: owner, rekening: "gezamenlijk", financialFor: "gezamenlijk", verwachtBedrag: base, meetellenVoorVerdeling: true, frequentieAantal: 1, frequentieEenheid: "maanden", begindatum: start, einddatum: "", actief: true, amountHistory: [{ id: `amount-${salaryId}`, effectiveFrom: start, amount: base }], monthOverrides: {}, recognition: { text: "", counterparty: "", amountTolerance: 100 }, legacyKind: "salary" };
         Object.entries(target.monthlyIncome || {}).forEach(([month, data]) => {
           const value = Number(data == null ? void 0 : data[owner]);
@@ -1078,10 +1127,10 @@
         if (!isPlainObject2(values)) return;
         const overrides = isPlainObject2(target.monthlyIncomeOverrides[month]) ? target.monthlyIncomeOverrides[month] : {};
         ["dion", "dara"].forEach((owner) => {
-          var _a, _b;
+          var _a2, _b;
           if (!Object.prototype.hasOwnProperty.call(values, owner)) return;
           const value = Number(values[owner]);
-          const expected = Number((_b = (_a = target.personen) == null ? void 0 : _a[owner]) == null ? void 0 : _b.salaris) || 0;
+          const expected = Number((_b = (_a2 = target.personen) == null ? void 0 : _a2[owner]) == null ? void 0 : _b.salaris) || 0;
           if (Number.isFinite(value) && (value === 0 || round2(value) !== round2(expected))) overrides[owner] = round2(value);
         });
         if (Object.keys(overrides).length) target.monthlyIncomeOverrides[month] = overrides;
@@ -1176,9 +1225,9 @@
     return getDistributionIncomeParts(person, month).refund;
   }
   function sumMaandTeruggaven(person, month = getSelectedMonth()) {
-    var _a, _b;
+    var _a2, _b;
     ensureMonthData(month);
-    return sumBedrag(((_b = (_a = state.monthlyTeruggaven) == null ? void 0 : _a[month]) == null ? void 0 : _b[person]) || []);
+    return sumBedrag(((_b = (_a2 = state.monthlyTeruggaven) == null ? void 0 : _a2[month]) == null ? void 0 : _b[person]) || []);
   }
   function getTotalMonthlyIncome(person, month = getSelectedMonth()) {
     const parts = getDistributionIncomeParts(person, month);
@@ -1196,11 +1245,11 @@
     state.monthlyIncome[month][person] = round2(Number(amount) || 0);
   }
   function getMonthlyScenarioData(scenario = state.meta.scenario) {
-    var _a, _b;
+    var _a2, _b;
     const month = getSelectedMonth();
     ensureMonthData(month);
     const base = state[scenario];
-    const monthly = (_b = (_a = state.monthlyBudgets) == null ? void 0 : _a[month]) == null ? void 0 : _b[scenario];
+    const monthly = (_b = (_a2 = state.monthlyBudgets) == null ? void 0 : _a2[month]) == null ? void 0 : _b[scenario];
     return {
       ...base,
       gezamenlijk: {
@@ -1221,8 +1270,8 @@
     return (state.transactions || []).filter((tx) => transactionMonth(tx) === month && (!owner || tx.owner === owner));
   }
   function normalizedTransactionType(tx) {
-    var _a;
-    const values = [tx == null ? void 0 : tx.transactionType, tx == null ? void 0 : tx.type, (_a = tx == null ? void 0 : tx.processing) == null ? void 0 : _a.transactionType, tx == null ? void 0 : tx.kind, tx == null ? void 0 : tx.category].map((value) => String(value || "").trim().toLocaleLowerCase("nl-NL").replace(/[ _]+/g, "-"));
+    var _a2;
+    const values = [tx == null ? void 0 : tx.transactionType, tx == null ? void 0 : tx.type, (_a2 = tx == null ? void 0 : tx.processing) == null ? void 0 : _a2.transactionType, tx == null ? void 0 : tx.kind, tx == null ? void 0 : tx.category].map((value) => String(value || "").trim().toLocaleLowerCase("nl-NL").replace(/[ _]+/g, "-"));
     const joined = values.join("|");
     if (/naar-?spaar-?rekening|storten-?naar-?spaar/.test(joined)) return "naar-spaarrekening";
     if (/van-?spaar-?rekening|opnemen-?van-?spaar/.test(joined)) return "van-spaarrekening";
@@ -1234,8 +1283,8 @@
     return values.find(Boolean) || "";
   }
   function isBudgetExpenseTransaction(tx) {
-    var _a, _b, _c;
-    if (!tx || ((_a = tx.processing) == null ? void 0 : _a.include) === false || tx.kind === "niet-meetellen") return false;
+    var _a2, _b, _c;
+    if (!tx || ((_a2 = tx.processing) == null ? void 0 : _a2.include) === false || tx.kind === "niet-meetellen") return false;
     const kind = String(tx.kind || "").toLocaleLowerCase("nl-NL").replace(/[ _]+/g, "-");
     const type = normalizedTransactionType(tx);
     if (["inkomen", "interne-overboeking", "terugbetaling", "niet-meetellen", "vaste-last", "fixed-expense"].includes(kind)) return false;
@@ -1271,8 +1320,8 @@
     const distributionIncome = round2(calcScenario(state).totaalSalaris);
     const standard = { dion: getDistributionIncomeParts("dion", month), dara: getDistributionIncomeParts("dara", month) };
     const rows = (state.transactions || []).filter((tx) => {
-      var _a;
-      return transactionMonth(tx) === month && tx.reviewStatus !== "genegeerd" && ((_a = tx.processing) == null ? void 0 : _a.include) !== false && tx.kind !== "niet-meetellen";
+      var _a2;
+      return transactionMonth(tx) === month && tx.reviewStatus !== "genegeerd" && ((_a2 = tx.processing) == null ? void 0 : _a2.include) !== false && tx.kind !== "niet-meetellen";
     });
     const salaryActual = { dion: 0, dara: 0, gezamenlijk: 0 };
     const salarySeen = { dion: false, dara: false, gezamenlijk: false };
@@ -1407,16 +1456,16 @@
   }
   function applyFinizeIconSystem(root2 = document) {
     root2.querySelectorAll(".tab-btn[data-tab] .u5-nav-icon").forEach((slot) => {
-      var _a;
-      const tab = (_a = slot.closest("[data-tab]")) == null ? void 0 : _a.dataset.tab;
+      var _a2;
+      const tab = (_a2 = slot.closest("[data-tab]")) == null ? void 0 : _a2.dataset.tab;
       const iconName = FINIZE_NAV_ICONS[tab] || "dashboard";
       if (slot.dataset.finizeIcon === iconName) return;
       slot.dataset.finizeIcon = iconName;
       slot.innerHTML = iconSvg(iconName);
     });
     root2.querySelectorAll(".bottom-nav-btn[data-tab] .bn-icon").forEach((slot) => {
-      var _a;
-      const tab = (_a = slot.closest("[data-tab]")) == null ? void 0 : _a.dataset.tab;
+      var _a2;
+      const tab = (_a2 = slot.closest("[data-tab]")) == null ? void 0 : _a2.dataset.tab;
       const iconName = FINIZE_NAV_ICONS[tab] || "dashboard";
       if (slot.dataset.finizeIcon === iconName) return;
       slot.dataset.finizeIcon = iconName;
@@ -1463,11 +1512,11 @@
       btn.insertAdjacentHTML("afterbegin", finizeIconWrap(name));
     });
     root2.querySelectorAll("td:first-child").forEach((cell) => {
-      var _a, _b;
+      var _a2, _b;
       const text = cell.textContent.trim();
       if (/^[⌂~⚡◆▤▶◌▣□€•…]$/.test(text)) {
         const row = cell.closest("tr");
-        const category = ((_a = row == null ? void 0 : row.querySelector('input[data-path$=".categorie"]')) == null ? void 0 : _a.value) || ((_b = row == null ? void 0 : row.querySelector("td:nth-child(2) input")) == null ? void 0 : _b.value) || "";
+        const category = ((_a2 = row == null ? void 0 : row.querySelector('input[data-path$=".categorie"]')) == null ? void 0 : _a2.value) || ((_b = row == null ? void 0 : row.querySelector("td:nth-child(2) input")) == null ? void 0 : _b.value) || "";
         cell.classList.add("finize-icon-cell");
         cell.innerHTML = iconSvg(categoryIconName(category));
       }
@@ -1542,8 +1591,8 @@
     return `<div class="card-head"><div class="card-head-title">${iconBadge(dashboardSectionIconName(title), tone, "card-head-icon")}<h2>${title}</h2></div>${hint ? `<span class="hint">${hint}</span>` : ""}</div>`;
   }
   function ownerLabel(owner) {
-    var _a, _b;
-    return owner === "gezamenlijk" ? "Gezamenlijk" : ((_b = (_a = state.personen) == null ? void 0 : _a[owner]) == null ? void 0 : _b.naam) || (owner === "dion" ? "Dion" : "Dara");
+    var _a2, _b;
+    return owner === "gezamenlijk" ? "Gezamenlijk" : ((_b = (_a2 = state.personen) == null ? void 0 : _a2[owner]) == null ? void 0 : _b.naam) || (owner === "dion" ? "Dion" : "Dara");
   }
   function renderJointFixedCostsCardHead(owner = "gezamenlijk", options = {}) {
     const name = ownerLabel(owner);
@@ -1559,11 +1608,11 @@
   </div>`;
   }
   function jointVariableCategoryOptions(selectedCategory = "", owner = "gezamenlijk") {
-    var _a;
+    var _a2;
     const scenarioData = getMonthlyScenarioData(state.meta.scenario);
     const seen = /* @__PURE__ */ new Set();
     const categories = [];
-    (((_a = scenarioData[owner]) == null ? void 0 : _a.variabel) || []).forEach((row) => {
+    (((_a2 = scenarioData[owner]) == null ? void 0 : _a2.variabel) || []).forEach((row) => {
       const rawLabel = String(row.post || row.categorie || "").trim();
       const key = rawLabel.toLocaleLowerCase();
       if (!rawLabel || seen.has(key)) return;
@@ -1677,8 +1726,8 @@
     return `<span class="goal-inleg-breakdown"><b style="grid-column:1/-1"><span class="goal-inleg-label">Inleg deze maand</span><span class="goal-inleg-value">${eur(total)}</span></b></span>`;
   }
   function goalMonthlyInlegBreakdown(item) {
-    var _a;
-    const fixed = Number((_a = item.vasteInlegWerkelijk) != null ? _a : item.doel.vasteInleg) || 0;
+    var _a2;
+    const fixed = Number((_a2 = item.vasteInlegWerkelijk) != null ? _a2 : item.doel.vasteInleg) || 0;
     const extra = Number(item.berekendeExtraInleg) || 0;
     return `<span class="goal-inleg-breakdown"><b><span class="goal-inleg-label">Vast</span><span class="goal-inleg-value">${eur(fixed)}</span></b><b><span class="goal-inleg-label">Naar rato</span><span class="goal-inleg-value">${eur(extra)}</span></b></span>`;
   }
@@ -1739,8 +1788,8 @@
     if (!root2 || root2.dataset.dashboardAccordionKeyboardBound === "true") return;
     root2.dataset.dashboardAccordionKeyboardBound = "true";
     root2.addEventListener("keydown", (event) => {
-      var _a, _b;
-      const summary = (_b = (_a = event.target).closest) == null ? void 0 : _b.call(_a, "[data-dashboard-accordion] > summary");
+      var _a2, _b;
+      const summary = (_b = (_a2 = event.target).closest) == null ? void 0 : _b.call(_a2, "[data-dashboard-accordion] > summary");
       if (!summary || !root2.contains(summary) || !["Enter", " ", "Spacebar"].includes(event.key)) return;
       event.preventDefault();
       summary.parentElement.open = !summary.parentElement.open;
@@ -1845,9 +1894,9 @@
     return headers.findIndex((header) => patterns.some((pattern) => pattern.test(header)));
   }
   function bankOwnerCategories(owner) {
-    var _a;
+    var _a2;
     const scenarioData = getMonthlyScenarioData(state.meta.scenario);
-    const rows = ((_a = scenarioData == null ? void 0 : scenarioData[owner]) == null ? void 0 : _a.variabel) || [];
+    const rows = ((_a2 = scenarioData == null ? void 0 : scenarioData[owner]) == null ? void 0 : _a2.variabel) || [];
     const seen = /* @__PURE__ */ new Set();
     const categories = [];
     rows.forEach((row) => {
@@ -2060,13 +2109,13 @@
       effDara = hypDara;
     }
     function persoonlijk(p, zakgeld) {
-      var _a;
+      var _a2;
       const persoonlijkeVasteLasten = sumEffective(s[p].vasteLasten);
       const persoonlijkVariabelBudget = sumBedrag(s[p].variabel);
       const resterendVoorVariabel = round2(zakgeld - persoonlijkeVasteLasten);
       const variabeleUitgaven = sumTransactions(p);
       const automatischBeschikbaarVoorSparen = round2(zakgeld - persoonlijkeVasteLasten - persoonlijkVariabelBudget);
-      const monthOverrides = (_a = state2.monthlySavingOverrides) == null ? void 0 : _a[selectedMonth];
+      const monthOverrides = (_a2 = state2.monthlySavingOverrides) == null ? void 0 : _a2[selectedMonth];
       const handmatigSparen = isPlainObject2(monthOverrides) && Object.prototype.hasOwnProperty.call(monthOverrides, p);
       const beschikbaarVoorSparen = handmatigSparen ? round2(Number(monthOverrides[p]) || 0) : automatischBeschikbaarVoorSparen;
       return {
@@ -2258,16 +2307,15 @@
       monthCorrections: []
     };
   }
-  var STORAGE_KEY = "finize-budget-planner-v1";
-  var BACKUP_STORAGE_KEY = "finize-budget-planner-v1-last-good-backup";
-  var MIGRATION_BACKUP_STORAGE_KEY = "finize-budget-planner-v1-pre-schema-v5";
   var DEVICE_ID_STORAGE_KEY = "finize-device-id";
   var FIREBASE_CONFIG_STORAGE_KEY = "finize-firebase-config";
-  var FIRESTORE_COLLECTION = "budgetPlanners";
-  var FIRESTORE_DOC_ID = "finize";
   var GOAL_IMAGE_DB_NAME = "finize-goal-images-v1";
   var GOAL_IMAGE_STORE_NAME = "images";
   var GOAL_IMAGE_REF_PREFIX = "idb:goal-image:";
+  var activeAuthSession = ((_a = globalThis.FinizeAuth) == null ? void 0 : _a.enabled) ? null : { status: "disabled" };
+  function activeStorageKeys() {
+    return storageKeysForSession(activeAuthSession);
+  }
   var GoalImageStore = {
     dbPromise: null,
     cache: /* @__PURE__ */ new Map(),
@@ -2353,10 +2401,10 @@
       }
     },
     async initializeState(target) {
-      var _a;
+      var _a2;
       let changed = false;
       for (const owner of ["gezamenlijk", "dion", "dara"]) {
-        for (const goal of ((_a = target == null ? void 0 : target.spaardoelen) == null ? void 0 : _a[owner]) || []) {
+        for (const goal of ((_a2 = target == null ? void 0 : target.spaardoelen) == null ? void 0 : _a2[owner]) || []) {
           const raw = String(goal.afbeelding || "");
           if (raw.startsWith("data:image/")) {
             const stored = await this.storeOrFallback(goal.id, raw);
@@ -2386,9 +2434,9 @@
       return changed;
     },
     async expandStateForTransfer(target) {
-      var _a;
+      var _a2;
       for (const owner of ["gezamenlijk", "dion", "dara"]) {
-        for (const goal of ((_a = target == null ? void 0 : target.spaardoelen) == null ? void 0 : _a[owner]) || []) {
+        for (const goal of ((_a2 = target == null ? void 0 : target.spaardoelen) == null ? void 0 : _a2[owner]) || []) {
           const key = this.keyFromRef(goal.afbeelding);
           if (!key) continue;
           try {
@@ -2434,30 +2482,30 @@
   }
   function ensurePersistentIds(target) {
     ["voor", "na"].forEach((scenario) => {
-      var _a, _b;
+      var _a2, _b;
       ["gezamenlijk", "dion", "dara"].forEach((owner) => {
-        var _a2, _b2, _c, _d;
-        ensureRowIds((_b2 = (_a2 = target == null ? void 0 : target[scenario]) == null ? void 0 : _a2[owner]) == null ? void 0 : _b2.vasteLasten);
+        var _a3, _b2, _c, _d;
+        ensureRowIds((_b2 = (_a3 = target == null ? void 0 : target[scenario]) == null ? void 0 : _a3[owner]) == null ? void 0 : _b2.vasteLasten);
         ensureRowIds((_d = (_c = target == null ? void 0 : target[scenario]) == null ? void 0 : _c[owner]) == null ? void 0 : _d.variabel);
       });
-      ensureRowIds((_b = (_a = target == null ? void 0 : target[scenario]) == null ? void 0 : _a.gezamenlijk) == null ? void 0 : _b.hypotheek);
+      ensureRowIds((_b = (_a2 = target == null ? void 0 : target[scenario]) == null ? void 0 : _a2.gezamenlijk) == null ? void 0 : _b.hypotheek);
     });
     ["dion", "dara"].forEach((owner) => {
-      var _a, _b;
-      return ensureRowIds((_b = (_a = target == null ? void 0 : target.personen) == null ? void 0 : _a[owner]) == null ? void 0 : _b.vasteTeruggaven);
+      var _a2, _b;
+      return ensureRowIds((_b = (_a2 = target == null ? void 0 : target.personen) == null ? void 0 : _a2[owner]) == null ? void 0 : _b.vasteTeruggaven);
     });
     Object.values((target == null ? void 0 : target.monthlyBudgets) || {}).forEach((monthData) => {
       ["voor", "na"].forEach((scenario) => {
         ["gezamenlijkVariabel", "dionVariabel", "daraVariabel"].forEach((key) => {
-          var _a;
-          return ensureRowIds((_a = monthData == null ? void 0 : monthData[scenario]) == null ? void 0 : _a[key]);
+          var _a2;
+          return ensureRowIds((_a2 = monthData == null ? void 0 : monthData[scenario]) == null ? void 0 : _a2[key]);
         });
       });
     });
     ["voor", "na"].forEach((scenario) => {
       ["gezamenlijk", "dion", "dara"].forEach((owner) => {
-        var _a, _b;
-        (((_b = (_a = target == null ? void 0 : target.budgetDefaultsHistory) == null ? void 0 : _a[scenario]) == null ? void 0 : _b[owner]) || []).forEach((entry) => ensureRowIds(entry == null ? void 0 : entry.rows));
+        var _a2, _b;
+        (((_b = (_a2 = target == null ? void 0 : target.budgetDefaultsHistory) == null ? void 0 : _a2[scenario]) == null ? void 0 : _b[owner]) || []).forEach((entry) => ensureRowIds(entry == null ? void 0 : entry.rows));
       });
     });
     Object.values((target == null ? void 0 : target.monthlyTeruggaven) || {}).forEach((monthData) => {
@@ -2465,12 +2513,12 @@
     });
     ensureRowIds(target == null ? void 0 : target.transactions);
     ["gezamenlijk", "dion", "dara"].forEach((owner) => {
-      var _a;
-      return ensureRowIds((_a = target == null ? void 0 : target.spaardoelen) == null ? void 0 : _a[owner]);
+      var _a2;
+      return ensureRowIds((_a2 = target == null ? void 0 : target.spaardoelen) == null ? void 0 : _a2[owner]);
     });
     ["voor", "na"].forEach((scenario) => {
-      var _a;
-      return ensureRowIds((_a = target == null ? void 0 : target.recurringFixedExpenses) == null ? void 0 : _a[scenario]);
+      var _a2;
+      return ensureRowIds((_a2 = target == null ? void 0 : target.recurringFixedExpenses) == null ? void 0 : _a2[scenario]);
     });
     ensureRowIds(target == null ? void 0 : target.recurringIncomeSources);
     ensureRowIds(target == null ? void 0 : target.transactionReviewQueue);
@@ -2482,13 +2530,14 @@
     Object.values((target == null ? void 0 : target.monthRecords) || {}).forEach((record) => ensureRowIds(record == null ? void 0 : record.closureHistory));
   }
   function migrateBudgetState(candidate) {
-    var _a;
+    var _a2, _b;
     const original = cloneState(candidate);
     const activeStateBeforeMigration = typeof state === "undefined" ? null : state;
     try {
-      const fromVersion = Number((_a = candidate == null ? void 0 : candidate.meta) == null ? void 0 : _a.schemaVersion) || 1;
+      const fromVersion = Number((_a2 = candidate == null ? void 0 : candidate.meta) == null ? void 0 : _a2.schemaVersion) || 1;
       if (fromVersion < U3_SCHEMA_VERSION) {
-        localStorage.setItem(MIGRATION_BACKUP_STORAGE_KEY, JSON.stringify({
+        const migrationKey = (_b = activeStorageKeys()) == null ? void 0 : _b.migration;
+        if (migrationKey) localStorage.setItem(migrationKey, JSON.stringify({
           savedAt: (/* @__PURE__ */ new Date()).toISOString(),
           fromVersion,
           state: original
@@ -2633,14 +2682,17 @@
     return (error == null ? void 0 : error.name) === "QuotaExceededError" || (error == null ? void 0 : error.name) === "NS_ERROR_DOM_QUOTA_REACHED" || (error == null ? void 0 : error.code) === 22 || (error == null ? void 0 : error.code) === 1014;
   }
   function localSave(state2) {
+    const keys = activeStorageKeys();
+    if (!keys) return false;
     const serialized = JSON.stringify(state2);
     try {
-      localStorage.setItem(STORAGE_KEY, serialized);
+      localStorage.setItem(keys.state, serialized);
     } catch (error) {
       if (!isStorageQuotaError(error)) throw error;
-      localStorage.removeItem(BACKUP_STORAGE_KEY);
-      localStorage.setItem(STORAGE_KEY, serialized);
+      localStorage.removeItem(keys.backup);
+      localStorage.setItem(keys.state, serialized);
     }
+    return true;
   }
   function firebaseConfigTemplate() {
     return JSON.stringify(DEFAULT_FIREBASE_CONFIG, null, 2);
@@ -2733,7 +2785,9 @@
         const { app, firestore } = await this.loadModules();
         this.app = app.getApps().length ? app.getApps()[0] : app.initializeApp(this.config);
         this.db = firestore.getFirestore(this.app);
-        this.docRef = firestore.doc(this.db, FIRESTORE_COLLECTION, FIRESTORE_DOC_ID);
+        const documentPath = cloudBudgetDocumentPath(activeAuthSession);
+        if (!documentPath) throw new Error("De accountkoppeling voor cloudopslag ontbreekt.");
+        this.docRef = firestore.doc(this.db, ...documentPath);
         this.attachSnapshot();
         this.status = this.pendingState ? "Opslaan…" : "Lokaal opgeslagen";
         renderCloudStatus();
@@ -2747,7 +2801,7 @@
       }
     },
     async acceptRemote(documentData, normalizedRemote, backupReason = "voor Firestore-sync") {
-      var _a;
+      var _a2;
       if (this.initialSyncComplete && isStaleCloudSnapshot(
         { ...documentData, state: normalizedRemote },
         this.cloudVersion,
@@ -2765,7 +2819,7 @@
       this.cloudVersion = cloudDocumentVersion(documentData);
       this.lastCloudSignature = cloudStateSignature(normalizedRemote);
       this.lastConfirmedCommitId = String(documentData.commitId || "");
-      this.lastConfirmedRevision = Number((_a = normalizedRemote.meta) == null ? void 0 : _a.revision) || 0;
+      this.lastConfirmedRevision = Number((_a2 = normalizedRemote.meta) == null ? void 0 : _a2.revision) || 0;
       this.confirmedState = cloneState(normalizedRemote);
       this.conflict = false;
       this.lastFailureRetryable = true;
@@ -2796,14 +2850,14 @@
       return true;
     },
     async rebasePendingOntoRemote(documentData, normalizedRemote, localSnapshot = this.pendingState, backupReason = "lokale wijzigingen voor cloudherstel") {
-      var _a, _b, _c;
+      var _a2, _b, _c;
       if (!localSnapshot) return false;
       const base = this.confirmedState || normalizedRemote;
       const merged = rebaseLocalChanges(base, localSnapshot, normalizedRemote);
       merged.meta = isPlainObject2(merged.meta) ? merged.meta : {};
       merged.meta.schemaVersion = U3_SCHEMA_VERSION;
       merged.meta.revision = Math.max(
-        Number((_a = normalizedRemote.meta) == null ? void 0 : _a.revision) || 0,
+        Number((_a2 = normalizedRemote.meta) == null ? void 0 : _a2.revision) || 0,
         Number((_b = localSnapshot.meta) == null ? void 0 : _b.revision) || 0
       ) + 1;
       merged.meta.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
@@ -2832,7 +2886,7 @@
       if (this.unsubscribe || !this.docRef) return;
       const { firestore } = this.modules;
       this.unsubscribe = firestore.onSnapshot(this.docRef, async (snap) => {
-        var _a, _b;
+        var _a2, _b;
         if (!snap.exists()) {
           this.initialSyncComplete = true;
           this.cloudVersion = 0;
@@ -2861,7 +2915,7 @@
           renderCloudStatus();
           return;
         }
-        if ((_a = snap.metadata) == null ? void 0 : _a.hasPendingWrites) {
+        if ((_a2 = snap.metadata) == null ? void 0 : _a2.hasPendingWrites) {
           this.status = "Opslaan…";
           renderCloudStatus();
           return;
@@ -2951,7 +3005,7 @@
       this.retryTimer = setTimeout(() => this.flushQueue(), delay);
     },
     async saveNow(snapshot) {
-      var _a;
+      var _a2;
       if (!this.isConnected() || !this.initialSyncComplete || this.cloudVersion === null || this.conflict) return false;
       this.lastFailureRetryable = true;
       const expectedVersion = this.cloudVersion;
@@ -2978,7 +3032,7 @@
         }
         const { firestore } = this.modules;
         const nextVersion = await firestore.runTransaction(this.db, async (transaction) => {
-          var _a2, _b;
+          var _a3, _b;
           const currentSnapshot = await transaction.get(this.docRef);
           const currentData = currentSnapshot.exists() ? currentSnapshot.data() : null;
           const currentVersion = assertCloudBase(currentData, expectedVersion, expectedSignature);
@@ -2986,7 +3040,7 @@
           transaction.set(this.docRef, {
             state: cloudSnapshot,
             updatedAt: firestore.serverTimestamp(),
-            revision: Number((_a2 = cloudSnapshot.meta) == null ? void 0 : _a2.revision) || 0,
+            revision: Number((_a3 = cloudSnapshot.meta) == null ? void 0 : _a3.revision) || 0,
             updatedBy: ((_b = cloudSnapshot.meta) == null ? void 0 : _b.updatedBy) || getDeviceId(),
             app: "finize",
             syncVersion: version,
@@ -2997,7 +3051,7 @@
         this.cloudVersion = nextVersion;
         this.lastCloudSignature = cloudStateSignature(cloudSnapshot);
         this.lastConfirmedCommitId = commitId;
-        this.lastConfirmedRevision = Number((_a = cloudSnapshot.meta) == null ? void 0 : _a.revision) || 0;
+        this.lastConfirmedRevision = Number((_a2 = cloudSnapshot.meta) == null ? void 0 : _a2.revision) || 0;
         this.confirmedState = cloneState(cloudSnapshot);
         this.status = this.pendingState ? "Opslaan…" : "Cloud opgeslagen";
         renderCloudStatus();
@@ -3091,6 +3145,18 @@
       this.remoteStateWaiting = null;
       this.status = "Offline — lokaal bewaard";
       renderCloudStatus();
+    },
+    importRef(importId) {
+      var _a2;
+      const path = cloudImportDocumentPath(activeAuthSession, importId);
+      if (!path || !this.db || !((_a2 = this.modules) == null ? void 0 : _a2.firestore)) return null;
+      return this.modules.firestore.doc(this.db, ...path);
+    },
+    importChunkRef(importId, chunkId) {
+      var _a2;
+      const path = cloudImportChunkPath(activeAuthSession, importId, chunkId);
+      if (!path || !this.db || !((_a2 = this.modules) == null ? void 0 : _a2.firestore)) return null;
+      return this.modules.firestore.doc(this.db, ...path);
     }
   };
   window.CloudAdapter = CloudAdapter;
@@ -3111,7 +3177,9 @@
     },
     load() {
       try {
-        const raw = localStorage.getItem(STORAGE_KEY);
+        const keys = activeStorageKeys();
+        if (!keys) return null;
+        const raw = localStorage.getItem(keys.state);
         if (!raw) return null;
         this.loadedFromStorage = true;
         const parsed = JSON.parse(raw);
@@ -3129,7 +3197,9 @@
     },
     backup(state2, reason) {
       try {
-        localStorage.setItem(BACKUP_STORAGE_KEY, JSON.stringify({
+        const keys = activeStorageKeys();
+        if (!keys) return false;
+        localStorage.setItem(keys.backup, JSON.stringify({
           savedAt: (/* @__PURE__ */ new Date()).toISOString(),
           label: backupLabel(),
           reason,
@@ -3143,7 +3213,9 @@
     },
     loadBackup() {
       try {
-        const raw = localStorage.getItem(BACKUP_STORAGE_KEY);
+        const keys = activeStorageKeys();
+        if (!keys) return null;
+        const raw = localStorage.getItem(keys.backup);
         return raw ? JSON.parse(raw) : null;
       } catch (e) {
         console.error("back-up laden mislukt", e);
@@ -3173,15 +3245,15 @@
       else if (typeof (change == null ? void 0 : change.apply) === "function") change.apply(state);
       if (JSON.stringify(before) === JSON.stringify(state)) return true;
       Object.entries(before.monthRecords || {}).forEach(([month, record]) => {
-        var _a;
+        var _a2;
         if (!["afgesloten", "correctie-nodig"].includes(record == null ? void 0 : record.status)) return;
-        const afterRecord = (_a = state.monthRecords) == null ? void 0 : _a[month];
+        const afterRecord = (_a2 = state.monthRecords) == null ? void 0 : _a2[month];
         const lateImportAllowed = ["afgesloten", "correctie-nodig"].includes(record.status) && (afterRecord == null ? void 0 : afterRecord.status) === "correctie-nodig" && (afterRecord.lateImportTransactionIds || []).length > (record.lateImportTransactionIds || []).length;
         const monthData = (snapshot) => {
-          var _a2, _b, _c, _d, _e;
+          var _a3, _b, _c, _d, _e;
           return {
             transactions: (snapshot.transactions || []).filter((tx) => transactionMonth(tx) === month),
-            income: ((_a2 = snapshot.monthlyIncome) == null ? void 0 : _a2[month]) || null,
+            income: ((_a3 = snapshot.monthlyIncome) == null ? void 0 : _a3[month]) || null,
             incomeOverrides: ((_b = snapshot.monthlyIncomeOverrides) == null ? void 0 : _b[month]) || null,
             budgets: ((_c = snapshot.monthlyBudgets) == null ? void 0 : _c[month]) || null,
             savingOverrides: ((_d = snapshot.monthlySavingOverrides) == null ? void 0 : _d[month]) || null,
@@ -3277,13 +3349,13 @@
       el.addEventListener("change", commit);
     });
     root2.querySelectorAll("[data-item-path][data-item-id][data-item-field]").forEach((el) => {
-      var _a;
+      var _a2;
       const item = findItemById(el.dataset.itemPath, el.dataset.itemId);
       if (!item) return;
       const field = el.dataset.itemField;
       if (el.type === "checkbox") el.checked = !!item[field];
       else if (el.dataset.percent === "true") el.value = percentInputValue(item[field]);
-      else el.value = (_a = item[field]) != null ? _a : "";
+      else el.value = (_a2 = item[field]) != null ? _a2 : "";
       const save = () => {
         let value = el.type === "checkbox" ? el.checked : el.value;
         if (el.type === "number") {
@@ -3625,17 +3697,17 @@
       return ad - bd;
     });
     const favoriteGoals = sortedGoals.filter((item) => {
-      var _a;
-      return (_a = item.doel) == null ? void 0 : _a.favoriet;
+      var _a2;
+      return (_a2 = item.doel) == null ? void 0 : _a2.favoriet;
     });
     const goalCardsDesktop = favoriteGoals.length ? `<div class="dashboard-goals-preview-list">${favoriteGoals.slice(0, 4).map((g) => renderDashboardGoalPreviewCard(g)).join("")}</div>` : `<div class="u5-goal-fallback"><strong>Nog geen favoriete spaardoelen</strong><span>${allGoals.length} doelen beschikbaar</span></div>`;
     const goalCardsMobile = sortedGoals.length ? `<div class="dashboard-goals-preview-list">${sortedGoals.slice(0, 3).map((g) => renderDashboardGoalPreviewCard(g)).join("")}</div>` : "";
     const year = Number(getSelectedMonth().slice(0, 4));
     const yearData = Array.from({ length: 12 }, (_, i) => {
-      var _a, _b;
+      var _a2, _b;
       const key = monthKey(new Date(year, i, 1));
       const monthResult = getMonthFinancialResult(key);
-      const income = round2(Number((_a = monthResult.income) == null ? void 0 : _a.total) || 0);
+      const income = round2(Number((_a2 = monthResult.income) == null ? void 0 : _a2.total) || 0);
       const spent = round2((Number(monthResult.fixedExpenses) || 0) + (Number((_b = monthResult.variableExpenses) == null ? void 0 : _b.total) || 0));
       const saving = round2(Number(monthResult.savings) || 0);
       return { key, name: ["Jan", "Feb", "Mrt", "Apr", "Mei", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dec"][i], income, spent, saving };
@@ -3801,9 +3873,9 @@
   </table></div>`;
   }
   function renderBudgetUsageList(owner = "gezamenlijk") {
-    var _a;
+    var _a2;
     const data = getMonthlyScenarioData(state.meta.scenario);
-    return `<div class="progress-list">${(((_a = data[owner]) == null ? void 0 : _a.variabel) || []).filter((row) => row.post || row.bedrag).map((row) => {
+    return `<div class="progress-list">${(((_a2 = data[owner]) == null ? void 0 : _a2.variabel) || []).filter((row) => row.post || row.bedrag).map((row) => {
       const budget = Number(row.bedrag) || 0;
       const used = sumTransactions(owner, row.post);
       const status = budgetStatus(used, budget);
@@ -3839,16 +3911,16 @@
   </div>`;
   }
   function renderRecurringFixedManage(owner) {
-    var _a;
+    var _a2;
     const scenario = state.meta.scenario;
-    const rows = (((_a = state.recurringFixedExpenses) == null ? void 0 : _a[scenario]) || []).filter((item) => {
+    const rows = (((_a2 = state.recurringFixedExpenses) == null ? void 0 : _a2[scenario]) || []).filter((item) => {
       const financialFor = item.financialFor || item.rekening || "gezamenlijk";
       return financialFor === owner && item.legacyKind !== "hypotheek";
     });
     const month = getSelectedMonth();
     const total = round2(u3FixedOccurrences(month, scenario).filter((item) => {
-      var _a2;
-      return (item.financialFor || item.rekening || "gezamenlijk") === owner && ((_a2 = item.source) == null ? void 0 : _a2.legacyKind) !== "hypotheek";
+      var _a3;
+      return (item.financialFor || item.rekening || "gezamenlijk") === owner && ((_a3 = item.source) == null ? void 0 : _a3.legacyKind) !== "hypotheek";
     }).reduce((sum, item) => sum + (Number(item.amount) || 0), 0));
     const rowsHtml = rows.map((item) => `
     <div class="summary-line">
@@ -4003,8 +4075,8 @@
     return `<section class="mobile-goal-section"><h2>${group.label}</h2><div class="card mobile-goal-list">${items.length ? items.map((item) => renderMobileGoalRow(item, group.key)).join("") : '<p class="hint">Nog geen spaardoelen.</p>'}</div></section>`;
   }
   function openMobileGoalEditor(owner, id) {
-    var _a, _b, _c, _d, _e;
-    const index = (_c = (_b = (_a = state.spaardoelen) == null ? void 0 : _a[owner]) == null ? void 0 : _b.findIndex((goal2) => goal2.id === id)) != null ? _c : -1;
+    var _a2, _b, _c, _d, _e;
+    const index = (_c = (_b = (_a2 = state.spaardoelen) == null ? void 0 : _a2[owner]) == null ? void 0 : _b.findIndex((goal2) => goal2.id === id)) != null ? _c : -1;
     const goal = index >= 0 ? (_e = (_d = state.spaardoelen) == null ? void 0 : _d[owner]) == null ? void 0 : _e[index] : null;
     if (!goal) return;
     const modal = document.getElementById("incomeEditModal");
@@ -4023,8 +4095,8 @@
     const saveButton = modal.querySelector("#goalEditSave");
     let imageProcessing = false;
     imageInput.addEventListener("change", async (event) => {
-      var _a2;
-      const file = (_a2 = event.target.files) == null ? void 0 : _a2[0];
+      var _a3;
+      const file = (_a3 = event.target.files) == null ? void 0 : _a3[0];
       if (!file) return;
       imageProcessing = true;
       saveButton.disabled = true;
@@ -4111,8 +4183,8 @@
     });
   }
   function openMobileGoalManager(owner) {
-    var _a;
-    const goals = ((_a = state.spaardoelen) == null ? void 0 : _a[owner]) || [];
+    var _a2;
+    const goals = ((_a2 = state.spaardoelen) == null ? void 0 : _a2[owner]) || [];
     const modal = document.getElementById("incomeEditModal");
     const name = ownerLabel(owner);
     const r = calcScenario(state);
@@ -4258,8 +4330,8 @@
   `;
   }
   function renderDataTab() {
-    var _a;
-    (_a = document.getElementById("tab-data")) == null ? void 0 : _a.classList.remove("mobile-data-page");
+    var _a2;
+    (_a2 = document.getElementById("tab-data")) == null ? void 0 : _a2.classList.remove("mobile-data-page");
     const lastBackup = DataAdapter.loadBackup();
     const lastBackupDate = (lastBackup == null ? void 0 : lastBackup.savedAt) ? new Date(lastBackup.savedAt) : null;
     const isToday = lastBackupDate && lastBackupDate.toDateString() === (/* @__PURE__ */ new Date()).toDateString();
@@ -4447,7 +4519,7 @@ service cloud.firestore {
     if (infoParagraphs[1]) infoParagraphs[1].textContent = "Cloud synchronisatie via Firebase is optioneel. De toegang wordt bepaald door je ingestelde Firestore-beveiligingsregels.";
   }
   function renderMonthSelect() {
-    var _a;
+    var _a2;
     const button = document.getElementById("monthPickerButton");
     const panel = document.getElementById("monthPickerPanel");
     if (!button || !panel) return;
@@ -4457,7 +4529,7 @@ service cloud.firestore {
     const currentMonthKey = monthKey();
     const monthNames = ["Jan", "Feb", "Mrt", "Apr", "Mei", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dec"];
     button.textContent = monthLabel(selected);
-    button.setAttribute("aria-expanded", ((_a = document.getElementById("monthControl")) == null ? void 0 : _a.classList.contains("open")) ? "true" : "false");
+    button.setAttribute("aria-expanded", ((_a2 = document.getElementById("monthControl")) == null ? void 0 : _a2.classList.contains("open")) ? "true" : "false");
     panel.innerHTML = `
     <div class="year-picker">
       ${yearOptions.map((year) => `<button type="button" data-month-year="${year}" class="${year === selectedYear ? "active" : ""}">${year}</button>`).join("")}
@@ -4472,26 +4544,26 @@ service cloud.firestore {
     </div>`;
   }
   function closeMonthPicker() {
-    var _a;
+    var _a2;
     const control = document.getElementById("monthControl");
     if (!control) return;
     control.classList.remove("open");
-    (_a = document.getElementById("monthPickerButton")) == null ? void 0 : _a.setAttribute("aria-expanded", "false");
+    (_a2 = document.getElementById("monthPickerButton")) == null ? void 0 : _a2.setAttribute("aria-expanded", "false");
   }
   function openMonthPicker() {
-    var _a;
+    var _a2;
     const control = document.getElementById("monthControl");
     if (!control) return;
     control.classList.add("open");
-    (_a = document.getElementById("monthPickerButton")) == null ? void 0 : _a.setAttribute("aria-expanded", "true");
+    (_a2 = document.getElementById("monthPickerButton")) == null ? void 0 : _a2.setAttribute("aria-expanded", "true");
   }
   function bindModalBackdrop(modal, close) {
     modal.__finizeBackdropClose = close;
     if (modal.dataset.finizeBackdropBound === "true") return;
     modal.dataset.finizeBackdropBound = "true";
     modal.addEventListener("click", (event) => {
-      var _a;
-      if (event.target === modal) (_a = modal.__finizeBackdropClose) == null ? void 0 : _a.call(modal);
+      var _a2;
+      if (event.target === modal) (_a2 = modal.__finizeBackdropClose) == null ? void 0 : _a2.call(modal);
     });
   }
   function openTransactionModal() {
@@ -4628,8 +4700,8 @@ service cloud.firestore {
     renderActiveTab();
   }
   function bindBankImport(root2) {
-    var _a, _b, _c, _d;
-    (_a = root2.querySelector('[data-dashboard-accordion="bank-import"]')) == null ? void 0 : _a.addEventListener("toggle", (event) => {
+    var _a2, _b, _c, _d;
+    (_a2 = root2.querySelector('[data-dashboard-accordion="bank-import"]')) == null ? void 0 : _a2.addEventListener("toggle", (event) => {
       bankImportOpen = event.currentTarget.open;
     });
     root2.querySelectorAll("[data-open-general-transaction]").forEach((button) => button.addEventListener("click", openGeneralTransactionModal));
@@ -4641,8 +4713,8 @@ service cloud.firestore {
       renderActiveTab();
     });
     (_c = root2.querySelector("[data-bank-csv-file]")) == null ? void 0 : _c.addEventListener("change", (event) => {
-      var _a2;
-      const file = (_a2 = event.target.files) == null ? void 0 : _a2[0];
+      var _a3;
+      const file = (_a3 = event.target.files) == null ? void 0 : _a3[0];
       if (!file) return;
       const reader = new FileReader();
       reader.onload = (loaded) => {
@@ -4843,13 +4915,13 @@ service cloud.firestore {
     }).join("");
   }
   function openJointVariableCostsModal(focusLast = false, owner = "gezamenlijk") {
-    var _a, _b, _c, _d, _e;
+    var _a2, _b, _c, _d, _e;
     const modal = document.getElementById("incomeEditModal");
     const scenario = state.meta.scenario;
     const month = getSelectedMonth();
     ensureMonthData(month);
     const key = `${owner}Variabel`;
-    const sourceRows = ((_c = (_b = (_a = state.monthlyBudgets) == null ? void 0 : _a[month]) == null ? void 0 : _b[scenario]) == null ? void 0 : _c[key]) || ((_e = (_d = state[scenario]) == null ? void 0 : _d[owner]) == null ? void 0 : _e.variabel) || [];
+    const sourceRows = ((_c = (_b = (_a2 = state.monthlyBudgets) == null ? void 0 : _a2[month]) == null ? void 0 : _b[scenario]) == null ? void 0 : _c[key]) || ((_e = (_d = state[scenario]) == null ? void 0 : _d[owner]) == null ? void 0 : _e.variabel) || [];
     let draftRows = cloneState(sourceRows).map((row) => ({
       ...row,
       id: row.id || uid(),
@@ -4862,7 +4934,7 @@ service cloud.firestore {
     const total = () => round2(sumBedrag(draftRows));
     let saveScope = "from";
     const draw = (focusNewest = false) => {
-      var _a2, _b2, _c2, _d2;
+      var _a3, _b2, _c2, _d2;
       modal.innerHTML = `
       <div class="modal joint-variable-fullscreen-editor" role="dialog" aria-modal="true" aria-label="Variabele lasten aanpassen">
         <div class="joint-variable-editor-header">
@@ -4907,7 +4979,7 @@ service cloud.firestore {
         modal.innerHTML = "";
         renderActiveTab();
       };
-      (_a2 = modal.querySelector("[data-close-joint-variable-costs]")) == null ? void 0 : _a2.addEventListener("click", close);
+      (_a3 = modal.querySelector("[data-close-joint-variable-costs]")) == null ? void 0 : _a3.addEventListener("click", close);
       (_b2 = modal.querySelector("[data-variable-scope]")) == null ? void 0 : _b2.addEventListener("change", (event) => {
         saveScope = event.target.value;
       });
@@ -4953,8 +5025,8 @@ service cloud.firestore {
       });
       if (focusNewest) {
         requestAnimationFrame(() => {
-          var _a3;
-          return (_a3 = modal.querySelector('.joint-variable-editor-row:last-child input[data-variable-field="post"]')) == null ? void 0 : _a3.focus();
+          var _a4;
+          return (_a4 = modal.querySelector('.joint-variable-editor-row:last-child input[data-variable-field="post"]')) == null ? void 0 : _a4.focus();
         });
       }
     };
@@ -5014,7 +5086,7 @@ service cloud.firestore {
     });
   }
   function openJointFixedCostsModal(focusLast = false, owner = "gezamenlijk", draftSession = null) {
-    var _a;
+    var _a2;
     const modal = document.getElementById("incomeEditModal");
     const scenario = state.meta.scenario;
     const account = state[scenario][owner];
@@ -5182,7 +5254,7 @@ service cloud.firestore {
         });
       });
     });
-    (_a = modal.querySelector("[data-fixed-save]")) == null ? void 0 : _a.addEventListener("click", () => {
+    (_a2 = modal.querySelector("[data-fixed-save]")) == null ? void 0 : _a2.addEventListener("click", () => {
       commitAllFields();
       const activeRows = rows.filter((row) => String(row.categorie || "").trim() || String(row.post || "").trim() || Number(row.bedrag));
       activeRows.forEach((row) => {
@@ -5221,8 +5293,8 @@ service cloud.firestore {
     }
     if (focusLast) {
       requestAnimationFrame(() => {
-        var _a2;
-        const lastId = (_a2 = rows[rows.length - 1]) == null ? void 0 : _a2.id;
+        var _a3;
+        const lastId = (_a3 = rows[rows.length - 1]) == null ? void 0 : _a3.id;
         const last = modal.querySelector(`input[data-fixed-field="categorie"][data-fixed-id="${lastId}"]`);
         if (last) last.focus();
       });
@@ -5278,13 +5350,13 @@ service cloud.firestore {
     });
   }
   function openPersonalSavingEditModal(owner) {
-    var _a;
+    var _a2;
     if (!["dion", "dara"].includes(owner)) return;
     const modal = document.getElementById("incomeEditModal");
     const month = getSelectedMonth();
     const result = calcScenario(state)[owner];
     const automatic = round2(Number(result.automatischBeschikbaarVoorSparen) || 0);
-    const monthOverrides = isPlainObject2((_a = state.monthlySavingOverrides) == null ? void 0 : _a[month]) ? state.monthlySavingOverrides[month] : {};
+    const monthOverrides = isPlainObject2((_a2 = state.monthlySavingOverrides) == null ? void 0 : _a2[month]) ? state.monthlySavingOverrides[month] : {};
     const hasOverride = Object.prototype.hasOwnProperty.call(monthOverrides, owner);
     const current = hasOverride ? round2(Number(monthOverrides[owner]) || 0) : automatic;
     const name = ownerLabel(owner);
@@ -5311,9 +5383,9 @@ service cloud.firestore {
     };
     const removeOverride = () => {
       const saved = commitChange(() => {
-        var _a2;
+        var _a3;
         assertMonthMutationAllowed(month);
-        if (isPlainObject2((_a2 = state.monthlySavingOverrides) == null ? void 0 : _a2[month])) {
+        if (isPlainObject2((_a3 = state.monthlySavingOverrides) == null ? void 0 : _a3[month])) {
           delete state.monthlySavingOverrides[month][owner];
           if (!Object.keys(state.monthlySavingOverrides[month]).length) delete state.monthlySavingOverrides[month];
         }
@@ -5439,7 +5511,7 @@ service cloud.firestore {
     document.getElementById("btnCancelTotalIncomeEdit").addEventListener("click", close);
     bindModalBackdrop(modal, close);
     document.getElementById("btnSaveTotalIncomeEdit").addEventListener("click", () => {
-      var _a, _b;
+      var _a2, _b;
       assertMonthMutationAllowed(month);
       ensureMonthData(month);
       const values = { dion: { salary: amount(inputs[0]), refund: amount(inputs[1]) }, dara: { salary: amount(inputs[2]), refund: amount(inputs[3]) } };
@@ -5454,7 +5526,7 @@ service cloud.firestore {
         });
       } else {
         ["dion", "dara"].forEach((person) => setIncomeDefaultsFromMonth(person, month, values[person].salary, values[person].refund));
-        if ((_a = state.monthlyIncomeOverrides) == null ? void 0 : _a[month]) {
+        if ((_a2 = state.monthlyIncomeOverrides) == null ? void 0 : _a2[month]) {
           delete state.monthlyIncomeOverrides[month].dion;
           delete state.monthlyIncomeOverrides[month].dara;
         }
@@ -5717,7 +5789,7 @@ service cloud.firestore {
     }
   }
   function openBudgetTransactionsModal(category, owner = "gezamenlijk") {
-    var _a;
+    var _a2;
     const modal = document.getElementById("transactionModal");
     const month = getSelectedMonth();
     const rows = getMonthTransactions(owner, month).filter((tx) => budgetCategoryMatches(tx, category) && Math.abs(getTransactionExpenseImpact(tx)) > 4e-3).sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
@@ -5728,7 +5800,7 @@ service cloud.firestore {
       modal.classList.remove("open");
       modal.innerHTML = "";
     };
-    (_a = modal.querySelector("[data-close-budget-transactions]")) == null ? void 0 : _a.addEventListener("click", close);
+    (_a2 = modal.querySelector("[data-close-budget-transactions]")) == null ? void 0 : _a2.addEventListener("click", close);
     bindModalBackdrop(modal, close);
     modal.querySelectorAll("[data-open-budget-transaction-id]").forEach((button) => button.addEventListener("click", () => {
       const id = button.dataset.openBudgetTransactionId;
@@ -5737,7 +5809,7 @@ service cloud.firestore {
     }));
   }
   function renderActiveTab() {
-    var _a, _b, _c;
+    var _a2, _b, _c;
     ensureMonthData(getSelectedMonth());
     renderMonthSelect();
     updateV4SidebarMeta();
@@ -5749,7 +5821,7 @@ service cloud.firestore {
     else if (activeTab === "gezamenlijk") window.innerWidth >= 768 ? renderPersonOrJoint("tab-gezamenlijk", "gezamenlijk", "Gezamenlijk") : renderEmptyVisualTab("tab-gezamenlijk", "Gezamenlijk");
     else if (activeTab === "dion") window.innerWidth >= 768 ? renderPersonOrJoint("tab-dion", "dion", "Dion") : renderEmptyVisualTab("tab-dion", "Dion");
     else if (activeTab === "dara") window.innerWidth >= 768 ? renderPersonOrJoint("tab-dara", "dara", "Dara") : renderEmptyVisualTab("tab-dara", "Dara");
-    else if (activeTab === "spaardoelen") window.innerWidth >= 768 && ((_a = window.FinizeUpdate5) == null ? void 0 : _a.renderGoals) ? window.FinizeUpdate5.renderGoals() : renderMobileSpaardoelen();
+    else if (activeTab === "spaardoelen") window.innerWidth >= 768 && ((_a2 = window.FinizeUpdate5) == null ? void 0 : _a2.renderGoals) ? window.FinizeUpdate5.renderGoals() : renderMobileSpaardoelen();
     else if (activeTab === "data") window.innerWidth >= 768 && ((_b = window.FinizeUpdate5) == null ? void 0 : _b.renderData) ? window.FinizeUpdate5.renderData() : renderMobileDataTab();
     if (["gezamenlijk", "dion", "dara", "spaardoelen", "data"].includes(activeTab)) {
       document.body.dataset.activeTab = "dashboard";
@@ -5794,8 +5866,8 @@ service cloud.firestore {
       btn.addEventListener("click", () => openMobileGoalManager(btn.dataset.openGoalManager));
     });
     root2.querySelectorAll(".mobile-savings-overview .manage-section").forEach((section, index) => {
-      var _a2;
-      (_a2 = section.querySelector("summary")) == null ? void 0 : _a2.addEventListener("click", (event) => {
+      var _a3;
+      (_a3 = section.querySelector("summary")) == null ? void 0 : _a3.addEventListener("click", (event) => {
         event.preventDefault();
         openMobileGoalManager(["gezamenlijk", "dion", "dara"][index]);
       });
@@ -5958,8 +6030,8 @@ service cloud.firestore {
     }
   });
   document.addEventListener("click", (e) => {
-    var _a;
-    if (!((_a = document.getElementById("monthControl")) == null ? void 0 : _a.contains(e.target))) closeMonthPicker();
+    var _a2;
+    if (!((_a2 = document.getElementById("monthControl")) == null ? void 0 : _a2.contains(e.target))) closeMonthPicker();
   });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") closeMonthPicker();
@@ -5997,7 +6069,7 @@ service cloud.firestore {
       goal.algespaard = u2GoalSaved(goal);
     }
   }
-  function u2NormalizeState(target, fromVersion = Number(((_a) => (_a = target == null ? void 0 : target.meta) == null ? void 0 : _a.schemaVersion)()) || 1) {
+  function u2NormalizeState(target, fromVersion = Number(((_b) => (_b = target == null ? void 0 : target.meta) == null ? void 0 : _b.schemaVersion)()) || 1) {
     target.spaardoelGeschiedenis = isPlainObject2(target.spaardoelGeschiedenis) ? target.spaardoelGeschiedenis : {};
     U2_OWNERS.forEach((owner) => {
       target.spaardoelen = isPlainObject2(target.spaardoelen) ? target.spaardoelen : {};
@@ -6166,9 +6238,9 @@ service cloud.firestore {
     return (goal.subdoelen || []).find((child) => !child.voltooid && Number(child.gespaard) < Number(child.doelbedrag)) || null;
   }
   function u2ApplyContribution(goal, amount) {
-    var _a;
+    var _a2;
     let cents = Math.max(0, Math.round(amount * 100));
-    if ((_a = goal.subdoelen) == null ? void 0 : _a.length) {
+    if ((_a2 = goal.subdoelen) == null ? void 0 : _a2.length) {
       goal.subdoelen.forEach((child) => {
         if (cents <= 0) return;
         const room = Math.max(0, Math.round((Number(child.doelbedrag) || 0) * 100) - Math.round((Number(child.gespaard) || 0) * 100));
@@ -6189,10 +6261,10 @@ service cloud.firestore {
     if (runtime == null ? void 0 : runtime.reconcileGoalSavedAmounts) runtime.reconcileGoalSavedAmounts(state, goalIds);
   }
   function u2SetGoalSavedAmount(goal, amount, source = "manual-correction") {
-    var _a;
+    var _a2;
     state.savingsGoalLedger = Array.isArray(state.savingsGoalLedger) ? state.savingsGoalLedger : [];
     u2ReconcileSavingsGoals([goal.id]);
-    const current = ((_a = window.FinizeUpdate4Runtime) == null ? void 0 : _a.calculateGoalSavedAmount) ? window.FinizeUpdate4Runtime.calculateGoalSavedAmount(state, goal.id) : Number(goal.algespaard) || 0;
+    const current = ((_a2 = window.FinizeUpdate4Runtime) == null ? void 0 : _a2.calculateGoalSavedAmount) ? window.FinizeUpdate4Runtime.calculateGoalSavedAmount(state, goal.id) : Number(goal.algespaard) || 0;
     const difference = round2(Math.max(0, Number(amount) || 0) - current);
     if (Math.abs(difference) <= 4e-3) return;
     const id = `saving-correction-${goal.id}-${uid()}`;
@@ -6220,14 +6292,14 @@ service cloud.firestore {
     return `${owner}:${month}`;
   }
   function u2IsProcessed(owner, month = getSelectedMonth()) {
-    var _a;
-    return !!((_a = state.spaardoelGeschiedenis) == null ? void 0 : _a[u2HistoryKey(owner, month)]);
+    var _a2;
+    return !!((_a2 = state.spaardoelGeschiedenis) == null ? void 0 : _a2[u2HistoryKey(owner, month)]);
   }
   function getCalculationDateForSelectedMonth(selectedMonth = getSelectedMonth(), owner = "gezamenlijk") {
-    var _a;
+    var _a2;
     const match = String(selectedMonth || "").match(/^(\d{4})-(\d{2})$/);
     if (!match) return new Date(TODAY.getFullYear(), TODAY.getMonth(), 1);
-    const record = (_a = state.monthRecords) == null ? void 0 : _a[selectedMonth];
+    const record = (_a2 = state.monthRecords) == null ? void 0 : _a2[selectedMonth];
     const processed = u2IsProcessed(owner, selectedMonth) || ["afgesloten", "correctie-nodig"].includes(record == null ? void 0 : record.status);
     return new Date(Number(match[1]), Number(match[2]) - 1 + (processed ? 1 : 0), 1, 12);
   }
@@ -6261,7 +6333,7 @@ service cloud.firestore {
     const insufficient = items.some((item) => item.onvoldoendeVasteInleg);
     const modal = document.getElementById("transactionModal");
     const render2 = () => {
-      var _a;
+      var _a2;
       const total = round2(amounts.reduce((sum, value) => sum + (Number(value) || 0), 0));
       const rows = items.map((item, index) => `<label class="u2-process-row"><span><strong>${textSafe(item.doel.naam)}</strong><small>Vast ${eur(Number(item.doel.vasteInleg) || 0)} · nodig ${item.benodigdPerMaand === null ? "—" : eur(item.benodigdPerMaand)}</small></span><input type="number" min="0" max="${item.nogTeGaan}" step="0.01" data-u2-process="${index}" value="${Number(amounts[index]).toFixed(2)}"></label>`).join("");
       modal.innerHTML = `<div class="modal u2-process-modal"><div class="u2-modal-head"><div><div class="section-kicker">${ownerLabel(owner)}</div><h2>Spaarpot ${monthLabel(month)}</h2></div><button class="ghost" data-u2-close>Sluiten</button></div>
@@ -6285,7 +6357,7 @@ service cloud.firestore {
         modal.classList.remove("open", "u2-process-open");
         modal.innerHTML = "";
       }));
-      (_a = modal.querySelector("[data-u2-fixed-ratio]")) == null ? void 0 : _a.addEventListener("click", () => {
+      (_a2 = modal.querySelector("[data-u2-fixed-ratio]")) == null ? void 0 : _a2.addEventListener("click", () => {
         amounts = u2FixedFallback(items, pot);
         render2();
       });
@@ -6340,9 +6412,9 @@ service cloud.firestore {
     render2();
   }
   function u2RenderChildSummary(goal) {
-    var _a;
+    var _a2;
     const active = u2ActiveChild(goal);
-    if (!((_a = goal.subdoelen) == null ? void 0 : _a.length)) return "";
+    if (!((_a2 = goal.subdoelen) == null ? void 0 : _a2.length)) return "";
     return `<div class="u2-next-goal">${active ? `<span>Volgende doel</span><strong>${textSafe(active.naam)} · nog ${eur(Math.max(0, Number(active.doelbedrag) - Number(active.gespaard)))}</strong>` : "<strong>Alle subdoelen voltooid</strong>"}</div>`;
   }
   var u2OriginalDashboardGoalPreviewCard = renderDashboardGoalPreviewCard;
@@ -6400,10 +6472,10 @@ service cloud.firestore {
     root2.querySelectorAll("[data-u2-process-owner]").forEach((btn) => btn.addEventListener("click", () => u2OpenProcessModal(btn.dataset.u2ProcessOwner)));
   };
   renderDashboardGoalPreviewCard = function(item) {
-    var _a;
+    var _a2;
     const goal = item.doel || item;
     const original = u2OriginalDashboardGoalPreviewCard(item);
-    if (!((_a = goal.subdoelen) == null ? void 0 : _a.length)) return original;
+    if (!((_a2 = goal.subdoelen) == null ? void 0 : _a2.length)) return original;
     const active = u2ActiveChild(goal);
     const calculated = calcDoel(goal, TODAY);
     const extra = `<div class="u2-dashboard-extra"><span>${active ? `Volgende: ${textSafe(active.naam)}` : "Alle subdoelen voltooid"}</span><span>Verwacht gereed: ${u2DateLabel(calculated.verwachteEinddatum)}</span></div>`;
@@ -6411,9 +6483,9 @@ service cloud.firestore {
   };
   var u2OriginalMobileGoalRow = renderMobileGoalRow;
   renderMobileGoalRow = function(item, owner) {
-    var _a;
+    var _a2;
     const goal = item.doel;
-    if (!((_a = goal.subdoelen) == null ? void 0 : _a.length)) return u2OriginalMobileGoalRow(item, owner);
+    if (!((_a2 = goal.subdoelen) == null ? void 0 : _a2.length)) return u2OriginalMobileGoalRow(item, owner);
     const active = u2ActiveChild(goal);
     const original = u2OriginalMobileGoalRow(item, owner);
     const children = goal.subdoelen.map((child) => {
@@ -6436,14 +6508,14 @@ service cloud.firestore {
       { owner: "dara", pot: Math.max(0, Number(result.dara.beschikbaarVoorSparen) || 0) }
     ];
     root2.querySelectorAll(".mobile-goal-section").forEach((section, index) => {
-      var _a;
+      var _a2;
       const group = groups[index];
       if (!group) return;
       const processed = u2IsProcessed(group.owner);
       const actions = document.createElement("div");
       actions.className = "u2-inline-actions";
       actions.innerHTML = `<span>Spaarpot ${monthLabel(getSelectedMonth())}: ${eur(group.pot)}</span><button type="button" class="ghost small" data-u2-process-owner="${group.owner}" ${processed ? "disabled" : ""}>${processed ? "Maand verwerkt" : "Spaarpot verwerken"}</button>`;
-      (_a = section.querySelector("h2")) == null ? void 0 : _a.insertAdjacentElement("afterend", actions);
+      (_a2 = section.querySelector("h2")) == null ? void 0 : _a2.insertAdjacentElement("afterend", actions);
     });
     const history = Object.values(state.spaardoelGeschiedenis || {}).sort((a, b) => String(b.maand).localeCompare(String(a.maand)));
     const historyHtml = `<div class="u2-history-list">${history.map((entry) => `<article><strong>${ownerLabel(entry.eigenaar)} Â· ${monthLabel(entry.maand)}</strong><span>Spaarpot ${eur(entry.spaarpot)} Â· verdeeld ${eur(entry.verdeeld)} Â· onverdeeld ${eur(entry.onverdeeld)}</span><small>${entry.transacties.map((tx) => `${textSafe(tx.doelNaam)} ${eur(tx.bedrag)}`).join(" Â· ")}</small></article>`).join("") || '<p class="hint">Nog geen maanden verwerkt.</p>'}</div>`;
@@ -6456,10 +6528,10 @@ service cloud.firestore {
   };
   var u2BaseGoalEditor = openMobileGoalEditor;
   openMobileGoalEditor = function(owner, id) {
-    var _a, _b;
+    var _a2, _b;
     u2BaseGoalEditor(owner, id);
     const modal = document.getElementById("incomeEditModal");
-    const goal = (_b = (_a = state.spaardoelen) == null ? void 0 : _a[owner]) == null ? void 0 : _b.find((item) => item.id === id);
+    const goal = (_b = (_a2 = state.spaardoelen) == null ? void 0 : _a2[owner]) == null ? void 0 : _b.find((item) => item.id === id);
     if (!goal || !modal.classList.contains("open")) return;
     const grid = modal.querySelector(".modal-grid");
     const targetInput = modal.querySelector("#goalEditTarget");
@@ -6472,7 +6544,7 @@ service cloud.firestore {
     const section = document.createElement("section");
     section.className = "full u2-subgoal-editor";
     const renderChildren = () => {
-      var _a2;
+      var _a3;
       section.innerHTML = `<div class="u2-subgoal-head"><div><h3>Subdoelen</h3><p>Er wordt altijd van boven naar beneden gespaard.</p></div><button type="button" class="ghost small" data-u2-add-child>+ Subdoel</button></div><div class="u2-subgoal-list">${drafts.map((child, index) => `<div class="u2-subgoal-row" draggable="true" data-u2-child="${index}"><span class="u2-drag" title="Sleep om te verplaatsen">⋮⋮</span><input aria-label="Naam subdoel" data-u2-child-name="${index}" value="${textSafe(child.naam || "")}"><input aria-label="Doelbedrag subdoel" type="number" min="0" step="0.01" data-u2-child-target="${index}" value="${Number(child.doelbedrag) || 0}"><input aria-label="Link subdoel" type="url" data-u2-child-link="${index}" value="${textSafe(child.link || "")}" placeholder="Optionele link"><span>${eur(Number(child.gespaard) || 0)}</span><button type="button" class="ghost small" data-u2-child-up="${index}" ${index === 0 ? "disabled" : ""}>↑</button><button type="button" class="ghost small" data-u2-child-down="${index}" ${index === drafts.length - 1 ? "disabled" : ""}>↓</button><button type="button" class="danger-ghost" data-u2-child-remove="${index}">×</button></div>`).join("") || '<p class="hint">Nog geen subdoelen. Het hoofddoelbedrag blijft handmatig instelbaar.</p>'}</div>`;
       targetInput.disabled = drafts.length > 0;
       if (drafts.length) targetInput.value = round2(drafts.reduce((sum, child) => sum + (Number(child.doelbedrag) || 0), 0));
@@ -6482,7 +6554,7 @@ service cloud.firestore {
         section.querySelectorAll("[data-u2-child-link]").forEach((input) => drafts[Number(input.dataset.u2ChildLink)].link = input.value);
         if (drafts.length) targetInput.value = round2(drafts.reduce((sum, child) => sum + (Number(child.doelbedrag) || 0), 0));
       };
-      (_a2 = section.querySelector("[data-u2-add-child]")) == null ? void 0 : _a2.addEventListener("click", () => {
+      (_a3 = section.querySelector("[data-u2-add-child]")) == null ? void 0 : _a3.addEventListener("click", () => {
         sync();
         drafts.push({ id: uid(), naam: "Nieuw subdoel", doelbedrag: 0, gespaard: 0, link: "", voltooid: false });
         renderChildren();
@@ -6604,8 +6676,8 @@ service cloud.firestore {
     });
   }
   function u3FixedOccurrences(month = getSelectedMonth(), scenario = state.meta.scenario) {
-    var _a;
-    return u3PlannedOccurrences(((_a = state.recurringFixedExpenses) == null ? void 0 : _a[scenario]) || [], month);
+    var _a2;
+    return u3PlannedOccurrences(((_a2 = state.recurringFixedExpenses) == null ? void 0 : _a2[scenario]) || [], month);
   }
   function u3LinkedActual(kind, occurrenceId, month = getSelectedMonth()) {
     const field = kind === "income" ? "incomeOccurrenceId" : "fixedOccurrenceId";
@@ -6624,9 +6696,9 @@ service cloud.firestore {
     return tx.accountOwner || tx.account || (source == null ? void 0 : source.eigenaar) || tx.budgetOwner || tx.financialFor || tx.owner || "gezamenlijk";
   }
   function resolveMonthlyIncome(owner, month = getSelectedMonth()) {
-    var _a, _b, _c, _d;
+    var _a2, _b, _c, _d;
     if (owner === "total") {
-      const aggregate = (_a = state.actualIncomeOverrides) == null ? void 0 : _a[month];
+      const aggregate = (_a2 = state.actualIncomeOverrides) == null ? void 0 : _a2[month];
       if (Number.isFinite(Number(aggregate == null ? void 0 : aggregate.total))) return { amount: round2(Number(aggregate.total)), source: "actual" };
       const parts = ["dion", "dara", "gezamenlijk"].map((key) => resolveMonthlyIncome(key, month));
       const sources = [...new Set(parts.map((item) => item.source))];
@@ -6661,10 +6733,10 @@ service cloud.firestore {
     return round2(u3FixedOccurrences(month).filter((row) => !financialFor || row.financialFor === financialFor).reduce((sum, row) => sum + Number(row.amount || 0), 0));
   }
   function u3VariableBudgets(owner, month = getSelectedMonth(), scenario = state.meta.scenario) {
-    var _a, _b, _c;
+    var _a2, _b, _c;
     ensureMonthData(month);
     const key = `${owner}Variabel`;
-    return ((_c = (_b = (_a = state.monthlyBudgets) == null ? void 0 : _a[month]) == null ? void 0 : _b[scenario]) == null ? void 0 : _c[key]) || [];
+    return ((_c = (_b = (_a2 = state.monthlyBudgets) == null ? void 0 : _a2[month]) == null ? void 0 : _b[scenario]) == null ? void 0 : _c[key]) || [];
   }
   function u3BudgetSummary(owner, month = getSelectedMonth(), scenario = state.meta.scenario) {
     const budgets = u3VariableBudgets(owner, month, scenario);
@@ -6696,8 +6768,8 @@ service cloud.firestore {
       target.actual = round2(target.actual + getTransactionExpenseImpact(tx));
     });
     return [...map.values()].map((row) => {
-      var _a;
-      return { ...row, difference: round2(((_a = row.budget) != null ? _a : 0) - row.actual), status: row.budget === null ? "geen-budget" : row.actual > row.budget ? "overschreden" : "resterend" };
+      var _a2;
+      return { ...row, difference: round2(((_a2 = row.budget) != null ? _a2 : 0) - row.actual), status: row.budget === null ? "geen-budget" : row.actual > row.budget ? "overschreden" : "resterend" };
     });
   }
   function u3ReserveDelta(owner, month = getSelectedMonth(), scenario = state.meta.scenario) {
@@ -6707,16 +6779,16 @@ service cloud.firestore {
     return round2((state.reserveLedger || []).filter((row) => row.owner === owner && String(row.month || "") <= throughMonth && row.status !== "vervallen").reduce((sum, row) => sum + (Number(row.amount) || 0), 0));
   }
   function u3OpeningBalance(account, month) {
-    var _a, _b, _c, _d, _e;
-    const setting = ((_a = state.accountSettings) == null ? void 0 : _a[account]) || { openingBalance: 0, effectiveMonth: month };
+    var _a2, _b, _c, _d, _e;
+    const setting = ((_a2 = state.accountSettings) == null ? void 0 : _a2[account]) || { openingBalance: 0, effectiveMonth: month };
     const previous = Object.values(state.monthRecords || {}).filter((record) => (record == null ? void 0 : record.status) === "afgesloten" && record.month < month && record.activeClosureId).sort((a, b) => String(b.month).localeCompare(String(a.month)))[0];
     const closure = (_b = previous == null ? void 0 : previous.closureHistory) == null ? void 0 : _b.find((item) => item.id === previous.activeClosureId);
     return round2(Number((_e = (_d = (_c = closure == null ? void 0 : closure.accountControl) == null ? void 0 : _c[account]) == null ? void 0 : _d.administrativeEnd) != null ? _e : setting.openingBalance) || 0);
   }
   function u3ConfirmedTransfersInCalendarMonth(account, month) {
     return (state.internalTransfers || []).filter((row) => row.status === "uitgevoerd" && String(row.date || "").slice(0, 7) === month).reduce((sum, row) => {
-      var _a;
-      const amount = Number((_a = row.actualAmount) != null ? _a : row.calculatedAmount) || 0;
+      var _a2;
+      const amount = Number((_a2 = row.actualAmount) != null ? _a2 : row.calculatedAmount) || 0;
       if (row.sourceAccount === account) return sum - amount;
       if (row.targetAccount === account) return sum + amount;
       return sum;
@@ -6849,8 +6921,8 @@ service cloud.firestore {
       const contributions = { dion: 0, dara: 0, joint: 0, total: 0 };
       (state.savingsGoalLedger || []).filter((entry) => entry.active !== false && entry.month === month && !["geannuleerd", "teruggedraaid"].includes(entry.status)).forEach((entry) => {
         const goalOwner = U3_ACCOUNTS.find((owner) => {
-          var _a;
-          return (((_a = state.spaardoelen) == null ? void 0 : _a[owner]) || []).some((goal) => goal.id === entry.goalId);
+          var _a2;
+          return (((_a2 = state.spaardoelen) == null ? void 0 : _a2[owner]) || []).some((goal) => goal.id === entry.goalId);
         }) || "gezamenlijk";
         contributions[goalOwner] = round2(contributions[goalOwner] + Number(entry.effectiveAmount || 0));
       });
@@ -6874,8 +6946,8 @@ service cloud.firestore {
     });
   }
   function getMonthFinancialResult(month = getSelectedMonth()) {
-    var _a;
-    const record = (_a = state.monthRecords) == null ? void 0 : _a[month];
+    var _a2;
+    const record = (_a2 = state.monthRecords) == null ? void 0 : _a2[month];
     if (record && ["afgesloten", "correctie-nodig"].includes(record.status) && record.activeClosureId) {
       const closure = (record.closureHistory || []).find((item) => (item.closingId || item.id) === record.activeClosureId);
       if (closure) {
@@ -7001,16 +7073,16 @@ service cloud.firestore {
     return true;
   }
   function u3SuggestedRecognition(description, account, amount) {
-    var _a;
+    var _a2;
     const text = bankText(description);
-    return ((_a = (state.recognitionRules || []).map((rule) => {
+    return ((_a2 = (state.recognitionRules || []).map((rule) => {
       let score = 0;
       if (rule.text && text.includes(bankText(rule.text))) score += 5;
       if (rule.counterparty && text.includes(bankText(rule.counterparty))) score += 3;
       if (rule.account && rule.account === account) score += 2;
       if (Number.isFinite(Number(rule.amount)) && Math.abs(Math.abs(Number(amount)) - Math.abs(Number(rule.amount))) <= Number(rule.tolerance || 5)) score += 2;
       return { rule, score };
-    }).filter((row) => row.score > 0).sort((a, b) => b.score - a.score)[0]) == null ? void 0 : _a.rule) || null;
+    }).filter((row) => row.score > 0).sort((a, b) => b.score - a.score)[0]) == null ? void 0 : _a2.rule) || null;
   }
   function u3RememberRecognition(tx) {
     const text = bankText(tx.description);
@@ -7026,8 +7098,8 @@ service cloud.firestore {
     return (state.transactionReviewQueue || []).filter((row) => (row.reviewStatus || "te-controleren") === "te-controleren" && String(row.date || "").slice(0, 7) === month);
   }
   function assertMonthMutationAllowed(month = getSelectedMonth(), mode2 = "direct") {
-    var _a, _b;
-    const status = (_b = (_a = state.monthRecords) == null ? void 0 : _a[month]) == null ? void 0 : _b.status;
+    var _a2, _b;
+    const status = (_b = (_a2 = state.monthRecords) == null ? void 0 : _a2[month]) == null ? void 0 : _b.status;
     if (!["afgesloten", "correctie-nodig"].includes(status)) return true;
     if (["reopen", "correction", "late-import"].includes(mode2)) return true;
     throw new Error("Deze maand is afgesloten. Heropen de maand of maak een correctie om financiële gegevens te wijzigen.");
@@ -7051,10 +7123,10 @@ service cloud.firestore {
     return { modal, close };
   }
   function renderU3AdminPanel() {
-    var _a;
+    var _a2;
     const month = getSelectedMonth();
     const summary = u3MonthSummary(month);
-    const record = (_a = state.monthRecords) == null ? void 0 : _a[month];
+    const record = (_a2 = state.monthRecords) == null ? void 0 : _a2[month];
     const pending = u3PendingReviews(month).length;
     const control = u3AccountControl(month);
     const needsCorrection = (record == null ? void 0 : record.status) === "correctie-nodig";
@@ -7080,13 +7152,13 @@ service cloud.firestore {
   }
   function bindU3Admin(root2) {
     root2.querySelectorAll("[data-u3-open]").forEach((button) => button.addEventListener("click", () => {
-      var _a, _b;
+      var _a2, _b;
       const view = button.dataset.u3Open;
       if (view === "planning") u3OpenPlanning(button.dataset.u3PlanningOwner || "");
       else if (view === "review") u3OpenReview();
       else if (view === "actual-income") {
         const month = getSelectedMonth();
-        const current = (_b = (_a = state.actualIncomeOverrides) == null ? void 0 : _a[month]) == null ? void 0 : _b.total;
+        const current = (_b = (_a2 = state.actualIncomeOverrides) == null ? void 0 : _a2[month]) == null ? void 0 : _b.total;
         const value = prompt(`Werkelijk inkomen voor ${month}. Laat leeg om de handmatige correctie te verwijderen.`, Number.isFinite(Number(current)) ? String(current) : String(u3ActualIncome(month)));
         if (value === null) return;
         const ok = commitChange(() => {
@@ -7111,9 +7183,9 @@ service cloud.firestore {
     }));
   }
   function u3RecurringRows(kind) {
-    var _a;
+    var _a2;
     if (kind === "income") return state.recurringIncomeSources || [];
-    return ((_a = state.recurringFixedExpenses) == null ? void 0 : _a[state.meta.scenario]) || [];
+    return ((_a2 = state.recurringFixedExpenses) == null ? void 0 : _a2[state.meta.scenario]) || [];
   }
   function u3OpenPlanning(owner = "") {
     const planningOwner = U3_ACCOUNTS.includes(owner) ? owner : "";
@@ -7133,7 +7205,7 @@ service cloud.firestore {
     }));
   }
   function u3OpenRecurringEditor(kind, id = "", defaults = {}) {
-    var _a, _b;
+    var _a2, _b;
     const existing = u3RecurringRows(kind).find((item) => item.id === id);
     const income = kind === "income";
     const current = getSelectedMonth();
@@ -7156,7 +7228,7 @@ service cloud.firestore {
       <label class="u2-checkbox"><input id="u3RecActive" type="checkbox" ${(existing == null ? void 0 : existing.actief) !== false ? "checked" : ""}> Actief</label>
     </div>
     <div class="modal-actions">${existing ? '<button class="danger-ghost" id="u3RecDelete">Stoppen</button>' : ""}<button class="ghost" data-u3-back-planning>Terug</button><button class="primary" id="u3RecSave">Opslaan</button></div>`);
-    (_a = modal.querySelector("[data-u3-back-planning]")) == null ? void 0 : _a.addEventListener("click", () => u3OpenPlanning(planningOwner));
+    (_a2 = modal.querySelector("[data-u3-back-planning]")) == null ? void 0 : _a2.addEventListener("click", () => u3OpenPlanning(planningOwner));
     (_b = modal.querySelector("#u3RecDelete")) == null ? void 0 : _b.addEventListener("click", () => {
       try {
         u3AssertMonthOpen();
@@ -7286,7 +7358,7 @@ service cloud.firestore {
     }));
   }
   function u3OpenClose() {
-    var _a, _b, _c, _d;
+    var _a2, _b, _c, _d;
     const month = getSelectedMonth();
     const record = u3MonthRecord(month);
     const summary = u3MonthSummary(month);
@@ -7318,18 +7390,18 @@ service cloud.firestore {
       }, { render: false });
       u3OpenClose();
     }));
-    (_a = modal.querySelector("#u3ReopenMonth")) == null ? void 0 : _a.addEventListener("click", () => {
+    (_a2 = modal.querySelector("#u3ReopenMonth")) == null ? void 0 : _a2.addEventListener("click", () => {
       commitChange(() => u3ReopenMonth(month), { render: false });
       u3OpenClose();
     });
     (_b = modal.querySelector("#u3GoTransactions")) == null ? void 0 : _b.addEventListener("click", () => {
-      var _a2, _b2;
-      (_a2 = modal.closest("#incomeEditModal")) == null ? void 0 : _a2.classList.remove("open", "u3-admin-open");
+      var _a3, _b2;
+      (_a3 = modal.closest("#incomeEditModal")) == null ? void 0 : _a3.classList.remove("open", "u3-admin-open");
       bankImportOpen = true;
       renderActiveTab();
       (_b2 = [...document.querySelectorAll(".manage-section")].find((item) => {
-        var _a3;
-        return (_a3 = item.querySelector("summary")) == null ? void 0 : _a3.textContent.includes("Bank import & uitgaven");
+        var _a4;
+        return (_a4 = item.querySelector("summary")) == null ? void 0 : _a4.textContent.includes("Bank import & uitgaven");
       })) == null ? void 0 : _b2.setAttribute("open", "");
     });
     const closeMonth = (force = false) => {
@@ -7354,8 +7426,8 @@ service cloud.firestore {
     const month = getSelectedMonth();
     const rows = (state.internalTransfers || []).filter((row) => row.month === month);
     const html = rows.map((row) => {
-      var _a;
-      return `<article class="u3-admin-row"><div class="u3-transfer-row"><div><strong>${textSafe(row.destination || row.type)}</strong><br><small>${u3AccountLabel(row.sourceAccount)}${row.targetAccount ? ` → ${u3AccountLabel(row.targetAccount)}` : ""} · ${row.status}</small></div><input data-u3-transfer-amount="${row.id}" type="number" step="0.01" value="${Number((_a = row.actualAmount) != null ? _a : row.calculatedAmount) || 0}" ${row.status === "uitgevoerd" ? "disabled" : ""}><button class="${row.status === "uitgevoerd" ? "ghost" : "primary"} small" data-u3-confirm-transfer="${row.id}" ${row.status === "uitgevoerd" ? "disabled" : ""}>${row.status === "uitgevoerd" ? "Uitgevoerd" : "Bevestig"}</button></div></article>`;
+      var _a2;
+      return `<article class="u3-admin-row"><div class="u3-transfer-row"><div><strong>${textSafe(row.destination || row.type)}</strong><br><small>${u3AccountLabel(row.sourceAccount)}${row.targetAccount ? ` → ${u3AccountLabel(row.targetAccount)}` : ""} · ${row.status}</small></div><input data-u3-transfer-amount="${row.id}" type="number" step="0.01" value="${Number((_a2 = row.actualAmount) != null ? _a2 : row.calculatedAmount) || 0}" ${row.status === "uitgevoerd" ? "disabled" : ""}><button class="${row.status === "uitgevoerd" ? "ghost" : "primary"} small" data-u3-confirm-transfer="${row.id}" ${row.status === "uitgevoerd" ? "disabled" : ""}>${row.status === "uitgevoerd" ? "Uitgevoerd" : "Bevestig"}</button></div></article>`;
     }).join("");
     const { modal } = u3AdminModal(`<div class="u3-admin-head"><div><div class="section-kicker">${monthLabel(month)}</div><h2>Interne overboekingen</h2><p>Uitvoering is handmatig; bevestigde aflossingen tellen niet als inkomen of uitgave.</p></div><button class="ghost" data-u3-close>Sluiten</button></div><div class="u3-admin-list">${html || '<div class="u3-empty">Nog geen voorstellen. Sluit de maand eerst af.</div>'}</div>`);
     modal.querySelectorAll("[data-u3-confirm-transfer]").forEach((button) => button.addEventListener("click", () => {
@@ -7439,7 +7511,17 @@ service cloud.firestore {
     if (!bootstrap.authReady) {
       if (!bootstrap.waitingForAuth) {
         bootstrap.waitingForAuth = true;
-        Promise.resolve(window.__finizeAuthGate).then((session) => {
+        Promise.resolve(window.__finizeAuthGate).then(async (session) => {
+          activeAuthSession = session;
+          if ((session == null ? void 0 : session.status) === "ready") {
+            const scopedState = DataAdapter.load();
+            if (scopedState) {
+              state = scopedState;
+              window.state = state;
+              committedStateSnapshot = cloneState(state);
+              await GoalImageStore.initializeState(state);
+            }
+          }
           bootstrap.authReady = true;
           bootstrap.authSession = session;
           window.__finizeMaybeFinishBootstrap();
@@ -7501,6 +7583,22 @@ service cloud.firestore {
     const CLOUD_READ_CONCURRENCY = 4;
     const OWNERS = ["gezamenlijk", "dion", "dara"];
     const IMPORT_STATUSES = ["concept", "verwerkt", "teruggedraaid", "correctie-nodig"];
+    function cloudImportRef(cloud, firestore, importId) {
+      if (typeof (cloud == null ? void 0 : cloud.importRef) === "function") {
+        const reference = cloud.importRef(importId);
+        if (!reference) throw new Error("De cloudlocatie voor deze import ontbreekt.");
+        return reference;
+      }
+      return firestore.doc(cloud.db, "budgetPlanners", "finize", "imports", String(importId));
+    }
+    function cloudImportChunkRef(cloud, firestore, importId, chunkId) {
+      if (typeof (cloud == null ? void 0 : cloud.importChunkRef) === "function") {
+        const reference = cloud.importChunkRef(importId, chunkId);
+        if (!reference) throw new Error("De cloudlocatie voor dit importdeel ontbreekt.");
+        return reference;
+      }
+      return firestore.doc(cloud.db, "budgetPlanners", "finize", "imports", String(importId), "chunks", String(chunkId));
+    }
     function plain(value) {
       return value !== null && typeof value === "object" && !Array.isArray(value);
     }
@@ -7533,10 +7631,10 @@ service cloud.firestore {
       return next;
     }
     function normalizeTransaction(tx) {
-      var _a, _b, _c;
+      var _a2, _b, _c;
       if (!plain(tx)) return tx;
       const accountOwner = validOwner(tx.accountOwner || tx.account || tx.owner);
-      const budgetOwner = validOwner(tx.budgetOwner || ((_a = tx.processing) == null ? void 0 : _a.budgetOwner) || tx.financialFor || tx.owner || accountOwner);
+      const budgetOwner = validOwner(tx.budgetOwner || ((_a2 = tx.processing) == null ? void 0 : _a2.budgetOwner) || tx.financialFor || tx.owner || accountOwner);
       tx.accountOwner = accountOwner;
       tx.budgetOwner = budgetOwner;
       tx.account = accountOwner;
@@ -7555,14 +7653,14 @@ service cloud.firestore {
     }
     function allGoals(state2) {
       return OWNERS.flatMap((owner) => {
-        var _a;
-        return (((_a = state2 == null ? void 0 : state2.spaardoelen) == null ? void 0 : _a[owner]) || []).map((goal) => ({ owner, goal }));
+        var _a2;
+        return (((_a2 = state2 == null ? void 0 : state2.spaardoelen) == null ? void 0 : _a2[owner]) || []).map((goal) => ({ owner, goal }));
       });
     }
     function contributionAmount(entry) {
-      var _a;
+      var _a2;
       if ((entry == null ? void 0 : entry.active) === false || ["geannuleerd", "teruggedraaid"].includes(entry == null ? void 0 : entry.status)) return 0;
-      const value = Number((_a = entry == null ? void 0 : entry.effectiveAmount) != null ? _a : entry == null ? void 0 : entry.amount);
+      const value = Number((_a2 = entry == null ? void 0 : entry.effectiveAmount) != null ? _a2 : entry == null ? void 0 : entry.amount);
       return Number.isFinite(value) ? round22(value) : 0;
     }
     function calculateGoalSavedAmount(state2, goalId) {
@@ -7591,8 +7689,8 @@ service cloud.firestore {
     function normalizeSavingsLedger(target) {
       target.savingsGoalLedger = Array.isArray(target.savingsGoalLedger) ? target.savingsGoalLedger.filter(plain) : [];
       target.savingsGoalLedger = target.savingsGoalLedger.map((entry, index) => {
-        var _a, _b, _c, _d;
-        const amount = Number((_b = (_a = entry.effectiveAmount) != null ? _a : entry.amount) != null ? _b : 0);
+        var _a2, _b, _c, _d;
+        const amount = Number((_b = (_a2 = entry.effectiveAmount) != null ? _a2 : entry.amount) != null ? _b : 0);
         const actual = Number((_c = entry.actualAmount) != null ? _c : entry.amount);
         const month = String(entry.month || "").slice(0, 7) || String(((_d = (target.transactions || []).find((tx) => tx.id === entry.transactionId)) == null ? void 0 : _d.date) || "").slice(0, 7);
         return {
@@ -7867,16 +7965,16 @@ service cloud.firestore {
       return result;
     }
     async function fetchImportFromCloud(root2, id) {
-      var _a, _b, _c, _d, _e;
+      var _a2, _b, _c, _d, _e;
       const cloud = root2 == null ? void 0 : root2.CloudAdapter;
-      if (!((_a = cloud == null ? void 0 : cloud.isConnected) == null ? void 0 : _a.call(cloud))) {
+      if (!((_a2 = cloud == null ? void 0 : cloud.isConnected) == null ? void 0 : _a2.call(cloud))) {
         if (((_b = cloud == null ? void 0 : cloud.isConfigured) == null ? void 0 : _b.call(cloud)) && typeof cloud.connect === "function") await cloud.connect();
       }
       if (!((_c = cloud == null ? void 0 : cloud.isConnected) == null ? void 0 : _c.call(cloud)) || !((_d = cloud.modules) == null ? void 0 : _d.firestore) || !cloud.db) {
         throw cloudImportError("cloud-offline", "De import staat niet lokaal en de cloudverbinding is niet beschikbaar.");
       }
       const firestore = cloud.modules.firestore;
-      const importRef = firestore.doc(cloud.db, "budgetPlanners", "finize", "imports", String(id));
+      const importRef = cloudImportRef(cloud, firestore, id);
       let headerSnapshot;
       try {
         headerSnapshot = await firestore.getDoc(importRef);
@@ -7891,15 +7989,15 @@ service cloud.firestore {
       if (!Number.isInteger(count) || count < 0) throw cloudImportError("cloud-invalid", "De cloudkopie bevat geen geldige importindeling.");
       const indices = Array.from({ length: count }, (_, index) => index);
       const chunks = await mapWithConcurrency(indices, CLOUD_READ_CONCURRENCY, async (index) => {
-        var _a2;
-        const chunkRef = firestore.doc(cloud.db, "budgetPlanners", "finize", "imports", String(id), "chunks", String(index).padStart(4, "0"));
+        var _a3;
+        const chunkRef = cloudImportChunkRef(cloud, firestore, id, String(index).padStart(4, "0"));
         let snapshot;
         try {
           snapshot = await firestore.getDoc(chunkRef);
         } catch (error) {
           throw classifyCloudError(error, `Importdeel ${index + 1} van ${count} kon niet worden opgehaald.`);
         }
-        if (!((_a2 = snapshot == null ? void 0 : snapshot.exists) == null ? void 0 : _a2.call(snapshot))) throw cloudImportError("cloud-incomplete", `Importdeel ${index + 1} van ${count} ontbreekt in de cloud.`);
+        if (!((_a3 = snapshot == null ? void 0 : snapshot.exists) == null ? void 0 : _a3.call(snapshot))) throw cloudImportError("cloud-incomplete", `Importdeel ${index + 1} van ${count} ontbreekt in de cloud.`);
         return snapshot.data();
       });
       return assembleCloudImport(header, chunks, id);
@@ -8051,12 +8149,12 @@ service cloud.firestore {
       return null;
     }
     function classifyOriginal(original, profile, rules = [], profiles = []) {
-      var _a, _b, _c, _d, _e, _f, _g, _h;
+      var _a2, _b, _c, _d, _e, _f, _g, _h;
       const type = proposeType(original, profiles);
       const proposal = recognitionProposal(original, rules);
       const special = !["uitgave"].includes(type);
       const strong = proposal && ["counterparty", "description", "organization"].includes(proposal.level);
-      const category = ((_a = proposal == null ? void 0 : proposal.rule) == null ? void 0 : _a.category) || "Ongecategoriseerd";
+      const category = ((_a2 = proposal == null ? void 0 : proposal.rule) == null ? void 0 : _a2.category) || "Ongecategoriseerd";
       const alwaysReview = ((_b = proposal == null ? void 0 : proposal.rules) == null ? void 0 : _b.some((rule) => rule.alwaysReview)) === true;
       const review = !profile || special || !strong || (proposal == null ? void 0 : proposal.conflict) || alwaysReview || category === "Ongecategoriseerd" || !!((_c = proposal == null ? void 0 : proposal.rule) == null ? void 0 : _c.fixedExpenseId) || !!((_d = proposal == null ? void 0 : proposal.rule) == null ? void 0 : _d.savingsGoalId);
       return {
@@ -8129,8 +8227,8 @@ service cloud.firestore {
       const parsed = parseBankCsv(text);
       const profile = findProfile(parsed, profiles);
       const existingFingerprints = new Set((transactions || []).map((tx) => {
-        var _a;
-        return (_a = tx.bankOriginal) == null ? void 0 : _a.fingerprint;
+        var _a2;
+        return (_a2 = tx.bankOriginal) == null ? void 0 : _a2.fingerprint;
       }).filter(Boolean));
       const rows = parsed.rows.map((original, index) => {
         original.importBatchId = id;
@@ -8181,8 +8279,8 @@ service cloud.firestore {
     }
     function updateDraftSummary(draft) {
       const active = (draft.rows || []).filter((row) => {
-        var _a;
-        return ((_a = row.bankOriginal) == null ? void 0 : _a.valid) && !row.duplicate;
+        var _a2;
+        return ((_a2 = row.bankOriginal) == null ? void 0 : _a2.valid) && !row.duplicate;
       });
       draft.summary = {
         newCount: active.length,
@@ -8306,8 +8404,8 @@ service cloud.firestore {
       return persistImportDraftImmediate(root2, draft, { syncCloud: sync, updateSummary: true });
     }
     async function reconcileActiveImportReference(root2, { localRead = (id) => ImportStore.getImport(id) } = {}) {
-      var _a;
-      const activeId = String(((_a = root2 == null ? void 0 : root2.state) == null ? void 0 : _a.activeImportId) || "");
+      var _a2;
+      const activeId = String(((_a2 = root2 == null ? void 0 : root2.state) == null ? void 0 : _a2.activeImportId) || "");
       if (!activeId) return { action: "none", activeImportId: "" };
       const summaries = root2.state.importSummaries || [];
       const summary = summaries.find((item) => String(item.id) === activeId);
@@ -8335,13 +8433,13 @@ service cloud.firestore {
       return { action: "cloud-needed", activeImportId: activeId };
     }
     async function deleteCloudImportBestEffort(root2, id, record = null) {
-      var _a, _b, _c, _d;
+      var _a2, _b, _c, _d;
       const cloud = root2 == null ? void 0 : root2.CloudAdapter;
       try {
-        if (!((_a = cloud == null ? void 0 : cloud.isConnected) == null ? void 0 : _a.call(cloud)) || !((_b = cloud.modules) == null ? void 0 : _b.firestore) || !cloud.db) return false;
+        if (!((_a2 = cloud == null ? void 0 : cloud.isConnected) == null ? void 0 : _a2.call(cloud)) || !((_b = cloud.modules) == null ? void 0 : _b.firestore) || !cloud.db) return false;
         const firestore = cloud.modules.firestore;
         if (typeof firestore.deleteDoc !== "function") return false;
-        const importRef = firestore.doc(cloud.db, "budgetPlanners", "finize", "imports", String(id));
+        const importRef = cloudImportRef(cloud, firestore, id);
         let chunkCount = null;
         if (typeof firestore.getDoc === "function") {
           const snapshot = await firestore.getDoc(importRef);
@@ -8352,7 +8450,7 @@ service cloud.firestore {
         if (Number.isInteger(chunkCount) && chunkCount >= 0) {
           const indices = Array.from({ length: chunkCount }, (_, index) => index);
           await mapWithConcurrency(indices, CLOUD_READ_CONCURRENCY, (index) => firestore.deleteDoc(
-            firestore.doc(cloud.db, "budgetPlanners", "finize", "imports", String(id), "chunks", String(index).padStart(4, "0"))
+            cloudImportChunkRef(cloud, firestore, id, String(index).padStart(4, "0"))
           ));
         }
         await firestore.deleteDoc(importRef);
@@ -8363,9 +8461,9 @@ service cloud.firestore {
       }
     }
     async function discardImportConcept(root2, id, { cleanupCloud = true } = {}) {
-      var _a, _b, _c, _d;
+      var _a2, _b, _c, _d;
       const importId = String(id || "");
-      const summary = (((_a = root2 == null ? void 0 : root2.state) == null ? void 0 : _a.importSummaries) || []).find((item) => String(item.id) === importId);
+      const summary = (((_a2 = root2 == null ? void 0 : root2.state) == null ? void 0 : _a2.importSummaries) || []).find((item) => String(item.id) === importId);
       if (!importId || String(((_b = root2 == null ? void 0 : root2.state) == null ? void 0 : _b.activeImportId) || "") !== importId || (summary == null ? void 0 : summary.status) !== "concept") {
         throw new Error("Alleen het actieve, onverwerkte importconcept kan worden verwijderd.");
       }
@@ -8408,21 +8506,21 @@ service cloud.firestore {
     function goalExists(state2, id) {
       if (!id) return true;
       return OWNERS.some((owner) => {
-        var _a;
-        return (((_a = state2.spaardoelen) == null ? void 0 : _a[owner]) || []).some((goal) => goal.id === id);
+        var _a2;
+        return (((_a2 = state2.spaardoelen) == null ? void 0 : _a2[owner]) || []).some((goal) => goal.id === id);
       });
     }
     function fixedExists(state2, id) {
       if (!id) return true;
       return ["voor", "na"].some((scenario) => {
-        var _a;
-        return (((_a = state2.recurringFixedExpenses) == null ? void 0 : _a[scenario]) || []).some((item) => item.id === id);
+        var _a2;
+        return (((_a2 = state2.recurringFixedExpenses) == null ? void 0 : _a2[scenario]) || []).some((item) => item.id === id);
       });
     }
     function findFixedItem(state2, id) {
-      var _a;
+      var _a2;
       for (const scenario of ["voor", "na"]) {
-        const item = (((_a = state2.recurringFixedExpenses) == null ? void 0 : _a[scenario]) || []).find((row) => row.id === id);
+        const item = (((_a2 = state2.recurringFixedExpenses) == null ? void 0 : _a2[scenario]) || []).find((row) => row.id === id);
         if (item) return { scenario, item };
       }
       return null;
@@ -8432,8 +8530,8 @@ service cloud.firestore {
       const profile = (state2.accountProfiles || []).find((item) => item.id === draft.accountProfileId);
       if (!profile) errors.push({ code: "profile", message: "Kies of maak eerst een rekeningprofiel." });
       (draft.rows || []).filter((row) => !row.duplicate).forEach((row) => {
-        var _a;
-        if (!((_a = row.bankOriginal) == null ? void 0 : _a.valid)) errors.push({ rowId: row.id, code: "original", message: "Originele bankregel mist datum, omschrijving of bedrag." });
+        var _a2;
+        if (!((_a2 = row.bankOriginal) == null ? void 0 : _a2.valid)) errors.push({ rowId: row.id, code: "original", message: "Originele bankregel mist datum, omschrijving of bedrag." });
         const p = row.processing || {};
         if (!parseDate(p.processingDate)) errors.push({ rowId: row.id, code: "date", message: "Ongeldige verwerkingsdatum." });
         if (!Number.isFinite(Number(p.processedAmount))) errors.push({ rowId: row.id, code: "amount", message: "Verwerkt bedrag ontbreekt." });
@@ -8481,8 +8579,8 @@ service cloud.firestore {
       return [{ id: `tx-${row.id}`, amount: round22(p.processedAmount), budgetOwner: p.budgetOwner, category: p.category, budgetItemId: p.budgetItemId || "", savingsGoalId: p.savingsGoalId || "", advanceMode: p.advanceMode || "auto", include: p.include !== false, splitId: "", isFirst: true }];
     }
     function advanceForTransaction(tx) {
-      var _a;
-      if (tx.kind === "niet-meetellen" || tx.kind === "interne-overboeking" || ((_a = tx.processing) == null ? void 0 : _a.advanceMode) === "none" || tx.accountOwner === tx.budgetOwner) return null;
+      var _a2;
+      if (tx.kind === "niet-meetellen" || tx.kind === "interne-overboeking" || ((_a2 = tx.processing) == null ? void 0 : _a2.advanceMode) === "none" || tx.accountOwner === tx.budgetOwner) return null;
       const incoming = tx.kind === "inkomen";
       const debtor = incoming ? tx.accountOwner : tx.budgetOwner;
       const creditor = incoming ? tx.budgetOwner : tx.accountOwner;
@@ -8517,14 +8615,14 @@ service cloud.firestore {
       return Math.abs(/* @__PURE__ */ new Date(`${a}T12:00:00`) - /* @__PURE__ */ new Date(`${b}T12:00:00`)) / 864e5;
     }
     function detectInternalPairs(transactions, state2) {
-      var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
+      var _a2, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
       const candidates = [...state2.transactions || [], ...transactions].filter((tx) => tx.transactionType === "interne-overboeking" || tx.kind === "interne-overboeking");
       const used = new Set((state2.internalTransferPairs || []).flatMap((pair) => pair.transactionIds || []));
       const pairs = [];
       for (let i = 0; i < candidates.length; i++) for (let j = i + 1; j < candidates.length; j++) {
         const a = candidates[i], b = candidates[j];
         if (used.has(a.id) || used.has(b.id) || a.id === b.id) continue;
-        if (Math.abs(Math.abs(Number((_b = (_a = a.bankOriginal) == null ? void 0 : _a.amount) != null ? _b : a.accountDelta)) - Math.abs(Number((_d = (_c = b.bankOriginal) == null ? void 0 : _c.amount) != null ? _d : b.accountDelta))) > 4e-3) continue;
+        if (Math.abs(Math.abs(Number((_b = (_a2 = a.bankOriginal) == null ? void 0 : _a2.amount) != null ? _b : a.accountDelta)) - Math.abs(Number((_d = (_c = b.bankOriginal) == null ? void 0 : _c.amount) != null ? _d : b.accountDelta))) > 4e-3) continue;
         if (Math.sign(Number((_f = (_e = a.bankOriginal) == null ? void 0 : _e.amount) != null ? _f : a.accountDelta)) === Math.sign(Number((_h = (_g = b.bankOriginal) == null ? void 0 : _g.amount) != null ? _h : b.accountDelta))) continue;
         if (daysBetween(((_i = a.bankOriginal) == null ? void 0 : _i.bankDate) || a.date, ((_j = b.bankOriginal) == null ? void 0 : _j.bankDate) || b.date) > 3) continue;
         const aProfile = state2.accountProfiles.find((profile) => profile.id === a.accountProfileId);
@@ -8563,7 +8661,7 @@ service cloud.firestore {
       return allocations;
     }
     function planImportEffects(draft, state2) {
-      var _a;
+      var _a2;
       const validation = validateDraft(draft, state2);
       if (!validation.ok) return { ok: false, errors: validation.errors };
       const profile = state2.accountProfiles.find((item) => item.id === draft.accountProfileId);
@@ -8632,7 +8730,7 @@ service cloud.firestore {
         });
         if (p.manualMatchId) {
           const manual = state2.transactions.find((tx) => tx.id === p.manualMatchId && !tx.importBatchId);
-          if (manual) replacements.push({ id: `replacement-${draft.id}-${manual.id}`, manualTransaction: cloneState(manual), replacementTransactionId: ((_a = transactions.find((tx) => tx.importTransactionId === row.id)) == null ? void 0 : _a.id) || "" });
+          if (manual) replacements.push({ id: `replacement-${draft.id}-${manual.id}`, manualTransaction: cloneState(manual), replacementTransactionId: ((_a2 = transactions.find((tx) => tx.importTransactionId === row.id)) == null ? void 0 : _a2.id) || "" });
         }
         if (p.fixedExpenseId && ["month", "from"].includes(p.fixedAmountMode)) {
           const found = findFixedItem(state2, p.fixedExpenseId);
@@ -8653,9 +8751,9 @@ service cloud.firestore {
       return { ok: true, importId: draft.id, transactions, replacements, savingsEntries, advances, repayments, internalPairs, fixedAdjustments, affectedMonths: [...affectedMonths], counts, duplicateCount: draft.summary.duplicateCount || 0, totalIncome: draft.summary.totalIncome, totalExpenses: draft.summary.totalExpenses };
     }
     function findGoal(state2, id) {
-      var _a;
+      var _a2;
       for (const owner of OWNERS) {
-        const goal = (((_a = state2.spaardoelen) == null ? void 0 : _a[owner]) || []).find((item) => item.id === id);
+        const goal = (((_a2 = state2.spaardoelen) == null ? void 0 : _a2[owner]) || []).find((item) => item.id === id);
         if (goal) return goal;
       }
       return null;
@@ -8736,8 +8834,8 @@ service cloud.firestore {
       const summary = state2.importSummaries.find((item) => item.id === plan.importId);
       if (summary) {
         summary.status = plan.affectedMonths.some((month) => {
-          var _a, _b;
-          return ((_b = (_a = state2.monthRecords) == null ? void 0 : _a[month]) == null ? void 0 : _b.status) === "correctie-nodig";
+          var _a2, _b;
+          return ((_b = (_a2 = state2.monthRecords) == null ? void 0 : _a2[month]) == null ? void 0 : _b.status) === "correctie-nodig";
         }) ? "correctie-nodig" : "verwerkt";
         summary.processedAt = (/* @__PURE__ */ new Date()).toISOString();
         summary.counts = cloneState(plan.counts);
@@ -8792,10 +8890,10 @@ service cloud.firestore {
       state2.advanceLedger = (state2.advanceLedger || []).filter((item) => !advanceIds.has(item.id));
       state2.internalTransferPairs = (state2.internalTransferPairs || []).filter((item) => !pairIds.has(item.id));
       (manifest.fixedAdjustments || []).forEach((adjustment) => {
-        var _a, _b;
+        var _a2, _b;
         const found = findFixedItem(state2, adjustment.fixedExpenseId);
         if (!found) return;
-        found.item.amountHistory = cloneState(((_a = adjustment.before) == null ? void 0 : _a.amountHistory) || []);
+        found.item.amountHistory = cloneState(((_a2 = adjustment.before) == null ? void 0 : _a2.amountHistory) || []);
         found.item.monthOverrides = cloneState(((_b = adjustment.before) == null ? void 0 : _b.monthOverrides) || {});
       });
       state2.manualTransactionReplacements = state2.manualTransactionReplacements || [];
@@ -8807,8 +8905,8 @@ service cloud.firestore {
       state2.manualTransactionReplacements = state2.manualTransactionReplacements.filter((item) => !replacementIds.has(item.id));
       state2.transactions = (state2.transactions || []).filter((tx) => !transactionIds.has(tx.id));
       (manifest.affectedMonths || []).forEach((month) => {
-        var _a;
-        const record = (_a = state2.monthRecords) == null ? void 0 : _a[month];
+        var _a2;
+        const record = (_a2 = state2.monthRecords) == null ? void 0 : _a2[month];
         if (!record) return;
         record.lateImportTransactionIds = (record.lateImportTransactionIds || []).filter((id) => !transactionIds.has(id));
         if (record.status === "correctie-nodig" && !record.lateImportTransactionIds.length) record.status = "afgesloten";
@@ -8847,7 +8945,7 @@ service cloud.firestore {
       return true;
     }
     async function reconcileImport(root2, draft) {
-      var _a;
+      var _a2;
       const working = cloneState(root2.state);
       undoImportEffects(working, draft);
       const plan = planImportEffects(draft, working);
@@ -8867,7 +8965,7 @@ service cloud.firestore {
         await ImportStore.putJournal(journal);
         throw new Error("De correctie is volledig afgebroken omdat opslaan mislukte.");
       }
-      draft.status = ((_a = root2.state.importSummaries.find((item) => item.id === draft.id)) == null ? void 0 : _a.status) || "verwerkt";
+      draft.status = ((_a2 = root2.state.importSummaries.find((item) => item.id === draft.id)) == null ? void 0 : _a2.status) || "verwerkt";
       draft.correctedAt = (/* @__PURE__ */ new Date()).toISOString();
       draft.effectManifest = effectManifest(plan);
       await ImportStore.putImport(draft);
@@ -8885,23 +8983,23 @@ service cloud.firestore {
       return `<div class="u4-import-summary"><div><span>Uitgaven</span><strong>${plan.counts.expenses}</strong></div><div><span>Inkomsten</span><strong>${plan.counts.income}</strong></div><div><span>Interne overboekingen</span><strong>${plan.counts.internal}</strong></div><div><span>Sparen</span><strong>${plan.counts.savings}</strong></div><div><span>Terugbetalingen</span><strong>${plan.counts.refunds}</strong></div><div><span>Voorschotten</span><strong>${plan.counts.advances}</strong></div><div><span>Ongecategoriseerd</span><strong>${plan.counts.uncategorized}</strong></div><div><span>Duplicaten</span><strong>${plan.duplicateCount}</strong></div></div><p><strong>Inkomsten ${euro(plan.totalIncome)}</strong> · uitgaven ${euro(plan.totalExpenses)}</p>`;
     }
     function validationTargetLabel(draft, error) {
-      var _a, _b, _c, _d, _e, _f, _g;
+      var _a2, _b, _c, _d, _e, _f, _g;
       if (!(error == null ? void 0 : error.rowId)) return (error == null ? void 0 : error.code) === "profile" ? "Rekeningprofiel" : "Importinstellingen";
       const row = (draft.rows || []).find((item) => String(item.id) === String(error.rowId));
       if (!row) return "Transactie";
-      const description = String(((_a = row.bankOriginal) == null ? void 0 : _a.description) || "Onbekende transactie").trim();
+      const description = String(((_a2 = row.bankOriginal) == null ? void 0 : _a2.description) || "Onbekende transactie").trim();
       const date = String(((_b = row.processing) == null ? void 0 : _b.processingDate) || ((_c = row.bankOriginal) == null ? void 0 : _c.bankDate) || "").trim();
       const amount = euro((_g = (_f = (_d = row.processing) == null ? void 0 : _d.processedAmount) != null ? _f : (_e = row.bankOriginal) == null ? void 0 : _e.amount) != null ? _g : 0);
       return `${date ? `${date} · ` : ""}${description} · ${amount}`;
     }
     function findDraftRowElement(modal, rowId) {
-      var _a;
-      return [...((_a = modal == null ? void 0 : modal.querySelectorAll) == null ? void 0 : _a.call(modal, "[data-u4-row]")) || []].find((element) => String(element.dataset.u4Row) === String(rowId)) || null;
+      var _a2;
+      return [...((_a2 = modal == null ? void 0 : modal.querySelectorAll) == null ? void 0 : _a2.call(modal, "[data-u4-row]")) || []].find((element) => String(element.dataset.u4Row) === String(rowId)) || null;
     }
     function focusValidationError(root2, draft, error) {
-      var _a, _b, _c;
+      var _a2, _b, _c;
       const modal = document.getElementById("u4ImportModalRoot");
-      (_a = document.querySelector(".u4-validation-overlay")) == null ? void 0 : _a.remove();
+      (_a2 = document.querySelector(".u4-validation-overlay")) == null ? void 0 : _a2.remove();
       if (!modal) return;
       if (!(error == null ? void 0 : error.rowId)) {
         const profile = modal.querySelector("[data-u4-profile-select]") || modal.querySelector(".u4-profile-grid");
@@ -8930,14 +9028,14 @@ service cloud.firestore {
       else if (error.code === "goal") target = row.querySelector('[data-u4-field="savingsGoalId"]');
       else if (error.code === "fixed") target = row.querySelector('[data-u4-field="fixedExpenseId"]');
       setTimeout(() => {
-        var _a2;
-        (_a2 = target == null ? void 0 : target.focus) == null ? void 0 : _a2.call(target, { preventScroll: true });
+        var _a3;
+        (_a3 = target == null ? void 0 : target.focus) == null ? void 0 : _a3.call(target, { preventScroll: true });
       }, 350);
       setTimeout(() => row == null ? void 0 : row.classList.remove("u4-validation-target"), 3500);
     }
     function showValidationErrors(root2, draft, errors, title = "Import kan nog niet worden verwerkt") {
-      var _a, _b;
-      (_a = document.querySelector(".u4-validation-overlay")) == null ? void 0 : _a.remove();
+      var _a2, _b;
+      (_a2 = document.querySelector(".u4-validation-overlay")) == null ? void 0 : _a2.remove();
       const overlay = document.createElement("div");
       overlay.className = "u4-validation-overlay";
       const shown = (errors || []).slice(0, 12);
@@ -8951,7 +9049,7 @@ service cloud.firestore {
       overlay.querySelectorAll("[data-u4-validation-index]").forEach((button) => button.addEventListener("click", () => focusValidationError(root2, draft, shown[Number(button.dataset.u4ValidationIndex)])));
     }
     async function processDraft(root2, draft) {
-      var _a;
+      var _a2;
       const plan = planImportEffects(draft, root2.state);
       if (!plan.ok) {
         showValidationErrors(root2, draft, plan.errors);
@@ -8966,7 +9064,7 @@ service cloud.firestore {
         await ImportStore.putJournal(journal);
         throw new Error("De import is volledig teruggedraaid omdat opslaan mislukte.");
       }
-      draft.status = ((_a = root2.state.importSummaries.find((item) => item.id === draft.id)) == null ? void 0 : _a.status) || "verwerkt";
+      draft.status = ((_a2 = root2.state.importSummaries.find((item) => item.id === draft.id)) == null ? void 0 : _a2.status) || "verwerkt";
       draft.processedAt = (/* @__PURE__ */ new Date()).toISOString();
       draft.effectManifest = effectManifest(plan);
       await ImportStore.putImport(draft);
@@ -9021,14 +9119,14 @@ service cloud.firestore {
     function goalOptions(root2, current) {
       const rows = [];
       OWNERS.forEach((owner) => {
-        var _a;
-        return (((_a = root2.state.spaardoelen) == null ? void 0 : _a[owner]) || []).forEach((goal) => rows.push({ id: goal.id, label: `${ownerLabel2(owner)} · ${goal.naam}` }));
+        var _a2;
+        return (((_a2 = root2.state.spaardoelen) == null ? void 0 : _a2[owner]) || []).forEach((goal) => rows.push({ id: goal.id, label: `${ownerLabel2(owner)} · ${goal.naam}` }));
       });
       return `<option value="">Geen spaardoel</option>${rows.map((row) => option(row.id, row.label, current)).join("")}`;
     }
     function fixedOptions(root2, current) {
-      var _a;
-      const rows = ((_a = root2.state.recurringFixedExpenses) == null ? void 0 : _a[root2.state.meta.scenario]) || [];
+      var _a2;
+      const rows = ((_a2 = root2.state.recurringFixedExpenses) == null ? void 0 : _a2[root2.state.meta.scenario]) || [];
       return `<option value="">Geen vaste last</option>${rows.map((row) => option(row.id, `${ownerLabel2(row.financialFor || row.rekening)} · ${row.naam}`, current)).join("")}`;
     }
     const TYPE_GROUPS = [
@@ -9063,8 +9161,8 @@ service cloud.firestore {
       const sourceDirection = Number(src.amount) >= 0 ? "in" : "out";
       const sourceIdentity = matchIdentity(src);
       return draft.rows.filter((row) => {
-        var _a;
-        return row !== source && ((_a = row.bankOriginal) == null ? void 0 : _a.valid) && !row.duplicate;
+        var _a2;
+        return row !== source && ((_a2 = row.bankOriginal) == null ? void 0 : _a2.valid) && !row.duplicate;
       }).map((row) => {
         const original = row.bankOriginal || {};
         if ((Number(original.amount) >= 0 ? "in" : "out") !== sourceDirection) return null;
@@ -9085,8 +9183,8 @@ service cloud.firestore {
         }
         return score >= 3 ? { row, score, reasons } : null;
       }).filter(Boolean).sort((a, b) => {
-        var _a, _b;
-        return b.score - a.score || String(((_a = b.row.processing) == null ? void 0 : _a.processingDate) || "").localeCompare(String(((_b = a.row.processing) == null ? void 0 : _b.processingDate) || ""));
+        var _a2, _b;
+        return b.score - a.score || String(((_a2 = b.row.processing) == null ? void 0 : _a2.processingDate) || "").localeCompare(String(((_b = a.row.processing) == null ? void 0 : _b.processingDate) || ""));
       });
     }
     function copiedProcessing(source, target) {
@@ -9120,11 +9218,11 @@ service cloud.firestore {
       return `<div class="u4-context-block wide"><strong>Interne overboeking</strong><div class="u4-context-grid"><label>Van rekening<select data-u4-field="sourceAccountProfileId">${profileOptions(root2, row.processing.sourceAccountProfileId || "")}</select></label><label>Naar rekening<select data-u4-field="destinationAccountProfileId">${profileOptions(root2, row.processing.destinationAccountProfileId || "")}</select></label></div><span class="u4-muted">Interne overboekingen tellen niet als inkomen of uitgave.</span></div>`;
     }
     function rowHtml(root2, row) {
-      var _a;
+      var _a2;
       const p = row.processing;
       const original = row.bankOriginal;
       return `<article class="u4-import-row" data-u4-row="${escAttr(row.id)}">
-      <div class="u4-import-row-main"><div><strong>${esc(original.description || "Onbekende transactie")}</strong><span class="u4-muted">${esc(p.processingDate)} · ${euro(p.processedAmount)}</span>${((_a = row.reasons) == null ? void 0 : _a.length) ? `<div class="u4-row-reasons">${esc(row.reasons.join(" · "))}</div>` : ""}</div><div class="u4-row-approval"><span class="u4-status ${row.certainty}">${row.certainty === "zeker" ? "Zeker" : "Nakijken"}</span>${row.certainty === "nakijken" ? '<button type="button" class="primary small" data-u4-approve>✓ Goedkeuren</button>' : '<button type="button" class="ghost small" data-u4-reopen>Opnieuw nakijken</button>'}</div></div>
+      <div class="u4-import-row-main"><div><strong>${esc(original.description || "Onbekende transactie")}</strong><span class="u4-muted">${esc(p.processingDate)} · ${euro(p.processedAmount)}</span>${((_a2 = row.reasons) == null ? void 0 : _a2.length) ? `<div class="u4-row-reasons">${esc(row.reasons.join(" · "))}</div>` : ""}</div><div class="u4-row-approval"><span class="u4-status ${row.certainty}">${row.certainty === "zeker" ? "Zeker" : "Nakijken"}</span>${row.certainty === "nakijken" ? '<button type="button" class="primary small" data-u4-approve>✓ Goedkeuren</button>' : '<button type="button" class="ghost small" data-u4-reopen>Opnieuw nakijken</button>'}</div></div>
       <div class="u4-row-grid">
         <label>Datum<input type="date" data-u4-field="processingDate" value="${esc(p.processingDate)}"></label>
         <label>Bedrag<input type="number" step="0.01" data-u4-field="processedAmount" value="${Number(p.processedAmount) || 0}"></label>
@@ -9146,7 +9244,7 @@ service cloud.firestore {
       return `<section class="u4-section u4-bulk-section"><div class="u4-section-list"><h3>Meerdere transacties aanpassen</h3><p class="u4-muted">Pas één keuze in één keer toe. Handmatig aangepaste zekere transacties worden standaard overgeslagen.</p><div class="u4-profile-grid"><label>Toepassen op<select data-u4-bulk-scope><option value="review">Alleen Nakijken</option><option value="uncategorized">Alleen ongecategoriseerd</option><option value="all">Alle transacties</option></select></label><label>Budgeteigenaar<select data-u4-bulk-owner><option value="">Niet wijzigen</option>${OWNERS.map((owner) => option(owner, ownerLabel2(owner), "")).join("")}</select></label><label>Categorie<select data-u4-bulk-category><option value="">Niet wijzigen</option>${categoryOptions(root2, "gezamenlijk", "")}</select></label><label>Transactie<select data-u4-bulk-type><option value="">Niet wijzigen</option>${typeOptions("")}</select></label></div><button type="button" class="ghost small" data-u4-apply-bulk>Voorbeeld en toepassen</button></div></section>`;
     }
     async function showMatchDialog(root2, draft, source, modal) {
-      var _a, _b;
+      var _a2, _b;
       const matches = matchCandidates(draft, source);
       if (!matches.length) {
         const previous = source.certainty;
@@ -9161,7 +9259,7 @@ ${(error == null ? void 0 : error.message) || error}`);
         });
         return;
       }
-      (_a = document.querySelector(".u4-match-overlay")) == null ? void 0 : _a.remove();
+      (_a2 = document.querySelector(".u4-match-overlay")) == null ? void 0 : _a2.remove();
       const overlay = document.createElement("div");
       overlay.className = "u4-match-overlay";
       overlay.innerHTML = `<div class="u4-match-dialog" role="dialog" aria-modal="true" aria-labelledby="u4-match-title"><div class="u4-match-head"><div><h3 id="u4-match-title">Vergelijkbare transacties gevonden</h3><p>${matches.length} mogelijke matches. Vink uit wat niet mee aangepast moet worden.</p></div><button type="button" class="ghost small" data-u4-match-close>Sluiten</button></div><div class="u4-match-change"><strong>Wordt toegepast</strong><span>${ownerLabel2(source.processing.budgetOwner)} · ${esc(source.processing.category)} · ${esc(((_b = TYPE_GROUPS.flatMap((g) => g.items).find((item) => item[0] === source.processing.transactionType)) == null ? void 0 : _b[1]) || source.processing.transactionType)} · Zeker</span></div><div class="u4-match-list">${matches.map(({ row, score, reasons }) => `<label class="u4-match-row"><input type="checkbox" data-u4-match-id="${esc(row.id)}" ${score >= 4 ? "checked" : ""}><span><strong>${esc(row.processing.processingDate)} · ${esc(row.bankOriginal.description || "Onbekend")}</strong><small>${euro(row.processing.processedAmount)} · ${esc(row.processing.category || "Ongecategoriseerd")} · ${esc(reasons.join(", "))}</small></span></label>`).join("")}</div><div class="u4-match-feedback" data-u4-match-feedback aria-live="polite"></div><div class="u4-match-actions"><button type="button" class="ghost" data-u4-match-only>Alleen deze transactie</button><button type="button" class="primary" data-u4-match-apply>Geselecteerde aanpassen</button></div></div>`;
@@ -9281,7 +9379,7 @@ ${(error == null ? void 0 : error.message) || error}`);
       return `De import kon niet worden geopend: ${(error == null ? void 0 : error.message) || error}`;
     }
     function renderCloudImportState(root2, id, error = null) {
-      var _a, _b, _c;
+      var _a2, _b, _c;
       const modal = ensureModalRoot();
       const summary = (root2.state.importSummaries || []).find((item) => String(item.id) === String(id));
       const canDiscard = String(root2.state.activeImportId || "") === String(id) && (summary == null ? void 0 : summary.status) === "concept";
@@ -9290,7 +9388,7 @@ ${(error == null ? void 0 : error.message) || error}`);
       <main class="u4-modal-body"><div class="u4-cloud-message">${error ? `<strong>Ophalen mislukt</strong><p>${esc(cloudImportMessage(error))}</p><div class="u4-cloud-actions"><button type="button" class="primary" data-u4-cloud-retry>Opnieuw proberen</button>${canDiscard ? '<button type="button" class="danger-ghost" data-u4-discard-concept>Concept verwijderen en nieuwe import toestaan</button>' : ""}</div>` : '<span class="u4-cloud-spinner" aria-hidden="true"></span><strong>Even geduld…</strong><p>Het oorspronkelijke CSV-bestand is niet nodig.</p>'}</div></main>
     </div>`;
       modal.classList.add("open");
-      (_a = modal.querySelector("[data-u4-close]")) == null ? void 0 : _a.addEventListener("click", closeDraft);
+      (_a2 = modal.querySelector("[data-u4-close]")) == null ? void 0 : _a2.addEventListener("click", closeDraft);
       (_b = modal.querySelector("[data-u4-cloud-retry]")) == null ? void 0 : _b.addEventListener("click", () => openDraft(root2, id));
       (_c = modal.querySelector("[data-u4-discard-concept]")) == null ? void 0 : _c.addEventListener("click", async (event) => {
         if (!confirm("Dit onverwerkte importconcept verwijderen? De financiële administratie en verwerkte imports blijven behouden.")) return;
@@ -9362,24 +9460,24 @@ ${(error == null ? void 0 : error.message) || error}`);
       const scroller = modal.querySelector(".u4-import-modal");
       const scrollTop = (scroller == null ? void 0 : scroller.scrollTop) || 0;
       const openRows = [...modal.querySelectorAll("[data-u4-row] details[open]")].map((details) => {
-        var _a;
-        return (_a = details.closest("[data-u4-row]")) == null ? void 0 : _a.dataset.u4Row;
+        var _a2;
+        return (_a2 = details.closest("[data-u4-row]")) == null ? void 0 : _a2.dataset.u4Row;
       }).filter(Boolean);
       renderDraftModal(root2, draft);
       const next = document.getElementById("u4ImportModalRoot");
       requestAnimationFrame(() => {
-        var _a;
+        var _a2;
         const nextScroller = next == null ? void 0 : next.querySelector(".u4-import-modal");
         if (nextScroller) nextScroller.scrollTop = scrollTop;
         openRows.forEach((id) => {
-          var _a2;
-          return (_a2 = next == null ? void 0 : next.querySelector(`[data-u4-row="${id}"] details`)) == null ? void 0 : _a2.setAttribute("open", "");
+          var _a3;
+          return (_a3 = next == null ? void 0 : next.querySelector(`[data-u4-row="${id}"] details`)) == null ? void 0 : _a3.setAttribute("open", "");
         });
-        if (rowId && !openRows.includes(rowId)) (_a = next == null ? void 0 : next.querySelector(`[data-u4-row="${rowId}"]`)) == null ? void 0 : _a.scrollIntoView({ block: "nearest" });
+        if (rowId && !openRows.includes(rowId)) (_a2 = next == null ? void 0 : next.querySelector(`[data-u4-row="${rowId}"]`)) == null ? void 0 : _a2.scrollIntoView({ block: "nearest" });
       });
     }
     function renderDraftRowCard(root2, draft, modal, rowId) {
-      var _a;
+      var _a2;
       const row = draft.rows.find((item) => String(item.id) === String(rowId));
       const current = modal.querySelector(`[data-u4-row="${rowId}"]`);
       if (!row || !current) return false;
@@ -9387,15 +9485,15 @@ ${(error == null ? void 0 : error.message) || error}`);
       const wrapper = document.createElement("div");
       wrapper.innerHTML = rowHtml(root2, row);
       const replacement = wrapper.firstElementChild;
-      if (detailsOpen) (_a = replacement.querySelector("details")) == null ? void 0 : _a.setAttribute("open", "");
+      if (detailsOpen) (_a2 = replacement.querySelector("details")) == null ? void 0 : _a2.setAttribute("open", "");
       current.replaceWith(replacement);
       return true;
     }
     function bindDraftModal(root2, draft, modal) {
-      var _a, _b;
+      var _a2, _b;
       UI.root = root2;
       UI.draft = draft;
-      (_a = modal.querySelector("[data-u4-close]")) == null ? void 0 : _a.addEventListener("click", async (event) => {
+      (_a2 = modal.querySelector("[data-u4-close]")) == null ? void 0 : _a2.addEventListener("click", async (event) => {
         const button = event.currentTarget;
         button.disabled = true;
         updateImportSaveStatus("Laatste lokale wijzigingen opslaan…");
@@ -9454,7 +9552,7 @@ ${(error == null ? void 0 : error.message) || error}`);
         scheduleImportDraftPersist(root2, draft, { delay: 350, syncCloud: true, updateSummary: true }).catch((error) => console.warn("Automatisch lokaal opslaan mislukt.", error));
       });
       modal.addEventListener("click", async (event) => {
-        var _a2, _b2, _c, _d;
+        var _a3, _b2, _c, _d;
         root2 = UI.root;
         draft = UI.draft;
         modal = ensureModalRoot();
@@ -9473,7 +9571,7 @@ ${(error == null ? void 0 : error.message) || error}`);
           return;
         }
         if (event.target.closest("[data-u4-apply-bulk]")) {
-          const scope = ((_a2 = modal.querySelector("[data-u4-bulk-scope]")) == null ? void 0 : _a2.value) || "review";
+          const scope = ((_a3 = modal.querySelector("[data-u4-bulk-scope]")) == null ? void 0 : _a3.value) || "review";
           const owner = ((_b2 = modal.querySelector("[data-u4-bulk-owner]")) == null ? void 0 : _b2.value) || "";
           const category = ((_c = modal.querySelector("[data-u4-bulk-category]")) == null ? void 0 : _c.value) || "";
           const type = ((_d = modal.querySelector("[data-u4-bulk-type]")) == null ? void 0 : _d.value) || "";
@@ -9482,8 +9580,8 @@ ${(error == null ? void 0 : error.message) || error}`);
             return;
           }
           const targets = draft.rows.filter((item) => {
-            var _a3;
-            return ((_a3 = item.bankOriginal) == null ? void 0 : _a3.valid) && !item.duplicate && (scope === "all" || scope === "review" && item.certainty === "nakijken" || scope === "uncategorized" && (!item.processing.category || item.processing.category === "Ongecategoriseerd"));
+            var _a4;
+            return ((_a4 = item.bankOriginal) == null ? void 0 : _a4.valid) && !item.duplicate && (scope === "all" || scope === "review" && item.certainty === "nakijken" || scope === "uncategorized" && (!item.processing.category || item.processing.category === "Ongecategoriseerd"));
           });
           if (!targets.length) {
             alert("Geen transacties binnen deze selectie.");
@@ -9553,10 +9651,10 @@ ${(error == null ? void 0 : error.message) || error}`);
       });
     }
     function bindImportPanel(rootElement, root2) {
-      var _a, _b, _c;
-      (_a = rootElement.querySelector("[data-u4-file]")) == null ? void 0 : _a.addEventListener("change", (event) => {
-        var _a2;
-        const file = (_a2 = event.target.files) == null ? void 0 : _a2[0];
+      var _a2, _b, _c;
+      (_a2 = rootElement.querySelector("[data-u4-file]")) == null ? void 0 : _a2.addEventListener("change", (event) => {
+        var _a3;
+        const file = (_a3 = event.target.files) == null ? void 0 : _a3[0];
         if (!file) return;
         if (root2.state.activeImportId) {
           event.target.value = "";
@@ -9615,8 +9713,8 @@ ${(error == null ? void 0 : error.message) || error}`);
       });
     }
     function injectSettlementCard(root2) {
-      var _a, _b;
-      (_a = document.querySelector('[data-dashboard-accordion="settlement"]')) == null ? void 0 : _a.remove();
+      var _a2, _b;
+      (_a2 = document.querySelector('[data-dashboard-accordion="settlement"]')) == null ? void 0 : _a2.remove();
       (_b = document.querySelector(".u4-settlement-card")) == null ? void 0 : _b.remove();
       if (document.body.dataset.activeTab !== "dashboard") return;
       const target = document.querySelector("#tab-dashboard .manage-stack") || document.querySelector(".manage-stack");
@@ -9646,7 +9744,7 @@ ${(error == null ? void 0 : error.message) || error}`);
       modal.querySelector("[data-u4-settlement-month]").addEventListener("change", (event) => renderSettlementDetail(root2, { person: modal.querySelector("[data-u4-settlement-person]").value, month: event.target.value }));
     }
     function installUI(root2) {
-      var _a;
+      var _a2;
       root2.renderBankImportSection = () => renderImportPanel(root2);
       root2.bindBankImport = (element) => bindImportPanel(element, root2);
       if (typeof root2.renderActiveTab === "function" && !root2.renderActiveTab.__u4Wrapped) {
@@ -9659,7 +9757,7 @@ ${(error == null ? void 0 : error.message) || error}`);
         wrapped.__u4Wrapped = true;
         root2.renderActiveTab = wrapped;
       }
-      (_a = root2.__finizeInstallUpdate4Hooks) == null ? void 0 : _a.call(root2, {
+      (_a2 = root2.__finizeInstallUpdate4Hooks) == null ? void 0 : _a2.call(root2, {
         renderBankImportSection: root2.renderBankImportSection,
         bindBankImport: root2.bindBankImport,
         renderActiveTab: root2.renderActiveTab
@@ -9680,12 +9778,12 @@ ${(error == null ? void 0 : error.message) || error}`);
       ImportPerformance.syncRequested = true;
       if (ImportPerformance.syncPromise) return ImportPerformance.syncPromise;
       ImportPerformance.syncPromise = (async () => {
-        var _a, _b, _c, _d;
+        var _a2, _b, _c, _d;
         let overall = true;
         while (ImportPerformance.syncRequested) {
           ImportPerformance.syncRequested = false;
           const cloud = root2.CloudAdapter;
-          if (!((_a = cloud == null ? void 0 : cloud.isConnected) == null ? void 0 : _a.call(cloud)) && ((_b = cloud == null ? void 0 : cloud.isConfigured) == null ? void 0 : _b.call(cloud)) && typeof cloud.connect === "function") await cloud.connect();
+          if (!((_a2 = cloud == null ? void 0 : cloud.isConnected) == null ? void 0 : _a2.call(cloud)) && ((_b = cloud == null ? void 0 : cloud.isConfigured) == null ? void 0 : _b.call(cloud)) && typeof cloud.connect === "function") await cloud.connect();
           if (!((_c = cloud == null ? void 0 : cloud.isConnected) == null ? void 0 : _c.call(cloud)) || !((_d = cloud.modules) == null ? void 0 : _d.firestore) || !cloud.db) return false;
           const firestore = cloud.modules.firestore;
           for (const item of await ImportStore.listSync()) {
@@ -9697,10 +9795,10 @@ ${(error == null ? void 0 : error.message) || error}`);
             try {
               const envelope = buildCloudImportEnvelope(record);
               for (let index = 0; index < envelope.chunks.length; index++) {
-                const chunkRef = firestore.doc(cloud.db, "budgetPlanners", "finize", "imports", record.id, "chunks", String(index).padStart(4, "0"));
+                const chunkRef = cloudImportChunkRef(cloud, firestore, record.id, String(index).padStart(4, "0"));
                 await firestore.setDoc(chunkRef, envelope.chunks[index], { merge: false });
               }
-              const importRef = firestore.doc(cloud.db, "budgetPlanners", "finize", "imports", record.id);
+              const importRef = cloudImportRef(cloud, firestore, record.id);
               await firestore.setDoc(importRef, envelope.header, { merge: false });
               await ImportStore.deleteSync(item.id);
             } catch (error) {
@@ -9722,11 +9820,11 @@ ${(error == null ? void 0 : error.message) || error}`);
       return ImportPerformance.syncPromise;
     }
     async function recoverJournal(root2) {
-      var _a, _b;
+      var _a2, _b;
       const entries = await ImportStore.listJournal();
       for (const entry of entries.filter((item) => item.status === "pending")) {
         if (entry.operation === "discard") {
-          if (((_a = root2.state) == null ? void 0 : _a.activeImportId) === entry.importId) {
+          if (((_a2 = root2.state) == null ? void 0 : _a2.activeImportId) === entry.importId) {
             entry.status = "rolled-back";
           } else {
             try {
@@ -9756,7 +9854,7 @@ ${(error == null ? void 0 : error.message) || error}`);
       }
     }
     function install(root2) {
-      var _a;
+      var _a2;
       if (!(root2 == null ? void 0 : root2.state)) return;
       normalizeCore(root2.state);
       const validation = validateCore(root2.state);
@@ -9798,12 +9896,12 @@ ${(error == null ? void 0 : error.message) || error}`);
       installUI(root2);
       if (!root2.__finizeUpdate4CloudListener) {
         root2.__finizeUpdate4CloudListener = true;
-        (_a = root2.addEventListener) == null ? void 0 : _a.call(root2, "finize:cloud-connected", () => recoverJournal(root2).then(() => flushImportSync(root2)).catch((error) => console.warn("Importsynchronisatie uitgesteld.", error)));
+        (_a2 = root2.addEventListener) == null ? void 0 : _a2.call(root2, "finize:cloud-connected", () => recoverJournal(root2).then(() => flushImportSync(root2)).catch((error) => console.warn("Importsynchronisatie uitgesteld.", error)));
       }
       Promise.resolve().then(() => recoverJournal(root2)).then(() => reconcileActiveImportReference(root2)).catch((error) => console.warn("Update 4 opslaginitialisatie uitgesteld.", error)).finally(() => {
-        var _a2;
+        var _a3;
         if (root2.__finizeBootstrap) root2.__finizeBootstrap.update4Ready = true;
-        (_a2 = root2.__finizeMaybeFinishBootstrap) == null ? void 0 : _a2.call(root2);
+        (_a3 = root2.__finizeMaybeFinishBootstrap) == null ? void 0 : _a3.call(root2);
         flushImportSync(root2).catch((error) => console.warn("Importsynchronisatie uitgesteld.", error));
       });
     }
@@ -9814,7 +9912,7 @@ ${(error == null ? void 0 : error.message) || error}`);
   // src/ui/presentation.js
   (function() {
     "use strict";
-    var _a;
+    var _a2;
     let selectedGoalRef = "";
     let goalOwnerFilter = "alle";
     let goalViewMode = "master";
@@ -9945,7 +10043,7 @@ ${(error == null ? void 0 : error.message) || error}`);
       }));
     }
     function renderGoals() {
-      var _a2;
+      var _a3;
       const groups = goalGroups();
       const items = calculatedGoals();
       const totals = items.reduce((sum, item) => {
@@ -9976,7 +10074,7 @@ ${(error == null ? void 0 : error.message) || error}`);
         <aside class="card u5-goal-list">
           <div class="card-head"><div><h2>Spaardoelen</h2><span class="hint">${selection.visible.length} zichtbaar</span></div></div>
           <div class="u5-goal-list-scroll">${goalListContent(selection.visible) || '<p class="hint">Geen doelen in deze groep.</p>'}</div>
-          <button type="button" class="ghost" data-open-goal-manager="${((_a2 = selection.selected) == null ? void 0 : _a2.owner) || "gezamenlijk"}">+ Nieuw doel of volgorde wijzigen</button>
+          <button type="button" class="ghost" data-open-goal-manager="${((_a3 = selection.selected) == null ? void 0 : _a3.owner) || "gezamenlijk"}">+ Nieuw doel of volgorde wijzigen</button>
         </aside>
         ${goalDetail(selection.selected)}
       </div>`}`;
@@ -10023,7 +10121,7 @@ ${(error == null ? void 0 : error.message) || error}`);
       renderActiveTab();
     });
     if (window.__finizeBootstrap) window.__finizeBootstrap.update5Ready = true;
-    (_a = window.__finizeMaybeFinishBootstrap) == null ? void 0 : _a.call(window);
+    (_a2 = window.__finizeMaybeFinishBootstrap) == null ? void 0 : _a2.call(window);
   })();
 
   // src/storage/service-worker-registration.js

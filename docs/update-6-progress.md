@@ -55,3 +55,29 @@ Status: lokaal afgerond en geverifieerd, nog niet gepubliceerd.
 - 30 Node-tests geslaagd, inclusief account-, profiel- en regelcontracten.
 - 34 Playwright-browsertests geslaagd; de bestaande interface en auth-preview blijven stabiel.
 - JavaScript-syntax, CSS en de gegenereerde runtime zijn schoon en reproduceerbaar.
+
+## Fase 3: accountgebonden opslag zonder rekenwijziging
+
+Status: lokaal afgerond en geverifieerd, nog niet gepubliceerd.
+
+### Opgeleverd
+
+- De bestaande complete Finize-state blijft ongewijzigd het invoerformaat van dezelfde rekenmotor.
+- Een actieve accountkoppeling gebruikt het beveiligde cloudpad `households/{householdId}/budgetState/current`.
+- Bankimportdetails gebruiken hetzelfde beveiligde huishouden in plaats van het oude openbare pad.
+- Lokale state, back-up en migratiekopie zijn per account en huishouden gescheiden.
+- Zonder actieve Update 6-auth blijft exact het bestaande lokale en cloudpad actief.
+
+### Bewuste grens van fase 3
+
+- Het bestaande document is nog niet naar het nieuwe pad gekopieerd.
+- De oude openbare regels blijven tot de gecontroleerde live-migratie bestaan.
+- Auth blijft uit, waardoor de productie-app en alle huidige berekeningen nog exact zoals voorheen werken.
+
+### Verificatie
+
+- 31 Node-tests geslaagd, inclusief de nieuwe opslagpad- en cachescheidingscontracten.
+- Alle bestaande Update 2 t/m 5-rekentests zijn ongewijzigd geslaagd.
+- 34 Playwright-browsertests geslaagd op telefoon-, tablet- en desktopformaten.
+- Firestore-regels compileren zonder fouten via een Firebase CLI dry-run.
+- JavaScript-syntax, CSS en de gegenereerde runtime zijn schoon en reproduceerbaar.

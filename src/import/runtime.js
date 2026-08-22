@@ -18,6 +18,24 @@ import { cloneState as clone } from "../core/state.js";
   const OWNERS=['gezamenlijk','dion','dara'];
   const IMPORT_STATUSES=['concept','verwerkt','teruggedraaid','correctie-nodig'];
 
+  function cloudImportRef(cloud,firestore,importId){
+    if(typeof cloud?.importRef==='function'){
+      const reference=cloud.importRef(importId);
+      if(!reference)throw new Error('De cloudlocatie voor deze import ontbreekt.');
+      return reference;
+    }
+    return firestore.doc(cloud.db,'budgetPlanners','finize','imports',String(importId));
+  }
+
+  function cloudImportChunkRef(cloud,firestore,importId,chunkId){
+    if(typeof cloud?.importChunkRef==='function'){
+      const reference=cloud.importChunkRef(importId,chunkId);
+      if(!reference)throw new Error('De cloudlocatie voor dit importdeel ontbreekt.');
+      return reference;
+    }
+    return firestore.doc(cloud.db,'budgetPlanners','finize','imports',String(importId),'chunks',String(chunkId));
+  }
+
   function plain(value){return value!==null&&typeof value==='object'&&!Array.isArray(value);}
   function round2(value){return Math.round((Number(value)+Number.EPSILON)*100)/100;}
   function normalizeIban(value){return String(value||'').toUpperCase().replace(/[^A-Z0-9]/g,'');}
@@ -337,7 +355,7 @@ import { cloneState as clone } from "../core/state.js";
       throw cloudImportError('cloud-offline','De import staat niet lokaal en de cloudverbinding is niet beschikbaar.');
     }
     const firestore=cloud.modules.firestore;
-    const importRef=firestore.doc(cloud.db,'budgetPlanners','finize','imports',String(id));
+    const importRef=cloudImportRef(cloud,firestore,id);
     let headerSnapshot;
     try{headerSnapshot=await firestore.getDoc(importRef);}
     catch(error){throw classifyCloudError(error,'De importheader kon niet worden opgehaald.');}
@@ -349,7 +367,7 @@ import { cloneState as clone } from "../core/state.js";
     if(!Number.isInteger(count)||count<0)throw cloudImportError('cloud-invalid','De cloudkopie bevat geen geldige importindeling.');
     const indices=Array.from({length:count},(_,index)=>index);
     const chunks=await mapWithConcurrency(indices,CLOUD_READ_CONCURRENCY,async index=>{
-      const chunkRef=firestore.doc(cloud.db,'budgetPlanners','finize','imports',String(id),'chunks',String(index).padStart(4,'0'));
+      const chunkRef=cloudImportChunkRef(cloud,firestore,id,String(index).padStart(4,'0'));
       let snapshot;
       try{snapshot=await firestore.getDoc(chunkRef);}
       catch(error){throw classifyCloudError(error,`Importdeel ${index+1} van ${count} kon niet worden opgehaald.`);}
@@ -750,7 +768,7 @@ import { cloneState as clone } from "../core/state.js";
       if(!cloud?.isConnected?.()||!cloud.modules?.firestore||!cloud.db)return false;
       const firestore=cloud.modules.firestore;
       if(typeof firestore.deleteDoc!=='function')return false;
-      const importRef=firestore.doc(cloud.db,'budgetPlanners','finize','imports',String(id));
+      const importRef=cloudImportRef(cloud,firestore,id);
       let chunkCount=null;
       if(typeof firestore.getDoc==='function'){
         const snapshot=await firestore.getDoc(importRef);
@@ -761,7 +779,7 @@ import { cloneState as clone } from "../core/state.js";
       if(Number.isInteger(chunkCount)&&chunkCount>=0){
         const indices=Array.from({length:chunkCount},(_,index)=>index);
         await mapWithConcurrency(indices,CLOUD_READ_CONCURRENCY,index=>firestore.deleteDoc(
-          firestore.doc(cloud.db,'budgetPlanners','finize','imports',String(id),'chunks',String(index).padStart(4,'0'))
+          cloudImportChunkRef(cloud,firestore,id,String(index).padStart(4,'0'))
         ));
       }
       await firestore.deleteDoc(importRef);
@@ -1727,10 +1745,10 @@ import { cloneState as clone } from "../core/state.js";
           try{
             const envelope=buildCloudImportEnvelope(record);
             for(let index=0;index<envelope.chunks.length;index++){
-              const chunkRef=firestore.doc(cloud.db,'budgetPlanners','finize','imports',record.id,'chunks',String(index).padStart(4,'0'));
+              const chunkRef=cloudImportChunkRef(cloud,firestore,record.id,String(index).padStart(4,'0'));
               await firestore.setDoc(chunkRef,envelope.chunks[index],{merge:false});
             }
-            const importRef=firestore.doc(cloud.db,'budgetPlanners','finize','imports',record.id);
+            const importRef=cloudImportRef(cloud,firestore,record.id);
             await firestore.setDoc(importRef,envelope.header,{merge:false});
             await ImportStore.deleteSync(item.id);
           }catch(error){

@@ -15,6 +15,12 @@ import {
   rebaseLocalChanges,
   removeStaleIncomeOverrides
 } from "../storage/sync-protocol.mjs";
+import {
+  cloudBudgetDocumentPath,
+  cloudImportChunkPath,
+  cloudImportDocumentPath,
+  storageKeysForSession
+} from "../storage/account-scope.mjs";
 
 /* ---------- helpers ---------- */
 function round2(n){ return Math.round((n + Number.EPSILON) * 100) / 100; }
@@ -1690,16 +1696,14 @@ function defaultState(){
 }
 
 /* ---------- opslag: lokaal + optionele Firebase/Firestore-sync ---------- */
-const STORAGE_KEY = 'finize-budget-planner-v1';
-const BACKUP_STORAGE_KEY = 'finize-budget-planner-v1-last-good-backup';
-const MIGRATION_BACKUP_STORAGE_KEY = 'finize-budget-planner-v1-pre-schema-v5';
 const DEVICE_ID_STORAGE_KEY = 'finize-device-id';
 const FIREBASE_CONFIG_STORAGE_KEY = 'finize-firebase-config';
-const FIRESTORE_COLLECTION = 'budgetPlanners';
-const FIRESTORE_DOC_ID = 'finize';
 const GOAL_IMAGE_DB_NAME = 'finize-goal-images-v1';
 const GOAL_IMAGE_STORE_NAME = 'images';
 const GOAL_IMAGE_REF_PREFIX = 'idb:goal-image:';
+let activeAuthSession = globalThis.FinizeAuth?.enabled ? null : {status:'disabled'};
+
+function activeStorageKeys(){ return storageKeysForSession(activeAuthSession); }
 
 const GoalImageStore = {
   dbPromise:null,
@@ -1897,11 +1901,12 @@ function migrateBudgetState(candidate){
   try{
     const fromVersion = Number(candidate?.meta?.schemaVersion) || 1;
     if (fromVersion < U3_SCHEMA_VERSION){
-      localStorage.setItem(MIGRATION_BACKUP_STORAGE_KEY, JSON.stringify({
-        savedAt:new Date().toISOString(),
-        fromVersion,
-        state:original
-      }));
+      const migrationKey = activeStorageKeys()?.migration;
+      if (migrationKey) localStorage.setItem(migrationKey, JSON.stringify({
+          savedAt:new Date().toISOString(),
+          fromVersion,
+          state:original
+        }));
     }
     const migrated = normalizeBudgetState(candidate);
     migrated.meta.schemaVersion = U3_SCHEMA_VERSION;
@@ -2057,14 +2062,17 @@ function isStorageQuotaError(error){
 }
 
 function localSave(state){
+  const keys = activeStorageKeys();
+  if (!keys) return false;
   const serialized = JSON.stringify(state);
   try{
-    localStorage.setItem(STORAGE_KEY, serialized);
+    localStorage.setItem(keys.state, serialized);
   }catch(error){
     if (!isStorageQuotaError(error)) throw error;
-    localStorage.removeItem(BACKUP_STORAGE_KEY);
-    localStorage.setItem(STORAGE_KEY, serialized);
+    localStorage.removeItem(keys.backup);
+    localStorage.setItem(keys.state, serialized);
   }
+  return true;
 }
 
 function firebaseConfigTemplate(){
@@ -2139,7 +2147,9 @@ const CloudAdapter = {
       const {app, firestore} = await this.loadModules();
       this.app = app.getApps().length ? app.getApps()[0] : app.initializeApp(this.config);
       this.db = firestore.getFirestore(this.app);
-      this.docRef = firestore.doc(this.db, FIRESTORE_COLLECTION, FIRESTORE_DOC_ID);
+      const documentPath = cloudBudgetDocumentPath(activeAuthSession);
+      if (!documentPath) throw new Error('De accountkoppeling voor cloudopslag ontbreekt.');
+      this.docRef = firestore.doc(this.db,...documentPath);
       this.attachSnapshot();
       this.status = this.pendingState ? 'Opslaan…' : 'Lokaal opgeslagen';
       renderCloudStatus();
@@ -2497,6 +2507,16 @@ const CloudAdapter = {
     this.remoteStateWaiting = null;
     this.status = 'Offline — lokaal bewaard';
     renderCloudStatus();
+  },
+  importRef(importId){
+    const path = cloudImportDocumentPath(activeAuthSession,importId);
+    if (!path || !this.db || !this.modules?.firestore) return null;
+    return this.modules.firestore.doc(this.db,...path);
+  },
+  importChunkRef(importId,chunkId){
+    const path = cloudImportChunkPath(activeAuthSession,importId,chunkId);
+    if (!path || !this.db || !this.modules?.firestore) return null;
+    return this.modules.firestore.doc(this.db,...path);
   }
 };
 window.CloudAdapter = CloudAdapter;
@@ -2515,7 +2535,9 @@ const DataAdapter = {
   },
   load(){
     try{
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const keys = activeStorageKeys();
+      if (!keys) return null;
+      const raw = localStorage.getItem(keys.state);
       if (!raw) return null;
       this.loadedFromStorage = true;
       const parsed = JSON.parse(raw);
@@ -2530,7 +2552,9 @@ const DataAdapter = {
   },
   backup(state, reason){
     try{
-      localStorage.setItem(BACKUP_STORAGE_KEY, JSON.stringify({
+      const keys = activeStorageKeys();
+      if (!keys) return false;
+      localStorage.setItem(keys.backup, JSON.stringify({
         savedAt: new Date().toISOString(),
         label: backupLabel(),
         reason,
@@ -2541,7 +2565,9 @@ const DataAdapter = {
   },
   loadBackup(){
     try{
-      const raw = localStorage.getItem(BACKUP_STORAGE_KEY);
+      const keys = activeStorageKeys();
+      if (!keys) return null;
+      const raw = localStorage.getItem(keys.backup);
       return raw ? JSON.parse(raw) : null;
     }catch(e){ console.error('back-up laden mislukt', e); return null; }
   }
@@ -6440,7 +6466,17 @@ window.__finizeMaybeFinishBootstrap=function(){
   if(!bootstrap.authReady){
     if(!bootstrap.waitingForAuth){
       bootstrap.waitingForAuth=true;
-      Promise.resolve(window.__finizeAuthGate).then(session=>{
+      Promise.resolve(window.__finizeAuthGate).then(async session=>{
+        activeAuthSession=session;
+        if (session?.status === 'ready'){
+          const scopedState = DataAdapter.load();
+          if (scopedState){
+            state=scopedState;
+            window.state=state;
+            committedStateSnapshot=clone(state);
+            await GoalImageStore.initializeState(state);
+          }
+        }
         bootstrap.authReady=true;
         bootstrap.authSession=session;
         window.__finizeMaybeFinishBootstrap();

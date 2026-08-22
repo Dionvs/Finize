@@ -61,6 +61,32 @@ service cloud.firestore {
           ]);
         allow delete: if false;
       }
+
+      // De bestaande Finize-state blijft één document, zodat alle huidige
+      // berekeningen en het transactionele syncprotocol ongewijzigd blijven.
+      match /budgetState/current {
+        allow read: if linkedTo(householdId);
+        allow create: if linkedTo(householdId)
+          && request.resource.data.syncVersion == 1
+          && request.resource.data.commitId is string;
+        allow update: if linkedTo(householdId)
+          && request.resource.data.syncVersion is int
+          && request.resource.data.commitId is string
+          && (
+            (!('syncVersion' in resource.data) && request.resource.data.syncVersion == 1)
+            || ('syncVersion' in resource.data
+              && request.resource.data.syncVersion == resource.data.syncVersion + 1)
+          );
+        allow delete: if false;
+      }
+
+      match /imports/{importId} {
+        allow read, write: if linkedTo(householdId);
+
+        match /chunks/{chunkId} {
+          allow read, write: if linkedTo(householdId);
+        }
+      }
     }
 
     // Finize gebruikt momenteel een gedeelde, niet-geauthenticeerde planner.
