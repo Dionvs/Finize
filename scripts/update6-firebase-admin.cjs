@@ -81,6 +81,11 @@ async function createOrVerifyDocument(documentPath,fields){
   return 'created';
 }
 
+async function replaceDocument(documentPath,fields){
+  await api(documentUrl(documentPath),{method:'PATCH',body:{fields}});
+  return 'replaced';
+}
+
 async function authConfig(){
   return api(`https://identitytoolkit.googleapis.com/admin/v2/projects/${projectId}/config`);
 }
@@ -119,7 +124,7 @@ async function backup(){
   console.log(JSON.stringify({firestore:path.basename(firestoreFile),auth:path.basename(authFile),stateBytes:JSON.stringify(legacy.fields?.state||{}).length,imports:imports.length,chunks:imports.reduce((sum,item)=>sum+item.chunks.length,0)}));
 }
 
-async function migrate(){
+async function migrate({replaceState=false}={}){
   const linking = JSON.parse(fs.readFileSync(localLinkFile,'utf8'));
   assert.equal(linking.accounts.length,2,'Update 6 verwacht exact twee accounts.');
   assert.deepEqual(new Set(linking.accounts.map(account=>account.role)),new Set(['dion','dara']));
@@ -132,7 +137,10 @@ async function migrate(){
     updateVersion:integerValue(6)
   };
   const householdResult=await createOrVerifyDocument(`households/${linking.householdId}`,householdFields);
-  const stateResult=await createOrVerifyDocument(`households/${linking.householdId}/budgetState/current`,legacy.fields);
+  const statePath=`households/${linking.householdId}/budgetState/current`;
+  const stateResult=replaceState
+    ? await replaceDocument(statePath,legacy.fields)
+    : await createOrVerifyDocument(statePath,legacy.fields);
   const legacyImports=await readLegacyImports();
   let importCount=0;
   let chunkCount=0;
@@ -245,5 +253,5 @@ async function testAuthenticatedBoundary(){
 }
 
 const command=process.argv[2];
-({inspect,backup,migrate,'enable-email-auth':enableEmailAuth,'authorize-domain':authorizeDomain,'verify-public-boundary':verifyPublicBoundary,'verify-final-boundary':verifyFinalBoundary,'test-auth-boundary':testAuthenticatedBoundary}[command] || (()=>{throw new Error('Onbekende Update 6-beheeropdracht.');}))()
+({inspect,backup,migrate,'migrate-latest':()=>migrate({replaceState:true}),'enable-email-auth':enableEmailAuth,'authorize-domain':authorizeDomain,'verify-public-boundary':verifyPublicBoundary,'verify-final-boundary':verifyFinalBoundary,'test-auth-boundary':testAuthenticatedBoundary}[command] || (()=>{throw new Error('Onbekende Update 6-beheeropdracht.');}))()
   .catch(error=>{console.error(error.message);process.exitCode=1;});

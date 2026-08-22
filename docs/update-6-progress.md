@@ -107,21 +107,24 @@ Status: lokaal afgerond en geverifieerd, nog niet gepubliceerd.
 
 ## Fase 5: live-migratie en release 79
 
-Status: cloudmigratie afgerond; releasecode klaar voor publicatie.
+Status: live gepubliceerd en na de definitieve beveiligingsomschakeling geverifieerd.
 
 ### Opgeleverd
 
-- Lokale herstelkopie van het bestaande Firestore-document, vijf importheaders, vijf importchunks en de Auth-configuratie.
-- Bestaande state exact gekopieerd naar het beveiligde huishoudpad: syncversie 77, revisie 4254.
+- Lokale herstelkopieën van het bestaande Firestore-document, de imports en de Auth-configuratie, inclusief een laatste kopie vlak voor de definitieve synchronisatie.
+- De laatst opgeslagen bestaande state exact gekopieerd naar het beveiligde huishoudpad: syncversie 85, revisie 4262.
 - Beide aangeleverde adressen buiten Git gekoppeld aan de juiste rol en hetzelfde huishouden.
 - Google en e-mail/wachtwoord ingeschakeld; GitHub Pages-domein toegevoegd aan de toegestane Auth-domeinen.
 - Release 79 activeert de accountlaag en een nieuwe service-worker-cache.
 - Definitieve regels sluiten het oude openbare document en de oude importsubcollecties.
+- GitHub Pages publiceert de accountrelease vanaf `main` op `https://dionvs.github.io/Finize/`.
 
-### Verificatie voor publicatie
+### Verificatie na publicatie
 
-- De beveiligde state is veld voor veld gelijk aan het bestaande document.
-- Alle vijf importheaders en vijf chunks zijn gekopieerd of exact gelijk bevonden.
+- De beveiligde state is na het sluiten van de oude route veld voor veld gelijk aan de laatste bestaande stand.
+- Alle zes importheaders en zes chunks zijn gekopieerd of exact gelijk bevonden.
 - Een tijdelijk geverifieerd testaccount kon uitsluitend de eigen koppeling en het gekoppelde huishouden lezen; de andere koppeling gaf 403.
 - Het tijdelijke testaccount en de tijdelijke koppeling zijn na de controle verwijderd.
-- De definitieve Firestore-regels compileren zonder fouten in dry-run.
+- Zonder account geven het oude pad, het huishoudpad en accountkoppelingen alle drie 403.
+- De publieke pagina laadt release 79, toont het nieuwe inlogscherm en heeft **Ingelogd blijven** standaard aangevinkt.
+- De definitieve Firestore-regels zijn zonder compilatiefouten gepubliceerd.
