@@ -81,6 +81,8 @@
   var resolveGate;
   var currentUser = null;
   var currentAssignment = null;
+  var currentMemberProfile = null;
+  var currentHouseholdMembers = [];
   var mode = "login";
   var busy = false;
   var driver = null;
@@ -298,6 +300,12 @@
       await firestoreModule.setDoc(reference, { ...seed, joinedAt: now, updatedAt: now });
       return seed;
     }
+    async function loadHouseholdMembers(assignment) {
+      const snapshot = await firestoreModule.getDocs(
+        firestoreModule.collection(database, "households", assignment.householdId, "members")
+      );
+      return snapshot.docs.map((item) => item.data());
+    }
     return {
       initialize(onUser) {
         return authModule.onAuthStateChanged(auth, async (user) => {
@@ -339,8 +347,29 @@
         if (!snapshot.exists()) return null;
         const assignment = normalizeAssignment(snapshot.data());
         if (!assignment) return null;
-        await ensureMemberProfile(user, assignment);
+        currentMemberProfile = await ensureMemberProfile(user, assignment);
+        currentHouseholdMembers = await loadHouseholdMembers(assignment);
         return assignment;
+      },
+      async updateSharingPreferences({ sharePersonalTab, hiddenKpis }) {
+        const seed = memberProfileSeed(auth.currentUser, currentAssignment);
+        if (!seed) throw new Error("De huishoudkoppeling ontbreekt.");
+        const preferences = {
+          sharePersonalTab: sharePersonalTab === true,
+          hiddenKpis: [...new Set((hiddenKpis || []).filter((value) => ["income", "fixed", "saving", "variable"].includes(value)))],
+          updatedAt: firestoreModule.serverTimestamp()
+        };
+        const reference = firestoreModule.doc(database, "households", seed.householdId, "members", seed.uid);
+        await firestoreModule.updateDoc(reference, preferences);
+        currentMemberProfile = { ...currentMemberProfile, ...preferences };
+        currentHouseholdMembers = currentHouseholdMembers.map((member) => member.uid === seed.uid ? { ...member, ...preferences } : member);
+        return currentMemberProfile;
+      },
+      getProfile() {
+        return currentMemberProfile;
+      },
+      getHouseholdMembers() {
+        return currentHouseholdMembers.slice();
       }
     };
   }
@@ -354,7 +383,16 @@
     }
     try {
       driver = globalThis.__FINIZE_AUTH_TEST_DRIVER__ || await createFirebaseDriver();
-      driver.initialize(() => render());
+      driver.initialize(async (user) => {
+        var _a2, _b;
+        if (user !== void 0) {
+          currentUser = user;
+          currentAssignment = (user == null ? void 0 : user.emailVerified) ? normalizeAssignment(await driver.loadAssignment(user)) : null;
+        }
+        currentMemberProfile = ((_a2 = driver.getProfile) == null ? void 0 : _a2.call(driver)) || currentMemberProfile;
+        currentHouseholdMembers = ((_b = driver.getHouseholdMembers) == null ? void 0 : _b.call(driver)) || currentHouseholdMembers;
+        render();
+      });
     } catch (error) {
       document.body.classList.add("auth-pending");
       root.hidden = false;
@@ -371,6 +409,13 @@
     get assignment() {
       return currentAssignment;
     },
+    get profile() {
+      return currentMemberProfile;
+    },
+    get householdMembers() {
+      return currentHouseholdMembers.slice();
+    },
+    updateSharingPreferences: (preferences) => driver == null ? void 0 : driver.updateSharingPreferences(preferences),
     signOut: () => driver == null ? void 0 : driver.signOut()
   };
   initialize();
@@ -1443,6 +1488,7 @@
       debt: '<circle cx="12" cy="12" r="8"/><path d="M8 12h8"/>',
       transfer: '<path d="M5 8h13M15 5l3 3l-3 3M19 16H6M9 13l-3 3l3 3"/>',
       lock: '<rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
+      settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1l-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3a1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6a1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1a1.7 1.7 0 0 0-.3-1.9L4.2 7L7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3V2.8h4V3a1.7 1.7 0 0 0 1 1.6a1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9a1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"/>',
       image: '<rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="M5.5 17l4.5-4l3 2.5l2.5-2l3 3.5"/>'
     };
     return `<svg viewBox="0 0 24 24" class="ui-svg" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round">${icons[name] || icons.wallet}</svg>`;
@@ -1450,7 +1496,7 @@
   function iconBadge(name, tone = "green", extra = "") {
     return `<span class="icon-badge tone-${tone} ${extra}">${iconSvg(name)}</span>`;
   }
-  var FINIZE_NAV_ICONS = { dashboard: "dashboard", gezamenlijk: "shared", dion: "person", dara: "person", spaardoelen: "target", data: "cloud" };
+  var FINIZE_NAV_ICONS = { dashboard: "dashboard", gezamenlijk: "shared", dion: "person", dara: "person", spaardoelen: "target", data: "cloud", settings: "settings" };
   function finizeIconWrap(name, cls = "finize-action-icon") {
     return `<span class="${cls}" aria-hidden="true">${iconSvg(name)}</span>`;
   }
@@ -1653,7 +1699,8 @@
     const action = opts.openFixedOwner ? `button type="button" data-u3-open="planning" data-u3-planning-owner="${opts.openFixedOwner}" aria-label="Vaste lasten van ${textSafe(ownerLabel(opts.openFixedOwner))} wijzigen"` : opts.editSavingOwner ? `button type="button" data-personal-saving-edit="${opts.editSavingOwner}" aria-label="Spaargeld van ${textSafe(ownerLabel(opts.editSavingOwner))} voor deze maand aanpassen"` : opts.editSaving ? 'button type="button" data-saving-edit aria-label="Spaargeld van deze maand aanpassen"' : "div";
     const tag = action.startsWith("button") ? "button" : "div";
     const attrs = tag === "button" ? action.slice("button".length) : "";
-    return `<${tag}${attrs} class="card metric-card icon-kpi ${opts.span || "span-3"}${tag === "button" ? " overview-kpi-action" : ""}">
+    const kpiId = opts.kpiId ? ` data-personal-kpi="${opts.kpiId}"` : "";
+    return `<${tag}${attrs}${kpiId} class="card metric-card icon-kpi ${opts.span || "span-3"}${tag === "button" ? " overview-kpi-action" : ""}">
     <div class="icon-kpi-top"><span class="icon-circle ${color}">${renderIconContent(icon)}</span><div class="metric-label">${label}</div></div>
     <div class="metric-value${valClass}">${value}</div>
     ${sub ? `<div class="metric-sub">${sub}</div>` : ""}
@@ -3957,7 +4004,67 @@
     }
     return rows;
   }
+  function update6AccountContext() {
+    var _a2;
+    const auth = globalThis.FinizeAuth;
+    const role = (auth == null ? void 0 : auth.enabled) ? (_a2 = auth.assignment) == null ? void 0 : _a2.role : "";
+    const otherRole = role === "dion" ? "dara" : role === "dara" ? "dion" : "";
+    const members = (auth == null ? void 0 : auth.householdMembers) || [];
+    return {
+      enabled: !!role,
+      role,
+      otherRole,
+      profile: (auth == null ? void 0 : auth.profile) || null,
+      otherProfile: members.find((member) => member.role === otherRole) || null
+    };
+  }
+  function canViewPersonalTab(owner) {
+    var _a2;
+    const context = update6AccountContext();
+    if (!context.enabled || owner === context.role) return true;
+    return owner === context.otherRole && ((_a2 = context.otherProfile) == null ? void 0 : _a2.sharePersonalTab) === true;
+  }
+  function isReadOnlyPersonalTab(owner) {
+    const context = update6AccountContext();
+    return context.enabled && owner !== context.role;
+  }
+  function personalKpiVisible(owner, kpiId) {
+    var _a2;
+    const context = update6AccountContext();
+    if (!context.enabled || owner === context.role) return true;
+    return !(((_a2 = context.otherProfile) == null ? void 0 : _a2.hiddenKpis) || []).includes(kpiId);
+  }
+  function configureUpdate6Navigation() {
+    const context = update6AccountContext();
+    if (!context.enabled) return;
+    document.querySelectorAll("[data-update6-nav]").forEach((button) => button.hidden = false);
+    document.querySelectorAll('.v4-sidebar .tab-btn[data-tab="data"]').forEach((button) => button.hidden = true);
+    document.querySelectorAll('.v4-sidebar .tab-btn[data-tab="dion"],.v4-sidebar .tab-btn[data-tab="dara"]').forEach((button) => {
+      const owner = button.dataset.tab;
+      button.hidden = owner !== context.role && !canViewPersonalTab(owner);
+      const label = button.querySelector(".u5-nav-label");
+      if (label) label.textContent = ownerLabel(owner) + (owner === context.role ? " (jij)" : "");
+    });
+    document.querySelectorAll('.v4-bottom-nav .bottom-nav-btn[data-tab="dion"],.v4-bottom-nav .bottom-nav-btn[data-tab="dara"]').forEach((button) => {
+      button.hidden = button.dataset.tab !== context.role;
+    });
+    applyFinizeIconSystem();
+  }
+  function applyReadOnlyPersonalTab(root2, owner) {
+    if (!isReadOnlyPersonalTab(owner)) return;
+    const name = ownerLabel(owner);
+    root2.insertAdjacentHTML("afterbegin", `<div class="u6-readonly-banner" role="status">${iconSvg("lock")}<span><strong>Gedeeld door ${textSafe(name)}</strong><small>Dit overzicht is alleen-lezen. Verborgen onderdelen worden niet getoond.</small></span></div>`);
+    root2.querySelectorAll("button,input,select,textarea").forEach((control) => {
+      control.disabled = true;
+      control.setAttribute("aria-disabled", "true");
+    });
+  }
   function renderPersonOrJoint(tabId, key, label) {
+    if (key !== "gezamenlijk" && !canViewPersonalTab(key)) {
+      activeTab = "settings";
+      renderSettings();
+      return;
+    }
     const s = getMonthlyScenarioData(state.meta.scenario);
     const r = calcScenario(state);
     const isJoint = key === "gezamenlijk";
@@ -4009,10 +4116,10 @@
     </div>` : "";
     const personalKpis = !isJoint ? `
     <div class="overview-kpi-row">
-      ${renderIconKpi("€", "green", `Totaal inkomen ${textSafe(label)}`, eur(totaalInkomen), monthLabel(getSelectedMonth()), { valueClass: "value pos" })}
-      ${renderIconKpi("▤", "blue", "Vaste lasten", eur(rr.persoonlijkeVasteLasten), "Klik om te wijzigen", { valueClass: rr.persoonlijkeVasteLasten > 0 ? "value neg" : "value pos", openFixedOwner: key })}
-      ${renderIconKpi("◎", "green", "Sparen", eur(rr.beschikbaarVoorSparen), `${rr.savingsSource === "handmatig" ? "Handmatig" : "Automatisch"} · klik om aan te passen`, { valueClass: rr.beschikbaarVoorSparen < 0 ? "value neg" : "value pos", editSavingOwner: key })}
-      ${renderIconKpi("▥", "blue", "Variabel gebruikt", `${eur(variableUsed)} / ${eur(variableBudget)}`, `<span class="overview-budget-track" style="--used-pct:${variablePct}%"></span>`)}
+      ${personalKpiVisible(key, "income") ? renderIconKpi("€", "green", `Totaal inkomen ${textSafe(label)}`, eur(totaalInkomen), monthLabel(getSelectedMonth()), { valueClass: "value pos", kpiId: "income" }) : ""}
+      ${personalKpiVisible(key, "fixed") ? renderIconKpi("▤", "blue", "Vaste lasten", eur(rr.persoonlijkeVasteLasten), "Klik om te wijzigen", { valueClass: rr.persoonlijkeVasteLasten > 0 ? "value neg" : "value pos", openFixedOwner: key, kpiId: "fixed" }) : ""}
+      ${personalKpiVisible(key, "saving") ? renderIconKpi("◎", "green", "Sparen", eur(rr.beschikbaarVoorSparen), `${rr.savingsSource === "handmatig" ? "Handmatig" : "Automatisch"} · klik om aan te passen`, { valueClass: rr.beschikbaarVoorSparen < 0 ? "value neg" : "value pos", editSavingOwner: key, kpiId: "saving" }) : ""}
+      ${personalKpiVisible(key, "variable") ? renderIconKpi("▥", "blue", "Variabel gebruikt", `${eur(variableUsed)} / ${eur(variableBudget)}`, `<span class="overview-budget-track" style="--used-pct:${variablePct}%"></span>`, { kpiId: "variable" }) : ""}
     </div>` : "";
     const incomeManage = !isJoint ? `
     <div class="card">
@@ -4059,6 +4166,7 @@
       ${renderManageSection("Spaardoelen tabeloverzicht", `<div class="card">${renderGoalOverviewTable(doelenVoorGroep, spaarpotVoorGroep)}</div>`, false)}
     </div>
   `;
+    applyReadOnlyPersonalTab(document.getElementById(tabId), key);
   }
   function renderMobileGoalRow(item, owner) {
     const goal = item.doel;
@@ -5808,8 +5916,97 @@ service cloud.firestore {
       owner === "gezamenlijk" ? openJointTransactionModal(id) : openPersonalTransactionModal(owner, id);
     }));
   }
+  function renderSettings() {
+    var _a2, _b, _c, _d, _e, _f;
+    const root2 = document.getElementById("tab-settings");
+    const context = update6AccountContext();
+    if (!root2) return;
+    if (!context.enabled) {
+      root2.innerHTML = `${renderPageHeading("Instellingen", "Account- en huishoudinstellingen worden zichtbaar zodra Update 6 actief is.")}<section class="card"><div class="card-head"><h2>Data & back-up</h2></div><p class="hint">De bestaande lokale en cloudinstellingen blijven beschikbaar.</p><button type="button" class="primary" data-tab-shortcut="data">Open Data & back-up</button></section>`;
+      return;
+    }
+    const email = ((_b = (_a2 = globalThis.FinizeAuth) == null ? void 0 : _a2.user) == null ? void 0 : _b.email) || "";
+    const ownName = ownerLabel(context.role);
+    const otherName = ownerLabel(context.otherRole);
+    const profile = context.profile || {};
+    const hidden = new Set(profile.hiddenKpis || []);
+    const share = profile.sharePersonalTab === true;
+    const otherShared = ((_c = context.otherProfile) == null ? void 0 : _c.sharePersonalTab) === true;
+    const kpis = [
+      ["income", "Totaal inkomen"],
+      ["fixed", "Vaste lasten"],
+      ["saving", "Sparen"],
+      ["variable", "Variabel gebruikt"]
+    ];
+    root2.innerHTML = `
+    ${renderPageHeading("Instellingen", "Beheer je account, huishouden, delen en back-ups op één plek.")}
+    <div class="u6-settings-grid">
+      <section class="card u6-settings-card">
+        <div class="card-head"><div class="card-head-title">${iconBadge("person", "green", "card-head-icon")}<h2>Account</h2></div></div>
+        <dl class="u6-settings-list"><div><dt>Naam</dt><dd>${textSafe(ownName)}</dd></div><div><dt>E-mailadres</dt><dd>${textSafe(email)}</dd></div><div><dt>Status</dt><dd><span class="u6-status-dot"></span>Geverifieerd</dd></div></dl>
+        <button type="button" class="ghost" data-u6-signout>Uitloggen</button>
+      </section>
+      <section class="card u6-settings-card">
+        <div class="card-head"><div class="card-head-title">${iconBadge("shared", "blue", "card-head-icon")}<h2>Huishouden</h2></div></div>
+        <p class="hint">Finize is nu ingericht voor precies twee financiële leden.</p>
+        <div class="u6-household-members"><span><b>${textSafe(ownName)}</b><small>Jij · ${textSafe(context.role)}</small></span><span><b>${textSafe(otherName)}</b><small>${context.otherProfile ? "Gekoppeld" : "Nog niet aangemeld"}</small></span></div>
+        ${otherShared ? `<button type="button" class="ghost" data-u6-open-shared="${context.otherRole}">Open gedeeld overzicht van ${textSafe(otherName)}</button>` : `<p class="u6-inline-note">Het persoonlijke overzicht van ${textSafe(otherName)} is niet gedeeld.</p>`}
+      </section>
+      <section class="card u6-settings-card u6-sharing-card">
+        <div class="card-head"><div class="card-head-title">${iconBadge("lock", "green", "card-head-icon")}<h2>Delen</h2></div></div>
+        <label class="u6-master-switch"><span><strong>Mijn persoonlijke tab delen</strong><small>${textSafe(otherName)} kan deze dan alleen bekijken.</small></span><input type="checkbox" data-u6-share-master ${share ? "checked" : ""}></label>
+        <fieldset class="u6-kpi-sharing" ${share ? "" : "disabled"}><legend>Kaarten die zichtbaar zijn</legend>${kpis.map(([id, label]) => `<label><input type="checkbox" data-u6-share-kpi="${id}" ${hidden.has(id) ? "" : "checked"}><span>${label}</span></label>`).join("")}</fieldset>
+        <div class="auth-feedback" data-u6-sharing-feedback role="status" aria-live="polite" hidden></div>
+        <button type="button" class="primary" data-u6-save-sharing>Deelvoorkeuren opslaan</button>
+      </section>
+      <section class="card u6-settings-card">
+        <div class="card-head"><div class="card-head-title">${iconBadge("cloud", "blue", "card-head-icon")}<h2>Cloud</h2></div></div>
+        <p class="hint">Status: <strong>${textSafe(CloudAdapter.statusText())}</strong></p>
+        <p>Je huishouddata gebruikt de bestaande Finize-sync, maar via het beveiligde huishoudpad.</p>
+        <button type="button" class="ghost" data-tab-shortcut="data">Cloudverbinding openen</button>
+      </section>
+      <section class="card u6-settings-card u6-data-card">
+        <div class="card-head"><div class="card-head-title">${iconBadge("download", "green", "card-head-icon")}<h2>Data & back-up</h2></div></div>
+        <p>Exporteer, importeer of herstel dezelfde Finize-state als voor Update 6.</p>
+        <button type="button" class="ghost" data-tab-shortcut="data">Data & back-up beheren</button>
+      </section>
+    </div>`;
+    const master = root2.querySelector("[data-u6-share-master]");
+    const fieldset = root2.querySelector(".u6-kpi-sharing");
+    master == null ? void 0 : master.addEventListener("change", () => {
+      fieldset.disabled = !master.checked;
+    });
+    (_d = root2.querySelector("[data-u6-save-sharing]")) == null ? void 0 : _d.addEventListener("click", async (event) => {
+      const button = event.currentTarget;
+      const feedback = root2.querySelector("[data-u6-sharing-feedback]");
+      const hiddenKpis = [...root2.querySelectorAll("[data-u6-share-kpi]")].filter((input) => !input.checked).map((input) => input.dataset.u6ShareKpi);
+      button.disabled = true;
+      feedback.hidden = false;
+      feedback.dataset.tone = "neutral";
+      feedback.textContent = "Opslaan…";
+      try {
+        await globalThis.FinizeAuth.updateSharingPreferences({ sharePersonalTab: master.checked, hiddenKpis });
+        feedback.dataset.tone = "success";
+        feedback.textContent = "Deelvoorkeuren opgeslagen.";
+      } catch (error) {
+        feedback.dataset.tone = "error";
+        feedback.textContent = String((error == null ? void 0 : error.message) || "Opslaan is niet gelukt.");
+      } finally {
+        button.disabled = false;
+      }
+    });
+    (_e = root2.querySelector("[data-u6-open-shared]")) == null ? void 0 : _e.addEventListener("click", (event) => {
+      activeTab = event.currentTarget.dataset.u6OpenShared;
+      renderActiveTab();
+    });
+    (_f = root2.querySelector("[data-u6-signout]")) == null ? void 0 : _f.addEventListener("click", async () => {
+      await CloudAdapter.signOut();
+      await globalThis.FinizeAuth.signOut();
+    });
+  }
   function renderActiveTab() {
     var _a2, _b, _c;
+    if (["dion", "dara"].includes(activeTab) && !canViewPersonalTab(activeTab)) activeTab = "settings";
     ensureMonthData(getSelectedMonth());
     renderMonthSelect();
     updateV4SidebarMeta();
@@ -5819,11 +6016,12 @@ service cloud.firestore {
     parkMonthControlBeforeRender();
     if (activeTab === "dashboard") renderDashboard();
     else if (activeTab === "gezamenlijk") window.innerWidth >= 768 ? renderPersonOrJoint("tab-gezamenlijk", "gezamenlijk", "Gezamenlijk") : renderEmptyVisualTab("tab-gezamenlijk", "Gezamenlijk");
-    else if (activeTab === "dion") window.innerWidth >= 768 ? renderPersonOrJoint("tab-dion", "dion", "Dion") : renderEmptyVisualTab("tab-dion", "Dion");
-    else if (activeTab === "dara") window.innerWidth >= 768 ? renderPersonOrJoint("tab-dara", "dara", "Dara") : renderEmptyVisualTab("tab-dara", "Dara");
+    else if (activeTab === "dion") window.innerWidth >= 768 || isReadOnlyPersonalTab("dion") ? renderPersonOrJoint("tab-dion", "dion", "Dion") : renderEmptyVisualTab("tab-dion", "Dion");
+    else if (activeTab === "dara") window.innerWidth >= 768 || isReadOnlyPersonalTab("dara") ? renderPersonOrJoint("tab-dara", "dara", "Dara") : renderEmptyVisualTab("tab-dara", "Dara");
     else if (activeTab === "spaardoelen") window.innerWidth >= 768 && ((_a2 = window.FinizeUpdate5) == null ? void 0 : _a2.renderGoals) ? window.FinizeUpdate5.renderGoals() : renderMobileSpaardoelen();
     else if (activeTab === "data") window.innerWidth >= 768 && ((_b = window.FinizeUpdate5) == null ? void 0 : _b.renderData) ? window.FinizeUpdate5.renderData() : renderMobileDataTab();
-    if (["gezamenlijk", "dion", "dara", "spaardoelen", "data"].includes(activeTab)) {
+    else if (activeTab === "settings") renderSettings();
+    if (["gezamenlijk", "dion", "dara", "spaardoelen", "data", "settings"].includes(activeTab)) {
       document.body.dataset.activeTab = "dashboard";
       document.body.dataset.realActiveTab = ["gezamenlijk", "dion", "dara"].includes(activeTab) ? "gezamenlijk" : activeTab;
     } else {
@@ -5976,6 +6174,10 @@ service cloud.firestore {
   window.addEventListener("resize", () => {
     placeMonthControl();
     placeDesktopPageHeading();
+  });
+  window.addEventListener("finize:sharing-updated", () => {
+    configureUpdate6Navigation();
+    if (activeTab === "settings") renderActiveTab();
   });
   document.getElementById("bottomNav").addEventListener("click", (e) => {
     const btn = e.target.closest(".tab-btn");
@@ -7522,6 +7724,7 @@ service cloud.firestore {
               await GoalImageStore.initializeState(state);
             }
           }
+          configureUpdate6Navigation();
           bootstrap.authReady = true;
           bootstrap.authSession = session;
           window.__finizeMaybeFinishBootstrap();

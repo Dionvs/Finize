@@ -56,6 +56,9 @@ service cloud.firestore {
           && request.resource.data.email == resource.data.email
           && request.resource.data.householdId == resource.data.householdId
           && request.resource.data.role == resource.data.role
+          && request.resource.data.sharePersonalTab is bool
+          && request.resource.data.hiddenKpis is list
+          && request.resource.data.hiddenKpis.size() <= 4
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'displayName', 'sharePersonalTab', 'hiddenKpis', 'updatedAt'
           ]);

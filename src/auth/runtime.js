@@ -16,6 +16,8 @@ const root = document.getElementById('authRoot');
 let resolveGate;
 let currentUser = null;
 let currentAssignment = null;
+let currentMemberProfile = null;
+let currentHouseholdMembers = [];
 let mode = 'login';
 let busy = false;
 let driver = null;
@@ -240,6 +242,13 @@ async function createFirebaseDriver(){
     return seed;
   }
 
+  async function loadHouseholdMembers(assignment){
+    const snapshot = await firestoreModule.getDocs(
+      firestoreModule.collection(database,'households',assignment.householdId,'members')
+    );
+    return snapshot.docs.map(item=>item.data());
+  }
+
   return {
     initialize(onUser){ return authModule.onAuthStateChanged(auth, async user=>{
       currentUser = user;
@@ -264,9 +273,26 @@ async function createFirebaseDriver(){
       if (!snapshot.exists()) return null;
       const assignment = normalizeAssignment(snapshot.data());
       if (!assignment) return null;
-      await ensureMemberProfile(user,assignment);
+      currentMemberProfile = await ensureMemberProfile(user,assignment);
+      currentHouseholdMembers = await loadHouseholdMembers(assignment);
       return assignment;
-    }
+    },
+    async updateSharingPreferences({sharePersonalTab,hiddenKpis}){
+      const seed = memberProfileSeed(auth.currentUser,currentAssignment);
+      if (!seed) throw new Error('De huishoudkoppeling ontbreekt.');
+      const preferences = {
+        sharePersonalTab:sharePersonalTab === true,
+        hiddenKpis:[...new Set((hiddenKpis || []).filter(value=>['income','fixed','saving','variable'].includes(value)))],
+        updatedAt:firestoreModule.serverTimestamp()
+      };
+      const reference = firestoreModule.doc(database,'households',seed.householdId,'members',seed.uid);
+      await firestoreModule.updateDoc(reference,preferences);
+      currentMemberProfile = {...currentMemberProfile,...preferences};
+      currentHouseholdMembers = currentHouseholdMembers.map(member=>member.uid===seed.uid ? {...member,...preferences} : member);
+      return currentMemberProfile;
+    },
+    getProfile(){ return currentMemberProfile; },
+    getHouseholdMembers(){ return currentHouseholdMembers.slice(); }
   };
 }
 
@@ -280,7 +306,15 @@ async function initialize(){
   }
   try{
     driver = globalThis.__FINIZE_AUTH_TEST_DRIVER__ || await createFirebaseDriver();
-    driver.initialize(()=>render());
+    driver.initialize(async user=>{
+      if (user !== undefined){
+        currentUser=user;
+        currentAssignment=user?.emailVerified ? normalizeAssignment(await driver.loadAssignment(user)) : null;
+      }
+      currentMemberProfile=driver.getProfile?.() || currentMemberProfile;
+      currentHouseholdMembers=driver.getHouseholdMembers?.() || currentHouseholdMembers;
+      render();
+    });
   }catch(error){
     document.body.classList.add('auth-pending');
     root.hidden = false;
@@ -292,6 +326,9 @@ globalThis.FinizeAuth = {
   get enabled(){ return enabled; },
   get user(){ return currentUser; },
   get assignment(){ return currentAssignment; },
+  get profile(){ return currentMemberProfile; },
+  get householdMembers(){ return currentHouseholdMembers.slice(); },
+  updateSharingPreferences:preferences=>driver?.updateSharingPreferences(preferences),
   signOut:()=>driver?.signOut()
 };
 

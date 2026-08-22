@@ -9,6 +9,7 @@ const styleSources = [
   ["styles", "tokens.css"],
   ["styles", "base.css"],
   ["styles", "auth.css"],
+  ["styles", "settings.css"],
   ["styles", "goals.css"],
   ["styles", "dashboard.css"],
   ["styles", "import.css"],

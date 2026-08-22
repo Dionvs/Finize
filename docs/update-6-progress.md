@@ -81,3 +81,26 @@ Status: lokaal afgerond en geverifieerd, nog niet gepubliceerd.
 - 34 Playwright-browsertests geslaagd op telefoon-, tablet- en desktopformaten.
 - Firestore-regels compileren zonder fouten via een Firebase CLI dry-run.
 - JavaScript-syntax, CSS en de gegenereerde runtime zijn schoon en reproduceerbaar.
+
+## Fase 4: accountnavigatie, Instellingen en delen
+
+Status: lokaal afgerond en geverifieerd, nog niet gepubliceerd.
+
+### Opgeleverd
+
+- Mobiel toont bij een account exact vijf knoppen: Dashboard, Gezamenlijk, eigen tab, Spaardoelen en Instellingen.
+- De persoonlijke tab van de andere persoon is standaard verborgen.
+- Desktop toont die andere tab alleen wanneer de eigenaar het volledige overzicht deelt.
+- Instellingen bevat Account, Huishouden, Delen, Cloud en Data & back-up.
+- De eigenaar kan de volledige persoonlijke tab delen en vier afzonderlijke KPI-kaarten verbergen.
+- Een gedeelde andere tab is alleen-lezen; verborgen KPI-kaarten worden niet gerenderd.
+- Dashboard en Gezamenlijk zijn niet gewijzigd.
+
+### Verificatie
+
+- 31 Node-tests en alle bestaande Update 2 t/m 5-rekentests geslaagd.
+- 37 Playwright-browsertests geslaagd, inclusief accountnavigatie, vijf mobiele knoppen, alleen-lezen en verborgen KPI's.
+- Alle zeven bestaande visuele baselines blijven exact binnen hun goedgekeurde toleranties.
+- Firestore-regels compileren zonder fouten via een Firebase CLI dry-run.
+- Impeccable-detector: geen bevindingen.
+- Inlogscherm daadwerkelijk geopend; semantiek, checkbox **Ingelogd blijven** en visuele hiërarchie gecontroleerd.
