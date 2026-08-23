@@ -4415,6 +4415,22 @@ body.v4-app[data-real-active-tab="gezamenlijk"] .joint-variable-overview-card{
     background:#fffaf4 !important;
     border-bottom:1px solid var(--border-soft) !important;
   }
+  #incomeEditModal .joint-fixed-editor-admin{
+    grid-column:2/-2 !important;
+    grid-row:2 !important;
+    display:flex !important;
+    align-items:center !important;
+    flex-wrap:wrap !important;
+    gap:6px 12px !important;
+    min-width:0 !important;
+    padding-top:4px !important;
+    color:var(--text-dim) !important;
+    font-size:9px !important;
+  }
+  #incomeEditModal .joint-fixed-editor-admin label{display:flex;align-items:center;gap:6px;font-size:9px;font-weight:750;color:var(--text-dim)}
+  #incomeEditModal .joint-fixed-editor-admin .joint-fixed-editor-date{width:126px !important;font-size:9px !important}
+  #incomeEditModal .joint-fixed-distribution{padding:3px 7px;border-radius:999px;background:var(--soft-green);color:var(--green)}
+  #incomeEditModal .joint-fixed-distribution strong{font-weight:900}
   #incomeEditModal .joint-fixed-editor-table-head,
   #incomeEditModal .joint-fixed-editor-row.joint-fixed-editor-row-compact{
     /* Icoon links; de omschrijving vult alle ruimte tussen de compacte

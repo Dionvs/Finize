@@ -1,4 +1,4 @@
-const CACHE_NAME = "finize-v89-subdoelen-desktop";
+const CACHE_NAME = "finize-v90-subdoelen-en-afschrijving";
 const CACHE_PREFIX = "finize-";
 
 const CRITICAL_SHELL = [

@@ -1,20 +1,23 @@
 const {test,expect} = require('@playwright/test');
 
-async function installAccount(page,{otherShared=false,hiddenKpis=[]}={}){
-  await page.addInitScript(({otherShared,hiddenKpis})=>{
-    const profile={uid:'uid-dion',role:'dion',householdId:'dion-dara',displayName:'Dion',sharePersonalTab:false,hiddenKpis:[]};
-    const members=[profile,{uid:'uid-dara',role:'dara',householdId:'dion-dara',displayName:'Dara',sharePersonalTab:otherShared,hiddenKpis}];
+async function installAccount(page,{otherShared=false,hiddenKpis=[],role='dion'}={}){
+  await page.addInitScript(({otherShared,hiddenKpis,role})=>{
+    const otherRole=role==='dion'?'dara':'dion';
+    const displayName=role==='dion'?'Dion':'Dara';
+    const otherName=otherRole==='dion'?'Dion':'Dara';
+    const profile={uid:`uid-${role}`,role,householdId:'dion-dara',displayName,sharePersonalTab:false,hiddenKpis:[]};
+    const members=[profile,{uid:`uid-${otherRole}`,role:otherRole,householdId:'dion-dara',displayName:otherName,sharePersonalTab:otherShared,hiddenKpis}];
     window.__FINIZE_AUTH_ENABLED__=true;
     window.__FINIZE_AUTH_TEST_DRIVER__={
-      initialize(callback){setTimeout(()=>callback({uid:'uid-dion',email:'dion@example.test',emailVerified:true}),0);},
-      loadAssignment:async()=>({householdId:'dion-dara',role:'dion',displayName:'Dion'}),
+      initialize(callback){setTimeout(()=>callback({uid:`uid-${role}`,email:`${role}@example.test`,emailVerified:true}),0);},
+      loadAssignment:async()=>({householdId:'dion-dara',role,displayName}),
       getProfile:()=>profile,
       getHouseholdMembers:()=>members,
       updateSharingPreferences:async preferences=>Object.assign(profile,preferences),
       setPersistence:async()=>{},signInEmail:async()=>{},registerEmail:async()=>{},signInGoogle:async()=>{},
       sendPasswordReset:async()=>{},sendVerification:async()=>{},reloadUser:async user=>user,signOut:async()=>{}
     };
-  },{otherShared,hiddenKpis});
+  },{otherShared,hiddenKpis,role});
   await page.route('https://www.gstatic.com/firebasejs/**',route=>route.abort());
   await page.goto('/');
   await expect(page.locator('#authRoot')).toBeHidden();
@@ -41,6 +44,35 @@ test('mobiel houdt vijf knoppen in de afgesproken volgorde',async({page})=>{
   const labels=await page.locator('.v4-bottom-nav .bottom-nav-btn:visible > span:last-child').allTextContents();
   expect(labels).toEqual(['Dashboard','Gezamenlijk','Dion','Spaardoelen','Instellingen']);
 });
+
+for(const role of ['dion','dara']){
+  test(`spaardoelen zijn voor ${role} visueel afgeschermd en dashboard toont alleen favorieten`,async({page})=>{
+    await page.setViewportSize({width:390,height:844});
+    await installAccount(page,{role});
+    await page.evaluate(()=>{
+      const goal=(id,naam,favoriet)=>({id,naam,favoriet,doelbedrag:1000,algespaard:100,doeldatum:'2027-12-31',vasteInleg:0,rendement:.01,rendementPeriode:'jaarlijks',subdoelen:[]});
+      window.state.spaardoelen.gezamenlijk=[goal('goal-joint-favorite','Gezamenlijk favoriet',true)];
+      window.state.spaardoelen.dion=[goal('goal-dion-favorite','Dion favoriet',true),goal('goal-dion-regular','Dion niet favoriet',false)];
+      window.state.spaardoelen.dara=[goal('goal-dara-favorite','Dara favoriet',true),goal('goal-dara-regular','Dara niet favoriet',false)];
+      window.renderActiveTab();
+    });
+    const dashboardPreview=page.locator('#tab-dashboard .dashboard-goals-preview.v4-mobile-only-block');
+    await expect(dashboardPreview).toContainText('Gezamenlijk favoriet');
+    await expect(dashboardPreview).not.toContainText('niet favoriet');
+
+    await page.locator('.v4-bottom-nav [data-tab="spaardoelen"]').click();
+    const expectedOwner=role==='dion'?'Dion':'Dara';
+    const hiddenOwner=role==='dion'?'Dara':'Dion';
+    await expect(page.locator('#tab-spaardoelen .mobile-goal-section h2')).toHaveText(['Gezamenlijk',expectedOwner]);
+    await expect(page.locator('#tab-spaardoelen')).not.toContainText(`${hiddenOwner} favoriet`);
+    expect(await page.evaluate(owner=>window.state.spaardoelen[owner].length,role==='dion'?'dara':'dion')).toBe(2);
+
+    await page.setViewportSize({width:1280,height:900});
+    await page.evaluate(()=>window.renderActiveTab());
+    await expect(page.locator('#tab-spaardoelen [data-u5-goal-filter]')).toHaveText(['Alle','Gezamenlijk',expectedOwner]);
+    await expect(page.locator('#tab-spaardoelen')).not.toContainText(`${hiddenOwner} favoriet`);
+  });
+}
 
 test('dashboard en gezamenlijk blijven voor ieder account bewerkbaar op desktop',async({page})=>{
   await installAccount(page);

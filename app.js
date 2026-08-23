@@ -824,6 +824,130 @@
     target.splice(safeIndex, 0, item);
     return { item, sourcePath, targetPath, sourceIndex, targetIndex: safeIndex };
   }
+  function createGoalForOwner(owner) {
+    if (!["gezamenlijk", "dion", "dara"].includes(owner)) return;
+    const goal = { id: uid(), naam: "Nieuw doel", doelbedrag: 0, algespaard: 0, doeldatum: "", vasteInleg: 0, rendement: 0.0125, rendementPeriode: "jaarlijks", favoriet: false, eigenaar: owner, ratoVerdeling: true, subdoelen: [] };
+    commitChange(() => state.spaardoelen[owner].push(goal), { render: false });
+    openMobileGoalEditor(owner, goal.id);
+  }
+  function bindDirectGoalOrdering(root2) {
+    if (root2.id === "tab-spaardoelen") {
+      root2.querySelectorAll(".mobile-savings-overview > .manage-stack").forEach((stack) => stack.remove());
+      root2.querySelectorAll(".mobile-goal-section").forEach((section, index) => {
+        var _a2;
+        const owner = ["gezamenlijk", "dion", "dara"][index];
+        if (!owner) return;
+        let actions = section.querySelector(".u2-inline-actions");
+        if (!actions) {
+          actions = document.createElement("div");
+          actions.className = "u2-inline-actions";
+          (_a2 = section.querySelector("h2")) == null ? void 0 : _a2.insertAdjacentElement("afterend", actions);
+        }
+        if (!actions.querySelector("[data-add-goal]")) actions.insertAdjacentHTML("beforeend", `<button type="button" class="ghost small" data-add-goal="${owner}">+ Spaardoel</button>`);
+        section.querySelectorAll(".mobile-goal-row").forEach((row) => {
+          var _a3;
+          const editor = row.querySelector("[data-open-goal-editor]");
+          const reference = (editor == null ? void 0 : editor.dataset.openGoalEditor) || "";
+          const [rowOwner, id] = reference.split(":");
+          if (!id) return;
+          const card = row.closest(".u2-goal-accordion") || row;
+          card.dataset.reorderGoal = "";
+          card.dataset.goalOwner = rowOwner || owner;
+          card.dataset.goalId = id;
+          if (!card.querySelector(":scope > [data-goal-drag-handle]")) card.insertAdjacentHTML("afterbegin", `<button type="button" class="goal-direct-drag-handle" data-goal-drag-handle aria-label="${attrSafe(((_a3 = row.querySelector("strong")) == null ? void 0 : _a3.textContent) || "Spaardoel")} verplaatsen" title="Verslepen om de volgorde te wijzigen"></button>`);
+        });
+      });
+    }
+    const move = (owner, id, targetIndex) => {
+      const path = `spaardoelen.${owner}`;
+      if (!commitChange(() => moveItemById(path, path, id, targetIndex), { render: false })) return;
+      renderActiveTab();
+    };
+    root2.querySelectorAll("[data-reorder-goal]").forEach((card) => {
+      const handle = card.querySelector("[data-goal-drag-handle]");
+      if (!handle) return;
+      handle.draggable = true;
+      handle.addEventListener("keydown", (event) => {
+        var _a2;
+        if (!["ArrowUp", "ArrowDown"].includes(event.key)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const owner = card.dataset.goalOwner, id = card.dataset.goalId;
+        const goals = ((_a2 = state.spaardoelen) == null ? void 0 : _a2[owner]) || [];
+        const index = goals.findIndex((goal) => goal.id === id);
+        const target = index + (event.key === "ArrowUp" ? -1 : 1);
+        if (index < 0 || target < 0 || target >= goals.length) return;
+        move(owner, id, target);
+      });
+      handle.addEventListener("pointerdown", (event) => {
+        if (event.pointerType === "mouse") return;
+        if (event.button !== void 0 && event.button !== 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const owner = card.dataset.goalOwner, id = card.dataset.goalId;
+        const parent = card.parentElement;
+        if (!parent) return;
+        let moved = false;
+        card.classList.add("goal-direct-dragging");
+        const onMove = (moveEvent) => {
+          var _a2, _b;
+          moveEvent.preventDefault();
+          const target = (_b = (_a2 = document.elementFromPoint(moveEvent.clientX, moveEvent.clientY)) == null ? void 0 : _a2.closest) == null ? void 0 : _b.call(_a2, `[data-reorder-goal][data-goal-owner="${owner}"]`);
+          if (!target || target === card || target.parentElement !== parent) return;
+          const box = target.getBoundingClientRect();
+          parent.insertBefore(card, moveEvent.clientY < box.top + box.height / 2 ? target : target.nextSibling);
+          moved = true;
+        };
+        const finish = () => {
+          document.removeEventListener("pointermove", onMove);
+          document.removeEventListener("pointerup", finish);
+          document.removeEventListener("pointercancel", cancel);
+          card.classList.remove("goal-direct-dragging");
+          if (!moved) return;
+          const ordered = [...parent.querySelectorAll(`:scope > [data-reorder-goal][data-goal-owner="${owner}"]`)];
+          move(owner, id, ordered.indexOf(card));
+        };
+        const cancel = () => {
+          moved = false;
+          finish();
+          renderActiveTab();
+        };
+        document.addEventListener("pointermove", onMove, { passive: false });
+        document.addEventListener("pointerup", finish, { once: true });
+        document.addEventListener("pointercancel", cancel, { once: true });
+      });
+      handle.addEventListener("dragstart", (event) => {
+        var _a2;
+        const owner = card.dataset.goalOwner, id = card.dataset.goalId, parent = card.parentElement;
+        if (!parent) {
+          event.preventDefault();
+          return;
+        }
+        (_a2 = event.dataTransfer) == null ? void 0 : _a2.setData("text/plain", id);
+        if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+        let moved = false;
+        card.classList.add("goal-direct-dragging");
+        const onDragOver = (dragEvent) => {
+          var _a3, _b;
+          const target = (_b = (_a3 = document.elementFromPoint(dragEvent.clientX, dragEvent.clientY)) == null ? void 0 : _a3.closest) == null ? void 0 : _b.call(_a3, `[data-reorder-goal][data-goal-owner="${owner}"]`);
+          if (!target || target === card || target.parentElement !== parent) return;
+          dragEvent.preventDefault();
+          const box = target.getBoundingClientRect();
+          parent.insertBefore(card, dragEvent.clientY < box.top + box.height / 2 ? target : target.nextSibling);
+          moved = true;
+        };
+        const finish = () => {
+          document.removeEventListener("dragover", onDragOver);
+          card.classList.remove("goal-direct-dragging");
+          if (!moved) return;
+          const ordered = [...parent.querySelectorAll(`:scope > [data-reorder-goal][data-goal-owner="${owner}"]`)];
+          move(owner, id, ordered.indexOf(card));
+        };
+        document.addEventListener("dragover", onDragOver);
+        handle.addEventListener("dragend", finish, { once: true });
+      });
+    });
+  }
   function formatDateNL(value) {
     if (!value) return "";
     const d = new Date(value);
@@ -1242,6 +1366,7 @@
             frequentieEenheid: row.jaarlijks ? "jaren" : "maanden",
             begindatum: start,
             einddatum: "",
+            afschrijfdatum: String(row.afschrijfdatum || ""),
             actief: true,
             amountHistory: [{ id: `amount-${row.id}`, effectiveFrom: start, amount: round2(Number(row.bedrag) || 0) }],
             monthOverrides: {},
@@ -3915,10 +4040,29 @@
     </tr></tfoot>
   </table></div>`;
   }
+  function renderGoalSubgoalEditor(basePath, goal, panelId) {
+    const children = Array.isArray(goal.subdoelen) ? goal.subdoelen : [];
+    const rows = children.map((child, index) => {
+      const target = Math.max(0, Number(child.doelbedrag) || 0);
+      const saved = Math.max(0, Number(child.gespaard) || 0);
+      const progress = target > 0 ? Math.min(100, Math.round(saved / target * 100)) : 0;
+      return `<div class="goal-table-subgoal-edit-row" data-goal-subgoal-edit="${attrSafe(child.id)}">
+      <span class="goal-table-subgoal-order">${index + 1}</span>
+      <label>Naam<input type="text" data-goal-subgoal-field="naam" data-goal-path="${attrSafe(basePath)}" data-goal-id="${attrSafe(goal.id)}" data-subgoal-id="${attrSafe(child.id)}" value="${attrSafe(child.naam || "")}" aria-label="Naam subdoel"></label>
+      <label>Doelbedrag<input type="number" min="0" step="0.01" inputmode="decimal" data-goal-subgoal-field="doelbedrag" data-goal-path="${attrSafe(basePath)}" data-goal-id="${attrSafe(goal.id)}" data-subgoal-id="${attrSafe(child.id)}" value="${target}" aria-label="Doelbedrag subdoel"></label>
+      <label>Productlink<input type="url" data-goal-subgoal-field="link" data-goal-path="${attrSafe(basePath)}" data-goal-id="${attrSafe(goal.id)}" data-subgoal-id="${attrSafe(child.id)}" value="${attrSafe(child.link || "")}" placeholder="Optionele link" aria-label="Productlink subdoel"></label>
+      <div class="goal-table-subgoal-progress"><span>${eur(saved)} van ${eur(target)}</span><div class="progress-track"><div class="progress-fill" style="width:${progress}%"></div></div></div>
+      <div class="goal-table-subgoal-actions"><button type="button" class="ghost small" data-move-table-subgoal="${attrSafe(basePath)}|${attrSafe(goal.id)}|${attrSafe(child.id)}|-1" ${index === 0 ? "disabled" : ""} aria-label="Subdoel omhoog">&uarr;</button><button type="button" class="ghost small" data-move-table-subgoal="${attrSafe(basePath)}|${attrSafe(goal.id)}|${attrSafe(child.id)}|1" ${index === children.length - 1 ? "disabled" : ""} aria-label="Subdoel omlaag">&darr;</button><button type="button" class="danger-ghost" data-remove-table-subgoal="${attrSafe(basePath)}|${attrSafe(goal.id)}|${attrSafe(child.id)}" aria-label="Subdoel verwijderen">&times;</button></div>
+    </div>`;
+    }).join("");
+    return `<tr id="${panelId}" class="goal-table-subgoal-editor-row" hidden><td colspan="13"><div class="goal-table-subgoal-editor"><div class="goal-table-subgoal-editor-head"><div><strong>Subdoelen</strong><span>De volgorde bepaalt waar de inleg als eerste naartoe gaat.</span></div><button type="button" class="ghost small" data-add-table-subgoal="${attrSafe(basePath)}|${attrSafe(goal.id)}">+ Subdoel</button></div><div class="goal-table-subgoal-edit-list">${rows || '<p class="hint">Nog geen subdoelen. Voeg het eerste subdoel toe.</p>'}</div></div></td></tr>`;
+  }
   function renderGoalGroup(basePath, doelen, spaarpotDezeMaand) {
     const berekend = calcGroep(doelen, spaarpotDezeMaand, TODAY);
     const rows = berekend.map((b, i) => {
       const barPct = Math.min(100, Math.round((b.voortgang || 0) * 100));
+      const childCount = Array.isArray(b.doel.subdoelen) ? b.doel.subdoelen.length : 0;
+      const panelId = `manage-subgoals-${basePath.replace(/[^a-z0-9]+/gi, "-")}-${String(b.doel.id).replace(/[^a-z0-9_-]+/gi, "-")}`;
       return `
     <tr>
       <td class="goal-favorite-cell">
@@ -3937,6 +4081,7 @@
         <label style="display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--text-dim);margin-top:5px">
           <input type="checkbox" data-item-path="${basePath}" data-item-id="${textSafe(b.doel.id)}" data-item-field="vastBedrag"> Vast bedrag
         </label>
+        <button type="button" class="goal-table-subgoal-manage-toggle" data-table-subgoal-toggle="${panelId}" data-goal-path="${attrSafe(basePath)}" data-goal-id="${attrSafe(b.doel.id)}" aria-expanded="false" aria-controls="${panelId}">${childCount ? `Subdoelen (${childCount})` : "Subdoel toevoegen"}</button>
       </td>
       <td data-label="Doelbedrag" class="num"><input type="number" step="0.01" data-item-path="${basePath}" data-item-id="${textSafe(b.doel.id)}" data-item-field="doelbedrag"></td>
       <td data-label="Al gespaard" class="num"><input type="number" step="0.01" data-item-path="${basePath}" data-item-id="${textSafe(b.doel.id)}" data-item-field="algespaard"></td>
@@ -3954,7 +4099,7 @@
       </td>
       <td class="num">${b.verwachteWaarde === null ? "—" : eur(b.verwachteWaarde)}</td>
       <td class="row-actions"><button class="danger-ghost" data-remove-id="${textSafe(b.doel.id)}" data-remove-path="${basePath}" title="Verwijderen">×</button></td>
-    </tr>`;
+    </tr>${renderGoalSubgoalEditor(basePath, b.doel, panelId)}`;
     }).join("");
     const totBenodigd = round2(berekend.reduce((s, b) => s + (b.benodigdPerMaand || 0), 0));
     const totDoelbedrag = round2(berekend.reduce((s, b) => s + (Number(b.doel.doelbedrag) || 0), 0));
@@ -3982,6 +4127,105 @@
   `;
   }
   function handleGoalClicks(root2) {
+    const reopenSubgoals = (path, goalId) => {
+      renderActiveTab();
+      const toggle = [...document.querySelectorAll("[data-table-subgoal-toggle]")].find((item) => item.dataset.goalPath === path && item.dataset.goalId === goalId) || [...document.querySelectorAll("[data-table-subgoal-toggle]")].find((item) => {
+        var _a2;
+        return (_a2 = item.getAttribute("aria-controls")) == null ? void 0 : _a2.endsWith(`-${String(goalId).replace(/[^a-z0-9_-]+/gi, "-")}`);
+      });
+      if (!toggle) return;
+      const panel = document.getElementById(toggle.dataset.tableSubgoalToggle);
+      toggle.setAttribute("aria-expanded", "true");
+      if (panel) panel.hidden = false;
+    };
+    const updateChildren = (path, goalId, mutate) => commitChange(() => {
+      const goal = findItemById(path, goalId);
+      if (!goal) return;
+      const savedAmount = Math.max(0, Number(goal.algespaard) || 0);
+      goal.subdoelen = Array.isArray(goal.subdoelen) ? goal.subdoelen : [];
+      mutate(goal);
+      u2NormalizeChildren(goal);
+      const effectiveSaved = Math.min(savedAmount, u2GoalTarget(goal));
+      if (goal.subdoelen.length) {
+        goal.subdoelen.forEach((child) => {
+          child.gespaard = 0;
+          child.voltooid = false;
+        });
+        goal.algespaard = 0;
+        u2ApplyContribution(goal, effectiveSaved);
+      } else goal.algespaard = effectiveSaved;
+      u2SetGoalSavedAmount(goal, effectiveSaved);
+    }, { render: false });
+    root2.querySelectorAll("[data-table-subgoal-toggle]").forEach((btn) => {
+      const panel = document.getElementById(btn.dataset.tableSubgoalToggle);
+      btn.addEventListener("click", () => {
+        const expanded = btn.getAttribute("aria-expanded") === "true";
+        btn.setAttribute("aria-expanded", String(!expanded));
+        if (panel) panel.hidden = expanded;
+      });
+    });
+    root2.querySelectorAll("[data-goal-subgoal-field]").forEach((input) => input.addEventListener("change", async () => {
+      var _a2, _b, _c;
+      const { goalPath: path, goalId, subgoalId, goalSubgoalField: field } = input.dataset;
+      const goal = findItemById(path, goalId);
+      const child = (_a2 = goal == null ? void 0 : goal.subdoelen) == null ? void 0 : _a2.find((item) => item.id === subgoalId);
+      if (!child) return;
+      let value = input.value.trim();
+      if (field === "doelbedrag") value = Math.max(0, round2(bankAmount(value) || 0));
+      if (JSON.stringify(child[field]) !== JSON.stringify(value)) updateChildren(path, goalId, (current) => {
+        const target = current.subdoelen.find((item) => item.id === subgoalId);
+        if (target) target[field] = value;
+      });
+      if (field !== "link") {
+        reopenSubgoals(path, goalId);
+        return;
+      }
+      const url = normalizeProductUrl(value);
+      if (!url) {
+        showQuickToast("Link kon niet worden gelezen. Vul naam en bedrag handmatig in.");
+        return;
+      }
+      const latest = (_c = (_b = findItemById(path, goalId)) == null ? void 0 : _b.subdoelen) == null ? void 0 : _c.find((item) => item.id === subgoalId);
+      if (!shouldFetchProductSnapshot(latest, url)) {
+        reopenSubgoals(path, goalId);
+        return;
+      }
+      try {
+        const snapshot = await fetchProductSnapshot(url);
+        updateChildren(path, goalId, (current) => {
+          const target = current.subdoelen.find((item) => item.id === subgoalId);
+          if (target) applyProductSnapshot(target, snapshot);
+        });
+        reopenSubgoals(path, goalId);
+        if (snapshot.price === null) showQuickToast("Product gevonden, maar geen prijs. Vul het bedrag handmatig in.");
+      } catch (error) {
+        console.info("Productinformatie bij subdoel niet automatisch aangevuld.", (error == null ? void 0 : error.message) || error);
+        showQuickToast("Link kon niet worden gelezen. Vul naam en bedrag handmatig in.");
+      }
+    }));
+    root2.querySelectorAll("[data-add-table-subgoal]").forEach((btn) => btn.addEventListener("click", () => {
+      const [path, goalId] = btn.dataset.addTableSubgoal.split("|");
+      updateChildren(path, goalId, (goal) => goal.subdoelen.push({ id: uid(), naam: "Nieuw subdoel", doelbedrag: 0, gespaard: 0, link: "", voltooid: false }));
+      reopenSubgoals(path, goalId);
+    }));
+    root2.querySelectorAll("[data-remove-table-subgoal]").forEach((btn) => btn.addEventListener("click", () => {
+      const [path, goalId, subgoalId] = btn.dataset.removeTableSubgoal.split("|");
+      updateChildren(path, goalId, (goal) => {
+        goal.subdoelen = goal.subdoelen.filter((item) => item.id !== subgoalId);
+      });
+      reopenSubgoals(path, goalId);
+    }));
+    root2.querySelectorAll("[data-move-table-subgoal]").forEach((btn) => btn.addEventListener("click", () => {
+      const [path, goalId, subgoalId, deltaText] = btn.dataset.moveTableSubgoal.split("|");
+      updateChildren(path, goalId, (goal) => {
+        const index = goal.subdoelen.findIndex((item) => item.id === subgoalId);
+        const target = index + Number(deltaText);
+        if (index < 0 || target < 0 || target >= goal.subdoelen.length) return;
+        const [child] = goal.subdoelen.splice(index, 1);
+        goal.subdoelen.splice(target, 0, child);
+      });
+      reopenSubgoals(path, goalId);
+    }));
     root2.querySelectorAll("[data-move-goal]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const [path, id, directionText] = btn.dataset.moveGoal.split("|");
@@ -4073,7 +4317,7 @@
       return (_a2 = item.doel) == null ? void 0 : _a2.favoriet;
     });
     const goalCardsDesktop = favoriteGoals.length ? `<div class="dashboard-goals-preview-list">${favoriteGoals.slice(0, 4).map((g) => renderDashboardGoalPreviewCard(g)).join("")}</div>` : `<div class="u5-goal-fallback"><strong>Nog geen favoriete spaardoelen</strong><span>${allGoals.length} doelen beschikbaar</span></div>`;
-    const goalCardsMobile = sortedGoals.length ? `<div class="dashboard-goals-preview-list">${sortedGoals.slice(0, 3).map((g) => renderDashboardGoalPreviewCard(g)).join("")}</div>` : "";
+    const goalCardsMobile = favoriteGoals.length ? `<div class="dashboard-goals-preview-list">${favoriteGoals.slice(0, 3).map((g) => renderDashboardGoalPreviewCard(g)).join("")}</div>` : `<div class="u5-goal-fallback"><strong>Nog geen favoriete spaardoelen</strong><span>${allGoals.length} doelen beschikbaar</span></div>`;
     const year = Number(getSelectedMonth().slice(0, 4));
     const yearData = Array.from({ length: 12 }, (_, i) => {
       var _a2, _b;
@@ -4345,6 +4589,10 @@
   function isReadOnlyPersonalTab(owner) {
     const context = update6AccountContext();
     return context.enabled && ["dion", "dara"].includes(owner) && owner !== context.role;
+  }
+  function visibleGoalOwnerKeys() {
+    const context = update6AccountContext();
+    return context.enabled ? ["gezamenlijk", context.role] : ["gezamenlijk", "dion", "dara"];
   }
   function personalKpiVisible(owner, kpiId) {
     var _a2;
@@ -4655,7 +4903,8 @@
   }
   function renderMobileSpaardoelen() {
     const r = calcScenario(state);
-    const groups = [{ key: "gezamenlijk", label: "Gezamenlijk", pot: r.spaarpotDezeMaand, doelen: state.spaardoelen.gezamenlijk }, { key: "dion", label: "Dion", pot: r.dion.beschikbaarVoorSparen, doelen: state.spaardoelen.dion }, { key: "dara", label: "Dara", pot: r.dara.beschikbaarVoorSparen, doelen: state.spaardoelen.dara }];
+    const visibleOwners = visibleGoalOwnerKeys();
+    const groups = [{ key: "gezamenlijk", label: "Gezamenlijk", pot: r.spaarpotDezeMaand, doelen: state.spaardoelen.gezamenlijk }, { key: "dion", label: "Dion", pot: r.dion.beschikbaarVoorSparen, doelen: state.spaardoelen.dion }, { key: "dara", label: "Dara", pot: r.dara.beschikbaarVoorSparen, doelen: state.spaardoelen.dara }].filter((group) => visibleOwners.includes(group.key));
     const calculated = groups.map((group) => ({ ...group, items: calcGroep(group.doelen, group.pot, TODAY) }));
     const all = calculated.flatMap((group) => group.items);
     const saved = round2(all.reduce((sum, item) => sum + (Number(item.doel.algespaard) || 0), 0));
@@ -4671,11 +4920,10 @@
     const distribution = groupSummary.map((group) => `<div class="mobile-goal-summary-line"><span>${group.label}</span><i><b style="width:${Math.round(group.ratio * 100)}%"></b></i><strong>${eur(group.target)} (${pct(group.ratio)})</strong></div>`).join("");
     const monthSummary = groupSummary.map((group) => `<div class="mobile-goal-summary-line"><span>${group.label}</span><i><b style="width:${monthly > 0 ? Math.round(group.monthly / monthly * 100) : 0}%"></b></i><strong>${eur(group.monthly)}</strong></div>`).join("");
     const root2 = document.getElementById("tab-spaardoelen");
-    root2.innerHTML = `${renderSharedEmptyTabHeader("Spaardoelen overzicht")}<div class="mobile-savings-overview"><div class="mobile-savings-kpis"><div class="card"><span>◈</span><small>Totaal gespaard</small><strong>${eur(saved)}</strong><em>van ${eur(target)}</em></div><div class="card"><span>◎</span><small>Totaal doelbedrag</small><strong>${eur(target)}</strong><em>alle doelen samen</em></div><div class="card"><span>↗</span><small>Gemiddelde voortgang</small><strong>${pct(average)}</strong><em>op basis van doelbedrag</em></div><div class="card"><span>€</span><small>Inleg deze maand</small><strong>${eur(monthly)}</strong><em>${monthLabel(getSelectedMonth())}</em></div></div>${groups.map(renderMobileGoalGroup).join("")}<div class="mobile-savings-summary-grid"><div class="card"><h2>Verdeling van spaardoelen</h2>${distribution}<p>Percentages gebaseerd op totaal doelbedrag per groep.</p></div><div class="card"><h2>Inleg deze maand</h2>${monthSummary}<strong class="mobile-savings-month-total">${eur(monthly)} totaal</strong></div></div><div class="manage-stack"><details class="manage-section"><summary><span class="manage-title">Spaardoelen beheren — Gezamenlijk</span><span class="expand-chevron"></span></summary><div class="manage-body"><div class="card">${renderGoalGroup("spaardoelen.gezamenlijk", state.spaardoelen.gezamenlijk, r.spaarpotDezeMaand)}</div></div></details><details class="manage-section"><summary><span class="manage-title">Spaardoelen beheren — Dion</span><span class="expand-chevron"></span></summary><div class="manage-body"><div class="card">${renderGoalGroup("spaardoelen.dion", state.spaardoelen.dion, r.dion.beschikbaarVoorSparen)}</div></div></details><details class="manage-section"><summary><span class="manage-title">Spaardoelen beheren — Dara</span><span class="expand-chevron"></span></summary><div class="manage-body"><div class="card">${renderGoalGroup("spaardoelen.dara", state.spaardoelen.dara, r.dara.beschikbaarVoorSparen)}</div></div></details></div></div>`;
+    root2.innerHTML = `${renderSharedEmptyTabHeader("Spaardoelen overzicht")}<div class="mobile-savings-overview"><div class="mobile-savings-kpis"><div class="card"><span>◈</span><small>Totaal gespaard</small><strong>${eur(saved)}</strong><em>van ${eur(target)}</em></div><div class="card"><span>◎</span><small>Totaal doelbedrag</small><strong>${eur(target)}</strong><em>zichtbare doelen samen</em></div><div class="card"><span>↗</span><small>Gemiddelde voortgang</small><strong>${pct(average)}</strong><em>op basis van doelbedrag</em></div><div class="card"><span>€</span><small>Inleg deze maand</small><strong>${eur(monthly)}</strong><em>${monthLabel(getSelectedMonth())}</em></div></div>${groups.map(renderMobileGoalGroup).join("")}<div class="mobile-savings-summary-grid"><div class="card"><h2>Verdeling van spaardoelen</h2>${distribution}<p>Percentages gebaseerd op totaal doelbedrag per groep.</p></div><div class="card"><h2>Inleg deze maand</h2>${monthSummary}<strong class="mobile-savings-month-total">${eur(monthly)} totaal</strong></div></div><div class="manage-stack">${groups.map((group) => `<details class="manage-section" data-goal-owner="${group.key}"><summary><span class="manage-title">Spaardoelen beheren — ${group.label}</span><span class="expand-chevron"></span></summary><div class="manage-body"><div class="card">${renderGoalGroup(`spaardoelen.${group.key}`, group.doelen, group.pot)}</div></div></details>`).join("")}</div></div>`;
     root2.querySelectorAll(".manage-section").forEach((section, index) => {
-      const owners = ["gezamenlijk", "dion", "dara"];
       const body = section.querySelector(".manage-body");
-      if (body) body.innerHTML = `<button type="button" class="ghost mobile-goal-manage-open" data-open-goal-manager="${owners[index]}">Open full-screen beheer</button>`;
+      if (body) body.innerHTML = `<button type="button" class="ghost mobile-goal-manage-open" data-open-goal-manager="${section.dataset.goalOwner}">Open full-screen beheer</button>`;
     });
   }
   function renderSpaardoelen() {
@@ -5311,6 +5559,8 @@ service cloud.firestore {
     const note = options.note || "";
     const sourcePath = options.sourcePath || `${state.meta.scenario}.gezamenlijk.vasteLasten`;
     const moveOptions = kind === "fixed" ? moveTargetOptions(sourcePath) : "";
+    const [rowScenario, rowOwner] = sourcePath.split(".");
+    const distributionLabel = kind === "mortgage" ? "50/50" : rowOwner === "gezamenlijk" ? rowScenario === "voor" ? "Naar rato · Dion minimaal 40%" : "Naar rato" : `Persoonlijk · ${ownerLabel(rowOwner)}`;
     const header = `<div class="joint-fixed-editor-table-head" aria-hidden="true">
     <span></span>
     <span>Categorie</span>
@@ -5343,7 +5593,11 @@ service cloud.firestore {
       </label>
       ${kind === "fixed" ? `<select class="joint-fixed-editor-move" data-fixed-move-id="${textSafe(row.id)}" data-fixed-source-path="${sourcePath}" aria-label="Verplaatsen naar">${moveOptions}</select>` : '<span class="joint-fixed-editor-mortgage-note">50/50</span>'}
       <button type="button" class="joint-fixed-row-delete-compact" ${removeAttr}="${textSafe(row.id)}" aria-label="Post verwijderen">×</button>
-      <div class="joint-fixed-editor-hint joint-fixed-editor-hint-compact">Gerekend als ${eur(monthly)} per maand${note ? ` · ${note}` : ""}</div>
+      <div class="joint-fixed-editor-admin">
+        <label>Afschrijfdatum<input class="joint-fixed-editor-input joint-fixed-editor-date" type="date" ${fieldAttr}="afschrijfdatum" ${idAttr}="${textSafe(row.id)}" value="${attrSafe(row.afschrijfdatum || "")}" aria-label="Afschrijfdatum"></label>
+        <span class="joint-fixed-distribution">Verdeling: <strong>${textSafe(distributionLabel)}</strong></span>
+        <span>Gerekend als ${eur(monthly)} per maand${note ? ` · ${note}` : ""}</span>
+      </div>
     </div>`;
     }).join("");
     return header + body;
@@ -5489,6 +5743,7 @@ service cloud.firestore {
       <label>Omschrijving<input type="text" id="fixedAddDescription" autocomplete="off"></label>
       <label>Bedrag<input type="number" id="fixedAddAmount" step="0.01" inputmode="decimal" value="0"></label>
       <label>Frequentie<select id="fixedAddFrequency"><option value="monthly">Maandelijks</option><option value="yearly">Jaarlijks</option></select></label>
+      <label>Afschrijfdatum<input type="date" id="fixedAddDebitDate"></label>
       <label class="full">Eigenaar<select id="fixedAddOwner"><option value="gezamenlijk">Gezamenlijk</option><option value="dion">Dion</option><option value="dara">Dara</option></select></label>
     </div>
     <div class="modal-actions"><button type="button" class="ghost" data-fixed-add-cancel>Annuleren</button><button type="button" class="primary" data-fixed-add-save>Vaste last opslaan</button></div>
@@ -5513,7 +5768,7 @@ service cloud.firestore {
       }
       saving = true;
       const selectedOwner = modal.querySelector("#fixedAddOwner").value;
-      const item = { id: uid(), categorie: category, post, bedrag: round2(amount), jaarlijks: modal.querySelector("#fixedAddFrequency").value === "yearly" };
+      const item = { id: uid(), categorie: category, post, bedrag: round2(amount), jaarlijks: modal.querySelector("#fixedAddFrequency").value === "yearly", afschrijfdatum: modal.querySelector("#fixedAddDebitDate").value };
       const ok = commitChange(() => {
         if (draftSession) {
           state[scenario][owner].vasteLasten = cloneState(draftSession.rows || []);
@@ -5568,7 +5823,7 @@ service cloud.firestore {
         ${mortgageBlock}
         <div class="joint-fixed-editor-subhead">
           <span>Overige vaste lasten</span>
-          ${scenario === "na" ? "<strong>Naar rato</strong>" : ""}
+          <strong>${owner === "gezamenlijk" ? scenario === "voor" ? "Naar rato · Dion minimaal 40%" : "Naar rato" : `Persoonlijk · ${textSafe(name)}`}</strong>
         </div>
         ${rows.length ? renderJointFixedCostsEditorRows(rows, { sourcePath: `${scenario}.${owner}.vasteLasten` }) : '<p class="hint">Nog geen vaste lasten toegevoegd.</p>'}
       </div>
@@ -5731,7 +5986,7 @@ service cloud.firestore {
     if (addMortgage) {
       addMortgage.addEventListener("click", () => {
         commitAllFields();
-        mortgageRows.push({ id: uid(), categorie: "Huis", post: "Hypotheek", bedrag: 0, jaarlijks: false });
+        mortgageRows.push({ id: uid(), categorie: "Huis", post: "Hypotheek", bedrag: 0, jaarlijks: false, afschrijfdatum: "" });
         session.dirty = true;
         openJointFixedCostsModal(false, owner, session);
       });
@@ -6413,6 +6668,10 @@ service cloud.firestore {
     root2.querySelectorAll("[data-open-goal-manager]").forEach((btn) => {
       btn.addEventListener("click", () => openMobileGoalManager(btn.dataset.openGoalManager));
     });
+    bindDirectGoalOrdering(root2);
+    root2.querySelectorAll("[data-add-goal]").forEach((btn) => {
+      btn.addEventListener("click", () => createGoalForOwner(btn.dataset.addGoal));
+    });
     root2.querySelectorAll(".mobile-savings-overview .manage-section").forEach((section, index) => {
       var _a3;
       (_a3 = section.querySelector("summary")) == null ? void 0 : _a3.addEventListener("click", (event) => {
@@ -6995,7 +7254,8 @@ service cloud.firestore {
     const goal = item.doel;
     const target = u2GoalTarget(goal), saved = u2GoalSaved(goal), progress = target > 0 ? Math.min(100, Math.round(saved / target * 100)) : 0;
     const image = safeImageUrl(goalImageSource(goal));
-    return `<article class="card u2-goal-card">
+    return `<article class="card u2-goal-card" data-reorder-goal data-goal-owner="${owner}" data-goal-id="${textSafe(goal.id)}">
+    <button type="button" class="goal-direct-drag-handle" data-goal-drag-handle aria-label="${textSafe(goal.naam || "Spaardoel")} verplaatsen" title="Verslepen om de volgorde te wijzigen"></button>
     <button class="u2-goal-main" type="button" data-open-goal-editor="${owner}:${textSafe(goal.id)}">
       <span class="u2-goal-image${image ? " has-image" : ""}"${image ? ` style="background-image:url('${image}')"` : ""}>${image ? "" : goalIcon(goal)}</span>
       <span class="u2-goal-copy"><span class="u2-goal-title"><strong>${textSafe(goal.naam || "Spaardoel")}</strong><em class="u2-status ${item.status.key}">${item.status.label}</em></span><span>${eur(saved)} van ${eur(target)}</span><span class="progress-track"><span class="progress-fill" style="width:${progress}%"></span></span>${u2RenderChildSummary(goal)}</span>
@@ -7022,7 +7282,7 @@ service cloud.firestore {
       ${groups.map((group) => {
       const items = calcGroep(state.spaardoelen[group.key], group.pot, TODAY);
       const processed = u2IsProcessed(group.key);
-      return `<section class="u2-owner-section"><div class="u2-owner-head"><div><h2>${group.label}</h2><span>Spaarpot ${monthLabel(getSelectedMonth())}: ${eur(group.pot)}</span></div><div><button class="ghost small" data-open-goal-manager="${group.key}">Doelen beheren</button><button class="primary small" data-u2-process-owner="${group.key}" ${processed ? "disabled" : ""}>${processed ? "Maand verwerkt" : "Spaarpot verwerken"}</button></div></div><div class="u2-goal-grid">${items.length ? items.map((item) => u2RenderGoalRow(item, group.key)).join("") : '<div class="card"><p class="hint">Nog geen spaardoelen.</p></div>'}</div></section>`;
+      return `<section class="u2-owner-section"><div class="u2-owner-head"><div><h2>${group.label}</h2><span>Spaarpot ${monthLabel(getSelectedMonth())}: ${eur(group.pot)}</span></div><div><button class="ghost small" data-add-goal="${group.key}">+ Spaardoel</button><button class="primary small" data-u2-process-owner="${group.key}" ${processed ? "disabled" : ""}>${processed ? "Maand verwerkt" : "Spaarpot verwerken"}</button></div></div><div class="u2-goal-grid">${items.length ? items.map((item) => u2RenderGoalRow(item, group.key)).join("") : '<div class="card"><p class="hint">Nog geen spaardoelen.</p></div>'}</div></section>`;
     }).join("")}
       <details class="card u2-history"><summary><strong>Spaargeschiedenis</strong><span>${Object.keys(state.spaardoelGeschiedenis || {}).length} maanden</span></summary><div>${Object.values(state.spaardoelGeschiedenis || {}).sort((a, b) => String(b.maand).localeCompare(String(a.maand))).map((entry) => `<article><strong>${ownerLabel(entry.eigenaar)} · ${monthLabel(entry.maand)}</strong><span>Spaarpot ${eur(entry.spaarpot)} · verdeeld ${eur(entry.verdeeld)} · onverdeeld ${eur(entry.onverdeeld)}</span><small>${entry.transacties.map((tx) => `${textSafe(tx.doelNaam)} ${eur(tx.bedrag)}`).join(" · ")}</small></article>`).join("") || '<p class="hint">Nog geen maanden verwerkt.</p>'}</div></details>
     </div>`;
@@ -7059,11 +7319,12 @@ service cloud.firestore {
     u2OriginalMobileSpaardoelen();
     const root2 = document.getElementById("tab-spaardoelen");
     const result = calcScenario(state);
+    const visibleOwners = visibleGoalOwnerKeys();
     const groups = [
       { owner: "gezamenlijk", pot: Math.max(0, Number(result.spaarpotDezeMaand) || 0) },
       { owner: "dion", pot: Math.max(0, Number(result.dion.beschikbaarVoorSparen) || 0) },
       { owner: "dara", pot: Math.max(0, Number(result.dara.beschikbaarVoorSparen) || 0) }
-    ];
+    ].filter((group) => visibleOwners.includes(group.owner));
     root2.querySelectorAll(".mobile-goal-section").forEach((section, index) => {
       var _a2;
       const group = groups[index];
@@ -7074,7 +7335,7 @@ service cloud.firestore {
       actions.innerHTML = `<span>Spaarpot ${monthLabel(getSelectedMonth())}: ${eur(group.pot)}</span><button type="button" class="ghost small" data-u2-process-owner="${group.owner}" ${processed ? "disabled" : ""}>${processed ? "Maand verwerkt" : "Spaarpot verwerken"}</button>`;
       (_a2 = section.querySelector("h2")) == null ? void 0 : _a2.insertAdjacentElement("afterend", actions);
     });
-    const history = Object.values(state.spaardoelGeschiedenis || {}).sort((a, b) => String(b.maand).localeCompare(String(a.maand)));
+    const history = Object.values(state.spaardoelGeschiedenis || {}).filter((entry) => visibleOwners.includes(entry.eigenaar)).sort((a, b) => String(b.maand).localeCompare(String(a.maand)));
     const historyHtml = `<div class="u2-history-list">${history.map((entry) => `<article><strong>${ownerLabel(entry.eigenaar)} Â· ${monthLabel(entry.maand)}</strong><span>Spaarpot ${eur(entry.spaarpot)} Â· verdeeld ${eur(entry.verdeeld)} Â· onverdeeld ${eur(entry.onverdeeld)}</span><small>${entry.transacties.map((tx) => `${textSafe(tx.doelNaam)} ${eur(tx.bedrag)}`).join(" Â· ")}</small></article>`).join("") || '<p class="hint">Nog geen maanden verwerkt.</p>'}</div>`;
     root2.insertAdjacentHTML("beforeend", `<div class="manage-stack u2-history-stack">${renderManageSection("Spaargeschiedenis", historyHtml, false)}</div>`);
     root2.querySelectorAll(".u2-goal-accordion [data-open-goal-editor]").forEach((btn) => btn.addEventListener("click", (event) => {
@@ -7781,12 +8042,17 @@ service cloud.firestore {
     if (kind === "income") return state.recurringIncomeSources || [];
     return ((_a2 = state.recurringFixedExpenses) == null ? void 0 : _a2[state.meta.scenario]) || [];
   }
+  function u3FixedDistributionLabel(item, financialFor = (item == null ? void 0 : item.financialFor) || (item == null ? void 0 : item.rekening) || "gezamenlijk") {
+    if (financialFor !== "gezamenlijk") return `Persoonlijk · ${u3AccountLabel(financialFor)}`;
+    if (state.meta.scenario === "na" && (item == null ? void 0 : item.legacyKind) === "hypotheek") return "50/50";
+    return state.meta.scenario === "voor" ? "Naar rato · Dion minimaal 40%" : "Naar rato";
+  }
   function u3OpenPlanning(owner = "") {
     const planningOwner = U3_ACCOUNTS.includes(owner) ? owner : "";
     const fixed = u3RecurringRows("fixed").filter((item) => !planningOwner || (item.financialFor || item.rekening || "gezamenlijk") === planningOwner);
     const incomes = u3RecurringRows("income");
     const ownerName = planningOwner ? u3AccountLabel(planningOwner) : "";
-    const rows = (items, kind) => items.map((item) => `<article class="u3-admin-row"><div class="u3-row-head"><div><strong>${textSafe(item.naam || "Zonder naam")}</strong><br><small>${u3AccountLabel(item.rekening)} → ${u3AccountLabel(item.financialFor || item.rekening)} · elke ${item.frequentieAantal} ${textSafe(item.frequentieEenheid)}</small></div><div><span class="u3-status ${item.actief !== false ? "ok" : ""}">${item.actief !== false ? "Actief" : "Gestopt"}</span> <button class="ghost small" data-u3-edit-recurring="${kind}:${item.id}">Bewerken</button></div></div><div>${eur(u3AmountAt(item, getSelectedMonth()))} <small>· gemiddeld ${eur(u3MonthlyAverage(item))} p/m</small></div></article>`).join("");
+    const rows = (items, kind) => items.map((item) => `<article class="u3-admin-row"><div class="u3-row-head"><div><strong>${textSafe(item.naam || "Zonder naam")}</strong><br><small>${u3AccountLabel(item.rekening)} → ${u3AccountLabel(item.financialFor || item.rekening)} · elke ${item.frequentieAantal} ${textSafe(item.frequentieEenheid)}${kind === "fixed" ? ` · ${textSafe(u3FixedDistributionLabel(item))}` : ""}</small></div><div><span class="u3-status ${item.actief !== false ? "ok" : ""}">${item.actief !== false ? "Actief" : "Gestopt"}</span> <button class="ghost small" data-u3-edit-recurring="${kind}:${item.id}">Bewerken</button></div></div><div>${eur(u3AmountAt(item, getSelectedMonth()))} <small>· gemiddeld ${eur(u3MonthlyAverage(item))} p/m${kind === "fixed" && item.afschrijfdatum ? ` · afschrijving ${formatDateNL(item.afschrijfdatum)}` : ""}</small></div></article>`).join("");
     const { modal } = u3AdminModal(`<div class="u3-admin-head"><div><div class="section-kicker">${monthLabel(getSelectedMonth())} · ${state.meta.scenario === "voor" ? "Voor verkoop" : "Na verkoop"}</div><h2>${planningOwner ? `${textSafe(ownerName)} vaste lasten` : "Planning beheren"}</h2><p>${planningOwner ? `Alleen de vaste lasten die financieel voor ${textSafe(ownerName)} zijn.` : "Bedragen kunnen voor één maand of vanaf deze maand wijzigen."}</p></div><button class="ghost" data-u3-close>Sluiten</button></div>
     <div class="u3-steps">
       <section class="u3-step"><div class="u3-step-head"><div><h3>Vaste lasten</h3><p>${fixed.length} terugkerende posten${planningOwner ? ` voor ${textSafe(ownerName)}` : " in dit scenario"}</p></div><button class="primary small" data-u3-add-recurring="fixed">+ Vaste last</button></div><div class="u3-admin-list">${rows(fixed, "fixed") || '<div class="u3-empty">Nog geen vaste lasten.</div>'}</div></section>
@@ -7799,7 +8065,7 @@ service cloud.firestore {
     }));
   }
   function u3OpenRecurringEditor(kind, id = "", defaults = {}) {
-    var _a2, _b;
+    var _a2, _b, _c;
     const existing = u3RecurringRows(kind).find((item) => item.id === id);
     const income = kind === "income";
     const current = getSelectedMonth();
@@ -7818,12 +8084,17 @@ service cloud.firestore {
       <label>Frequentie<select id="u3RecUnit">${U3_FREQUENCY_UNITS.map((value2) => `<option value="${value2}" ${(existing == null ? void 0 : existing.frequentieEenheid) === value2 ? "selected" : ""}>${value2}</option>`).join("")}</select></label>
       <label>Begindatum<input id="u3RecStart" type="date" value="${textSafe((existing == null ? void 0 : existing.begindatum) || `${current}-01`)}"></label>
       <label>Einddatum<input id="u3RecEnd" type="date" value="${textSafe((existing == null ? void 0 : existing.einddatum) || "")}"></label>
+      ${income ? "" : `<label>Afschrijfdatum<input id="u3RecDebitDate" type="date" value="${textSafe((existing == null ? void 0 : existing.afschrijfdatum) || "")}"></label><div class="u3-fixed-distribution-info"><span>Verdeling</span><strong id="u3RecDistributionLabel">${textSafe(u3FixedDistributionLabel(existing || {}, (existing == null ? void 0 : existing.financialFor) || defaultOwner))}</strong><small>Deze keuze volgt automatisch uit het scenario en de eigenaar.</small></div>`}
       <label>Bedrag wijzigen<select id="u3RecScope"><option value="from">Vanaf ${monthLabel(current)}</option><option value="once">Alleen ${monthLabel(current)}</option></select></label>
       <label class="u2-checkbox"><input id="u3RecActive" type="checkbox" ${(existing == null ? void 0 : existing.actief) !== false ? "checked" : ""}> Actief</label>
     </div>
     <div class="modal-actions">${existing ? '<button class="danger-ghost" id="u3RecDelete">Stoppen</button>' : ""}<button class="ghost" data-u3-back-planning>Terug</button><button class="primary" id="u3RecSave">Opslaan</button></div>`);
     (_a2 = modal.querySelector("[data-u3-back-planning]")) == null ? void 0 : _a2.addEventListener("click", () => u3OpenPlanning(planningOwner));
-    (_b = modal.querySelector("#u3RecDelete")) == null ? void 0 : _b.addEventListener("click", () => {
+    (_b = modal.querySelector("#u3RecFor")) == null ? void 0 : _b.addEventListener("change", (event) => {
+      const label = modal.querySelector("#u3RecDistributionLabel");
+      if (label) label.textContent = u3FixedDistributionLabel(existing || {}, event.target.value);
+    });
+    (_c = modal.querySelector("#u3RecDelete")) == null ? void 0 : _c.addEventListener("click", () => {
       try {
         u3AssertMonthOpen();
         commitChange(() => {
@@ -7859,6 +8130,7 @@ service cloud.firestore {
           } else {
             item.categorie = modal.querySelector("#u3RecCategory").value.trim() || "Overig";
             item.bedrag = amount;
+            item.afschrijfdatum = modal.querySelector("#u3RecDebitDate").value;
           }
           item.amountHistory = Array.isArray(item.amountHistory) ? item.amountHistory : [];
           item.monthOverrides = isPlainObject2(item.monthOverrides) ? item.monthOverrides : {};
@@ -10772,11 +11044,12 @@ ${(error == null ? void 0 : error.message) || error}`);
     }
     function goalGroups() {
       const result = calcScenario(state);
+      const visibleOwners = visibleGoalOwnerKeys();
       return [
         { owner: "gezamenlijk", label: "Gezamenlijk", pot: result.spaarpotDezeMaand, goals: state.spaardoelen.gezamenlijk || [] },
         { owner: "dion", label: "Dion", pot: result.dion.beschikbaarVoorSparen, goals: state.spaardoelen.dion || [] },
         { owner: "dara", label: "Dara", pot: result.dara.beschikbaarVoorSparen, goals: state.spaardoelen.dara || [] }
-      ];
+      ].filter((group) => visibleOwners.includes(group.owner));
     }
     function calculatedGoals() {
       return goalGroups().flatMap(
@@ -10801,7 +11074,8 @@ ${(error == null ? void 0 : error.message) || error}`);
       const saved = Number(goal.algespaard) || 0;
       const progress = target > 0 ? Math.min(100, Math.round(saved / target * 100)) : 0;
       const reference = `${item.owner}:${goal.id}`;
-      return `<button type="button" class="u5-goal-list-card${reference === selectedGoalRef ? " active" : ""}" data-u5-select-goal="${textSafe(reference)}">
+      return `<div class="u5-goal-list-card${reference === selectedGoalRef ? " active" : ""}" data-u5-select-goal="${textSafe(reference)}" data-reorder-goal data-goal-owner="${item.owner}" data-goal-id="${textSafe(goal.id)}" role="button" tabindex="0">
+      <button type="button" class="goal-direct-drag-handle" data-goal-drag-handle aria-label="${textSafe(goal.naam || "Spaardoel")} verplaatsen" title="Verslepen om de volgorde te wijzigen"></button>
       ${goalImageMarkup(goal, "u5-goal-list-image")}
       <span class="u5-goal-list-copy">
         <span class="u5-goal-list-title"><strong>${textSafe(goal.naam || "Spaardoel")}</strong><em>${goal.favoriet ? "★" : ""}</em></span>
@@ -10809,7 +11083,7 @@ ${(error == null ? void 0 : error.message) || error}`);
         <span class="progress-track"><span class="progress-fill" style="width:${progress}%"></span></span>
       </span>
       <b>${progress}%</b>
-    </button>`;
+    </div>`;
     }
     function goalListContent(items) {
       if (goalOwnerFilter !== "alle") return items.map(goalListCard).join("");
@@ -10852,7 +11126,7 @@ ${(error == null ? void 0 : error.message) || error}`);
       </div>
       <div class="u5-goal-detail-actions">
         <button type="button" class="primary" data-open-goal-editor="${item.owner}:${textSafe(goal.id)}">Alle instellingen bewerken</button>
-        <button type="button" class="ghost" data-open-goal-manager="${item.owner}">Volgorde en doelen beheren</button>
+        <button type="button" class="ghost" data-add-goal="${item.owner}">+ Spaardoel</button>
       </div>
       <p class="hint">Bewerken gebruikt dezelfde opslag, berekeningen en afbeeldingsdata als de mobiele doelbewerker.</p>
     </article>`;
@@ -10860,7 +11134,7 @@ ${(error == null ? void 0 : error.message) || error}`);
     function goalTableView(groups) {
       return `<div class="u5-goal-table-stack">
       ${groups.map((group) => `<section class="card">
-        <div class="card-head"><h2>${group.label}</h2><button type="button" class="ghost small" data-open-goal-manager="${group.owner}">Doelen beheren</button></div>
+        <div class="card-head"><h2>${group.label}</h2><button type="button" class="ghost small" data-add-goal="${group.owner}">+ Spaardoel</button></div>
         ${renderGoalGroup(`spaardoelen.${group.owner}`, group.goals, group.pot)}
       </section>`).join("")}
     </div>`;
@@ -10870,10 +11144,20 @@ ${(error == null ? void 0 : error.message) || error}`);
         goalOwnerFilter = button.dataset.u5GoalFilter;
         renderActiveTab();
       }));
-      root2.querySelectorAll("[data-u5-select-goal]").forEach((button) => button.addEventListener("click", () => {
-        selectedGoalRef = button.dataset.u5SelectGoal;
-        renderActiveTab();
-      }));
+      root2.querySelectorAll("[data-u5-select-goal]").forEach((button) => {
+        const select = (event) => {
+          if (event.target.closest("[data-goal-drag-handle]")) return;
+          selectedGoalRef = button.dataset.u5SelectGoal;
+          renderActiveTab();
+        };
+        button.addEventListener("click", select);
+        button.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            select(event);
+          }
+        });
+      });
       root2.querySelectorAll("[data-u5-goal-view]").forEach((button) => button.addEventListener("click", () => {
         goalViewMode = button.dataset.u5GoalView;
         renderActiveTab();
@@ -10882,6 +11166,8 @@ ${(error == null ? void 0 : error.message) || error}`);
     function renderGoals() {
       var _a3;
       const groups = goalGroups();
+      const allowedFilters = /* @__PURE__ */ new Set(["alle", ...groups.map((group) => group.owner)]);
+      if (!allowedFilters.has(goalOwnerFilter)) goalOwnerFilter = "alle";
       const items = calculatedGoals();
       const totals = items.reduce((sum, item) => {
         sum.saved += Number(item.doel.algespaard) || 0;
@@ -10900,7 +11186,7 @@ ${(error == null ? void 0 : error.message) || error}`);
       </div>
       <div class="u5-goal-toolbar">
         <div class="u5-segmented" aria-label="Filter op eigenaar">
-          ${[["alle", "Alle"], ["gezamenlijk", "Gezamenlijk"], ["dion", "Dion"], ["dara", "Dara"]].map(([value, label]) => `<button type="button" class="${goalOwnerFilter === value ? "active" : ""}" data-u5-goal-filter="${value}">${label}</button>`).join("")}
+          ${[["alle", "Alle"], ...groups.map((group) => [group.owner, group.label])].map(([value, label]) => `<button type="button" class="${goalOwnerFilter === value ? "active" : ""}" data-u5-goal-filter="${value}">${label}</button>`).join("")}
         </div>
         <div class="u5-segmented" aria-label="Spaardoelenweergave">
           <button type="button" class="${goalViewMode === "master" ? "active" : ""}" data-u5-goal-view="master">Kaarten</button>
@@ -10911,7 +11197,7 @@ ${(error == null ? void 0 : error.message) || error}`);
         <aside class="card u5-goal-list">
           <div class="card-head"><div><h2>Spaardoelen</h2><span class="hint">${selection.visible.length} zichtbaar</span></div></div>
           <div class="u5-goal-list-scroll">${goalListContent(selection.visible) || '<p class="hint">Geen doelen in deze groep.</p>'}</div>
-          <button type="button" class="ghost" data-open-goal-manager="${((_a3 = selection.selected) == null ? void 0 : _a3.owner) || "gezamenlijk"}">+ Nieuw doel of volgorde wijzigen</button>
+          <button type="button" class="ghost" data-add-goal="${((_a3 = selection.selected) == null ? void 0 : _a3.owner) || (goalOwnerFilter === "alle" ? "gezamenlijk" : goalOwnerFilter)}">+ Spaardoel</button>
         </aside>
         ${goalDetail(selection.selected)}
       </div>`}`;

@@ -311,9 +311,9 @@ body.v4-app .value.is-negative{color:var(--red) !important}
   .u5-goal-owner-label small{color:var(--text-faint);font-size:10px}
   .u5-goal-owner-items{display:grid;gap:7px}
   .u5-goal-list-card{
-    width:100%;display:grid;grid-template-columns:62px minmax(0,1fr) auto;align-items:center;gap:10px;
+    width:100%;display:grid;grid-template-columns:26px 62px minmax(0,1fr) auto;align-items:center;gap:10px;
     min-height:80px;padding:9px;border:1px solid var(--border-soft);border-radius:14px;background:#fffaf4;
-    color:var(--text);text-align:left;box-shadow:none
+    color:var(--text);text-align:left;box-shadow:none;cursor:pointer
   }
   .u5-goal-list-card:hover{transform:none;background:#fffdf9}
   .u5-goal-list-card.active{border-color:rgba(88,124,76,.55);background:var(--green-bg);box-shadow:inset 3px 0 0 var(--green)}

@@ -18,7 +18,8 @@ import {
   renderPageHeading,
   safeImageUrl,
   state,
-  textSafe
+  textSafe,
+  visibleGoalOwnerKeys
 } from "../core/runtime.js";
 
 (function(){
@@ -49,11 +50,12 @@ import {
 
   function goalGroups(){
     const result = calcScenario(state);
+    const visibleOwners=visibleGoalOwnerKeys();
     return [
       {owner:'gezamenlijk',label:'Gezamenlijk',pot:result.spaarpotDezeMaand,goals:state.spaardoelen.gezamenlijk || []},
       {owner:'dion',label:'Dion',pot:result.dion.beschikbaarVoorSparen,goals:state.spaardoelen.dion || []},
       {owner:'dara',label:'Dara',pot:result.dara.beschikbaarVoorSparen,goals:state.spaardoelen.dara || []}
-    ];
+    ].filter(group=>visibleOwners.includes(group.owner));
   }
 
   function calculatedGoals(){
@@ -82,7 +84,8 @@ import {
     const saved = Number(goal.algespaard)||0;
     const progress = target > 0 ? Math.min(100,Math.round(saved/target*100)) : 0;
     const reference = `${item.owner}:${goal.id}`;
-    return `<button type="button" class="u5-goal-list-card${reference===selectedGoalRef?' active':''}" data-u5-select-goal="${textSafe(reference)}">
+    return `<div class="u5-goal-list-card${reference===selectedGoalRef?' active':''}" data-u5-select-goal="${textSafe(reference)}" data-reorder-goal data-goal-owner="${item.owner}" data-goal-id="${textSafe(goal.id)}" role="button" tabindex="0">
+      <button type="button" class="goal-direct-drag-handle" data-goal-drag-handle aria-label="${textSafe(goal.naam||'Spaardoel')} verplaatsen" title="Verslepen om de volgorde te wijzigen"></button>
       ${goalImageMarkup(goal,'u5-goal-list-image')}
       <span class="u5-goal-list-copy">
         <span class="u5-goal-list-title"><strong>${textSafe(goal.naam||'Spaardoel')}</strong><em>${goal.favoriet?'★':''}</em></span>
@@ -90,7 +93,7 @@ import {
         <span class="progress-track"><span class="progress-fill" style="width:${progress}%"></span></span>
       </span>
       <b>${progress}%</b>
-    </button>`;
+    </div>`;
   }
 
   function goalListContent(items){
@@ -135,7 +138,7 @@ import {
       </div>
       <div class="u5-goal-detail-actions">
         <button type="button" class="primary" data-open-goal-editor="${item.owner}:${textSafe(goal.id)}">Alle instellingen bewerken</button>
-        <button type="button" class="ghost" data-open-goal-manager="${item.owner}">Volgorde en doelen beheren</button>
+        <button type="button" class="ghost" data-add-goal="${item.owner}">+ Spaardoel</button>
       </div>
       <p class="hint">Bewerken gebruikt dezelfde opslag, berekeningen en afbeeldingsdata als de mobiele doelbewerker.</p>
     </article>`;
@@ -144,7 +147,7 @@ import {
   function goalTableView(groups){
     return `<div class="u5-goal-table-stack">
       ${groups.map(group=>`<section class="card">
-        <div class="card-head"><h2>${group.label}</h2><button type="button" class="ghost small" data-open-goal-manager="${group.owner}">Doelen beheren</button></div>
+        <div class="card-head"><h2>${group.label}</h2><button type="button" class="ghost small" data-add-goal="${group.owner}">+ Spaardoel</button></div>
         ${renderGoalGroup(`spaardoelen.${group.owner}`,group.goals,group.pot)}
       </section>`).join('')}
     </div>`;
@@ -155,10 +158,15 @@ import {
       goalOwnerFilter = button.dataset.u5GoalFilter;
       renderActiveTab();
     }));
-    root.querySelectorAll('[data-u5-select-goal]').forEach(button=>button.addEventListener('click',()=>{
-      selectedGoalRef = button.dataset.u5SelectGoal;
-      renderActiveTab();
-    }));
+    root.querySelectorAll('[data-u5-select-goal]').forEach(button=>{
+      const select=event=>{
+        if(event.target.closest('[data-goal-drag-handle]'))return;
+        selectedGoalRef = button.dataset.u5SelectGoal;
+        renderActiveTab();
+      };
+      button.addEventListener('click',select);
+      button.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();select(event);}});
+    });
     root.querySelectorAll('[data-u5-goal-view]').forEach(button=>button.addEventListener('click',()=>{
       goalViewMode = button.dataset.u5GoalView;
       renderActiveTab();
@@ -167,6 +175,8 @@ import {
 
   function renderGoals(){
     const groups = goalGroups();
+    const allowedFilters=new Set(['alle',...groups.map(group=>group.owner)]);
+    if(!allowedFilters.has(goalOwnerFilter))goalOwnerFilter='alle';
     const items = calculatedGoals();
     const totals = items.reduce((sum,item)=>{
       sum.saved += Number(item.doel.algespaard)||0;
@@ -185,7 +195,7 @@ import {
       </div>
       <div class="u5-goal-toolbar">
         <div class="u5-segmented" aria-label="Filter op eigenaar">
-          ${[['alle','Alle'],['gezamenlijk','Gezamenlijk'],['dion','Dion'],['dara','Dara']].map(([value,label])=>`<button type="button" class="${goalOwnerFilter===value?'active':''}" data-u5-goal-filter="${value}">${label}</button>`).join('')}
+          ${[['alle','Alle'],...groups.map(group=>[group.owner,group.label])].map(([value,label])=>`<button type="button" class="${goalOwnerFilter===value?'active':''}" data-u5-goal-filter="${value}">${label}</button>`).join('')}
         </div>
         <div class="u5-segmented" aria-label="Spaardoelenweergave">
           <button type="button" class="${goalViewMode==='master'?'active':''}" data-u5-goal-view="master">Kaarten</button>
@@ -196,7 +206,7 @@ import {
         <aside class="card u5-goal-list">
           <div class="card-head"><div><h2>Spaardoelen</h2><span class="hint">${selection.visible.length} zichtbaar</span></div></div>
           <div class="u5-goal-list-scroll">${goalListContent(selection.visible) || '<p class="hint">Geen doelen in deze groep.</p>'}</div>
-          <button type="button" class="ghost" data-open-goal-manager="${selection.selected?.owner||'gezamenlijk'}">+ Nieuw doel of volgorde wijzigen</button>
+          <button type="button" class="ghost" data-add-goal="${selection.selected?.owner||(goalOwnerFilter==='alle'?'gezamenlijk':goalOwnerFilter)}">+ Spaardoel</button>
         </aside>
         ${goalDetail(selection.selected)}
       </div>`}`;
