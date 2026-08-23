@@ -19,7 +19,7 @@ function round2(value) {
   return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 }
 
-function runScenario(scenario, jointActual, personalActual = {}, savingOverrides = {}) {
+function runScenario(scenario, jointActual, personalActual = {}, savingOverrides = {}, selectedMonth = '2026-07', allSavingOverrides = null) {
   const monthly = {
     verdeling: {
       minimumDion: 0.4,
@@ -50,7 +50,7 @@ function runScenario(scenario, jointActual, personalActual = {}, savingOverrides
     Math,
     round2,
     isPlainObject: value => !!value && typeof value === 'object' && !Array.isArray(value),
-    getSelectedMonth: () => '2026-07',
+    getSelectedMonth: () => selectedMonth,
     getDistributionIncomeParts: owner => ({
       salary: owner === 'dion' ? 3000 : 2000,
       refund: 0
@@ -64,7 +64,7 @@ function runScenario(scenario, jointActual, personalActual = {}, savingOverrides
   vm.runInContext(source, context);
   return JSON.parse(JSON.stringify(context.calcScenario({
     meta: { scenario },
-    monthlySavingOverrides: { '2026-07': savingOverrides }
+    monthlySavingOverrides: allSavingOverrides || { [selectedMonth]: savingOverrides }
   })));
 }
 
@@ -113,5 +113,16 @@ assert.equal(manualSaving.dion.savingsSource, 'handmatig');
 assert.equal(manualSaving.dara.beschikbaarVoorSparen, 0, 'Een expliciete nul moet als handmatige spaarwaarde blijven gelden');
 assert.equal(manualSaving.dara.savingsSource, 'handmatig');
 assert.equal(manualSaving.dion.zakgeld, automaticSaving.dion.zakgeld, 'Een spaaroverride mag de zakgeldverdeling niet wijzigen');
+
+const jointSavingsByMonth = {
+  '2026-07': { gezamenlijkVoor: 300 },
+  '2026-08': { gezamenlijkVoor: 700 }
+};
+const julyJointSaving = runScenario('voor', 750, {}, {}, '2026-07', jointSavingsByMonth);
+const augustJointSaving = runScenario('voor', 750, {}, {}, '2026-08', jointSavingsByMonth);
+const afterSaleJointSaving = runScenario('na', 750, {}, {}, '2026-08', jointSavingsByMonth);
+assert.equal(julyJointSaving.spaarpotDezeMaand, 300, 'Juli houdt zijn eigen gezamenlijke spaarbedrag');
+assert.equal(augustJointSaving.spaarpotDezeMaand, 700, 'Augustus houdt zijn eigen gezamenlijke spaarbedrag');
+assert.equal(afterSaleJointSaving.spaarpotDezeMaand, 500, 'Voor en na verkoop houden afzonderlijke maandwaarden');
 
 console.log('UPDATE5_ALLOWANCE_BUDGET_REGRESSION_OK');

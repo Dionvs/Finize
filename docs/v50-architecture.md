@@ -56,7 +56,7 @@ Er is geen externe API toegevoegd. Klassieke globals die door de bestaande runti
 
 ## PWA
 
-De cachemarker is `finize-v78-cloud-vervangen`. Alleen caches met de prefix `finize-` worden opgeruimd. Alleen navigatieverzoeken mogen offline op `index.html` terugvallen; ontbrekende scripts, CSS en afbeeldingen krijgen nooit HTML als vervanging. Optionele pictogrammen kunnen een installatie niet blokkeren.
+De cachemarker is `finize-v87-csv-verwerking`. Alleen caches met de prefix `finize-` worden opgeruimd. Alleen navigatieverzoeken mogen offline op `index.html` terugvallen; ontbrekende scripts, CSS en afbeeldingen krijgen nooit HTML als vervanging. Optionele pictogrammen kunnen een installatie niet blokkeren.
 
 Cloudwrites gebruiken een Firestore-transactie met een serverbrede `syncVersion` en unieke `commitId`. De eerste geldige cloudsnapshot is leidend; een apparaat-lokale `revision` bepaalt nooit meer welke apparaatstand wint. Als de cloud sinds de laatste bevestiging is veranderd, wordt de lokale stand als nood-back-up bewaard en daarna door de actuele cloudstand vervangen. Expliciet herstel van een JSON- of noodback-up wordt atomair als nieuwe cloudversie opgeslagen; de schermstand wisselt pas na bevestiging door Firestore. Vertraagd binnenkomende snapshots met een lagere of inconsistente `syncVersion` worden altijd genegeerd.
 

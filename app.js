@@ -2261,6 +2261,7 @@
     });
   }
   function calcScenario(state2) {
+    var _a2;
     const scenario = state2.meta.scenario;
     const selectedMonth = getSelectedMonth();
     const dionIncomeParts = getDistributionIncomeParts("dion", selectedMonth);
@@ -2279,7 +2280,10 @@
     const variabelBudgetTotaal = sumBedrag(s.gezamenlijk.variabel);
     const variabelTotaal = sumTransactions("gezamenlijk");
     const variabelVoorVerdelingTotaal = variabelBudgetTotaal;
-    const spaarpotDezeMaand = Number(s.spaarpotDezeMaand) || 0;
+    const jointSavingKey = scenario === "voor" ? "gezamenlijkVoor" : "gezamenlijkNa";
+    const selectedSavingOverrides = (_a2 = state2.monthlySavingOverrides) == null ? void 0 : _a2[selectedMonth];
+    const hasJointSavingOverride = isPlainObject2(selectedSavingOverrides) && Object.prototype.hasOwnProperty.call(selectedSavingOverrides, jointSavingKey);
+    const spaarpotDezeMaand = hasJointSavingOverride ? round2(Number(selectedSavingOverrides[jointSavingKey]) || 0) : round2(Number(s.spaarpotDezeMaand) || 0);
     let effDion, effDara, zakgeldDion, zakgeldDara, hypotheekBedrag = 0;
     if (scenario === "voor") {
       const minDion = Number(s.verdeling.minimumDion);
@@ -2299,13 +2303,13 @@
       effDara = hypDara;
     }
     function persoonlijk(p, zakgeld) {
-      var _a2;
+      var _a3;
       const persoonlijkeVasteLasten = sumEffective(s[p].vasteLasten);
       const persoonlijkVariabelBudget = sumBedrag(s[p].variabel);
       const resterendVoorVariabel = round2(zakgeld - persoonlijkeVasteLasten);
       const variabeleUitgaven = sumTransactions(p);
       const automatischBeschikbaarVoorSparen = round2(zakgeld - persoonlijkeVasteLasten - persoonlijkVariabelBudget);
-      const monthOverrides = (_a2 = state2.monthlySavingOverrides) == null ? void 0 : _a2[selectedMonth];
+      const monthOverrides = (_a3 = state2.monthlySavingOverrides) == null ? void 0 : _a3[selectedMonth];
       const handmatigSparen = isPlainObject2(monthOverrides) && Object.prototype.hasOwnProperty.call(monthOverrides, p);
       const beschikbaarVoorSparen = handmatigSparen ? round2(Number(monthOverrides[p]) || 0) : automatischBeschikbaarVoorSparen;
       return {
@@ -3564,7 +3568,10 @@
           if (el.dataset.percent === "true") value /= 100;
         } else if (typeof value === "string") value = value.trim();
         if (JSON.stringify(item[field]) === JSON.stringify(value)) return;
-        commitChange(() => updateItemById(el.dataset.itemPath, el.dataset.itemId, { [field]: value }), { render: false });
+        commitChange(() => {
+          if (field === "algespaard" && el.dataset.itemPath.startsWith("spaardoelen.")) u2SetGoalSavedAmount(item, value);
+          else updateItemById(el.dataset.itemPath, el.dataset.itemId, { [field]: value });
+        }, { render: false });
       };
       el.addEventListener("change", save);
     });
@@ -5574,10 +5581,14 @@ service cloud.firestore {
     }
   }
   function openSavingEditModal() {
+    var _a2;
     const modal = document.getElementById("incomeEditModal");
     const scenario = state.meta.scenario;
+    const month = getSelectedMonth();
     const data = getMonthlyScenarioData(scenario);
-    const current = Number(data.spaarpotDezeMaand) || 0;
+    const savingKey = scenario === "voor" ? "gezamenlijkVoor" : "gezamenlijkNa";
+    const monthOverrides = isPlainObject2((_a2 = state.monthlySavingOverrides) == null ? void 0 : _a2[month]) ? state.monthlySavingOverrides[month] : {};
+    const current = Object.prototype.hasOwnProperty.call(monthOverrides, savingKey) ? round2(Number(monthOverrides[savingKey]) || 0) : round2(Number(data.spaarpotDezeMaand) || 0);
     const scenarioLabel = scenario === "voor" ? "Voor verkoop" : "Na verkoop";
     modal.innerHTML = `
     <div class="modal income-sheet">
@@ -5585,7 +5596,7 @@ service cloud.firestore {
       <div class="card-head"><h2>Sparen aanpassen</h2><button class="danger-ghost" id="btnCloseSavingEdit">×</button></div>
       <div class="income-sheet-meta">
         <span>${scenarioLabel}</span>
-        <span>${monthLabel(getSelectedMonth())}</span>
+        <span>${monthLabel(month)}</span>
       </div>
       <div class="income-sheet-total">
         <span>Sparen deze maand</span>
@@ -5615,11 +5626,20 @@ service cloud.firestore {
     bindModalBackdrop(modal, close);
     document.getElementById("btnSaveSavingEdit").addEventListener("click", () => {
       const parsed = parseFloat(String(input.value).replace(",", "."));
-      state[scenario].spaarpotDezeMaand = round2(Number.isFinite(parsed) ? parsed : 0);
-      persist();
+      if (!Number.isFinite(parsed)) {
+        alert("Vul een geldig spaarbedrag in.");
+        return;
+      }
+      const saved = commitChange(() => {
+        assertMonthMutationAllowed(month);
+        state.monthlySavingOverrides = isPlainObject2(state.monthlySavingOverrides) ? state.monthlySavingOverrides : {};
+        state.monthlySavingOverrides[month] = isPlainObject2(state.monthlySavingOverrides[month]) ? state.monthlySavingOverrides[month] : {};
+        state.monthlySavingOverrides[month][savingKey] = round2(parsed);
+      }, { render: false });
+      if (!saved) return;
       close();
       renderActiveTab();
-      showQuickToast("Sparen opgeslagen");
+      showQuickToast("Spaarbedrag voor deze maand opgeslagen");
     });
   }
   function openPersonalSavingEditModal(owner) {
@@ -8016,9 +8036,14 @@ service cloud.firestore {
       });
     }
     function contributionAmount(entry) {
-      var _a2;
+      var _a2, _b, _c;
       if ((entry == null ? void 0 : entry.active) === false || ["geannuleerd", "teruggedraaid"].includes(entry == null ? void 0 : entry.status)) return 0;
-      const value = Number((_a2 = entry == null ? void 0 : entry.effectiveAmount) != null ? _a2 : entry == null ? void 0 : entry.amount);
+      if ((entry == null ? void 0 : entry.source) === "planned") return 0;
+      if (["bank-import", "bank-match"].includes(entry == null ? void 0 : entry.source) && (entry == null ? void 0 : entry.transactionId)) {
+        const actual = Number((_b = (_a2 = entry == null ? void 0 : entry.actualAmount) != null ? _a2 : entry == null ? void 0 : entry.amount) != null ? _b : entry == null ? void 0 : entry.effectiveAmount);
+        return Number.isFinite(actual) ? round22(actual) : 0;
+      }
+      const value = Number((_c = entry == null ? void 0 : entry.effectiveAmount) != null ? _c : entry == null ? void 0 : entry.amount);
       return Number.isFinite(value) ? round22(value) : 0;
     }
     function calculateGoalSavedAmount(state2, goalId) {
@@ -8512,15 +8537,36 @@ service cloud.firestore {
       }
       return null;
     }
-    function classifyOriginal(original, profile, rules = [], profiles = []) {
-      var _a2, _b, _c, _d, _e, _f, _g, _h;
-      const type = proposeType(original, profiles);
+    function fixedAmountAt(item, dateOrMonth) {
+      var _a2, _b, _c;
+      const month = String(dateOrMonth || "").slice(0, 7);
+      if ((item == null ? void 0 : item.monthOverrides) && Number.isFinite(Number(item.monthOverrides[month]))) return round22(Number(item.monthOverrides[month]));
+      const history = (Array.isArray(item == null ? void 0 : item.amountHistory) ? item.amountHistory : []).filter((entry) => String((entry == null ? void 0 : entry.effectiveFrom) || "").slice(0, 7) <= month).sort((a, b) => String(a.effectiveFrom || "").localeCompare(String(b.effectiveFrom || ""))).pop();
+      return round22(Number((_c = (_b = (_a2 = history == null ? void 0 : history.amount) != null ? _a2 : item == null ? void 0 : item.bedrag) != null ? _b : item == null ? void 0 : item.verwachtBedrag) != null ? _c : 0) || 0);
+    }
+    function fixedRecognition(original, profile, rule, fixedExpenses = []) {
+      if (!(rule == null ? void 0 : rule.fixedExpenseId)) return { required: false, safe: true, item: null, expected: 0, tolerance: 0 };
+      const item = (fixedExpenses || []).find((entry) => String(entry == null ? void 0 : entry.id) === String(rule.fixedExpenseId));
+      if (!item) return { required: true, safe: false, item: null, reason: "gekoppelde vaste last bestaat niet meer" };
+      const fixedOwner = validOwner(item.financialFor || item.rekening || "gezamenlijk");
+      if (!profile || fixedOwner !== profile.accountOwner) return { required: true, safe: false, item, reason: "vaste last hoort bij een andere budgeteigenaar" };
+      const expected = Math.abs(fixedAmountAt(item, original.bankDate));
+      const actual = Math.abs(Number(original.amount) || 0);
+      const tolerance = Math.max(5, round22(expected * 0.15));
+      const safe = expected > 0 && Math.abs(actual - expected) <= tolerance + 4e-3;
+      return { required: true, safe, item, expected, tolerance, reason: safe ? "" : `bedrag wijkt meer dan ${tolerance.toFixed(2)} af` };
+    }
+    function classifyOriginal(original, profile, rules = [], profiles = [], fixedExpenses = []) {
+      var _a2, _b, _c, _d, _e, _f, _g, _h, _i;
       const proposal = recognitionProposal(original, rules);
-      const special = !["uitgave"].includes(type);
+      const proposedType = ((_a2 = proposal == null ? void 0 : proposal.rule) == null ? void 0 : _a2.transactionType) || proposeType(original, profiles);
+      const type = ((_b = proposal == null ? void 0 : proposal.rule) == null ? void 0 : _b.fixedExpenseId) ? "vaste-last" : proposedType;
+      const fixedMatch = fixedRecognition(original, profile, proposal == null ? void 0 : proposal.rule, fixedExpenses);
+      const special = !["uitgave", "vaste-last"].includes(type);
       const strong = proposal && ["counterparty", "description", "organization"].includes(proposal.level);
-      const category = ((_a2 = proposal == null ? void 0 : proposal.rule) == null ? void 0 : _a2.category) || "Ongecategoriseerd";
-      const alwaysReview = ((_b = proposal == null ? void 0 : proposal.rules) == null ? void 0 : _b.some((rule) => rule.alwaysReview)) === true;
-      const review = !profile || special || !strong || (proposal == null ? void 0 : proposal.conflict) || alwaysReview || category === "Ongecategoriseerd" || !!((_c = proposal == null ? void 0 : proposal.rule) == null ? void 0 : _c.fixedExpenseId) || !!((_d = proposal == null ? void 0 : proposal.rule) == null ? void 0 : _d.savingsGoalId);
+      const category = ((_c = proposal == null ? void 0 : proposal.rule) == null ? void 0 : _c.category) || "Ongecategoriseerd";
+      const alwaysReview = ((_d = proposal == null ? void 0 : proposal.rules) == null ? void 0 : _d.some((rule) => rule.alwaysReview)) === true;
+      const review = !profile || special || !strong || (proposal == null ? void 0 : proposal.conflict) || alwaysReview || category === "Ongecategoriseerd" || fixedMatch.required && !fixedMatch.safe || !!((_e = proposal == null ? void 0 : proposal.rule) == null ? void 0 : _e.savingsGoalId);
       return {
         certainty: review ? "nakijken" : "zeker",
         reasons: [
@@ -8529,7 +8575,8 @@ service cloud.firestore {
           (proposal == null ? void 0 : proposal.conflict) ? "conflicterende herkenningsregels" : "",
           !proposal ? "geen herkenningsregel" : "",
           category === "Ongecategoriseerd" ? "categorie onbekend" : "",
-          alwaysReview ? "regel staat op altijd nakijken" : ""
+          alwaysReview ? "regel staat op altijd nakijken" : "",
+          fixedMatch.required && !fixedMatch.safe ? fixedMatch.reason : ""
         ].filter(Boolean),
         processing: {
           processingDate: original.bankDate,
@@ -8537,14 +8584,14 @@ service cloud.firestore {
           category,
           transactionType: type,
           budgetOwner: (profile == null ? void 0 : profile.accountOwner) || "",
-          budgetItemId: ((_e = proposal == null ? void 0 : proposal.rule) == null ? void 0 : _e.budgetItemId) || "",
-          fixedExpenseId: ((_f = proposal == null ? void 0 : proposal.rule) == null ? void 0 : _f.fixedExpenseId) || "",
+          budgetItemId: ((_f = proposal == null ? void 0 : proposal.rule) == null ? void 0 : _f.budgetItemId) || "",
+          fixedExpenseId: ((_g = proposal == null ? void 0 : proposal.rule) == null ? void 0 : _g.fixedExpenseId) || "",
           fixedAmountMode: "none",
-          savingsGoalId: ((_g = proposal == null ? void 0 : proposal.rule) == null ? void 0 : _g.savingsGoalId) || "",
+          savingsGoalId: ((_h = proposal == null ? void 0 : proposal.rule) == null ? void 0 : _h.savingsGoalId) || "",
           splits: [],
           advanceMode: "auto",
           include: true,
-          recognitionRuleId: ((_h = proposal == null ? void 0 : proposal.rule) == null ? void 0 : _h.id) || "",
+          recognitionRuleId: ((_i = proposal == null ? void 0 : proposal.rule) == null ? void 0 : _i.id) || "",
           note: ""
         }
       };
@@ -8587,7 +8634,7 @@ service cloud.firestore {
       if (identifiers.length !== 1) return null;
       return profiles.find((profile) => normalizeIban(profile.identifier) === identifiers[0]) || null;
     }
-    function createImportDraft({ text, fileName = "import.csv", profiles = [], rules = [], transactions = [], id = uid2("import") }) {
+    function createImportDraft({ text, fileName = "import.csv", profiles = [], rules = [], transactions = [], fixedExpenses = [], id = uid2("import") }) {
       const parsed = parseBankCsv(text);
       const profile = findProfile(parsed, profiles);
       const existingFingerprints = new Set((transactions || []).map((tx) => {
@@ -8599,7 +8646,7 @@ service cloud.firestore {
         original.importTransactionId = `${id}-${String(index + 1).padStart(5, "0")}`;
         original.fingerprint = fingerprint(original, (profile == null ? void 0 : profile.id) || original.accountIdentifier);
         const duplicate = existingFingerprints.has(original.fingerprint);
-        const proposal = classifyOriginal(original, profile, rules, profiles);
+        const proposal = classifyOriginal(original, profile, rules, profiles, fixedExpenses);
         return { id: original.importTransactionId, bankOriginal: original, accountProfileId: (profile == null ? void 0 : profile.id) || "", accountOwner: (profile == null ? void 0 : profile.accountOwner) || "", duplicate, ...proposal };
       });
       const active = rows.filter((row) => row.bankOriginal.valid && !row.duplicate);
@@ -8906,6 +8953,10 @@ service cloud.firestore {
         if (!parseDate(p.processingDate)) errors.push({ rowId: row.id, code: "date", message: "Ongeldige verwerkingsdatum." });
         if (!Number.isFinite(Number(p.processedAmount))) errors.push({ rowId: row.id, code: "amount", message: "Verwerkt bedrag ontbreekt." });
         if (!OWNERS.includes(p.budgetOwner)) errors.push({ rowId: row.id, code: "owner", message: "Budgeteigenaar ontbreekt." });
+        if (p.transactionType === "maandelijkse-bijdrage" && !["dion", "dara"].includes(p.budgetOwner)) errors.push({ rowId: row.id, code: "owner", message: "Kies Dion of Dara als ontvanger van het zakgeld." });
+        if (p.transactionType === "vaste-last" && !p.fixedExpenseId) errors.push({ rowId: row.id, code: "fixed-choice", message: "Kies welke vaste last bij deze banktransactie hoort." });
+        if (p.transactionType === "sparen" && !p.savingsGoalId) errors.push({ rowId: row.id, code: "goal-choice", message: "Kies het spaardoel voor deze inleg." });
+        if (transferType(p.transactionType) && (!p.sourceAccountProfileId || !p.destinationAccountProfileId || p.sourceAccountProfileId === p.destinationAccountProfileId)) errors.push({ rowId: row.id, code: "transfer", message: "Kies twee verschillende rekeningen voor de interne overboeking." });
         if (p.savingsGoalId && !goalExists(state2, p.savingsGoalId)) errors.push({ rowId: row.id, code: "goal", message: "Het gekozen spaardoel bestaat niet meer." });
         if (p.fixedExpenseId && !fixedExists(state2, p.fixedExpenseId)) errors.push({ rowId: row.id, code: "fixed", message: "De gekozen vaste last bestaat niet meer." });
         const activeSplits = (p.splits || []).filter((split) => Math.abs(Number(split.amount) || 0) > 4e-3);
@@ -9290,6 +9341,41 @@ service cloud.firestore {
       if (state2.activeImportId === draft.id) state2.activeImportId = "";
       return state2;
     }
+    function learnedRecognitionRules(draft) {
+      const groups = /* @__PURE__ */ new Map();
+      (draft.rows || []).filter((row) => {
+        var _a2;
+        return row.certainty === "zeker" && ((_a2 = row.bankOriginal) == null ? void 0 : _a2.valid) && !row.duplicate;
+      }).forEach((row) => {
+        const original = row.bankOriginal;
+        const p = row.processing || {};
+        const counterparty = normalizeIban(original.counterpartyAccount);
+        const level = counterparty ? "counterparty" : "description";
+        const value = counterparty || String(original.rawDescription || original.description || "").trim();
+        if (!value) return;
+        const transactionType = p.fixedExpenseId ? "vaste-last" : p.include === false ? "niet-meetellen" : p.transactionType || "uitgave";
+        const category = p.fixedExpenseId ? "Vaste lasten" : String(p.category || "Ongecategoriseerd");
+        const signature = [category, transactionType, p.budgetItemId || "", p.fixedExpenseId || "", p.savingsGoalId || ""].join("|");
+        const key = `${level}|${normalizeText(value)}`;
+        if (!groups.has(key)) groups.set(key, { level, value, rows: [], signatures: /* @__PURE__ */ new Set() });
+        const group = groups.get(key);
+        group.rows.push({ p, category, transactionType });
+        group.signatures.add(signature);
+      });
+      return [...groups.entries()].filter(([, group]) => group.signatures.size === 1).map(([key, group]) => {
+        const { p, category, transactionType } = group.rows[0];
+        return normalizeRule({ id: `u4-rule-${hashText(key)}`, enabled: true, level: group.level, value: group.value, category, transactionType, budgetItemId: p.budgetItemId || "", fixedExpenseId: p.fixedExpenseId || "", savingsGoalId: p.savingsGoalId || "", alwaysReview: false, updatedAt: (/* @__PURE__ */ new Date()).toISOString() });
+      });
+    }
+    function rememberRecognitionRules(state2, draft) {
+      state2.recognitionRules = Array.isArray(state2.recognitionRules) ? state2.recognitionRules : [];
+      learnedRecognitionRules(draft).forEach((rule) => {
+        const index = state2.recognitionRules.findIndex((existing) => existing.id === rule.id || existing.level === rule.level && normalizeText(existing.value) === normalizeText(rule.value));
+        if (index >= 0) state2.recognitionRules[index] = rule;
+        else state2.recognitionRules.unshift(rule);
+      });
+      state2.recognitionRules = state2.recognitionRules.slice(0, 300);
+    }
     async function undoImport(root2, draft) {
       if (draft.status === "teruggedraaid") return true;
       const journal = { id: `undo-${draft.id}`, importId: draft.id, operation: "undo", status: "pending", createdAt: (/* @__PURE__ */ new Date()).toISOString() };
@@ -9328,6 +9414,7 @@ service cloud.firestore {
       const ok = root2.commitChange(() => {
         undoImportEffects(root2.state, draft);
         applyImportPlan(root2.state, plan);
+        rememberRecognitionRules(root2.state, draft);
       }, { render: false, mutationMode: "correction" });
       if (!ok) {
         journal.status = "rolled-back";
@@ -9395,8 +9482,9 @@ service cloud.firestore {
       else if (error.code === "date") target = row.querySelector('[data-u4-field="processingDate"]');
       else if (error.code === "amount") target = row.querySelector('[data-u4-field="processedAmount"]');
       else if (error.code === "owner") target = row.querySelector('[data-u4-field="budgetOwner"]');
-      else if (error.code === "goal") target = row.querySelector('[data-u4-field="savingsGoalId"]');
-      else if (error.code === "fixed") target = row.querySelector('[data-u4-field="fixedExpenseId"]');
+      else if (["goal", "goal-choice"].includes(error.code)) target = row.querySelector('[data-u4-field="savingsGoalId"]');
+      else if (["fixed", "fixed-choice"].includes(error.code)) target = row.querySelector('[data-u4-field="fixedExpenseId"]');
+      else if (error.code === "transfer") target = row.querySelector('[data-u4-field="sourceAccountProfileId"]');
       setTimeout(() => {
         var _a3;
         (_a3 = target == null ? void 0 : target.focus) == null ? void 0 : _a3.call(target, { preventScroll: true });
@@ -9427,7 +9515,10 @@ service cloud.firestore {
       }
       const journal = { id: `process-${draft.id}`, importId: draft.id, status: "pending", createdAt: (/* @__PURE__ */ new Date()).toISOString(), transactionIds: plan.transactions.map((tx) => tx.id) };
       await ImportStore.putJournal(journal);
-      const ok = root2.commitChange(() => applyImportPlan(root2.state, plan), { render: false, mutationMode: "late-import" });
+      const ok = root2.commitChange(() => {
+        applyImportPlan(root2.state, plan);
+        rememberRecognitionRules(root2.state, draft);
+      }, { render: false, mutationMode: "late-import" });
       if (!ok) {
         journal.status = "rolled-back";
         journal.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
@@ -9538,8 +9629,70 @@ service cloud.firestore {
       { label: "Correctie en verrekening", items: [["terugbetaling-voorschot", "Terugbetaling voorschot"]] }
     ];
     const TYPES = TYPE_GROUPS.flatMap((group) => group.items.map((item) => item[0]));
+    const INCOME_TYPES = ["salaris", "vakantiegeld", "nabetaling", "vergoeding", "belastingteruggave", "overige-inkomsten"];
+    const TRANSFER_TYPES = ["naar-spaarrekening", "van-spaarrekening", "interne-overboeking"];
+    const REPAYMENT_TYPES = ["terugbetaling", "terugbetaling-voorschot"];
+    const TRANSACTION_FAMILIES = [["uitgave", "Uitgave"], ["inkomen", "Inkomen"], ["sparen", "Sparen"], ["overboeking", "Interne overboeking"], ["zakgeld", "Zakgeld"], ["extra-bijdrage", "Extra bijdrage"], ["terugbetaling", "Terugbetaling"], ["niet-meetellen", "Niet meetellen"]];
     function typeOptions(current) {
       return TYPE_GROUPS.map((group) => `<optgroup label="${esc(group.label)}">${group.items.map(([value, label]) => option(value, label, current)).join("")}</optgroup>`).join("");
+    }
+    function transactionFamily(processing = {}) {
+      const type = processing.include === false ? "niet-meetellen" : processing.transactionType;
+      if (type === "niet-meetellen") return "niet-meetellen";
+      if (INCOME_TYPES.includes(type)) return "inkomen";
+      if (type === "sparen") return "sparen";
+      if (TRANSFER_TYPES.includes(type)) return "overboeking";
+      if (type === "maandelijkse-bijdrage") return "zakgeld";
+      if (type === "extra-bijdrage") return "extra-bijdrage";
+      if (REPAYMENT_TYPES.includes(type)) return "terugbetaling";
+      return "uitgave";
+    }
+    function familyOptions(current) {
+      return TRANSACTION_FAMILIES.map(([value, label]) => option(value, label, current)).join("");
+    }
+    function ownerOptions(row) {
+      const family = transactionFamily(row.processing);
+      const owners = family === "zakgeld" ? ["dion", "dara"] : OWNERS;
+      return `${family === "zakgeld" && !owners.includes(row.processing.budgetOwner) ? '<option value="" selected>Kies Dion of Dara</option>' : ""}${owners.map((owner) => option(owner, ownerLabel2(owner), row.processing.budgetOwner)).join("")}`;
+    }
+    function applyTransactionFamily(row, family) {
+      const p = row.processing;
+      p.fixedExpenseId = "";
+      p.fixedAmountMode = "none";
+      p.savingsGoalId = "";
+      p.sourceAccountProfileId = "";
+      p.destinationAccountProfileId = "";
+      p.repaymentAllocations = [];
+      p.budgetItemId = "";
+      p.splits = [];
+      p.advanceMode = "auto";
+      p.include = family !== "niet-meetellen";
+      if (family === "uitgave") {
+        p.transactionType = "uitgave";
+        p.category = p.category && p.category !== "Vaste lasten" ? p.category : "Ongecategoriseerd";
+      } else if (family === "inkomen") {
+        p.transactionType = INCOME_TYPES.includes(p.transactionType) ? p.transactionType : "overige-inkomsten";
+        p.category = "Inkomen";
+      } else if (family === "sparen") {
+        p.transactionType = "sparen";
+        p.category = "Sparen";
+      } else if (family === "overboeking") {
+        p.transactionType = TRANSFER_TYPES.includes(p.transactionType) ? p.transactionType : "interne-overboeking";
+        p.category = "Interne overboeking";
+      } else if (family === "zakgeld") {
+        p.transactionType = "maandelijkse-bijdrage";
+        p.category = "Zakgeld";
+        if (!["dion", "dara"].includes(p.budgetOwner)) p.budgetOwner = "";
+      } else if (family === "extra-bijdrage") {
+        p.transactionType = "extra-bijdrage";
+        p.category = "Extra bijdrage";
+      } else if (family === "terugbetaling") {
+        p.transactionType = REPAYMENT_TYPES.includes(p.transactionType) ? p.transactionType : "terugbetaling";
+        p.category = "Terugbetaling";
+      } else {
+        p.transactionType = "niet-meetellen";
+        p.category = "Niet meetellen";
+      }
     }
     function transferType(type) {
       return ["naar-spaarrekening", "van-spaarrekening", "interne-overboeking"].includes(type);
@@ -9564,7 +9717,7 @@ service cloud.firestore {
       const sourceIdentity = matchIdentity(src);
       return draft.rows.filter((row) => {
         var _a2;
-        return row !== source && ((_a2 = row.bankOriginal) == null ? void 0 : _a2.valid) && !row.duplicate;
+        return row !== source && row.certainty !== "zeker" && ((_a2 = row.bankOriginal) == null ? void 0 : _a2.valid) && !row.duplicate;
       }).map((row) => {
         const original = row.bankOriginal || {};
         if ((Number(original.amount) >= 0 ? "in" : "out") !== sourceDirection) return null;
@@ -9619,31 +9772,48 @@ service cloud.firestore {
       if (!transferType(row.processing.transactionType)) return "";
       return `<div class="u4-context-block wide"><strong>Interne overboeking</strong><div class="u4-context-grid"><label>Van rekening<select data-u4-field="sourceAccountProfileId">${profileOptions(root2, row.processing.sourceAccountProfileId || "")}</select></label><label>Naar rekening<select data-u4-field="destinationAccountProfileId">${profileOptions(root2, row.processing.destinationAccountProfileId || "")}</select></label></div><span class="u4-muted">Interne overboekingen tellen niet als inkomen of uitgave.</span></div>`;
     }
+    function dependentFieldsHtml(root2, row) {
+      const p = row.processing;
+      const family = transactionFamily(p);
+      if (family === "uitgave") {
+        const category = p.fixedExpenseId || p.transactionType === "vaste-last" ? "Vaste lasten" : p.category;
+        return `<div class="u4-dependent-grid"><label>Categorie<select data-u4-field="category">${categoryOptions(root2, p.budgetOwner, category)}</select></label>${category === "Vaste lasten" ? `<label>Vaste last<select data-u4-field="fixedExpenseId">${fixedOptions(root2, p.budgetOwner, p.fixedExpenseId)}</select></label>` : ""}</div>`;
+      }
+      if (family === "inkomen") return `<div class="u4-dependent-grid"><label>Soort inkomen<select data-u4-field="transactionType">${INCOME_TYPES.map((type) => {
+        var _a2;
+        return option(type, ((_a2 = TYPE_GROUPS[1].items.find((item) => item[0] === type)) == null ? void 0 : _a2[1]) || type, p.transactionType);
+      }).join("")}</select></label></div>`;
+      if (family === "sparen") return `<div class="u4-dependent-grid"><label>Spaardoel<select data-u4-field="savingsGoalId">${goalOptions(root2, p.savingsGoalId)}</select></label></div>`;
+      if (family === "overboeking") return `<div class="u4-dependent-grid"><label>Soort overboeking<select data-u4-field="transactionType">${TYPE_GROUPS[2].items.filter((item) => TRANSFER_TYPES.includes(item[0])).map(([type, label]) => option(type, label, p.transactionType)).join("")}</select></label></div>${transferFieldsHtml(root2, row)}`;
+      if (family === "zakgeld") return '<p class="u4-dependent-hint">Kies Dion of Dara bij Budgeteigenaar.</p>';
+      if (family === "extra-bijdrage") return '<p class="u4-dependent-hint">De budgeteigenaar ontvangt deze extra bijdrage.</p>';
+      if (family === "terugbetaling") return `<div class="u4-dependent-grid"><label>Soort terugbetaling<select data-u4-field="transactionType">${option("terugbetaling", "Terugbetaling aankoop", p.transactionType)}${option("terugbetaling-voorschot", "Terugbetaling voorschot", p.transactionType)}</select></label></div>${repaymentHtml(root2, row)}`;
+      return "";
+    }
     function rowHtml(root2, row) {
       var _a2;
       const p = row.processing;
       const original = row.bankOriginal;
+      const family = transactionFamily(p);
       return `<article class="u4-import-row" data-u4-row="${escAttr(row.id)}">
       <div class="u4-import-row-main"><div><strong>${esc(original.description || "Onbekende transactie")}</strong><span class="u4-muted">${esc(displayDate(p.processingDate))} · ${euro(p.processedAmount)}</span>${((_a2 = row.reasons) == null ? void 0 : _a2.length) ? `<div class="u4-row-reasons">${esc(row.reasons.join(" · "))}</div>` : ""}</div><div class="u4-row-approval"><span class="u4-status ${row.certainty}">${row.certainty === "zeker" ? "Zeker" : "Nakijken"}</span>${row.certainty === "nakijken" ? '<button type="button" class="primary small" data-u4-approve>✓ Goedkeuren</button>' : '<button type="button" class="ghost small" data-u4-reopen>Opnieuw nakijken</button>'}</div></div>
       <div class="u4-row-grid">
         <label>Datum<input type="date" data-u4-field="processingDate" value="${esc(p.processingDate)}"></label>
         <label>Bedrag<input type="number" step="0.01" data-u4-field="processedAmount" value="${Number(p.processedAmount) || 0}"></label>
-        <label>Budgeteigenaar<select data-u4-field="budgetOwner">${OWNERS.map((owner) => option(owner, ownerLabel2(owner), p.budgetOwner)).join("")}</select></label>
-        <label>Categorie<select data-u4-field="category">${categoryOptions(root2, p.budgetOwner, p.category)}</select></label>
-        <label class="wide">Transactie<select data-u4-field="transactionType">${typeOptions(p.transactionType)}</select></label>
-        ${transferFieldsHtml(root2, row)}
+        <label>Budgeteigenaar<select data-u4-field="budgetOwner">${ownerOptions(row)}</select></label>
+        <label>Transactie<select data-u4-family>${familyOptions(family)}</select></label>
       </div>
+      ${dependentFieldsHtml(root2, row)}
       <details><summary>Meer opties voor deze verwerking</summary><div class="u4-more-grid">
         <div class="u4-original wide">Origineel: ${esc(displayDate(original.bankDate))} · ${euro(original.amount)}<br>${esc(original.accountIdentifier || "Geen rekeningkenmerk")} → ${esc(original.counterpartyAccount || "Geen tegenrekening")}<br>Regel ${Number(original.lineNumber) || "—"} · ${esc(original.fingerprint)}</div>
-        ${["uitgave", "terugbetaling"].includes(p.transactionType) ? `<label>Budgetpost<input data-u4-field="budgetItemId" value="${esc(p.budgetItemId)}"></label><label>Vaste last<select data-u4-field="fixedExpenseId">${fixedOptions(root2, p.budgetOwner, p.fixedExpenseId)}</select></label><label>Afwijkend vast bedrag<select data-u4-field="fixedAmountMode">${option("none", "Planning niet aanpassen", p.fixedAmountMode || "none")}${option("month", "Alleen deze maand", p.fixedAmountMode)}${option("from", "Vanaf deze maand", p.fixedAmountMode)}</select></label><label>Voorschot<select data-u4-field="advanceMode">${option("auto", "Automatisch bij andere eigenaar", p.advanceMode)}${option("none", "Geen voorschot", p.advanceMode)}${option("force", "Altijd voorschot", p.advanceMode)}</select></label>` : ""}
-        ${p.transactionType === "sparen" ? `<label>Spaardoel<select data-u4-field="savingsGoalId">${goalOptions(root2, p.savingsGoalId)}</select></label>` : ""}
+        ${["uitgave", "terugbetaling"].includes(family) ? `<label>Budgetpost<input data-u4-field="budgetItemId" value="${esc(p.budgetItemId)}"></label>${p.transactionType === "vaste-last" ? `<label>Afwijkend vast bedrag<select data-u4-field="fixedAmountMode">${option("none", "Planning niet aanpassen", p.fixedAmountMode || "none")}${option("month", "Alleen deze maand", p.fixedAmountMode)}${option("from", "Vanaf deze maand", p.fixedAmountMode)}</select></label>` : ""}<label>Voorschot<select data-u4-field="advanceMode">${option("auto", "Automatisch bij andere eigenaar", p.advanceMode)}${option("none", "Geen voorschot", p.advanceMode)}${option("force", "Altijd voorschot", p.advanceMode)}</select></label>` : ""}
         <label>Meetellen<select data-u4-field="include">${option("true", "Meetellen", String(p.include))}${option("false", "Niet meetellen", String(p.include))}</select></label>
         <label class="wide">Notitie<input data-u4-field="note" value="${esc(p.note)}"></label>
-      ${repaymentHtml(root2, row)}</div>${["uitgave", "terugbetaling"].includes(p.transactionType) ? `<div class="u4-split-list">${(p.splits || []).map((split, index) => splitHtml(root2, row, split, index)).join("")}</div><button type="button" class="ghost small" data-u4-add-split>+ Splitsregel</button>` : ""}</details>
+      </div>${["uitgave", "terugbetaling"].includes(family) ? `<div class="u4-split-list">${(p.splits || []).map((split, index) => splitHtml(root2, row, split, index)).join("")}</div><button type="button" class="ghost small" data-u4-add-split>+ Splitsregel</button>` : ""}</details>
     </article>`;
     }
     function bulkEditor(root2, draft) {
-      return `<section class="u4-section u4-bulk-section"><div class="u4-section-list"><h3>Meerdere transacties aanpassen</h3><p class="u4-muted">Pas één keuze in één keer toe. Handmatig aangepaste zekere transacties worden standaard overgeslagen.</p><div class="u4-profile-grid"><label>Toepassen op<select data-u4-bulk-scope><option value="review">Alleen Nakijken</option><option value="uncategorized">Alleen ongecategoriseerd</option><option value="all">Alle transacties</option></select></label><label>Budgeteigenaar<select data-u4-bulk-owner><option value="">Niet wijzigen</option>${OWNERS.map((owner) => option(owner, ownerLabel2(owner), "")).join("")}</select></label><label>Categorie<select data-u4-bulk-category><option value="">Niet wijzigen</option>${categoryOptions(root2, "gezamenlijk", "")}</select></label><label>Transactie<select data-u4-bulk-type><option value="">Niet wijzigen</option>${typeOptions("")}</select></label></div><button type="button" class="ghost small" data-u4-apply-bulk>Voorbeeld en toepassen</button></div></section>`;
+      return `<details class="u4-section u4-bulk-section"><summary><span>Meerdere transacties aanpassen</span><span>Optioneel</span></summary><div class="u4-section-list"><p class="u4-muted">Pas één keuze in één keer toe. Handmatig aangepaste zekere transacties worden standaard overgeslagen.</p><div class="u4-profile-grid"><label>Toepassen op<select data-u4-bulk-scope><option value="review">Alleen Nakijken</option><option value="uncategorized">Alleen ongecategoriseerd</option><option value="all">Alle transacties</option></select></label><label>Budgeteigenaar<select data-u4-bulk-owner><option value="">Niet wijzigen</option>${OWNERS.map((owner) => option(owner, ownerLabel2(owner), "")).join("")}</select></label><label>Categorie<select data-u4-bulk-category><option value="">Niet wijzigen</option>${categoryOptions(root2, "gezamenlijk", "")}</select></label><label>Transactie<select data-u4-bulk-type><option value="">Niet wijzigen</option>${typeOptions("")}</select></label></div><button type="button" class="ghost small" data-u4-apply-bulk>Voorbeeld en toepassen</button></div></details>`;
     }
     async function showMatchDialog(root2, draft, source, modal) {
       var _a2, _b;
@@ -9745,13 +9915,14 @@ ${(error == null ? void 0 : error.message) || error}`);
       const profiles = (root2.state.accountProfiles || []).filter((profile) => !draft.entryOwner || profile.accountOwner === draft.entryOwner);
       const detected = [...new Set(draft.rows.map((row) => row.bankOriginal.accountIdentifier).filter(Boolean))][0] || "";
       const profileOwner = draft.entryOwner || draft.accountOwner || "gezamenlijk";
-      return `<section class="u4-section"><div class="u4-section-list"><h3>Rekeningprofiel</h3><div class="u4-profile-grid">
+      const known = Boolean(draft.accountProfileId);
+      return `<details class="u4-section u4-profile-section ${known ? "" : "needs-attention"}" ${known ? "" : "open"}><summary><span>Rekeningprofiel</span><span>${known ? "Gekoppeld" : "Actie nodig"}</span></summary><div class="u4-section-list"><div class="u4-profile-grid">
       <label class="wide">Bestaand profiel<select data-u4-profile-select><option value="">Nieuw profiel maken</option>${profiles.map((profile) => option(profile.id, profileDisplayLabel(profile), draft.accountProfileId)).join("")}</select></label>
       <label>Naam<input data-u4-profile-name value="${esc(draft.accountProfileId ? "" : `ING ${ownerLabel2(draft.accountOwner || "gezamenlijk")}`)}"></label>
       <label>IBAN/rekeningkenmerk<input data-u4-profile-identifier value="${esc(detected)}"></label>
       ${draft.entryOwner ? `<label>Rekeninghouder<span class="u4-profile-owner-static">${esc(ownerLabel2(profileOwner))}</span><input type="hidden" data-u4-profile-owner value="${esc(profileOwner)}"></label>` : `<label>Rekeninghouder<select data-u4-profile-owner>${OWNERS.map((owner) => option(owner, ownerLabel2(owner), profileOwner)).join("")}</select></label>`}
       <label>Bank<input data-u4-profile-bank value="${esc(draft.bank || "ING")}"></label>
-    </div><button type="button" class="primary small" data-u4-apply-profile>Profiel gebruiken</button></div></section>`;
+    </div><button type="button" class="primary small" data-u4-apply-profile>Profiel gebruiken</button></div></details>`;
     }
     function renderDraftModal(root2, draft) {
       updateDraftSummary(draft);
@@ -9850,9 +10021,11 @@ ${(error == null ? void 0 : error.message) || error}`);
       draft.accountProfileId = profile.id;
       draft.accountOwner = profile.accountOwner;
       draft.rows.forEach((row) => {
+        var _a2;
         row.accountProfileId = profile.id;
         row.accountOwner = profile.accountOwner;
-        const proposal = classifyOriginal(row.bankOriginal, profile, root2.state.recognitionRules, root2.state.accountProfiles);
+        const fixedExpenses = ((_a2 = root2.state.recurringFixedExpenses) == null ? void 0 : _a2[root2.state.meta.scenario]) || [];
+        const proposal = classifyOriginal(row.bankOriginal, profile, root2.state.recognitionRules, root2.state.accountProfiles, fixedExpenses);
         row.certainty = proposal.certainty;
         row.reasons = proposal.reasons;
         row.processing = { ...proposal.processing, ...row.processing, budgetOwner: row.processing.budgetOwner || profile.accountOwner };
@@ -9928,16 +10101,35 @@ ${(error == null ? void 0 : error.message) || error}`);
         const row = draft.rows.find((item) => item.id === container.dataset.u4Row);
         if (!row) return;
         let rerender = false;
-        if (event.target.dataset.u4Field) {
+        if (event.target.hasAttribute("data-u4-family")) {
+          applyTransactionFamily(row, event.target.value);
+          rerender = true;
+        } else if (event.target.dataset.u4Field) {
           const field = event.target.dataset.u4Field;
           let value = event.target.value;
           if (field === "processedAmount") value = round22(Math.abs(Number(value) || 0));
           if (field === "include") value = value === "true";
           row.processing[field] = value;
+          if (field === "category") {
+            if (value === "Vaste lasten") row.processing.transactionType = "vaste-last";
+            else if (transactionFamily(row.processing) === "uitgave") {
+              row.processing.transactionType = "uitgave";
+              row.processing.fixedExpenseId = "";
+              row.processing.fixedAmountMode = "none";
+            }
+          }
+          if (field === "include" && value === false) row.processing.transactionType = "niet-meetellen";
           if (field === "budgetOwner" && row.processing.fixedExpenseId) {
+            const wasFixed = row.processing.transactionType === "vaste-last" || row.processing.category === "Vaste lasten" || Boolean(row.processing.fixedExpenseId);
             const fixedRows = ((_a3 = root2.state.recurringFixedExpenses) == null ? void 0 : _a3[root2.state.meta.scenario]) || [];
             const selectedFixed = fixedRows.find((item) => item.id === row.processing.fixedExpenseId);
-            if (!selectedFixed || (selectedFixed.financialFor || selectedFixed.rekening || "gezamenlijk") !== value) row.processing.fixedExpenseId = "";
+            if (!selectedFixed || (selectedFixed.financialFor || selectedFixed.rekening || "gezamenlijk") !== value) {
+              row.processing.fixedExpenseId = "";
+              if (wasFixed) {
+                row.processing.transactionType = "vaste-last";
+                row.processing.category = "Vaste lasten";
+              }
+            }
           }
           if (field === "transactionType") {
             row.processing.splits = (row.processing.splits || []).filter((split) => Math.abs(Number(split.amount) || 0) > 4e-3);
@@ -9946,7 +10138,7 @@ ${(error == null ? void 0 : error.message) || error}`);
             const relation = repaymentRelation(root2, row);
             row.processing.repaymentAllocations = relation ? proposeRepaymentAllocations(root2.state, relation.debtor, relation.creditor, row.processing.processedAmount) : [];
           }
-          rerender = ["transactionType", "budgetOwner", "category"].includes(field);
+          rerender = ["transactionType", "budgetOwner", "category", "include", "fixedExpenseId"].includes(field);
         } else if (event.target.hasAttribute("data-u4-row-certainty")) row.certainty = event.target.value;
         else if (event.target.dataset.u4SplitField) {
           const split = row.processing.splits[Number(event.target.closest("[data-u4-split]").dataset.u4Split)];
@@ -10079,8 +10271,9 @@ ${(error == null ? void 0 : error.message) || error}`);
         }
         const reader = new FileReader();
         reader.onload = async (loaded) => {
+          var _a4;
           try {
-            const draft = createImportDraft({ text: String(loaded.target.result || ""), fileName: file.name, profiles: root2.state.accountProfiles, rules: root2.state.recognitionRules, transactions: root2.state.transactions });
+            const draft = createImportDraft({ text: String(loaded.target.result || ""), fileName: file.name, profiles: root2.state.accountProfiles, rules: root2.state.recognitionRules, transactions: root2.state.transactions, fixedExpenses: ((_a4 = root2.state.recurringFixedExpenses) == null ? void 0 : _a4[root2.state.meta.scenario]) || [] });
             if (owner && draft.accountProfileId && draft.accountOwner !== owner) throw new Error(`Dit bankbestand hoort bij ${ownerLabel2(draft.accountOwner)}. Open de juiste persoonlijke of gezamenlijke tab.`);
             if (owner) {
               draft.entryOwner = owner;
@@ -10313,6 +10506,10 @@ ${(error == null ? void 0 : error.message) || error}`);
         createImportDraft,
         fingerprint,
         classifyOriginal,
+        fixedRecognition,
+        transactionFamily,
+        applyTransactionFamily,
+        learnedRecognitionRules,
         validateDraft,
         planImportEffects,
         undoImportEffects,
@@ -10333,7 +10530,7 @@ ${(error == null ? void 0 : error.message) || error}`);
         flushImportSync(root2).catch((error) => console.warn("Importsynchronisatie uitgesteld.", error));
       });
     }
-    return { SCHEMA_VERSION, CLOUD_STORAGE_VERSION, CLOUD_READ_CONCURRENCY, OWNERS, IMPORT_STATUSES, normalizeIban, normalizeRule, normalizeTransaction, normalizeCore, validateCore, calculateGoalSavedAmount, reconcileGoalSavedAmounts, chunkRows, canonicalValue, rowsChecksum, buildCloudImportEnvelope, assembleCloudImport, mapWithConcurrency, classifyCloudError, fetchImportFromCloud, resolveImportDetails, reconcileActiveImportReference, deleteCloudImportBestEffort, discardImportConcept, normalizeText, matchIdentity, matchCandidates, detectDelimiter, parseDelimited, parseDate, parseAmount, detectFormat, inferMapping, hashText, fingerprint, organizationName, proposeType, recognitionProposal, classifyOriginal, parseBankCsv, findProfile, createImportDraft, updateDraftSummary, compactSummary, validateDraft, transactionKind, expenseImpact, financialRows, advanceForTransaction, savingsForTransaction, detectInternalPairs, directionalBalances, proposeRepaymentAllocations, planImportEffects, applyImportPlan, effectManifest, undoImportEffects, ImportStore, persistImportDraft, scheduleImportDraftPersist, flushScheduledImportDraft, queueImportSync, flushImportSync, recoverJournal, install, round2: round22, uid: uid2, clone: cloneState, testRenderDraftModal: renderDraftModal };
+    return { SCHEMA_VERSION, CLOUD_STORAGE_VERSION, CLOUD_READ_CONCURRENCY, OWNERS, IMPORT_STATUSES, normalizeIban, normalizeRule, normalizeTransaction, normalizeCore, validateCore, calculateGoalSavedAmount, reconcileGoalSavedAmounts, chunkRows, canonicalValue, rowsChecksum, buildCloudImportEnvelope, assembleCloudImport, mapWithConcurrency, classifyCloudError, fetchImportFromCloud, resolveImportDetails, reconcileActiveImportReference, deleteCloudImportBestEffort, discardImportConcept, normalizeText, matchIdentity, matchCandidates, detectDelimiter, parseDelimited, parseDate, parseAmount, detectFormat, inferMapping, hashText, fingerprint, organizationName, proposeType, recognitionProposal, fixedAmountAt, fixedRecognition, classifyOriginal, parseBankCsv, findProfile, createImportDraft, updateDraftSummary, compactSummary, validateDraft, transactionKind, expenseImpact, financialRows, advanceForTransaction, savingsForTransaction, detectInternalPairs, directionalBalances, proposeRepaymentAllocations, planImportEffects, applyImportPlan, learnedRecognitionRules, rememberRecognitionRules, effectManifest, undoImportEffects, transactionFamily, applyTransactionFamily, ImportStore, persistImportDraft, scheduleImportDraftPersist, flushScheduledImportDraft, queueImportSync, flushImportSync, recoverJournal, install, round2: round22, uid: uid2, clone: cloneState, testRenderDraftModal: renderDraftModal };
   });
   var FinizeImportRuntime = globalThis.FinizeUpdate4Runtime;
 

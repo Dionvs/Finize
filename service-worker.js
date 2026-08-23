@@ -1,11 +1,11 @@
-const CACHE_NAME = "finize-v86-budgetinteractie";
+const CACHE_NAME = "finize-v87-csv-verwerking";
 const CACHE_PREFIX = "finize-";
 
 const CRITICAL_SHELL = [
   "./",
   "./index.html",
-  "./app.js?v=86-budgetinteractie",
-  "./app.css?v=86-budgetinteractie",
+  "./app.js?v=87-csv-verwerking",
+  "./app.css?v=87-csv-verwerking",
   "./manifest.json"
 ];
 

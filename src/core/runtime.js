@@ -1589,7 +1589,12 @@ function calcScenario(state){
   // Update 5: zakgeld blijft een geplande overdracht. Werkelijke transacties
   // worden uitsluitend in de realisatielaag en budgetverschillen gebruikt.
   const variabelVoorVerdelingTotaal = variabelBudgetTotaal;
-  const spaarpotDezeMaand = Number(s.spaarpotDezeMaand)||0;
+  const jointSavingKey=scenario==='voor'?'gezamenlijkVoor':'gezamenlijkNa';
+  const selectedSavingOverrides=state.monthlySavingOverrides?.[selectedMonth];
+  const hasJointSavingOverride=isPlainObject(selectedSavingOverrides)&&Object.prototype.hasOwnProperty.call(selectedSavingOverrides,jointSavingKey);
+  const spaarpotDezeMaand=hasJointSavingOverride
+    ? round2(Number(selectedSavingOverrides[jointSavingKey])||0)
+    : round2(Number(s.spaarpotDezeMaand)||0);
 
   let effDion, effDara, zakgeldDion, zakgeldDara, hypotheekBedrag = 0;
   if (scenario === 'voor'){
@@ -2829,7 +2834,10 @@ function bindInputs(root){
         if (el.dataset.percent === 'true') value /= 100;
       } else if (typeof value === 'string') value = value.trim();
       if(JSON.stringify(item[field])===JSON.stringify(value))return;
-      commitChange(()=>updateItemById(el.dataset.itemPath, el.dataset.itemId, {[field]:value}), {render:false});
+      commitChange(()=>{
+        if(field==='algespaard'&&el.dataset.itemPath.startsWith('spaardoelen.'))u2SetGoalSavedAmount(item,value);
+        else updateItemById(el.dataset.itemPath, el.dataset.itemId, {[field]:value});
+      }, {render:false});
     };
     el.addEventListener('change', save);
   });
@@ -4726,8 +4734,13 @@ function openJointFixedCostsModal(focusLast=false, owner='gezamenlijk', draftSes
 function openSavingEditModal(){
   const modal = document.getElementById('incomeEditModal');
   const scenario = state.meta.scenario;
+  const month=getSelectedMonth();
   const data = getMonthlyScenarioData(scenario);
-  const current = Number(data.spaarpotDezeMaand)||0;
+  const savingKey=scenario==='voor'?'gezamenlijkVoor':'gezamenlijkNa';
+  const monthOverrides=isPlainObject(state.monthlySavingOverrides?.[month])?state.monthlySavingOverrides[month]:{};
+  const current=Object.prototype.hasOwnProperty.call(monthOverrides,savingKey)
+    ? round2(Number(monthOverrides[savingKey])||0)
+    : round2(Number(data.spaarpotDezeMaand)||0);
   const scenarioLabel = scenario === 'voor' ? 'Voor verkoop' : 'Na verkoop';
   modal.innerHTML = `
     <div class="modal income-sheet">
@@ -4735,7 +4748,7 @@ function openSavingEditModal(){
       <div class="card-head"><h2>Sparen aanpassen</h2><button class="danger-ghost" id="btnCloseSavingEdit">×</button></div>
       <div class="income-sheet-meta">
         <span>${scenarioLabel}</span>
-        <span>${monthLabel(getSelectedMonth())}</span>
+        <span>${monthLabel(month)}</span>
       </div>
       <div class="income-sheet-total">
         <span>Sparen deze maand</span>
@@ -4765,11 +4778,17 @@ function openSavingEditModal(){
   bindModalBackdrop(modal,close);
   document.getElementById('btnSaveSavingEdit').addEventListener('click', ()=>{
     const parsed = parseFloat(String(input.value).replace(',', '.'));
-    state[scenario].spaarpotDezeMaand = round2(Number.isFinite(parsed) ? parsed : 0);
-    persist();
+    if(!Number.isFinite(parsed)){alert('Vul een geldig spaarbedrag in.');return;}
+    const saved=commitChange(()=>{
+      assertMonthMutationAllowed(month);
+      state.monthlySavingOverrides=isPlainObject(state.monthlySavingOverrides)?state.monthlySavingOverrides:{};
+      state.monthlySavingOverrides[month]=isPlainObject(state.monthlySavingOverrides[month])?state.monthlySavingOverrides[month]:{};
+      state.monthlySavingOverrides[month][savingKey]=round2(parsed);
+    },{render:false});
+    if(!saved)return;
     close();
     renderActiveTab();
-    showQuickToast('Sparen opgeslagen');
+    showQuickToast('Spaarbedrag voor deze maand opgeslagen');
   });
 }
 

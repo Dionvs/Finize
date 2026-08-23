@@ -84,6 +84,33 @@ test('gezamenlijk over deze maand gebruikt alle inkomsten en trekt zakgeld allee
   expect(remaining).toBeCloseTo(incomeAfter-fixed-used-saving-allowance,2);
 });
 
+test('gezamenlijk spaarbedrag blijft per maand gescheiden', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('.v4-sidebar .tab-btn[data-tab="gezamenlijk"]').click();
+  const originalDefault=await page.evaluate(() => window.state[window.state.meta.scenario].spaarpotDezeMaand);
+  await page.evaluate(() => {
+    window.state.meta.selectedMonth='2026-07';
+    window.state.monthlySavingOverrides=window.state.monthlySavingOverrides||{};
+    window.state.monthlySavingOverrides['2026-08']={
+      ...(window.state.monthlySavingOverrides['2026-08']||{}),
+      gezamenlijkVoor:700
+    };
+    window.renderActiveTab();
+  });
+  await page.locator('#tab-gezamenlijk .savings-month-button').click();
+  await page.locator('#savingEditInput').fill('300');
+  await page.locator('#btnSaveSavingEdit').click();
+  expect(await page.evaluate(() => window.state.monthlySavingOverrides['2026-07'].gezamenlijkVoor)).toBe(300);
+  expect(await page.evaluate(() => window.state[window.state.meta.scenario].spaarpotDezeMaand)).toBe(originalDefault);
+
+  await page.evaluate(() => {
+    window.state.meta.selectedMonth='2026-08';
+    window.renderActiveTab();
+  });
+  await expect(page.locator('#tab-gezamenlijk .savings-month-button strong')).toContainText('700');
+  expect(await page.evaluate(() => window.state.monthlySavingOverrides['2026-07'].gezamenlijkVoor)).toBe(300);
+});
+
 test('gezamenlijk inkomen vervangt standaardsalaris en negeert oude dubbele teruggaven', async ({ page }) => {
   await page.goto('/');
   await page.locator('.v4-sidebar .tab-btn[data-tab="gezamenlijk"]').click();

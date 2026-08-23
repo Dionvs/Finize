@@ -24,6 +24,7 @@ function importPlan(state,amount,id='save'){
 
 const exact=createState();
 planned(exact);
+assert.equal(exact.spaardoelen.gezamenlijk[0].algespaard,0,'geplande inleg blijft administratief');
 const exactPlan=importPlan(exact,250);
 u4.applyImportPlan(exact,exactPlan);
 assert.equal(u4.calculateGoalSavedAmount(exact,'buffer'),250);
