@@ -4,8 +4,8 @@ const CACHE_PREFIX = "finize-";
 const CRITICAL_SHELL = [
   "./",
   "./index.html",
-  "./app.js?v=89-subdoelen-desktop",
-  "./app.css?v=89-subdoelen-desktop",
+  "./app.js?v=90-subdoelen-en-afschrijving",
+  "./app.css?v=90-subdoelen-en-afschrijving",
   "./manifest.json"
 ];
 
