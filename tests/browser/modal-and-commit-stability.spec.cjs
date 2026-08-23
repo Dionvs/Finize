@@ -84,6 +84,62 @@ test('gezamenlijk over deze maand gebruikt alle inkomsten en trekt zakgeld allee
   expect(remaining).toBeCloseTo(incomeAfter-fixed-used-saving-allowance,2);
 });
 
+test('gezamenlijk inkomen vervangt standaardsalaris en negeert oude dubbele teruggaven', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('.v4-sidebar .tab-btn[data-tab="gezamenlijk"]').click();
+  await page.evaluate(() => {
+    const month='2026-07';
+    window.__incomeTestSavedState={
+      transactions:structuredClone(state.transactions),
+      monthlyTeruggaven:structuredClone(state.monthlyTeruggaven),
+      incomeDefaultsHistory:structuredClone(state.incomeDefaultsHistory),
+      monthlyIncomeOverrides:structuredClone(state.monthlyIncomeOverrides),
+      monthlyRefundOverrides:structuredClone(state.monthlyRefundOverrides),
+      recurringIncomeSources:structuredClone(state.recurringIncomeSources),
+      selectedMonth:state.meta.selectedMonth
+    };
+    state.meta.selectedMonth=month;
+    state.transactions=[
+      {id:'salary-a',date:`${month}-05`,owner:'gezamenlijk',kind:'inkomen',processing:{transactionType:'salaris',include:true},amount:1200,description:'Salaris A'},
+      {id:'salary-b',date:`${month}-24`,owner:'gezamenlijk',kind:'inkomen',transactionType:'salaris',amount:1800,description:'Salaris B'},
+      {id:'extra',date:`${month}-08`,owner:'gezamenlijk',kind:'inkomen',transactionType:'overige-inkomsten',amount:50,description:'Naam: Cadeau'},
+      {id:'refund',date:`${month}-09`,owner:'dion',kind:'uitgave',transactionType:'terugbetaling',amount:20,description:'Naam: Terugbetaling'},
+      {id:'duo',date:`${month}-20`,owner:'dion',kind:'inkomen',transactionType:'overige-inkomsten',amount:300.5,description:'DUO Hoofdrekening'},
+      {id:'transfer',date:`${month}-21`,owner:'gezamenlijk',kind:'interne-overboeking',transactionType:'van-spaarrekening',amount:500,description:'Oranje Spaarrekening'}
+    ];
+    state.incomeDefaultsHistory={
+      dion:[{id:'dion-default',effectiveFrom:'0000-01',salary:900,refund:300}],
+      dara:[{id:'dara-default',effectiveFrom:'0000-01',salary:1100,refund:0}]
+    };
+    state.monthlyIncomeOverrides={};
+    state.monthlyRefundOverrides={};
+    state.recurringIncomeSources=[{
+      id:'duo-source',naam:'DUO',legacyKind:'fixed-refund',eigenaar:'dion',actief:true,
+      verwachtBedrag:300,amountHistory:[{effectiveFrom:'0000-01',amount:300}],recognition:{text:'duo',amountTolerance:10}
+    }];
+    state.monthlyTeruggaven={[month]:{
+      dion:[{id:'duplicate-refund',omschrijving:'Terugbetaling',bedrag:20}],
+      dara:[],
+      gezamenlijk:[
+        {id:'duplicate-extra',omschrijving:'Cadeau',bedrag:50},
+        {id:'stale-transfer',omschrijving:'Oranje Spaarrekening',bedrag:500},
+        {id:'manual-only',omschrijving:'Los handmatig bedrag',bedrag:30}
+      ]
+    }};
+    renderActiveTab();
+  });
+  const incomeCard=page.locator('#tab-gezamenlijk .overview-kpi-row .icon-kpi').filter({hasText:'Totaal gezamenlijk inkomen'});
+  expect(parseEuro(await incomeCard.locator('.metric-value').innerText())).toBe(3400.5);
+  await page.evaluate(() => {
+    const saved=window.__incomeTestSavedState;
+    Object.assign(state,saved);
+    state.meta.selectedMonth=saved.selectedMonth;
+    delete state.selectedMonth;
+    delete window.__incomeTestSavedState;
+    renderActiveTab();
+  });
+});
+
 test('dashboard toont alleen het directe jaaroverzicht onderaan', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('#tab-dashboard')).not.toContainText('Maandadministratie');

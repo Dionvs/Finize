@@ -746,15 +746,42 @@ function transactionsByCategory(owner, month=getSelectedMonth()){
   });
   return totals;
 }
+function transactionMatchesLegacyRefund(tx,refund){
+  const amountMatches=Math.abs(Math.abs(Number(tx?.amount)||0)-Math.abs(Number(refund?.bedrag)||0))<.005;
+  const refundText=bankText(refund?.omschrijving||'');
+  const transactionText=bankText(tx?.description||tx?.title||tx?.name||'');
+  return amountMatches&&!!refundText&&transactionText.includes(refundText);
+}
+function unmatchedMonthlyRefundTotal(owner,month,transactions){
+  return round2((state.monthlyTeruggaven?.[month]?.[owner]||[]).reduce((sum,refund)=>{
+    return transactions.some(tx=>u3IncomeTransactionOwner(tx)===owner&&transactionMatchesLegacyRefund(tx,refund))?sum:sum+(Number(refund.bedrag)||0);
+  },0));
+}
+function representedFixedRefund(owner,month,incomeRows){
+  const sources=(state.recurringIncomeSources||[]).filter(source=>source.legacyKind==='fixed-refund'&&source.eigenaar===owner&&source.actief!==false);
+  return round2(sources.reduce((sum,source)=>{
+    const recognition=source.recognition||{};
+    const expected=Math.abs(u3AmountAt(source,month));
+    const tolerance=Math.max(0,Number(recognition.amountTolerance)||0);
+    const recognitionText=bankText(recognition.text||source.naam||'');
+    const represented=incomeRows.some(tx=>{
+      if(u3IncomeTransactionOwner(tx)!==owner||normalizedTransactionType(tx)==='salaris')return false;
+      const text=bankText(tx.description||tx.title||tx.name||'');
+      return !!recognitionText&&text.includes(recognitionText)&&Math.abs(Math.abs(Number(tx.amount)||0)-expected)<=tolerance;
+    });
+    return represented?sum+expected:sum;
+  },0));
+}
 function dashboardIncomeBreakdown(month=getSelectedMonth()){
   const distributionIncome=round2(calcScenario(state).totaalSalaris);
   const standard={dion:getDistributionIncomeParts('dion',month),dara:getDistributionIncomeParts('dara',month)};
-  const rows=(state.transactions||[]).filter(tx=>transactionMonth(tx)===month&&tx.reviewStatus!=='genegeerd'&&tx.processing?.include!==false&&tx.kind!=='niet-meetellen');
+  const monthTransactions=(state.transactions||[]).filter(tx=>transactionMonth(tx)===month);
+  const rows=monthTransactions.filter(tx=>tx.reviewStatus!=='genegeerd'&&tx.processing?.include!==false&&tx.kind!=='niet-meetellen');
   const salaryActual={dion:0,dara:0,gezamenlijk:0};
   const salarySeen={dion:false,dara:false,gezamenlijk:false};
   let extraTransactions=0;
   rows.forEach(tx=>{
-    const type=String(tx.transactionType||tx.type||'').toLowerCase();
+    const type=normalizedTransactionType(tx);
     const kind=String(tx.kind||'').toLowerCase();
     const isIncome=kind==='inkomen';
     const isRefund=type==='terugbetaling'||kind==='terugbetaling';
@@ -764,8 +791,19 @@ function dashboardIncomeBreakdown(month=getSelectedMonth()){
     if(type==='salaris'&&(owner==='dion'||owner==='dara'||owner==='gezamenlijk')){salaryActual[owner]=round2(salaryActual[owner]+amount);salarySeen[owner]=true;return;}
     extraTransactions=round2(extraTransactions+amount);
   });
-  const visibleBase=round2((salarySeen.dion?salaryActual.dion:standard.dion.salary)+standard.dion.refund+(salarySeen.dara?salaryActual.dara:standard.dara.salary)+standard.dara.refund+(salarySeen.gezamenlijk?salaryActual.gezamenlijk:0));
-  const manualRefunds=round2(sumMaandTeruggaven('dion',month)+sumMaandTeruggaven('dara',month)+sumMaandTeruggaven('gezamenlijk',month));
+  const salaryBase=salarySeen.gezamenlijk
+    ? round2(salaryActual.dion+salaryActual.dara+salaryActual.gezamenlijk)
+    : round2((salarySeen.dion?salaryActual.dion:standard.dion.salary)+(salarySeen.dara?salaryActual.dara:standard.dara.salary));
+  const fixedRefundBase=round2(
+    Math.max(0,standard.dion.refund-representedFixedRefund('dion',month,rows))+
+    Math.max(0,standard.dara.refund-representedFixedRefund('dara',month,rows))
+  );
+  const visibleBase=round2(salaryBase+fixedRefundBase);
+  const manualRefunds=round2(
+    unmatchedMonthlyRefundTotal('dion',month,monthTransactions)+
+    unmatchedMonthlyRefundTotal('dara',month,monthTransactions)+
+    unmatchedMonthlyRefundTotal('gezamenlijk',month,monthTransactions)
+  );
   const extra=round2(extraTransactions+manualRefunds);
   return {distributionIncome,extra,total:round2(visibleBase+extra),visibleBase};
 }
@@ -773,7 +811,8 @@ function personalIncomeOverview(owner, allowance, month=getSelectedMonth()){
   const context=update6AccountContext();
   const household=context.enabled;
   const parts=getDistributionIncomeParts(owner,month);
-  const rows=(state.transactions||[]).filter(tx=>transactionMonth(tx)===month&&tx.reviewStatus!=='genegeerd'&&tx.processing?.include!==false&&tx.kind!=='niet-meetellen'&&u3IncomeTransactionOwner(tx)===owner);
+  const monthTransactions=(state.transactions||[]).filter(tx=>transactionMonth(tx)===month);
+  const rows=monthTransactions.filter(tx=>tx.reviewStatus!=='genegeerd'&&tx.processing?.include!==false&&tx.kind!=='niet-meetellen'&&u3IncomeTransactionOwner(tx)===owner);
   const sources=new Map();
   const add=(label,amount)=>{amount=round2(Math.abs(Number(amount)||0));if(amount)sources.set(label,round2((sources.get(label)||0)+amount));};
   let actualSalary=0;
@@ -790,13 +829,13 @@ function personalIncomeOverview(owner, allowance, month=getSelectedMonth()){
     }[type]||'Overige inkomsten';
     add(label,amount);
   });
-  const monthlyRefunds=sumMaandTeruggaven(owner,month);
+  const monthlyRefunds=unmatchedMonthlyRefundTotal(owner,month,monthTransactions);
   if(household){
     sources.set('Zakgeld',round2(Number(allowance)||0));
     add('Persoonlijke teruggaven',monthlyRefunds);
   }else{
     sources.set('Salaris',actualSalarySeen?actualSalary:parts.salary);
-    add('Vaste teruggaven',parts.refund);
+    add('Vaste teruggaven',Math.max(0,parts.refund-representedFixedRefund(owner,month,rows)));
     add('Persoonlijke teruggaven',monthlyRefunds);
   }
   const items=[...sources.entries()].map(([label,amount])=>({label,amount}));
