@@ -13,16 +13,20 @@ test('een productlink vult bestaande subdoelvelden zonder nieuwe interface',asyn
 
   await page.route('https://www.gstatic.com/firebasejs/**',route=>route.abort());
   await page.route('https://firestore.googleapis.com/**',route=>route.abort());
-  await page.route('https://api.microlink.io/**',route=>route.fulfill({
-    status:200,
-    contentType:'application/json',
-    body:JSON.stringify({status:'success',data:{
-      title:'Automatische espressomachine',
-      url:'https://winkel.example/espressomachine',
-      price:'€ 749,50',
-      image:{url:'https://winkel.example/espressomachine.jpg'}
-    }})
-  }));
+  await page.route('https://api.microlink.io/**',route=>{
+    const productUrl=new URL(route.request().url()).searchParams.get('url');
+    const missingPrice=productUrl?.includes('zonder-prijs');
+    return route.fulfill({
+      status:200,
+      contentType:'application/json',
+      body:JSON.stringify({status:'success',data:{
+        title:missingPrice?'Product zonder prijs':'Automatische espressomachine',
+        url:productUrl,
+        price:missingPrice?null:'€ 749,50',
+        image:{url:'https://winkel.example/espressomachine.jpg'}
+      }})
+    });
+  });
   await page.addInitScript(value=>{
     localStorage.setItem('finize-budget-planner-v1',JSON.stringify(value));
     localStorage.setItem('finize-device-id','subgoal-product-test');
@@ -48,4 +52,11 @@ test('een productlink vult bestaande subdoelvelden zonder nieuwe interface',asyn
   expect(saved.doelbedrag).toBe(749.5);
   expect(saved.productInfo.price).toBe(749.5);
   expect(saved.productInfo.currency).toBe('EUR');
+
+  await page.locator(`[data-open-goal-editor="gezamenlijk:${goal.id}"]:visible`).first().click();
+  await page.locator('#incomeEditModal details summary',{hasText:'Subdoelen'}).click();
+  const reopened=page.locator('[data-u2-child="0"]');
+  await reopened.locator('[data-u2-child-link]').fill('https://winkel.example/zonder-prijs');
+  await reopened.locator('[data-u2-child-link]').dispatchEvent('change');
+  await expect(page.locator('.quick-toast')).toContainText('Product gevonden, maar geen prijs');
 });

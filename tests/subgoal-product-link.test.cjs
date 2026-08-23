@@ -12,11 +12,13 @@ const {pathToFileURL}=require('node:url');
   assert.deepEqual(product.parseProductPrice('€ 1.299,95'),{amount:1299.95,currency:'EUR',raw:'€ 1.299,95'});
   assert.deepEqual(product.parseProductPrice('Van € 899,00 voor € 749,50'),{amount:749.5,currency:'EUR',raw:'Van € 899,00 voor € 749,50'});
   assert.deepEqual(product.parseProductPrice('£63.00'),{amount:63,currency:'GBP',raw:'£63.00'});
+  assert.equal(product.parseProductPrice(null),null);
 
   const request=new URL(product.buildProductMetadataRequest('https://shop.example/product'));
   assert.equal(request.origin,'https://api.microlink.io');
   assert.equal(request.searchParams.get('url'),'https://shop.example/product');
   assert.ok(request.searchParams.get('data').includes('product:price:amount'));
+  assert.ok(request.searchParams.get('data').includes('corePriceDisplay_desktop_feature_div'),'Amazon-prijsvelden ontbreken');
 
   let requests=0;
   const snapshot=await product.fetchProductSnapshot('https://shop.example/product',{

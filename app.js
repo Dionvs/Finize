@@ -623,6 +623,15 @@
       { selector: 'meta[property="og:price:amount"]', attr: "content", type: "string" },
       { selector: 'meta[itemprop="price"]', attr: "content", type: "string" },
       { selector: '[itemprop="price"]', attr: "content", type: "string" },
+      { selector: "#corePriceDisplay_desktop_feature_div .a-price .a-offscreen", attr: "text", type: "string" },
+      { selector: "#corePrice_feature_div .a-price .a-offscreen", attr: "text", type: "string" },
+      { selector: "#apex_desktop .a-price .a-offscreen", attr: "text", type: "string" },
+      { selector: ".reinventPricePriceToPayMargin .a-offscreen", attr: "text", type: "string" },
+      { selector: '.a-price[data-a-color="price"] .a-offscreen', attr: "text", type: "string" },
+      { selector: "#priceblock_ourprice", attr: "text", type: "string" },
+      { selector: "#priceblock_dealprice", attr: "text", type: "string" },
+      { selector: "#price_inside_buybox", attr: "text", type: "string" },
+      { selector: "#twister-plus-price-data-price", attr: "value", type: "string" },
       { selector: ".price ins .woocommerce-Price-amount", attr: "text", type: "string" },
       { selector: ".price .woocommerce-Price-amount", attr: "text", type: "string" },
       { selector: '[data-testid="price"]', attr: "text", type: "string" },
@@ -672,7 +681,7 @@
   }
   function parseProductPrice(value) {
     var _a2, _b, _c;
-    if (Number.isFinite(Number(value)) && String(value).trim() !== "") return { amount: Math.round(Number(value) * 100) / 100, currency: "", raw: String(value) };
+    if (value !== null && value !== void 0 && typeof value !== "boolean" && Number.isFinite(Number(value)) && String(value).trim() !== "") return { amount: Math.round(Number(value) * 100) / 100, currency: "", raw: String(value) };
     const raw = typeof value === "object" && value !== null ? String((_c = (_b = (_a2 = value.amount) != null ? _a2 : value.value) != null ? _b : value.price) != null ? _c : "") : String(value || "");
     const candidates = raw.match(/\d[\d\s\u00a0.,'’]*/g) || [];
     const amount = [...candidates].reverse().map(parseLocalizedNumber).find((number) => number !== null && number >= 0);
@@ -2053,7 +2062,7 @@
         <button type="button" class="ghost small" data-tab-shortcut="spaardoelen">Bekijk alle doelen →</button>
       </div>
     </div>
-    ${renderGoalOverviewTable(doelen, pot)}
+    ${renderGoalOverviewTable(doelen, pot, owner)}
   </div>`;
   }
   function goalMonthlyInlegText(item) {
@@ -3855,7 +3864,7 @@
     const idx = parts.pop();
     return [parts.join("."), idx];
   }
-  function renderGoalOverviewTable(doelen, spaarpotDezeMaand) {
+  function renderGoalOverviewTable(doelen, spaarpotDezeMaand, owner = "gezamenlijk") {
     const berekend = calcGroep(doelen, spaarpotDezeMaand, TODAY);
     const totaalDoelbedrag = round2(berekend.reduce((s, b) => s + (Number(b.doel.doelbedrag) || 0), 0));
     const totaalAlGespaard = round2(berekend.reduce((s, b) => s + (Number(b.doel.algespaard) || 0), 0));
@@ -3864,10 +3873,21 @@
     const totaalVast = round2(berekend.reduce((s, b) => s + (Number(b.doel.vasteInleg) || 0), 0));
     const totaalExtra = round2(berekend.reduce((s, b) => s + (b.berekendeExtraInleg || 0), 0));
     const totaalWerkelijk = round2(berekend.reduce((s, b) => s + (b.werkelijkeInleg || 0), 0));
-    const rows = berekend.map((b) => {
+    const rows = berekend.map((b, index) => {
       const barPct = Math.min(100, Math.round((b.voortgang || 0) * 100));
+      const children = Array.isArray(b.doel.subdoelen) ? b.doel.subdoelen : [];
+      const panelId = `goal-subgoals-${owner}-${index}`;
+      const name = children.length ? `<button type="button" class="goal-table-subgoal-toggle" data-goal-subgoal-toggle="${panelId}" aria-expanded="false" aria-controls="${panelId}"><span>${textSafe(b.doel.naam || "(naamloos)")}</span></button>` : textSafe(b.doel.naam || "(naamloos)");
+      const childRows = children.map((child, childIndex) => {
+        const target = Math.max(0, Number(child.doelbedrag) || 0);
+        const saved = Math.max(0, Number(child.gespaard) || 0);
+        const progress = target > 0 ? Math.min(100, Math.round(saved / target * 100)) : 0;
+        const done = target > 0 && saved >= target;
+        const active = !done && children.slice(0, childIndex).every((previous) => (Number(previous.gespaard) || 0) >= (Number(previous.doelbedrag) || 0));
+        return `<div class="u2-accordion-child ${done ? "done" : active ? "active" : ""}"><strong>${textSafe(child.naam || "Subdoel")}</strong><span>${eur(saved)} / ${eur(target)}</span><div class="progress-track"><div class="progress-fill" style="width:${progress}%"></div></div></div>`;
+      }).join("");
       return `<tr>
-      <td>${textSafe(b.doel.naam || "(naamloos)")}</td>
+      <td>${name}</td>
       <td class="num">${eur(Number(b.doel.doelbedrag) || 0)}</td>
       <td class="num">${eur(Number(b.doel.algespaard) || 0)}</td>
       <td class="num">${eur(b.nogTeGaan)}</td>
@@ -3877,7 +3897,7 @@
       <td class="num">${eur(Number(b.doel.vasteInleg) || 0)}</td>
       <td class="num">${eur(b.berekendeExtraInleg || 0)}</td>
       <td class="num">${eur(b.werkelijkeInleg)}</td>
-    </tr>`;
+    </tr>${children.length ? `<tr id="${panelId}" class="goal-table-subgoal-detail" hidden><td colspan="10"><div class="u2-accordion-body">${childRows}</div></td></tr>` : ""}`;
     }).join("");
     return `<div class="goal-table-wrap"><table class="goal-table">
     <thead><tr>
@@ -6423,6 +6443,15 @@ service cloud.firestore {
         openTransactionEntryMenu("gezamenlijk");
       });
     });
+    root2.querySelectorAll("[data-goal-subgoal-toggle]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const panel = document.getElementById(button.dataset.goalSubgoalToggle);
+        if (!panel) return;
+        const expanded = button.getAttribute("aria-expanded") === "true";
+        button.setAttribute("aria-expanded", String(!expanded));
+        panel.hidden = expanded;
+      });
+    });
     root2.querySelectorAll("[data-open-personal-transaction]").forEach((btn) => {
       btn.addEventListener("click", () => openTransactionEntryMenu(btn.dataset.openPersonalTransaction));
     });
@@ -7100,8 +7129,10 @@ service cloud.firestore {
           if (nameInput) nameInput.value = current.naam || "";
           if (target) target.value = Number(current.doelbedrag) || 0;
           if (drafts.length) targetInput.value = round2(drafts.reduce((sum, item) => sum + (Number(item.doelbedrag) || 0), 0));
+          if (snapshot.price === null) showQuickToast("Product gevonden, maar geen prijs. Vul het bedrag handmatig in.");
         }).catch((error) => {
           console.info("Productinformatie bij subdoel niet automatisch aangevuld.", (error == null ? void 0 : error.message) || error);
+          showQuickToast("Link kon niet worden gelezen. Vul naam en bedrag handmatig in.");
         }).finally(() => productLookups.delete(lookupKey));
         productLookups.set(lookupKey, promise);
         return promise;

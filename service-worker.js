@@ -1,11 +1,11 @@
-const CACHE_NAME = "finize-v88-subdoel-productlink";
+const CACHE_NAME = "finize-v89-subdoelen-desktop";
 const CACHE_PREFIX = "finize-";
 
 const CRITICAL_SHELL = [
   "./",
   "./index.html",
-  "./app.js?v=88-subdoel-productlink",
-  "./app.css?v=88-subdoel-productlink",
+  "./app.js?v=89-subdoelen-desktop",
+  "./app.css?v=89-subdoelen-desktop",
   "./manifest.json"
 ];
 

@@ -1249,7 +1249,7 @@ function renderDesktopGoalsPreview(doelen, pot, owner='gezamenlijk'){
         <button type="button" class="ghost small" data-tab-shortcut="spaardoelen">Bekijk alle doelen →</button>
       </div>
     </div>
-    ${renderGoalOverviewTable(doelen, pot)}
+    ${renderGoalOverviewTable(doelen, pot, owner)}
   </div>`;
 }
 function goalMonthlyInlegText(item){
@@ -2985,7 +2985,7 @@ function splitLastIndex(pathWithIndex){
 }
 
 /* ---------- alleen-lezen spaardoelen-overzicht (voor Gezamenlijk/Dion/Dara tabs) ---------- */
-function renderGoalOverviewTable(doelen, spaarpotDezeMaand){
+function renderGoalOverviewTable(doelen, spaarpotDezeMaand, owner='gezamenlijk'){
   const berekend = calcGroep(doelen, spaarpotDezeMaand, TODAY);
   const totaalDoelbedrag = round2(berekend.reduce((s,b)=>s+(Number(b.doel.doelbedrag)||0),0));
   const totaalAlGespaard = round2(berekend.reduce((s,b)=>s+(Number(b.doel.algespaard)||0),0));
@@ -2994,10 +2994,23 @@ function renderGoalOverviewTable(doelen, spaarpotDezeMaand){
   const totaalVast = round2(berekend.reduce((s,b)=>s+(Number(b.doel.vasteInleg)||0),0));
   const totaalExtra = round2(berekend.reduce((s,b)=>s+(b.berekendeExtraInleg||0),0));
   const totaalWerkelijk = round2(berekend.reduce((s,b)=>s+(b.werkelijkeInleg||0),0));
-  const rows = berekend.map(b=>{
+  const rows = berekend.map((b,index)=>{
     const barPct = Math.min(100, Math.round((b.voortgang||0)*100));
+    const children=Array.isArray(b.doel.subdoelen)?b.doel.subdoelen:[];
+    const panelId=`goal-subgoals-${owner}-${index}`;
+    const name=children.length
+      ? `<button type="button" class="goal-table-subgoal-toggle" data-goal-subgoal-toggle="${panelId}" aria-expanded="false" aria-controls="${panelId}"><span>${textSafe(b.doel.naam || '(naamloos)')}</span></button>`
+      : textSafe(b.doel.naam || '(naamloos)');
+    const childRows=children.map((child,childIndex)=>{
+      const target=Math.max(0,Number(child.doelbedrag)||0);
+      const saved=Math.max(0,Number(child.gespaard)||0);
+      const progress=target>0?Math.min(100,Math.round(saved/target*100)):0;
+      const done=target>0&&saved>=target;
+      const active=!done&&children.slice(0,childIndex).every(previous=>(Number(previous.gespaard)||0)>=(Number(previous.doelbedrag)||0));
+      return `<div class="u2-accordion-child ${done?'done':active?'active':''}"><strong>${textSafe(child.naam||'Subdoel')}</strong><span>${eur(saved)} / ${eur(target)}</span><div class="progress-track"><div class="progress-fill" style="width:${progress}%"></div></div></div>`;
+    }).join('');
     return `<tr>
-      <td>${textSafe(b.doel.naam || '(naamloos)')}</td>
+      <td>${name}</td>
       <td class="num">${eur(Number(b.doel.doelbedrag)||0)}</td>
       <td class="num">${eur(Number(b.doel.algespaard)||0)}</td>
       <td class="num">${eur(b.nogTeGaan)}</td>
@@ -3007,7 +3020,7 @@ function renderGoalOverviewTable(doelen, spaarpotDezeMaand){
       <td class="num">${eur(Number(b.doel.vasteInleg)||0)}</td>
       <td class="num">${eur(b.berekendeExtraInleg||0)}</td>
       <td class="num">${eur(b.werkelijkeInleg)}</td>
-    </tr>`;
+    </tr>${children.length?`<tr id="${panelId}" class="goal-table-subgoal-detail" hidden><td colspan="10"><div class="u2-accordion-body">${childRows}</div></td></tr>`:''}`;
   }).join('');
   return `<div class="goal-table-wrap"><table class="goal-table">
     <thead><tr>
@@ -5370,6 +5383,15 @@ function renderActiveTab(){
       openTransactionEntryMenu('gezamenlijk');
     });
   });
+  root.querySelectorAll('[data-goal-subgoal-toggle]').forEach(button=>{
+    button.addEventListener('click',()=>{
+      const panel=document.getElementById(button.dataset.goalSubgoalToggle);
+      if(!panel)return;
+      const expanded=button.getAttribute('aria-expanded')==='true';
+      button.setAttribute('aria-expanded',String(!expanded));
+      panel.hidden=expanded;
+    });
+  });
   root.querySelectorAll('[data-open-personal-transaction]').forEach(btn=>{
     btn.addEventListener('click', ()=>openTransactionEntryMenu(btn.dataset.openPersonalTransaction));
   });
@@ -5997,8 +6019,10 @@ openMobileGoalEditor=function(owner,id){
         if(nameInput)nameInput.value=current.naam||'';
         if(target)target.value=Number(current.doelbedrag)||0;
         if(drafts.length)targetInput.value=round2(drafts.reduce((sum,item)=>sum+(Number(item.doelbedrag)||0),0));
+        if(snapshot.price===null)showQuickToast('Product gevonden, maar geen prijs. Vul het bedrag handmatig in.');
       }).catch(error=>{
         console.info('Productinformatie bij subdoel niet automatisch aangevuld.',error?.message||error);
+        showQuickToast('Link kon niet worden gelezen. Vul naam en bedrag handmatig in.');
       }).finally(()=>productLookups.delete(lookupKey));
       productLookups.set(lookupKey,promise);
       return promise;

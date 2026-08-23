@@ -5266,6 +5266,18 @@ body.v4-app[data-real-active-tab="spaardoelen"] .u2-goal-accordion>summary::afte
 .u2-editor-details>summary{padding:10px;cursor:pointer;font-size:11px;font-weight:850}
 .u2-editor-details>.manage-body{padding:0 10px 10px}
 .u2-editor-settings{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.goal-table-subgoal-toggle{width:100%;min-width:0;border:0;padding:0;background:transparent;color:inherit;font:inherit;font-weight:800;text-align:left;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer}
+.goal-table-subgoal-toggle span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.goal-table-subgoal-toggle::after{content:"";width:16px;height:16px;flex:0 0 16px;border:1px solid var(--border);border-radius:999px;background-color:var(--surface);background-image:var(--finize-chevron);background-repeat:no-repeat;background-position:center;background-size:9px 9px;transition:transform .18s ease,background-color .18s ease,border-color .18s ease}
+.goal-table-subgoal-toggle[aria-expanded="true"]::after{transform:rotate(180deg);background-color:var(--soft-green);border-color:#cddab7}
+.goal-table-subgoal-toggle:focus-visible{outline:2px solid var(--green);outline-offset:3px;border-radius:4px}
+.goal-table-subgoal-detail>td{padding:0!important;border-top:0!important}
+.goal-table-subgoal-detail .u2-accordion-body{margin:0 8px 8px}
+@media(min-width:768px){
+  #incomeEditModal .goal-detail-editor{width:min(960px,calc(100vw - 48px))}
+  .u2-subgoal-row{grid-template-columns:20px minmax(110px,1.2fr) minmax(90px,.65fr) minmax(130px,1.25fr) minmax(70px,.55fr) 30px 30px 30px}
+  .u2-subgoal-row input{width:100%;min-width:0}
+}
 
 /* Finize bron: dashboard.css */
 /* Update 3 â€” financiÃ«le maandadministratie */

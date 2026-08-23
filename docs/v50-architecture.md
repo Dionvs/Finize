@@ -56,7 +56,7 @@ Er is geen externe API toegevoegd. Klassieke globals die door de bestaande runti
 
 ## PWA
 
-De cachemarker is `finize-v88-subdoel-productlink`. Alleen caches met de prefix `finize-` worden opgeruimd. Alleen navigatieverzoeken mogen offline op `index.html` terugvallen; ontbrekende scripts, CSS en afbeeldingen krijgen nooit HTML als vervanging. Optionele pictogrammen kunnen een installatie niet blokkeren.
+De cachemarker is `finize-v89-subdoelen-desktop`. Alleen caches met de prefix `finize-` worden opgeruimd. Alleen navigatieverzoeken mogen offline op `index.html` terugvallen; ontbrekende scripts, CSS en afbeeldingen krijgen nooit HTML als vervanging. Optionele pictogrammen kunnen een installatie niet blokkeren.
 
 Een gewijzigde openbare productlink bij een subdoel wordt eenmalig via de Microlink-metadata-API gelezen. Titel, europrijs, afbeelding, bronlink en ophaaltijd worden als compacte momentopname in het subdoel bewaard; dezelfde link veroorzaakt daarna geen nieuwe aanvraag. Bij een geblokkeerde winkel, netwerkfout of daglimiet blijven de handmatig ingevulde naam en het doelbedrag leidend.
 

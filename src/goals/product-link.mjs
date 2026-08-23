@@ -5,6 +5,15 @@ const PRODUCT_PRICE_RULES = {
     {selector:'meta[property="og:price:amount"]',attr:'content',type:'string'},
     {selector:'meta[itemprop="price"]',attr:'content',type:'string'},
     {selector:'[itemprop="price"]',attr:'content',type:'string'},
+    {selector:'#corePriceDisplay_desktop_feature_div .a-price .a-offscreen',attr:'text',type:'string'},
+    {selector:'#corePrice_feature_div .a-price .a-offscreen',attr:'text',type:'string'},
+    {selector:'#apex_desktop .a-price .a-offscreen',attr:'text',type:'string'},
+    {selector:'.reinventPricePriceToPayMargin .a-offscreen',attr:'text',type:'string'},
+    {selector:'.a-price[data-a-color="price"] .a-offscreen',attr:'text',type:'string'},
+    {selector:'#priceblock_ourprice',attr:'text',type:'string'},
+    {selector:'#priceblock_dealprice',attr:'text',type:'string'},
+    {selector:'#price_inside_buybox',attr:'text',type:'string'},
+    {selector:'#twister-plus-price-data-price',attr:'value',type:'string'},
     {selector:'.price ins .woocommerce-Price-amount',attr:'text',type:'string'},
     {selector:'.price .woocommerce-Price-amount',attr:'text',type:'string'},
     {selector:'[data-testid="price"]',attr:'text',type:'string'},
@@ -55,7 +64,7 @@ function parseLocalizedNumber(value){
 }
 
 export function parseProductPrice(value){
-  if(Number.isFinite(Number(value))&&String(value).trim()!=='')return {amount:Math.round(Number(value)*100)/100,currency:'',raw:String(value)};
+  if(value!==null&&value!==undefined&&typeof value!=='boolean'&&Number.isFinite(Number(value))&&String(value).trim()!=='')return {amount:Math.round(Number(value)*100)/100,currency:'',raw:String(value)};
   const raw=typeof value==='object'&&value!==null
     ? String(value.amount??value.value??value.price??'')
     : String(value||'');
