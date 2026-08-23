@@ -1,11 +1,11 @@
-const CACHE_NAME = "finize-v90-subdoelen-en-afschrijving";
+const CACHE_NAME = "finize-v91-update6-auth-start";
 const CACHE_PREFIX = "finize-";
 
 const CRITICAL_SHELL = [
   "./",
   "./index.html",
-  "./app.js?v=90-subdoelen-en-afschrijving",
-  "./app.css?v=90-subdoelen-en-afschrijving",
+  "./app.js?v=91-update6-auth-start",
+  "./app.css?v=91-update6-auth-start",
   "./manifest.json"
 ];
 

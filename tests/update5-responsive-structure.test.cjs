@@ -12,7 +12,7 @@ const sw = fs.readFileSync(path.join(root, 'service-worker.js'), 'utf8');
 
 assert.match(markup, /app\.css/);
 assert.match(markup, /app\.js/);
-assert.match(sw, /finize-v90-subdoelen-en-afschrijving/);
+assert.match(sw, /finize-v91-update6-auth-start/);
 assert.match(js, /const dashboardTotalIncome = r\.totaalSalaris;/);
 assert.match(sw, /\.\/app\.css/);
 assert.match(sw, /\.\/app\.js/);

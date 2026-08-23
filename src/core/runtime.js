@@ -1923,6 +1923,7 @@ function activeStorageKeys(){ return storageKeysForSession(activeAuthSession); }
 function cloudConnectionAllowed(){
   const localRuntime = ['localhost','127.0.0.1'].includes(location.hostname);
   const explicitCloudTest = new URLSearchParams(location.search).get('cloud-test') === '1';
+  if(globalThis.FinizeAuth?.enabled && activeAuthSession?.status!=='ready')return false;
   return !localRuntime || explicitCloudTest;
 }
 

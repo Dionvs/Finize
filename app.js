@@ -2790,8 +2790,10 @@
     return storageKeysForSession(activeAuthSession);
   }
   function cloudConnectionAllowed() {
+    var _a2;
     const localRuntime = ["localhost", "127.0.0.1"].includes(location.hostname);
     const explicitCloudTest = new URLSearchParams(location.search).get("cloud-test") === "1";
+    if (((_a2 = globalThis.FinizeAuth) == null ? void 0 : _a2.enabled) && (activeAuthSession == null ? void 0 : activeAuthSession.status) !== "ready") return false;
     return !localRuntime || explicitCloudTest;
   }
   var GoalImageStore = {

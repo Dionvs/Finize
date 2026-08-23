@@ -28,6 +28,16 @@ test('toont de accountkeuzes en ingelogd blijven zonder de app erachter',async({
   await expect(page.getByRole('heading',{name:'Account aanmaken'})).toBeVisible();
 });
 
+test('probeert cloudopslag pas na een geldige accountkoppeling',async({page})=>{
+  const errors=[];
+  page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
+  await page.goto('/?cloud-test=1');
+  await expect(page.getByRole('heading',{name:'Welkom terug'})).toBeVisible();
+  await page.waitForTimeout(500);
+  expect(errors.join('\n')).not.toContain('accountkoppeling voor cloudopslag ontbreekt');
+  expect(errors.join('\n')).not.toContain('Firebase verbinden mislukt');
+});
+
 test('toont na accountaanmaak direct de verificatiestap',async({page})=>{
   await page.getByRole('button',{name:'Nieuw account aanmaken'}).click();
   await page.getByLabel('E-mailadres').fill('test@example.com');
