@@ -100,16 +100,16 @@ test('gezamenlijk inkomen vervangt standaardsalaris en negeert oude dubbele teru
     };
     state.meta.selectedMonth=month;
     state.transactions=[
-      {id:'salary-a',date:`${month}-05`,owner:'gezamenlijk',kind:'inkomen',processing:{transactionType:'salaris',include:true},amount:1200,description:'Salaris A'},
-      {id:'salary-b',date:`${month}-24`,owner:'gezamenlijk',kind:'inkomen',transactionType:'salaris',amount:1800,description:'Salaris B'},
+      {id:'salary-a',date:`${month}-05`,owner:'gezamenlijk',kind:'inkomen',processing:{transactionType:'salaris',include:true},amount:800,description:'Werkgever Dion — Deel 1'},
+      {id:'salary-b',date:`${month}-24`,owner:'gezamenlijk',kind:'inkomen',transactionType:'salaris',amount:1200,description:'Werkgever Dion — Deel 2'},
       {id:'extra',date:`${month}-08`,owner:'gezamenlijk',kind:'inkomen',transactionType:'overige-inkomsten',amount:50,description:'Naam: Cadeau'},
       {id:'refund',date:`${month}-09`,owner:'dion',kind:'uitgave',transactionType:'terugbetaling',amount:20,description:'Naam: Terugbetaling'},
       {id:'duo',date:`${month}-20`,owner:'dion',kind:'inkomen',transactionType:'overige-inkomsten',amount:300.5,description:'DUO Hoofdrekening'},
       {id:'transfer',date:`${month}-21`,owner:'gezamenlijk',kind:'interne-overboeking',transactionType:'van-spaarrekening',amount:500,description:'Oranje Spaarrekening'}
     ];
     state.incomeDefaultsHistory={
-      dion:[{id:'dion-default',effectiveFrom:'0000-01',salary:900,refund:300}],
-      dara:[{id:'dara-default',effectiveFrom:'0000-01',salary:1100,refund:0}]
+      dion:[{id:'dion-default',effectiveFrom:'0000-01',salary:2000,refund:300}],
+      dara:[{id:'dara-default',effectiveFrom:'0000-01',salary:3000,refund:0}]
     };
     state.monthlyIncomeOverrides={};
     state.monthlyRefundOverrides={};
@@ -129,13 +129,53 @@ test('gezamenlijk inkomen vervangt standaardsalaris en negeert oude dubbele teru
     renderActiveTab();
   });
   const incomeCard=page.locator('#tab-gezamenlijk .overview-kpi-row .icon-kpi').filter({hasText:'Totaal gezamenlijk inkomen'});
-  expect(parseEuro(await incomeCard.locator('.metric-value').innerText())).toBe(3400.5);
+  expect(parseEuro(await incomeCard.locator('.metric-value').innerText())).toBe(5400.5);
   await page.evaluate(() => {
     const saved=window.__incomeTestSavedState;
     Object.assign(state,saved);
     state.meta.selectedMonth=saved.selectedMonth;
     delete state.selectedMonth;
     delete window.__incomeTestSavedState;
+    renderActiveTab();
+  });
+});
+
+test('twee herkende werkgevers vervangen in juli beide persoonlijke standaardsalarissen', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('.v4-sidebar .tab-btn[data-tab="gezamenlijk"]').click();
+  await page.evaluate(() => {
+    window.__julyIncomeSavedState={
+      transactions:structuredClone(state.transactions),
+      monthlyTeruggaven:structuredClone(state.monthlyTeruggaven),
+      incomeDefaultsHistory:structuredClone(state.incomeDefaultsHistory),
+      monthlyIncomeOverrides:structuredClone(state.monthlyIncomeOverrides),
+      monthlyRefundOverrides:structuredClone(state.monthlyRefundOverrides),
+      recurringIncomeSources:structuredClone(state.recurringIncomeSources),
+      selectedMonth:state.meta.selectedMonth
+    };
+    state.meta.selectedMonth='2026-07';
+    state.transactions=[
+      {id:'salary-dion',date:'2026-07-06',owner:'gezamenlijk',kind:'inkomen',transactionType:'salaris',amount:1294.74,description:'St-iek Fysiotherapie B.V. — Salaris juni'},
+      {id:'salary-dara',date:'2026-07-24',owner:'gezamenlijk',kind:'inkomen',transactionType:'salaris',amount:3610.09,description:'Stichting SBOH — Maand 7 2026'}
+    ];
+    state.incomeDefaultsHistory={
+      dion:[{id:'dion-default',effectiveFrom:'0000-01',salary:2650,refund:0}],
+      dara:[{id:'dara-default',effectiveFrom:'0000-01',salary:3250,refund:0}]
+    };
+    state.monthlyIncomeOverrides={'2026-07':{dion:922.42}};
+    state.monthlyRefundOverrides={};
+    state.monthlyTeruggaven={'2026-07':{dion:[],dara:[],gezamenlijk:[]}};
+    state.recurringIncomeSources=[];
+    renderActiveTab();
+  });
+  const incomeCard=page.locator('#tab-gezamenlijk .overview-kpi-row .icon-kpi').filter({hasText:'Totaal gezamenlijk inkomen'});
+  expect(parseEuro(await incomeCard.locator('.metric-value').innerText())).toBe(4904.83);
+  await page.evaluate(() => {
+    const saved=window.__julyIncomeSavedState;
+    Object.assign(state,saved);
+    state.meta.selectedMonth=saved.selectedMonth;
+    delete state.selectedMonth;
+    delete window.__julyIncomeSavedState;
     renderActiveTab();
   });
 });

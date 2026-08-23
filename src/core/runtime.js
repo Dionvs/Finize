@@ -772,13 +772,32 @@ function representedFixedRefund(owner,month,incomeRows){
     return represented?sum+expected:sum;
   },0));
 }
+function inferredSalaryOwners(rows,standard){
+  const result=new Map();
+  const groups=new Map();
+  rows.filter(tx=>normalizedTransactionType(tx)==='salaris').forEach(tx=>{
+    const explicitOwner=u3IncomeTransactionOwner(tx);
+    if(explicitOwner==='dion'||explicitOwner==='dara'){result.set(tx.id,explicitOwner);return;}
+    const description=String(tx.description||tx.title||tx.name||'');
+    const counterparty=bankText(description.split(/[—–]/)[0])||String(tx.id||uid());
+    if(!groups.has(counterparty))groups.set(counterparty,[]);
+    groups.get(counterparty).push(tx);
+  });
+  groups.forEach(group=>{
+    const amount=round2(group.reduce((sum,tx)=>sum+Math.abs(Number(tx.amount)||0),0));
+    const owner=Math.abs(amount-standard.dion.salary)<=Math.abs(amount-standard.dara.salary)?'dion':'dara';
+    group.forEach(tx=>result.set(tx.id,owner));
+  });
+  return result;
+}
 function dashboardIncomeBreakdown(month=getSelectedMonth()){
   const distributionIncome=round2(calcScenario(state).totaalSalaris);
   const standard={dion:getDistributionIncomeParts('dion',month),dara:getDistributionIncomeParts('dara',month)};
   const monthTransactions=(state.transactions||[]).filter(tx=>transactionMonth(tx)===month);
   const rows=monthTransactions.filter(tx=>tx.reviewStatus!=='genegeerd'&&tx.processing?.include!==false&&tx.kind!=='niet-meetellen');
-  const salaryActual={dion:0,dara:0,gezamenlijk:0};
-  const salarySeen={dion:false,dara:false,gezamenlijk:false};
+  const salaryActual={dion:0,dara:0};
+  const salarySeen={dion:false,dara:false};
+  const salaryOwners=inferredSalaryOwners(rows,standard);
   let extraTransactions=0;
   rows.forEach(tx=>{
     const type=normalizedTransactionType(tx);
@@ -786,14 +805,12 @@ function dashboardIncomeBreakdown(month=getSelectedMonth()){
     const isIncome=kind==='inkomen';
     const isRefund=type==='terugbetaling'||kind==='terugbetaling';
     if(!isIncome&&!isRefund)return;
-    const owner=u3IncomeTransactionOwner(tx);
+    const owner=type==='salaris'?(salaryOwners.get(tx.id)||u3IncomeTransactionOwner(tx)):u3IncomeTransactionOwner(tx);
     const amount=Math.abs(Number(tx.amount)||0);
-    if(type==='salaris'&&(owner==='dion'||owner==='dara'||owner==='gezamenlijk')){salaryActual[owner]=round2(salaryActual[owner]+amount);salarySeen[owner]=true;return;}
+    if(type==='salaris'&&(owner==='dion'||owner==='dara')){salaryActual[owner]=round2(salaryActual[owner]+amount);salarySeen[owner]=true;return;}
     extraTransactions=round2(extraTransactions+amount);
   });
-  const salaryBase=salarySeen.gezamenlijk
-    ? round2(salaryActual.dion+salaryActual.dara+salaryActual.gezamenlijk)
-    : round2((salarySeen.dion?salaryActual.dion:standard.dion.salary)+(salarySeen.dara?salaryActual.dara:standard.dara.salary));
+  const salaryBase=round2((salarySeen.dion?salaryActual.dion:standard.dion.salary)+(salarySeen.dara?salaryActual.dara:standard.dara.salary));
   const fixedRefundBase=round2(
     Math.max(0,standard.dion.refund-representedFixedRefund('dion',month,rows))+
     Math.max(0,standard.dara.refund-representedFixedRefund('dara',month,rows))
