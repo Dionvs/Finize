@@ -1,11 +1,11 @@
-const CACHE_NAME = "finize-v85-inkomen-per-persoon";
+const CACHE_NAME = "finize-v86-budgetinteractie";
 const CACHE_PREFIX = "finize-";
 
 const CRITICAL_SHELL = [
   "./",
   "./index.html",
-  "./app.js?v=85-inkomen-per-persoon",
-  "./app.css?v=85-inkomen-per-persoon",
+  "./app.js?v=86-budgetinteractie",
+  "./app.css?v=86-budgetinteractie",
   "./manifest.json"
 ];
 

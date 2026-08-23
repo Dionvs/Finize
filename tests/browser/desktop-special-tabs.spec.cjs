@@ -106,6 +106,38 @@ test('desktop spaardoelen en data back-up renderen volledig', async ({ page }) =
   expect(errors).toEqual([]);
 });
 
+test('budgetten openen op desktop transacties en zijn op mobiel bewerkbaar', async ({ page }) => {
+  await page.setViewportSize({ width:1280, height:900 });
+  await page.goto('/');
+  await page.locator('.v4-sidebar [data-tab="dion"]').click();
+  const desktopBudget=page.locator('#tab-dion .budget-usage-button').first();
+  const category=await desktopBudget.locator('strong').innerText();
+  await desktopBudget.click();
+  const transactionsModal=page.locator('#transactionModal.open .budget-transactions-modal');
+  await expect(transactionsModal.getByRole('heading',{name:category})).toBeVisible();
+  await expect(transactionsModal).toContainText(/transactie/);
+  await transactionsModal.getByRole('button',{name:'Sluiten'}).click();
+
+  await page.setViewportSize({ width:390, height:844 });
+  await page.reload();
+  await page.locator('.v4-bottom-nav [data-tab="gezamenlijk"]').click();
+  const jointEdit=page.locator('#tab-gezamenlijk').getByRole('button',{name:'Gezamenlijke maandbudgetten wijzigen'});
+  await expect(jointEdit).toContainText('Wijzig');
+  expect((await jointEdit.boundingBox()).height).toBeGreaterThanOrEqual(44);
+  await jointEdit.click();
+  const jointDialog=page.getByRole('dialog',{name:'Variabele lasten aanpassen'});
+  await expect(jointDialog.getByRole('heading',{name:'Variabele lasten',exact:true})).toBeVisible();
+  await jointDialog.getByRole('button',{name:'Sluiten'}).click();
+
+  await page.locator('.v4-bottom-nav [data-tab="dion"]').click();
+  const personalEdit=page.locator('#tab-dion').getByRole('button',{name:'Maandbudgetten van Dion wijzigen'});
+  await expect(personalEdit).toContainText('Wijzig');
+  await personalEdit.click();
+  const personalDialog=page.getByRole('dialog',{name:'Variabele lasten aanpassen'});
+  await expect(personalDialog.getByRole('heading',{name:'Dion variabele lasten'})).toBeVisible();
+  await personalDialog.getByRole('button',{name:'Sluiten'}).click();
+});
+
 test('mobiele spaardoelbalken houden hun vaste breedte', async ({ page }) => {
   await page.setViewportSize({ width: 430, height: 900 });
   await page.goto('/');

@@ -1786,9 +1786,11 @@
   }
   function renderJointVariableCostsCardHead(owner = "gezamenlijk") {
     const name = ownerLabel(owner);
-    return `<div class="card-head joint-variable-card-head">
-    <div class="card-head-title">${iconBadge("chart", "green", "card-head-icon")}<h2>${owner === "gezamenlijk" ? "Variabele lasten" : `${name} variabele lasten`}</h2><button type="button" class="joint-variable-edit-btn" data-open-owner-variable="${owner}" aria-label="Variabele lasten aanpassen">${iconSvg("receipt")}</button></div>
-  </div>`;
+    const label = owner === "gezamenlijk" ? "Gezamenlijke maandbudgetten wijzigen" : `Maandbudgetten van ${name} wijzigen`;
+    return `<button type="button" class="card-head joint-variable-card-head joint-variable-edit-btn" data-open-owner-variable="${owner}" aria-label="${textSafe(label)}">
+    <span class="card-head-title">${iconBadge("chart", "green", "card-head-icon")}<h2>${owner === "gezamenlijk" ? "Variabele lasten" : `${name} variabele lasten`}</h2></span>
+    <span class="joint-variable-edit-label">Wijzig</span>${finizeIconWrap("edit", "finize-action-icon joint-variable-edit-icon")}
+  </button>`;
   }
   function jointVariableCategoryOptions(selectedCategory = "", owner = "gezamenlijk") {
     var _a2;
@@ -4069,10 +4071,11 @@
       const budget = Number(row.bedrag) || 0;
       const used = sumTransactions(owner, row.post);
       const status = budgetStatus(used, budget);
-      return `<div class="progress-item">
+      const label = row.post || row.categorie || "Budget";
+      return `<button type="button" class="progress-item budget-usage-button" data-open-budget-transactions="${textSafe(label)}" data-budget-owner="${owner}" aria-label="Open transacties voor ${textSafe(label)}">
       <div class="progress-top"><strong>${textSafe(row.post || row.categorie)}</strong><span><span class="neutral-amount">${eur(used)}</span> / <span class="neutral-amount">${eur(budget)}</span> <span class="status-badge ${status.cls}">${status.label}</span></span></div>
       <div class="progress-track"><div class="progress-fill" style="width:${Math.min(100, Math.round(status.ratio * 100))}%"></div></div>
-    </div>`;
+    </button>`;
     }).join("") || '<p class="hint">Nog geen budgetten.</p>'}</div>`;
   }
   function renderFixedCostsOverviewCard(owner, data, total) {
