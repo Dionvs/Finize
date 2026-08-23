@@ -19,6 +19,7 @@ const context = {
   Map,
   Set,
   isPlainObject: value => value !== null && typeof value === 'object' && !Array.isArray(value),
+  normalizeProductSnapshot: value => value && typeof value === 'object' ? {...value} : null,
   round2: value => Math.round((Number(value) + Number.EPSILON) * 100) / 100,
   uid: (() => { let id = 0; return () => `test-${++id}`; })(),
   clone: value => JSON.parse(JSON.stringify(value)),

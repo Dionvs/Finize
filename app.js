@@ -615,6 +615,151 @@
     return parent && id ? Object.freeze([...parent, "chunks", id]) : null;
   }
 
+  // src/goals/product-link.mjs
+  var PRODUCT_METADATA_ENDPOINT = "https://api.microlink.io/";
+  var PRODUCT_PRICE_RULES = {
+    price: [
+      { selector: 'meta[property="product:price:amount"]', attr: "content", type: "string" },
+      { selector: 'meta[property="og:price:amount"]', attr: "content", type: "string" },
+      { selector: 'meta[itemprop="price"]', attr: "content", type: "string" },
+      { selector: '[itemprop="price"]', attr: "content", type: "string" },
+      { selector: ".price ins .woocommerce-Price-amount", attr: "text", type: "string" },
+      { selector: ".price .woocommerce-Price-amount", attr: "text", type: "string" },
+      { selector: '[data-testid="price"]', attr: "text", type: "string" },
+      { selector: '[class*="product-price"]', attr: "text", type: "string" }
+    ]
+  };
+  function isPrivateHostname(hostname) {
+    const host = String(hostname || "").toLowerCase().replace(/^\[|\]$/g, "");
+    if (!host || host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host === "::1") return true;
+    if (/^127\./.test(host) || /^10\./.test(host) || /^192\.168\./.test(host) || /^169\.254\./.test(host)) return true;
+    const match = host.match(/^172\.(\d{1,3})\./);
+    return Boolean(match && Number(match[1]) >= 16 && Number(match[1]) <= 31);
+  }
+  function normalizeProductUrl(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+    let parsed;
+    try {
+      parsed = new URL(raw);
+    } catch (e) {
+      return "";
+    }
+    if (!["http:", "https:"].includes(parsed.protocol) || isPrivateHostname(parsed.hostname)) return "";
+    parsed.hash = "";
+    return parsed.toString();
+  }
+  function parseLocalizedNumber(value) {
+    const compact = String(value || "").replace(/[\s\u00a0'’]/g, "").replace(/[^0-9.,-]/g, "");
+    if (!/\d/.test(compact)) return null;
+    const lastComma = compact.lastIndexOf(",");
+    const lastDot = compact.lastIndexOf(".");
+    const decimalIndex = Math.max(lastComma, lastDot);
+    let normalized = compact;
+    if (lastComma >= 0 && lastDot >= 0) {
+      const decimal = decimalIndex === lastComma ? "," : ".";
+      const thousands = decimal === "," ? "." : ",";
+      normalized = compact.split(thousands).join("").replace(decimal, ".");
+    } else if (decimalIndex >= 0) {
+      const separator = compact[decimalIndex];
+      const decimals = compact.length - decimalIndex - 1;
+      const occurrences = compact.split(separator).length - 1;
+      normalized = decimals >= 1 && decimals <= 2 ? compact.slice(0, decimalIndex).split(separator).join("") + "." + compact.slice(decimalIndex + 1) : compact.split(separator).join("");
+      if (occurrences > 1 && decimals === 3) normalized = compact.split(separator).join("");
+    }
+    const number = Number(normalized);
+    return Number.isFinite(number) ? Math.round((number + Number.EPSILON) * 100) / 100 : null;
+  }
+  function parseProductPrice(value) {
+    var _a2, _b, _c;
+    if (Number.isFinite(Number(value)) && String(value).trim() !== "") return { amount: Math.round(Number(value) * 100) / 100, currency: "", raw: String(value) };
+    const raw = typeof value === "object" && value !== null ? String((_c = (_b = (_a2 = value.amount) != null ? _a2 : value.value) != null ? _b : value.price) != null ? _c : "") : String(value || "");
+    const candidates = raw.match(/\d[\d\s\u00a0.,'’]*/g) || [];
+    const amount = [...candidates].reverse().map(parseLocalizedNumber).find((number) => number !== null && number >= 0);
+    if (amount === void 0) return null;
+    const upper = raw.toUpperCase();
+    const currency = /€|\bEUR\b/.test(upper) ? "EUR" : /£|\bGBP\b/.test(upper) ? "GBP" : /\$|\bUSD\b/.test(upper) ? "USD" : "";
+    return { amount, currency, raw: raw.trim() };
+  }
+  function buildProductMetadataRequest(value) {
+    const url = normalizeProductUrl(value);
+    if (!url) throw new Error("Ongeldige openbare productlink.");
+    const request = new URL(PRODUCT_METADATA_ENDPOINT);
+    request.searchParams.set("url", url);
+    request.searchParams.set("data", JSON.stringify(PRODUCT_PRICE_RULES));
+    request.searchParams.set("filter", "title,image,url,price");
+    return request.toString();
+  }
+  function safeRemoteImage(value) {
+    const raw = typeof value === "object" && value !== null ? value.url : value;
+    return normalizeProductUrl(raw);
+  }
+  function normalizeProductSnapshot(value) {
+    if (!value || typeof value !== "object") return null;
+    const price = Number(value.price);
+    const url = normalizeProductUrl(value.url);
+    if (!url) return null;
+    return {
+      url,
+      resolvedUrl: normalizeProductUrl(value.resolvedUrl) || url,
+      title: String(value.title || "").trim().slice(0, 300),
+      price: Number.isFinite(price) && price >= 0 ? Math.round(price * 100) / 100 : null,
+      currency: ["EUR", "GBP", "USD"].includes(value.currency) ? value.currency : "",
+      priceText: String(value.priceText || "").trim().slice(0, 100),
+      image: safeRemoteImage(value.image),
+      source: "microlink",
+      fetchedAt: String(value.fetchedAt || "")
+    };
+  }
+  function shouldFetchProductSnapshot(child, value) {
+    var _a2;
+    const url = normalizeProductUrl(value);
+    if (!url) return false;
+    return ((_a2 = normalizeProductSnapshot(child == null ? void 0 : child.productInfo)) == null ? void 0 : _a2.url) !== url;
+  }
+  function applyProductSnapshot(child, value) {
+    const snapshot = normalizeProductSnapshot(value);
+    if (!child || !snapshot) return child;
+    const previous = normalizeProductSnapshot(child.productInfo);
+    const currentName = String(child.naam || "").trim();
+    const generatedName = !currentName || /^nieuw subdoel$/i.test(currentName) || /^subdoel\s+\d+$/i.test(currentName) || currentName === (previous == null ? void 0 : previous.title);
+    if (snapshot.title && generatedName) child.naam = snapshot.title;
+    if (snapshot.price !== null && (!snapshot.currency || snapshot.currency === "EUR")) child.doelbedrag = snapshot.price;
+    child.productInfo = snapshot;
+    return child;
+  }
+  async function fetchProductSnapshot(value, { fetchImpl = globalThis.fetch, timeoutMs = 12e3, now = () => (/* @__PURE__ */ new Date()).toISOString() } = {}) {
+    if (typeof fetchImpl !== "function") throw new Error("Productinformatie ophalen wordt niet ondersteund.");
+    const url = normalizeProductUrl(value);
+    const request = buildProductMetadataRequest(url);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetchImpl(request, { headers: { accept: "application/json" }, signal: controller.signal });
+      if (!(response == null ? void 0 : response.ok)) throw new Error((response == null ? void 0 : response.status) === 429 ? "Daglimiet voor productinformatie bereikt." : "Productinformatie is tijdelijk niet beschikbaar.");
+      const payload = await response.json();
+      if ((payload == null ? void 0 : payload.status) !== "success" || !(payload == null ? void 0 : payload.data)) throw new Error("Productinformatie kon niet worden gelezen.");
+      const price = parseProductPrice(payload.data.price);
+      const snapshot = normalizeProductSnapshot({
+        url,
+        resolvedUrl: payload.data.url || url,
+        title: payload.data.title || "",
+        price: price == null ? void 0 : price.amount,
+        currency: (price == null ? void 0 : price.currency) || "",
+        priceText: (price == null ? void 0 : price.raw) || "",
+        image: payload.data.image,
+        fetchedAt: now()
+      });
+      if (!(snapshot == null ? void 0 : snapshot.title) && (snapshot == null ? void 0 : snapshot.price) === null) throw new Error("Deze winkel geeft geen herkenbare productinformatie door.");
+      return snapshot;
+    } catch (error) {
+      if ((error == null ? void 0 : error.name) === "AbortError") throw new Error("Productinformatie ophalen duurde te lang.");
+      throw error;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   // src/core/runtime.js
   var _a;
   function round2(n) {
@@ -820,7 +965,7 @@
           const current = Number(child.gespaard);
           const saved = Number.isFinite(current) ? Math.min(target, Math.max(0, current)) : Math.min(target, remaining);
           remaining = Math.max(0, remaining - saved);
-          return { id: child.id || uid(), naam: String(child.naam || `Subdoel ${index + 1}`), doelbedrag: round2(target), gespaard: round2(saved), link: String(child.link || ""), volgorde: index, voltooid: target > 0 && saved >= target };
+          return { id: child.id || uid(), naam: String(child.naam || `Subdoel ${index + 1}`), doelbedrag: round2(target), gespaard: round2(saved), link: String(child.link || ""), productInfo: normalizeProductSnapshot(child.productInfo), volgorde: index, voltooid: target > 0 && saved >= target };
         });
         if (goal.subdoelen.length) {
           goal.doelbedrag = round2(goal.subdoelen.reduce((sum, child) => sum + child.doelbedrag, 0));
@@ -6442,6 +6587,7 @@ service cloud.firestore {
         doelbedrag: round2(target),
         gespaard: round2(saved),
         link: String(child.link || ""),
+        productInfo: normalizeProductSnapshot(child.productInfo),
         volgorde: index,
         voltooid: saved >= target && target > 0
       };
@@ -6918,6 +7064,7 @@ service cloud.firestore {
     const grid = modal.querySelector(".modal-grid");
     const targetInput = modal.querySelector("#goalEditTarget");
     let drafts = cloneState(goal.subdoelen || []);
+    const productLookups = /* @__PURE__ */ new Map();
     const ownerField = document.createElement("label");
     ownerField.innerHTML = `Eigenaar<select id="u2GoalOwner">${U2_OWNERS.map((value) => `<option value="${value}" ${value === owner ? "selected" : ""}>${ownerLabel(value)}</option>`).join("")}</select>`;
     const ratioField = document.createElement("label");
@@ -6935,6 +7082,29 @@ service cloud.firestore {
         section.querySelectorAll("[data-u2-child-target]").forEach((input) => drafts[Number(input.dataset.u2ChildTarget)].doelbedrag = Math.max(0, round2(bankAmount(input.value) || 0)));
         section.querySelectorAll("[data-u2-child-link]").forEach((input) => drafts[Number(input.dataset.u2ChildLink)].link = input.value);
         if (drafts.length) targetInput.value = round2(drafts.reduce((sum, child) => sum + (Number(child.doelbedrag) || 0), 0));
+      };
+      const lookupProduct = async (input) => {
+        sync();
+        const index = Number(input.dataset.u2ChildLink);
+        const child = drafts[index];
+        const url = normalizeProductUrl(input.value);
+        if (!child || !shouldFetchProductSnapshot(child, url)) return;
+        const lookupKey = child.id || String(index);
+        const promise = fetchProductSnapshot(url).then((snapshot) => {
+          const current = drafts.find((item) => (item.id || "") === (child.id || "")) || drafts[index];
+          if (!current || normalizeProductUrl(current.link) !== url) return;
+          applyProductSnapshot(current, snapshot);
+          const row = section.querySelector(`[data-u2-child="${drafts.indexOf(current)}"]`);
+          const nameInput = row == null ? void 0 : row.querySelector("[data-u2-child-name]");
+          const target = row == null ? void 0 : row.querySelector("[data-u2-child-target]");
+          if (nameInput) nameInput.value = current.naam || "";
+          if (target) target.value = Number(current.doelbedrag) || 0;
+          if (drafts.length) targetInput.value = round2(drafts.reduce((sum, item) => sum + (Number(item.doelbedrag) || 0), 0));
+        }).catch((error) => {
+          console.info("Productinformatie bij subdoel niet automatisch aangevuld.", (error == null ? void 0 : error.message) || error);
+        }).finally(() => productLookups.delete(lookupKey));
+        productLookups.set(lookupKey, promise);
+        return promise;
       };
       (_a3 = section.querySelector("[data-u2-add-child]")) == null ? void 0 : _a3.addEventListener("click", () => {
         sync();
@@ -6971,11 +7141,22 @@ service cloud.firestore {
         });
       });
       section.querySelectorAll("input").forEach((input) => input.addEventListener("input", sync));
+      section.querySelectorAll("[data-u2-child-link]").forEach((input) => input.addEventListener("change", () => lookupProduct(input)));
     };
     grid.insertBefore(ownerField, grid.firstChild);
     grid.insertBefore(ratioField, grid.querySelector(".goal-calculation-card"));
     grid.insertBefore(section, grid.querySelector(".goal-calculation-card"));
     renderChildren();
+    modal.querySelector("#goalEditSave").addEventListener("click", async (event) => {
+      if (!productLookups.size) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const button = event.currentTarget;
+      button.disabled = true;
+      await Promise.allSettled([...productLookups.values()]);
+      button.disabled = false;
+      button.click();
+    }, { capture: true });
     const u2CloseButton = modal.querySelector("[data-close-goal-editor]");
     const u2CloseEditor = (event) => {
       event.preventDefault();

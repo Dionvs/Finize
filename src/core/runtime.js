@@ -21,6 +21,13 @@ import {
   cloudImportDocumentPath,
   storageKeysForSession
 } from "../storage/account-scope.mjs";
+import {
+  applyProductSnapshot,
+  fetchProductSnapshot,
+  normalizeProductSnapshot,
+  normalizeProductUrl,
+  shouldFetchProductSnapshot
+} from "../goals/product-link.mjs";
 
 /* ---------- helpers ---------- */
 function round2(n){ return Math.round((n + Number.EPSILON) * 100) / 100; }
@@ -210,7 +217,7 @@ function normalizeGoalDefaults(){
         const current = Number(child.gespaard);
         const saved = Number.isFinite(current) ? Math.min(target,Math.max(0,current)) : Math.min(target,remaining);
         remaining = Math.max(0,remaining-saved);
-        return {id:child.id||uid(),naam:String(child.naam||`Subdoel ${index+1}`),doelbedrag:round2(target),gespaard:round2(saved),link:String(child.link||''),volgorde:index,voltooid:target>0&&saved>=target};
+        return {id:child.id||uid(),naam:String(child.naam||`Subdoel ${index+1}`),doelbedrag:round2(target),gespaard:round2(saved),link:String(child.link||''),productInfo:normalizeProductSnapshot(child.productInfo),volgorde:index,voltooid:target>0&&saved>=target};
       });
       if (goal.subdoelen.length){
         goal.doelbedrag = round2(goal.subdoelen.reduce((sum,child)=>sum+child.doelbedrag,0));
@@ -5529,6 +5536,7 @@ function u2NormalizeChildren(goal){
       doelbedrag: round2(target),
       gespaard: round2(saved),
       link: String(child.link || ''),
+      productInfo: normalizeProductSnapshot(child.productInfo),
       volgorde: index,
       voltooid: saved >= target && target > 0
     };
@@ -5954,6 +5962,7 @@ openMobileGoalEditor=function(owner,id){
   const grid=modal.querySelector('.modal-grid');
   const targetInput=modal.querySelector('#goalEditTarget');
   let drafts=clone(goal.subdoelen||[]);
+  const productLookups=new Map();
   const ownerField=document.createElement('label');
   ownerField.innerHTML=`Eigenaar<select id="u2GoalOwner">${U2_OWNERS.map(value=>`<option value="${value}" ${value===owner?'selected':''}>${ownerLabel(value)}</option>`).join('')}</select>`;
   const ratioField=document.createElement('label');
@@ -5971,6 +5980,29 @@ openMobileGoalEditor=function(owner,id){
       section.querySelectorAll('[data-u2-child-link]').forEach(input=>drafts[Number(input.dataset.u2ChildLink)].link=input.value);
       if(drafts.length) targetInput.value=round2(drafts.reduce((sum,child)=>sum+(Number(child.doelbedrag)||0),0));
     };
+    const lookupProduct=async input=>{
+      sync();
+      const index=Number(input.dataset.u2ChildLink);
+      const child=drafts[index];
+      const url=normalizeProductUrl(input.value);
+      if(!child||!shouldFetchProductSnapshot(child,url))return;
+      const lookupKey=child.id||String(index);
+      const promise=fetchProductSnapshot(url).then(snapshot=>{
+        const current=drafts.find(item=>(item.id||'')===(child.id||''))||drafts[index];
+        if(!current||normalizeProductUrl(current.link)!==url)return;
+        applyProductSnapshot(current,snapshot);
+        const row=section.querySelector(`[data-u2-child="${drafts.indexOf(current)}"]`);
+        const nameInput=row?.querySelector('[data-u2-child-name]');
+        const target=row?.querySelector('[data-u2-child-target]');
+        if(nameInput)nameInput.value=current.naam||'';
+        if(target)target.value=Number(current.doelbedrag)||0;
+        if(drafts.length)targetInput.value=round2(drafts.reduce((sum,item)=>sum+(Number(item.doelbedrag)||0),0));
+      }).catch(error=>{
+        console.info('Productinformatie bij subdoel niet automatisch aangevuld.',error?.message||error);
+      }).finally(()=>productLookups.delete(lookupKey));
+      productLookups.set(lookupKey,promise);
+      return promise;
+    };
     section.querySelector('[data-u2-add-child]')?.addEventListener('click',()=>{sync();drafts.push({id:uid(),naam:'Nieuw subdoel',doelbedrag:0,gespaard:0,link:'',voltooid:false});renderChildren();});
     section.querySelectorAll('[data-u2-child-remove]').forEach(btn=>btn.addEventListener('click',()=>{sync();drafts.splice(Number(btn.dataset.u2ChildRemove),1);renderChildren();}));
     const move=(from,to)=>{sync();if(to<0||to>=drafts.length)return;const [child]=drafts.splice(from,1);drafts.splice(to,0,child);renderChildren();};
@@ -5984,11 +6016,22 @@ openMobileGoalEditor=function(owner,id){
       row.addEventListener('drop',event=>{event.preventDefault();const target=Number(row.dataset.u2Child);if(dragIndex!==null&&dragIndex!==target)move(dragIndex,target);});
     });
     section.querySelectorAll('input').forEach(input=>input.addEventListener('input',sync));
+    section.querySelectorAll('[data-u2-child-link]').forEach(input=>input.addEventListener('change',()=>lookupProduct(input)));
   };
   grid.insertBefore(ownerField,grid.firstChild);
   grid.insertBefore(ratioField,grid.querySelector('.goal-calculation-card'));
   grid.insertBefore(section,grid.querySelector('.goal-calculation-card'));
   renderChildren();
+  modal.querySelector('#goalEditSave').addEventListener('click',async event=>{
+    if(!productLookups.size)return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const button=event.currentTarget;
+    button.disabled=true;
+    await Promise.allSettled([...productLookups.values()]);
+    button.disabled=false;
+    button.click();
+  },{capture:true});
   const u2CloseButton=modal.querySelector('[data-close-goal-editor]');
   const u2CloseEditor=event=>{
     event.preventDefault();

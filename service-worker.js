@@ -1,11 +1,11 @@
-const CACHE_NAME = "finize-v87-csv-verwerking";
+const CACHE_NAME = "finize-v88-subdoel-productlink";
 const CACHE_PREFIX = "finize-";
 
 const CRITICAL_SHELL = [
   "./",
   "./index.html",
-  "./app.js?v=87-csv-verwerking",
-  "./app.css?v=87-csv-verwerking",
+  "./app.js?v=88-subdoel-productlink",
+  "./app.css?v=88-subdoel-productlink",
   "./manifest.json"
 ];
 
