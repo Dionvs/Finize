@@ -12,7 +12,7 @@ const sw = fs.readFileSync(path.join(root, 'service-worker.js'), 'utf8');
 
 assert.match(markup, /app\.css/);
 assert.match(markup, /app\.js/);
-assert.match(sw, /finize-v82-bankimport-spaargeld/);
+assert.match(sw, /finize-v83-auth-jaaroverzicht/);
 assert.match(js, /const dashboardTotalIncome = r\.totaalSalaris;/);
 assert.match(sw, /\.\/app\.css/);
 assert.match(sw, /\.\/app\.js/);
@@ -22,7 +22,8 @@ assert.match(html, /setVariableBudgetDefaultsFromMonth\(scenario,owner,month,cle
 assert.match(html, /data-personal-saving-edit/);
 assert.match(html, /Spaargeld deze maand <strong>\$\{eur\(pot\)\}<\/strong>/);
 assert.match(html, /'Over deze maand'/);
-assert.match(html, /- variableUsed\s+- spaarpotVoorGroep/);
+assert.match(html, /jointVisibleIncome - r\.vasteLastenTotaal - variableUsed - spaarpotVoorGroep - jointAllowance/);
+assert.match(html, /dashboardIncomeBreakdown\(getSelectedMonth\(\)\)\.total/);
 assert.doesNotMatch(html, /renderManageSection\('Sparen'/);
 assert.match(html, /function openPersonalSavingEditModal\(owner\)/);
 assert.match(html, /Automatisch gebruiken/);

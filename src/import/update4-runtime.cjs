@@ -1756,13 +1756,6 @@
   function injectSettlementCard(root){
     document.querySelector('[data-dashboard-accordion="settlement"]')?.remove();
     document.querySelector('.u4-settlement-card')?.remove();
-    if(document.body.dataset.activeTab!=='dashboard')return;
-    const target=document.querySelector('#tab-dashboard .manage-stack')||document.querySelector('.manage-stack');
-    if(!target)return;
-    const balances=directionalBalances(root.state,root.state.meta.selectedMonth||'9999-12');
-    const accordion=document.createElement('details');accordion.className='manage-section';accordion.dataset.dashboardAccordion='settlement';
-    accordion.innerHTML=`<summary><span class="manage-title">Onderling te verrekenen</span><span class="expand-chevron" aria-hidden="true"></span></summary><div class="manage-body"><section class="card u4-settlement-card"><div class="card-head"><div></div><button type="button" class="ghost small" data-u4-open-settlement>Details</button></div><div class="u4-settlement-lines">${balances.map(row=>`<div class="u4-settlement-line"><span>${ownerLabel(row.debtor)} → ${ownerLabel(row.creditor)}</span><strong>${euro(row.amount)}</strong></div>`).join('')||'<span class="u4-muted">Geen openstaande voorschotten.</span>'}</div></section></div>`;
-    target.prepend(accordion);accordion.querySelector('[data-u4-open-settlement]').addEventListener('click',()=>renderSettlementDetail(root));
   }
   function renderSettlementDetail(root,filters={}){
     const modal=ensureModalRoot();const person=filters.person||'';const month=filters.month||'';

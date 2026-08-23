@@ -47,6 +47,7 @@ function authErrorMessage(error){
   if (code.includes('popup-blocked')) return 'De Google-pop-up is geblokkeerd. Sta pop-ups voor Finize toe en probeer opnieuw.';
   if (code.includes('network-request-failed')) return 'Er is geen verbinding. Controleer je internet en probeer opnieuw.';
   if (code.includes('too-many-requests')) return 'Er zijn te veel pogingen gedaan. Wacht even en probeer daarna opnieuw.';
+  if (code.includes('permission-denied')) return 'Je e-mailadres is bevestigd, maar de toegang kon nog niet worden vernieuwd. Probeer opnieuw of log opnieuw in.';
   return String(error?.message || 'Inloggen is niet gelukt. Probeer het opnieuw.');
 }
 
@@ -290,7 +291,11 @@ async function createFirebaseDriver(){
       continueUrl.hash = '';
       return authModule.sendEmailVerification(user,{url:continueUrl.toString(),handleCodeInApp:false});
     },
-    async reloadUser(user){ await authModule.reload(user); return auth.currentUser; },
+    async reloadUser(user){
+      await authModule.reload(user);
+      if (auth.currentUser) await authModule.getIdToken(auth.currentUser,true);
+      return auth.currentUser;
+    },
     signOut(){ return authModule.signOut(auth); },
     async loadAssignment(user){
       const documentId = accountLinkDocumentId(user?.email);

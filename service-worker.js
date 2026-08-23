@@ -1,11 +1,11 @@
-const CACHE_NAME = "finize-v82-bankimport-spaargeld";
+const CACHE_NAME = "finize-v83-auth-jaaroverzicht";
 const CACHE_PREFIX = "finize-";
 
 const CRITICAL_SHELL = [
   "./",
   "./index.html",
-  "./app.js?v=82-bankimport-spaargeld",
-  "./app.css?v=82-bankimport-spaargeld",
+  "./app.js?v=83-auth-jaaroverzicht",
+  "./app.css?v=83-auth-jaaroverzicht",
   "./manifest.json"
 ];
 

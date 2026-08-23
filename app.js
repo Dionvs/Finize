@@ -104,6 +104,7 @@
     if (code.includes("popup-blocked")) return "De Google-pop-up is geblokkeerd. Sta pop-ups voor Finize toe en probeer opnieuw.";
     if (code.includes("network-request-failed")) return "Er is geen verbinding. Controleer je internet en probeer opnieuw.";
     if (code.includes("too-many-requests")) return "Er zijn te veel pogingen gedaan. Wacht even en probeer daarna opnieuw.";
+    if (code.includes("permission-denied")) return "Je e-mailadres is bevestigd, maar de toegang kon nog niet worden vernieuwd. Probeer opnieuw of log opnieuw in.";
     return String((error == null ? void 0 : error.message) || "Inloggen is niet gelukt. Probeer het opnieuw.");
   }
   async function activateCredential(credential) {
@@ -357,6 +358,7 @@
       },
       async reloadUser(user) {
         await authModule.reload(user);
+        if (auth.currentUser) await authModule.getIdToken(auth.currentUser, true);
         return auth.currentUser;
       },
       signOut() {
@@ -3851,29 +3853,16 @@
       const saving = round2(Number(monthResult.savings) || 0);
       return { key, name: ["Jan", "Feb", "Mrt", "Apr", "Mei", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dec"][i], income, spent, saving };
     });
-    const maxYearValue = Math.max(1, ...yearData.flatMap((m) => [m.income, m.spent, m.saving]));
     const currentMonthKey = monthKey(TODAY);
     const yearTotals = {
       income: round2(yearData.reduce((s, m) => s + m.income, 0)),
       spent: round2(yearData.reduce((s, m) => s + m.spent, 0)),
       saving: round2(yearData.reduce((s, m) => s + m.saving, 0))
     };
-    const CHART_H = 84;
-    const monthBars = yearData.map((m) => {
+    const yearTableRows = yearData.map((m) => {
       const isFuture = m.key > currentMonthKey;
-      const active = m.key === getSelectedMonth() ? " active" : "";
-      const futureCls = isFuture ? " future" : "";
-      const hIncome = Math.max(2, Math.round(m.income / maxYearValue * CHART_H));
-      const hSpent = Math.max(2, Math.round(m.spent / maxYearValue * CHART_H));
-      const hSaving = Math.max(2, Math.round(m.saving / maxYearValue * CHART_H));
-      return `<div class="year-col${active}${futureCls}" title="${m.name}: inkomen ${eur(m.income)}, uitgaven ${eur(m.spent)}, sparen ${eur(m.saving)}">
-      <div class="year-col-bars" style="height:${CHART_H}px">
-        <span class="year-bar-v income" style="height:${hIncome}px"></span>
-        <span class="year-bar-v spent" style="height:${hSpent}px"></span>
-        <span class="year-bar-v saving" style="height:${hSaving}px"></span>
-      </div>
-      <div class="year-col-label">${m.name}</div>
-    </div>`;
+      const rowClass = `${m.key === getSelectedMonth() ? " selected" : ""}${isFuture ? " future" : ""}`.trim();
+      return `<tr${rowClass ? ` class="${rowClass}"` : ""}><th scope="row">${m.name}</th><td class="num value pos">${eur(m.income)}</td><td class="num value neg">${eur(m.spent)}</td><td class="num value pos">${eur(m.saving)}</td></tr>`;
     }).join("");
     const personSummary = (label, rr) => `
     <div class="card span-4 dash-status-card v4-desktop-only-block">
@@ -3981,10 +3970,12 @@
       <div class="card span-6 v4-bottom-card card-scroll dashboard-goals-preview v4-desktop-only-block">${renderDashboardCardHead("Spaardoelen preview", "", "blue")}<div class="scroll-area">${goalCardsDesktop || '<p class="hint">Nog geen spaardoelen.</p>'}</div><button type="button" class="goals-preview-link" data-tab-shortcut="spaardoelen"><span>Alle spaardoelen bekijken</span><strong>›</strong></button></div>
       <div class="card span-6 dashboard-goals-preview savings-preview-card v4-mobile-only-block">${renderDashboardCardHead("Spaardoelen preview", "", "blue")}${goalCardsMobile || '<p class="hint">Nog geen spaardoelen.</p>'}<button type="button" class="goals-preview-link" data-tab-shortcut="spaardoelen"><span>Alle spaardoelen</span><strong>›</strong></button></div>
     </div>
-    <div class="manage-stack">
-      ${renderU3AdminPanel()}
-      ${renderManageSection(`Jaaroverzicht ${year}`, `<div class="card"><div class="year-legend top"><span><i class="income-dot"></i>Inkomen</span><span><i class="spent-dot"></i>Uitgaven</span><span><i class="saving-dot"></i>Sparen</span></div><div class="year-summary"><div><span>Inkomen dit jaar</span><strong class="value pos">${eur(yearTotals.income)}</strong></div><div><span>Uitgaven dit jaar</span><strong class="value neg">${eur(yearTotals.spent)}</strong></div><div><span>Sparen dit jaar</span><strong class="value pos">${eur(yearTotals.saving)}</strong></div></div><div class="year-chart">${monthBars}</div></div>`, false)}
-    </div>
+    <section class="card dashboard-year-overview" aria-labelledby="dashboardYearTitle">
+      <div class="card-head"><h2 id="dashboardYearTitle">Jaaroverzicht ${year}</h2></div>
+      <div class="dashboard-year-table-wrap">
+        <table class="dashboard-year-table"><thead><tr><th scope="col">Maand</th><th scope="col" class="num">Inkomen</th><th scope="col" class="num">Uitgaven</th><th scope="col" class="num">Sparen</th></tr></thead><tbody>${yearTableRows}</tbody><tfoot><tr><th scope="row">Totaal</th><td class="num value pos">${eur(yearTotals.income)}</td><td class="num value neg">${eur(yearTotals.spent)}</td><td class="num value pos">${eur(yearTotals.saving)}</td></tr></tfoot></table>
+      </div>
+    </section>
   `;
   }
   function renderRecentTransactionsList(owner, limit = 4) {
@@ -4192,14 +4183,14 @@
     const variableBudget = isJoint ? r.variabelBudgetTotaal : sumBedrag(data.variabel || []);
     const variableUsed = isJoint ? r.variabelTotaal : rr.variabeleUitgaven;
     const variablePct = variableBudget > 0 ? Math.min(100, Math.round(variableUsed / variableBudget * 100)) : 0;
-    const remainingThisMonth = round2(
-      (isJoint ? r.totaalSalaris : personalIncome.total) - (isJoint ? r.vasteLastenTotaal : rr.persoonlijkeVasteLasten) - variableUsed - spaarpotVoorGroep
-    );
+    const jointVisibleIncome = isJoint ? dashboardIncomeBreakdown(getSelectedMonth()).total : 0;
+    const jointAllowance = isJoint ? round2(r.dion.zakgeld + r.dara.zakgeld) : 0;
+    const remainingThisMonth = isJoint ? round2(jointVisibleIncome - r.vasteLastenTotaal - variableUsed - spaarpotVoorGroep - jointAllowance) : round2(personalIncome.total - rr.persoonlijkeVasteLasten - variableUsed - spaarpotVoorGroep);
     const jointKpis = isJoint ? `
     <div class="overview-kpi-row">
-      ${renderIconKpi("€", "green", "Totaal gezamenlijk inkomen", eur(r.totaalSalaris), "Dion en Dara samen", { valueClass: "value pos" })}
+      ${renderIconKpi("€", "green", "Totaal gezamenlijk inkomen", eur(jointVisibleIncome), "Inclusief inkomsten uit transacties", { valueClass: jointVisibleIncome < 0 ? "value neg" : "value pos" })}
       ${renderIconKpi("▤", "blue", "Vaste lasten totaal", eur(r.vasteLastenTotaal), "Klik om te wijzigen", { valueClass: "value neg", openFixedOwner: "gezamenlijk" })}
-      ${renderIconKpi("◎", "green", "Over deze maand", eur(remainingThisMonth), "Na vaste lasten, gebruikt budget en spaargeld", { valueClass: remainingThisMonth < 0 ? "value neg" : "value pos" })}
+      ${renderIconKpi("◎", "green", "Over deze maand", eur(remainingThisMonth), "", { valueClass: remainingThisMonth < 0 ? "value neg" : "value pos" })}
       ${renderIconKpi("▥", "blue", "Variabel gebruikt", `${eur(variableUsed)} / ${eur(variableBudget)}`, `<span class="overview-budget-track" style="--used-pct:${variablePct}%"></span>`)}
     </div>` : "";
     const personalKpis = !isJoint ? `
@@ -10102,16 +10093,6 @@ ${(error == null ? void 0 : error.message) || error}`);
       var _a2, _b;
       (_a2 = document.querySelector('[data-dashboard-accordion="settlement"]')) == null ? void 0 : _a2.remove();
       (_b = document.querySelector(".u4-settlement-card")) == null ? void 0 : _b.remove();
-      if (document.body.dataset.activeTab !== "dashboard") return;
-      const target = document.querySelector("#tab-dashboard .manage-stack") || document.querySelector(".manage-stack");
-      if (!target) return;
-      const balances = directionalBalances(root2.state, root2.state.meta.selectedMonth || "9999-12");
-      const accordion = document.createElement("details");
-      accordion.className = "manage-section";
-      accordion.dataset.dashboardAccordion = "settlement";
-      accordion.innerHTML = `<summary><span class="manage-title">Onderling te verrekenen</span><span class="expand-chevron" aria-hidden="true"></span></summary><div class="manage-body"><section class="card u4-settlement-card"><div class="card-head"><div></div><button type="button" class="ghost small" data-u4-open-settlement>Details</button></div><div class="u4-settlement-lines">${balances.map((row) => `<div class="u4-settlement-line"><span>${ownerLabel2(row.debtor)} → ${ownerLabel2(row.creditor)}</span><strong>${euro(row.amount)}</strong></div>`).join("") || '<span class="u4-muted">Geen openstaande voorschotten.</span>'}</div></section></div>`;
-      target.prepend(accordion);
-      accordion.querySelector("[data-u4-open-settlement]").addEventListener("click", () => renderSettlementDetail(root2));
     }
     function renderSettlementDetail(root2, filters = {}) {
       const modal = ensureModalRoot();

@@ -19,11 +19,10 @@ assert.match(html,/function openTransactionEntryMenu\(owner\)/,'Keuzemenu voor h
 assert.match(js,/openBankImportForOwner/,'Eigenaargebonden bankimport ontbreekt');
 assert.match(html,/function bindDashboardAccordionKeyboard\(root\)/,'Centrale toetsenbordbediening voor dashboardaccordeons ontbreekt');
 assert.match(html,/\['Enter',' ','Spacebar'\]\.includes\(event\.key\)/,'Enter- en spatiebediening voor dashboardaccordeons ontbreekt');
-assert.match(html,/renderManageSection\('Maandadministratie',body,false,'data-dashboard-accordion="month-admin"'\)/,'Maandadministratie start niet als gesloten accordeon');
-assert.match(js,/accordion\.dataset\.dashboardAccordion='settlement'/,'Onderling te verrekenen is geen dashboardaccordeon');
-assert.doesNotMatch(js,/accordion\.open\s*=\s*true/,'Onderling te verrekenen start niet gesloten');
-assert.match(js,/class="manage-title">Onderling te verrekenen/,'Titel van verrekenaccordeon ontbreekt');
-assert.match(js,/data-u4-open-settlement/,'Detailsactie voor verrekenen ontbreekt');
+assert.doesNotMatch(html,/\$\{renderU3AdminPanel\(\)\}/,'Maandadministratie staat nog op het dashboard');
+assert.doesNotMatch(js,/accordion\.dataset\.dashboardAccordion='settlement'/,'Onderling te verrekenen staat nog op het dashboard');
+assert.match(html,/class="card dashboard-year-overview"/,'Direct jaaroverzicht ontbreekt');
+assert.match(html,/class="dashboard-year-table"/,'Jaaroverzicht is geen tabel');
 assert.match(css,/#u4ImportModalRoot/);
 assert.match(css,/u4-cloud-spinner/);
 assert.match(css,/min-height:calc\(100dvh - 150px\)/);

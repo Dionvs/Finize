@@ -94,6 +94,11 @@ async function googleProvider(){
   return api(`https://identitytoolkit.googleapis.com/admin/v2/projects/${projectId}/defaultSupportedIdpConfigs/google.com`,{allowMissing:true});
 }
 
+async function authUsersByEmail(emails){
+  const result=await api(`https://identitytoolkit.googleapis.com/v1/projects/${projectId}/accounts:lookup`,{method:'POST',body:{email:emails}});
+  return result.users||[];
+}
+
 async function inspect(){
   const linking = JSON.parse(fs.readFileSync(localLinkFile,'utf8'));
   const legacy = await readDocument('budgetPlanners/finize');
@@ -102,11 +107,12 @@ async function inspect(){
   const links = await Promise.all(linking.accounts.map(account=>readDocument(`accountLinks/${account.email.trim().toLowerCase()}`)));
   const config = await authConfig();
   const google = await googleProvider();
+  const authUsers = await authUsersByEmail(linking.accounts.map(account=>account.email.trim().toLowerCase()));
   console.log(JSON.stringify({
     legacy:{exists:!!legacy,syncVersion:fieldInteger(legacy,'syncVersion'),revision:fieldInteger(legacy,'revision'),stateBytes:JSON.stringify(legacy?.fields?.state||{}).length,imports:imports.length,chunks:imports.reduce((sum,item)=>sum+item.chunks.length,0)},
     secureTarget:{exists:!!target,syncVersion:fieldInteger(target,'syncVersion'),revision:fieldInteger(target,'revision'),stateBytes:JSON.stringify(target?.fields?.state||{}).length},
     accountLinks:links.map((document,index)=>({role:linking.accounts[index].role,exists:!!document,householdId:fieldString(document,'householdId')})),
-    auth:{emailEnabled:config.signIn?.email?.enabled===true,passwordRequired:config.signIn?.email?.passwordRequired===true,googleEnabled:google?.enabled===true,authorizedDomains:config.authorizedDomains || []}
+    auth:{emailEnabled:config.signIn?.email?.enabled===true,passwordRequired:config.signIn?.email?.passwordRequired===true,googleEnabled:google?.enabled===true,authorizedDomains:config.authorizedDomains || [],accounts:linking.accounts.map(account=>{const user=authUsers.find(item=>String(item.email||'').toLowerCase()===account.email.trim().toLowerCase());return {role:account.role,exists:!!user,emailVerified:user?.emailVerified===true,disabled:user?.disabled===true,providers:(user?.providerUserInfo||[]).map(provider=>provider.providerId)};})}
   },null,2));
 }
 

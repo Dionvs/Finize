@@ -1,5 +1,9 @@
 const { expect, test } = require('@playwright/test');
 
+function parseEuro(text){
+  return Number(String(text).replace(/[^\d,.-]/g,'').replace(/\./g,'').replace(',','.'))||0;
+}
+
 test('transacties worden alleen vanuit persoonlijk en gezamenlijk toegevoegd', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('[data-open-transaction], [data-open-general-transaction]')).toHaveCount(0);
@@ -54,6 +58,40 @@ test('zonder huishouden toont persoonlijk totaal alle inkomstenbronnen', async (
   await expect(card).toContainText('Salaris');
   await expect(card).toContainText('Overige inkomsten');
   await expect(card).not.toContainText('Zakgeld');
+});
+
+test('gezamenlijk over deze maand gebruikt alle inkomsten en trekt zakgeld alleen visueel af', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('.v4-sidebar .tab-btn[data-tab="gezamenlijk"]').click();
+  const cards=page.locator('#tab-gezamenlijk .overview-kpi-row .icon-kpi');
+  const incomeCard=cards.filter({hasText:'Totaal gezamenlijk inkomen'});
+  const remainingCard=cards.filter({hasText:'Over deze maand'});
+  const incomeBefore=parseEuro(await incomeCard.locator('.metric-value').innerText());
+  await page.evaluate(() => {
+    const month=window.state.meta.selectedMonth;
+    window.state.transactions.push({id:'joint-extra-income-test',date:month+'-14',owner:'gezamenlijk',kind:'inkomen',transactionType:'overige-inkomsten',amount:125,description:'Gezamenlijk extra inkomen'});
+    window.renderActiveTab();
+  });
+  const incomeAfter=parseEuro(await incomeCard.locator('.metric-value').innerText());
+  expect(incomeAfter-incomeBefore).toBe(125);
+  const fixed=parseEuro(await cards.filter({hasText:'Vaste lasten totaal'}).locator('.metric-value').innerText());
+  const used=parseEuro((await cards.filter({hasText:'Variabel gebruikt'}).locator('.metric-value').innerText()).split('/')[0]);
+  const saving=parseEuro(await page.locator('#tab-gezamenlijk .savings-month-button strong').innerText());
+  const remaining=parseEuro(await remainingCard.locator('.metric-value').innerText());
+  await expect(remainingCard.locator('.metric-sub')).toHaveCount(0);
+  await page.locator('.v4-sidebar .tab-btn[data-tab="dashboard"]').click();
+  const allowance=parseEuro(await page.locator('#tab-dashboard .allowance-return-card .metric-value').innerText());
+  expect(remaining).toBeCloseTo(incomeAfter-fixed-used-saving-allowance,2);
+});
+
+test('dashboard toont alleen het directe jaaroverzicht onderaan', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('#tab-dashboard')).not.toContainText('Maandadministratie');
+  await expect(page.locator('#tab-dashboard')).not.toContainText('Onderling te verrekenen');
+  const year=page.locator('#tab-dashboard .dashboard-year-overview');
+  await expect(year).toBeVisible();
+  await expect(year.locator('tbody tr')).toHaveCount(12);
+  await expect(year.locator('details')).toHaveCount(0);
 });
 
 test('opgeslagen inkomen valt niet terug door een nieuwere cloudsnapshot', async ({ page }) => {

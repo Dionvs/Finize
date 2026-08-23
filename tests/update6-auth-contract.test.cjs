@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const {pathToFileURL} = require('node:url');
 const path = require('node:path');
+const fs = require('node:fs');
 
 (async()=>{
   const contract = await import(pathToFileURL(path.resolve(__dirname,'../src/auth/contracts.mjs')).href);
@@ -29,5 +30,7 @@ const path = require('node:path');
       sharePersonalTab:false,hiddenKpis:[]
     }
   );
+  const authRuntime=fs.readFileSync(path.resolve(__dirname,'../src/auth/runtime.js'),'utf8');
+  assert.match(authRuntime,/await authModule\.reload\(user\);\s*if \(auth\.currentUser\) await authModule\.getIdToken\(auth\.currentUser,true\);/,'Na e-mailverificatie wordt het Firebase-token niet geforceerd vernieuwd');
   console.log('UPDATE6_AUTH_CONTRACT_OK');
 })().catch(error=>{ console.error(error); process.exitCode=1; });

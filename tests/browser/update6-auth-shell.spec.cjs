@@ -37,6 +37,20 @@ test('toont na accountaanmaak direct de verificatiestap',async({page})=>{
   await expect(page.getByText('test@example.com')).toBeVisible();
 });
 
+test('vernieuwt na e-mailbevestiging de koppeling en opent de app',async({page})=>{
+  await page.getByRole('button',{name:'Nieuw account aanmaken'}).click();
+  await page.getByLabel('E-mailadres').fill('dara_endenburg@hotmail.com');
+  await page.getByLabel('Wachtwoord').fill('veilig-wachtwoord');
+  await page.getByRole('button',{name:'Account aanmaken',exact:true}).click();
+  await page.evaluate(()=>{
+    window.__FINIZE_AUTH_TEST_DRIVER__.reloadUser=async user=>({...user,uid:'uid-dara',emailVerified:true});
+    window.__FINIZE_AUTH_TEST_DRIVER__.loadAssignment=async()=>({householdId:'dion-dara',role:'dara',displayName:'Dara'});
+  });
+  await page.getByRole('button',{name:'Ik heb mijn e-mail bevestigd'}).click();
+  await expect(page.locator('#authRoot')).toBeHidden();
+  await expect(page.locator('.v4-sidebar')).toBeVisible();
+});
+
 test('rondt Google-inloggen af zonder redirect van de PWA',async({page})=>{
   await page.evaluate(()=>{
     window.__FINIZE_AUTH_TEST_DRIVER__.signInGoogle=async()=>({user:{uid:'uid-dion',email:'dion@example.test',emailVerified:true}});
