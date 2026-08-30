@@ -85,7 +85,7 @@ import {
     const progress = target > 0 ? Math.min(100,Math.round(saved/target*100)) : 0;
     const reference = `${item.owner}:${goal.id}`;
     return `<div class="u5-goal-list-card${reference===selectedGoalRef?' active':''}" data-u5-select-goal="${textSafe(reference)}" data-reorder-goal data-goal-owner="${item.owner}" data-goal-id="${textSafe(goal.id)}" role="button" tabindex="0">
-      <button type="button" class="goal-direct-drag-handle" data-goal-drag-handle aria-label="${textSafe(goal.naam||'Spaardoel')} verplaatsen" title="Verslepen om de volgorde te wijzigen"></button>
+      <span class="goal-direct-order-controls" aria-label="Volgorde aanpassen"><button type="button" class="goal-direct-order-arrow up" data-goal-move="-1" aria-label="${textSafe(goal.naam||'Spaardoel')} omhoog" title="Omhoog"></button><button type="button" class="goal-direct-order-arrow down" data-goal-move="1" aria-label="${textSafe(goal.naam||'Spaardoel')} omlaag" title="Omlaag"></button></span>
       ${goalImageMarkup(goal,'u5-goal-list-image')}
       <span class="u5-goal-list-copy">
         <span class="u5-goal-list-title"><strong>${textSafe(goal.naam||'Spaardoel')}</strong><em>${goal.favoriet?'★':''}</em></span>
@@ -160,7 +160,7 @@ import {
     }));
     root.querySelectorAll('[data-u5-select-goal]').forEach(button=>{
       const select=event=>{
-        if(event.target.closest('[data-goal-drag-handle]'))return;
+        if(event.target.closest('.goal-direct-order-controls'))return;
         selectedGoalRef = button.dataset.u5SelectGoal;
         renderActiveTab();
       };

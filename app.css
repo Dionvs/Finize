@@ -5163,16 +5163,19 @@ html body.v4-app .v4-sidebar .tab-btn[hidden],html body.v4-app .v4-bottom-nav .b
 .u2-goal-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:8px}
 .u2-goal-card{position:relative;padding:0;overflow:hidden}
 .u2-goal-main{width:100%;border:0;background:transparent;color:inherit;padding:12px 12px 12px 34px;display:grid;grid-template-columns:52px 1fr auto;gap:10px;text-align:left;cursor:pointer}
-.goal-direct-drag-handle{display:grid;place-items:center;width:26px;height:34px;padding:0;border:1px solid var(--border);border-radius:9px;background-color:#fffaf4;background-image:radial-gradient(circle,var(--text-dim) 1.25px,transparent 1.5px);background-size:6px 6px;background-position:center;cursor:grab;touch-action:none;user-select:none}
-.goal-direct-drag-handle:active{cursor:grabbing}
-.goal-direct-drag-handle:focus-visible{outline:2px solid var(--green);outline-offset:2px}
-.u2-goal-card>.goal-direct-drag-handle{position:absolute;z-index:2;left:5px;top:21px}
+.goal-direct-order-controls{display:grid;grid-template-rows:repeat(2,20px);width:22px;height:40px;align-content:center}
+.goal-direct-order-arrow{display:grid;place-items:center;width:22px;height:20px;min-width:22px;min-height:20px;padding:0;border:0;border-radius:6px;background:transparent;box-shadow:none;color:var(--text-dim);cursor:pointer}
+.goal-direct-order-arrow::before{content:"";width:7px;height:7px;background:var(--finize-chevron) center/7px 7px no-repeat}
+.goal-direct-order-arrow.up::before{transform:rotate(180deg)}
+.goal-direct-order-arrow:hover:not(:disabled){background:var(--surface-2);transform:none}
+.goal-direct-order-arrow:focus-visible{outline:2px solid var(--green);outline-offset:1px}
+.goal-direct-order-arrow:disabled{opacity:.22;cursor:default}
+.u2-goal-card>.goal-direct-order-controls{position:absolute;z-index:2;left:5px;top:17px}
 .mobile-goal-row[data-reorder-goal]{position:relative;padding-left:28px}
-.mobile-goal-row[data-reorder-goal]>.goal-direct-drag-handle{position:absolute;z-index:2;left:0;top:50%;transform:translateY(-50%)}
+.mobile-goal-row[data-reorder-goal]>.goal-direct-order-controls{position:absolute;z-index:2;left:0;top:50%;transform:translateY(-50%)}
 .u2-goal-accordion[data-reorder-goal]{position:relative}
-.u2-goal-accordion[data-reorder-goal]>.goal-direct-drag-handle{position:absolute;z-index:3;left:0;top:22px;transform:translateY(-50%)}
+.u2-goal-accordion[data-reorder-goal]>.goal-direct-order-controls{position:absolute;z-index:3;left:0;top:22px;transform:translateY(-50%)}
 .u2-goal-accordion[data-reorder-goal]>summary .mobile-goal-row{padding-left:28px}
-.goal-direct-dragging{opacity:.68;box-shadow:0 12px 28px rgba(47,31,24,.18)!important}
 .u2-goal-main:hover{background:rgba(95,126,70,.055)}
 .u2-goal-image{width:52px;height:52px;border-radius:13px;background:var(--soft-green);display:grid;place-items:center;font-size:21px;background-size:cover;background-position:center}
 .u2-goal-copy{min-width:0;display:grid;gap:5px}
@@ -5343,6 +5346,7 @@ body.v4-app[data-real-active-tab="spaardoelen"] .u2-goal-accordion>summary::afte
 .u3-admin-row small{color:var(--text-dim)}
 .u3-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
 .u3-grid label{display:grid;gap:5px;font-size:10px;color:var(--text-dim);font-weight:750}
+.u3-grid label small{font-size:9px;font-weight:500;line-height:1.35;color:var(--text-dim)}
 .u3-grid .full{grid-column:1/-1}
 .u3-fixed-distribution-info{grid-column:1/-1;display:grid;grid-template-columns:auto 1fr;align-items:center;gap:3px 9px;padding:9px 11px;border:1px solid var(--border);border-radius:12px;background:var(--surface-2)}
 .u3-fixed-distribution-info span{font-size:10px;color:var(--text-dim);font-weight:750}
@@ -6011,19 +6015,19 @@ body.v4-app .value.is-negative{color:var(--red) !important}
   .u5-goal-owner-label small{color:var(--text-faint);font-size:10px}
   .u5-goal-owner-items{display:grid;gap:7px}
   .u5-goal-list-card{
-    width:100%;display:grid;grid-template-columns:26px 62px minmax(0,1fr) auto;align-items:center;gap:10px;
+    width:100%;display:grid;grid-template-columns:22px 56px minmax(0,1fr) 28px;align-items:center;gap:8px;
     min-height:80px;padding:9px;border:1px solid var(--border-soft);border-radius:14px;background:#fffaf4;
     color:var(--text);text-align:left;box-shadow:none;cursor:pointer
   }
   .u5-goal-list-card:hover{transform:none;background:#fffdf9}
   .u5-goal-list-card.active{border-color:rgba(88,124,76,.55);background:var(--green-bg);box-shadow:inset 3px 0 0 var(--green)}
-  .u5-goal-list-image{width:62px;height:62px;display:grid;place-items:center;border-radius:13px;background:var(--green-bg);background-size:cover;background-position:center;font-size:24px}
-  .u5-goal-list-copy{display:grid;gap:6px;min-width:0}
-  .u5-goal-list-title{display:flex;justify-content:space-between;gap:8px}
-  .u5-goal-list-title strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .u5-goal-list-image{width:56px;height:56px;display:grid;place-items:center;border-radius:13px;background:var(--green-bg);background-size:cover;background-position:center;font-size:24px}
+  .u5-goal-list-copy{display:grid;gap:6px;min-width:0;max-width:100%}
+  .u5-goal-list-title{display:flex;justify-content:space-between;gap:8px;min-width:0;max-width:100%}
+  .u5-goal-list-title strong{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .u5-goal-list-title em{color:#b7832e;font-style:normal}
   .u5-goal-list-copy small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-dim)}
-  .u5-goal-list-card>b{font-size:12px}
+  .u5-goal-list-card>b{min-width:28px;font-size:12px;text-align:right;justify-self:end;align-self:start}
   .u5-goal-detail{padding:20px !important}
   .u5-goal-detail-hero{display:grid;grid-template-columns:220px minmax(0,1fr);gap:22px;align-items:center;padding-bottom:20px;border-bottom:1px solid var(--border)}
   .u5-goal-detail-image{width:220px;aspect-ratio:4/3;display:grid;place-items:center;border-radius:17px;background:linear-gradient(135deg,var(--green-bg),var(--blue-bg));background-size:cover;background-position:center;font-size:54px}

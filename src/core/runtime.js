@@ -100,7 +100,10 @@ function bindDirectGoalOrdering(root){
         if(!id)return;
         const card=row.closest('.u2-goal-accordion')||row;
         card.dataset.reorderGoal='';card.dataset.goalOwner=rowOwner||owner;card.dataset.goalId=id;
-        if(!card.querySelector(':scope > [data-goal-drag-handle]'))card.insertAdjacentHTML('afterbegin',`<button type="button" class="goal-direct-drag-handle" data-goal-drag-handle aria-label="${attrSafe(row.querySelector('strong')?.textContent||'Spaardoel')} verplaatsen" title="Verslepen om de volgorde te wijzigen"></button>`);
+        if(!card.querySelector(':scope > .goal-direct-order-controls')){
+          const label=attrSafe(row.querySelector('strong')?.textContent||'Spaardoel');
+          card.insertAdjacentHTML('afterbegin',`<span class="goal-direct-order-controls" aria-label="Volgorde aanpassen"><button type="button" class="goal-direct-order-arrow up" data-goal-move="-1" aria-label="${label} omhoog" title="Omhoog"></button><button type="button" class="goal-direct-order-arrow down" data-goal-move="1" aria-label="${label} omlaag" title="Omlaag"></button></span>`);
+        }
       });
     });
   }
@@ -110,74 +113,17 @@ function bindDirectGoalOrdering(root){
     renderActiveTab();
   };
   root.querySelectorAll('[data-reorder-goal]').forEach(card=>{
-    const handle=card.querySelector('[data-goal-drag-handle]');
-    if(!handle)return;
-    handle.draggable=true;
-    handle.addEventListener('keydown',event=>{
-      if(!['ArrowUp','ArrowDown'].includes(event.key))return;
-      event.preventDefault();event.stopPropagation();
-      const owner=card.dataset.goalOwner,id=card.dataset.goalId;
-      const goals=state.spaardoelen?.[owner]||[];
-      const index=goals.findIndex(goal=>goal.id===id);
-      const target=index+(event.key==='ArrowUp'?-1:1);
-      if(index<0||target<0||target>=goals.length)return;
-      move(owner,id,target);
-    });
-    handle.addEventListener('pointerdown',event=>{
-      if(event.pointerType==='mouse')return;
-      if(event.button!==undefined&&event.button!==0)return;
-      event.preventDefault();event.stopPropagation();
-      const owner=card.dataset.goalOwner,id=card.dataset.goalId;
-      const parent=card.parentElement;
-      if(!parent)return;
-      let moved=false;
-      card.classList.add('goal-direct-dragging');
-      const onMove=moveEvent=>{
-        moveEvent.preventDefault();
-        const target=document.elementFromPoint(moveEvent.clientX,moveEvent.clientY)?.closest?.(`[data-reorder-goal][data-goal-owner="${owner}"]`);
-        if(!target||target===card||target.parentElement!==parent)return;
-        const box=target.getBoundingClientRect();
-        parent.insertBefore(card,moveEvent.clientY<box.top+box.height/2?target:target.nextSibling);
-        moved=true;
-      };
-      const finish=()=>{
-        document.removeEventListener('pointermove',onMove);
-        document.removeEventListener('pointerup',finish);
-        document.removeEventListener('pointercancel',cancel);
-        card.classList.remove('goal-direct-dragging');
-        if(!moved)return;
-        const ordered=[...parent.querySelectorAll(`:scope > [data-reorder-goal][data-goal-owner="${owner}"]`)];
-        move(owner,id,ordered.indexOf(card));
-      };
-      const cancel=()=>{moved=false;finish();renderActiveTab();};
-      document.addEventListener('pointermove',onMove,{passive:false});
-      document.addEventListener('pointerup',finish,{once:true});
-      document.addEventListener('pointercancel',cancel,{once:true});
-    });
-    handle.addEventListener('dragstart',event=>{
-      const owner=card.dataset.goalOwner,id=card.dataset.goalId,parent=card.parentElement;
-      if(!parent){event.preventDefault();return;}
-      event.dataTransfer?.setData('text/plain',id);
-      if(event.dataTransfer)event.dataTransfer.effectAllowed='move';
-      let moved=false;
-      card.classList.add('goal-direct-dragging');
-      const onDragOver=dragEvent=>{
-        const target=document.elementFromPoint(dragEvent.clientX,dragEvent.clientY)?.closest?.(`[data-reorder-goal][data-goal-owner="${owner}"]`);
-        if(!target||target===card||target.parentElement!==parent)return;
-        dragEvent.preventDefault();
-        const box=target.getBoundingClientRect();
-        parent.insertBefore(card,dragEvent.clientY<box.top+box.height/2?target:target.nextSibling);
-        moved=true;
-      };
-      const finish=()=>{
-        document.removeEventListener('dragover',onDragOver);
-        card.classList.remove('goal-direct-dragging');
-        if(!moved)return;
-        const ordered=[...parent.querySelectorAll(`:scope > [data-reorder-goal][data-goal-owner="${owner}"]`)];
-        move(owner,id,ordered.indexOf(card));
-      };
-      document.addEventListener('dragover',onDragOver);
-      handle.addEventListener('dragend',finish,{once:true});
+    const owner=card.dataset.goalOwner,id=card.dataset.goalId;
+    const goals=state.spaardoelen?.[owner]||[];
+    const index=goals.findIndex(goal=>goal.id===id);
+    card.querySelectorAll('[data-goal-move]').forEach(button=>{
+      const direction=Number(button.dataset.goalMove)||0;
+      button.disabled=index<0||index+direction<0||index+direction>=goals.length;
+      button.addEventListener('click',event=>{
+        event.preventDefault();event.stopPropagation();
+        if(button.disabled)return;
+        move(owner,id,index+direction);
+      });
     });
   });
 }
@@ -627,6 +573,7 @@ function u3NormalizeRecurringItem(item,kind){
     item.categorie=String(item.categorie||'Overig');
     item.bedrag=round2(Number(item.bedrag)||0);
     item.financialFor=U3_ACCOUNTS.includes(item.financialFor)?item.financialFor:item.rekening;
+    item.distributionMode=['income-ratio','equal'].includes(item.distributionMode)?item.distributionMode:'';
   }
   return item;
 }
@@ -1693,6 +1640,7 @@ function calcScenario(state){
   const inkomenRatioDion = totaalSalaris>0 ? salarisDion/totaalSalaris : 0;
   const inkomenRatioDara = totaalSalaris>0 ? salarisDara/totaalSalaris : 0;
   const s = getMonthlyScenarioData(scenario);
+  const jointFixedRows=[...(s.gezamenlijk.vasteLasten||[]),...(s.gezamenlijk.hypotheek||[])];
   const vasteLastenTotaal = sumEffective(s.gezamenlijk.vasteLasten);
   const variabelBudgetTotaal = sumBedrag(s.gezamenlijk.variabel);
   const variabelTotaal = sumTransactions('gezamenlijk');
@@ -1711,16 +1659,20 @@ function calcScenario(state){
     const minDion = Number(s.verdeling.minimumDion);
     effDion = Math.max(minDion, inkomenRatioDion);
     effDara = 1 - effDion;
-    const pot = vasteLastenTotaal + variabelVoorVerdelingTotaal + spaarpotDezeMaand;
-    zakgeldDion = round2(salarisDion - pot*effDion);
-    zakgeldDara = round2(salarisDara - pot*effDara);
+    const equalFixed=sumEffective(jointFixedRows.filter(row=>row.distributionMode==='equal'));
+    const ratioFixed=sumEffective(jointFixedRows.filter(row=>row.distributionMode!=='equal'));
+    const ratioPot=ratioFixed+variabelVoorVerdelingTotaal+spaarpotDezeMaand;
+    zakgeldDion = round2(salarisDion - equalFixed*.5 - ratioPot*effDion);
+    zakgeldDara = round2(salarisDara - equalFixed*.5 - ratioPot*effDara);
   } else {
     const hypDion = Number(s.verdeling.hypotheekDion);
     const hypDara = 1 - hypDion;
     hypotheekBedrag = sumBedrag(s.gezamenlijk.hypotheek);
-    const overigePot = vasteLastenTotaal + variabelVoorVerdelingTotaal + spaarpotDezeMaand;
-    zakgeldDion = round2(salarisDion - (hypotheekBedrag*hypDion + overigePot*inkomenRatioDion));
-    zakgeldDara = round2(salarisDara - (hypotheekBedrag*hypDara + overigePot*inkomenRatioDara));
+    const equalFixed=sumEffective(jointFixedRows.filter(row=>row.distributionMode==='equal'));
+    const ratioFixed=sumEffective(jointFixedRows.filter(row=>row.distributionMode!=='equal'));
+    const ratioPot=ratioFixed+variabelVoorVerdelingTotaal+spaarpotDezeMaand;
+    zakgeldDion = round2(salarisDion - equalFixed*.5 - ratioPot*inkomenRatioDion);
+    zakgeldDara = round2(salarisDara - equalFixed*.5 - ratioPot*inkomenRatioDara);
     effDion = hypDion; effDara = hypDara;
   }
   function persoonlijk(p, zakgeld){
@@ -6097,7 +6049,7 @@ function u2RenderGoalRow(item,owner){
   const target=u2GoalTarget(goal),saved=u2GoalSaved(goal),progress=target>0?Math.min(100,Math.round(saved/target*100)):0;
   const image=safeImageUrl(goalImageSource(goal));
   return `<article class="card u2-goal-card" data-reorder-goal data-goal-owner="${owner}" data-goal-id="${textSafe(goal.id)}">
-    <button type="button" class="goal-direct-drag-handle" data-goal-drag-handle aria-label="${textSafe(goal.naam||'Spaardoel')} verplaatsen" title="Verslepen om de volgorde te wijzigen"></button>
+    <span class="goal-direct-order-controls" aria-label="Volgorde aanpassen"><button type="button" class="goal-direct-order-arrow up" data-goal-move="-1" aria-label="${textSafe(goal.naam||'Spaardoel')} omhoog" title="Omhoog"></button><button type="button" class="goal-direct-order-arrow down" data-goal-move="1" aria-label="${textSafe(goal.naam||'Spaardoel')} omlaag" title="Omlaag"></button></span>
     <button class="u2-goal-main" type="button" data-open-goal-editor="${owner}:${textSafe(goal.id)}">
       <span class="u2-goal-image${image?' has-image':''}"${image?` style="background-image:url('${image}')"`:''}>${image?'':goalIcon(goal)}</span>
       <span class="u2-goal-copy"><span class="u2-goal-title"><strong>${textSafe(goal.naam||'Spaardoel')}</strong><em class="u2-status ${item.status.key}">${item.status.label}</em></span><span>${eur(saved)} van ${eur(target)}</span><span class="progress-track"><span class="progress-fill" style="width:${progress}%"></span></span>${u2RenderChildSummary(goal)}</span>
@@ -6800,8 +6752,13 @@ function u3RecurringRows(kind){
 }
 function u3FixedDistributionLabel(item,financialFor=item?.financialFor||item?.rekening||'gezamenlijk'){
   if(financialFor!=='gezamenlijk')return `Persoonlijk · ${u3AccountLabel(financialFor)}`;
-  if(state.meta.scenario==='na'&&item?.legacyKind==='hypotheek')return '50/50';
+  if(u3FixedDistributionMode(item,financialFor)==='equal')return '50/50';
   return state.meta.scenario==='voor'?'Naar rato · Dion minimaal 40%':'Naar rato';
+}
+function u3FixedDistributionMode(item,financialFor=item?.financialFor||item?.rekening||'gezamenlijk'){
+  if(financialFor!=='gezamenlijk')return 'personal';
+  if(['income-ratio','equal'].includes(item?.distributionMode))return item.distributionMode;
+  return state.meta.scenario==='na'&&item?.legacyKind==='hypotheek'?'equal':'income-ratio';
 }
 function u3OpenPlanning(owner=''){
   const planningOwner=U3_ACCOUNTS.includes(owner)?owner:'';
@@ -6836,13 +6793,22 @@ function u3OpenRecurringEditor(kind,id='',defaults={}){
       <label>Frequentie<select id="u3RecUnit">${U3_FREQUENCY_UNITS.map(value=>`<option value="${value}" ${existing?.frequentieEenheid===value?'selected':''}>${value}</option>`).join('')}</select></label>
       <label>Begindatum<input id="u3RecStart" type="date" value="${textSafe(existing?.begindatum||`${current}-01`)}"></label>
       <label>Einddatum<input id="u3RecEnd" type="date" value="${textSafe(existing?.einddatum||'')}"></label>
-      ${income?'':`<label>Afschrijfdatum<input id="u3RecDebitDate" type="date" value="${textSafe(existing?.afschrijfdatum||'')}"></label><div class="u3-fixed-distribution-info"><span>Verdeling</span><strong id="u3RecDistributionLabel">${textSafe(u3FixedDistributionLabel(existing||{},existing?.financialFor||defaultOwner))}</strong><small>Deze keuze volgt automatisch uit het scenario en de eigenaar.</small></div>`}
+      ${income?'':`<label>Afschrijfdatum<input id="u3RecDebitDate" type="date" value="${textSafe(existing?.afschrijfdatum||'')}"></label><label id="u3RecDistributionField">Verdeling<select id="u3RecDistribution"><option value="income-ratio" ${u3FixedDistributionMode(existing||{},existing?.financialFor||defaultOwner)==='income-ratio'?'selected':''}>${state.meta.scenario==='voor'?'Naar rato · Dion minimaal 40%':'Naar rato van inkomen'}</option><option value="equal" ${u3FixedDistributionMode(existing||{},existing?.financialFor||defaultOwner)==='equal'?'selected':''}>50/50</option></select><small id="u3RecDistributionHint">Kies hoe Dion en Dara deze gezamenlijke vaste last verdelen.</small></label>`}
       <label>Bedrag wijzigen<select id="u3RecScope"><option value="from">Vanaf ${monthLabel(current)}</option><option value="once">Alleen ${monthLabel(current)}</option></select></label>
       <label class="u2-checkbox"><input id="u3RecActive" type="checkbox" ${existing?.actief!==false?'checked':''}> Actief</label>
     </div>
     <div class="modal-actions">${existing?'<button class="danger-ghost" id="u3RecDelete">Stoppen</button>':''}<button class="ghost" data-u3-back-planning>Terug</button><button class="primary" id="u3RecSave">Opslaan</button></div>`);
   modal.querySelector('[data-u3-back-planning]')?.addEventListener('click',()=>u3OpenPlanning(planningOwner));
-  modal.querySelector('#u3RecFor')?.addEventListener('change',event=>{const label=modal.querySelector('#u3RecDistributionLabel');if(label)label.textContent=u3FixedDistributionLabel(existing||{},event.target.value);});
+  const updateDistributionField=()=>{
+    const financialFor=modal.querySelector('#u3RecFor')?.value||defaultOwner;
+    const select=modal.querySelector('#u3RecDistribution');
+    const hint=modal.querySelector('#u3RecDistributionHint');
+    if(!select)return;
+    select.disabled=financialFor!=='gezamenlijk';
+    if(hint)hint.textContent=financialFor==='gezamenlijk'?'Kies hoe Dion en Dara deze gezamenlijke vaste last verdelen.':`Deze vaste last is volledig persoonlijk voor ${u3AccountLabel(financialFor)}.`;
+  };
+  modal.querySelector('#u3RecFor')?.addEventListener('change',updateDistributionField);
+  updateDistributionField();
   modal.querySelector('#u3RecDelete')?.addEventListener('click',()=>{
     try{u3AssertMonthOpen();commitChange(()=>{existing.actief=false;existing.einddatum=existing.einddatum||u3IsoDate(new Date(`${current}-01T12:00:00`));},{render:false});u3OpenPlanning(planningOwner);}catch(error){alert(error.message);}
   });
@@ -6858,7 +6824,7 @@ function u3OpenRecurringEditor(kind,id='',defaults={}){
         item.frequentieAantal=Math.max(1,Math.floor(Number(modal.querySelector('#u3RecFrequency').value)||1));item.frequentieEenheid=modal.querySelector('#u3RecUnit').value;
         item.begindatum=modal.querySelector('#u3RecStart').value||`${current}-01`;item.einddatum=modal.querySelector('#u3RecEnd').value;item.actief=modal.querySelector('#u3RecActive').checked;
         if(income){item.type=modal.querySelector('#u3RecCategory').value;item.eigenaar=modal.querySelector('#u3RecOwner').value;item.meetellenVoorVerdeling=modal.querySelector('#u3RecDistribution').checked;item.verwachtBedrag=amount;}
-        else{item.categorie=modal.querySelector('#u3RecCategory').value.trim()||'Overig';item.bedrag=amount;item.afschrijfdatum=modal.querySelector('#u3RecDebitDate').value;}
+        else{item.categorie=modal.querySelector('#u3RecCategory').value.trim()||'Overig';item.bedrag=amount;item.afschrijfdatum=modal.querySelector('#u3RecDebitDate').value;item.distributionMode=modal.querySelector('#u3RecDistribution').value;}
         item.amountHistory=Array.isArray(item.amountHistory)?item.amountHistory:[];item.monthOverrides=isPlainObject(item.monthOverrides)?item.monthOverrides:{};
         if(modal.querySelector('#u3RecScope').value==='once')item.monthOverrides[current]=amount;
         else{delete item.monthOverrides[current];item.amountHistory=item.amountHistory.filter(row=>String(row.effectiveFrom).slice(0,7)!==current);item.amountHistory.push({id:`amount-${item.id}-${current}`,effectiveFrom:`${current}-01`,amount});}
@@ -6973,8 +6939,8 @@ getMonthlyScenarioData=function(scenario=state.meta.scenario){
   U3_ACCOUNTS.forEach(account=>{
     const planned=u3FixedOccurrences(month,scenario).filter(row=>row.financialFor===account);
     result[account]=result[account]||{};
-    result[account].vasteLasten=planned.filter(row=>row.source.legacyKind!=='hypotheek').map(row=>({id:row.id,categorie:row.categorie,post:row.naam,bedrag:row.amount,u3OccurrenceId:row.id}));
-    if(account==='gezamenlijk')result[account].hypotheek=planned.filter(row=>row.source.legacyKind==='hypotheek').map(row=>({id:row.id,categorie:row.categorie,post:row.naam,bedrag:row.amount,u3OccurrenceId:row.id}));
+    result[account].vasteLasten=planned.filter(row=>row.source.legacyKind!=='hypotheek').map(row=>({id:row.id,categorie:row.categorie,post:row.naam,bedrag:row.amount,u3OccurrenceId:row.id,distributionMode:u3FixedDistributionMode(row.source,account)}));
+    if(account==='gezamenlijk')result[account].hypotheek=planned.filter(row=>row.source.legacyKind==='hypotheek').map(row=>({id:row.id,categorie:row.categorie,post:row.naam,bedrag:row.amount,u3OccurrenceId:row.id,distributionMode:u3FixedDistributionMode(row.source,account)}));
   });
   return result;
 };
@@ -7002,6 +6968,7 @@ window.FinizeUpdate3=Object.freeze({
   expectedIncome:(month,financialFor)=>u3ExpectedIncome(month,financialFor),
   actualIncome:(month,financialFor)=>u3ActualIncome(month,financialFor),
   actualExpenses:(month,financialFor)=>u3ActualExpenses(month,financialFor),
+  scenarioResult:()=>clone(calcScenario(state)),
   reserveDelta:(owner,month,scenario)=>u3ReserveDelta(owner,month,scenario),
   reserveBalance:(owner,throughMonth)=>u3ReserveBalance(owner,throughMonth),
   netAdvances:month=>u3NetAdvances(month),

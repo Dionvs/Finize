@@ -182,7 +182,7 @@ test('subdoelen zijn rechtstreeks in de spaardoelentabel uitklapbaar en bewerkba
   expect(await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
 });
 
-test('vaste lasten tonen hun verdeling en bewaren een administratieve afschrijfdatum',async({page})=>{
+test('vaste lasten laten hun verdeling aanpassen en bewaren een administratieve afschrijfdatum',async({page})=>{
   await page.setViewportSize({width:1280,height:900});
   await page.goto('/');
   await page.evaluate(()=>{
@@ -198,17 +198,31 @@ test('vaste lasten tonen hun verdeling en bewaren een administratieve afschrijfd
   const planning=page.getByRole('dialog');
   const row=planning.locator('.u3-admin-row').filter({hasText:'Administratieve last'});
   await expect(row).toContainText('Naar rato · Dion minimaal 40%');
+  const ratioResult=await page.evaluate(()=>({zakgeld:FinizeUpdate3.scenarioResult().dion.zakgeld,ratio:FinizeUpdate3.scenarioResult().effDion}));
   await row.getByRole('button',{name:'Bewerken'}).click();
   const editor=page.getByRole('dialog');
-  await expect(editor.locator('#u3RecDistributionLabel')).toHaveText('Naar rato · Dion minimaal 40%');
+  await expect(editor.locator('#u3RecDistribution')).toHaveValue('income-ratio');
+  await editor.locator('#u3RecDistribution').selectOption('equal');
   await editor.locator('#u3RecDebitDate').fill('2026-08-24');
   await editor.getByRole('button',{name:'Opslaan'}).click();
   await expect.poll(()=>page.evaluate(()=>state.recurringFixedExpenses.voor.find(item=>item.id==='admin-fixed-date')?.afschrijfdatum)).toBe('2026-08-24');
+  await expect.poll(()=>page.evaluate(()=>state.recurringFixedExpenses.voor.find(item=>item.id==='admin-fixed-date')?.distributionMode)).toBe('equal');
+  const equalZakgeld=await page.evaluate(()=>FinizeUpdate3.scenarioResult().dion.zakgeld);
+  const expectedEqual=Math.round((ratioResult.zakgeld+73.45*(ratioResult.ratio-.5))*100)/100;
+  expect(Math.abs(equalZakgeld-expectedEqual)).toBeLessThanOrEqual(.011);
   expect(await page.evaluate(()=>state.recurringFixedExpenses.voor.find(item=>item.id==='admin-fixed-date')?.bedrag)).toBe(73.45);
   const savedRow=page.getByRole('dialog').locator('.u3-admin-row').filter({hasText:'Administratieve last'});
   await expect(savedRow).toContainText('afschrijving 24-08-2026');
+  await expect(savedRow).toContainText('50/50');
+
+  await page.setViewportSize({width:390,height:844});
+  await savedRow.getByRole('button',{name:'Bewerken'}).click();
+  await expect(page.getByRole('dialog').locator('#u3RecDistribution')).toBeVisible();
+  await expect(page.getByRole('dialog').locator('#u3RecDistribution')).toHaveValue('equal');
+  await page.getByRole('dialog').getByRole('button',{name:'Terug'}).click();
 
   await page.getByRole('dialog').getByRole('button',{name:'Sluiten'}).click();
+  await page.setViewportSize({width:1280,height:900});
   await page.evaluate(()=>{
     state.meta.scenario='na';
     state.recurringFixedExpenses.na.push({id:'admin-mortgage',naam:'Hypotheek test',categorie:'Huis',bedrag:1000,rekening:'gezamenlijk',financialFor:'gezamenlijk',frequentieAantal:1,frequentieEenheid:'maanden',begindatum:'2026-01-01',einddatum:'',actief:true,amountHistory:[{id:'amount-admin-mortgage',effectiveFrom:'2026-01-01',amount:1000}],monthOverrides:{},recognition:{},legacyKind:'hypotheek'});
@@ -231,25 +245,34 @@ test('spaardoelkaarten wijzigen direct van volgorde zonder beheerpop-up',async({
   const ownerSection=page.locator('.mobile-goal-section').filter({has:page.getByRole('heading',{name:'Dion',exact:true})});
   await expect(ownerSection.locator('[data-reorder-goal]')).toHaveCount(2);
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await ownerSection.getByRole('button',{name:'Tweede doel verplaatsen'}).focus();
-  await page.keyboard.press('ArrowUp');
+  await expect(ownerSection.getByRole('button',{name:'Eerste doel omhoog'})).toBeDisabled();
+  await expect(ownerSection.getByRole('button',{name:'Tweede doel omlaag'})).toBeDisabled();
+  const arrowBoxes=await ownerSection.locator('.goal-direct-order-arrow').evaluateAll(buttons=>buttons.map(button=>({width:button.getBoundingClientRect().width,height:button.getBoundingClientRect().height})));
+  arrowBoxes.forEach(box=>{expect(box.width).toBeLessThanOrEqual(24);expect(box.height).toBeLessThanOrEqual(22);});
+  await ownerSection.getByRole('button',{name:'Tweede doel omhoog'}).click();
   await expect.poll(()=>page.evaluate(()=>state.spaardoelen.dion.map(goal=>goal.id).join(','))).toBe('direct-b,direct-a');
-  const firstHandle=ownerSection.getByRole('button',{name:'Eerste doel verplaatsen'});
-  const secondHandle=ownerSection.getByRole('button',{name:'Tweede doel verplaatsen'});
-  await firstHandle.dragTo(secondHandle,{targetPosition:{x:4,y:2}});
+  await ownerSection.getByRole('button',{name:'Tweede doel omlaag'}).click();
   await expect.poll(()=>page.evaluate(()=>state.spaardoelen.dion.map(goal=>goal.id).join(','))).toBe('direct-a,direct-b');
-  const touchFrom=ownerSection.getByRole('button',{name:'Tweede doel verplaatsen'});
-  const touchTo=ownerSection.getByRole('button',{name:'Eerste doel verplaatsen'});
-  const [touchFromBox,touchToBox]=await Promise.all([touchFrom.boundingBox(),touchTo.boundingBox()]);
-  await touchFrom.dispatchEvent('pointerdown',{pointerType:'touch',pointerId:7,button:0,clientX:touchFromBox.x+4,clientY:touchFromBox.y+4});
-  await page.evaluate(({x,y})=>document.dispatchEvent(new PointerEvent('pointermove',{bubbles:true,pointerType:'touch',pointerId:7,clientX:x,clientY:y})),{x:touchToBox.x+4,y:touchToBox.y+2});
-  await page.evaluate(({x,y})=>document.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,pointerType:'touch',pointerId:7,clientX:x,clientY:y})),{x:touchToBox.x+4,y:touchToBox.y+2});
-  await expect.poll(()=>page.evaluate(()=>state.spaardoelen.dion.map(goal=>goal.id).join(','))).toBe('direct-b,direct-a');
   await ownerSection.getByRole('button',{name:'+ Spaardoel'}).click();
   await expect(page.getByRole('heading',{name:'Spaardoel bewerken'})).toBeVisible();
   await expect(page.getByRole('heading',{name:'Spaardoelen beheren'})).toHaveCount(0);
   await expect.poll(()=>page.evaluate(()=>state.spaardoelen.dion.length)).toBe(3);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+  await page.getByRole('button',{name:'Sluiten'}).click();
+
+  await page.setViewportSize({width:768,height:900});
+  await page.evaluate(()=>{state.spaardoelen.dion[0].naam='olympische spelen 2032 met een extra lange naam';renderActiveTab();});
+  const desktopCard=page.locator('.u5-goal-list-card').filter({hasText:'olympische spelen 2032'});
+  await expect(desktopCard).toBeVisible();
+  const fit=await desktopCard.evaluate(card=>{
+    const title=card.querySelector('.u5-goal-list-title strong').getBoundingClientRect();
+    const percent=card.querySelector(':scope > b').getBoundingClientRect();
+    const bounds=card.getBoundingClientRect();
+    return {overflow:card.scrollWidth-card.clientWidth,titleRight:title.right,percentLeft:percent.left,percentRight:percent.right,boundsRight:bounds.right};
+  });
+  expect(fit.overflow).toBeLessThanOrEqual(1);
+  expect(fit.titleRight).toBeLessThanOrEqual(fit.percentLeft);
+  expect(fit.percentRight).toBeLessThanOrEqual(fit.boundsRight);
 });
 
 test('budgetten openen op desktop transacties en zijn op mobiel bewerkbaar', async ({ page }) => {

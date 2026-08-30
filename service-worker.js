@@ -1,4 +1,4 @@
-const CACHE_NAME = "finize-v91-update6-auth-start";
+const CACHE_NAME = "finize-v92-goal-order-fixed-distribution";
 const CACHE_PREFIX = "finize-";
 
 const CRITICAL_SHELL = [

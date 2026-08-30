@@ -17,6 +17,7 @@
 .u3-admin-row small{color:var(--text-dim)}
 .u3-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
 .u3-grid label{display:grid;gap:5px;font-size:10px;color:var(--text-dim);font-weight:750}
+.u3-grid label small{font-size:9px;font-weight:500;line-height:1.35;color:var(--text-dim)}
 .u3-grid .full{grid-column:1/-1}
 .u3-fixed-distribution-info{grid-column:1/-1;display:grid;grid-template-columns:auto 1fr;align-items:center;gap:3px 9px;padding:9px 11px;border:1px solid var(--border);border-radius:12px;background:var(--surface-2)}
 .u3-fixed-distribution-info span{font-size:10px;color:var(--text-dim);font-weight:750}
