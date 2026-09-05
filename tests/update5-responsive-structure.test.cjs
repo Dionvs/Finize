@@ -12,7 +12,7 @@ const sw = fs.readFileSync(path.join(root, 'service-worker.js'), 'utf8');
 
 assert.match(markup, /app\.css/);
 assert.match(markup, /app\.js/);
-assert.match(sw, /finize-v91-update6-auth-start/);
+assert.match(sw, /finize-v93-responsive-function-parity/);
 assert.match(js, /const dashboardTotalIncome = r\.totaalSalaris;/);
 assert.match(sw, /\.\/app\.css/);
 assert.match(sw, /\.\/app\.js/);
@@ -31,6 +31,9 @@ assert.match(html, /data-income-edit="dion" data-income-label="Dion" aria-label=
 assert.match(html, /data-income-edit="dara" data-income-label="Dara" aria-label="Inkomen van Dara aanpassen"/);
 assert.match(html, /data-u3-open="planning" data-u3-planning-owner="\$\{(?:owner|opts\.openFixedOwner)\}" aria-label="Vaste lasten van/);
 assert.match(html, /function u3OpenPlanning\(owner=''\)/);
+assert.doesNotMatch(js, /data-open-owner-fixed/);
+assert.match(js, /if\(field\)field\.hidden=!isJoint/);
+assert.match(js, /else delete item\.distributionMode/);
 assert.match(html, /function openTotalIncomeEditModal\(\)/);
 assert.match(html, /Werkelijk inkomen aanpassen/);
 assert.match(html, /u5-fixed-costs-overview/);

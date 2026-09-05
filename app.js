@@ -1877,7 +1877,7 @@
     const buttonRules = [
       ["[data-open-joint-transaction], [data-open-personal-transaction]", "plus"],
       ["[data-addrow], [data-addrefund], [data-addgoal], [data-add-subgoal], [data-add-account]", "plus"],
-      ["[data-open-owner-fixed], [data-open-owner-variable], .joint-fixed-edit-btn, .joint-variable-edit-btn", "edit"],
+      ['[data-u3-open="planning"], [data-open-owner-variable], .joint-fixed-edit-btn, .joint-variable-edit-btn', "edit"],
       ["[data-remove], [data-remove-transaction], .danger-ghost", "trash"],
       ["#btnExport, [data-export]", "download"],
       ["#btnImport, [data-import]", "upload"],
@@ -1994,7 +1994,7 @@
   }
   function renderJointFixedCostsCardHead(owner = "gezamenlijk", options = {}) {
     const name = ownerLabel(owner);
-    const editAction = options.planning ? `data-u3-open="planning" data-u3-planning-owner="${owner}" aria-label="Vaste lasten van ${textSafe(name)} wijzigen"` : `data-open-owner-fixed="${owner}" aria-label="Vaste lasten aanpassen"`;
+    const editAction = `data-u3-open="planning" data-u3-planning-owner="${owner}" aria-label="Vaste lasten van ${textSafe(name)} wijzigen"`;
     return `<div class="card-head joint-fixed-card-head">
     <div class="card-head-title">${iconBadge(dashboardSectionIconName("Vaste lasten verdeling"), "green", "card-head-icon")}<h2>${owner === "gezamenlijk" ? "Vaste lasten verdeling" : `${name} vaste lasten`}</h2><button type="button" class="joint-fixed-edit-btn" ${editAction}>${iconSvg("receipt")}</button></div>
   </div>`;
@@ -6630,11 +6630,6 @@ service cloud.firestore {
     root2.querySelectorAll("[data-personal-saving-edit]").forEach((btn) => {
       btn.addEventListener("click", () => openPersonalSavingEditModal(btn.dataset.personalSavingEdit));
     });
-    root2.querySelectorAll("[data-open-owner-fixed]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        openJointFixedCostsModal(false, btn.dataset.openOwnerFixed);
-      });
-    });
     root2.querySelectorAll("[data-open-owner-variable]").forEach((btn) => {
       btn.addEventListener("click", () => {
         openJointVariableCostsModal(false, btn.dataset.openOwnerVariable);
@@ -8041,11 +8036,14 @@ service cloud.firestore {
     const updateDistributionField = () => {
       var _a3;
       const financialFor = ((_a3 = modal.querySelector("#u3RecFor")) == null ? void 0 : _a3.value) || defaultOwner;
+      const field = modal.querySelector("#u3RecDistributionField");
       const select = modal.querySelector("#u3RecDistribution");
       const hint = modal.querySelector("#u3RecDistributionHint");
       if (!select) return;
-      select.disabled = financialFor !== "gezamenlijk";
-      if (hint) hint.textContent = financialFor === "gezamenlijk" ? "Kies hoe Dion en Dara deze gezamenlijke vaste last verdelen." : `Deze vaste last is volledig persoonlijk voor ${u3AccountLabel(financialFor)}.`;
+      const isJoint = financialFor === "gezamenlijk";
+      if (field) field.hidden = !isJoint;
+      select.disabled = !isJoint;
+      if (hint) hint.textContent = "Kies hoe Dion en Dara deze gezamenlijke vaste last verdelen.";
     };
     (_b = modal.querySelector("#u3RecFor")) == null ? void 0 : _b.addEventListener("change", updateDistributionField);
     updateDistributionField();
@@ -8086,7 +8084,8 @@ service cloud.firestore {
             item.categorie = modal.querySelector("#u3RecCategory").value.trim() || "Overig";
             item.bedrag = amount;
             item.afschrijfdatum = modal.querySelector("#u3RecDebitDate").value;
-            item.distributionMode = modal.querySelector("#u3RecDistribution").value;
+            if (item.financialFor === "gezamenlijk") item.distributionMode = modal.querySelector("#u3RecDistribution").value;
+            else delete item.distributionMode;
           }
           item.amountHistory = Array.isArray(item.amountHistory) ? item.amountHistory : [];
           item.monthOverrides = isPlainObject2(item.monthOverrides) ? item.monthOverrides : {};

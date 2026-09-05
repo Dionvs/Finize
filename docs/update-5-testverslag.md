@@ -2,6 +2,8 @@
 
 Datum: 24 juli 2026
 
+Laatste functiepariteitscontrole: 5 september 2026
+
 ## Automatische controles
 
 De volledige set Update 2-, 3-, 4- en 5-tests is uitgevoerd. De Update 5-dekking controleert onder meer:
@@ -60,3 +62,14 @@ Op de Gezamenlijk-pagina is daarnaast gemeten dat de verticale hoofdblokafstand 
 - `max-width:640px`: uitsluitend generieke niet-V4-onderdelen en gedeelde tabellen/hulpelementen.
 - `max-width:374px`: alleen editor- en navigatiefit; geen verkleining van dashboard-KPI-typografie en geen wijziging naar minder dan vier KPI-kolommen.
 - Er zijn geen browserfallbacks met dubbele selector/property/media-combinaties nodig.
+
+## Functiepariteit vaste lasten
+
+- Op 390 px is een gezamenlijke vaste last van rato naar 50/50 gewijzigd en op 768, 1024 en 1280 px vanuit dezelfde canonieke state teruggelezen.
+- Dezelfde last is op desktop teruggezet naar rato en daarna mobiel gecontroleerd, inclusief Dions bestaande minimumaandeel van 40% vóór verkoop.
+- Het scenario Na verkoop is afzonderlijk met 50/50 gevalideerd.
+- Toevoegen, een eenmalige maanduitzondering, afschrijfdatum en stoppen zijn via de mobiele gedeelde editor getest; de legacy vaste-lastenarray bleef bytegelijk.
+- Persoonlijke vaste lasten tonen geen verdelingskeuze. De gezamenlijke keuze wordt uitsluitend als `distributionMode` op het canonieke terugkerende-lastobject opgeslagen.
+- Conflictherstel bewaart gelijktijdig `distributionMode`, bedragshistorie en externe maanduitzonderingen.
+- De editor en pagina hebben geen horizontale overflow op 360 px. De bestaande responsive baselines slagen daarnaast op 390, 768, 1024 en 1280 px.
+- Resultaat: 33 Node-tests en 66 browsertests geslaagd; syntax-, CSS-, service-worker- en reproduceerbare-buildcontroles zijn eveneens geslaagd.

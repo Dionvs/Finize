@@ -62,4 +62,12 @@ De consolidatie veranderde geen financiële functies, state, opslag, schema’s,
 - De desktop-spaardoelenpreview biedt zes pixels extra onderruimte, toont drie doelen volledig en blijft bij extra doelen scrollbaar.
 - De Gezamenlijk-pagina gebruikt tussen de primaire KPI’s, beide dashboardrijen en de beheerblokken dezelfde verticale tussenruimte van 16 px als binnen de kaartgrids.
 - De spaardoelenpreview in de smalle desktopkolom toont doelen onder elkaar, zodat inhoud en acties niet meer worden ingeklemd; tablet behoudt de brede gedeelde layout.
-- De service-worker-cache is verhoogd naar `finize-v24-update5-annotations`; Update 5-assets gebruiken versiequery `v=24`.
+- De service-worker-cache gebruikt na de functiepariteitsronde `finize-v93-responsive-function-parity`; de gegenereerde assets gebruiken dezelfde versiequery.
+
+## Functiepariteit vaste lasten — 5 september 2026
+
+- Mobiel, tablet en desktop openen voortaan dezelfde bestaande planning- en terugkerende-lasteneditor.
+- `state.recurringFixedExpenses[scenario]` is daarmee op iedere schermgrootte de enige bewerkbare bron voor vaste lasten; de legacy vaste-lastenarrays blijven alleen voor migratie en compatibiliteit aanwezig.
+- Gezamenlijke vaste lasten bieden overal dezelfde keuze tussen 50/50 en naar rato. Dions bestaande minimumaandeel vóór verkoop is ongewijzigd.
+- Persoonlijke vaste lasten gebruiken dezelfde velden en opslag, maar verbergen de niet-toepasselijke verdelingskeuze.
+- De bestaande bedragshistorie, maanduitzonderingen, afschrijfdatum, actiefstatus en cloudsynchronisatie zijn behouden. Er is geen nieuwe financiële of navigatiestate toegevoegd.

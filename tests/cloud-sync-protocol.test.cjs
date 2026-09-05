@@ -39,6 +39,18 @@ const { pathToFileURL } = require('node:url');
   assert.equal(rebased.incomeDefaultsHistory.dara[0].salary,3250,'onaangeraakte waarden blijven uit de cloud komen');
   assert.equal(rebased.voorkeur.thema,'donker','een gelijktijdige wijziging op een ander cloudveld blijft behouden');
 
+  const fixedBase = {
+    recurringFixedExpenses:{voor:[{id:'huur',distributionMode:'income-ratio',amountHistory:[{id:'huur-2026',effectiveFrom:'2026-01-01',amount:900}],monthOverrides:{}}]}
+  };
+  const fixedLocal = structuredClone(fixedBase);
+  fixedLocal.recurringFixedExpenses.voor[0].distributionMode='equal';
+  const fixedRemote = structuredClone(fixedBase);
+  fixedRemote.recurringFixedExpenses.voor[0].monthOverrides['2026-09']=925;
+  const fixedRebased = protocol.rebaseLocalChanges(fixedBase,fixedLocal,fixedRemote);
+  assert.equal(fixedRebased.recurringFixedExpenses.voor[0].distributionMode,'equal','de mobiele verdelingskeuze blijft bij conflictherstel behouden');
+  assert.equal(fixedRebased.recurringFixedExpenses.voor[0].monthOverrides['2026-09'],925,'een gelijktijdige maanduitzondering uit de cloud blijft behouden');
+  assert.deepEqual(fixedRebased.recurringFixedExpenses.voor[0].amountHistory,fixedBase.recurringFixedExpenses.voor[0].amountHistory,'bedragshistorie blijft intact');
+
   const inconsistentIncome = {
     incomeDefaultsHistory:{dion:[{effectiveFrom:'2026-08',salary:2020}],dara:[]},
     monthlyIncome:{'2026-08':{dion:2020}},

@@ -1,11 +1,11 @@
-const CACHE_NAME = "finize-v92-goal-order-fixed-distribution";
+const CACHE_NAME = "finize-v93-responsive-function-parity";
 const CACHE_PREFIX = "finize-";
 
 const CRITICAL_SHELL = [
   "./",
   "./index.html",
-  "./app.js?v=91-update6-auth-start",
-  "./app.css?v=91-update6-auth-start",
+  "./app.js?v=93-responsive-function-parity",
+  "./app.css?v=93-responsive-function-parity",
   "./manifest.json"
 ];
 

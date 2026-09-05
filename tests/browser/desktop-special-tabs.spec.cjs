@@ -182,6 +182,124 @@ test('subdoelen zijn rechtstreeks in de spaardoelentabel uitklapbaar en bewerkba
   expect(await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
 });
 
+test('mobiel en desktop beheren vaste lasten via dezelfde canonieke editor',async({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  await page.goto('/');
+  const legacyBefore=await page.evaluate(()=>{
+    state.meta.scenario='voor';
+    state.recurringFixedExpenses.voor.push({
+      id:'parity-joint',naam:'Pariteit gezamenlijke last',categorie:'Wonen',bedrag:80,rekening:'gezamenlijk',financialFor:'gezamenlijk',
+      frequentieAantal:1,frequentieEenheid:'maanden',begindatum:'2026-01-01',einddatum:'',afschrijfdatum:'',actief:true,
+      distributionMode:'income-ratio',amountHistory:[{id:'amount-parity-joint',effectiveFrom:'2026-01-01',amount:80}],monthOverrides:{},recognition:{}
+    });
+    state.recurringFixedExpenses.voor.push({
+      id:'parity-personal',naam:'Pariteit persoonlijk',categorie:'Overig',bedrag:25,rekening:'dion',financialFor:'dion',
+      frequentieAantal:1,frequentieEenheid:'maanden',begindatum:'2026-01-01',einddatum:'',afschrijfdatum:'',actief:true,
+      distributionMode:'equal',amountHistory:[{id:'amount-parity-personal',effectiveFrom:'2026-01-01',amount:25}],monthOverrides:{},recognition:{}
+    });
+    renderActiveTab();
+    return JSON.stringify(state.voor.gezamenlijk.vasteLasten);
+  });
+
+  await page.locator('.v4-bottom-nav [data-tab="gezamenlijk"]').click();
+  await expect(page.locator('#tab-gezamenlijk [data-open-owner-fixed]')).toHaveCount(0);
+  const mobileFixed=page.locator('#tab-gezamenlijk [data-u3-planning-owner="gezamenlijk"]');
+  await expect(mobileFixed).toBeVisible();
+  await mobileFixed.click();
+  const planning=page.getByRole('dialog');
+  await expect(planning.getByRole('heading',{name:'Gezamenlijk vaste lasten'})).toBeVisible();
+  await planning.locator('.u3-admin-row').filter({hasText:'Pariteit gezamenlijke last'}).getByRole('button',{name:'Bewerken'}).click();
+  const editor=page.getByRole('dialog');
+  await expect(editor.locator('#u3RecDistributionField')).toBeVisible();
+  await editor.locator('#u3RecDistribution').selectOption('equal');
+  await editor.locator('#u3RecDebitDate').fill('2026-09-05');
+  await editor.getByRole('button',{name:'Opslaan'}).click();
+  await expect.poll(()=>page.evaluate(()=>state.recurringFixedExpenses.voor.find(item=>item.id==='parity-joint')?.distributionMode)).toBe('equal');
+  await expect.poll(()=>page.evaluate(()=>state.recurringFixedExpenses.voor.find(item=>item.id==='parity-joint')?.afschrijfdatum)).toBe('2026-09-05');
+  expect(await page.evaluate(()=>JSON.stringify(state.voor.gezamenlijk.vasteLasten))).toBe(legacyBefore);
+  await expect(page.getByRole('dialog').locator('.u3-admin-row').filter({hasText:'Pariteit gezamenlijke last'})).toContainText('50/50');
+  await page.getByRole('dialog').getByRole('button',{name:'Sluiten'}).click();
+
+  for(const width of [768,1024,1280]){
+    await page.setViewportSize({width,height:900});
+    await page.evaluate(()=>renderActiveTab());
+    await expect(page.locator('#tab-gezamenlijk [data-u3-planning-owner="gezamenlijk"]').first()).toBeVisible();
+  }
+  await page.locator('#tab-gezamenlijk [data-u3-planning-owner="gezamenlijk"]').first().click();
+  const desktopRow=page.getByRole('dialog').locator('.u3-admin-row').filter({hasText:'Pariteit gezamenlijke last'});
+  await expect(desktopRow).toContainText('50/50');
+  await desktopRow.getByRole('button',{name:'Bewerken'}).click();
+  await page.getByRole('dialog').locator('#u3RecDistribution').selectOption('income-ratio');
+  await page.getByRole('dialog').getByRole('button',{name:'Opslaan'}).click();
+  await expect.poll(()=>page.evaluate(()=>state.recurringFixedExpenses.voor.find(item=>item.id==='parity-joint')?.distributionMode)).toBe('income-ratio');
+  await page.getByRole('dialog').getByRole('button',{name:'Sluiten'}).click();
+
+  await page.setViewportSize({width:390,height:844});
+  await page.evaluate(()=>renderActiveTab());
+  await page.locator('#tab-gezamenlijk [data-u3-planning-owner="gezamenlijk"]').click();
+  await expect(page.getByRole('dialog').locator('.u3-admin-row').filter({hasText:'Pariteit gezamenlijke last'})).toContainText('Naar rato · Dion minimaal 40%');
+  await page.getByRole('dialog').getByRole('button',{name:'Sluiten'}).click();
+
+  await page.locator('.v4-bottom-nav [data-tab="dion"]').click();
+  await page.locator('#tab-dion [data-u3-planning-owner="dion"]').click();
+  await page.getByRole('dialog').locator('.u3-admin-row').filter({hasText:'Pariteit persoonlijk'}).getByRole('button',{name:'Bewerken'}).click();
+  await expect(page.getByRole('dialog').locator('#u3RecDistributionField')).toBeHidden();
+  await expect(page.getByRole('dialog').locator('#u3RecDistribution')).toBeDisabled();
+  await page.setViewportSize({width:360,height:800});
+  await expect(page.getByRole('dialog')).toBeVisible();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+});
+
+test('de gedeelde mobiele editor bewaart 50/50 ook na verkoop',async({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  await page.goto('/');
+  await page.evaluate(()=>{
+    state.meta.scenario='na';
+    state.recurringFixedExpenses.na.push({
+      id:'parity-after-sale',naam:'Last na verkoop',categorie:'Wonen',bedrag:120,rekening:'gezamenlijk',financialFor:'gezamenlijk',
+      frequentieAantal:1,frequentieEenheid:'maanden',begindatum:'2026-01-01',einddatum:'',afschrijfdatum:'',actief:true,
+      distributionMode:'income-ratio',amountHistory:[{id:'amount-parity-after-sale',effectiveFrom:'2026-01-01',amount:120}],monthOverrides:{},recognition:{}
+    });
+    renderActiveTab();
+  });
+  await page.locator('.v4-bottom-nav [data-tab="gezamenlijk"]').click();
+  await page.locator('#tab-gezamenlijk [data-u3-planning-owner="gezamenlijk"]').click();
+  await page.getByRole('dialog').locator('.u3-admin-row').filter({hasText:'Last na verkoop'}).getByRole('button',{name:'Bewerken'}).click();
+  const editor=page.getByRole('dialog');
+  await expect(editor.locator('#u3RecDistribution')).toHaveValue('income-ratio');
+  await expect(editor.locator('#u3RecDistribution').locator('option').first()).toHaveText('Naar rato van inkomen');
+  await editor.locator('#u3RecDistribution').selectOption('equal');
+  await editor.getByRole('button',{name:'Opslaan'}).click();
+  await expect.poll(()=>page.evaluate(()=>state.recurringFixedExpenses.na.find(item=>item.id==='parity-after-sale')?.distributionMode)).toBe('equal');
+  await expect(page.getByRole('dialog').locator('.u3-admin-row').filter({hasText:'Last na verkoop'})).toContainText('50/50');
+});
+
+test('mobiel voegt een canonieke vaste last met maanduitzondering toe en kan die stoppen',async({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  await page.goto('/');
+  await page.evaluate(()=>{state.meta.scenario='voor';renderActiveTab();});
+  const month=await page.evaluate(()=>getSelectedMonth());
+  const legacyBefore=await page.evaluate(()=>JSON.stringify(state.voor.gezamenlijk.vasteLasten));
+  await page.locator('.v4-bottom-nav [data-tab="gezamenlijk"]').click();
+  await page.locator('#tab-gezamenlijk [data-u3-planning-owner="gezamenlijk"]').click();
+  await page.getByRole('dialog').getByRole('button',{name:'+ Vaste last'}).click();
+  const editor=page.getByRole('dialog');
+  await editor.locator('#u3RecName').fill('Mobiele canonieke last');
+  await editor.locator('#u3RecAmount').fill('42.50');
+  await editor.locator('#u3RecCategory').fill('Test');
+  await editor.locator('#u3RecDebitDate').fill(`${month}-12`);
+  await editor.locator('#u3RecDistribution').selectOption('equal');
+  await editor.locator('#u3RecScope').selectOption('once');
+  await editor.getByRole('button',{name:'Opslaan'}).click();
+  await expect.poll(()=>page.evaluate(()=>state.recurringFixedExpenses.voor.find(item=>item.naam==='Mobiele canonieke last')?.distributionMode)).toBe('equal');
+  await expect.poll(()=>page.evaluate(selectedMonth=>state.recurringFixedExpenses.voor.find(item=>item.naam==='Mobiele canonieke last')?.monthOverrides[selectedMonth],month)).toBe(42.5);
+  expect(await page.evaluate(()=>JSON.stringify(state.voor.gezamenlijk.vasteLasten))).toBe(legacyBefore);
+  const row=page.getByRole('dialog').locator('.u3-admin-row').filter({hasText:'Mobiele canonieke last'});
+  await row.getByRole('button',{name:'Bewerken'}).click();
+  await page.getByRole('dialog').getByRole('button',{name:'Stoppen'}).click();
+  await expect.poll(()=>page.evaluate(()=>state.recurringFixedExpenses.voor.find(item=>item.naam==='Mobiele canonieke last')?.actief)).toBe(false);
+});
+
 test('vaste lasten laten hun verdeling aanpassen en bewaren een administratieve afschrijfdatum',async({page})=>{
   await page.setViewportSize({width:1280,height:900});
   await page.goto('/');

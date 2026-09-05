@@ -1051,7 +1051,7 @@ function applyFinizeIconSystem(root=document){
   const buttonRules=[
     ['[data-open-joint-transaction], [data-open-personal-transaction]', 'plus'],
     ['[data-addrow], [data-addrefund], [data-addgoal], [data-add-subgoal], [data-add-account]', 'plus'],
-    ['[data-open-owner-fixed], [data-open-owner-variable], .joint-fixed-edit-btn, .joint-variable-edit-btn', 'edit'],
+    ['[data-u3-open="planning"], [data-open-owner-variable], .joint-fixed-edit-btn, .joint-variable-edit-btn', 'edit'],
     ['[data-remove], [data-remove-transaction], .danger-ghost', 'trash'],
     ['#btnExport, [data-export]', 'download'],
     ['#btnImport, [data-import]', 'upload'],
@@ -1162,9 +1162,7 @@ function renderDashboardCardHead(title, hint='', tone='green'){
 function ownerLabel(owner){ return owner === 'gezamenlijk' ? 'Gezamenlijk' : (state.personen?.[owner]?.naam || (owner === 'dion' ? 'Dion' : 'Dara')); }
 function renderJointFixedCostsCardHead(owner='gezamenlijk', options={}){
   const name = ownerLabel(owner);
-  const editAction = options.planning
-    ? `data-u3-open="planning" data-u3-planning-owner="${owner}" aria-label="Vaste lasten van ${textSafe(name)} wijzigen"`
-    : `data-open-owner-fixed="${owner}" aria-label="Vaste lasten aanpassen"`;
+  const editAction = `data-u3-open="planning" data-u3-planning-owner="${owner}" aria-label="Vaste lasten van ${textSafe(name)} wijzigen"`;
   return `<div class="card-head joint-fixed-card-head">
     <div class="card-head-title">${iconBadge(dashboardSectionIconName('Vaste lasten verdeling'), 'green', 'card-head-icon')}<h2>${owner === 'gezamenlijk' ? 'Vaste lasten verdeling' : `${name} vaste lasten`}</h2><button type="button" class="joint-fixed-edit-btn" ${editAction}>${iconSvg('receipt')}</button></div>
   </div>`;
@@ -5532,11 +5530,6 @@ function renderActiveTab(){
   root.querySelectorAll('[data-personal-saving-edit]').forEach(btn=>{
     btn.addEventListener('click', ()=>openPersonalSavingEditModal(btn.dataset.personalSavingEdit));
   });
-  root.querySelectorAll('[data-open-owner-fixed]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      openJointFixedCostsModal(false, btn.dataset.openOwnerFixed);
-    });
-  });
   root.querySelectorAll('[data-open-owner-variable]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       openJointVariableCostsModal(false, btn.dataset.openOwnerVariable);
@@ -6801,11 +6794,14 @@ function u3OpenRecurringEditor(kind,id='',defaults={}){
   modal.querySelector('[data-u3-back-planning]')?.addEventListener('click',()=>u3OpenPlanning(planningOwner));
   const updateDistributionField=()=>{
     const financialFor=modal.querySelector('#u3RecFor')?.value||defaultOwner;
+    const field=modal.querySelector('#u3RecDistributionField');
     const select=modal.querySelector('#u3RecDistribution');
     const hint=modal.querySelector('#u3RecDistributionHint');
     if(!select)return;
-    select.disabled=financialFor!=='gezamenlijk';
-    if(hint)hint.textContent=financialFor==='gezamenlijk'?'Kies hoe Dion en Dara deze gezamenlijke vaste last verdelen.':`Deze vaste last is volledig persoonlijk voor ${u3AccountLabel(financialFor)}.`;
+    const isJoint=financialFor==='gezamenlijk';
+    if(field)field.hidden=!isJoint;
+    select.disabled=!isJoint;
+    if(hint)hint.textContent='Kies hoe Dion en Dara deze gezamenlijke vaste last verdelen.';
   };
   modal.querySelector('#u3RecFor')?.addEventListener('change',updateDistributionField);
   updateDistributionField();
@@ -6824,7 +6820,7 @@ function u3OpenRecurringEditor(kind,id='',defaults={}){
         item.frequentieAantal=Math.max(1,Math.floor(Number(modal.querySelector('#u3RecFrequency').value)||1));item.frequentieEenheid=modal.querySelector('#u3RecUnit').value;
         item.begindatum=modal.querySelector('#u3RecStart').value||`${current}-01`;item.einddatum=modal.querySelector('#u3RecEnd').value;item.actief=modal.querySelector('#u3RecActive').checked;
         if(income){item.type=modal.querySelector('#u3RecCategory').value;item.eigenaar=modal.querySelector('#u3RecOwner').value;item.meetellenVoorVerdeling=modal.querySelector('#u3RecDistribution').checked;item.verwachtBedrag=amount;}
-        else{item.categorie=modal.querySelector('#u3RecCategory').value.trim()||'Overig';item.bedrag=amount;item.afschrijfdatum=modal.querySelector('#u3RecDebitDate').value;item.distributionMode=modal.querySelector('#u3RecDistribution').value;}
+        else{item.categorie=modal.querySelector('#u3RecCategory').value.trim()||'Overig';item.bedrag=amount;item.afschrijfdatum=modal.querySelector('#u3RecDebitDate').value;if(item.financialFor==='gezamenlijk')item.distributionMode=modal.querySelector('#u3RecDistribution').value;else delete item.distributionMode;}
         item.amountHistory=Array.isArray(item.amountHistory)?item.amountHistory:[];item.monthOverrides=isPlainObject(item.monthOverrides)?item.monthOverrides:{};
         if(modal.querySelector('#u3RecScope').value==='once')item.monthOverrides[current]=amount;
         else{delete item.monthOverrides[current];item.amountHistory=item.amountHistory.filter(row=>String(row.effectiveFrom).slice(0,7)!==current);item.amountHistory.push({id:`amount-${item.id}-${current}`,effectiveFrom:`${current}-01`,amount});}
