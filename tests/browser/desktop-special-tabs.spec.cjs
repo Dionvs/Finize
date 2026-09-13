@@ -298,6 +298,54 @@ test('mobiel voegt een canonieke vaste last met maanduitzondering toe en kan die
   await row.getByRole('button',{name:'Bewerken'}).click();
   await page.getByRole('dialog').getByRole('button',{name:'Stoppen'}).click();
   await expect.poll(()=>page.evaluate(()=>state.recurringFixedExpenses.voor.find(item=>item.naam==='Mobiele canonieke last')?.actief)).toBe(false);
+  const stoppedOccurrences=await page.evaluate(selectedMonth=>{
+    const item=state.recurringFixedExpenses.voor.find(row=>row.naam==='Mobiele canonieke last');
+    const [year,number]=selectedMonth.split('-').map(Number);
+    const previousDate=new Date(year,number-2,1);
+    const nextDate=new Date(year,number,1);
+    const key=date=>`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
+    return {
+      previous:FinizeUpdate3.plannedOccurrences([item],key(previousDate)).length,
+      current:FinizeUpdate3.plannedOccurrences([item],selectedMonth).length,
+      next:FinizeUpdate3.plannedOccurrences([item],key(nextDate)).length
+    };
+  },month);
+  expect(stoppedOccurrences.current).toBeGreaterThan(0);
+  expect(stoppedOccurrences.next).toBe(0);
+});
+
+test('een vaste last kan naast stoppen vanaf de gekozen maand worden verwijderd',async({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  await page.goto('/');
+  await page.evaluate(()=>{
+    state.meta.scenario='voor';
+    state.recurringFixedExpenses.voor.push({
+      id:'remove-fixed-test',naam:'Te verwijderen last',categorie:'Test',bedrag:12.34,rekening:'gezamenlijk',financialFor:'gezamenlijk',
+      frequentieAantal:1,frequentieEenheid:'maanden',begindatum:'2026-01-01',einddatum:'',actief:true,
+      amountHistory:[{id:'amount-remove-fixed',effectiveFrom:'2026-01-01',amount:12.34}],monthOverrides:{},recognition:{}
+    });
+    renderActiveTab();
+  });
+  await page.locator('.v4-bottom-nav [data-tab="gezamenlijk"]').click();
+  await page.locator('#tab-gezamenlijk [data-u3-planning-owner="gezamenlijk"]').click();
+  await page.getByRole('dialog').locator('.u3-admin-row').filter({hasText:'Te verwijderen last'}).getByRole('button',{name:'Bewerken'}).click();
+  await expect(page.getByRole('dialog').getByRole('button',{name:'Stoppen'})).toBeVisible();
+  page.once('dialog',dialog=>dialog.accept());
+  await page.getByRole('dialog').getByRole('button',{name:'Verwijderen'}).click();
+  const result=await page.evaluate(()=>{
+    const month=state.meta.selectedMonth;
+    const [year,number]=month.split('-').map(Number);
+    const previous=`${new Date(year,number-2,1).getFullYear()}-${String(new Date(year,number-2,1).getMonth()+1).padStart(2,'0')}`;
+    const item=state.recurringFixedExpenses.voor.find(row=>row.id==='remove-fixed-test');
+    return {
+      preserved:!!item,
+      active:item?.actief,
+      current:FinizeUpdate3.plannedOccurrences([item],month).length,
+      previous:FinizeUpdate3.plannedOccurrences([item],previous).length
+    };
+  });
+  expect(result).toEqual({preserved:true,active:true,current:0,previous:1});
+  await expect(page.getByRole('dialog').locator('.u3-admin-row').filter({hasText:'Te verwijderen last'})).toHaveCount(0);
 });
 
 test('vaste lasten laten hun verdeling aanpassen en bewaren een administratieve afschrijfdatum',async({page})=>{

@@ -5199,6 +5199,12 @@ html body.v4-app .v4-sidebar .tab-btn[hidden],html body.v4-app .v4-bottom-nav .b
 .u2-history>div{border-top:1px solid var(--border)}
 .u2-history article{display:grid;gap:3px;padding:10px 12px;border-bottom:1px solid var(--border)}
 .u2-history article span,.u2-history article small{color:var(--text-dim);font-size:10px}
+.u5-goal-processing{display:grid;gap:12px;margin-bottom:18px}
+.u5-goal-processing-actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px}
+.u5-goal-processing-actions>div{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:var(--surface-2)}
+.u5-goal-processing-actions span{display:grid;gap:2px}
+.u5-goal-processing-actions small{color:var(--text-dim)}
+.u5-goal-processing>.u2-history{border:1px solid var(--border);border-radius:12px}
 .u2-process-modal{width:min(620px,100%);max-height:90vh;overflow:auto}
 .goal-detail-editor{max-height:92vh;overflow:auto}
 .goal-detail-editor>.joint-variable-editor-header{position:sticky;top:-22px;z-index:4;margin:-22px -22px 12px;padding:18px 22px 10px;background:rgba(255,250,244,.98);border-bottom:1px solid var(--border)}

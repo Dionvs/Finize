@@ -78,17 +78,20 @@ function moveItemById(sourcePath, targetPath, id, targetIndex){
   target.splice(safeIndex, 0, item);
   return {item, sourcePath, targetPath, sourceIndex, targetIndex:safeIndex};
 }
+function createGoalRecord(owner){
+  return {id:uid(),naam:'Nieuw doel',doelbedrag:0,algespaard:0,doeldatum:'',vasteInleg:0,vastBedrag:false,rendement:.0125,rendementPeriode:'jaarlijks',favoriet:false,eigenaar:owner,ratoVerdeling:true,subdoelen:[]};
+}
 function createGoalForOwner(owner){
-  if(!['gezamenlijk','dion','dara'].includes(owner))return;
-  const goal={id:uid(),naam:'Nieuw doel',doelbedrag:0,algespaard:0,doeldatum:'',vasteInleg:0,rendement:.0125,rendementPeriode:'jaarlijks',favoriet:false,eigenaar:owner,ratoVerdeling:true,subdoelen:[]};
+  if(!manageableGoalOwnerKeys().includes(owner))return;
+  const goal=createGoalRecord(owner);
   commitChange(()=>state.spaardoelen[owner].push(goal),{render:false});
   openMobileGoalEditor(owner,goal.id);
 }
 function bindDirectGoalOrdering(root){
   if(root.id==='tab-spaardoelen'){
     root.querySelectorAll('.mobile-savings-overview > .manage-stack').forEach(stack=>stack.remove());
-    root.querySelectorAll('.mobile-goal-section').forEach((section,index)=>{
-      const owner=['gezamenlijk','dion','dara'][index];
+    root.querySelectorAll('.mobile-goal-section').forEach(section=>{
+      const owner=section.dataset.goalOwner;
       if(!owner)return;
       let actions=section.querySelector('.u2-inline-actions');
       if(!actions){actions=document.createElement('div');actions.className='u2-inline-actions';section.querySelector('h2')?.insertAdjacentElement('afterend',actions);}
@@ -437,8 +440,8 @@ function u3AmountAt(item, dateOrMonth){
 function u3OccurrenceDates(item, month){
   const bounds = u3MonthBounds(month);
   const start = u3ParseDate(item?.begindatum);
-  if (!bounds || !start || item?.actief === false) return [];
   const end = item?.einddatum ? u3ParseDate(item.einddatum) : null;
+  if (!bounds || !start || (item?.actief === false && !end)) return [];
   const amount = Math.max(1,Math.floor(Number(item.frequentieAantal)||1));
   const unit = U3_FREQUENCY_UNITS.includes(item.frequentieEenheid) ? item.frequentieEenheid : 'maanden';
   const dates = [];
@@ -2961,40 +2964,11 @@ function renderRowsTable(basePath, rows, opts={}){
   `;
 }
 
-function renderTeruggavenTable(basePath, rows){
-  const total = sumBedrag(rows);
-  const useScroll = (rows||[]).length > 5;
-  const rowsHtml = (rows||[]).map(r=>`
-    <tr>
-      <td><input type="text" data-item-path="${basePath}" data-item-id="${textSafe(r.id)}" data-item-field="omschrijving" placeholder="Omschrijving"></td>
-      <td class="num"><input type="number" step="0.01" data-item-path="${basePath}" data-item-id="${textSafe(r.id)}" data-item-field="bedrag"></td>
-      <td class="row-actions"><button class="danger-ghost" data-remove-id="${textSafe(r.id)}" data-remove-path="${basePath}" title="Verwijderen">×</button></td>
-    </tr>
-  `).join('');
-  return `
-    <div class="${useScroll ? 'scroll-area table-scroll' : ''}">
-    <table>
-      <thead><tr><th>Omschrijving</th><th style="text-align:right">Bedrag</th><th></th></tr></thead>
-      <tbody>${rowsHtml || '<tr><td colspan="3" style="color:var(--text-faint)">Nog geen vaste teruggaven.</td></tr>'}</tbody>
-      <tfoot><tr class="tot-row"><td>Totaal per maand</td><td class="num">${eur(total)}</td><td></td></tr></tfoot>
-    </table>
-    </div>
-    <button class="ghost small add-row-btn" data-addrefund="${basePath}">+ Teruggave toevoegen</button>
-  `;
-}
-
 function handleTableClicks(root){
   root.querySelectorAll('[data-addrow]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const path = btn.dataset.addrow;
       commitChange(()=>getPath(state, path).push({id:uid(), categorie:'', post:'', bedrag:0}), {render:false});
-      renderActiveTab();
-    });
-  });
-  root.querySelectorAll('[data-addrefund]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      const path = btn.dataset.addrefund;
-      commitChange(()=>getPath(state, path).push({id:uid(), omschrijving:'', bedrag:0}), {render:false});
       renderActiveTab();
     });
   });
@@ -3178,7 +3152,6 @@ function renderGoalGroup(basePath, doelen, spaarpotDezeMaand){
         <td class="num">${eur(totVerwacht)}</td><td></td>
       </tr></tfoot>
     </table></div>
-    <button class="ghost small add-row-btn" data-addgoal="${basePath}">+ Spaardoel toevoegen</button>
   `;
 }
 function handleGoalClicks(root){
@@ -3258,13 +3231,6 @@ function handleGoalClicks(root){
       const next = idx + direction;
       if (!Array.isArray(arr) || next < 0 || next >= arr.length) return;
       commitChange(()=>moveItemById(path,path,id,next), {render:false}); renderActiveTab();
-    });
-  });
-  root.querySelectorAll('[data-addgoal]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      const path = btn.dataset.addgoal;
-      commitChange(()=>getPath(state, path).push({id:uid(), naam:'Nieuw doel', doelbedrag:0, algespaard:0, doeldatum:'', vasteInleg:0, rendement:0.0125, rendementPeriode:'jaarlijks', favoriet:false}), {render:false});
-      renderActiveTab();
     });
   });
 }
@@ -3628,6 +3594,11 @@ function visibleGoalOwnerKeys(){
   return context.enabled ? ['gezamenlijk',context.role] : ['gezamenlijk','dion','dara'];
 }
 
+function manageableGoalOwnerKeys(){
+  const context=update6AccountContext();
+  return context.enabled ? ['gezamenlijk',context.role] : ['gezamenlijk','dion','dara'];
+}
+
 function personalKpiVisible(owner,kpiId){
   const context = update6AccountContext();
   if (!context.enabled || owner === context.role) return true;
@@ -3680,13 +3651,6 @@ function renderPersonOrJoint(tabId, key, label){
     ? 'Samen houden jullie grip op deze maand.'
     : `Jouw maand, jouw keuzes — zo sta je ervoor, ${label}.`;
 
-  const refundsCard = isJoint ? '' : `
-      <div class="card">
-        <div class="card-head"><h2>Vaste teruggaven</h2></div>
-        <p class="hint" style="margin-top:-4px">Toeslagen, vergoedingen en vaste correcties die maandelijks terugkomen.</p>
-        ${renderTeruggavenTable(`personen.${key}.vasteTeruggaven`, state.personen[key].vasteTeruggaven)}
-      </div>`;
-
   const spaarpotVoorGroep = isJoint ? r.spaarpotDezeMaand : rr.beschikbaarVoorSparen;
   const doelenVoorGroep = state.spaardoelen[key];
   const hypotheekCard = isJoint && state.meta.scenario==='na' ? `
@@ -3726,14 +3690,14 @@ function renderPersonOrJoint(tabId, key, label){
     </div>` : '';
   const incomeManage = !isJoint ? `
     <div class="card">
-      <div class="card-head"><h2>Inkomen</h2><span class="hint">${monthLabel(getSelectedMonth())}</span></div>
+      <div class="card-head"><h2>Inkomen</h2><button type="button" class="ghost small" data-income-edit="${key}" data-income-label="${textSafe(label)}">Bewerken</button></div>
       <div class="summary-list">
-        <div class="summary-line"><span>Basisinkomen deze maand</span><input class="inline-edit" type="number" step="0.01" data-month-income="${key}"></div>
-        <div class="summary-line"><span>Vaste teruggaven</span><strong class="value pos">${eur(vasteTeruggaven)}</strong></div>
+        <div class="summary-line"><span>Standaardsalaris</span><strong class="value pos">${eur(basisInkomen)}</strong></div>
+        <div class="summary-line"><span>Standaardteruggave</span><strong class="value pos">${eur(vasteTeruggaven)}</strong></div>
         <div class="summary-line"><span>Totaal naar gezamenlijke rekening</span><strong class="value pos">${eur(totaalInkomen)}</strong></div>
       </div>
-    </div>
-    ${refundsCard}` : '';
+      <p class="hint">CSV-inkomsten en maandafwijkingen houden hun bestaande voorrang.</p>
+    </div>` : '';
   document.getElementById(tabId).innerHTML = isJoint ? `
     ${renderPageHeading(`Gezamenlijk overzicht — ${monthLabel(getSelectedMonth())}`, pageGreeting)}
     ${jointKpis}
@@ -3783,7 +3747,7 @@ function renderMobileGoalRow(item, owner){
 }
 function renderMobileGoalGroup(group){
   const items = calcGroep(group.doelen, group.pot, TODAY);
-  return `<section class="mobile-goal-section"><h2>${group.label}</h2><div class="card mobile-goal-list">${items.length ? items.map(item=>renderMobileGoalRow(item,group.key)).join('') : '<p class="hint">Nog geen spaardoelen.</p>'}</div></section>`;
+  return `<section class="mobile-goal-section" data-goal-owner="${group.key}"><h2>${group.label}</h2><div class="card mobile-goal-list">${items.length ? items.map(item=>renderMobileGoalRow(item,group.key)).join('') : '<p class="hint">Nog geen spaardoelen.</p>'}</div></section>`;
 }
 function openMobileGoalEditor(owner,id){
   const index = state.spaardoelen?.[owner]?.findIndex(goal=>goal.id === id) ?? -1;
@@ -3836,8 +3800,12 @@ function openMobileGoalEditor(owner,id){
     try{
       const imageReference = await GoalImageStore.storeOrFallback(id, goalImageData);
       const savedAmount=round2(bankAmount(modal.querySelector('#goalEditSaved').value)||0);
-      const changes={naam:modal.querySelector('#goalEditName').value.trim(),doelbedrag:round2(bankAmount(modal.querySelector('#goalEditTarget').value)||0),doeldatum:modal.querySelector('#goalEditDate').value,vasteInleg:round2(bankAmount(modal.querySelector('#goalEditMonthly').value)||0),vastBedrag:modal.querySelector('#goalEditFixedOnly').checked,rendement:(bankAmount(modal.querySelector('#goalEditReturn').value)||0)/100,rendementPeriode:modal.querySelector('#goalEditPeriod').value,favoriet:modal.querySelector('#goalEditFavorite').checked,afbeelding:imageReference};
-      if(!commitChange(()=>{updateItemById(`spaardoelen.${owner}`,id,changes);u2SetGoalSavedAmount(goal,savedAmount);},{render:false})) throw new Error('Lokale opslag is mislukt.');
+      const ratioControl=modal.querySelector('#u2GoalRatio');
+      const fixedOnly=ratioControl?!ratioControl.checked:modal.querySelector('#goalEditFixedOnly').checked;
+      const changes={naam:modal.querySelector('#goalEditName').value.trim(),doelbedrag:round2(bankAmount(modal.querySelector('#goalEditTarget').value)||0),doeldatum:modal.querySelector('#goalEditDate').value,vasteInleg:round2(bankAmount(modal.querySelector('#goalEditMonthly').value)||0),vastBedrag:fixedOnly,rendement:(bankAmount(modal.querySelector('#goalEditReturn').value)||0)/100,rendementPeriode:modal.querySelector('#goalEditPeriod').value,favoriet:modal.querySelector('#goalEditFavorite').checked,afbeelding:imageReference};
+      const selectedOwner=modal.querySelector('#u2GoalOwner')?.value;
+      const targetOwner=manageableGoalOwnerKeys().includes(selectedOwner)?selectedOwner:owner;
+      if(!commitChange(()=>{updateItemById(`spaardoelen.${targetOwner}`,id,changes);u2SetGoalSavedAmount(goal,savedAmount);},{render:false})) throw new Error('Lokale opslag is mislukt.');
       if (!goalImageData){
         try{ await GoalImageStore.remove(id); }
         catch(error){ console.warn('Verwijderde spaardoelfoto kon niet uit IndexedDB worden opgeruimd.', error); }
@@ -3870,7 +3838,11 @@ function openMobileGoalManager(owner){
   modal.querySelectorAll('[data-open-manager-goal]').forEach(btn=>{const open=()=>{modal.classList.remove('open','goal-manager-editor-open');openMobileGoalEditor(owner,btn.dataset.openManagerGoal);};btn.addEventListener('click',open);btn.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();open();}});});
   modal.querySelectorAll('[data-move-manager-goal]').forEach(btn=>btn.addEventListener('click',event=>{event.stopPropagation();const [id,deltaText]=btn.dataset.moveManagerGoal.split(':');const index=goals.findIndex(goal=>goal.id===id);const target=index+Number(deltaText);if(index<0||target<0||target>=goals.length)return;commitChange(()=>moveItemById(`spaardoelen.${owner}`,`spaardoelen.${owner}`,id,target),{render:false});openMobileGoalManager(owner);}));
   modal.querySelectorAll('[data-remove-manager-goal]').forEach(btn=>btn.addEventListener('click',event=>{event.stopPropagation();modal.classList.remove('open','goal-manager-editor-open');removeWithUndo(`spaardoelen.${owner}`,btn.dataset.removeManagerGoal,'Spaardoel verwijderd');}));
-  modal.querySelector('[data-add-manager-goal]').addEventListener('click',()=>{commitChange(()=>goals.push({id:uid(),naam:'Nieuw doel',doelbedrag:0,algespaard:0,doeldatum:'',vasteInleg:0,rendement:.0125,rendementPeriode:'jaarlijks',favoriet:false}),{render:false});openMobileGoalManager(owner);});
+  modal.querySelector('[data-add-manager-goal]').addEventListener('click',()=>{
+    modal.classList.remove('open','goal-manager-editor-open');
+    modal.innerHTML='';
+    createGoalForOwner(owner);
+  });
 }
 function renderMobileSpaardoelen(){
   const r=calcScenario(state);
@@ -5322,7 +5294,7 @@ function renderPersonalFirstRow(owner){
   const fixedRows=Object.entries(fixed).sort((a,b)=>b[1]-a[1]).map(([cat,amount])=>{ const ratio=person.persoonlijkeVasteLasten>0?amount/person.persoonlijkeVasteLasten:0; return `<div class="progress-item"><div class="progress-item-icon tone-green">${iconSvg(jointFixedCategoryIconName(cat))}</div><div class="progress-top"><strong>${cat}</strong><span>${eur(amount)} · ${pct(ratio)}</span></div><div class="progress-track"><div class="progress-fill" style="width:${Math.round(ratio*100)}%"></div></div></div>`; }).join('');
   const variableBudget=sumBedrag(data.variabel||[]); const variablePct=variableBudget>0?Math.min(100,Math.round((person.variabeleUitgaven/variableBudget)*100)):0;
   return `<div class="mobile-kpi-grid v4-mobile-only-grid joint-first-row" aria-label="${name} rij 1">
-    ${personalKpiVisible(owner,'income')?`<div class="mobile-kpi-card joint-kpi-card joint-total-income-card static" data-personal-kpi-mobile="income"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg('allowance')}</span></div><div class="mobile-kpi-label">Totaal inkomen</div><div class="mobile-kpi-value ${personalIncome.total<0?'value neg':'value pos'}">${eur(personalIncome.total)}</div>${renderPersonalIncomeSources(personalIncome)}</div>`:''}
+    ${personalKpiVisible(owner,'income')?`<button type="button" class="mobile-kpi-card joint-kpi-card joint-total-income-card" data-personal-kpi-mobile="income" data-income-edit="${owner}" data-income-label="${textSafe(name)}" aria-label="Inkomen van ${textSafe(name)} aanpassen"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg('allowance')}</span></div><div class="mobile-kpi-label">Totaal inkomen</div><div class="mobile-kpi-value ${personalIncome.total<0?'value neg':'value pos'}">${eur(personalIncome.total)}</div>${renderPersonalIncomeSources(personalIncome)}</button>`:''}
     <div class="mobile-kpi-card joint-kpi-card joint-fixed-costs-card"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg('wallet')}</span></div><div class="mobile-kpi-label">Vaste lasten</div><div class="mobile-kpi-value value neg">${eur(person.persoonlijkeVasteLasten)}</div><div class="mobile-kpi-edit-hint-placeholder">.</div></div>
     <button type="button" class="mobile-kpi-card joint-kpi-card joint-saving-card" data-personal-saving-edit="${owner}" aria-label="Spaargeld van ${textSafe(name)} voor deze maand aanpassen"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg('piggy')}</span></div><div class="mobile-kpi-label">Sparen deze maand</div><div class="mobile-kpi-value ${person.beschikbaarVoorSparen<0?'value neg':'value pos'}">${eur(person.beschikbaarVoorSparen)}</div><div class="mobile-kpi-edit-hint">${person.savingsSource==='handmatig'?'Handmatig':'Tik om aan te passen'}</div></button>
     <div class="mobile-kpi-card joint-kpi-card static joint-variable-card"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg('chart')}</span></div><div class="mobile-kpi-label">Variabel gebruikt</div><div class="mobile-kpi-value mobile-kpi-value-budget neu">${eur(person.variabeleUitgaven)} / ${eur(variableBudget)}</div><div class="mobile-kpi-budget-track" style="--used-pct:${variablePct}%"></div></div>
@@ -5516,10 +5488,10 @@ function renderActiveTab(){
   root.querySelectorAll('[data-add-goal]').forEach(btn=>{
     btn.addEventListener('click',()=>createGoalForOwner(btn.dataset.addGoal));
   });
-  root.querySelectorAll('.mobile-savings-overview .manage-section').forEach((section,index)=>{
+  root.querySelectorAll('.mobile-savings-overview .manage-section').forEach(section=>{
     section.querySelector('summary')?.addEventListener('click',event=>{
       event.preventDefault();
-      openMobileGoalManager(['gezamenlijk','dion','dara'][index]);
+      openMobileGoalManager(section.dataset.goalOwner);
     });
   });
   root.querySelectorAll('[data-saving-edit]').forEach(btn=>{
@@ -6115,8 +6087,8 @@ renderMobileSpaardoelen=function(){
     {owner:'dion',pot:Math.max(0,Number(result.dion.beschikbaarVoorSparen)||0)},
     {owner:'dara',pot:Math.max(0,Number(result.dara.beschikbaarVoorSparen)||0)}
   ].filter(group=>visibleOwners.includes(group.owner));
-  root.querySelectorAll('.mobile-goal-section').forEach((section,index)=>{
-    const group=groups[index];
+  root.querySelectorAll('.mobile-goal-section').forEach(section=>{
+    const group=groups.find(item=>item.owner===section.dataset.goalOwner);
     if(!group)return;
     const processed=u2IsProcessed(group.owner);
     const actions=document.createElement('div');
@@ -6145,7 +6117,7 @@ openMobileGoalEditor=function(owner,id){
   let drafts=clone(goal.subdoelen||[]);
   const productLookups=new Map();
   const ownerField=document.createElement('label');
-  ownerField.innerHTML=`Eigenaar<select id="u2GoalOwner">${U2_OWNERS.map(value=>`<option value="${value}" ${value===owner?'selected':''}>${ownerLabel(value)}</option>`).join('')}</select>`;
+  ownerField.innerHTML=`Eigenaar<select id="u2GoalOwner">${manageableGoalOwnerKeys().map(value=>`<option value="${value}" ${value===owner?'selected':''}>${ownerLabel(value)}</option>`).join('')}</select>`;
   const ratioField=document.createElement('label');
   ratioField.className='u2-checkbox';
   ratioField.innerHTML=`<input id="u2GoalRatio" type="checkbox" ${goal.ratoVerdeling?'checked':''}> Meedoen aan automatische ratoverdeling`;
@@ -6230,6 +6202,7 @@ openMobileGoalEditor=function(owner,id){
   modal.querySelector('#goalEditSave').addEventListener('click',()=>{
     section.querySelectorAll('input').forEach(input=>input.dispatchEvent(new Event('input')));
     const newOwner=modal.querySelector('#u2GoalOwner').value;
+    if(!manageableGoalOwnerKeys().includes(newOwner))return;
     const extras={
       naam:modal.querySelector('#goalEditName').value.trim(),
       doelbedrag:round2(bankAmount(modal.querySelector('#goalEditTarget').value)||0),
@@ -6273,17 +6246,6 @@ openMobileGoalEditor=function(owner,id){
     grid.insertBefore(calculationDetails,calculation);
     calculationDetails.querySelector('.manage-body').appendChild(calculation);
   }
-};
-
-const u2BaseGoalManager=openMobileGoalManager;
-openMobileGoalManager=function(owner){
-  u2BaseGoalManager(owner);
-  const add=document.querySelector('#incomeEditModal [data-add-manager-goal]');
-  if(add) add.addEventListener('click',()=>setTimeout(()=>{
-    const goals=state.spaardoelen[owner]||[];
-    const newest=goals[goals.length-1];
-    if(newest&&!newest.eigenaar) commitChange(()=>Object.assign(newest,{eigenaar:owner,ratoVerdeling:true,subdoelen:[]}),{render:false});
-  },0),true);
 };
 
 /* ---------- Update 3: rekenlaag en administratieve acties ---------- */
@@ -6743,6 +6705,14 @@ function u3RecurringRows(kind){
   if(kind==='income')return state.recurringIncomeSources||[];
   return state.recurringFixedExpenses?.[state.meta.scenario]||[];
 }
+function u3RecurringVisibleInMonth(item,month=getSelectedMonth()){
+  const bounds=u3MonthBounds(month);
+  const start=u3ParseDate(item?.begindatum);
+  const end=item?.einddatum?u3ParseDate(item.einddatum):null;
+  if(!bounds||!start||start>bounds.end)return false;
+  if(item?.actief===false)return true;
+  return !end||end>=bounds.start;
+}
 function u3FixedDistributionLabel(item,financialFor=item?.financialFor||item?.rekening||'gezamenlijk'){
   if(financialFor!=='gezamenlijk')return `Persoonlijk · ${u3AccountLabel(financialFor)}`;
   if(u3FixedDistributionMode(item,financialFor)==='equal')return '50/50';
@@ -6755,8 +6725,8 @@ function u3FixedDistributionMode(item,financialFor=item?.financialFor||item?.rek
 }
 function u3OpenPlanning(owner=''){
   const planningOwner=U3_ACCOUNTS.includes(owner)?owner:'';
-  const fixed=u3RecurringRows('fixed').filter(item=>!planningOwner||(item.financialFor||item.rekening||'gezamenlijk')===planningOwner);
-  const incomes=u3RecurringRows('income');
+  const fixed=u3RecurringRows('fixed').filter(item=>u3RecurringVisibleInMonth(item)&&(!planningOwner||(item.financialFor||item.rekening||'gezamenlijk')===planningOwner));
+  const incomes=u3RecurringRows('income').filter(item=>u3RecurringVisibleInMonth(item));
   const ownerName=planningOwner?u3AccountLabel(planningOwner):'';
   const rows=(items,kind)=>items.map(item=>`<article class="u3-admin-row"><div class="u3-row-head"><div><strong>${textSafe(item.naam||'Zonder naam')}</strong><br><small>${u3AccountLabel(item.rekening)} → ${u3AccountLabel(item.financialFor||item.rekening)} · elke ${item.frequentieAantal} ${textSafe(item.frequentieEenheid)}${kind==='fixed'?` · ${textSafe(u3FixedDistributionLabel(item))}`:''}</small></div><div><span class="u3-status ${item.actief!==false?'ok':''}">${item.actief!==false?'Actief':'Gestopt'}</span> <button class="ghost small" data-u3-edit-recurring="${kind}:${item.id}">Bewerken</button></div></div><div>${eur(u3AmountAt(item,getSelectedMonth()))} <small>· gemiddeld ${eur(u3MonthlyAverage(item))} p/m${kind==='fixed'&&item.afschrijfdatum?` · afschrijving ${formatDateNL(item.afschrijfdatum)}`:''}</small></div></article>`).join('');
   const {modal}=u3AdminModal(`<div class="u3-admin-head"><div><div class="section-kicker">${monthLabel(getSelectedMonth())} · ${state.meta.scenario==='voor'?'Voor verkoop':'Na verkoop'}</div><h2>${planningOwner?`${textSafe(ownerName)} vaste lasten`:'Planning beheren'}</h2><p>${planningOwner?`Alleen de vaste lasten die financieel voor ${textSafe(ownerName)} zijn.`:'Bedragen kunnen voor één maand of vanaf deze maand wijzigen.'}</p></div><button class="ghost" data-u3-close>Sluiten</button></div>
@@ -6790,7 +6760,7 @@ function u3OpenRecurringEditor(kind,id='',defaults={}){
       <label>Bedrag wijzigen<select id="u3RecScope"><option value="from">Vanaf ${monthLabel(current)}</option><option value="once">Alleen ${monthLabel(current)}</option></select></label>
       <label class="u2-checkbox"><input id="u3RecActive" type="checkbox" ${existing?.actief!==false?'checked':''}> Actief</label>
     </div>
-    <div class="modal-actions">${existing?'<button class="danger-ghost" id="u3RecDelete">Stoppen</button>':''}<button class="ghost" data-u3-back-planning>Terug</button><button class="primary" id="u3RecSave">Opslaan</button></div>`);
+    <div class="modal-actions">${existing?`${existing.actief!==false?'<button class="ghost" id="u3RecStop">Stoppen</button>':''}<button class="danger-ghost" id="u3RecDelete">Verwijderen</button>`:''}<button class="ghost" data-u3-back-planning>Terug</button><button class="primary" id="u3RecSave">Opslaan</button></div>`);
   modal.querySelector('[data-u3-back-planning]')?.addEventListener('click',()=>u3OpenPlanning(planningOwner));
   const updateDistributionField=()=>{
     const financialFor=modal.querySelector('#u3RecFor')?.value||defaultOwner;
@@ -6805,8 +6775,25 @@ function u3OpenRecurringEditor(kind,id='',defaults={}){
   };
   modal.querySelector('#u3RecFor')?.addEventListener('change',updateDistributionField);
   updateDistributionField();
+  modal.querySelector('#u3RecStop')?.addEventListener('click',()=>{
+    try{u3AssertMonthOpen();commitChange(()=>{existing.actief=false;existing.einddatum=u3IsoDate(u3MonthBounds(current).end);},{render:false});u3OpenPlanning(planningOwner);}catch(error){alert(error.message);}
+  });
   modal.querySelector('#u3RecDelete')?.addEventListener('click',()=>{
-    try{u3AssertMonthOpen();commitChange(()=>{existing.actief=false;existing.einddatum=existing.einddatum||u3IsoDate(new Date(`${current}-01T12:00:00`));},{render:false});u3OpenPlanning(planningOwner);}catch(error){alert(error.message);}
+    const label=existing?.naam||`${income?'inkomstenbron':'vaste last'}`;
+    if(!confirm(`“${label}” verwijderen vanaf ${monthLabel(current)}? Eerdere maanden en bestaande transacties blijven bewaard.`))return;
+    try{
+      u3AssertMonthOpen();
+      commitChange(()=>{
+        const bounds=u3MonthBounds(current);
+        const dayBefore=new Date(bounds.start);
+        dayBefore.setDate(dayBefore.getDate()-1);
+        const previousEnd=existing.einddatum?u3ParseDate(existing.einddatum):null;
+        existing.einddatum=u3IsoDate(previousEnd&&previousEnd<dayBefore?previousEnd:dayBefore);
+        existing.actief=true;
+      },{render:false});
+      u3OpenPlanning(planningOwner);
+      showQuickToast(`${income?'Inkomstenbron':'Vaste last'} verwijderd vanaf ${monthLabel(current)}`);
+    }catch(error){alert(error.message);}
   });
   modal.querySelector('#u3RecSave').addEventListener('click',()=>{
     try{
@@ -7078,6 +7065,7 @@ export {
   GoalImageStore,
   iconSvg,
   localSave,
+  manageableGoalOwnerKeys,
   migrateBudgetState,
   monthLabel,
   normalizeBudgetState,
@@ -7091,6 +7079,8 @@ export {
   resolveMonthlyIncome,
   safeImageUrl,
   textSafe,
+  u2IsProcessed,
+  u2OpenProcessModal,
   validateBudgetState,
   visibleGoalOwnerKeys
 };

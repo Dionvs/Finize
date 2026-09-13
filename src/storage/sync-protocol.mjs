@@ -82,7 +82,7 @@ function rebaseIdArray(base, local, remote) {
   const baseById = new Map(base.map(item => [item.id, item]));
   const localById = new Map(local.map(item => [item.id, item]));
   const locallyDeleted = new Set(base.filter(item => !localById.has(item.id)).map(item => item.id));
-  const result = remote
+  let result = remote
     .filter(item => !locallyDeleted.has(item.id))
     .map(item => {
       if (!localById.has(item.id)) return copyValue(item);
@@ -94,6 +94,14 @@ function rebaseIdArray(base, local, remote) {
       result.push(copyValue(item));
     }
   });
+  const baseOrder = base.map(item => item.id).filter(id => localById.has(id));
+  const localOrder = local.map(item => item.id).filter(id => baseById.has(id));
+  if (!sameValue(localOrder, baseOrder)) {
+    const resultById = new Map(result.map(item => [item.id, item]));
+    const locallyOrdered = local.map(item => resultById.get(item.id)).filter(Boolean);
+    const localIds = new Set(locallyOrdered.map(item => item.id));
+    result = [...locallyOrdered, ...result.filter(item => !localIds.has(item.id))];
+  }
   return result;
 }
 

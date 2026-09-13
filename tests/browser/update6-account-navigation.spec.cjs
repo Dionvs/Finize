@@ -124,5 +124,6 @@ test('gedeelde andere tab opent alleen-lezen en verbergt gekozen KPI',async({pag
   await expect(page.locator('#tab-dara .u6-readonly-banner')).toBeVisible();
   await expect(page.locator('#tab-dara [data-personal-kpi="income"]')).toHaveCount(0);
   await expect(page.locator('#tab-dara [data-personal-kpi]')).toHaveCount(3);
-  await expect(page.locator('#tab-dara input:not([type="hidden"])').first()).toBeDisabled();
+  await expect(page.locator('#tab-dara input:not([type="hidden"])')).toHaveCount(0);
+  await expect(page.locator('#tab-dara button').first()).toBeDisabled();
 });

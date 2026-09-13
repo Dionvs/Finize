@@ -19,6 +19,8 @@ import {
   safeImageUrl,
   state,
   textSafe,
+  u2IsProcessed,
+  u2OpenProcessModal,
   visibleGoalOwnerKeys
 } from "../core/runtime.js";
 
@@ -153,6 +155,21 @@ import {
     </div>`;
   }
 
+  function goalProcessingPanel(groups){
+    const visibleOwners=new Set(groups.map(group=>group.owner));
+    const history=Object.values(state.spaardoelGeschiedenis||{})
+      .filter(entry=>visibleOwners.has(entry.eigenaar))
+      .sort((a,b)=>String(b.maand).localeCompare(String(a.maand)));
+    return `<section class="card u5-goal-processing">
+      <div class="card-head"><div><h2>Spaarpotten verwerken</h2><span class="hint">${monthLabel(getSelectedMonth())}</span></div></div>
+      <div class="u5-goal-processing-actions">${groups.map(group=>{
+        const processed=u2IsProcessed(group.owner);
+        return `<div><span><strong>${textSafe(group.label)}</strong><small>${eur(group.pot)}</small></span><button type="button" class="${processed?'ghost':'primary'} small" data-u2-process-owner="${group.owner}" ${processed?'disabled':''}>${processed?'Maand verwerkt':'Spaarpot verwerken'}</button></div>`;
+      }).join('')}</div>
+      <details class="u2-history"><summary><strong>Spaargeschiedenis</strong><span>${history.length} ${history.length===1?'maand':'maanden'}</span></summary><div>${history.map(entry=>`<article><strong>${textSafe(groups.find(group=>group.owner===entry.eigenaar)?.label||entry.eigenaar)} · ${monthLabel(entry.maand)}</strong><span>Spaarpot ${eur(entry.spaarpot)} · verdeeld ${eur(entry.verdeeld)} · onverdeeld ${eur(entry.onverdeeld)}</span><small>${(entry.transacties||[]).map(tx=>`${textSafe(tx.doelNaam)} ${eur(tx.bedrag)}`).join(' · ')}</small></article>`).join('')||'<p class="hint">Nog geen maanden verwerkt.</p>'}</div></details>
+    </section>`;
+  }
+
   function bindGoalPresentation(root){
     root.querySelectorAll('[data-u5-goal-filter]').forEach(button=>button.addEventListener('click',()=>{
       goalOwnerFilter = button.dataset.u5GoalFilter;
@@ -171,6 +188,7 @@ import {
       goalViewMode = button.dataset.u5GoalView;
       renderActiveTab();
     }));
+    root.querySelectorAll('[data-u2-process-owner]').forEach(button=>button.addEventListener('click',()=>u2OpenProcessModal(button.dataset.u2ProcessOwner)));
   }
 
   function renderGoals(){
@@ -202,6 +220,7 @@ import {
           <button type="button" class="${goalViewMode==='table'?'active':''}" data-u5-goal-view="table">Tabelweergave</button>
         </div>
       </div>
+      ${goalProcessingPanel(groups)}
       ${goalViewMode === 'table' ? goalTableView(groups) : `<div class="u5-goal-master">
         <aside class="card u5-goal-list">
           <div class="card-head"><div><h2>Spaardoelen</h2><span class="hint">${selection.visible.length} zichtbaar</span></div></div>

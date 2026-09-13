@@ -526,7 +526,7 @@
     const baseById = new Map(base.map((item) => [item.id, item]));
     const localById = new Map(local.map((item) => [item.id, item]));
     const locallyDeleted = new Set(base.filter((item) => !localById.has(item.id)).map((item) => item.id));
-    const result = remote.filter((item) => !locallyDeleted.has(item.id)).map((item) => {
+    let result = remote.filter((item) => !locallyDeleted.has(item.id)).map((item) => {
       if (!localById.has(item.id)) return copyValue(item);
       return rebaseLocalChanges(baseById.get(item.id), localById.get(item.id), item);
     });
@@ -536,6 +536,14 @@
         result.push(copyValue(item));
       }
     });
+    const baseOrder = base.map((item) => item.id).filter((id) => localById.has(id));
+    const localOrder = local.map((item) => item.id).filter((id) => baseById.has(id));
+    if (!sameValue(localOrder, baseOrder)) {
+      const resultById = new Map(result.map((item) => [item.id, item]));
+      const locallyOrdered = local.map((item) => resultById.get(item.id)).filter(Boolean);
+      const localIds = new Set(locallyOrdered.map((item) => item.id));
+      result = [...locallyOrdered, ...result.filter((item) => !localIds.has(item.id))];
+    }
     return result;
   }
   function rebaseLocalChanges(base, local, remote) {
@@ -824,18 +832,21 @@
     target.splice(safeIndex, 0, item);
     return { item, sourcePath, targetPath, sourceIndex, targetIndex: safeIndex };
   }
+  function createGoalRecord(owner) {
+    return { id: uid(), naam: "Nieuw doel", doelbedrag: 0, algespaard: 0, doeldatum: "", vasteInleg: 0, vastBedrag: false, rendement: 0.0125, rendementPeriode: "jaarlijks", favoriet: false, eigenaar: owner, ratoVerdeling: true, subdoelen: [] };
+  }
   function createGoalForOwner(owner) {
-    if (!["gezamenlijk", "dion", "dara"].includes(owner)) return;
-    const goal = { id: uid(), naam: "Nieuw doel", doelbedrag: 0, algespaard: 0, doeldatum: "", vasteInleg: 0, rendement: 0.0125, rendementPeriode: "jaarlijks", favoriet: false, eigenaar: owner, ratoVerdeling: true, subdoelen: [] };
+    if (!manageableGoalOwnerKeys().includes(owner)) return;
+    const goal = createGoalRecord(owner);
     commitChange(() => state.spaardoelen[owner].push(goal), { render: false });
     openMobileGoalEditor(owner, goal.id);
   }
   function bindDirectGoalOrdering(root2) {
     if (root2.id === "tab-spaardoelen") {
       root2.querySelectorAll(".mobile-savings-overview > .manage-stack").forEach((stack) => stack.remove());
-      root2.querySelectorAll(".mobile-goal-section").forEach((section, index) => {
+      root2.querySelectorAll(".mobile-goal-section").forEach((section) => {
         var _a2;
-        const owner = ["gezamenlijk", "dion", "dara"][index];
+        const owner = section.dataset.goalOwner;
         if (!owner) return;
         let actions = section.querySelector(".u2-inline-actions");
         if (!actions) {
@@ -1204,8 +1215,8 @@
   function u3OccurrenceDates(item, month) {
     const bounds = u3MonthBounds(month);
     const start = u3ParseDate(item == null ? void 0 : item.begindatum);
-    if (!bounds || !start || (item == null ? void 0 : item.actief) === false) return [];
     const end = (item == null ? void 0 : item.einddatum) ? u3ParseDate(item.einddatum) : null;
+    if (!bounds || !start || (item == null ? void 0 : item.actief) === false && !end) return [];
     const amount = Math.max(1, Math.floor(Number(item.frequentieAantal) || 1));
     const unit = U3_FREQUENCY_UNITS.includes(item.frequentieEenheid) ? item.frequentieEenheid : "maanden";
     const dates = [];
@@ -3853,39 +3864,11 @@
     <button class="ghost small add-row-btn" data-addrow="${basePath}">+ Post toevoegen</button>
   `;
   }
-  function renderTeruggavenTable(basePath, rows) {
-    const total = sumBedrag(rows);
-    const useScroll = (rows || []).length > 5;
-    const rowsHtml = (rows || []).map((r) => `
-    <tr>
-      <td><input type="text" data-item-path="${basePath}" data-item-id="${textSafe(r.id)}" data-item-field="omschrijving" placeholder="Omschrijving"></td>
-      <td class="num"><input type="number" step="0.01" data-item-path="${basePath}" data-item-id="${textSafe(r.id)}" data-item-field="bedrag"></td>
-      <td class="row-actions"><button class="danger-ghost" data-remove-id="${textSafe(r.id)}" data-remove-path="${basePath}" title="Verwijderen">×</button></td>
-    </tr>
-  `).join("");
-    return `
-    <div class="${useScroll ? "scroll-area table-scroll" : ""}">
-    <table>
-      <thead><tr><th>Omschrijving</th><th style="text-align:right">Bedrag</th><th></th></tr></thead>
-      <tbody>${rowsHtml || '<tr><td colspan="3" style="color:var(--text-faint)">Nog geen vaste teruggaven.</td></tr>'}</tbody>
-      <tfoot><tr class="tot-row"><td>Totaal per maand</td><td class="num">${eur(total)}</td><td></td></tr></tfoot>
-    </table>
-    </div>
-    <button class="ghost small add-row-btn" data-addrefund="${basePath}">+ Teruggave toevoegen</button>
-  `;
-  }
   function handleTableClicks(root2) {
     root2.querySelectorAll("[data-addrow]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const path = btn.dataset.addrow;
         commitChange(() => getPath(state, path).push({ id: uid(), categorie: "", post: "", bedrag: 0 }), { render: false });
-        renderActiveTab();
-      });
-    });
-    root2.querySelectorAll("[data-addrefund]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const path = btn.dataset.addrefund;
-        commitChange(() => getPath(state, path).push({ id: uid(), omschrijving: "", bedrag: 0 }), { render: false });
         renderActiveTab();
       });
     });
@@ -4066,7 +4049,6 @@
         <td class="num">${eur(totVerwacht)}</td><td></td>
       </tr></tfoot>
     </table></div>
-    <button class="ghost small add-row-btn" data-addgoal="${basePath}">+ Spaardoel toevoegen</button>
   `;
   }
   function handleGoalClicks(root2) {
@@ -4178,13 +4160,6 @@
         const next = idx + direction;
         if (!Array.isArray(arr) || next < 0 || next >= arr.length) return;
         commitChange(() => moveItemById(path, path, id, next), { render: false });
-        renderActiveTab();
-      });
-    });
-    root2.querySelectorAll("[data-addgoal]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const path = btn.dataset.addgoal;
-        commitChange(() => getPath(state, path).push({ id: uid(), naam: "Nieuw doel", doelbedrag: 0, algespaard: 0, doeldatum: "", vasteInleg: 0, rendement: 0.0125, rendementPeriode: "jaarlijks", favoriet: false }), { render: false });
         renderActiveTab();
       });
     });
@@ -4537,6 +4512,10 @@
     const context = update6AccountContext();
     return context.enabled ? ["gezamenlijk", context.role] : ["gezamenlijk", "dion", "dara"];
   }
+  function manageableGoalOwnerKeys() {
+    const context = update6AccountContext();
+    return context.enabled ? ["gezamenlijk", context.role] : ["gezamenlijk", "dion", "dara"];
+  }
   function personalKpiVisible(owner, kpiId) {
     var _a2;
     const context = update6AccountContext();
@@ -4584,12 +4563,6 @@
     const totaalInkomen = isJoint ? 0 : getTotalMonthlyIncome(key);
     const personalIncome = isJoint ? null : personalIncomeOverview(key, rr.zakgeld);
     const pageGreeting = isJoint ? "Samen houden jullie grip op deze maand." : `Jouw maand, jouw keuzes — zo sta je ervoor, ${label}.`;
-    const refundsCard = isJoint ? "" : `
-      <div class="card">
-        <div class="card-head"><h2>Vaste teruggaven</h2></div>
-        <p class="hint" style="margin-top:-4px">Toeslagen, vergoedingen en vaste correcties die maandelijks terugkomen.</p>
-        ${renderTeruggavenTable(`personen.${key}.vasteTeruggaven`, state.personen[key].vasteTeruggaven)}
-      </div>`;
     const spaarpotVoorGroep = isJoint ? r.spaarpotDezeMaand : rr.beschikbaarVoorSparen;
     const doelenVoorGroep = state.spaardoelen[key];
     const hypotheekCard = isJoint && state.meta.scenario === "na" ? `
@@ -4625,14 +4598,14 @@
     </div>` : "";
     const incomeManage = !isJoint ? `
     <div class="card">
-      <div class="card-head"><h2>Inkomen</h2><span class="hint">${monthLabel(getSelectedMonth())}</span></div>
+      <div class="card-head"><h2>Inkomen</h2><button type="button" class="ghost small" data-income-edit="${key}" data-income-label="${textSafe(label)}">Bewerken</button></div>
       <div class="summary-list">
-        <div class="summary-line"><span>Basisinkomen deze maand</span><input class="inline-edit" type="number" step="0.01" data-month-income="${key}"></div>
-        <div class="summary-line"><span>Vaste teruggaven</span><strong class="value pos">${eur(vasteTeruggaven)}</strong></div>
+        <div class="summary-line"><span>Standaardsalaris</span><strong class="value pos">${eur(basisInkomen)}</strong></div>
+        <div class="summary-line"><span>Standaardteruggave</span><strong class="value pos">${eur(vasteTeruggaven)}</strong></div>
         <div class="summary-line"><span>Totaal naar gezamenlijke rekening</span><strong class="value pos">${eur(totaalInkomen)}</strong></div>
       </div>
-    </div>
-    ${refundsCard}` : "";
+      <p class="hint">CSV-inkomsten en maandafwijkingen houden hun bestaande voorrang.</p>
+    </div>` : "";
     document.getElementById(tabId).innerHTML = isJoint ? `
     ${renderPageHeading(`Gezamenlijk overzicht — ${monthLabel(getSelectedMonth())}`, pageGreeting)}
     ${jointKpis}
@@ -4680,7 +4653,7 @@
   }
   function renderMobileGoalGroup(group) {
     const items = calcGroep(group.doelen, group.pot, TODAY);
-    return `<section class="mobile-goal-section"><h2>${group.label}</h2><div class="card mobile-goal-list">${items.length ? items.map((item) => renderMobileGoalRow(item, group.key)).join("") : '<p class="hint">Nog geen spaardoelen.</p>'}</div></section>`;
+    return `<section class="mobile-goal-section" data-goal-owner="${group.key}"><h2>${group.label}</h2><div class="card mobile-goal-list">${items.length ? items.map((item) => renderMobileGoalRow(item, group.key)).join("") : '<p class="hint">Nog geen spaardoelen.</p>'}</div></section>`;
   }
   function openMobileGoalEditor(owner, id) {
     var _a2, _b, _c, _d, _e;
@@ -4754,15 +4727,20 @@
     };
     modal.querySelector("[data-close-goal-editor]").addEventListener("click", close);
     modal.querySelector("#goalEditSave").addEventListener("click", async () => {
+      var _a3;
       if (imageProcessing || saveButton.disabled) return;
       const previousImage = goalImageSource(goal);
       saveButton.disabled = true;
       try {
         const imageReference = await GoalImageStore.storeOrFallback(id, goalImageData);
         const savedAmount = round2(bankAmount(modal.querySelector("#goalEditSaved").value) || 0);
-        const changes = { naam: modal.querySelector("#goalEditName").value.trim(), doelbedrag: round2(bankAmount(modal.querySelector("#goalEditTarget").value) || 0), doeldatum: modal.querySelector("#goalEditDate").value, vasteInleg: round2(bankAmount(modal.querySelector("#goalEditMonthly").value) || 0), vastBedrag: modal.querySelector("#goalEditFixedOnly").checked, rendement: (bankAmount(modal.querySelector("#goalEditReturn").value) || 0) / 100, rendementPeriode: modal.querySelector("#goalEditPeriod").value, favoriet: modal.querySelector("#goalEditFavorite").checked, afbeelding: imageReference };
+        const ratioControl = modal.querySelector("#u2GoalRatio");
+        const fixedOnly = ratioControl ? !ratioControl.checked : modal.querySelector("#goalEditFixedOnly").checked;
+        const changes = { naam: modal.querySelector("#goalEditName").value.trim(), doelbedrag: round2(bankAmount(modal.querySelector("#goalEditTarget").value) || 0), doeldatum: modal.querySelector("#goalEditDate").value, vasteInleg: round2(bankAmount(modal.querySelector("#goalEditMonthly").value) || 0), vastBedrag: fixedOnly, rendement: (bankAmount(modal.querySelector("#goalEditReturn").value) || 0) / 100, rendementPeriode: modal.querySelector("#goalEditPeriod").value, favoriet: modal.querySelector("#goalEditFavorite").checked, afbeelding: imageReference };
+        const selectedOwner = (_a3 = modal.querySelector("#u2GoalOwner")) == null ? void 0 : _a3.value;
+        const targetOwner = manageableGoalOwnerKeys().includes(selectedOwner) ? selectedOwner : owner;
         if (!commitChange(() => {
-          updateItemById(`spaardoelen.${owner}`, id, changes);
+          updateItemById(`spaardoelen.${targetOwner}`, id, changes);
           u2SetGoalSavedAmount(goal, savedAmount);
         }, { render: false })) throw new Error("Lokale opslag is mislukt.");
         if (!goalImageData) {
@@ -4840,8 +4818,9 @@
       removeWithUndo(`spaardoelen.${owner}`, btn.dataset.removeManagerGoal, "Spaardoel verwijderd");
     }));
     modal.querySelector("[data-add-manager-goal]").addEventListener("click", () => {
-      commitChange(() => goals.push({ id: uid(), naam: "Nieuw doel", doelbedrag: 0, algespaard: 0, doeldatum: "", vasteInleg: 0, rendement: 0.0125, rendementPeriode: "jaarlijks", favoriet: false }), { render: false });
-      openMobileGoalManager(owner);
+      modal.classList.remove("open", "goal-manager-editor-open");
+      modal.innerHTML = "";
+      createGoalForOwner(owner);
     });
   }
   function renderMobileSpaardoelen() {
@@ -6415,7 +6394,7 @@ service cloud.firestore {
     const variableBudget = sumBedrag(data.variabel || []);
     const variablePct = variableBudget > 0 ? Math.min(100, Math.round(person.variabeleUitgaven / variableBudget * 100)) : 0;
     return `<div class="mobile-kpi-grid v4-mobile-only-grid joint-first-row" aria-label="${name} rij 1">
-    ${personalKpiVisible(owner, "income") ? `<div class="mobile-kpi-card joint-kpi-card joint-total-income-card static" data-personal-kpi-mobile="income"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg("allowance")}</span></div><div class="mobile-kpi-label">Totaal inkomen</div><div class="mobile-kpi-value ${personalIncome.total < 0 ? "value neg" : "value pos"}">${eur(personalIncome.total)}</div>${renderPersonalIncomeSources(personalIncome)}</div>` : ""}
+    ${personalKpiVisible(owner, "income") ? `<button type="button" class="mobile-kpi-card joint-kpi-card joint-total-income-card" data-personal-kpi-mobile="income" data-income-edit="${owner}" data-income-label="${textSafe(name)}" aria-label="Inkomen van ${textSafe(name)} aanpassen"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg("allowance")}</span></div><div class="mobile-kpi-label">Totaal inkomen</div><div class="mobile-kpi-value ${personalIncome.total < 0 ? "value neg" : "value pos"}">${eur(personalIncome.total)}</div>${renderPersonalIncomeSources(personalIncome)}</button>` : ""}
     <div class="mobile-kpi-card joint-kpi-card joint-fixed-costs-card"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg("wallet")}</span></div><div class="mobile-kpi-label">Vaste lasten</div><div class="mobile-kpi-value value neg">${eur(person.persoonlijkeVasteLasten)}</div><div class="mobile-kpi-edit-hint-placeholder">.</div></div>
     <button type="button" class="mobile-kpi-card joint-kpi-card joint-saving-card" data-personal-saving-edit="${owner}" aria-label="Spaargeld van ${textSafe(name)} voor deze maand aanpassen"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg("piggy")}</span></div><div class="mobile-kpi-label">Sparen deze maand</div><div class="mobile-kpi-value ${person.beschikbaarVoorSparen < 0 ? "value neg" : "value pos"}">${eur(person.beschikbaarVoorSparen)}</div><div class="mobile-kpi-edit-hint">${person.savingsSource === "handmatig" ? "Handmatig" : "Tik om aan te passen"}</div></button>
     <div class="mobile-kpi-card joint-kpi-card static joint-variable-card"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg("chart")}</span></div><div class="mobile-kpi-label">Variabel gebruikt</div><div class="mobile-kpi-value mobile-kpi-value-budget neu">${eur(person.variabeleUitgaven)} / ${eur(variableBudget)}</div><div class="mobile-kpi-budget-track" style="--used-pct:${variablePct}%"></div></div>
@@ -6615,11 +6594,11 @@ service cloud.firestore {
     root2.querySelectorAll("[data-add-goal]").forEach((btn) => {
       btn.addEventListener("click", () => createGoalForOwner(btn.dataset.addGoal));
     });
-    root2.querySelectorAll(".mobile-savings-overview .manage-section").forEach((section, index) => {
+    root2.querySelectorAll(".mobile-savings-overview .manage-section").forEach((section) => {
       var _a3;
       (_a3 = section.querySelector("summary")) == null ? void 0 : _a3.addEventListener("click", (event) => {
         event.preventDefault();
-        openMobileGoalManager(["gezamenlijk", "dion", "dara"][index]);
+        openMobileGoalManager(section.dataset.goalOwner);
       });
     });
     root2.querySelectorAll("[data-saving-edit]").forEach((btn) => {
@@ -7263,9 +7242,9 @@ service cloud.firestore {
       { owner: "dion", pot: Math.max(0, Number(result.dion.beschikbaarVoorSparen) || 0) },
       { owner: "dara", pot: Math.max(0, Number(result.dara.beschikbaarVoorSparen) || 0) }
     ].filter((group) => visibleOwners.includes(group.owner));
-    root2.querySelectorAll(".mobile-goal-section").forEach((section, index) => {
+    root2.querySelectorAll(".mobile-goal-section").forEach((section) => {
       var _a2;
-      const group = groups[index];
+      const group = groups.find((item) => item.owner === section.dataset.goalOwner);
       if (!group) return;
       const processed = u2IsProcessed(group.owner);
       const actions = document.createElement("div");
@@ -7294,7 +7273,7 @@ service cloud.firestore {
     let drafts = cloneState(goal.subdoelen || []);
     const productLookups = /* @__PURE__ */ new Map();
     const ownerField = document.createElement("label");
-    ownerField.innerHTML = `Eigenaar<select id="u2GoalOwner">${U2_OWNERS.map((value) => `<option value="${value}" ${value === owner ? "selected" : ""}>${ownerLabel(value)}</option>`).join("")}</select>`;
+    ownerField.innerHTML = `Eigenaar<select id="u2GoalOwner">${manageableGoalOwnerKeys().map((value) => `<option value="${value}" ${value === owner ? "selected" : ""}>${ownerLabel(value)}</option>`).join("")}</select>`;
     const ratioField = document.createElement("label");
     ratioField.className = "u2-checkbox";
     ratioField.innerHTML = `<input id="u2GoalRatio" type="checkbox" ${goal.ratoVerdeling ? "checked" : ""}> Meedoen aan automatische ratoverdeling`;
@@ -7402,6 +7381,7 @@ service cloud.firestore {
     modal.querySelector("#goalEditSave").addEventListener("click", () => {
       section.querySelectorAll("input").forEach((input) => input.dispatchEvent(new Event("input")));
       const newOwner = modal.querySelector("#u2GoalOwner").value;
+      if (!manageableGoalOwnerKeys().includes(newOwner)) return;
       const extras = {
         naam: modal.querySelector("#goalEditName").value.trim(),
         doelbedrag: round2(bankAmount(modal.querySelector("#goalEditTarget").value) || 0),
@@ -7448,16 +7428,6 @@ service cloud.firestore {
       grid.insertBefore(calculationDetails, calculation);
       calculationDetails.querySelector(".manage-body").appendChild(calculation);
     }
-  };
-  var u2BaseGoalManager = openMobileGoalManager;
-  openMobileGoalManager = function(owner) {
-    u2BaseGoalManager(owner);
-    const add = document.querySelector("#incomeEditModal [data-add-manager-goal]");
-    if (add) add.addEventListener("click", () => setTimeout(() => {
-      const goals = state.spaardoelen[owner] || [];
-      const newest = goals[goals.length - 1];
-      if (newest && !newest.eigenaar) commitChange(() => Object.assign(newest, { eigenaar: owner, ratoVerdeling: true, subdoelen: [] }), { render: false });
-    }, 0), true);
   };
   function u3ConfirmedTransactions(month = getSelectedMonth()) {
     return (state.transactions || []).filter((tx) => transactionMonth(tx) === month && (tx.reviewStatus || "bevestigd") === "bevestigd");
@@ -7980,6 +7950,14 @@ service cloud.firestore {
     if (kind === "income") return state.recurringIncomeSources || [];
     return ((_a2 = state.recurringFixedExpenses) == null ? void 0 : _a2[state.meta.scenario]) || [];
   }
+  function u3RecurringVisibleInMonth(item, month = getSelectedMonth()) {
+    const bounds = u3MonthBounds(month);
+    const start = u3ParseDate(item == null ? void 0 : item.begindatum);
+    const end = (item == null ? void 0 : item.einddatum) ? u3ParseDate(item.einddatum) : null;
+    if (!bounds || !start || start > bounds.end) return false;
+    if ((item == null ? void 0 : item.actief) === false) return true;
+    return !end || end >= bounds.start;
+  }
   function u3FixedDistributionLabel(item, financialFor = (item == null ? void 0 : item.financialFor) || (item == null ? void 0 : item.rekening) || "gezamenlijk") {
     if (financialFor !== "gezamenlijk") return `Persoonlijk · ${u3AccountLabel(financialFor)}`;
     if (u3FixedDistributionMode(item, financialFor) === "equal") return "50/50";
@@ -7992,8 +7970,8 @@ service cloud.firestore {
   }
   function u3OpenPlanning(owner = "") {
     const planningOwner = U3_ACCOUNTS.includes(owner) ? owner : "";
-    const fixed = u3RecurringRows("fixed").filter((item) => !planningOwner || (item.financialFor || item.rekening || "gezamenlijk") === planningOwner);
-    const incomes = u3RecurringRows("income");
+    const fixed = u3RecurringRows("fixed").filter((item) => u3RecurringVisibleInMonth(item) && (!planningOwner || (item.financialFor || item.rekening || "gezamenlijk") === planningOwner));
+    const incomes = u3RecurringRows("income").filter((item) => u3RecurringVisibleInMonth(item));
     const ownerName = planningOwner ? u3AccountLabel(planningOwner) : "";
     const rows = (items, kind) => items.map((item) => `<article class="u3-admin-row"><div class="u3-row-head"><div><strong>${textSafe(item.naam || "Zonder naam")}</strong><br><small>${u3AccountLabel(item.rekening)} → ${u3AccountLabel(item.financialFor || item.rekening)} · elke ${item.frequentieAantal} ${textSafe(item.frequentieEenheid)}${kind === "fixed" ? ` · ${textSafe(u3FixedDistributionLabel(item))}` : ""}</small></div><div><span class="u3-status ${item.actief !== false ? "ok" : ""}">${item.actief !== false ? "Actief" : "Gestopt"}</span> <button class="ghost small" data-u3-edit-recurring="${kind}:${item.id}">Bewerken</button></div></div><div>${eur(u3AmountAt(item, getSelectedMonth()))} <small>· gemiddeld ${eur(u3MonthlyAverage(item))} p/m${kind === "fixed" && item.afschrijfdatum ? ` · afschrijving ${formatDateNL(item.afschrijfdatum)}` : ""}</small></div></article>`).join("");
     const { modal } = u3AdminModal(`<div class="u3-admin-head"><div><div class="section-kicker">${monthLabel(getSelectedMonth())} · ${state.meta.scenario === "voor" ? "Voor verkoop" : "Na verkoop"}</div><h2>${planningOwner ? `${textSafe(ownerName)} vaste lasten` : "Planning beheren"}</h2><p>${planningOwner ? `Alleen de vaste lasten die financieel voor ${textSafe(ownerName)} zijn.` : "Bedragen kunnen voor één maand of vanaf deze maand wijzigen."}</p></div><button class="ghost" data-u3-close>Sluiten</button></div>
@@ -8008,7 +7986,7 @@ service cloud.firestore {
     }));
   }
   function u3OpenRecurringEditor(kind, id = "", defaults = {}) {
-    var _a2, _b, _c;
+    var _a2, _b, _c, _d;
     const existing = u3RecurringRows(kind).find((item) => item.id === id);
     const income = kind === "income";
     const current = getSelectedMonth();
@@ -8031,7 +8009,7 @@ service cloud.firestore {
       <label>Bedrag wijzigen<select id="u3RecScope"><option value="from">Vanaf ${monthLabel(current)}</option><option value="once">Alleen ${monthLabel(current)}</option></select></label>
       <label class="u2-checkbox"><input id="u3RecActive" type="checkbox" ${(existing == null ? void 0 : existing.actief) !== false ? "checked" : ""}> Actief</label>
     </div>
-    <div class="modal-actions">${existing ? '<button class="danger-ghost" id="u3RecDelete">Stoppen</button>' : ""}<button class="ghost" data-u3-back-planning>Terug</button><button class="primary" id="u3RecSave">Opslaan</button></div>`);
+    <div class="modal-actions">${existing ? `${existing.actief !== false ? '<button class="ghost" id="u3RecStop">Stoppen</button>' : ""}<button class="danger-ghost" id="u3RecDelete">Verwijderen</button>` : ""}<button class="ghost" data-u3-back-planning>Terug</button><button class="primary" id="u3RecSave">Opslaan</button></div>`);
     (_a2 = modal.querySelector("[data-u3-back-planning]")) == null ? void 0 : _a2.addEventListener("click", () => u3OpenPlanning(planningOwner));
     const updateDistributionField = () => {
       var _a3;
@@ -8047,14 +8025,33 @@ service cloud.firestore {
     };
     (_b = modal.querySelector("#u3RecFor")) == null ? void 0 : _b.addEventListener("change", updateDistributionField);
     updateDistributionField();
-    (_c = modal.querySelector("#u3RecDelete")) == null ? void 0 : _c.addEventListener("click", () => {
+    (_c = modal.querySelector("#u3RecStop")) == null ? void 0 : _c.addEventListener("click", () => {
       try {
         u3AssertMonthOpen();
         commitChange(() => {
           existing.actief = false;
-          existing.einddatum = existing.einddatum || u3IsoDate(/* @__PURE__ */ new Date(`${current}-01T12:00:00`));
+          existing.einddatum = u3IsoDate(u3MonthBounds(current).end);
         }, { render: false });
         u3OpenPlanning(planningOwner);
+      } catch (error) {
+        alert(error.message);
+      }
+    });
+    (_d = modal.querySelector("#u3RecDelete")) == null ? void 0 : _d.addEventListener("click", () => {
+      const label = (existing == null ? void 0 : existing.naam) || `${income ? "inkomstenbron" : "vaste last"}`;
+      if (!confirm(`“${label}” verwijderen vanaf ${monthLabel(current)}? Eerdere maanden en bestaande transacties blijven bewaard.`)) return;
+      try {
+        u3AssertMonthOpen();
+        commitChange(() => {
+          const bounds = u3MonthBounds(current);
+          const dayBefore = new Date(bounds.start);
+          dayBefore.setDate(dayBefore.getDate() - 1);
+          const previousEnd = existing.einddatum ? u3ParseDate(existing.einddatum) : null;
+          existing.einddatum = u3IsoDate(previousEnd && previousEnd < dayBefore ? previousEnd : dayBefore);
+          existing.actief = true;
+        }, { render: false });
+        u3OpenPlanning(planningOwner);
+        showQuickToast(`${income ? "Inkomstenbron" : "Vaste last"} verwijderd vanaf ${monthLabel(current)}`);
       } catch (error) {
         alert(error.message);
       }
@@ -11095,6 +11092,21 @@ ${(error == null ? void 0 : error.message) || error}`);
       </section>`).join("")}
     </div>`;
     }
+    function goalProcessingPanel(groups) {
+      const visibleOwners = new Set(groups.map((group) => group.owner));
+      const history = Object.values(state.spaardoelGeschiedenis || {}).filter((entry) => visibleOwners.has(entry.eigenaar)).sort((a, b) => String(b.maand).localeCompare(String(a.maand)));
+      return `<section class="card u5-goal-processing">
+      <div class="card-head"><div><h2>Spaarpotten verwerken</h2><span class="hint">${monthLabel(getSelectedMonth())}</span></div></div>
+      <div class="u5-goal-processing-actions">${groups.map((group) => {
+        const processed = u2IsProcessed(group.owner);
+        return `<div><span><strong>${textSafe(group.label)}</strong><small>${eur(group.pot)}</small></span><button type="button" class="${processed ? "ghost" : "primary"} small" data-u2-process-owner="${group.owner}" ${processed ? "disabled" : ""}>${processed ? "Maand verwerkt" : "Spaarpot verwerken"}</button></div>`;
+      }).join("")}</div>
+      <details class="u2-history"><summary><strong>Spaargeschiedenis</strong><span>${history.length} ${history.length === 1 ? "maand" : "maanden"}</span></summary><div>${history.map((entry) => {
+        var _a3;
+        return `<article><strong>${textSafe(((_a3 = groups.find((group) => group.owner === entry.eigenaar)) == null ? void 0 : _a3.label) || entry.eigenaar)} · ${monthLabel(entry.maand)}</strong><span>Spaarpot ${eur(entry.spaarpot)} · verdeeld ${eur(entry.verdeeld)} · onverdeeld ${eur(entry.onverdeeld)}</span><small>${(entry.transacties || []).map((tx) => `${textSafe(tx.doelNaam)} ${eur(tx.bedrag)}`).join(" · ")}</small></article>`;
+      }).join("") || '<p class="hint">Nog geen maanden verwerkt.</p>'}</div></details>
+    </section>`;
+    }
     function bindGoalPresentation(root2) {
       root2.querySelectorAll("[data-u5-goal-filter]").forEach((button) => button.addEventListener("click", () => {
         goalOwnerFilter = button.dataset.u5GoalFilter;
@@ -11118,6 +11130,7 @@ ${(error == null ? void 0 : error.message) || error}`);
         goalViewMode = button.dataset.u5GoalView;
         renderActiveTab();
       }));
+      root2.querySelectorAll("[data-u2-process-owner]").forEach((button) => button.addEventListener("click", () => u2OpenProcessModal(button.dataset.u2ProcessOwner)));
     }
     function renderGoals() {
       var _a3;
@@ -11149,6 +11162,7 @@ ${(error == null ? void 0 : error.message) || error}`);
           <button type="button" class="${goalViewMode === "table" ? "active" : ""}" data-u5-goal-view="table">Tabelweergave</button>
         </div>
       </div>
+      ${goalProcessingPanel(groups)}
       ${goalViewMode === "table" ? goalTableView(groups) : `<div class="u5-goal-master">
         <aside class="card u5-goal-list">
           <div class="card-head"><div><h2>Spaardoelen</h2><span class="hint">${selection.visible.length} zichtbaar</span></div></div>

@@ -51,6 +51,26 @@ const { pathToFileURL } = require('node:url');
   assert.equal(fixedRebased.recurringFixedExpenses.voor[0].monthOverrides['2026-09'],925,'een gelijktijdige maanduitzondering uit de cloud blijft behouden');
   assert.deepEqual(fixedRebased.recurringFixedExpenses.voor[0].amountHistory,fixedBase.recurringFixedExpenses.voor[0].amountHistory,'bedragshistorie blijft intact');
 
+  const goalsBase = {
+    spaardoelen:{gezamenlijk:[
+      {id:'goal-a',naam:'Buffer',afbeelding:'goal-image:goal-a',subdoelen:[{id:'child-a',naam:'Laptop',doelbedrag:1000}]},
+      {id:'goal-b',naam:'Vakantie',subdoelen:[]}
+    ]},
+    spaardoelGeschiedenis:{'gezamenlijk:2026-08':{id:'gezamenlijk:2026-08',eigenaar:'gezamenlijk',transacties:[{id:'saving-a',doelId:'goal-a',bedrag:50}]}}
+  };
+  const goalsLocal = structuredClone(goalsBase);
+  goalsLocal.spaardoelen.gezamenlijk.reverse();
+  goalsLocal.spaardoelen.gezamenlijk[1].subdoelen[0].naam='Nieuwe laptop';
+  const goalsRemote = structuredClone(goalsBase);
+  goalsRemote.spaardoelen.gezamenlijk[0].naam='Noodbuffer';
+  goalsRemote.spaardoelGeschiedenis['gezamenlijk:2026-08'].transacties[0].bedrag=75;
+  const goalsRebased = protocol.rebaseLocalChanges(goalsBase,goalsLocal,goalsRemote);
+  assert.deepEqual(goalsRebased.spaardoelen.gezamenlijk.map(goal=>goal.id),['goal-b','goal-a'],'een lokale doelvolgorde blijft behouden tijdens conflictherstel');
+  assert.equal(goalsRebased.spaardoelen.gezamenlijk[1].naam,'Noodbuffer','een gelijktijdig gewijzigd doelveld uit de cloud blijft behouden');
+  assert.equal(goalsRebased.spaardoelen.gezamenlijk[1].afbeelding,'goal-image:goal-a','afbeeldingsreferenties blijven intact');
+  assert.equal(goalsRebased.spaardoelen.gezamenlijk[1].subdoelen[0].naam,'Nieuwe laptop','lokale subdoelwijzigingen blijven per ID behouden');
+  assert.equal(goalsRebased.spaardoelGeschiedenis['gezamenlijk:2026-08'].transacties[0].bedrag,75,'gelijktijdige spaargeschiedenis blijft per transactie-ID behouden');
+
   const inconsistentIncome = {
     incomeDefaultsHistory:{dion:[{effectiveFrom:'2026-08',salary:2020}],dara:[]},
     monthlyIncome:{'2026-08':{dion:2020}},
