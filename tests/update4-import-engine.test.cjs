@@ -22,7 +22,8 @@ assert.equal(dion.rows[0].processing.transactionType,'salaris');
 assert.equal(dion.rows[0].certainty,'nakijken');
 assert.equal(dion.rows[1].accountOwner,'dion');
 assert.equal(dion.rows[1].processing.budgetOwner,'dion');
-assert.equal(dion.rows[1].certainty,'zeker');
+assert.equal(dion.rows[1].certainty,'nakijken','herkende boodschappen blijven wachten op expliciete goedkeuring');
+assert.equal(dion.rows[1].processing.category,'Boodschappen');
 
 const dara=u4.createImportDraft({text:fixture('ing-dara.csv'),fileName:'dara.csv',profiles,rules,id:'batch-dara'});
 assert.equal(dara.accountOwner,'dara');
@@ -43,6 +44,25 @@ const conflict=u4.classifyOriginal(dion.rows[1].bankOriginal,profiles[0],[
 ],profiles);
 assert.equal(conflict.certainty,'nakijken');
 assert.ok(conflict.reasons.includes('conflicterende herkenningsregels'));
+
+const unknown=u4.classifyOriginal({...dion.rows[1].bankOriginal,counterpartyAccount:'',rawDescription:'Nieuwe winkel 42',description:'Nieuwe winkel 42'},profiles[0],[],profiles);
+assert.equal(unknown.certainty,'onbekend','een uitgave zonder herkenning hoort bij Onbekend');
+
+const lidlText='"Datum";"Naam / Omschrijving";"Rekening";"Tegenrekening";"Code";"Af Bij";"Bedrag (EUR)";"Mutatiesoort";"Mededelingen"\n"20260705";"LIDL 1234 AMSTERDAM";"";"";"BA";"Af";"38,90";"Betaalautomaat";"PASVOLGNR 007"';
+const lidl=u4.createImportDraft({text:lidlText,fileName:'lidl.csv',profiles,rules:[{id:'lidl',enabled:true,level:'organization',value:'lidl',category:'Boodschappen',transactionType:'uitgave'}],entryOwner:'gezamenlijk',id:'batch-lidl'});
+assert.equal(lidl.accountOwner,'gezamenlijk','de eigenaargebonden rekeningfallback wordt voor herkenning toegepast');
+assert.equal(lidl.rows[0].certainty,'nakijken');
+assert.equal(lidl.rows[0].processing.category,'Boodschappen');
+assert.equal(lidl.rows[0].processing.description,'Lidl','transactiedetails en locatie komen niet in de nette omschrijving');
+assert.match(lidl.rows[0].bankOriginal.description,/AMSTERDAM/,'de originele CSV-omschrijving blijft bewaard');
+u4.markExplicitlyApproved(lidl.rows[0]);
+const learnedLidl=u4.learnedRecognitionRules(lidl);
+assert.equal(learnedLidl[0].level,'organization','een goedgekeurde winkel leert de winkelnaam in plaats van alle locatiegegevens');
+assert.equal(learnedLidl[0].value,'lidl');
+const nextLidl=u4.classifyOriginal({...lidl.rows[0].bankOriginal,rawDescription:'LIDL 9876 UTRECHT',description:'LIDL 9876 UTRECHT — PASVOLGNR 008'},profiles[2],learnedLidl,profiles);
+assert.equal(nextLidl.processing.category,'Boodschappen');
+assert.equal(nextLidl.processing.description,'Lidl');
+assert.equal(nextLidl.certainty,'nakijken','ook een geleerde Lidl-match vraagt steeds opnieuw expliciete goedkeuring');
 
 const changed={...dion.rows[1].bankOriginal,amount:-40,bankDate:'2026-08-01'};
 assert.notEqual(u4.fingerprint(changed,'dion-ing'),dion.rows[1].bankOriginal.fingerprint);

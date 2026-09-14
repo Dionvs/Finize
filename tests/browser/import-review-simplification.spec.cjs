@@ -14,13 +14,39 @@ async function openReview(page){
     state.spaardoelen.gezamenlijk=[{id:'goal-buffer',naam:'Buffer',doelbedrag:1000,algespaard:0}];
     window.__reviewDraft={
       id:'review-layout',fileName:'review.csv',bank:'ING',format:'ing',status:'concept',accountProfileId:'joint',accountOwner:'gezamenlijk',
-      rows:[{id:'review-row',certainty:'nakijken',duplicate:false,reasons:[],bankOriginal:{valid:true,amount:-100,description:'Leverancier',rawDescription:'Leverancier',bankDate:'2026-08-05',accountIdentifier:'NL01JOINT',counterpartyAccount:'NL01OTHER',fingerprint:'review-row',lineNumber:1},processing:{processingDate:'2026-08-05',processedAmount:100,budgetOwner:'gezamenlijk',category:'Overig',transactionType:'uitgave',include:true,note:'',fixedExpenseId:'',fixedAmountMode:'none',savingsGoalId:'',sourceAccountProfileId:'',destinationAccountProfileId:'',repaymentAllocations:[],budgetItemId:'',splits:[],advanceMode:'auto'}}],
+      rows:[
+        {id:'review-row',certainty:'nakijken',recognitionState:'known',duplicate:false,reasons:[],bankOriginal:{valid:true,amount:-100,description:'Leverancier',rawDescription:'Leverancier',bankDate:'2026-08-05',accountIdentifier:'NL01JOINT',counterpartyAccount:'NL01OTHER',fingerprint:'review-row',lineNumber:1},processing:{processingDate:'2026-08-05',processedAmount:100,description:'Leverancier',budgetOwner:'gezamenlijk',category:'Overig',transactionType:'uitgave',include:true,note:'',fixedExpenseId:'',fixedAmountMode:'none',savingsGoalId:'',sourceAccountProfileId:'',destinationAccountProfileId:'',repaymentAllocations:[],budgetItemId:'',splits:[],advanceMode:'auto'}},
+        {id:'unknown-row',certainty:'onbekend',recognitionState:'unknown',duplicate:false,reasons:['geen herkenningsregel'],bankOriginal:{valid:true,amount:-12,description:'Nieuwe winkel',rawDescription:'Nieuwe winkel',bankDate:'2026-08-06',accountIdentifier:'NL01JOINT',counterpartyAccount:'',fingerprint:'unknown-row',lineNumber:2},processing:{processingDate:'2026-08-06',processedAmount:12,description:'Nieuwe winkel',budgetOwner:'gezamenlijk',category:'Ongecategoriseerd',transactionType:'uitgave',include:true,note:'',fixedExpenseId:'',fixedAmountMode:'none',savingsGoalId:'',sourceAccountProfileId:'',destinationAccountProfileId:'',repaymentAllocations:[],budgetItemId:'',splits:[],advanceMode:'auto'}},
+        {id:'approved-row',certainty:'goedgekeurd',recognitionState:'known',approvalSource:'manual',approvedAt:'2026-08-05T12:00:00.000Z',duplicate:false,reasons:[],bankOriginal:{valid:true,amount:-8,description:'Goedgekeurde winkel',rawDescription:'Goedgekeurde winkel',bankDate:'2026-08-07',accountIdentifier:'NL01JOINT',counterpartyAccount:'NL02OTHER',fingerprint:'approved-row',lineNumber:3},processing:{processingDate:'2026-08-07',processedAmount:8,description:'Goedgekeurde winkel',budgetOwner:'gezamenlijk',category:'Overig',transactionType:'uitgave',include:true,note:'',fixedExpenseId:'',fixedAmountMode:'none',savingsGoalId:'',sourceAccountProfileId:'',destinationAccountProfileId:'',repaymentAllocations:[],budgetItemId:'',splits:[],advanceMode:'auto'}}
+      ],
       summary:{}
     };
     window.FinizeUpdate4Runtime.testRenderDraftModal(window,window.__reviewDraft);
+    document.querySelector('.u4-section-review').open=true;
   });
   return page.locator('[data-u4-row="review-row"]');
 }
+
+test('importcontrole splitst onbekend, nakijken en alleen handmatig goedgekeurd',async({page})=>{
+  await openReview(page);
+  await expect(page.locator('.u4-section-unknown > summary')).toContainText('Onbekend');
+  await expect(page.locator('.u4-section-review > summary')).toContainText('Nakijken');
+  await expect(page.locator('.u4-section-approved > summary')).toContainText('Goedgekeurd');
+  await expect(page.locator('.u4-section-unknown [data-u4-row="unknown-row"]')).toHaveCount(1);
+  await expect(page.locator('.u4-section-review [data-u4-row="review-row"]')).toHaveCount(1);
+  await page.locator('.u4-section-approved > summary').click();
+  await expect(page.locator('.u4-section-approved [data-u4-row="approved-row"]')).toHaveCount(1);
+});
+
+test('verwerken blokkeert niet-goedgekeurde regels en handmatig goedkeuren verplaatst de regel',async({page})=>{
+  await openReview(page);
+  await page.locator('[data-u4-process]').click();
+  await expect(page.locator('.u4-validation-dialog')).toContainText('expliciet goed');
+  await page.locator('[data-u4-validation-close]').click();
+  await page.locator('[data-u4-row="review-row"] [data-u4-approve]').click();
+  await expect(page.locator('.u4-section-approved [data-u4-row="review-row"]')).toHaveCount(1);
+  expect(await page.evaluate(()=>({certainty:window.__reviewDraft.rows[0].certainty,source:window.__reviewDraft.rows[0].approvalSource}))).toEqual({certainty:'goedgekeurd',source:'manual'});
+});
 
 test('CSV-controle toont vier hoofdvelden en alleen relevante vervolgkeuzes',async({page})=>{
   const row=await openReview(page);

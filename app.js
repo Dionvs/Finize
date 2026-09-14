@@ -8440,6 +8440,7 @@ service cloud.firestore {
         budgetItemId: String((rule == null ? void 0 : rule.budgetItemId) || ""),
         fixedExpenseId: String((rule == null ? void 0 : rule.fixedExpenseId) || ""),
         savingsGoalId: String((rule == null ? void 0 : rule.savingsGoalId) || ""),
+        displayName: String((rule == null ? void 0 : rule.displayName) || "").trim(),
         alwaysReview: (rule == null ? void 0 : rule.alwaysReview) === true,
         updatedAt: String((rule == null ? void 0 : rule.updatedAt) || (/* @__PURE__ */ new Date(0)).toISOString())
       };
@@ -8940,7 +8941,7 @@ service cloud.firestore {
       return `u4-${hashText(basis)}`;
     }
     function organizationName(description) {
-      return normalizeText(description).replace(/\b(pasvolgnr|betaalautomaat|incasso|ideal|sepa|europese|betaling|kenmerk|omschrijving)\b.*$/, "").replace(/\b\d{3,}\b/g, "").trim();
+      return normalizeText(description).replace(/\b(pasvolgnr|betaalautomaat|incasso|ideal|sepa|europese|betaling|kenmerk|omschrijving)\b.*$/, "").replace(/\b\d{3,}\b.*$/, "").trim();
     }
     function proposeType(original, profiles = []) {
       const text = normalizeText(`${original.description} ${original.notes || ""}`);
@@ -8993,19 +8994,54 @@ service cloud.firestore {
       const safe = expected > 0 && Math.abs(actual - expected) <= tolerance + 4e-3;
       return { required: true, safe, item, expected, tolerance, reason: safe ? "" : `bedrag wijkt meer dan ${tolerance.toFixed(2)} af` };
     }
+    function isExplicitlyApproved(row) {
+      return (row == null ? void 0 : row.certainty) === "goedgekeurd" && (row == null ? void 0 : row.approvalSource) === "manual";
+    }
+    function importReviewState(row) {
+      if (isExplicitlyApproved(row)) return "goedgekeurd";
+      if ((row == null ? void 0 : row.recognitionState) === "unknown" || (row == null ? void 0 : row.certainty) === "onbekend") return "onbekend";
+      return "nakijken";
+    }
+    function markExplicitlyApproved(row) {
+      row.certainty = "goedgekeurd";
+      row.approvalSource = "manual";
+      row.approvedAt = (/* @__PURE__ */ new Date()).toISOString();
+      row.reasons = [];
+      return row;
+    }
+    function reopenForReview(row) {
+      row.certainty = "nakijken";
+      row.approvalSource = "";
+      row.approvedAt = "";
+      return row;
+    }
+    function titleCaseMerchant(value) {
+      return String(value || "").trim().toLocaleLowerCase("nl-NL").replace(/(^|[\s-])\p{L}/gu, (char) => char.toLocaleUpperCase("nl-NL"));
+    }
+    function recognizedDescription(original, proposal) {
+      var _a2, _b;
+      const saved = String(((_a2 = proposal == null ? void 0 : proposal.rule) == null ? void 0 : _a2.displayName) || "").trim();
+      if (saved) return saved;
+      const ruleValue = String(((_b = proposal == null ? void 0 : proposal.rule) == null ? void 0 : _b.value) || "").trim();
+      if (proposal && ["organization", "keyword", "prediction"].includes(proposal.level) && ruleValue.length <= 60) return titleCaseMerchant(ruleValue);
+      const organization = organizationName(original.rawDescription || original.description);
+      return organization ? titleCaseMerchant(organization) : String(original.rawDescription || original.description || "").trim();
+    }
     function classifyOriginal(original, profile, rules = [], profiles = [], fixedExpenses = []) {
-      var _a2, _b, _c, _d, _e, _f, _g, _h, _i;
+      var _a2, _b, _c, _d, _e, _f, _g, _h;
       const proposal = recognitionProposal(original, rules);
       const proposedType = ((_a2 = proposal == null ? void 0 : proposal.rule) == null ? void 0 : _a2.transactionType) || proposeType(original, profiles);
       const type = ((_b = proposal == null ? void 0 : proposal.rule) == null ? void 0 : _b.fixedExpenseId) ? "vaste-last" : proposedType;
       const fixedMatch = fixedRecognition(original, profile, proposal == null ? void 0 : proposal.rule, fixedExpenses);
       const special = !["uitgave", "vaste-last"].includes(type);
-      const strong = proposal && ["counterparty", "description", "organization"].includes(proposal.level);
       const category = ((_c = proposal == null ? void 0 : proposal.rule) == null ? void 0 : _c.category) || "Ongecategoriseerd";
       const alwaysReview = ((_d = proposal == null ? void 0 : proposal.rules) == null ? void 0 : _d.some((rule) => rule.alwaysReview)) === true;
-      const review = !profile || special || !strong || (proposal == null ? void 0 : proposal.conflict) || alwaysReview || category === "Ongecategoriseerd" || fixedMatch.required && !fixedMatch.safe || !!((_e = proposal == null ? void 0 : proposal.rule) == null ? void 0 : _e.savingsGoalId);
+      const recognized = Boolean(proposal) || type !== "uitgave" && type !== "overige-inkomsten";
       return {
-        certainty: review ? "nakijken" : "zeker",
+        certainty: recognized ? "nakijken" : "onbekend",
+        recognitionState: recognized ? "known" : "unknown",
+        approvalSource: "",
+        approvedAt: "",
         reasons: [
           !profile ? "rekeningprofiel ontbreekt" : "",
           special ? `bijzonder type: ${type}` : "",
@@ -9018,17 +9054,18 @@ service cloud.firestore {
         processing: {
           processingDate: original.bankDate,
           processedAmount: round22(Math.abs(Number(original.amount) || 0)),
+          description: recognizedDescription(original, proposal),
           category,
           transactionType: type,
           budgetOwner: (profile == null ? void 0 : profile.accountOwner) || "",
-          budgetItemId: ((_f = proposal == null ? void 0 : proposal.rule) == null ? void 0 : _f.budgetItemId) || "",
-          fixedExpenseId: ((_g = proposal == null ? void 0 : proposal.rule) == null ? void 0 : _g.fixedExpenseId) || "",
+          budgetItemId: ((_e = proposal == null ? void 0 : proposal.rule) == null ? void 0 : _e.budgetItemId) || "",
+          fixedExpenseId: ((_f = proposal == null ? void 0 : proposal.rule) == null ? void 0 : _f.fixedExpenseId) || "",
           fixedAmountMode: "none",
-          savingsGoalId: ((_h = proposal == null ? void 0 : proposal.rule) == null ? void 0 : _h.savingsGoalId) || "",
+          savingsGoalId: ((_g = proposal == null ? void 0 : proposal.rule) == null ? void 0 : _g.savingsGoalId) || "",
           splits: [],
           advanceMode: "auto",
           include: true,
-          recognitionRuleId: ((_i = proposal == null ? void 0 : proposal.rule) == null ? void 0 : _i.id) || "",
+          recognitionRuleId: ((_h = proposal == null ? void 0 : proposal.rule) == null ? void 0 : _h.id) || "",
           note: ""
         }
       };
@@ -9071,9 +9108,11 @@ service cloud.firestore {
       if (identifiers.length !== 1) return null;
       return profiles.find((profile) => normalizeIban(profile.identifier) === identifiers[0]) || null;
     }
-    function createImportDraft({ text, fileName = "import.csv", profiles = [], rules = [], transactions = [], fixedExpenses = [], id = uid2("import") }) {
+    function createImportDraft({ text, fileName = "import.csv", profiles = [], rules = [], transactions = [], fixedExpenses = [], entryOwner = "", id = uid2("import") }) {
       const parsed = parseBankCsv(text);
-      const profile = findProfile(parsed, profiles);
+      const detectedProfile = findProfile(parsed, profiles);
+      const ownerProfiles = OWNERS.includes(entryOwner) ? profiles.filter((profile2) => profile2.accountOwner === entryOwner) : [];
+      const profile = detectedProfile || (ownerProfiles.length === 1 ? ownerProfiles[0] : null);
       const existingFingerprints = new Set((transactions || []).map((tx) => {
         var _a2;
         return (_a2 = tx.bankOriginal) == null ? void 0 : _a2.fingerprint;
@@ -9097,6 +9136,7 @@ service cloud.firestore {
         format: parsed.format,
         headers: parsed.headers,
         mapping: parsed.mapping,
+        entryOwner: OWNERS.includes(entryOwner) ? entryOwner : "",
         accountProfileId: (profile == null ? void 0 : profile.id) || "",
         accountOwner: (profile == null ? void 0 : profile.accountOwner) || "",
         status: "concept",
@@ -9105,7 +9145,7 @@ service cloud.firestore {
         periodFrom: dates[0] || "",
         periodTo: dates[dates.length - 1] || "",
         rows,
-        summary: { newCount: active.length, duplicateCount: rows.filter((row) => row.duplicate).length, totalIncome: round22(income), totalExpenses: round22(expenses), sureCount: active.filter((row) => row.certainty === "zeker").length, reviewCount: active.filter((row) => row.certainty === "nakijken").length }
+        summary: { newCount: active.length, duplicateCount: rows.filter((row) => row.duplicate).length, totalIncome: round22(income), totalExpenses: round22(expenses), sureCount: 0, approvedCount: 0, reviewCount: active.filter((row) => importReviewState(row) === "nakijken").length, unknownCount: active.filter((row) => importReviewState(row) === "onbekend").length }
       };
     }
     const UI = { draft: null, visibleRows: 60, root: null };
@@ -9140,8 +9180,10 @@ service cloud.firestore {
         duplicateCount: (draft.rows || []).filter((row) => row.duplicate).length,
         totalIncome: round22(active.filter((row) => row.bankOriginal.amount > 0 && row.processing.include).reduce((sum, row) => sum + Number(row.processing.processedAmount || 0), 0)),
         totalExpenses: round22(active.filter((row) => row.bankOriginal.amount < 0 && row.processing.include).reduce((sum, row) => sum + Number(row.processing.processedAmount || 0), 0)),
-        sureCount: active.filter((row) => row.certainty === "zeker").length,
-        reviewCount: active.filter((row) => row.certainty === "nakijken").length,
+        sureCount: active.filter(isExplicitlyApproved).length,
+        approvedCount: active.filter(isExplicitlyApproved).length,
+        reviewCount: active.filter((row) => importReviewState(row) === "nakijken").length,
+        unknownCount: active.filter((row) => importReviewState(row) === "onbekend").length,
         uncategorizedCount: active.filter((row) => row.processing.category === "Ongecategoriseerd").length
       };
       draft.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
@@ -9384,8 +9426,9 @@ service cloud.firestore {
       const profile = (state2.accountProfiles || []).find((item) => item.id === draft.accountProfileId);
       if (!profile) errors.push({ code: "profile", message: "Kies of maak eerst een rekeningprofiel." });
       (draft.rows || []).filter((row) => !row.duplicate).forEach((row) => {
-        var _a2;
+        var _a2, _b;
         if (!((_a2 = row.bankOriginal) == null ? void 0 : _a2.valid)) errors.push({ rowId: row.id, code: "original", message: "Originele bankregel mist datum, omschrijving of bedrag." });
+        if (((_b = row.bankOriginal) == null ? void 0 : _b.valid) && !isExplicitlyApproved(row)) errors.push({ rowId: row.id, code: "approval", message: "Keur deze transactie expliciet goed voordat je de import verwerkt." });
         const p = row.processing || {};
         if (!parseDate(p.processingDate)) errors.push({ rowId: row.id, code: "date", message: "Ongeldige verwerkingsdatum." });
         if (!Number.isFinite(Number(p.processedAmount))) errors.push({ rowId: row.id, code: "amount", message: "Verwerkt bedrag ontbreekt." });
@@ -9540,7 +9583,7 @@ service cloud.firestore {
             id: part.id,
             date: p.processingDate,
             amount: round22(part.amount),
-            description: row.bankOriginal.description,
+            description: p.description || row.bankOriginal.description,
             category: part.category || "Ongecategoriseerd",
             kind,
             transactionType: type,
@@ -9782,13 +9825,15 @@ service cloud.firestore {
       const groups = /* @__PURE__ */ new Map();
       (draft.rows || []).filter((row) => {
         var _a2;
-        return row.certainty === "zeker" && ((_a2 = row.bankOriginal) == null ? void 0 : _a2.valid) && !row.duplicate;
+        return isExplicitlyApproved(row) && ((_a2 = row.bankOriginal) == null ? void 0 : _a2.valid) && !row.duplicate;
       }).forEach((row) => {
         const original = row.bankOriginal;
         const p = row.processing || {};
         const counterparty = normalizeIban(original.counterpartyAccount);
-        const level = counterparty ? "counterparty" : "description";
-        const value = counterparty || String(original.rawDescription || original.description || "").trim();
+        const organization = organizationName(original.rawDescription || original.description || "");
+        const merchantRule = !p.fixedExpenseId && p.transactionType === "uitgave" && organization;
+        const level = merchantRule ? "organization" : counterparty ? "counterparty" : "description";
+        const value = merchantRule ? organization : counterparty || String(original.rawDescription || original.description || "").trim();
         if (!value) return;
         const transactionType = p.fixedExpenseId ? "vaste-last" : p.include === false ? "niet-meetellen" : p.transactionType || "uitgave";
         const category = p.fixedExpenseId ? "Vaste lasten" : String(p.category || "Ongecategoriseerd");
@@ -9801,7 +9846,7 @@ service cloud.firestore {
       });
       return [...groups.entries()].filter(([, group]) => group.signatures.size === 1).map(([key, group]) => {
         const { p, category, transactionType } = group.rows[0];
-        return normalizeRule({ id: `u4-rule-${hashText(key)}`, enabled: true, level: group.level, value: group.value, category, transactionType, budgetItemId: p.budgetItemId || "", fixedExpenseId: p.fixedExpenseId || "", savingsGoalId: p.savingsGoalId || "", alwaysReview: false, updatedAt: (/* @__PURE__ */ new Date()).toISOString() });
+        return normalizeRule({ id: `u4-rule-${hashText(key)}`, enabled: true, level: group.level, value: group.value, displayName: p.description || "", category, transactionType, budgetItemId: p.budgetItemId || "", fixedExpenseId: p.fixedExpenseId || "", savingsGoalId: p.savingsGoalId || "", alwaysReview: false, updatedAt: (/* @__PURE__ */ new Date()).toISOString() });
       });
     }
     function rememberRecognitionRules(state2, draft) {
@@ -9922,6 +9967,7 @@ service cloud.firestore {
       else if (["goal", "goal-choice"].includes(error.code)) target = row.querySelector('[data-u4-field="savingsGoalId"]');
       else if (["fixed", "fixed-choice"].includes(error.code)) target = row.querySelector('[data-u4-field="fixedExpenseId"]');
       else if (error.code === "transfer") target = row.querySelector('[data-u4-field="sourceAccountProfileId"]');
+      else if (error.code === "approval") target = row.querySelector("[data-u4-approve]");
       setTimeout(() => {
         var _a3;
         (_a3 = target == null ? void 0 : target.focus) == null ? void 0 : _a3.call(target, { preventScroll: true });
@@ -10154,7 +10200,7 @@ service cloud.firestore {
       const sourceIdentity = matchIdentity(src);
       return draft.rows.filter((row) => {
         var _a2;
-        return row !== source && row.certainty !== "zeker" && ((_a2 = row.bankOriginal) == null ? void 0 : _a2.valid) && !row.duplicate;
+        return row !== source && !isExplicitlyApproved(row) && ((_a2 = row.bankOriginal) == null ? void 0 : _a2.valid) && !row.duplicate;
       }).map((row) => {
         const original = row.bankOriginal || {};
         if ((Number(original.amount) >= 0 ? "in" : "out") !== sourceDirection) return null;
@@ -10180,7 +10226,7 @@ service cloud.firestore {
       });
     }
     function copiedProcessing(source, target) {
-      ["budgetOwner", "category", "transactionType", "budgetItemId", "fixedExpenseId", "fixedAmountMode", "savingsGoalId", "advanceMode", "include", "sourceAccountProfileId", "destinationAccountProfileId"].forEach((field) => {
+      ["description", "budgetOwner", "category", "transactionType", "budgetItemId", "fixedExpenseId", "fixedAmountMode", "savingsGoalId", "advanceMode", "include", "sourceAccountProfileId", "destinationAccountProfileId"].forEach((field) => {
         const value = source.processing[field];
         if (value === void 0) delete target.processing[field];
         else target.processing[field] = cloneState(value);
@@ -10232,8 +10278,10 @@ service cloud.firestore {
       const p = row.processing;
       const original = row.bankOriginal;
       const family = transactionFamily(p);
+      const reviewState = importReviewState(row);
+      const statusLabel = reviewState === "goedgekeurd" ? "Goedgekeurd" : reviewState === "onbekend" ? "Onbekend" : "Nakijken";
       return `<article class="u4-import-row" data-u4-row="${escAttr(row.id)}">
-      <div class="u4-import-row-main"><div><strong>${esc(original.description || "Onbekende transactie")}</strong><span class="u4-muted">${esc(displayDate(p.processingDate))} · ${euro(p.processedAmount)}</span>${((_a2 = row.reasons) == null ? void 0 : _a2.length) ? `<div class="u4-row-reasons">${esc(row.reasons.join(" · "))}</div>` : ""}</div><div class="u4-row-approval"><span class="u4-status ${row.certainty}">${row.certainty === "zeker" ? "Zeker" : "Nakijken"}</span>${row.certainty === "nakijken" ? '<button type="button" class="primary small" data-u4-approve>✓ Goedkeuren</button>' : '<button type="button" class="ghost small" data-u4-reopen>Opnieuw nakijken</button>'}</div></div>
+      <div class="u4-import-row-main"><div><strong>${esc(p.description || original.rawDescription || original.description || "Onbekende transactie")}</strong><span class="u4-muted">${esc(displayDate(p.processingDate))} · ${euro(p.processedAmount)}</span>${((_a2 = row.reasons) == null ? void 0 : _a2.length) ? `<div class="u4-row-reasons">${esc(row.reasons.join(" · "))}</div>` : ""}</div><div class="u4-row-approval"><span class="u4-status ${reviewState}">${statusLabel}</span>${reviewState === "goedgekeurd" ? '<button type="button" class="ghost small" data-u4-reopen>Opnieuw nakijken</button>' : `<button type="button" class="primary small" data-u4-approve>✓ ${reviewState === "onbekend" ? "Categoriseren en goedkeuren" : "Goedkeuren"}</button>`}</div></div>
       <div class="u4-row-grid">
         <label>Datum<input type="date" data-u4-field="processingDate" value="${esc(p.processingDate)}"></label>
         <label>Bedrag<input type="number" step="0.01" data-u4-field="processedAmount" value="${Number(p.processedAmount) || 0}"></label>
@@ -10250,17 +10298,20 @@ service cloud.firestore {
     </article>`;
     }
     function bulkEditor(root2, draft) {
-      return `<details class="u4-section u4-bulk-section"><summary><span>Meerdere transacties aanpassen</span><span>Optioneel</span></summary><div class="u4-section-list"><p class="u4-muted">Pas één keuze in één keer toe. Handmatig aangepaste zekere transacties worden standaard overgeslagen.</p><div class="u4-profile-grid"><label>Toepassen op<select data-u4-bulk-scope><option value="review">Alleen Nakijken</option><option value="uncategorized">Alleen ongecategoriseerd</option><option value="all">Alle transacties</option></select></label><label>Budgeteigenaar<select data-u4-bulk-owner><option value="">Niet wijzigen</option>${OWNERS.map((owner) => option(owner, ownerLabel2(owner), "")).join("")}</select></label><label>Categorie<select data-u4-bulk-category><option value="">Niet wijzigen</option>${categoryOptions(root2, "gezamenlijk", "")}</select></label><label>Transactie<select data-u4-bulk-type><option value="">Niet wijzigen</option>${typeOptions("")}</select></label></div><button type="button" class="ghost small" data-u4-apply-bulk>Voorbeeld en toepassen</button></div></details>`;
+      return `<details class="u4-section u4-bulk-section"><summary><span>Meerdere transacties aanpassen</span><span>Optioneel</span></summary><div class="u4-section-list"><p class="u4-muted">Pas één keuze in één keer toe. Goedgekeurde transacties worden standaard overgeslagen en iedere aangepaste regel moet daarna expliciet worden goedgekeurd.</p><div class="u4-profile-grid"><label>Toepassen op<select data-u4-bulk-scope><option value="review">Alleen Nakijken</option><option value="unknown">Alleen Onbekend</option><option value="uncategorized">Alleen ongecategoriseerd</option><option value="all">Alle niet-goedgekeurde transacties</option></select></label><label>Budgeteigenaar<select data-u4-bulk-owner><option value="">Niet wijzigen</option>${OWNERS.map((owner) => option(owner, ownerLabel2(owner), "")).join("")}</select></label><label>Categorie<select data-u4-bulk-category><option value="">Niet wijzigen</option>${categoryOptions(root2, "gezamenlijk", "")}</select></label><label>Transactie<select data-u4-bulk-type><option value="">Niet wijzigen</option>${typeOptions("")}</select></label></div><button type="button" class="ghost small" data-u4-apply-bulk>Voorbeeld en toepassen</button></div></details>`;
     }
     async function showMatchDialog(root2, draft, source, modal) {
       var _a2, _b;
       const matches = matchCandidates(draft, source);
       if (!matches.length) {
-        const previous = source.certainty;
-        source.certainty = "zeker";
+        const previous = { certainty: source.certainty, approvalSource: source.approvalSource, approvedAt: source.approvedAt, reasons: cloneState(source.reasons || []) };
+        markExplicitlyApproved(source);
         renderDraftModalPreservingView(root2, draft, modal, source.id);
         Promise.resolve().then(() => persistImportDraft(root2, draft)).catch((error) => {
-          source.certainty = previous;
+          source.certainty = previous.certainty;
+          source.approvalSource = previous.approvalSource;
+          source.approvedAt = previous.approvedAt;
+          source.reasons = previous.reasons;
           renderDraftModalPreservingView(root2, draft, document.getElementById("u4ImportModalRoot"), source.id);
           alert(`Goedkeuren kon niet lokaal worden opgeslagen en is teruggedraaid. Probeer het opnieuw.
 
@@ -10271,7 +10322,7 @@ ${(error == null ? void 0 : error.message) || error}`);
       (_a2 = document.querySelector(".u4-match-overlay")) == null ? void 0 : _a2.remove();
       const overlay = document.createElement("div");
       overlay.className = "u4-match-overlay";
-      overlay.innerHTML = `<div class="u4-match-dialog" role="dialog" aria-modal="true" aria-labelledby="u4-match-title"><div class="u4-match-head"><div><h3 id="u4-match-title">Vergelijkbare transacties gevonden</h3><p>${matches.length} mogelijke matches. Vink uit wat niet mee aangepast moet worden.</p></div><button type="button" class="ghost small" data-u4-match-close>Sluiten</button></div><div class="u4-match-change"><strong>Wordt toegepast</strong><span>${ownerLabel2(source.processing.budgetOwner)} · ${esc(source.processing.category)} · ${esc(((_b = TYPE_GROUPS.flatMap((g) => g.items).find((item) => item[0] === source.processing.transactionType)) == null ? void 0 : _b[1]) || source.processing.transactionType)} · Zeker</span></div><div class="u4-match-list">${matches.map(({ row, score, reasons }) => `<label class="u4-match-row"><input type="checkbox" data-u4-match-id="${esc(row.id)}" ${score >= 4 ? "checked" : ""}><span><strong>${esc(displayDate(row.processing.processingDate))} · ${esc(row.bankOriginal.description || "Onbekend")}</strong><small>${euro(row.processing.processedAmount)} · ${esc(row.processing.category || "Ongecategoriseerd")} · ${esc(reasons.join(", "))}</small></span></label>`).join("")}</div><div class="u4-match-feedback" data-u4-match-feedback aria-live="polite"></div><div class="u4-match-actions"><button type="button" class="ghost" data-u4-match-only>Alleen deze transactie</button><button type="button" class="primary" data-u4-match-apply>Geselecteerde aanpassen</button></div></div>`;
+      overlay.innerHTML = `<div class="u4-match-dialog" role="dialog" aria-modal="true" aria-labelledby="u4-match-title"><div class="u4-match-head"><div><h3 id="u4-match-title">Vergelijkbare transacties gevonden</h3><p>${matches.length} mogelijke matches. Vink uit wat niet mee aangepast en goedgekeurd moet worden.</p></div><button type="button" class="ghost small" data-u4-match-close>Sluiten</button></div><div class="u4-match-change"><strong>Wordt toegepast</strong><span>${ownerLabel2(source.processing.budgetOwner)} · ${esc(source.processing.category)} · ${esc(((_b = TYPE_GROUPS.flatMap((g) => g.items).find((item) => item[0] === source.processing.transactionType)) == null ? void 0 : _b[1]) || source.processing.transactionType)} · Goedgekeurd</span></div><div class="u4-match-list">${matches.map(({ row, score, reasons }) => `<label class="u4-match-row"><input type="checkbox" data-u4-match-id="${esc(row.id)}" ${score >= 4 ? "checked" : ""}><span><strong>${esc(displayDate(row.processing.processingDate))} · ${esc(row.processing.description || row.bankOriginal.description || "Onbekend")}</strong><small>${euro(row.processing.processedAmount)} · ${esc(row.processing.category || "Ongecategoriseerd")} · ${esc(reasons.join(", "))}</small></span></label>`).join("")}</div><div class="u4-match-feedback" data-u4-match-feedback aria-live="polite"></div><div class="u4-match-actions"><button type="button" class="ghost" data-u4-match-only>Alleen deze transactie</button><button type="button" class="primary" data-u4-match-apply>Geselecteerde goedkeuren</button></div></div>`;
       document.body.appendChild(overlay);
       const close = () => overlay.remove();
       overlay.querySelector("[data-u4-match-close]").onclick = close;
@@ -10288,19 +10339,17 @@ ${(error == null ? void 0 : error.message) || error}`);
         button.textContent = "Bezig…";
         feedback.textContent = "Wijzigingen worden toegepast.";
         const snapshots = /* @__PURE__ */ new Map();
-        const remember = (row) => snapshots.set(row.id, { processing: cloneState(row.processing), certainty: row.certainty, reasons: cloneState(row.reasons || []) });
+        const remember = (row) => snapshots.set(row.id, { processing: cloneState(row.processing), certainty: row.certainty, approvalSource: row.approvalSource, approvedAt: row.approvedAt, reasons: cloneState(row.reasons || []) });
         try {
           remember(source);
-          source.certainty = "zeker";
-          source.reasons = [];
+          markExplicitlyApproved(source);
           if (applyMatches) {
             overlay.querySelectorAll("[data-u4-match-id]:checked").forEach((input) => {
               const target = draft.rows.find((row) => row.id === input.dataset.u4MatchId);
               if (target) {
                 remember(target);
                 copiedProcessing(source, target);
-                target.certainty = "zeker";
-                target.reasons = [];
+                markExplicitlyApproved(target);
               }
             });
           }
@@ -10319,6 +10368,8 @@ ${(error == null ? void 0 : error.message) || error}`);
                   if (row) {
                     row.processing = snapshot.processing;
                     row.certainty = snapshot.certainty;
+                    row.approvalSource = snapshot.approvalSource;
+                    row.approvedAt = snapshot.approvedAt;
                     row.reasons = snapshot.reasons;
                   }
                 });
@@ -10335,6 +10386,8 @@ ${(error == null ? void 0 : error.message) || error}`);
             if (row) {
               row.processing = snapshot.processing;
               row.certainty = snapshot.certainty;
+              row.approvalSource = snapshot.approvalSource;
+              row.approvedAt = snapshot.approvedAt;
               row.reasons = snapshot.reasons;
             }
           });
@@ -10366,15 +10419,17 @@ ${(error == null ? void 0 : error.message) || error}`);
       const isConcept = draft.status === "concept";
       const canCorrect = draft.status === "verwerkt" || draft.status === "correctie-nodig";
       const active = draft.rows.filter((row) => row.bankOriginal.valid && !row.duplicate);
-      const review = active.filter((row) => row.certainty === "nakijken").slice(0, UI.visibleRows);
-      const sure = active.filter((row) => row.certainty === "zeker").slice(0, UI.visibleRows);
+      const unknown = active.filter((row) => importReviewState(row) === "onbekend").slice(0, UI.visibleRows);
+      const review = active.filter((row) => importReviewState(row) === "nakijken").slice(0, UI.visibleRows);
+      const approved = active.filter((row) => importReviewState(row) === "goedgekeurd").slice(0, UI.visibleRows);
       const modal = ensureModalRoot();
       modal.innerHTML = `<div class="u4-import-modal" role="dialog" aria-modal="true" aria-label="Bankimport controleren">
       <header class="u4-modal-head"><div><h2>${isConcept ? "Bankimport controleren" : "Importdetails"}</h2><p>${esc(draft.fileName)} · ${esc(draft.bank)} · ${esc(displayDate(draft.periodFrom) || "—")} t/m ${esc(displayDate(draft.periodTo) || "—")} · ${esc(draft.status)}</p></div><button type="button" class="ghost" data-u4-close>Sluiten</button></header>
       <main class="u4-modal-body">${isConcept ? profileEditor(root2, draft) + bulkEditor(root2, draft) : ""}
         <div class="u4-import-summary"><div><span>Nieuw</span><strong>${draft.summary.newCount}</strong></div><div><span>Duplicaten</span><strong>${draft.summary.duplicateCount}</strong></div><div><span>Inkomsten</span><strong>${euro(draft.summary.totalIncome)}</strong></div><div><span>Uitgaven</span><strong>${euro(draft.summary.totalExpenses)}</strong></div></div>
-        <details class="u4-section" open><summary><span>Nakijken</span><span>${draft.summary.reviewCount}</span></summary><div class="u4-section-list">${review.map((row) => rowHtml(root2, row)).join("") || '<div class="u4-empty">Geen transacties om na te kijken.</div>'}</div></details>
-        <details class="u4-section"><summary><span>Zeker</span><span>${draft.summary.sureCount}</span></summary><div class="u4-section-list">${sure.map((row) => rowHtml(root2, row)).join("") || '<div class="u4-empty">Geen zekere transacties.</div>'}</div></details>
+        <details class="u4-section u4-section-unknown" ${draft.summary.unknownCount ? "open" : ""}><summary><span>Onbekend</span><span>${draft.summary.unknownCount}</span></summary><div class="u4-section-list">${unknown.map((row) => rowHtml(root2, row)).join("") || '<div class="u4-empty">Alle transacties zijn herkend.</div>'}</div></details>
+        <details class="u4-section u4-section-review" ${draft.summary.unknownCount ? "" : "open"}><summary><span>Nakijken</span><span>${draft.summary.reviewCount}</span></summary><div class="u4-section-list">${review.map((row) => rowHtml(root2, row)).join("") || '<div class="u4-empty">Geen herkende transacties om na te kijken.</div>'}</div></details>
+        <details class="u4-section u4-section-approved"><summary><span>Goedgekeurd</span><span>${draft.summary.approvedCount}</span></summary><div class="u4-section-list">${approved.map((row) => rowHtml(root2, row)).join("") || '<div class="u4-empty">Nog geen transacties expliciet goedgekeurd.</div>'}</div></details>
         ${draft.summary.duplicateCount ? `<details class="u4-section"><summary><span>Eerder geïmporteerd — overgeslagen</span><span>${draft.summary.duplicateCount}</span></summary><div class="u4-section-list">${draft.rows.filter((row) => row.duplicate).map((row) => `<div class="u4-original">${esc(displayDate(row.bankOriginal.bankDate))} · ${esc(row.bankOriginal.description)} · ${euro(row.bankOriginal.amount)}</div>`).join("")}</div></details>` : ""}
       </main>
       <footer class="u4-modal-actions"><span class="u4-muted" data-u4-save-status>${isConcept ? "Wijzigingen worden automatisch lokaal bewaard." : canCorrect ? "Aanpassingen worden pas financieel verwerkt na bevestiging." : "Deze import is financieel teruggedraaid."}</span>${canCorrect ? '<button type="button" class="danger-ghost" data-u4-undo>Import ongedaan maken</button><button type="button" class="primary" data-u4-reconcile>Wijzigingen verwerken</button>' : isConcept ? '<button type="button" class="ghost" data-u4-save-concept>Concept opslaan</button><button type="button" class="primary" data-u4-process>Alles verwerken</button>' : ""}</footer>
@@ -10464,6 +10519,9 @@ ${(error == null ? void 0 : error.message) || error}`);
         const fixedExpenses = ((_a2 = root2.state.recurringFixedExpenses) == null ? void 0 : _a2[root2.state.meta.scenario]) || [];
         const proposal = classifyOriginal(row.bankOriginal, profile, root2.state.recognitionRules, root2.state.accountProfiles, fixedExpenses);
         row.certainty = proposal.certainty;
+        row.recognitionState = proposal.recognitionState;
+        row.approvalSource = "";
+        row.approvedAt = "";
         row.reasons = proposal.reasons;
         row.processing = { ...proposal.processing, ...row.processing, budgetOwner: row.processing.budgetOwner || profile.accountOwner };
       });
@@ -10537,6 +10595,7 @@ ${(error == null ? void 0 : error.message) || error}`);
         if (!container) return;
         const row = draft.rows.find((item) => item.id === container.dataset.u4Row);
         if (!row) return;
+        const wasApproved = isExplicitlyApproved(row);
         let rerender = false;
         if (event.target.hasAttribute("data-u4-family")) {
           applyTransactionFamily(row, event.target.value);
@@ -10576,7 +10635,7 @@ ${(error == null ? void 0 : error.message) || error}`);
             row.processing.repaymentAllocations = relation ? proposeRepaymentAllocations(root2.state, relation.debtor, relation.creditor, row.processing.processedAmount) : [];
           }
           rerender = ["transactionType", "budgetOwner", "category", "include", "fixedExpenseId"].includes(field);
-        } else if (event.target.hasAttribute("data-u4-row-certainty")) row.certainty = event.target.value;
+        } else if (event.target.hasAttribute("data-u4-row-certainty")) reopenForReview(row);
         else if (event.target.dataset.u4SplitField) {
           const split = row.processing.splits[Number(event.target.closest("[data-u4-split]").dataset.u4Split)];
           let value = event.target.value;
@@ -10585,6 +10644,10 @@ ${(error == null ? void 0 : error.message) || error}`);
         } else if (event.target.dataset.u4AllocationField) {
           const allocation = row.processing.repaymentAllocations[Number(event.target.closest("[data-u4-allocation]").dataset.u4Allocation)];
           allocation[event.target.dataset.u4AllocationField] = round22(Math.abs(Number(event.target.value) || 0));
+        }
+        if (wasApproved) {
+          reopenForReview(row);
+          rerender = true;
         }
         if (rerender) renderDraftRowCard(root2, draft, modal, row.id);
         updateImportSaveStatus("Wijziging klaarzetten voor lokale opslag…");
@@ -10604,7 +10667,7 @@ ${(error == null ? void 0 : error.message) || error}`);
           return;
         }
         if (event.target.closest("[data-u4-reopen]") && row) {
-          row.certainty = "nakijken";
+          reopenForReview(row);
           renderDraftModalPreservingView(root2, draft, modal, row.id);
           scheduleImportDraftPersist(root2, draft, { delay: 0 }).catch((error) => console.warn("Opnieuw nakijken opslaan mislukt.", error));
           return;
@@ -10620,7 +10683,7 @@ ${(error == null ? void 0 : error.message) || error}`);
           }
           const targets = draft.rows.filter((item) => {
             var _a4;
-            return ((_a4 = item.bankOriginal) == null ? void 0 : _a4.valid) && !item.duplicate && (scope === "all" || scope === "review" && item.certainty === "nakijken" || scope === "uncategorized" && (!item.processing.category || item.processing.category === "Ongecategoriseerd"));
+            return ((_a4 = item.bankOriginal) == null ? void 0 : _a4.valid) && !item.duplicate && !isExplicitlyApproved(item) && (scope === "all" || scope === "review" && importReviewState(item) === "nakijken" || scope === "unknown" && importReviewState(item) === "onbekend" || scope === "uncategorized" && (!item.processing.category || item.processing.category === "Ongecategoriseerd"));
           });
           if (!targets.length) {
             alert("Geen transacties binnen deze selectie.");
@@ -10631,6 +10694,7 @@ ${(error == null ? void 0 : error.message) || error}`);
             if (owner) item.processing.budgetOwner = owner;
             if (category) item.processing.category = category;
             if (type) item.processing.transactionType = type;
+            reopenForReview(item);
           });
           renderDraftModal(root2, draft);
           scheduleImportDraftPersist(root2, draft, { delay: 0 }).catch((error) => console.warn("Bulkbewerking opslaan mislukt.", error));
@@ -10710,7 +10774,7 @@ ${(error == null ? void 0 : error.message) || error}`);
         reader.onload = async (loaded) => {
           var _a4;
           try {
-            const draft = createImportDraft({ text: String(loaded.target.result || ""), fileName: file.name, profiles: root2.state.accountProfiles, rules: root2.state.recognitionRules, transactions: root2.state.transactions, fixedExpenses: ((_a4 = root2.state.recurringFixedExpenses) == null ? void 0 : _a4[root2.state.meta.scenario]) || [] });
+            const draft = createImportDraft({ text: String(loaded.target.result || ""), fileName: file.name, profiles: root2.state.accountProfiles, rules: root2.state.recognitionRules, transactions: root2.state.transactions, fixedExpenses: ((_a4 = root2.state.recurringFixedExpenses) == null ? void 0 : _a4[root2.state.meta.scenario]) || [], entryOwner: owner });
             if (owner && draft.accountProfileId && draft.accountOwner !== owner) throw new Error(`Dit bankbestand hoort bij ${ownerLabel2(draft.accountOwner)}. Open de juiste persoonlijke of gezamenlijke tab.`);
             if (owner) {
               draft.entryOwner = owner;
@@ -10967,7 +11031,7 @@ ${(error == null ? void 0 : error.message) || error}`);
         flushImportSync(root2).catch((error) => console.warn("Importsynchronisatie uitgesteld.", error));
       });
     }
-    return { SCHEMA_VERSION, CLOUD_STORAGE_VERSION, CLOUD_READ_CONCURRENCY, OWNERS, IMPORT_STATUSES, normalizeIban, normalizeRule, normalizeTransaction, normalizeCore, validateCore, calculateGoalSavedAmount, reconcileGoalSavedAmounts, chunkRows, canonicalValue, rowsChecksum, buildCloudImportEnvelope, assembleCloudImport, mapWithConcurrency, classifyCloudError, fetchImportFromCloud, resolveImportDetails, reconcileActiveImportReference, deleteCloudImportBestEffort, discardImportConcept, normalizeText, matchIdentity, matchCandidates, detectDelimiter, parseDelimited, parseDate, parseAmount, detectFormat, inferMapping, hashText, fingerprint, organizationName, proposeType, recognitionProposal, fixedAmountAt, fixedRecognition, classifyOriginal, parseBankCsv, findProfile, createImportDraft, updateDraftSummary, compactSummary, validateDraft, transactionKind, expenseImpact, financialRows, advanceForTransaction, savingsForTransaction, detectInternalPairs, directionalBalances, proposeRepaymentAllocations, planImportEffects, applyImportPlan, learnedRecognitionRules, rememberRecognitionRules, effectManifest, undoImportEffects, transactionFamily, applyTransactionFamily, ImportStore, persistImportDraft, scheduleImportDraftPersist, flushScheduledImportDraft, queueImportSync, flushImportSync, recoverJournal, install, round2: round22, uid: uid2, clone: cloneState, testRenderDraftModal: renderDraftModal };
+    return { SCHEMA_VERSION, CLOUD_STORAGE_VERSION, CLOUD_READ_CONCURRENCY, OWNERS, IMPORT_STATUSES, normalizeIban, normalizeRule, normalizeTransaction, normalizeCore, validateCore, calculateGoalSavedAmount, reconcileGoalSavedAmounts, chunkRows, canonicalValue, rowsChecksum, buildCloudImportEnvelope, assembleCloudImport, mapWithConcurrency, classifyCloudError, fetchImportFromCloud, resolveImportDetails, reconcileActiveImportReference, deleteCloudImportBestEffort, discardImportConcept, normalizeText, matchIdentity, matchCandidates, detectDelimiter, parseDelimited, parseDate, parseAmount, detectFormat, inferMapping, hashText, fingerprint, organizationName, proposeType, recognitionProposal, fixedAmountAt, fixedRecognition, isExplicitlyApproved, importReviewState, markExplicitlyApproved, classifyOriginal, parseBankCsv, findProfile, createImportDraft, updateDraftSummary, compactSummary, validateDraft, transactionKind, expenseImpact, financialRows, advanceForTransaction, savingsForTransaction, detectInternalPairs, directionalBalances, proposeRepaymentAllocations, planImportEffects, applyImportPlan, learnedRecognitionRules, rememberRecognitionRules, effectManifest, undoImportEffects, transactionFamily, applyTransactionFamily, ImportStore, persistImportDraft, scheduleImportDraftPersist, flushScheduledImportDraft, queueImportSync, flushImportSync, recoverJournal, install, round2: round22, uid: uid2, clone: cloneState, testRenderDraftModal: renderDraftModal };
   });
   var FinizeImportRuntime = globalThis.FinizeUpdate4Runtime;
 

@@ -62,7 +62,7 @@ De consolidatie veranderde geen financiële functies, state, opslag, schema’s,
 - De desktop-spaardoelenpreview biedt zes pixels extra onderruimte, toont drie doelen volledig en blijft bij extra doelen scrollbaar.
 - De Gezamenlijk-pagina gebruikt tussen de primaire KPI’s, beide dashboardrijen en de beheerblokken dezelfde verticale tussenruimte van 16 px als binnen de kaartgrids.
 - De spaardoelenpreview in de smalle desktopkolom toont doelen onder elkaar, zodat inhoud en acties niet meer worden ingeklemd; tablet behoudt de brede gedeelde layout.
-- De service-worker-cache gebruikt na de vaste-lastenreparatie `finize-v94-fixed-cost-delete`; de gegenereerde assets gebruiken dezelfde versiequery zodat bestaande PWA-installaties de actuele editor ophalen.
+- De service-worker-cache gebruikt na de importstatuscorrectie `finize-v95-import-review-status`; de gegenereerde assets gebruiken dezelfde versiequery zodat bestaande PWA-installaties de actuele importcontrole ophalen.
 
 ## Functiepariteit vaste lasten — 5 september 2026
 

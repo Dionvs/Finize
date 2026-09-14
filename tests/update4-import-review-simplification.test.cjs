@@ -31,13 +31,13 @@ assert.equal(familyRow.processing.transactionType,'niet-meetellen');
 assert.equal(familyRow.processing.include,false);
 
 const source=row('source');
-const approved=row('approved',{certainty:'zeker'});
+const approved=row('approved',{certainty:'goedgekeurd',approvalSource:'manual',approvedAt:'2026-08-05T12:00:00.000Z'});
 const pending=row('pending');
 const matches=u4.matchCandidates({rows:[source,approved,pending]},source);
 assert.deepEqual(matches.map(match=>match.row.id),['pending'],'alleen nog niet goedgekeurde regels worden voorgesteld');
 
 const learned=u4.learnedRecognitionRules({rows:[row('fixed-approved',{
-  certainty:'zeker',
+  certainty:'goedgekeurd',approvalSource:'manual',approvedAt:'2026-08-05T12:00:00.000Z',
   processing:processing({category:'Vaste lasten',transactionType:'vaste-last',fixedExpenseId:'fixed-energy'})
 })]});
 assert.equal(learned.length,1);
@@ -53,7 +53,7 @@ const fixedRule={id:'energy',enabled:true,level:'counterparty',value:'NL01BANK01
 const safe=u4.classifyOriginal(row('safe').bankOriginal,profile,[fixedRule],[profile],fixedExpenses);
 assert.equal(safe.processing.transactionType,'vaste-last');
 assert.equal(safe.processing.fixedExpenseId,'fixed-energy');
-assert.equal(safe.certainty,'zeker','sterke vaste-lastenmatch binnen tolerantie wordt zeker');
+assert.equal(safe.certainty,'nakijken','sterke vaste-lastenmatch wordt vooringevuld maar nooit automatisch goedgekeurd');
 assert.equal(u4.expenseImpact('vaste-last',100,true),0,'vaste lasten tellen niet dubbel als variabele uitgave');
 
 const deviatingOriginal={...row('deviating').bankOriginal,amount:-121};
@@ -67,5 +67,13 @@ assert.equal(missing.certainty,'nakijken','verdwenen vaste last blijft nakijken'
 const invalidSaving={accountProfileId:'joint',rows:[row('saving',{processing:processing({transactionType:'sparen',category:'Sparen',savingsGoalId:''})})]};
 const validation=u4.validateDraft(invalidSaving,{accountProfiles:[profile],spaardoelen:{gezamenlijk:[],dion:[],dara:[]},recurringFixedExpenses:{voor:[],na:[]}});
 assert.ok(validation.errors.some(error=>error.code==='goal-choice'));
+assert.ok(validation.errors.some(error=>error.code==='approval'),'een niet-goedgekeurde regel blokkeert verwerking');
+
+const approvalDraft={accountProfileId:'joint',rows:[row('manual',{processing:processing({category:'Boodschappen'})})]};
+let approvalValidation=u4.validateDraft(approvalDraft,{accountProfiles:[profile],spaardoelen:{gezamenlijk:[],dion:[],dara:[]},recurringFixedExpenses:{voor:[],na:[]}});
+assert.ok(approvalValidation.errors.some(error=>error.code==='approval'));
+u4.markExplicitlyApproved(approvalDraft.rows[0]);
+approvalValidation=u4.validateDraft(approvalDraft,{accountProfiles:[profile],spaardoelen:{gezamenlijk:[],dion:[],dara:[]},recurringFixedExpenses:{voor:[],na:[]}});
+assert.equal(approvalValidation.ok,true,'alleen expliciete handmatige goedkeuring maakt verwerking mogelijk');
 
 console.log('UPDATE4_IMPORT_REVIEW_SIMPLIFICATION_OK');

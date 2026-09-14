@@ -18,6 +18,7 @@ draft.rows[1].processing.splits=[
   {id:'joint',amount:40,budgetOwner:'gezamenlijk',category:'Boodschappen',include:true},
   {id:'personal',amount:2.18,budgetOwner:'dion',category:'Overig',include:true}
 ];
+draft.rows.filter(row=>row.bankOriginal.valid&&!row.duplicate).forEach(row=>u4.markExplicitlyApproved(row));
 state.importSummaries.push({id:draft.id,status:'concept'});
 state.activeImportId=draft.id;
 

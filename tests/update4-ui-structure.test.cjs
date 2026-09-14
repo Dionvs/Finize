@@ -10,7 +10,7 @@ const html=markup+js;
 assert.match(markup,/app\.css/);
 assert.match(markup,/app\.js/);
 assert.doesNotMatch(html,/renderManageSection\('Bank import & uitgaven'/);
-for(const marker of ['Bankimport controleren','Nakijken','Zeker','Meer opties','Alles verwerken','Herkenningsregels','Alle imports bekijken','Import uit cloud ophalen','Opnieuw proberen']){
+for(const marker of ['Bankimport controleren','Onbekend','Nakijken','Goedgekeurd','Meer opties','Alles verwerken','Herkenningsregels','Alle imports bekijken','Import uit cloud ophalen','Opnieuw proberen']){
   assert.match(js,new RegExp(marker),`UI-marker ontbreekt: ${marker}`);
 }
 assert.doesNotMatch(html,/section-kicker">Update 3/);

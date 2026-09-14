@@ -5483,6 +5483,9 @@ button.icon-only-finize{width:34px;height:34px;padding:0!important;border-radius
 .u4-import-receipts{display:grid;gap:8px}
 .u4-receipt{padding:10px;border:1px solid var(--border);border-radius:13px;background:var(--surface)}
 .u4-status{display:inline-flex;padding:4px 8px;border-radius:999px;background:#edf3e6;color:var(--green);font-size:10px;font-weight:800}
+.u4-status.onbekend{background:#fff1cf;color:#75550a}
+.u4-status.nakijken{background:#e9f2fb;color:#315f91}
+.u4-status.goedgekeurd{background:#edf3e6;color:var(--green)}
 .u4-status.concept{background:#fff1cf;color:#75550a}
 .u4-status.teruggedraaid{background:#eee;color:#666}
 #u4ImportModalRoot{position:fixed;inset:0;z-index:10000;display:none;overflow:hidden;background:rgba(37,28,22,.46);backdrop-filter:blur(5px)}

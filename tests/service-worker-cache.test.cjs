@@ -22,6 +22,6 @@ const htmlJs = html.match(/src="(\.\/app\.js\?v=[^"]+)"/)?.[1];
 assert.ok(htmlCss && htmlJs, 'index.html moet versiegebonden app-assets laden');
 assert.ok(source.includes(`"${htmlCss}"`), 'serviceworker moet dezelfde CSS-versie cachen als index.html');
 assert.ok(source.includes(`"${htmlJs}"`), 'serviceworker moet dezelfde JavaScript-versie cachen als index.html');
-assert.match(source, /const CACHE_NAME = "finize-v94-fixed-cost-delete"/);
+assert.match(source, /const CACHE_NAME = "finize-v95-import-review-status"/);
 
 console.log('SERVICE_WORKER_CACHE_OK');
