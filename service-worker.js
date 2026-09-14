@@ -1,11 +1,11 @@
-const CACHE_NAME = "finize-v93-responsive-function-parity";
+const CACHE_NAME = "finize-v94-fixed-cost-delete";
 const CACHE_PREFIX = "finize-";
 
 const CRITICAL_SHELL = [
   "./",
   "./index.html",
-  "./app.js?v=93-responsive-function-parity",
-  "./app.css?v=93-responsive-function-parity",
+  "./app.js?v=94-fixed-cost-delete",
+  "./app.css?v=94-fixed-cost-delete",
   "./manifest.json"
 ];
 
