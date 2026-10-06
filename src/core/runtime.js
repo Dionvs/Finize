@@ -1,3 +1,4 @@
+import { createMigrationBackupStore, readLegacyMigrationBackup } from '../storage/migration-backups.mjs';
 import { assertNoDuplicateSources } from '../import/import-identity.mjs';
 import { findImportConflicts } from '../import/import-sync-protocol.mjs';
 /* =========================================================
@@ -1856,7 +1857,7 @@ function migrateBudgetState(candidate){
     const diagnostics=[];
     const migrated=migrateStateData(candidate,{normalizeLegacy:normalizeLegacyBudgetState,validate:validateBudgetState,diagnostics});
     migrateBudgetState.lastDiagnostics=diagnostics;
-    if(diagnostics.length)console.warn('Finize datamigratie: compatibiliteitsmeldingen',diagnostics);
+    if(diagnostics.length)console.warn('Finize datamigratie: compatibiliteitsmeldingen '+JSON.stringify(diagnostics.reduce((counts,item)=>{counts[item.code]=(counts[item.code]||0)+1;return counts;},{})));
     return migrated;
   }catch(error){
     console.error('Datamigratie mislukt; oude gegevens blijven behouden',error);
@@ -1864,33 +1865,29 @@ function migrateBudgetState(candidate){
   }
 }
 
-function ensureMigrationBackup(original,source='local'){
-  if(detectSchemaVersion(original)>=CURRENT_SCHEMA_VERSION)return true;
-  const key=activeStorageKeys()?.migration;
-  if(!key)return false;
-  const existing=localStorage.getItem(key);
-  // Preserve the historical pre-v5 backup; retain the current migration original alongside it.
-  const backup=existing?JSON.parse(existing):{};
-  if(detectSchemaVersion(original)<10){
-    const previous=source==='cloud'?'package1CloudOriginal':'package1Original';
-    if(backup[previous]===undefined)backup[previous]={fromVersion:detectSchemaVersion(original),state:clone(original)};
-  }
+const migrationBackupStore = createMigrationBackupStore();
+window.FinizeMigrationBackups = {
+  list: async () => migrationBackupStore.list(activeStorageKeys()?.migration),
+  get: async id => migrationBackupStore.get(activeStorageKeys()?.migration,id),
+  legacy: () => readLegacyMigrationBackup(localStorage,activeStorageKeys()?.migration)
+};
+async function ensureMigrationBackup(original,source='local',metadata={}){
+  const fromVersion=detectSchemaVersion(original);
+  if(fromVersion>=CURRENT_SCHEMA_VERSION)return true;
+  const scope=activeStorageKeys()?.migration;
+  if(!scope)return false;
+  // Old localStorage envelopes remain untouched and independently restorable.
+  readLegacyMigrationBackup(localStorage,scope);
   const field=source==='cloud'?'package2CloudOriginal':'package2Original';
-  const capture=()=>({fromVersion:detectSchemaVersion(original),state:clone(original),v10State:migrateStateData(original,{normalizeLegacy:normalizeLegacyBudgetState,targetVersion:10})});
-  if(backup[field]===undefined){
-    backup[field]=capture();
-  }else{
-    if(!isPlainObject(backup[field]?.state?.na)||Number(backup[field]?.v10State?.meta?.schemaVersion)!==10)throw new Error('Bestaande migratieback-up is ongeldig; oorspronkelijke state behouden.');
-    if(JSON.stringify(backup[field].state)!==JSON.stringify(original)){
-      if(backup.package2AdditionalOriginals===undefined)backup.package2AdditionalOriginals=[];
-      if(!Array.isArray(backup.package2AdditionalOriginals))throw new Error('Aanvullende migratieback-ups zijn ongeldig.');
-      if(!backup.package2AdditionalOriginals.some(entry=>JSON.stringify(entry.state)===JSON.stringify(original)))backup.package2AdditionalOriginals.push({...capture(),source});
-    }
-  }
-  const encoded=JSON.stringify(backup);
-  if(existing!==encoded){
-    localStorage.setItem(key,encoded);
-    if(localStorage.getItem(key)!==encoded)throw new Error('Migratieback-up kon niet worden bevestigd.');
+  const envelope={ [field]:{fromVersion,state:clone(original),v10State:migrateStateData(original,{normalizeLegacy:normalizeLegacyBudgetState,targetVersion:10})} };
+  if(fromVersion<10)envelope[source==='cloud'?'package1CloudOriginal':'package1Original']={fromVersion,state:clone(original)};
+  const result=await migrationBackupStore.persist(scope,envelope,{
+    sourceSchema:fromVersion,source,household:activeAuthSession?.assignment?.householdId||'legacy',
+    revision:original.meta?.revision??null,syncVersion:metadata.syncVersion??original.meta?.syncVersion??null
+  });
+  if(result.created){
+    const {payload,...metadata}=result.record;
+    console.info('Finize migratieback-up bevestigd: '+JSON.stringify({...metadata,integrity:'readback-sha256-ok'}));
   }
   return true;
 }
@@ -2160,7 +2157,9 @@ const CloudAdapter = {
     }
     const pendingImportConflict=!this.initialSyncComplete&&await window.FinizeImportSync?.beforeInitialRemote?.(normalizedRemote);
     const normalizedCloudData = documentData.state !== undefined && JSON.stringify(documentData.state) !== JSON.stringify(normalizedRemote);
-    if(normalizedCloudData && !ensureMigrationBackup(documentData.state,'cloud'))throw new Error('Migratieback-up ontbreekt; cloudstate is niet vervangen.');
+    if(normalizedCloudData && !await ensureMigrationBackup(documentData.state,'cloud',{syncVersion:documentData.syncVersion}))throw new Error('Migratieback-up ontbreekt; cloudstate is niet vervangen.');
+    // Backup I/O can yield to a newer listener; apply the existing revision guard again.
+    if(this.initialSyncComplete && isStaleCloudSnapshot({...documentData,state:normalizedRemote},this.cloudVersion,this.lastCloudSignature))return false;
     if (backupReason) DataAdapter.backup(state, backupReason);
     clearTimeout(this.saveTimer);
     this.pendingState = null;
@@ -2540,7 +2539,7 @@ const DataAdapter = {
       return true;
     }catch(e){ console.error('opslaan mislukt', e); return false; }
   },
-  load(){
+  async load(){
     try{
       const keys = activeStorageKeys();
       if (!keys) return null;
@@ -2549,7 +2548,7 @@ const DataAdapter = {
       this.loadedFromStorage = true;
       const parsed = JSON.parse(raw);
       const migrated = migrateBudgetState(parsed);
-      if(!ensureMigrationBackup(parsed))throw new Error('Migratieback-up ontbreekt; lokale state is behouden.');
+      if(!await ensureMigrationBackup(parsed))throw new Error('Migratieback-up ontbreekt; lokale state is behouden.');
       const validation = validateBudgetState(migrated);
       if (!validation.ok){
         console.error('opgeslagen data ongeldig', validation.errors);
@@ -2582,17 +2581,9 @@ const DataAdapter = {
   }
 };
 
-var state = null;
-try{
-  state = DataAdapter.load() || migrateBudgetState(defaultState());
-}catch(error){
-  window.__finizeInitError = {
-    message: String(error?.message || error),
-    stack: String(error?.stack || '')
-  };
-  console.error('Finize initialisatie mislukt', error);
-  throw error;
-}
+// Local state adoption is deferred until the async backup gate has completed.
+// This placeholder is never persisted or rendered before that gate.
+var state = migrateBudgetState(defaultState());
 window.state = state;
 var committedStateSnapshot = clone(state);
 let activeTab = 'dashboard';
@@ -3824,7 +3815,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
           e.target.value = '';
           return;
         }
-        if(!ensureMigrationBackup(imported,'restore'))throw new Error('Migratieback-up ontbreekt; geïmporteerde state is niet toegepast.');
+        if(!await ensureMigrationBackup(imported,'restore'))throw new Error('Migratieback-up ontbreekt; geïmporteerde state is niet toegepast.');
         await CloudAdapter.restoreBackup(migratedImport, 'voor import van ' + file.name);
         alert('Back-up hersteld en bevestigd door de cloud.');
       }catch(err){ alert('Kon dit bestand niet lezen: ' + err.message); }
@@ -3847,7 +3838,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     const label = backup.label || backup.savedAt || 'onbekend moment';
     if (confirm('Laatste lokale nood-back-up herstellen van ' + label + '? De huidige stand wordt eerst opnieuw als nood-back-up bewaard.')){
       try{
-        if(!ensureMigrationBackup(backup.state,'restore'))throw new Error('Migratieback-up ontbreekt; lokale nood-back-up is niet toegepast.');
+        if(!await ensureMigrationBackup(backup.state,'restore'))throw new Error('Migratieback-up ontbreekt; lokale nood-back-up is niet toegepast.');
         await CloudAdapter.restoreBackup(migratedBackup, 'voor herstel lokale nood-back-up');
         alert('Lokale nood-back-up hersteld en bevestigd door de cloud.');
       }catch(error){
@@ -6352,7 +6343,7 @@ window.FinizeUpdate2=Object.freeze({
 
 // Full state was migrated once before bootstrap. Read initialization cannot adjust goal balances.
 ensurePersistentIds(state);
-if(activeStorageKeys())localSave(state);
+// Initial persistence is performed by DataAdapter.load after verified backup.
 committedStateSnapshot=clone(state);
 
 window.__finizeBootstrap={
@@ -6370,8 +6361,8 @@ window.__finizeMaybeFinishBootstrap=function(){
       bootstrap.waitingForAuth=true;
       Promise.resolve(window.__finizeAuthGate).then(async session=>{
         activeAuthSession=session;
-        if (session?.status === 'ready'){
-          const scopedState = DataAdapter.load();
+        if (session?.status === 'ready' || session?.status === 'disabled'){
+          const scopedState = await DataAdapter.load();
           if (scopedState){
             state=scopedState;
             window.state=state;
@@ -6384,6 +6375,10 @@ window.__finizeMaybeFinishBootstrap=function(){
         bootstrap.authReady=true;
         bootstrap.authSession=session;
         window.__finizeMaybeFinishBootstrap();
+      }).catch(error=>{
+        window.__finizeInitError={message:String(error?.message||error),stack:String(error?.stack||'')};
+        state=null;delete window.state;
+        console.error('Finize initialisatie mislukt; oorspronkelijke opslag behouden',error);
       });
     }
     return false;

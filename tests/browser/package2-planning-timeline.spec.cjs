@@ -51,21 +51,21 @@ for(const width of [390,1440])test(`Historische/future editors en herladen op ${
   await page.getByRole('dialog').getByRole('button',{name:'Sluiten'}).click();
   await page.setViewportSize({width:width===390?1440:390,height:900});await page.evaluate(()=>renderActiveTab());
   expect(await fixedValue(page,'2026-09')).toBe(1807);
-  const backupBefore=await page.evaluate(backupKey=>localStorage.getItem(backupKey),backupKey);
+  const backupBefore=await page.evaluate(async()=>(await FinizeMigrationBackups.list())[0].payload);
   const backup=JSON.parse(backupBefore);expect(backup.package2Original.state.na).toEqual(input.na);expect(backup.package2Original.v10State.meta.schemaVersion).toBe(10);
   await page.reload();await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   expect(await fixedValue(page,'2026-09')).toBe(1807);expect(await fixedValue(page,'2027-01')).toBe(1900);
   expect(await page.evaluate(()=>FinizePlanning.budgets('2026-09','gezamenlijk')[0].bedrag)).toBe(500);
-  expect(await page.evaluate(backupKey=>localStorage.getItem(backupKey),backupKey)).toBe(backupBefore);
+  expect(await page.evaluate(async()=>(await FinizeMigrationBackups.list())[0].payload)).toBe(backupBefore);
   expect(errors).toEqual([]);
 });
 test('v10-back-upfout verwijdert Na niet uit opslag',async({page})=>{
   const input=require('../../src/core/data-normalization.mjs').migrateStateData(fixture,{normalizeLegacy:require('../helpers/migration-runtime.cjs')().normalizeLegacyBudgetState,targetVersion:10});
   await page.addInitScript(({input,key,backupKey})=>{
     localStorage.setItem(key,JSON.stringify(input));const original=Storage.prototype.setItem;
-    Storage.prototype.setItem=function(name,value){if(name===backupKey)throw new DOMException('Pakket 2 back-up quota','QuotaExceededError');return original.call(this,name,value);};
+    const open=indexedDB.open.bind(indexedDB);indexedDB.open=(name,...args)=>{if(name==='finize-migration-backups')throw new DOMException('Pakket 2 back-up quota','QuotaExceededError');return open(name,...args);};
   },{input,key,backupKey});
-  await page.goto('/');expect(await page.evaluate(key=>JSON.parse(localStorage.getItem(key)).na,key)).toEqual(fixture.na);
+  await page.goto('/');await page.waitForFunction(()=>window.__finizeInitError);expect(await page.evaluate(key=>JSON.parse(localStorage.getItem(key)).na,key)).toEqual(fixture.na);
   expect(await page.evaluate(()=>window.__finizeInitError.message)).toContain('back-up quota');
   expect(await page.evaluate(key=>JSON.parse(localStorage.getItem(key)).meta.schemaVersion,key)).toBe(10);
 });

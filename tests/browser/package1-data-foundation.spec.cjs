@@ -31,14 +31,14 @@ for(const width of [390,1440])test(`Pakket 1: zes schermen, data en stabiele her
   expect(after.writes).toBe(before.writes);expect(after.revision).toBe(before.revision);expect(after.schema).toBe(11);
   expect(after.tx.amount).toBe(12.345);expect(after.tx.bankOriginal).toEqual(state.transactions[0].bankOriginal);
   expect(after.imports).toBe(1);expect(after.fixed).toBeGreaterThan(0);expect(after.budgets).toBeGreaterThan(0);expect(after.goals).toBe(6);expect(after.ledger).toBe(6);
-  const backup=await page.evaluate(migrationKey=>JSON.parse(localStorage.getItem(migrationKey)),migrationKey);
+  const backup=await page.evaluate(async()=>JSON.parse((await FinizeMigrationBackups.list())[0].payload));
   expect(backup.package1Original.state).toEqual(state);
   await page.reload();await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   expect(await page.evaluate(()=>window.state.meta.revision)).toBe(before.revision);expect(errors).toEqual([]);
 });
 test('lokale laadfout bewaart originele opslag en laadt geen defaults',async({page})=>{
   await page.addInitScript(key=>localStorage.setItem(key,'{"broken":'),key);
-  await page.goto('/');
+  await page.goto('/');await page.waitForFunction(()=>window.__finizeInitError);
   expect(await page.evaluate(key=>localStorage.getItem(key),key)).toBe('{"broken":');
   expect(await page.evaluate(()=>window.__finizeInitError?.message)).toBeTruthy();
   expect(await page.evaluate(()=>window.state)).toBeUndefined();
@@ -46,9 +46,9 @@ test('lokale laadfout bewaart originele opslag en laadt geen defaults',async({pa
 test('migratieback-upfout bewaart v9-opslag zonder default- of cloudwrite',async({page})=>{
   await page.addInitScript(({state,key,migrationKey})=>{
     localStorage.setItem(key,JSON.stringify(state));const set=Storage.prototype.setItem;
-    Storage.prototype.setItem=function(name,value){if(name===migrationKey)throw new DOMException('Test quota','QuotaExceededError');return set.call(this,name,value);};
+    const open=indexedDB.open.bind(indexedDB);indexedDB.open=(name,...args)=>{if(name==='finize-migration-backups')throw new DOMException('Test quota','QuotaExceededError');return open(name,...args);};
   },{state:fixture,key,migrationKey});
-  await page.goto('/');expect(await page.evaluate(key=>JSON.parse(localStorage.getItem(key)).meta.schemaVersion,key)).toBe(9);
+  await page.goto('/');await page.waitForFunction(()=>window.__finizeInitError);expect(await page.evaluate(key=>JSON.parse(localStorage.getItem(key)).meta.schemaVersion,key)).toBe(9);
   expect(await page.evaluate(()=>window.__finizeInitError?.message)).toContain('Test quota');
 });
 
@@ -58,10 +58,10 @@ test('state-opslagfout bij migratie behoudt de originele state en alle back-ups'
     const set=Storage.prototype.setItem;
     Storage.prototype.setItem=function(name,value){if(name===key)throw new DOMException('Test state quota','QuotaExceededError');return set.call(this,name,value);};
   },{state:fixture,key});
-  await page.goto('/');
+  await page.goto('/');await page.waitForFunction(()=>window.__finizeInitError);
   expect(await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),key)).toEqual(fixture);
   expect(await page.evaluate(key=>localStorage.getItem(key+'-last-good-backup'),key)).toBe('retained-backup');
-  expect(await page.evaluate(migrationKey=>JSON.parse(localStorage.getItem(migrationKey)).package1Original.state,migrationKey)).toEqual(fixture);
+  expect(await page.evaluate(async()=>JSON.parse((await FinizeMigrationBackups.list())[0].payload).package1Original.state)).toEqual(fixture);
   expect(await page.evaluate(()=>window.__finizeInitError?.message)).toContain('Test state quota');
 });
 

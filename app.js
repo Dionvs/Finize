@@ -450,6 +450,90 @@
   };
   initialize();
 
+  // src/storage/migration-backups.mjs
+  var MIGRATION_BACKUP_DB = "finize-migration-backups";
+  var STORE = "originals";
+  var bytes = (text) => new TextEncoder().encode(text);
+  async function backupDigest(text, cryptoApi = globalThis.crypto) {
+    const hash = await cryptoApi.subtle.digest("SHA-256", bytes(text));
+    return [...new Uint8Array(hash)].map((value) => value.toString(16).padStart(2, "0")).join("");
+  }
+  function createMigrationBackupStore({ indexedDB: indexedDB2 = globalThis.indexedDB, crypto = globalThis.crypto, now = () => (/* @__PURE__ */ new Date()).toISOString() } = {}) {
+    let database;
+    function open() {
+      if (!indexedDB2) return Promise.reject(new Error("IndexedDB is niet beschikbaar; migratie gestopt."));
+      if (!database) database = new Promise((resolve, reject) => {
+        const request = indexedDB2.open(MIGRATION_BACKUP_DB, 1);
+        request.onupgradeneeded = () => request.result.createObjectStore(STORE, { keyPath: "id" });
+        request.onerror = () => reject(request.error);
+        request.onblocked = () => reject(new Error("Migratieback-upopslag is geblokkeerd."));
+        request.onsuccess = () => {
+          const db = request.result;
+          db.onversionchange = () => {
+            db.close();
+            database = void 0;
+          };
+          resolve(db);
+        };
+      }).catch((error) => {
+        database = void 0;
+        throw error;
+      });
+      return database;
+    }
+    async function operation(mode2, action) {
+      const db = await open();
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction(STORE, mode2);
+        let result;
+        const request = action(transaction.objectStore(STORE));
+        request.onsuccess = () => {
+          result = request.result;
+        };
+        transaction.oncomplete = () => resolve(result);
+        transaction.onabort = transaction.onerror = () => reject(transaction.error || request.error || new Error("Migratieback-uptransactie mislukt."));
+      });
+    }
+    async function verify(record, scope, expectedPayload) {
+      if (!record || record.scope !== scope || record.id !== `${scope}:${record.sha256}` || record.migrationId !== "finize-schema-v11" || record.storageVersion !== 1 || typeof record.payload !== "string" || record.byteLength !== bytes(record.payload).length || record.sha256 !== await backupDigest(record.payload, crypto) || expectedPayload !== void 0 && record.payload !== expectedPayload) {
+        throw new Error("Migratieback-up is niet volledig teruggelezen; migratie gestopt.");
+      }
+      const envelope = JSON.parse(record.payload);
+      const original2 = envelope.package2Original || envelope.package2CloudOriginal;
+      if (!(original2 == null ? void 0 : original2.state) || original2.fromVersion !== record.sourceSchema || record.targetSchema !== 11) throw new Error("Migratieback-upmetadata is ongeldig.");
+      return record;
+    }
+    async function get(scope, id) {
+      if (!scope || !id) throw new Error("Migratieback-upcontext ontbreekt.");
+      return verify(await operation("readonly", (store) => store.get(id)), scope);
+    }
+    async function list2(scope) {
+      if (!scope) return [];
+      const records = await operation("readonly", (store) => store.getAll());
+      return Promise.all(records.filter((record) => record.scope === scope).map((record) => verify(record, scope)));
+    }
+    async function persist2(scope, envelope, metadata) {
+      if (!scope) throw new Error("Migratieback-upcontext ontbreekt.");
+      const payload = JSON.stringify(envelope);
+      const sha256 = await backupDigest(payload, crypto);
+      const id = `${scope}:${sha256}`;
+      const previous = await operation("readonly", (store) => store.get(id));
+      if (previous) return { record: await verify(previous, scope, payload), created: false };
+      const record = { ...metadata, id, scope, storageVersion: 1, migrationId: "finize-schema-v11", targetSchema: 11, createdAt: now(), payload, sha256, byteLength: bytes(payload).length };
+      try {
+        await operation("readwrite", (store) => store.add(record));
+      } catch (error) {
+        if ((error == null ? void 0 : error.name) !== "ConstraintError") throw error;
+      }
+      return { record: await verify(await operation("readonly", (store) => store.get(id)), scope, payload), created: true };
+    }
+    return Object.freeze({ persist: persist2, get, list: list2 });
+  }
+  function readLegacyMigrationBackup(storage, key) {
+    const text = key && storage.getItem(key);
+    return text ? JSON.parse(text) : null;
+  }
+
   // src/import/import-identity.mjs
   var original = (row) => row.bankOriginal || row;
   var accountKey = (row, batch) => String(row.accountContext || row.accountOwner || (batch == null ? void 0 : batch.accountOwner) || "") + "|" + String(original(row).accountIdentifier || (batch == null ? void 0 : batch.accountProfileId) || "");
@@ -484,8 +568,8 @@
     return null;
   }
   function csvFileDigest(text) {
-    const bytes = new TextEncoder().encode(String(text)), length = bytes.length, padded = new Uint8Array((Math.floor((length + 8) / 64) + 1) * 64);
-    padded.set(bytes);
+    const bytes2 = new TextEncoder().encode(String(text)), length = bytes2.length, padded = new Uint8Array((Math.floor((length + 8) / 64) + 1) * 64);
+    padded.set(bytes2);
     padded[length] = 128;
     const view = new DataView(padded.buffer);
     view.setUint32(padded.length - 8, Math.floor(length / 536870912));
@@ -4431,40 +4515,51 @@
       const diagnostics = [];
       const migrated = migrateStateData(candidate, { normalizeLegacy: normalizeLegacyBudgetState, validate: validateBudgetState, diagnostics });
       migrateBudgetState.lastDiagnostics = diagnostics;
-      if (diagnostics.length) console.warn("Finize datamigratie: compatibiliteitsmeldingen", diagnostics);
+      if (diagnostics.length) console.warn("Finize datamigratie: compatibiliteitsmeldingen " + JSON.stringify(diagnostics.reduce((counts, item) => {
+        counts[item.code] = (counts[item.code] || 0) + 1;
+        return counts;
+      }, {})));
       return migrated;
     } catch (error) {
       console.error("Datamigratie mislukt; oude gegevens blijven behouden", error);
       throw error;
     }
   }
-  function ensureMigrationBackup(original2, source = "local") {
-    var _a2, _b, _c, _d, _e, _f;
-    if (detectSchemaVersion(original2) >= CURRENT_SCHEMA_VERSION) return true;
-    const key = (_a2 = activeStorageKeys()) == null ? void 0 : _a2.migration;
-    if (!key) return false;
-    const existing = localStorage.getItem(key);
-    const backup = existing ? JSON.parse(existing) : {};
-    if (detectSchemaVersion(original2) < 10) {
-      const previous = source === "cloud" ? "package1CloudOriginal" : "package1Original";
-      if (backup[previous] === void 0) backup[previous] = { fromVersion: detectSchemaVersion(original2), state: cloneState(original2) };
+  var migrationBackupStore = createMigrationBackupStore();
+  window.FinizeMigrationBackups = {
+    list: async () => {
+      var _a2;
+      return migrationBackupStore.list((_a2 = activeStorageKeys()) == null ? void 0 : _a2.migration);
+    },
+    get: async (id) => {
+      var _a2;
+      return migrationBackupStore.get((_a2 = activeStorageKeys()) == null ? void 0 : _a2.migration, id);
+    },
+    legacy: () => {
+      var _a2;
+      return readLegacyMigrationBackup(localStorage, (_a2 = activeStorageKeys()) == null ? void 0 : _a2.migration);
     }
+  };
+  async function ensureMigrationBackup(original2, source = "local", metadata = {}) {
+    var _a2, _b, _c, _d, _e, _f, _g;
+    const fromVersion = detectSchemaVersion(original2);
+    if (fromVersion >= CURRENT_SCHEMA_VERSION) return true;
+    const scope = (_a2 = activeStorageKeys()) == null ? void 0 : _a2.migration;
+    if (!scope) return false;
+    readLegacyMigrationBackup(localStorage, scope);
     const field = source === "cloud" ? "package2CloudOriginal" : "package2Original";
-    const capture = () => ({ fromVersion: detectSchemaVersion(original2), state: cloneState(original2), v10State: migrateStateData(original2, { normalizeLegacy: normalizeLegacyBudgetState, targetVersion: 10 }) });
-    if (backup[field] === void 0) {
-      backup[field] = capture();
-    } else {
-      if (!isPlainObject2((_c = (_b = backup[field]) == null ? void 0 : _b.state) == null ? void 0 : _c.na) || Number((_f = (_e = (_d = backup[field]) == null ? void 0 : _d.v10State) == null ? void 0 : _e.meta) == null ? void 0 : _f.schemaVersion) !== 10) throw new Error("Bestaande migratieback-up is ongeldig; oorspronkelijke state behouden.");
-      if (JSON.stringify(backup[field].state) !== JSON.stringify(original2)) {
-        if (backup.package2AdditionalOriginals === void 0) backup.package2AdditionalOriginals = [];
-        if (!Array.isArray(backup.package2AdditionalOriginals)) throw new Error("Aanvullende migratieback-ups zijn ongeldig.");
-        if (!backup.package2AdditionalOriginals.some((entry) => JSON.stringify(entry.state) === JSON.stringify(original2))) backup.package2AdditionalOriginals.push({ ...capture(), source });
-      }
-    }
-    const encoded = JSON.stringify(backup);
-    if (existing !== encoded) {
-      localStorage.setItem(key, encoded);
-      if (localStorage.getItem(key) !== encoded) throw new Error("Migratieback-up kon niet worden bevestigd.");
+    const envelope = { [field]: { fromVersion, state: cloneState(original2), v10State: migrateStateData(original2, { normalizeLegacy: normalizeLegacyBudgetState, targetVersion: 10 }) } };
+    if (fromVersion < 10) envelope[source === "cloud" ? "package1CloudOriginal" : "package1Original"] = { fromVersion, state: cloneState(original2) };
+    const result = await migrationBackupStore.persist(scope, envelope, {
+      sourceSchema: fromVersion,
+      source,
+      household: ((_b = activeAuthSession == null ? void 0 : activeAuthSession.assignment) == null ? void 0 : _b.householdId) || "legacy",
+      revision: (_d = (_c = original2.meta) == null ? void 0 : _c.revision) != null ? _d : null,
+      syncVersion: (_g = (_f = metadata.syncVersion) != null ? _f : (_e = original2.meta) == null ? void 0 : _e.syncVersion) != null ? _g : null
+    });
+    if (result.created) {
+      const { payload, ...metadata2 } = result.record;
+      console.info("Finize migratieback-up bevestigd: " + JSON.stringify({ ...metadata2, integrity: "readback-sha256-ok" }));
     }
     return true;
   }
@@ -4747,7 +4842,8 @@
       }
       const pendingImportConflict = !this.initialSyncComplete && await ((_b = (_a2 = window.FinizeImportSync) == null ? void 0 : _a2.beforeInitialRemote) == null ? void 0 : _b.call(_a2, normalizedRemote));
       const normalizedCloudData = documentData.state !== void 0 && JSON.stringify(documentData.state) !== JSON.stringify(normalizedRemote);
-      if (normalizedCloudData && !ensureMigrationBackup(documentData.state, "cloud")) throw new Error("Migratieback-up ontbreekt; cloudstate is niet vervangen.");
+      if (normalizedCloudData && !await ensureMigrationBackup(documentData.state, "cloud", { syncVersion: documentData.syncVersion })) throw new Error("Migratieback-up ontbreekt; cloudstate is niet vervangen.");
+      if (this.initialSyncComplete && isStaleCloudSnapshot({ ...documentData, state: normalizedRemote }, this.cloudVersion, this.lastCloudSignature)) return false;
       if (backupReason) DataAdapter.backup(state, backupReason);
       clearTimeout(this.saveTimer);
       this.pendingState = null;
@@ -5164,7 +5260,7 @@
         return false;
       }
     },
-    load() {
+    async load() {
       try {
         const keys = activeStorageKeys();
         if (!keys) return null;
@@ -5173,7 +5269,7 @@
         this.loadedFromStorage = true;
         const parsed = JSON.parse(raw);
         const migrated = migrateBudgetState(parsed);
-        if (!ensureMigrationBackup(parsed)) throw new Error("Migratieback-up ontbreekt; lokale state is behouden.");
+        if (!await ensureMigrationBackup(parsed)) throw new Error("Migratieback-up ontbreekt; lokale state is behouden.");
         const validation = validateBudgetState(migrated);
         if (!validation.ok) {
           console.error("opgeslagen data ongeldig", validation.errors);
@@ -5214,17 +5310,7 @@
       }
     }
   };
-  var state = null;
-  try {
-    state = DataAdapter.load() || migrateBudgetState(defaultState());
-  } catch (error) {
-    window.__finizeInitError = {
-      message: String((error == null ? void 0 : error.message) || error),
-      stack: String((error == null ? void 0 : error.stack) || "")
-    };
-    console.error("Finize initialisatie mislukt", error);
-    throw error;
-  }
+  var state = migrateBudgetState(defaultState());
   window.state = state;
   var committedStateSnapshot = cloneState(state);
   var activeTab = "dashboard";
@@ -6531,7 +6617,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
             e.target.value = "";
             return;
           }
-          if (!ensureMigrationBackup(imported, "restore")) throw new Error("Migratieback-up ontbreekt; geïmporteerde state is niet toegepast.");
+          if (!await ensureMigrationBackup(imported, "restore")) throw new Error("Migratieback-up ontbreekt; geïmporteerde state is niet toegepast.");
           await CloudAdapter.restoreBackup(migratedImport, "voor import van " + file.name);
           alert("Back-up hersteld en bevestigd door de cloud.");
         } catch (err) {
@@ -6556,7 +6642,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       const label = backup.label || backup.savedAt || "onbekend moment";
       if (confirm("Laatste lokale nood-back-up herstellen van " + label + "? De huidige stand wordt eerst opnieuw als nood-back-up bewaard.")) {
         try {
-          if (!ensureMigrationBackup(backup.state, "restore")) throw new Error("Migratieback-up ontbreekt; lokale nood-back-up is niet toegepast.");
+          if (!await ensureMigrationBackup(backup.state, "restore")) throw new Error("Migratieback-up ontbreekt; lokale nood-back-up is niet toegepast.");
           await CloudAdapter.restoreBackup(migratedBackup, "voor herstel lokale nood-back-up");
           alert("Lokale nood-back-up hersteld en bevestigd door de cloud.");
         } catch (error) {
@@ -9441,7 +9527,6 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     historyKey: u2HistoryKey
   });
   ensurePersistentIds(state);
-  if (activeStorageKeys()) localSave(state);
   committedStateSnapshot = cloneState(state);
   window.__finizeBootstrap = {
     coreReady: false,
@@ -9459,8 +9544,8 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
         Promise.resolve(window.__finizeAuthGate).then(async (session) => {
           var _a2, _b;
           activeAuthSession = session;
-          if ((session == null ? void 0 : session.status) === "ready") {
-            const scopedState = DataAdapter.load();
+          if ((session == null ? void 0 : session.status) === "ready" || (session == null ? void 0 : session.status) === "disabled") {
+            const scopedState = await DataAdapter.load();
             if (scopedState) {
               state = scopedState;
               window.state = state;
@@ -9473,6 +9558,11 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
           bootstrap.authReady = true;
           bootstrap.authSession = session;
           window.__finizeMaybeFinishBootstrap();
+        }).catch((error) => {
+          window.__finizeInitError = { message: String((error == null ? void 0 : error.message) || error), stack: String((error == null ? void 0 : error.stack) || "") };
+          state = null;
+          delete window.state;
+          console.error("Finize initialisatie mislukt; oorspronkelijke opslag behouden", error);
         });
       }
       return false;
@@ -9976,16 +10066,16 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     function chunkRows(rows, maxBytes = 7e5) {
       const chunks = [];
       let current = [];
-      let bytes = 2;
+      let bytes2 = 2;
       (rows || []).forEach((row) => {
         const size = new TextEncoder().encode(JSON.stringify(row)).length + 1;
-        if (current.length && (bytes + size > maxBytes || current.length >= 200)) {
+        if (current.length && (bytes2 + size > maxBytes || current.length >= 200)) {
           chunks.push(current);
           current = [];
-          bytes = 2;
+          bytes2 = 2;
         }
         current.push(row);
-        bytes += size;
+        bytes2 += size;
       });
       if (current.length) chunks.push(current);
       return chunks;

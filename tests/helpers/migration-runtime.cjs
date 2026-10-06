@@ -8,6 +8,7 @@ module.exports = function migrationRuntime(options = {}) {
   const logs = [];
   const context = {
     ...data,
+    ...require('../../src/storage/migration-backups.mjs'),
     ...require('../../src/core/planning-timeline.mjs'),
     console: { error: (...args) => logs.push(args), warn: (...args) => logs.push(args) },
     Date, Math, Number, String, Array, Object, JSON,
