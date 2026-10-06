@@ -7,7 +7,8 @@ const u4=require('../src/import/update4-runtime.cjs');
 const html=require('./helpers/runtime-source.cjs');
 const start=html.indexOf('function normalizedTransactionType');
 const end=html.indexOf('function sumTransactions',start);
-const context={Number,String,Math,round2:value=>Math.round((Number(value)+Number.EPSILON)*100)/100};
+const context={state:{},Number,String,Math,round2:value=>Math.round((Number(value)+Number.EPSILON)*100)/100};
+Object.assign(context,require('../src/core/transaction-model.mjs'),require('../src/core/transaction-engine.mjs'),require('../src/core/recurring-occurrences.mjs'));
 vm.createContext(context);
 vm.runInContext(html.slice(start,end),context);
 
@@ -22,6 +23,7 @@ const transactions=[
   {kind:'interne-overboeking',transactionType:'sparen',amount:250},
   {kind:'uitgave',amount:75,processing:{include:false}}
 ];
+transactions.forEach(tx=>tx.reviewStatus='bevestigd');
 assert.equal(transactions.reduce((sum,tx)=>sum+context.getTransactionExpenseImpact(tx),0),310);
 
 const incomeShare=2450/(2450+3010);
@@ -35,7 +37,7 @@ const retained=u4.normalizeCore({
   spaardoelen:{gezamenlijk:[{id:'goal-1',algespaard:100}],dion:[],dara:[]},
   savingsGoalLedger:[],advanceLedger:[{id:'advance-1'}],monthRecords:{'2026-01':{status:'afgesloten',closureHistory:[]}}
 });
-assert.equal(retained.meta.schemaVersion,9);
+assert.equal(retained.meta.schemaVersion,10);
 assert.equal(retained.transactions.length,1);
 assert.equal(retained.importSummaries.length,1);
 assert.equal(retained.spaardoelen.gezamenlijk.length,1);

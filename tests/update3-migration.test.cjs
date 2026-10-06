@@ -13,7 +13,9 @@ const context={
   console,Date,Math,Number,String,Array,Object,
   U3_ACCOUNTS:['gezamenlijk','dion','dara'],
   U3_FREQUENCY_UNITS:['weken','maanden','jaren'],
-  U3_SCHEMA_VERSION:9,
+  U3_SCHEMA_VERSION:10,
+  CURRENT_SCHEMA_VERSION:10,
+  stableId:(path,index)=>`schema-${path}-${index}`,
   isPlainObject:value=>value!==null&&typeof value==='object'&&!Array.isArray(value),
   round2:value=>Math.round((Number(value)+Number.EPSILON)*100)/100,
   sumBedrag:rows=>rows.reduce((sum,row)=>sum+(Number(row.bedrag)||0),0),
@@ -50,10 +52,10 @@ function fixture(version){
 
 for(const version of [1,2,3]){
   const migrated=context.u3NormalizeState(fixture(version));
-  assert.equal(migrated.meta.schemaVersion,9);
-  assert.equal(migrated.transactions[0].account,'dion');
-  assert.equal(migrated.transactions[0].financialFor,'dion');
-  assert.equal(migrated.transactions[0].reviewStatus,'bevestigd');
+  assert.equal(migrated.meta.schemaVersion,10);
+  assert.equal(migrated.transactions[0].account,undefined,'Een ambigu legacy-owner bewijst geen fysieke rekening');
+  assert.equal(migrated.transactions[0].owner,'dion','Bestaande budgettoerekening blijft behouden');
+  assert.equal(migrated.transactions[0].reviewStatus,undefined,'Geen synthetische gebruikersgoedkeuring');
   assert.equal(migrated.advanceLedger.length,0,'Migratie mag geen kunstmatige schuld maken');
   assert.ok(migrated.recurringFixedExpenses.voor.some(row=>row.id==='fixed-voor-gezamenlijk-rent'));
   assert.ok(migrated.recurringIncomeSources.some(row=>row.id==='income-loon-dion'));

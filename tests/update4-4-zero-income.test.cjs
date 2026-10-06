@@ -29,18 +29,19 @@ const context={
     {owner:'dara',amount:3010}
   ]
 };
+Object.assign(context,require('../src/core/transaction-model.mjs'),require('../src/core/transaction-engine.mjs'),require('../src/core/recurring-occurrences.mjs'));
 vm.createContext(context);
 vm.runInContext(html.slice(start,end),context);
 
-assert.deepEqual(JSON.parse(JSON.stringify(context.resolveMonthlyIncome('dion','2026-07'))),{amount:2500,source:'expected'});
+assert.deepEqual(JSON.parse(JSON.stringify(context.resolveMonthlyIncome('dion','2026-07'))),{amount:0,source:'none'});
 state.monthlyIncomeOverrides['2026-07']={dion:0};
-assert.deepEqual(JSON.parse(JSON.stringify(context.resolveMonthlyIncome('dion','2026-07'))),{amount:0,source:'monthly-override'});
-state.transactions.push({id:'actual',date:'2026-07-25',kind:'inkomen',amount:2430,incomeSourceId:'salary-dion'});
-assert.deepEqual(JSON.parse(JSON.stringify(context.resolveMonthlyIncome('dion','2026-07'))),{amount:2430,source:'actual'});
+assert.deepEqual(JSON.parse(JSON.stringify(context.resolveMonthlyIncome('dion','2026-07'))),{amount:0,source:'none'});
+state.transactions.push({id:'actual',date:'2026-07-25',kind:'inkomen',amount:2430,financialFor:'dion',reviewStatus:'bevestigd',incomeSourceId:'salary-dion'});
+assert.deepEqual(JSON.parse(JSON.stringify(context.resolveMonthlyIncome('dion','2026-07'))),{amount:2430,source:'transactions'});
 state.transactions=[];
 assert.equal(context.resolveMonthlyIncome('dion','2026-07').amount,0);
 delete state.monthlyIncomeOverrides['2026-07'];
-assert.equal(context.resolveMonthlyIncome('dion','2026-07').amount,2500);
+assert.equal(context.resolveMonthlyIncome('dion','2026-07').amount,0);
 state.actualIncomeOverrides['2026-07']={total:5000};
-assert.deepEqual(JSON.parse(JSON.stringify(context.resolveMonthlyIncome('total','2026-07'))),{amount:5000,source:'actual'});
+assert.deepEqual(JSON.parse(JSON.stringify(context.resolveMonthlyIncome('total','2026-07'))),{amount:5000,source:'manual-correction'});
 console.log('UPDATE4_4_ZERO_INCOME_OK');

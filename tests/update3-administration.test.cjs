@@ -7,7 +7,7 @@ const html = require('./helpers/runtime-source.cjs');
 const impactStart = html.indexOf('function normalizedTransactionType');
 const impactEnd = html.indexOf('function sumTransactions', impactStart);
 const start = html.indexOf('function u3ConfirmedTransactions');
-const end = html.indexOf('const u3LegacyMonthlyScenarioData', start);
+const end = html.indexOf('// Update 41/42', start);
 assert.ok(start >= 0 && end > start, 'Update 3 administratierekenlaag is niet gevonden');
 
 const state = {
@@ -44,6 +44,7 @@ const context = {
   ensureMonthData:()=>{},
   getTotalMonthlyIncome:()=>0,
   getDistributionIncomeParts:()=>({salary:0,refund:0,total:0}),
+  monthlyFinancialForecast:month=>require('../src/core/transaction-engine.mjs').financialForecastForMonth(state,month,{fixedOccurrences:[],plannedIncome:{dion:{salary:0},dara:{salary:0}}}),
   sumTransactions:()=>0,
   sumMaandTeruggaven:()=>0,
   u2ReconcileSavingsGoals:()=>{},
@@ -56,6 +57,9 @@ const context = {
   u3IsoDate:date=>`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`,
   bankText:value=>String(value||'').toLowerCase()
 };
+state.recurringFixedExpenses=[];state.monthlyBudgets['2026-07']=state.monthlyBudgets['2026-07'].voor;
+Object.assign(context,require('../src/core/planning-timeline.mjs'));
+Object.assign(context,require('../src/core/transaction-model.mjs'),require('../src/core/transaction-engine.mjs'),require('../src/core/recurring-occurrences.mjs'));
 vm.createContext(context);
 vm.runInContext(html.slice(impactStart,impactEnd),context,{filename:'update4-expense-impact-inline.js'});
 vm.runInContext(html.slice(start,end),context,{filename:'update3-administration-inline.js'});
@@ -103,7 +107,7 @@ assert.equal(context.u3ActualIncome('2026-07'),0);
 state.transactions.push({id:'salary',date:'2026-07-25',kind:'inkomen',amount:2500,account:'gezamenlijk',financialFor:'gezamenlijk',owner:'gezamenlijk',reviewStatus:'bevestigd'});
 assert.equal(context.u3ActualIncome('2026-07'),2500);
 state.actualIncomeOverrides={'2026-07':{total:2475}};
-assert.equal(context.u3ActualIncome('2026-07'),2475,'handmatige override staat los van de salaristransactie');
+assert.equal(context.u3ActualIncome('2026-07'),2500,'actieve inkomensregels gaan boven een handmatige actual-correctie');
 assert.equal(context.u3ActualExpenses('2026-07'),125);
 
 console.log('UPDATE3_ADMINISTRATION_OK');

@@ -32,6 +32,7 @@ for (const width of widths) {
     }, state);
     await page.setViewportSize({ width, height: 900 });
     await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => window.__finizeBootstrap?.rendered);
     await page.waitForTimeout(1500);
     const session = await page.context().newCDPSession(page);
     const capture = await session.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
@@ -50,6 +51,7 @@ test('v50 computed-style-contract', async ({ page }) => {
   }, state);
   await page.setViewportSize({ width: 390, height: 900 });
   await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => window.__finizeBootstrap?.rendered);
   const styles = await page.evaluate(selectors => Object.fromEntries(selectors.map(selector => {
     const element = document.querySelector(selector);
     if (!element) return [selector, null];

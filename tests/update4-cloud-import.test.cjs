@@ -78,7 +78,7 @@ function snapshot(value){
 
   const originalListSync=u4.ImportStore.listSync;
   const originalGetImport=u4.ImportStore.getImport;
-  const originalDeleteSync=u4.ImportStore.deleteSync;
+  const originalDeleteSync=u4.ImportStore.deleteSync,originalConfirm=u4.ImportStore.confirmCloudReceipt,originalJournal=u4.ImportStore.getJournal;u4.ImportStore.confirmCloudReceipt=async()=>{};u4.ImportStore.getJournal=async()=>null;
   const writes=[];
   u4.ImportStore.listSync=async()=>[{id:'cloud-1',importId:'cloud-1'}];
   u4.ImportStore.getImport=async()=>record;
@@ -86,9 +86,9 @@ function snapshot(value){
   try{
     const writeFirestore={
       doc:(_db,...parts)=>parts.join('/'),
-      setDoc:async(ref,value,options)=>writes.push({ref,value,options})
+      setDoc:async(ref,value,options)=>writes.push({ref,value,options}),runTransaction:async(_db,fn)=>fn({get:async()=>({exists:()=>false}),set:(ref,value)=>writes.push({ref,value,options:{merge:false}})})
     };
-    const synced=await u4.flushImportSync({CloudAdapter:{isConnected:()=>true,modules:{firestore:writeFirestore},db:{}}});
+    const synced=await u4.flushImportSync({state:{importSummaries:[{id:record.id,version:0,operationId:record.operationId||''}]},CloudAdapter:{isConnected:()=>true,modules:{firestore:writeFirestore},db:{}}});
     assert.equal(synced,true);
     assert.ok(writes.slice(0,-1).every(write=>write.ref.includes('/chunks/')),'chunks moeten vóór de header worden geschreven');
     assert.equal(writes.at(-1).ref,'budgetPlanners/finize/imports/cloud-1');
@@ -97,7 +97,7 @@ function snapshot(value){
   }finally{
     u4.ImportStore.listSync=originalListSync;
     u4.ImportStore.getImport=originalGetImport;
-    u4.ImportStore.deleteSync=originalDeleteSync;
+    u4.ImportStore.deleteSync=originalDeleteSync;u4.ImportStore.confirmCloudReceipt=originalConfirm;u4.ImportStore.getJournal=originalJournal;
   }
 
   console.log('UPDATE4_CLOUD_IMPORT_OK');

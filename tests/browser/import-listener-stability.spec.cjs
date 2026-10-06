@@ -34,10 +34,10 @@ test('vijftig importrenders houden één gedelegeerde click- en change-handler',
 test('vaste lasten volgen de budgeteigenaar en datums zijn Nederlands', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => {
-    state.recurringFixedExpenses[state.meta.scenario] = [
-      {id:'fixed-joint',naam:'Gezamenlijke verzekering',financialFor:'gezamenlijk',rekening:'gezamenlijk'},
-      {id:'fixed-dion',naam:'Dion telefoon',financialFor:'dion',rekening:'dion'},
-      {id:'fixed-dara',naam:'Dara telefoon',financialFor:'dara',rekening:'dara'}
+    state.recurringFixedExpenses = [
+      {id:'fixed-joint',begindatum:'2026-01-01',actief:true,naam:'Gezamenlijke verzekering',financialFor:'gezamenlijk',rekening:'gezamenlijk'},
+      {id:'fixed-dion',begindatum:'2026-01-01',actief:true,naam:'Dion telefoon',financialFor:'dion',rekening:'dion'},
+      {id:'fixed-dara',begindatum:'2026-01-01',actief:true,naam:'Dara telefoon',financialFor:'dara',rekening:'dara'}
     ];
     const draft = {
       id:'fixed-owner-test',fileName:'test.csv',bank:'ING',format:'ing',status:'concept',accountOwner:'dion',

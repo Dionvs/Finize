@@ -19,6 +19,7 @@ const transactions = [
   {id:'stored',date:'2026-07-08',owner:'dion',kind:'uitgave',amount:80,expenseImpact:12.34},
   {id:'legacy',date:'2026-07-09',owner:'dara',amount:42}
 ];
+transactions.forEach(tx=>tx.reviewStatus='bevestigd');
 const context = {
   state:{transactions},
   Number, String, Math,
@@ -27,6 +28,7 @@ const context = {
   getSelectedMonth:()=> '2026-07',
   getMonthTransactions:(owner=null,month='2026-07')=>transactions.filter(tx=>String(tx.date).slice(0,7)===month&&(!owner||tx.owner===owner))
 };
+Object.assign(context,require('../src/core/transaction-model.mjs'),require('../src/core/transaction-engine.mjs'),require('../src/core/recurring-occurrences.mjs'));
 vm.createContext(context);
 vm.runInContext(html.slice(start,end), context);
 

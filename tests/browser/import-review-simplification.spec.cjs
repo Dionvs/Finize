@@ -8,8 +8,8 @@ async function openReview(page){
       {id:'dion-account',name:'Dion',identifier:'NL01DION',accountOwner:'dion'},
       {id:'dara-account',name:'Dara',identifier:'NL01DARA',accountOwner:'dara'}
     ];
-    state.recurringFixedExpenses[state.meta.scenario]=[
-      {id:'fixed-energy',naam:'Energie',financialFor:'gezamenlijk',rekening:'gezamenlijk',amountHistory:[{effectiveFrom:'2026-01-01',amount:100}],monthOverrides:{}}
+    state.recurringFixedExpenses=[
+      {id:'fixed-energy',begindatum:'2026-01-01',actief:true,naam:'Energie',financialFor:'gezamenlijk',rekening:'gezamenlijk',amountHistory:[{effectiveFrom:'2026-01-01',amount:100}],monthOverrides:{}}
     ];
     state.spaardoelen.gezamenlijk=[{id:'goal-buffer',naam:'Buffer',doelbedrag:1000,algespaard:0}];
     window.__reviewDraft={
@@ -38,20 +38,19 @@ test('importcontrole splitst onbekend, nakijken en alleen handmatig goedgekeurd'
   await expect(page.locator('.u4-section-approved [data-u4-row="approved-row"]')).toHaveCount(1);
 });
 
-test('verwerken blokkeert niet-goedgekeurde regels en handmatig goedkeuren verplaatst de regel',async({page})=>{
+test('gedeeltelijke verwerking houdt onbekende regels open en activeert expliciete goedkeuring',async({page})=>{
   await openReview(page);
-  await page.locator('[data-u4-process]').click();
-  await expect(page.locator('.u4-validation-dialog')).toContainText('expliciet goed');
-  await page.locator('[data-u4-validation-close]').click();
+  expect(await page.evaluate(()=>state.transactions.filter(tx=>tx.importBatchId==='review-test').length)).toBe(0);
   await page.locator('[data-u4-row="review-row"] [data-u4-approve]').click();
   await expect(page.locator('.u4-section-approved [data-u4-row="review-row"]')).toHaveCount(1);
+  await expect.poll(()=>page.evaluate(()=>state.transactions.some(tx=>tx.importTransactionId==='review-row'&&tx.processingStatus==='goedgekeurd'))).toBe(true);
   expect(await page.evaluate(()=>({certainty:window.__reviewDraft.rows[0].certainty,source:window.__reviewDraft.rows[0].approvalSource}))).toEqual({certainty:'goedgekeurd',source:'manual'});
 });
 
 test('CSV-controle toont vier hoofdvelden en alleen relevante vervolgkeuzes',async({page})=>{
   const row=await openReview(page);
   await expect(row.locator('.u4-row-grid > label')).toHaveCount(4);
-  await expect(row.locator('.u4-row-grid')).toContainText('Datum');
+  await expect(row.locator('.u4-row-grid')).toContainText('Verwerkingsdatum');
   await expect(row.locator('.u4-row-grid')).toContainText('Bedrag');
   await expect(row.locator('.u4-row-grid')).toContainText('Budgeteigenaar');
   await expect(row.locator('.u4-row-grid')).toContainText('Transactie');

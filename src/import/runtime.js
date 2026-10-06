@@ -1,4 +1,15 @@
+import { expenseCategoriesForMonth } from '../core/planning-timeline.mjs';
+import { INCOME_TRANSACTION_TYPES } from '../core/transaction-model.mjs';
+import { importVersion, sameImportOperation, assertImportBase, pendingQueueReceipt, acknowledgeMatches, findImportConflicts, mergeImportDetails } from './import-sync-protocol.mjs';
+import { planImportCommand, deriveBatchReviewStatus, batchLifecycle } from './import-lifecycle.mjs';
+import { classifyCsvDuplicate, importDateError, validCalendarDate, csvFileDigest, assertNoDuplicateSources } from './import-identity.mjs';
+import { plannedOccurrences } from '../core/recurring-occurrences.mjs';
+import { projectTransaction, validateTransactionProcessing, getTransactionFinancialMonth, confirmInternalTransferPair, confirmManualReplacement, refundCategoryIsRecognizable } from '../core/transaction-engine.mjs';
+import { reopenTransactionSource, replaceProcessedSourceRows, createTransactionSavingsEntry, synchronizeChangedSavings, assertFinancialMutationSafe, applyFinancialCandidate } from '../core/transaction-processing.mjs';
+import { resolveRecurringAmount, resolveRecurringConfig, resolveFixedExpensesForMonth, applyFixedPlanningAdjustment, undoFixedPlanningAdjustment } from '../core/planning-timeline.mjs';
 import { cloneState as clone } from "../core/state.js";
+import { CURRENT_SCHEMA_VERSION, normalizeImportCore, calculateGoalSavedAmount, reconcileGoalSavedAmounts } from '../core/data-normalization.mjs';
+import { normalizeDataTransaction, getTransactionAccountContext, getTransactionSource, getTransactionProcessingStatus, isTransactionFinanciallyActive, getTransactionOriginalBankData, assertOriginalBankDataUnchanged } from '../core/transaction-model.mjs';
 
 (function(root,factory){
   const api=factory();
@@ -7,7 +18,7 @@ import { cloneState as clone } from "../core/state.js";
 })(typeof window!=='undefined'?window:globalThis,function(){
   'use strict';
 
-  const SCHEMA_VERSION=9;
+  const SCHEMA_VERSION=CURRENT_SCHEMA_VERSION;
   const DB_NAME='finize-imports-v1';
   const DB_VERSION=1;
   const IMPORT_STORE='imports';
@@ -44,6 +55,7 @@ import { cloneState as clone } from "../core/state.js";
 
   function normalizeRule(rule,index=0){
     const next={
+      ...rule,
       id:String(rule?.id||`u4-rule-${index}`),
       enabled:rule?.enabled!==false,
       level:['counterparty','description','organization','keyword','prediction'].includes(rule?.level)?rule.level:(rule?.counterparty?'counterparty':'description'),
@@ -61,131 +73,10 @@ import { cloneState as clone } from "../core/state.js";
   }
 
   function normalizeTransaction(tx){
-    if(!plain(tx))return tx;
-    const accountOwner=validOwner(tx.accountOwner||tx.account||tx.owner);
-    const budgetOwner=validOwner(tx.budgetOwner||tx.processing?.budgetOwner||tx.financialFor||tx.owner||accountOwner);
-    tx.accountOwner=accountOwner;
-    tx.budgetOwner=budgetOwner;
-    tx.account=accountOwner;
-    tx.financialFor=budgetOwner;
-    tx.owner=budgetOwner;
-    if(tx.bankOriginal){
-      tx.bankOriginal.accountIdentifier=normalizeIban(tx.bankOriginal.accountIdentifier);
-      tx.bankOriginal.counterpartyAccount=normalizeIban(tx.bankOriginal.counterpartyAccount);
-    }
-    if(tx.processing){
-      tx.processing.budgetOwner=budgetOwner;
-      tx.processing.processedAmount=round2(tx.processing.processedAmount??tx.amount??0);
-      tx.processing.processingDate=tx.processing.processingDate||tx.date||'';
-    }
-    return tx;
+    return Object.assign(tx,normalizeDataTransaction(tx));
   }
-
-  function allGoals(state){
-    return OWNERS.flatMap(owner=>(state?.spaardoelen?.[owner]||[]).map(goal=>({owner,goal})));
-  }
-  function contributionAmount(entry){
-    if(entry?.active===false||['geannuleerd','teruggedraaid'].includes(entry?.status))return 0;
-    // Een geplande maandinleg is alleen administratie. Alleen een werkelijk
-    // verwerkte banktransactie of handmatige correctie wijzigt het doelsaldo.
-    if(entry?.source==='planned')return 0;
-    if(['bank-import','bank-match'].includes(entry?.source)&&entry?.transactionId){
-      const actual=Number(entry?.actualAmount??entry?.amount??entry?.effectiveAmount);
-      return Number.isFinite(actual)?round2(actual):0;
-    }
-    const value=Number(entry?.effectiveAmount??entry?.amount);
-    return Number.isFinite(value)?round2(value):0;
-  }
-  function calculateGoalSavedAmount(state,goalId){
-    return round2((state?.savingsGoalLedger||[]).filter(entry=>entry.goalId===goalId).reduce((sum,entry)=>sum+contributionAmount(entry),0));
-  }
-  function reconcileGoalSavedAmounts(state,goalIds=null){
-    const selected=goalIds?new Set(goalIds):null;
-    allGoals(state).forEach(({goal})=>{
-      if(selected&&!selected.has(goal.id))return;
-      const saved=Math.max(0,calculateGoalSavedAmount(state,goal.id));
-      goal.algespaard=round2(saved);
-      if(Array.isArray(goal.subdoelen)&&goal.subdoelen.length){
-        let remaining=Math.round(saved*100);
-        goal.subdoelen.forEach(child=>{
-          const capacity=Math.max(0,Math.round((Number(child.doelbedrag)||0)*100));
-          const applied=Math.min(capacity,Math.max(0,remaining));
-          child.gespaard=round2(applied/100);
-          child.voltooid=capacity>0&&applied>=capacity;
-          remaining-=applied;
-        });
-        goal.algespaard=round2(goal.subdoelen.reduce((sum,child)=>sum+(Number(child.gespaard)||0),0));
-      }
-    });
-    return state;
-  }
-  function normalizeSavingsLedger(target){
-    target.savingsGoalLedger=Array.isArray(target.savingsGoalLedger)?target.savingsGoalLedger.filter(plain):[];
-    target.savingsGoalLedger=target.savingsGoalLedger.map((entry,index)=>{
-      const amount=Number(entry.effectiveAmount??entry.amount??0);
-      const actual=Number(entry.actualAmount??entry.amount);
-      const month=String(entry.month||'').slice(0,7)||String((target.transactions||[]).find(tx=>tx.id===entry.transactionId)?.date||'').slice(0,7);
-      return {
-        ...entry,
-        id:String(entry.id||`saving-legacy-${index}`),
-        goalId:String(entry.goalId||''),
-        month,
-        plannedAmount:round2(Number(entry.plannedAmount)||0),
-        actualAmount:Number.isFinite(actual)?round2(actual):null,
-        effectiveAmount:round2(Number.isFinite(amount)?amount:0),
-        status:String(entry.status||'uitgevoerd'),
-        source:String(entry.source||'bank-import'),
-        transactionId:String(entry.transactionId||''),
-        active:entry.active!==false,
-        createdAt:String(entry.createdAt||new Date(0).toISOString()),
-        updatedAt:String(entry.updatedAt||entry.createdAt||new Date(0).toISOString())
-      };
-    });
-    allGoals(target).forEach(({goal})=>{
-      const id=`saving-opening-${goal.id}`;
-      if(target.savingsGoalLedger.some(entry=>entry.id===id))return;
-      const existing=target.savingsGoalLedger.filter(entry=>entry.goalId===goal.id).reduce((sum,entry)=>sum+contributionAmount(entry),0);
-      const opening=round2((Number(goal.algespaard)||0)-existing);
-      target.savingsGoalLedger.unshift({
-        id,goalId:goal.id,month:'',plannedAmount:0,actualAmount:null,effectiveAmount:opening,
-        status:'uitgevoerd',source:'legacy-opening',transactionId:'',active:true,
-        createdAt:new Date(0).toISOString(),updatedAt:new Date(0).toISOString()
-      });
-    });
-    reconcileGoalSavedAmounts(target);
-  }
-
   function normalizeCore(candidate){
-    const target=candidate||{};
-    target.meta=plain(target.meta)?target.meta:{};
-    target.accountProfiles=Array.isArray(target.accountProfiles)?target.accountProfiles.filter(plain):[];
-    target.accountProfiles=target.accountProfiles.map((profile,index)=>({
-      id:String(profile.id||`account-${index}`),
-      name:String(profile.name||profile.rekeningnaam||'Rekening'),
-      identifier:normalizeIban(profile.identifier||profile.iban),
-      bank:String(profile.bank||'ING'),
-      csvFormat:String(profile.csvFormat||'ing'),
-      accountOwner:validOwner(profile.accountOwner||profile.owner),
-      createdAt:String(profile.createdAt||new Date(0).toISOString()),
-      updatedAt:String(profile.updatedAt||new Date(0).toISOString())
-    }));
-    target.importSummaries=Array.isArray(target.importSummaries)?target.importSummaries.filter(plain):[];
-    target.importSummaries.forEach(summary=>{
-      summary.status=IMPORT_STATUSES.includes(summary.status)?summary.status:'concept';
-      summary.id=String(summary.id||uid('import'));
-    });
-    target.activeImportId=String(target.activeImportId||'');
-    normalizeSavingsLedger(target);
-    target.manualTransactionReplacements=Array.isArray(target.manualTransactionReplacements)?target.manualTransactionReplacements.filter(plain):[];
-    target.internalTransferPairs=Array.isArray(target.internalTransferPairs)?target.internalTransferPairs.filter(plain):[];
-    target.advanceRepayments=Array.isArray(target.advanceRepayments)?target.advanceRepayments.filter(plain):[];
-    target.actualIncomeOverrides=plain(target.actualIncomeOverrides)?target.actualIncomeOverrides:{};
-    target.monthlyIncomeOverrides=plain(target.monthlyIncomeOverrides)?target.monthlyIncomeOverrides:{};
-    target.recognitionRules=(Array.isArray(target.recognitionRules)?target.recognitionRules:[]).map(normalizeRule).filter(rule=>rule.value);
-    target.transactions=Array.isArray(target.transactions)?target.transactions:[];
-    target.transactions.forEach(normalizeTransaction);
-    target.meta.schemaVersion=SCHEMA_VERSION;
-    return target;
+    return normalizeImportCore(candidate);
   }
 
   function validateCore(target){
@@ -205,12 +96,13 @@ import { cloneState as clone } from "../core/state.js";
   }
 
   const ImportStore={
-    dbPromise:null,
+    dbPromise:null,scope:'legacy',legacyReferences:new Set(),
+    setScope(scope){if(this.scope===scope)return;this.dbPromise?.then(db=>db.close()).catch(()=>{});this.scope=scope;this.dbPromise=null;},
     open(){
       if(this.dbPromise)return this.dbPromise;
       this.dbPromise=new Promise((resolve,reject)=>{
         if(typeof indexedDB==='undefined'){reject(new Error('IndexedDB is niet beschikbaar.'));return;}
-        const request=indexedDB.open(DB_NAME,DB_VERSION);
+        const request=indexedDB.open(this.scope==='legacy'?DB_NAME:`${DB_NAME}-${this.scope}`,DB_VERSION);
         request.onupgradeneeded=()=>{
           const db=request.result;
           if(!db.objectStoreNames.contains(IMPORT_STORE))db.createObjectStore(IMPORT_STORE,{keyPath:'id'});
@@ -220,6 +112,7 @@ import { cloneState as clone } from "../core/state.js";
         request.onsuccess=()=>resolve(request.result);
         request.onerror=()=>reject(request.error||new Error('Importopslag openen mislukt.'));
       });
+      this.dbPromise=this.dbPromise.catch(error=>{this.dbPromise=null;throw error;});
       return this.dbPromise;
     },
     async request(storeName,mode,action){
@@ -227,19 +120,45 @@ import { cloneState as clone } from "../core/state.js";
       return new Promise((resolve,reject)=>{
         const tx=db.transaction(storeName,mode);
         const store=tx.objectStore(storeName);
-        let request;
+        let request,result;
+        tx.oncomplete=()=>resolve(result);
         try{request=action(store);}
         catch(error){reject(error);return;}
         if(request){
-          request.onsuccess=()=>resolve(request.result);
+          request.onsuccess=()=>{result=request.result;};
           request.onerror=()=>reject(request.error||new Error('Importopslagactie mislukt.'));
         }else tx.oncomplete=()=>resolve();
         tx.onerror=()=>reject(tx.error||new Error('Importopslagtransactie mislukt.'));
         tx.onabort=()=>reject(tx.error||new Error('Importopslagtransactie afgebroken.'));
       });
     },
-    putImport(record){const next=clone(record);delete next.rawText;return this.request(IMPORT_STORE,'readwrite',store=>store.put(next));},
-    getImport(id){return this.request(IMPORT_STORE,'readonly',store=>store.get(String(id)));},
+    putImport(record){
+      const next=clone(record);
+      // Compare versions and immutable originals within the IndexedDB write transaction.
+      return this.open().then(db=>new Promise((resolve,reject)=>{
+        const transaction=db.transaction(IMPORT_STORE,'readwrite'),store=transaction.objectStore(IMPORT_STORE);
+        let failure;
+        const existing=store.get(String(next.id));
+        existing.onsuccess=()=>{
+          try{const old=existing.result;if(old?.lifecycle==='deleted'&&next.lifecycle!=='deleted')throw cloudImportError('import-deleted','Deze import is permanent verwijderd.');if(old&&importVersion(next)<importVersion(old))throw cloudImportError('import-conflict','Nieuwere lokale importdetails blijven behouden.');if(old&&importVersion(next)===importVersion(old)&&old.operationId&&next.operationId&&old.operationId!==next.operationId)throw cloudImportError('import-conflict','Een andere lokale keuze bestaat voor deze importversie.');assertOriginalBankDataUnchanged(old?.rows,next.rows);store.put(next);}
+          catch(error){failure=error;transaction.abort();}
+        };
+        transaction.oncomplete=()=>resolve(next.id);
+        transaction.onerror=()=>reject(failure||transaction.error||new Error('Importopslag mislukt.'));
+        transaction.onabort=()=>reject(failure||transaction.error||new Error('Importopslag afgebroken.'));
+      }));
+    },
+    async getImport(id){const local=await this.request(IMPORT_STORE,'readonly',store=>store.get(String(id)));if(local||this.scope==='legacy'||!this.legacyReferences.has(String(id)))return local;const legacy=await new Promise((resolve,reject)=>{const request=indexedDB.open(DB_NAME,DB_VERSION);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});try{const record=await new Promise((resolve,reject)=>{const tx=legacy.transaction(IMPORT_STORE,'readonly'),request=tx.objectStore(IMPORT_STORE).get(String(id));request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});if(record){await this.putImport(record);return record;}return undefined;}finally{legacy.close();}},
+    async rollbackImport(expected,previous,previousQueue){
+      const db=await this.open();return new Promise((resolve,reject)=>{
+        const tx=db.transaction([IMPORT_STORE,SYNC_STORE],'readwrite'),imports=tx.objectStore(IMPORT_STORE),queue=tx.objectStore(SYNC_STORE);let failure;
+        const request=imports.get(String(expected.id));request.onsuccess=()=>{
+          if(!sameImportOperation(request.result,expected)){failure=cloudImportError('import-conflict','Nieuwere lokale importkeuze blijft behouden; rollback is geblokkeerd.');tx.abort();return;}
+          if(previous)imports.put(clone(previous));else imports.delete(String(expected.id));
+          const queued=queue.get(String(expected.id));queued.onsuccess=()=>{if(!acknowledgeMatches(queued.result,pendingQueueReceipt(expected)))return;if(previousQueue)queue.put(clone(previousQueue));else queue.delete(String(expected.id));};
+        };tx.oncomplete=()=>resolve();tx.onerror=tx.onabort=()=>reject(failure||tx.error||new Error('Importrollback mislukt.'));
+      });
+    },
     deleteImport(id){return this.request(IMPORT_STORE,'readwrite',store=>store.delete(String(id)));},
     listImports(){return this.request(IMPORT_STORE,'readonly',store=>store.getAll());},
     putJournal(record){return this.request(JOURNAL_STORE,'readwrite',store=>store.put(clone(record)));},
@@ -247,13 +166,16 @@ import { cloneState as clone } from "../core/state.js";
     listJournal(){return this.request(JOURNAL_STORE,'readonly',store=>store.getAll());},
     putSync(record){return this.request(SYNC_STORE,'readwrite',store=>store.put(clone(record)));},
     deleteSync(id){return this.request(SYNC_STORE,'readwrite',store=>store.delete(String(id)));},
-    listSync(){return this.request(SYNC_STORE,'readonly',store=>store.getAll())}
+    listSync(){return this.request(SYNC_STORE,'readonly',store=>store.getAll());},
+    async acknowledgeSync(receipt){const db=await this.open();return new Promise((resolve,reject)=>{const tx=db.transaction(SYNC_STORE,'readwrite'),store=tx.objectStore(SYNC_STORE);let removed=false;const request=store.get(receipt.id);request.onsuccess=()=>{if(acknowledgeMatches(request.result,receipt)){store.delete(receipt.id);removed=true;}};tx.oncomplete=()=>resolve(removed);tx.onerror=tx.onabort=()=>reject(tx.error||new Error('Retry bevestigen mislukt.'));});},
+    async confirmCloudReceipt(receipt,confirmed){const db=await this.open();return new Promise((resolve,reject)=>{const tx=db.transaction([IMPORT_STORE,SYNC_STORE],'readwrite'),imports=tx.objectStore(IMPORT_STORE),queue=tx.objectStore(SYNC_STORE);const get=imports.get(receipt.id);get.onsuccess=()=>{const current=get.result;if(current&&importVersion(current)>=receipt.version&&Number(current.baseVersion||0)<=receipt.baseVersion){current.baseVersion=receipt.version;current.confirmedBatch=clone(confirmed);delete current.confirmedBatch.confirmedBatch;imports.put(current);const queued=queue.get(receipt.id);queued.onsuccess=()=>{if(acknowledgeMatches(queued.result,receipt))queue.delete(receipt.id);else if(queued.result&&queued.result.version===current.version)queue.put({...queued.result,baseVersion:receipt.version});};}};tx.oncomplete=()=>resolve();tx.onerror=tx.onabort=()=>reject(tx.error||new Error('Cloudbevestiging opslaan mislukt.'));});},
+    deleteJournal(id){return this.request(JOURNAL_STORE,'readwrite',store=>store.delete(String(id)));}
   };
 
   function chunkRows(rows,maxBytes=700000){
     const chunks=[];let current=[];let bytes=2;
     (rows||[]).forEach(row=>{
-      const size=JSON.stringify(row).length+1;
+      const size=new TextEncoder().encode(JSON.stringify(row)).length+1;
       if(current.length&&(bytes+size>maxBytes||current.length>=200)){chunks.push(current);current=[];bytes=2;}
       current.push(row);bytes+=size;
     });
@@ -277,13 +199,15 @@ import { cloneState as clone } from "../core/state.js";
     const chunks=chunkRows(rows);
     const header=clone(record);
     delete header.rows;
-    delete header.rawText;
+    delete header.rawText;delete header.originalCsv;delete header.confirmedBatch;
     header.storageVersion=CLOUD_STORAGE_VERSION;
     header.rowCount=rows.length;
     header.chunkCount=chunks.length;
-    header.rowsChecksum=rowsChecksum(rows);
+    header.rowsChecksum=rowsChecksum(rows);header.rowsSha256=csvFileDigest(JSON.stringify(canonicalValue(rows)));
     header.syncedAt=new Date().toISOString();
-    return {header,chunks:chunks.map((chunk,index)=>({index,rows:clone(chunk)}))};
+    header.generation=record.operationId||'';
+    const sourceText=typeof record.originalCsv==='string'?record.originalCsv:'';const sourceChunks=[];let sourcePart='';for(const char of sourceText){if(sourcePart.length>=100000){sourceChunks.push(sourcePart);sourcePart='';}sourcePart+=char;}if(sourcePart)sourceChunks.push(sourcePart);header.sourceChunkCount=sourceChunks.length;
+    return {header,chunks:chunks.map((chunk,index)=>({index,generation:header.generation,rows:clone(chunk)})),sourceChunks};
   }
 
   function cloudImportError(code,message){
@@ -315,6 +239,7 @@ import { cloneState as clone } from "../core/state.js";
     }
     const byIndex=new Map();
     chunks.forEach(chunk=>{
+      if(header.generation&&chunk.generation!==header.generation)throw cloudImportError('cloud-incomplete','Importdelen horen bij verschillende versies.');
       if(!plain(chunk)||!Number.isInteger(Number(chunk.index))||!Array.isArray(chunk.rows)){
         throw cloudImportError('cloud-invalid','Een importdeel in de cloud is beschadigd.');
       }
@@ -336,6 +261,7 @@ import { cloneState as clone } from "../core/state.js";
     if(header.rowsChecksum&&rowsChecksum(rows)!==String(header.rowsChecksum)){
       throw cloudImportError('cloud-checksum','De controlecode van de cloudkopie klopt niet.');
     }
+    if(header.rowsSha256&&header.rowsSha256!==csvFileDigest(JSON.stringify(canonicalValue(rows))))throw cloudImportError('cloud-checksum','Importinhoud wijkt af van de SHA-256-controlecode.');
     const record=clone(header);
     delete record.rawText;delete record.rowCount;delete record.chunkCount;delete record.rowsChecksum;
     record.rows=rows;
@@ -371,24 +297,28 @@ import { cloneState as clone } from "../core/state.js";
       throw cloudImportError('cloud-missing','Deze import is nog niet vanaf het bronapparaat naar de cloud gesynchroniseerd.');
     }
     const header=headerSnapshot.data();
+    if(header?.lifecycle==='deleted')return clone(header);
     const count=Number(header?.chunkCount);
     if(!Number.isInteger(count)||count<0)throw cloudImportError('cloud-invalid','De cloudkopie bevat geen geldige importindeling.');
     const indices=Array.from({length:count},(_,index)=>index);
     const chunks=await mapWithConcurrency(indices,CLOUD_READ_CONCURRENCY,async index=>{
-      const chunkRef=cloudImportChunkRef(cloud,firestore,id,String(index).padStart(4,'0'));
+      const chunkRef=cloudImportChunkRef(cloud,firestore,id,`${header.generation?header.generation+'-':''}${String(index).padStart(4,'0')}`);
       let snapshot;
       try{snapshot=await firestore.getDoc(chunkRef);}
       catch(error){throw classifyCloudError(error,`Importdeel ${index+1} van ${count} kon niet worden opgehaald.`);}
       if(!snapshot?.exists?.())throw cloudImportError('cloud-incomplete',`Importdeel ${index+1} van ${count} ontbreekt in de cloud.`);
       return snapshot.data();
     });
-    return assembleCloudImport(header,chunks,id);
+    const record=assembleCloudImport(header,chunks,id);
+    if(header.sourceChunkCount){const textChunks=await mapWithConcurrency(Array.from({length:header.sourceChunkCount},(_,index)=>index),CLOUD_READ_CONCURRENCY,async index=>{const snap=await firestore.getDoc(cloudImportChunkRef(cloud,firestore,id,`${header.generation}-source-${index}`));if(!snap.exists()||snap.data().generation!==header.generation)throw cloudImportError('cloud-incomplete','Originele CSV ontbreekt in deze versie.');return snap.data().text;});record.originalCsv=textChunks.join('');if(header.fileDigest&&csvFileDigest(record.originalCsv)!==header.fileDigest)throw cloudImportError('cloud-checksum','Originele CSV-controlecode wijkt af.');}
+    record.baseVersion=importVersion(header);return record;
   }
 
-  async function resolveImportDetails(id,{localRead,cloudRead,localWrite}){
+  async function resolveImportDetails(id,{localRead,cloudRead,localWrite,refresh=false,pendingRead=async()=>false,onConflict=async()=>{}}){
     const local=await localRead(String(id));
-    if(local)return {record:local,source:'local'};
-    const cloud=await cloudRead(String(id));
+    if(local&&!refresh)return {record:local,source:'local'};
+    let cloud;try{cloud=await cloudRead(String(id));}catch(error){if(local&&error.code==='cloud-offline')return {record:local,source:'local-offline'};throw error;}
+    if(local){if(await pendingRead(id)){if(sameImportOperation(local,cloud))return {record:local,source:'echo'};if(importVersion(cloud)!==Number(local.baseVersion||0)){await onConflict(local,cloud);return {record:cloud,source:'conflict'};}return {record:local,source:'local-pending'};}if(importVersion(local)>importVersion(cloud))throw cloudImportError('import-conflict','De cloudkopie is ouder dan de lokale import; geen gegevens zijn overschreven.');if(importVersion(local)===importVersion(cloud)&&JSON.stringify(local.rows)===JSON.stringify(cloud.rows))return {record:local,source:'echo'};}
     await localWrite(cloud);
     return {record:cloud,source:'cloud'};
   }
@@ -432,10 +362,10 @@ import { cloneState as clone } from "../core/state.js";
   function parseDate(value){
     const text=String(value||'').trim();
     let match=text.match(/^(\d{4})[-/]?(\d{2})[-/]?(\d{2})$/);
-    if(match)return `${match[1]}-${match[2]}-${match[3]}`;
+    if(match){const date=`${match[1]}-${match[2]}-${match[3]}`;return validCalendarDate(date)?date:'';}
     match=text.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2}|\d{4})$/);
     if(!match)return '';
-    return `${match[3].length===2?'20'+match[3]:match[3]}-${match[2].padStart(2,'0')}-${match[1].padStart(2,'0')}`;
+    const date=`${match[3].length===2?'20'+match[3]:match[3]}-${match[2].padStart(2,'0')}-${match[1].padStart(2,'0')}`;return validCalendarDate(date)?date:'';
   }
   function displayDate(value){
     const normalized=parseDate(value);
@@ -456,7 +386,9 @@ import { cloneState as clone } from "../core/state.js";
   }
 
   const HEADER_ALIASES={
-    date:['datum','date','boekdatum','transactiedatum','rentedatum'],
+    date:['transactiedatum','datum','date','boekdatum','rentedatum'],
+    bookingDate:['boekdatum','booking date','bookingdate'],
+    transactionTime:['transactietijd','tijd','time'],
     description:['naam omschrijving','omschrijving','description','naam tegenpartij','tegenpartij'],
     accountIdentifier:['rekening','rekeningnummer','iban','eigen rekening'],
     counterpartyAccount:['tegenrekening','tegenrekening iban','iban tegenpartij'],
@@ -481,6 +413,7 @@ import { cloneState as clone } from "../core/state.js";
   function inferMapping(headers){
     const mapping={};
     Object.entries(HEADER_ALIASES).forEach(([key,aliases])=>mapping[key]=findHeader(headers,aliases));
+    const transactionIndex=findHeader(headers,['transactiedatum','transaction date']);if(transactionIndex>=0)mapping.date=transactionIndex;
     return mapping;
   }
 
@@ -538,13 +471,7 @@ import { cloneState as clone } from "../core/state.js";
   }
 
   function fixedAmountAt(item,dateOrMonth){
-    const month=String(dateOrMonth||'').slice(0,7);
-    if(item?.monthOverrides&&Number.isFinite(Number(item.monthOverrides[month])))return round2(Number(item.monthOverrides[month]));
-    const history=(Array.isArray(item?.amountHistory)?item.amountHistory:[])
-      .filter(entry=>String(entry?.effectiveFrom||'').slice(0,7)<=month)
-      .sort((a,b)=>String(a.effectiveFrom||'').localeCompare(String(b.effectiveFrom||'')))
-      .pop();
-    return round2(Number(history?.amount??item?.bedrag??item?.verwachtBedrag??0)||0);
+    return resolveRecurringAmount(item,String(dateOrMonth).slice(0,7));
   }
   function fixedRecognition(original,profile,rule,fixedExpenses=[]){
     if(!rule?.fixedExpenseId)return {required:false,safe:true,item:null,expected:0,tolerance:0};
@@ -563,11 +490,12 @@ import { cloneState as clone } from "../core/state.js";
     return row?.certainty==='goedgekeurd'&&row?.approvalSource==='manual';
   }
   function importReviewState(row){
-    if(isExplicitlyApproved(row))return 'goedgekeurd';
-    if(row?.recognitionState==='unknown'||row?.certainty==='onbekend')return 'onbekend';
+    if(isExplicitlyApproved(row))return row.processing?.include===false?'niet-meetellen':'goedgekeurd';
+    if(getTransactionProcessingStatus(row)==='onbekend')return 'onbekend';
     return 'nakijken';
   }
   function markExplicitlyApproved(row){
+    row.processingStatus=row.processing?.include===false?'niet-meetellen':'goedgekeurd';
     row.certainty='goedgekeurd';
     row.approvalSource='manual';
     row.approvedAt=new Date().toISOString();
@@ -575,6 +503,7 @@ import { cloneState as clone } from "../core/state.js";
     return row;
   }
   function reopenForReview(row){
+    row.processingStatus='nakijken';
     row.certainty='nakijken';
     row.approvalSource='';
     row.approvedAt='';
@@ -651,7 +580,7 @@ import { cloneState as clone } from "../core/state.js";
       const description=String(cells[mapping.description]||'').trim();
       const notes=String(cells[mapping.notes]||'').trim();
       return {
-        bankDate:parseDate(cells[mapping.date]),
+        bankDate:parseDate(cells[mapping.date]),bookingDate:parseDate(cells[mapping.bookingDate]),transactionTime:String(cells[mapping.transactionTime]||'').trim(),
         description:notes&&notes!==description?`${description} — ${notes}`:description,
         rawDescription:description,
         amount:round2(amount),
@@ -675,33 +604,38 @@ import { cloneState as clone } from "../core/state.js";
     return profiles.find(profile=>normalizeIban(profile.identifier)===identifiers[0])||null;
   }
 
-  function createImportDraft({text,fileName='import.csv',profiles=[],rules=[],transactions=[],fixedExpenses=[],entryOwner='',id=uid('import')}){
+  function createImportDraft({text,fileName='import.csv',profiles=[],rules=[],transactions=[],existingImports=[],fixedExpenses=[],entryOwner='',today=new Date().toLocaleDateString('sv-SE'),id=uid('import')}){
     const parsed=parseBankCsv(text);
     const detectedProfile=findProfile(parsed,profiles);
     const ownerProfiles=OWNERS.includes(entryOwner)?profiles.filter(profile=>profile.accountOwner===entryOwner):[];
     const profile=detectedProfile||(ownerProfiles.length===1?ownerProfiles[0]:null);
-    const existingFingerprints=new Set((transactions||[]).map(tx=>tx.bankOriginal?.fingerprint).filter(Boolean));
+    const fileDigest=csvFileDigest(text);
+    const observed=new Map(existingImports.map(batch=>[batch.id,batch]));
+    for(const tx of transactions||[]){if(!tx.importBatchId||!tx.bankOriginal||observed.has(tx.importBatchId))continue;const accountOwner=getTransactionAccountContext(tx,{accountProfiles:profiles});if(!accountOwner)continue;const siblings=transactions.filter(row=>row.importBatchId===tx.importBatchId);observed.set(tx.importBatchId,{id:tx.importBatchId,accountOwner,accountProfileId:tx.accountProfileId,lifecycle:tx.batchLifecycle||'active',rows:[...new Map(siblings.map(row=>[row.importTransactionId,{id:row.importTransactionId,bankOriginal:row.bankOriginal,accountOwner,sourceIdentityProof:row.sourceIdentityProof}])).values()]});}
     const rows=parsed.rows.map((original,index)=>{
       original.importBatchId=id;
       original.importTransactionId=`${id}-${String(index+1).padStart(5,'0')}`;
       original.fingerprint=fingerprint(original,profile?.id||original.accountIdentifier);
-      const duplicate=existingFingerprints.has(original.fingerprint);
-      const proposal=classifyOriginal(original,profile,rules,profiles,fixedExpenses);
-      return {id:original.importTransactionId,bankOriginal:original,accountProfileId:profile?.id||'',accountOwner:profile?.accountOwner||'',duplicate,...proposal};
+      const sourceIdentityProof={kind:'file-row',fileDigest,rowOrdinal:index+1};
+      const duplicateResult=classifyCsvDuplicate({bankOriginal:original,accountOwner:profile?.accountOwner||entryOwner,sourceIdentityProof},{originalCsv:text,accountOwner:profile?.accountOwner||entryOwner,accountProfileId:profile?.id||''},[...observed.values()]);
+      const importError=importDateError(original,today);
+      const matchingFixed=original.valid&&/^\d{4}-\d{2}-\d{2}$/.test(original.bankDate)?fixedExpenses.map(item=>item.begindatum?resolveRecurringConfig(item,original.bankDate.slice(0,7)):item).filter(Boolean):[];
+      const proposal=classifyOriginal(original,profile,rules,profiles,matchingFixed);
+      return {id:original.importTransactionId,bankOriginal:original,accountProfileId:profile?.id||'',accountOwner:profile?.accountOwner||'',sourceIdentityProof,...duplicateResult,importError,...proposal};
     });
-    const active=rows.filter(row=>row.bankOriginal.valid&&!row.duplicate);
+    const active=rows.filter(row=>row.bankOriginal.valid&&!row.importError&&!row.duplicate);
     const dates=active.map(row=>row.bankOriginal.bankDate).sort();
     const income=active.filter(row=>row.bankOriginal.amount>0).reduce((sum,row)=>sum+row.processing.processedAmount,0);
     const expenses=active.filter(row=>row.bankOriginal.amount<0).reduce((sum,row)=>sum+row.processing.processedAmount,0);
     return {
-      id,fileName,bank:parsed.format==='ing'?'ING':'Onbekend',format:parsed.format,headers:parsed.headers,mapping:parsed.mapping,entryOwner:OWNERS.includes(entryOwner)?entryOwner:'',
+      id,fileName,fileDigest,originalCsv:String(text),lifecycle:'active',version:0,bank:parsed.format==='ing'?'ING':'Onbekend',format:parsed.format,headers:parsed.headers,mapping:parsed.mapping,entryOwner:OWNERS.includes(entryOwner)?entryOwner:'',
       accountProfileId:profile?.id||'',accountOwner:profile?.accountOwner||'',status:'concept',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),
       periodFrom:dates[0]||'',periodTo:dates[dates.length-1]||'',rows,
       summary:{newCount:active.length,duplicateCount:rows.filter(row=>row.duplicate).length,totalIncome:round2(income),totalExpenses:round2(expenses),sureCount:0,approvedCount:0,reviewCount:active.filter(row=>importReviewState(row)==='nakijken').length,unknownCount:active.filter(row=>importReviewState(row)==='onbekend').length}
     };
   }
 
-  const UI={draft:null,visibleRows:60,root:null};
+  const UI={draft:null,visibleRows:60,root:null,conflicts:new Map()};
   const ImportPerformance={pending:new Map(),chains:new Map(),syncPromise:null,syncRequested:false};
   function esc(value){return String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));}
   function escAttr(value){return esc(value).replace(/`/g,'&#96;').replace(/[\u0000-\u001f\u007f]/g,'');}
@@ -713,8 +647,8 @@ import { cloneState as clone } from "../core/state.js";
     return identifier?`${title} · ${identifier}`:title;
   }
   function option(value,label,current){return `<option value="${escAttr(value)}" ${value===current?'selected':''}>${esc(label)}</option>`;}
-  function updateDraftSummary(draft){
-    const active=(draft.rows||[]).filter(row=>row.bankOriginal?.valid&&!row.duplicate);
+  function updateDraftSummary(draft,{touch=true}={}){
+    const active=(draft.rows||[]).filter(row=>row.bankOriginal?.valid&&!row.importError&&!row.duplicate);
     draft.summary={
       newCount:active.length,
       duplicateCount:(draft.rows||[]).filter(row=>row.duplicate).length,
@@ -726,29 +660,29 @@ import { cloneState as clone } from "../core/state.js";
       unknownCount:active.filter(row=>importReviewState(row)==='onbekend').length,
       uncategorizedCount:active.filter(row=>row.processing.category==='Ongecategoriseerd').length
     };
-    draft.updatedAt=new Date().toISOString();
+    if(touch)draft.updatedAt=new Date().toISOString();
     return draft.summary;
   }
   function compactSummary(draft){
-    updateDraftSummary(draft);
-    return {
+    updateDraftSummary(draft,{touch:false});
+    return clone({
       id:draft.id,fileName:draft.fileName,accountProfileId:draft.accountProfileId,accountOwner:draft.accountOwner,bank:draft.bank,status:draft.status,
       importDate:draft.createdAt,periodFrom:draft.periodFrom,periodTo:draft.periodTo,
-      newCount:draft.summary.newCount,duplicateCount:draft.summary.duplicateCount,uncategorizedCount:draft.summary.uncategorizedCount||0,
+      lifecycle:batchLifecycle(draft),version:Number(draft.version)||0,operationId:draft.operationId||'',newCount:draft.summary.newCount,duplicateCount:draft.summary.duplicateCount,uncategorizedCount:draft.summary.uncategorizedCount||0,
       totalIncome:draft.summary.totalIncome,totalExpenses:draft.summary.totalExpenses,updatedAt:draft.updatedAt
-    };
+    });
+  }
+  function applyImportSummary(target,draft){
+    const summary=compactSummary(draft);target.importSummaries=target.importSummaries||[];
+    const index=target.importSummaries.findIndex(item=>item.id===summary.id);
+    if(index>=0)target.importSummaries[index]={...target.importSummaries[index],...summary};else target.importSummaries.unshift(summary);
+    target.activeImportId=draft.status==='concept'?draft.id:(target.activeImportId===draft.id?'':target.activeImportId);
   }
   function commitSummary(root,draft){
-    const summary=compactSummary(draft);
-    const ok=root.commitChange(()=>{
-      root.state.importSummaries=root.state.importSummaries||[];
-      const index=root.state.importSummaries.findIndex(item=>item.id===summary.id);
-      if(index>=0)root.state.importSummaries[index]=summary;else root.state.importSummaries.unshift(summary);
-      root.state.activeImportId=draft.status==='concept'?draft.id:(root.state.activeImportId===draft.id?'':root.state.activeImportId);
-    },{render:false});
-    if(!ok)throw new Error('Importsamenvatting kon niet worden opgeslagen.');
+    if(!root.commitChange(()=>applyImportSummary(root.state,draft),{render:false}))throw new Error('Importsamenvatting kon niet worden opgeslagen.');
   }
   function updateImportSaveStatus(text,error=false){
+    if(typeof document==='undefined')return;
     const status=document.querySelector('#u4ImportModalRoot [data-u4-save-status]');
     if(!status)return;
     status.textContent=text;
@@ -759,14 +693,22 @@ import { cloneState as clone } from "../core/state.js";
     const id=String(draft.id);
     const previous=ImportPerformance.chains.get(id)||Promise.resolve();
     const operation=previous.catch(()=>{}).then(async()=>{
-      if(updateSummary)updateDraftSummary(draft);
+      if(updateSummary)updateDraftSummary(draft,{touch:false});
       else draft.updatedAt=new Date().toISOString();
+      const stored=await ImportStore.getImport(id);
+      if(stored){const left=clone(stored),right=clone(draft);for(const value of [left,right]){delete value.confirmedBatch;delete value.syncConflict;delete value.updatedAt;delete value.baseVersion;}if(draft.operationId&&JSON.stringify(left)===JSON.stringify(right))return draft;}
+      if(stored&&draft.version!==undefined&&importVersion(stored)!==importVersion(draft))throw cloudImportError('import-conflict','Deze import is intussen gewijzigd. Heropen de actuele importdetails.');
+      draft.updatedAt=new Date().toISOString();draft.baseVersion=Number(stored?.baseVersion??draft.baseVersion??draft.version??0);draft.version=importVersion(stored||draft)+1;draft.operationId=uid('import-op');
+      const baseSignature=JSON.stringify(root.state),candidate=clone(root.state);applyImportSummary(candidate,draft);
+      const previousQueue=(await ImportStore.listSync()).find(item=>item.importId===id);
+      const journal={id:draft.operationId,importId:id,operation:'import-command',status:'pending',intent:{type:'draft-save',operationId:draft.operationId},baseSignature,candidate,batch:clone(draft),previousBatch:stored?clone(stored):null};
+      await ImportStore.putJournal(journal);
+      if(JSON.stringify(root.state)!==baseSignature){journal.status='conflict';await ImportStore.putJournal(journal);await preserveImportConflict(root,draft,stored||{id,version:0},[{kind:'local-core-changed'}]);throw new Error('De state wijzigde tijdens opslaan. De importkeuze is veilig bewaard.');}
       await ImportStore.putImport(draft);
-      commitSummary(root,draft);
-      if(syncCloud){
-        await queueImportSync(draft);
-        flushImportSync(root).catch(error=>console.warn('Importsynchronisatie wordt later opnieuw geprobeerd.',error));
-      }
+      if(syncCloud)await queueImportSync(draft);
+      try{commitSummary(root,draft);}catch(error){journal.status='rolled-back';await ImportStore.putJournal(journal);await ImportStore.rollbackImport(draft,stored,previousQueue);throw error;}
+      journal.status='completed';delete journal.candidate;delete journal.previousBatch;delete journal.baseSignature;await ImportStore.putJournal(journal);
+      if(syncCloud)flushImportSync(root).catch(error=>console.warn('Importsynchronisatie wordt later opnieuw geprobeerd.',error));
       return draft;
     });
     ImportPerformance.chains.set(id,operation);
@@ -874,82 +816,58 @@ import { cloneState as clone } from "../core/state.js";
     }
   }
 
-  async function discardImportConcept(root,id,{cleanupCloud=true}={}){
-    const importId=String(id||'');
-    const summary=(root?.state?.importSummaries||[]).find(item=>String(item.id)===importId);
-    if(!importId||String(root?.state?.activeImportId||'')!==importId||summary?.status!=='concept'){
-      throw new Error('Alleen het actieve, onverwerkte importconcept kan worden verwijderd.');
-    }
-    let local=null;
-    try{local=await ImportStore.getImport(importId);}
-    catch(error){console.warn('Lokaal importconcept kon niet worden gelezen voor verwijdering.',error);}
-    const journal={id:`discard-${importId}`,operation:'discard',importId,status:'pending',createdAt:new Date().toISOString()};
-    await ImportStore.putJournal(journal);
-    const ok=root.commitChange(()=>{
-      root.state.importSummaries=(root.state.importSummaries||[]).filter(item=>String(item.id)!==importId);
-      if(root.state.activeImportId===importId)root.state.activeImportId='';
-    },{render:false});
-    if(!ok){
-      journal.status='rolled-back';journal.updatedAt=new Date().toISOString();await ImportStore.putJournal(journal);
-      throw new Error('Het importconcept is niet verwijderd; de bestaande gegevens zijn behouden.');
-    }
-    let localCleanup=true;
-    try{
-      await ImportStore.deleteImport(importId);
-      await ImportStore.deleteSync(importId);
-    }catch(error){
-      localCleanup=false;journal.localCleanupError=String(error?.message||error);
-    }
-    const cloudCleanup=cleanupCloud?await deleteCloudImportBestEffort(root,importId,local):false;
-    if(UI.draft?.id===importId)UI.draft=null;
-    journal.status=localCleanup?'completed':'pending';
-    if(localCleanup)journal.completedAt=new Date().toISOString();
-    journal.localCleanup=localCleanup;journal.cloudCleanup=cloudCleanup;
-    await ImportStore.putJournal(journal);
-    root.renderActiveTab?.();
-    return {ok:true,localCleanup,cloudCleanup};
+  async function discardImportConcept(root,id){
+    const summary=(root.state.importSummaries||[]).find(row=>row.id===id);if(!summary||summary.status!=='concept')throw new Error('Alleen een onverwerkt concept kan hier worden verwijderd.');
+    let draft=await ImportStore.getImport(id);
+    if(!draft){const dependencies=(root.state.transactions||[]).some(tx=>tx.importBatchId===id)||(root.state.savingsGoalLedger||[]).some(row=>row.importBatchId===id)||(root.state.manualTransactionReplacements||[]).some(row=>row.importBatchId===id||row.id?.startsWith(`replacement-${id}-`));if(dependencies)throw new Error('Betrouwbare importdetails ontbreken. Herstel eerst de bron voordat je deze batch verwijdert.');draft={...clone(summary),rows:[],lifecycle:'active',version:Number(summary.version)||0};}
+    await commitImportCommand(root,draft,{type:'delete'});root.renderActiveTab?.();return {ok:true,localCleanup:true,cloudCleanup:false};
   }
   function goalExists(state,id){
     if(!id)return true;
     return OWNERS.some(owner=>(state.spaardoelen?.[owner]||[]).some(goal=>goal.id===id));
   }
-  function fixedExists(state,id){
+  function activeFixedRows(state){
+    return Array.isArray(state.recurringFixedExpenses)?state.recurringFixedExpenses:state.recurringFixedExpenses?.voor||[];
+  }
+  function fixedExists(state,id,month){
     if(!id)return true;
-    return ['voor','na'].some(scenario=>(state.recurringFixedExpenses?.[scenario]||[]).some(item=>item.id===id));
+    const item=activeFixedRows(state).find(item=>item.id===id);
+    return !!item&&(!month||!item.begindatum||!!resolveRecurringConfig(item,month));
   }
   function findFixedItem(state,id){
-    for(const scenario of ['voor','na']){
-      const item=(state.recurringFixedExpenses?.[scenario]||[]).find(row=>row.id===id);
-      if(item)return {scenario,item};
-    }
-    return null;
+    const item=activeFixedRows(state).find(item=>item.id===id);
+    return item?{item}:null;
+  }
+  function rowProcessingValidation(row,state){
+    if(row.importError)return {ok:false,errors:[row.importError]};
+    if(!row.bankOriginal?.valid)return {ok:false,errors:[{code:'original',message:'Originele bankregel is ongeldig.'}]};
+    if(row.processing?.include===false||row.processing?.transactionType==='niet-meetellen')return {ok:true,errors:[]};
+    const p=row.processing||{},lines=p.splits?.length?p.splits:[p];
+    const months=[...new Set(lines.map(line=>line.fixedOccurrenceMonth||p.fixedOccurrenceMonth||String(row.bankOriginal.bankDate).slice(0,7)))];
+    const timelineState=Array.isArray(state.recurringFixedExpenses)?state:{...state,recurringFixedExpenses:activeFixedRows(state)};
+    const occurrences=lines.some(line=>line.fixedExpenseId)?months.flatMap(month=>plannedOccurrences(resolveFixedExpensesForMonth(timelineState,month),month)):[];
+    return validateTransactionProcessing(row,{fixedOccurrences:occurrences,validFixedId:id=>occurrences.some(item=>item.itemId===id),goalExists:id=>goalExists(state,id),refundCategoryExists:(category,month,owner)=>refundCategoryIsRecognizable(state,category,month,owner)});
   }
   function validateDraft(draft,state){
     const errors=[];
     const profile=(state.accountProfiles||[]).find(item=>item.id===draft.accountProfileId);
     if(!profile)errors.push({code:'profile',message:'Kies of maak eerst een rekeningprofiel.'});
     (draft.rows||[]).filter(row=>!row.duplicate).forEach(row=>{
+      if(row.importError)errors.push({rowId:row.id,...row.importError});
       if(!row.bankOriginal?.valid)errors.push({rowId:row.id,code:'original',message:'Originele bankregel mist datum, omschrijving of bedrag.'});
       if(row.bankOriginal?.valid&&!isExplicitlyApproved(row))errors.push({rowId:row.id,code:'approval',message:'Keur deze transactie expliciet goed voordat je de import verwerkt.'});
       const p=row.processing||{};
+      rowProcessingValidation(row,state).errors.forEach(error=>errors.push({...error,rowId:row.id}));
       if(!parseDate(p.processingDate))errors.push({rowId:row.id,code:'date',message:'Ongeldige verwerkingsdatum.'});
       if(!Number.isFinite(Number(p.processedAmount)))errors.push({rowId:row.id,code:'amount',message:'Verwerkt bedrag ontbreekt.'});
       if(!OWNERS.includes(p.budgetOwner))errors.push({rowId:row.id,code:'owner',message:'Budgeteigenaar ontbreekt.'});
       if(p.transactionType==='maandelijkse-bijdrage'&&!['dion','dara'].includes(p.budgetOwner))errors.push({rowId:row.id,code:'owner',message:'Kies Dion of Dara als ontvanger van het zakgeld.'});
       if(p.transactionType==='vaste-last'&&!p.fixedExpenseId)errors.push({rowId:row.id,code:'fixed-choice',message:'Kies welke vaste last bij deze banktransactie hoort.'});
-      if(p.transactionType==='sparen'&&!p.savingsGoalId)errors.push({rowId:row.id,code:'goal-choice',message:'Kies het spaardoel voor deze inleg.'});
+      if(['sparen','naar-spaarrekening','van-spaarrekening'].includes(p.transactionType)&&!p.savingsGoalId)errors.push({rowId:row.id,code:'goal-choice',message:'Kies het spaardoel voor deze inleg.'});
       if(transferType(p.transactionType)&&(!p.sourceAccountProfileId||!p.destinationAccountProfileId||p.sourceAccountProfileId===p.destinationAccountProfileId))errors.push({rowId:row.id,code:'transfer',message:'Kies twee verschillende rekeningen voor de interne overboeking.'});
       if(p.savingsGoalId&&!goalExists(state,p.savingsGoalId))errors.push({rowId:row.id,code:'goal',message:'Het gekozen spaardoel bestaat niet meer.'});
-      if(p.fixedExpenseId&&!fixedExists(state,p.fixedExpenseId))errors.push({rowId:row.id,code:'fixed',message:'De gekozen vaste last bestaat niet meer.'});
-      const activeSplits=(p.splits||[]).filter(split=>Math.abs(Number(split.amount)||0)>.004);
-      if(activeSplits.length){
-        const splitTotal=round2(activeSplits.reduce((sum,split)=>sum+Number(split.amount||0),0));
-        if(Math.abs(splitTotal-round2(p.processedAmount))>.004)errors.push({rowId:row.id,code:'splits',message:`De splitsregels zijn samen ${euro(splitTotal)}, maar deze transactie is ${euro(p.processedAmount)}. Pas de splitbedragen aan of verwijder de lege splitsregels.`});
-        activeSplits.forEach(split=>{
-          if(!OWNERS.includes(split.budgetOwner)||!split.category)errors.push({rowId:row.id,code:'split-fields',message:'Iedere splitregel heeft een budgeteigenaar en categorie nodig.'});
-          if(split.savingsGoalId&&!goalExists(state,split.savingsGoalId))errors.push({rowId:row.id,code:'split-goal',message:'Een spaardoel in een splitregel bestaat niet meer.'});
-        });
-      }
+      if(p.fixedExpenseId&&!fixedExists(state,p.fixedExpenseId,p.fixedOccurrenceMonth||String(row.bankOriginal.bankDate).slice(0,7)))errors.push({rowId:row.id,code:'fixed',message:'De gekozen vaste last bestaat niet meer.'});
+
     });
     return {ok:errors.length===0,errors};
   }
@@ -961,17 +879,14 @@ import { cloneState as clone } from "../core/state.js";
     return 'uitgave';
   }
   function expenseImpact(type,amount,include=true){
-    if(!include||['salaris','vakantiegeld','nabetaling','vergoeding','belastingteruggave','overige-inkomsten','interne-overboeking','naar-spaarrekening','van-spaarrekening','maandelijkse-bijdrage','extra-bijdrage','sparen','terugbetaling-voorschot','terugbetaling','vaste-last'].includes(type))return 0;
-    return Math.abs(amount);
+    // Legacy stored compatibility field, derived from the same projection as readers.
+    return projectTransaction({source:'manual',transactionType:type,amount,processing:{include}}).effects.budgetImpact;
   }
   function financialRows(row){
-    const p=row.processing;
-    const activeSplits=(p.splits||[]).filter(split=>Math.abs(Number(split.amount)||0)>.004);
-    if(activeSplits.length)return activeSplits.map((split,index)=>({
-      id:`${row.id}-split-${split.id||index+1}`,amount:round2(split.amount),budgetOwner:split.budgetOwner,category:split.category,
-      budgetItemId:split.budgetItemId||'',savingsGoalId:split.savingsGoalId||'',advanceMode:split.advanceMode||'auto',include:split.include!==false,splitId:split.id||String(index+1),isFirst:index===0
-    }));
-    return [{id:`tx-${row.id}`,amount:round2(p.processedAmount),budgetOwner:p.budgetOwner,category:p.category,budgetItemId:p.budgetItemId||'',savingsGoalId:p.savingsGoalId||'',advanceMode:p.advanceMode||'auto',include:p.include!==false,splitId:'',isFirst:true}];
+    const p=row.processing,activeSplits=(p.splits||[]).filter(split=>Number(split.amount)!==0);
+    const common=part=>({amount:round2(Math.abs(Number(part.amount??p.processedAmount))),budgetOwner:part.budgetOwner||p.budgetOwner,category:part.category||p.category,budgetItemId:part.budgetItemId||'',savingsGoalId:part.savingsGoalId||'',refundCategory:part.refundCategory||'',refundMonth:part.refundMonth||'',advanceMode:part.advanceMode||p.advanceMode||'auto',include:p.include!==false&&part.include!==false,transactionType:part.transactionType||(part.fixedExpenseId?'vaste-last':activeSplits.length&&p.transactionType==='vaste-last'?'uitgave':p.transactionType),fixedExpenseId:part.fixedExpenseId||'',fixedOccurrenceId:part.fixedOccurrenceId||'',fixedOccurrenceMonth:part.fixedOccurrenceMonth||''});
+    if(activeSplits.length)return activeSplits.map((split,index)=>({...common(split),id:`${row.id}-split-${split.id||index+1}`,splitId:split.id||String(index+1),isFirst:index===0}));
+    return [{...common(p),id:`tx-${row.id}`,splitId:'',isFirst:true}];
   }
   function advanceForTransaction(tx){
     if(tx.kind==='niet-meetellen'||tx.kind==='interne-overboeking'||tx.processing?.advanceMode==='none'||tx.accountOwner===tx.budgetOwner)return null;
@@ -980,22 +895,7 @@ import { cloneState as clone } from "../core/state.js";
     const creditor=incoming?tx.budgetOwner:tx.accountOwner;
     return {id:`advance-${tx.id}`,transactionId:tx.id,month:String(tx.date).slice(0,7),debtor,creditor,originalAmount:round2(tx.amount),outstandingAmount:round2(tx.amount),status:'open',createdAt:tx.createdAt,settlementTransferIds:[],repaymentAllocationIds:[]};
   }
-  function savingsForTransaction(tx,state){
-    if(tx.transactionType!=='sparen'||!tx.savingsGoalId||tx.kind==='niet-meetellen')return null;
-    const month=String(tx.date||'').slice(0,7);
-    const amount=round2(tx.amount);
-    const candidates=(state?.savingsGoalLedger||[]).filter(entry=>
-      entry.goalId===tx.savingsGoalId&&entry.month===month&&entry.active!==false&&!entry.transactionId&&
-      entry.source==='planned'
-    );
-    const planned=candidates.find(entry=>Math.abs(Number(entry.plannedAmount||entry.effectiveAmount)-amount)<=.01)||(candidates.length===1?candidates[0]:null);
-    return {
-      id:`saving-${tx.id}`,transactionId:tx.id,importBatchId:tx.importBatchId,goalId:tx.savingsGoalId,month,
-      plannedAmount:0,actualAmount:amount,effectiveAmount:planned?round2(amount-Number(planned.effectiveAmount||0)):amount,
-      matchedContributionId:planned?.id||'',status:planned&&Math.abs(amount-Number(planned.plannedAmount||0))>.004?'afwijkend':'uitgevoerd',
-      source:planned?'bank-match':'bank-import',active:true,createdAt:tx.createdAt,updatedAt:tx.createdAt
-    };
-  }
+  function savingsForTransaction(tx,state){return createTransactionSavingsEntry(tx,state);}
   function daysBetween(a,b){return Math.abs(new Date(`${a}T12:00:00`)-new Date(`${b}T12:00:00`))/86400000;}
   function detectInternalPairs(transactions,state){
     const candidates=[...(state.transactions||[]),...transactions].filter(tx=>tx.transactionType==='interne-overboeking'||tx.kind==='interne-overboeking');
@@ -1017,14 +917,14 @@ import { cloneState as clone } from "../core/state.js";
   }
   function directionalBalances(state,throughMonth='9999-12'){
     const map=new Map();
-    (state.advanceLedger||[]).filter(row=>row.status!=='voldaan'&&Number(row.outstandingAmount)>0&&String(row.month||'')<=throughMonth).forEach(row=>{
+    (state.advanceLedger||[]).filter(row=>row.active!==false&&row.status!=='voldaan'&&Number(row.outstandingAmount)>0&&String(row.month||'')<=throughMonth).forEach(row=>{
       const key=`${row.debtor}|${row.creditor}`;map.set(key,round2((map.get(key)||0)+Number(row.outstandingAmount||0)));
     });
     return [...map.entries()].map(([key,amount])=>{const [debtor,creditor]=key.split('|');return {debtor,creditor,amount};}).filter(row=>row.amount>.004).sort((a,b)=>b.amount-a.amount);
   }
   function proposeRepaymentAllocations(state,debtor,creditor,amount){
     let remaining=round2(amount);const allocations=[];
-    (state.advanceLedger||[]).filter(row=>row.debtor===debtor&&row.creditor===creditor&&row.status!=='voldaan'&&Number(row.outstandingAmount)>0).sort((a,b)=>String(a.createdAt).localeCompare(String(b.createdAt))).forEach(row=>{
+    (state.advanceLedger||[]).filter(row=>row.active!==false&&row.debtor===debtor&&row.creditor===creditor&&row.status!=='voldaan'&&Number(row.outstandingAmount)>0).sort((a,b)=>String(a.createdAt).localeCompare(String(b.createdAt))).forEach(row=>{
       if(remaining<=.004)return;const applied=round2(Math.min(remaining,Number(row.outstandingAmount)||0));
       allocations.push({id:`allocation-${row.id}`,advanceId:row.id,amount:applied});remaining=round2(remaining-applied);
     });
@@ -1035,32 +935,35 @@ import { cloneState as clone } from "../core/state.js";
     if(!validation.ok)return {ok:false,errors:validation.errors};
     const profile=state.accountProfiles.find(item=>item.id===draft.accountProfileId);
     const transactions=[];const replacements=[];const savingsEntries=[];const advances=[];const repayments=[];const fixedAdjustments=[];const affectedMonths=new Set();const counts={expenses:0,income:0,internal:0,savings:0,refunds:0,advances:0,uncategorized:0};
-    for(const row of draft.rows.filter(item=>item.bankOriginal.valid&&!item.duplicate)){
+    for(const row of draft.rows.filter(item=>item.bankOriginal.valid&&!item.importError&&!item.duplicate)){
       const p=row.processing;const type=p.include===false?'niet-meetellen':p.transactionType;
       financialRows(row).forEach(part=>{
-        const kind=transactionKind(type,part.include);
+        const lineType=part.transactionType||type;const kind=transactionKind(lineType,part.include);
         const tx={
-          id:part.id,date:p.processingDate,amount:round2(part.amount),description:p.description||row.bankOriginal.description,category:part.category||'Ongecategoriseerd',
-          kind,transactionType:type,reviewStatus:'bevestigd',accountOwner:profile.accountOwner,budgetOwner:part.budgetOwner,
+          id:part.id,date:row.bankOriginal.bankDate,transactionDate:row.bankOriginal.bankDate,amount:round2(part.amount),description:row.bankOriginal.description,category:part.category||'Ongecategoriseerd',
+          kind,transactionType:lineType,reviewStatus:'bevestigd',accountOwner:profile.accountOwner,budgetOwner:part.budgetOwner,
           account:profile.accountOwner,financialFor:part.budgetOwner,owner:part.budgetOwner,accountProfileId:profile.id,
-          importBatchId:draft.id,importTransactionId:row.id,splitId:part.splitId,bankOriginal:clone(row.bankOriginal),
-          processing:{...clone(p),processedAmount:part.amount,budgetOwner:part.budgetOwner,category:part.category,budgetItemId:part.budgetItemId,savingsGoalId:part.savingsGoalId,include:part.include},
-          expenseImpact:expenseImpact(type,part.amount,part.include),
+          source:'csv',accountContext:profile.accountOwner,accountContextEvidence:'account-profile',
+          processingStatus:part.include===false||type==='niet-meetellen'?'niet-meetellen':'goedgekeurd',
+          approvalSource:row.approvalSource,approvedAt:row.approvedAt,certainty:row.certainty,
+          importBatchId:draft.id,importTransactionId:row.id,splitId:part.splitId,bankOriginal:clone(row.bankOriginal),sourceIdentityProof:clone(row.sourceIdentityProof||null),batchLifecycle:batchLifecycle(draft),
+          processing:{...clone(p),processedAmount:part.amount,transactionType:lineType,fixedExpenseId:part.fixedExpenseId,fixedOccurrenceId:part.fixedOccurrenceId,fixedOccurrenceMonth:part.fixedOccurrenceMonth,budgetOwner:part.budgetOwner,category:part.category,budgetItemId:part.budgetItemId,savingsGoalId:part.savingsGoalId,refundCategory:part.refundCategory,refundMonth:part.refundMonth,include:part.include},
+          expenseImpact:expenseImpact(lineType,part.amount,part.include),
           accountDelta:part.isFirst?round2(row.bankOriginal.amount):0,
-          fixedExpenseId:p.fixedExpenseId||'',fixedOccurrenceId:'',incomeSourceId:p.incomeSourceId||'',incomeOccurrenceId:'',
-          savingsGoalId:part.savingsGoalId,note:p.note||'',createdAt:new Date().toISOString()
+          fixedExpenseId:part.fixedExpenseId,fixedOccurrenceId:part.fixedOccurrenceId,fixedOccurrenceMonth:part.fixedOccurrenceMonth,incomeSourceId:p.incomeSourceId||'',incomeOccurrenceId:'',
+          savingsGoalId:part.savingsGoalId,refundCategory:part.refundCategory,refundMonth:part.refundMonth,note:p.note||'',createdAt:new Date().toISOString()
         };
         transactions.push(tx);affectedMonths.add(String(tx.date).slice(0,7));
         const saving=savingsForTransaction(tx,state);if(saving)savingsEntries.push(saving);
         const advance=advanceForTransaction(tx);if(advance){advances.push(advance);counts.advances++;}
-        if(type==='terugbetaling-voorschot'){
+        if(lineType==='terugbetaling-voorschot'){
           const allocations=p.repaymentAllocations||[];
           allocations.forEach(allocation=>repayments.push({id:`repayment-${tx.id}-${allocation.advanceId}`,transactionId:tx.id,advanceId:allocation.advanceId,amount:round2(allocation.amount),date:tx.date,status:'actief'}));
         }
         if(kind==='inkomen')counts.income++;else if(kind==='interne-overboeking')counts.internal++;else if(kind!=='niet-meetellen')counts.expenses++;
-        if(type==='sparen')counts.savings++;if(type==='terugbetaling')counts.refunds++;if(tx.category==='Ongecategoriseerd')counts.uncategorized++;
+        if(['sparen','naar-spaarrekening','van-spaarrekening'].includes(lineType))counts.savings++;if(lineType==='terugbetaling')counts.refunds++;if(tx.category==='Ongecategoriseerd')counts.uncategorized++;
       });
-      if(p.manualMatchId){
+      if(p.manualMatchId&&(state.manualTransactionReplacements||[]).some(item=>item.active!==false&&item.id===`replacement-${draft.id}-${p.manualMatchId}`)){
         const manual=state.transactions.find(tx=>tx.id===p.manualMatchId&&!tx.importBatchId);
         if(manual)replacements.push({id:`replacement-${draft.id}-${manual.id}`,manualTransaction:clone(manual),replacementTransactionId:transactions.find(tx=>tx.importTransactionId===row.id)?.id||''});
       }
@@ -1069,7 +972,7 @@ import { cloneState as clone } from "../core/state.js";
         if(found&&!fixedAdjustments.some(item=>item.fixedExpenseId===p.fixedExpenseId&&item.month===String(p.processingDate).slice(0,7))){
           fixedAdjustments.push({
             id:`fixed-adjustment-${draft.id}-${p.fixedExpenseId}-${String(p.processingDate).slice(0,7)}`,
-            fixedExpenseId:p.fixedExpenseId,scenario:found.scenario,month:String(p.processingDate).slice(0,7),
+            fixedExpenseId:p.fixedExpenseId,month:String(p.processingDate).slice(0,7),
             mode:p.fixedAmountMode,amount:round2(p.processedAmount),
             before:{amountHistory:clone(found.item.amountHistory||[]),monthOverrides:clone(found.item.monthOverrides||{})}
           });
@@ -1083,17 +986,18 @@ import { cloneState as clone } from "../core/state.js";
     for(const owner of OWNERS){const goal=(state.spaardoelen?.[owner]||[]).find(item=>item.id===id);if(goal)return goal;}
     return null;
   }
-  function applyImportPlan(state,plan){
+  function applyImportPlanInPlace(state,plan){
     const transactionIds=new Set((state.transactions||[]).map(tx=>tx.id));
     plan.transactions.forEach(tx=>{if(!transactionIds.has(tx.id)){state.transactions.push(clone(tx));transactionIds.add(tx.id);}});
     state.manualTransactionReplacements=state.manualTransactionReplacements||[];
     plan.replacements.forEach(replacement=>{
       if(!state.manualTransactionReplacements.some(item=>item.id===replacement.id))state.manualTransactionReplacements.push(clone(replacement));
-      state.transactions=state.transactions.filter(tx=>tx.id!==replacement.manualTransaction.id);
+      // The duplicate remains recoverable; projection suppresses it via replacement metadata.
     });
     state.savingsGoalLedger=state.savingsGoalLedger||[];
     plan.savingsEntries.forEach(entry=>{
-      if(state.savingsGoalLedger.some(item=>item.id===entry.id))return;
+      const existing=state.savingsGoalLedger.find(item=>item.id===entry.id);
+      if(existing?.active!==false&&existing)return;
       const goal=findGoal(state,entry.goalId);if(!goal)return;
       if(entry.matchedContributionId){
         const planned=state.savingsGoalLedger.find(item=>item.id===entry.matchedContributionId);
@@ -1104,31 +1008,25 @@ import { cloneState as clone } from "../core/state.js";
           planned.updatedAt=entry.updatedAt;
         }
       }
-      state.savingsGoalLedger.push(clone(entry));
+      if(existing){const history=[...(existing.processingHistory||[]),clone({...existing,processingHistory:undefined})];Object.assign(existing,clone(entry),{active:true,processingHistory:history});}else state.savingsGoalLedger.push(clone(entry));
     });
     reconcileGoalSavedAmounts(state,plan.savingsEntries.map(entry=>entry.goalId));
     state.advanceLedger=state.advanceLedger||[];
-    plan.advances.forEach(entry=>{if(!state.advanceLedger.some(item=>item.id===entry.id))state.advanceLedger.push(clone(entry));});
+    plan.advances.forEach(entry=>{const old=state.advanceLedger.find(item=>item.id===entry.id);if(old?.active===false)Object.assign(old,clone(entry),{active:true});else if(!old)state.advanceLedger.push(clone(entry));});
     state.advanceRepayments=state.advanceRepayments||[];
     plan.repayments.forEach(repayment=>{
-      if(state.advanceRepayments.some(item=>item.id===repayment.id))return;
+      const previous=state.advanceRepayments.find(item=>item.id===repayment.id);if(previous&&previous.active!==false)return;
       const advance=state.advanceLedger.find(item=>item.id===repayment.advanceId);if(!advance)return;
       const applied=round2(Math.min(Number(repayment.amount)||0,Number(advance.outstandingAmount)||0));
       advance.outstandingAmount=round2(Number(advance.outstandingAmount||0)-applied);if(advance.outstandingAmount<=.004){advance.outstandingAmount=0;advance.status='voldaan';}
       advance.repaymentAllocationIds=[...new Set([...(advance.repaymentAllocationIds||[]),repayment.id])];
-      state.advanceRepayments.push({...clone(repayment),amount:applied});
+      if(previous)Object.assign(previous,clone(repayment),{amount:applied,active:true});else state.advanceRepayments.push({...clone(repayment),amount:applied});
     });
     state.internalTransferPairs=state.internalTransferPairs||[];
     plan.internalPairs.forEach(pair=>{if(!state.internalTransferPairs.some(item=>item.id===pair.id))state.internalTransferPairs.push(clone(pair));});
     (plan.fixedAdjustments||[]).forEach(adjustment=>{
       const found=findFixedItem(state,adjustment.fixedExpenseId);if(!found)return;
-      const item=found.item;item.amountHistory=Array.isArray(item.amountHistory)?item.amountHistory:[];item.monthOverrides=plain(item.monthOverrides)?item.monthOverrides:{};
-      if(adjustment.mode==='month')item.monthOverrides[adjustment.month]=adjustment.amount;
-      else{
-        delete item.monthOverrides[adjustment.month];
-        item.amountHistory=item.amountHistory.filter(row=>String(row.effectiveFrom||'').slice(0,7)!==adjustment.month);
-        item.amountHistory.push({id:`amount-${item.id}-${adjustment.month}`,effectiveFrom:`${adjustment.month}-01`,amount:adjustment.amount});
-      }
+      applyFixedPlanningAdjustment(found.item,adjustment);
     });
     state.monthRecords=state.monthRecords||{};
     plan.affectedMonths.forEach(month=>{
@@ -1139,9 +1037,21 @@ import { cloneState as clone } from "../core/state.js";
       }
     });
     const summary=state.importSummaries.find(item=>item.id===plan.importId);
-    if(summary){summary.status=plan.affectedMonths.some(month=>state.monthRecords?.[month]?.status==='correctie-nodig')?'correctie-nodig':'verwerkt';summary.processedAt=new Date().toISOString();summary.counts=clone(plan.counts);}
+    if(summary){summary.status=plan.affectedMonths.some(month=>state.monthRecords?.[month]?.status==='correctie-nodig')?'correctie-nodig':'verwerkt';summary.processedAt=new Date().toISOString();if(!plan.sourceCorrection)summary.counts=clone(plan.counts);}
     if(state.activeImportId===plan.importId)state.activeImportId='';
     return plan;
+  }
+  function applyImportPlan(state,plan){
+    const candidate=clone(state);applyImportPlanInPlace(candidate,plan);
+    synchronizeChangedSavings(candidate,state);assertFinancialMutationSafe(state,candidate);
+    applyFinancialCandidate(state,candidate);return plan;
+  }
+  function applySourceApproval(state,draft,row,plan){
+    const candidate=clone(state);
+    replaceProcessedSourceRows(candidate,draft.id,row.id,plan.transactions);
+    applyImportPlanInPlace(candidate,{...plan,fixedAdjustments:[],sourceCorrection:true});
+    synchronizeChangedSavings(candidate,state);assertFinancialMutationSafe(state,candidate);
+    applyFinancialCandidate(state,candidate);
   }
   function effectManifest(plan){
     return {
@@ -1156,8 +1066,9 @@ import { cloneState as clone } from "../core/state.js";
       counts:clone(plan.counts)
     };
   }
-  function undoImportEffects(state,draft){
+  function undoImportEffectsInPlace(state,draft){
     const manifest=draft.effectManifest||{};
+    (manifest.fixedAdjustments||[]).forEach(adjustment=>undoFixedPlanningAdjustment(findFixedItem(state,adjustment.fixedExpenseId)?.item,adjustment,{dryRun:true}));
     const transactionIds=new Set(manifest.transactionIds||[]);
     const savingIds=new Set(manifest.savingIds||[]);
     const advanceIds=new Set(manifest.advanceIds||[]);
@@ -1166,7 +1077,7 @@ import { cloneState as clone } from "../core/state.js";
     const replacementIds=new Set(manifest.replacementIds||[]);
 
     state.advanceRepayments=state.advanceRepayments||[];
-    state.advanceRepayments.filter(item=>repaymentIds.has(item.id)).forEach(repayment=>{
+    state.advanceRepayments.filter(item=>repaymentIds.has(item.id)&&item.active!==false).forEach(repayment=>{
       const advance=(state.advanceLedger||[]).find(item=>item.id===repayment.advanceId);
       if(!advance)return;
       advance.outstandingAmount=round2((Number(advance.outstandingAmount)||0)+Number(repayment.amount||0));
@@ -1180,16 +1091,15 @@ import { cloneState as clone } from "../core/state.js";
     state.savingsGoalLedger.filter(item=>savingIds.has(item.id)).forEach(entry=>{
       if(!entry.matchedContributionId)return;
       const planned=state.savingsGoalLedger.find(item=>item.id===entry.matchedContributionId);
-      if(planned){planned.transactionId='';planned.actualAmount=null;planned.status='gepland';planned.updatedAt=new Date().toISOString();}
+      if(planned&&planned.transactionId===entry.transactionId){planned.transactionId='';planned.actualAmount=null;planned.status='gepland';planned.updatedAt=new Date().toISOString();}
     });
-    state.savingsGoalLedger=state.savingsGoalLedger.filter(item=>!savingIds.has(item.id));
+    state.savingsGoalLedger.filter(item=>savingIds.has(item.id)&&item.active!==false).forEach(entry=>{entry.processingHistory=[...(entry.processingHistory||[]),clone({...entry,processingHistory:undefined})];entry.active=false;entry.status='teruggedraaid';});
     reconcileGoalSavedAmounts(state,affectedSavingGoals);
     state.advanceLedger=(state.advanceLedger||[]).filter(item=>!advanceIds.has(item.id));
     state.internalTransferPairs=(state.internalTransferPairs||[]).filter(item=>!pairIds.has(item.id));
     (manifest.fixedAdjustments||[]).forEach(adjustment=>{
       const found=findFixedItem(state,adjustment.fixedExpenseId);if(!found)return;
-      found.item.amountHistory=clone(adjustment.before?.amountHistory||[]);
-      found.item.monthOverrides=clone(adjustment.before?.monthOverrides||{});
+      undoFixedPlanningAdjustment(found.item,adjustment);
     });
 
     state.manualTransactionReplacements=state.manualTransactionReplacements||[];
@@ -1208,9 +1118,14 @@ import { cloneState as clone } from "../core/state.js";
       if(record.status==='correctie-nodig'&&!record.lateImportTransactionIds.length)record.status='afgesloten';
     });
     const summary=(state.importSummaries||[]).find(item=>item.id===draft.id);
-    if(summary){summary.status='teruggedraaid';summary.undoneAt=new Date().toISOString();summary.updatedAt=summary.undoneAt;}
+    if(summary&&summary.status!=='teruggedraaid'){summary.status='teruggedraaid';summary.undoneAt=new Date().toISOString();summary.updatedAt=summary.undoneAt;}
     if(state.activeImportId===draft.id)state.activeImportId='';
     return state;
+  }
+  function undoImportEffects(state,draft){
+    const candidate=clone(state);undoImportEffectsInPlace(candidate,draft);
+    synchronizeChangedSavings(candidate,state);assertFinancialMutationSafe(state,candidate);
+    applyFinancialCandidate(state,candidate);return state;
   }
   function learnedRecognitionRules(draft){
     const groups=new Map();
@@ -1242,8 +1157,16 @@ import { cloneState as clone } from "../core/state.js";
     });
     state.recognitionRules=state.recognitionRules.slice(0,300);
   }
+  function sourceIsActive(root,draft,row){return (root.state.transactions||[]).some(tx=>tx.importBatchId===draft.id&&tx.importTransactionId===row.id&&isTransactionFinanciallyActive(tx));}
+  async function reopenStoredSource(root,draft,row){
+    if(!(root.state.transactions||[]).some(tx=>tx.importBatchId===draft.id&&tx.importTransactionId===row.id)){reopenForReview(row);return true;}
+    await commitImportCommand(root,draft,{type:'source-reopen',rowId:row.id});return true;
+  }
+  async function approveStoredSource(root,draft,row){return commitImportCommand(root,draft,{type:'source-approve',rowId:row.id});}
+  async function replaceManualSource(root,draft,row,manualId){return commitImportCommand(root,draft,{type:'source-replacement',rowId:row.id,manualId});}
   async function undoImport(root,draft){
     if(draft.status==='teruggedraaid')return true;
+    undoImportEffects(clone(root.state),draft);
     const journal={id:`undo-${draft.id}`,importId:draft.id,operation:'undo',status:'pending',createdAt:new Date().toISOString()};
     await ImportStore.putJournal(journal);
     const ok=root.commitChange(()=>undoImportEffects(root.state,draft),{render:false,mutationMode:'correction'});
@@ -1334,19 +1257,12 @@ import { cloneState as clone } from "../core/state.js";
     overlay.querySelectorAll('[data-u4-validation-index]').forEach(button=>button.addEventListener('click',()=>focusValidationError(root,draft,shown[Number(button.dataset.u4ValidationIndex)])));
   }
   async function processDraft(root,draft){
-    const plan=planImportEffects(draft,root.state);
-    if(!plan.ok){showValidationErrors(root,draft,plan.errors);return false;}
-    const journal={id:`process-${draft.id}`,importId:draft.id,status:'pending',createdAt:new Date().toISOString(),transactionIds:plan.transactions.map(tx=>tx.id)};
-    await ImportStore.putJournal(journal);
-    const ok=root.commitChange(()=>{applyImportPlan(root.state,plan);rememberRecognitionRules(root.state,draft);},{render:false,mutationMode:'late-import'});
-    if(!ok){journal.status='rolled-back';journal.updatedAt=new Date().toISOString();await ImportStore.putJournal(journal);throw new Error('De import is volledig teruggedraaid omdat opslaan mislukte.');}
-    draft.status=root.state.importSummaries.find(item=>item.id===draft.id)?.status||'verwerkt';
-    draft.processedAt=new Date().toISOString();draft.effectManifest=effectManifest(plan);
-    await ImportStore.putImport(draft);await queueImportSync(draft);
-    journal.status='completed';journal.completedAt=new Date().toISOString();await ImportStore.putJournal(journal);
-    flushImportSync(root).catch(()=>{});
-    const modal=ensureModalRoot();modal.innerHTML=`<div class="u4-import-modal"><header class="u4-modal-head"><h2>Import verwerkt</h2><button class="ghost" data-u4-close>Sluiten</button></header><main class="u4-modal-body">${processedSummaryHtml(plan)}</main></div>`;modal.querySelector('[data-u4-close]').addEventListener('click',()=>{closeDraft();root.renderActiveTab();});
-    return true;
+    await (ImportPerformance.chains.get(String(draft.id))||Promise.resolve());
+    for(const row of draft.rows.filter(row=>isExplicitlyApproved(row)&&!row.importError&&!row.duplicate)){
+      if((root.state.transactions||[]).some(tx=>tx.importBatchId===draft.id&&tx.importTransactionId===row.id&&['goedgekeurd','niet-meetellen'].includes(tx.processingStatus)))continue;
+      try{await commitImportCommand(root,draft,{type:'source-approve',rowId:row.id});}catch(error){showValidationErrors(root,draft,[{rowId:row.id,code:'source',message:error.message}]);return false;}
+    }
+    const modal=ensureModalRoot();modal.innerHTML='<div class="u4-import-modal"><header class="u4-modal-head"><h2>Import verwerkt</h2><button class="ghost" data-u4-close>Sluiten</button></header><main class="u4-modal-body">Goedgekeurde bronnen zijn afzonderlijk verwerkt. Openstaande bronnen blijven via de importhistorie bereikbaar.</main></div>';modal.querySelector('[data-u4-close]').addEventListener('click',()=>{closeDraft();root.renderActiveTab();});return true;
   }
   function renderReceipt(root,summary){
     const profile=(root.state.accountProfiles||[]).find(item=>item.id===summary.accountProfileId);
@@ -1373,7 +1289,7 @@ import { cloneState as clone } from "../core/state.js";
   }
   function renderImportPanel(root,owner=''){
     const active=root.state.activeImportId;
-    const allSummaries=(root.state.importSummaries||[]).slice().sort((a,b)=>String(b.updatedAt||b.importDate).localeCompare(String(a.updatedAt||a.importDate)));
+    const allSummaries=[...(root.state.importSummaries||[]),...[...UI.conflicts.values()].filter(c=>c.localChoice?.rows&&!(root.state.importSummaries||[]).some(s=>s.id===c.importId)).map(c=>({...compactSummary(c.localChoice),status:'synchronisatieconflict'}))].sort((a,b)=>String(b.updatedAt||b.importDate).localeCompare(String(a.updatedAt||a.importDate)));
     const summaries=owner?allSummaries.filter(summary=>importSummaryOwner(root,summary)===owner):allSummaries;
     const current=summaries.find(item=>item.id===active);
     const selectedMonth=String(root.state.meta?.selectedMonth||'').slice(0,7);
@@ -1383,6 +1299,7 @@ import { cloneState as clone } from "../core/state.js";
         <label class="primary">Bank-CSV importeren<input type="file" accept=".csv,text/csv" data-u4-file></label>
         <button type="button" class="ghost small" data-u4-manage-rules>Herkenningsregels</button>
       </div>
+      ${UI.conflicts.size?`<div class="u4-original">${UI.conflicts.size} synchronisatieconflict(en). Cloudstand behouden; lokale keuzes veilig bewaard.<button type="button" class="ghost small" data-u4-conflicts>Keuzes bekijken</button></div>`:''}
       ${current?`<button type="button" class="u4-concept-banner" data-u4-open-concept="${esc(current.id)}"><strong>Bankimport nog niet verwerkt</strong><br>${Number(current.newCount)||0} transacties klaar om te controleren</button>`:'<p class="hint">ING wordt automatisch herkend. Andere CSV-bestanden kunnen via kolomherkenning worden ingelezen.</p>'}
       <div class="u4-import-receipts">${selectedSummaries.map(summary=>renderReceipt(root,summary)).join('')||`<div class="u4-empty">Geen imports in ${esc(importMonthLabel(selectedMonth))}.</div>`}</div>
       ${summaries.length?'<button type="button" class="ghost small" data-u4-all-imports>Alle imports bekijken</button>':''}
@@ -1393,9 +1310,9 @@ import { cloneState as clone } from "../core/state.js";
     if(!modal){modal=document.createElement('div');modal.id='u4ImportModalRoot';document.body.appendChild(modal);}
     return modal;
   }
-  function categoryOptions(root,owner,current){
-    let categories=['Ongecategoriseerd','Overig','Vaste lasten','Boodschappen','Entertainment','Vervoer','Kleding'];
-    try{if(typeof root.bankOwnerCategories==='function')categories=['Ongecategoriseerd',...root.bankOwnerCategories(owner)];}catch(_){}
+  function categoryOptions(root,owner,current,month){
+    const contextMonth=/^\d{4}-(0[1-9]|1[0-2])$/.test(month)?month:root.state.meta.selectedMonth;
+    const categories=['Ongecategoriseerd',...expenseCategoriesForMonth(root.state,contextMonth,owner,{existingCategory:current||''}),'Vaste lasten'];
     return [...new Set(categories)].map(value=>option(value,value,current)).join('');
   }
   function goalOptions(root,current){
@@ -1403,10 +1320,11 @@ import { cloneState as clone } from "../core/state.js";
     OWNERS.forEach(owner=>(root.state.spaardoelen?.[owner]||[]).forEach(goal=>rows.push({id:goal.id,label:`${ownerLabel(owner)} · ${goal.naam}`})));
     return `<option value="">Geen spaardoel</option>${rows.map(row=>option(row.id,row.label,current)).join('')}`;
   }
-  function fixedOptions(root,owner,current){
-    const rows=root.state.recurringFixedExpenses?.[root.state.meta.scenario]||[];
-    const matching=rows.filter(row=>(row.financialFor||row.rekening||'gezamenlijk')===owner);
-    return `<option value="">Geen vaste last</option>${matching.map(row=>option(row.id,row.naam,current)).join('')}`;
+  function fixedOptions(root,owner,current,month){
+    const rows=/^\d{4}-\d{2}$/.test(month)?resolveFixedExpensesForMonth(root.state,month,owner):[];
+    const archived=(root.state.legacyPlanningReferences||[]).find(item=>item.id===current);
+    const historical=current&&!rows.some(item=>item.id===current)?`<option value="${esc(current)}" selected disabled>${esc(archived?.naam||'Oude vaste last')} · kies een geldige vaste last</option>`:'';
+    return `<option value="">Geen vaste last</option>${historical}${rows.map(row=>option(row.id,row.naam,current)).join('')}`;
   }
   const TYPE_GROUPS=[
     {label:'Uitgaven',items:[['uitgave','Gewone uitgave'],['terugbetaling','Terugbetaling aankoop'],['niet-meetellen','Niet meetellen']]},
@@ -1415,7 +1333,7 @@ import { cloneState as clone } from "../core/state.js";
     {label:'Correctie en verrekening',items:[['terugbetaling-voorschot','Terugbetaling voorschot']]}
   ];
   const TYPES=TYPE_GROUPS.flatMap(group=>group.items.map(item=>item[0]));
-  const INCOME_TYPES=['salaris','vakantiegeld','nabetaling','vergoeding','belastingteruggave','overige-inkomsten'];
+  const INCOME_TYPES=INCOME_TRANSACTION_TYPES;
   const TRANSFER_TYPES=['naar-spaarrekening','van-spaarrekening','interne-overboeking'];
   const REPAYMENT_TYPES=['terugbetaling','terugbetaling-voorschot'];
   const TRANSACTION_FAMILIES=[['uitgave','Uitgave'],['inkomen','Inkomen'],['sparen','Sparen'],['overboeking','Interne overboeking'],['zakgeld','Zakgeld'],['extra-bijdrage','Extra bijdrage'],['terugbetaling','Terugbetaling'],['niet-meetellen','Niet meetellen']];
@@ -1424,7 +1342,7 @@ import { cloneState as clone } from "../core/state.js";
     const type=processing.include===false?'niet-meetellen':processing.transactionType;
     if(type==='niet-meetellen')return 'niet-meetellen';
     if(INCOME_TYPES.includes(type))return 'inkomen';
-    if(type==='sparen')return 'sparen';
+    if(['sparen','naar-spaarrekening','van-spaarrekening'].includes(type))return 'sparen';
     if(TRANSFER_TYPES.includes(type))return 'overboeking';
     if(type==='maandelijkse-bijdrage')return 'zakgeld';
     if(type==='extra-bijdrage')return 'extra-bijdrage';
@@ -1450,7 +1368,7 @@ import { cloneState as clone } from "../core/state.js";
     else if(family==='terugbetaling'){p.transactionType=REPAYMENT_TYPES.includes(p.transactionType)?p.transactionType:'terugbetaling';p.category='Terugbetaling';}
     else{p.transactionType='niet-meetellen';p.category='Niet meetellen';}
   }
-  function transferType(type){return ['naar-spaarrekening','van-spaarrekening','interne-overboeking'].includes(type);}
+  function transferType(type){return type==='interne-overboeking';}
   function profileOptions(root,current){return `<option value="">Kies rekening</option>${(root.state.accountProfiles||[]).map(profile=>option(profile.id,profileDisplayLabel(profile),current)).join('')}`;}
   function compactText(value){return String(value||'').toLocaleLowerCase('nl-NL').replace(/\s+/g,' ').trim();}
   function matchIdentity(original){
@@ -1477,15 +1395,32 @@ import { cloneState as clone } from "../core/state.js";
     }).filter(Boolean).sort((a,b)=>b.score-a.score||String(b.row.processing?.processingDate||'').localeCompare(String(a.row.processing?.processingDate||'')));
   }
   function copiedProcessing(source,target){
-    ['description','budgetOwner','category','transactionType','budgetItemId','fixedExpenseId','fixedAmountMode','savingsGoalId','advanceMode','include','sourceAccountProfileId','destinationAccountProfileId'].forEach(field=>{
+    ['description','budgetOwner','category','transactionType','budgetItemId','fixedExpenseId','fixedAmountMode','savingsGoalId','refundCategory','advanceMode','include','sourceAccountProfileId','destinationAccountProfileId'].forEach(field=>{
       const value=source.processing[field];
       if(value===undefined)delete target.processing[field];
       else target.processing[field]=clone(value);
     });
   }
 
+  function occurrenceFields(root,row,line,split=false){
+    const month=line.fixedOccurrenceMonth||String(row.bankOriginal.bankDate).slice(0,7);
+    const attr=split?'data-u4-split-field':'data-u4-field';
+    const occurrences=/^\d{4}-(0[1-9]|1[0-2])$/.test(month)?plannedOccurrences(resolveFixedExpensesForMonth(root.state,month),month).filter(item=>item.itemId===line.fixedExpenseId):[];
+    return `<label>Geplande maand<input type="month" ${attr}="fixedOccurrenceMonth" value="${esc(month)}"></label><label>Betaalmoment<select ${attr}="fixedOccurrenceId"><option value="">Kies expliciet een betaalmoment</option>${occurrences.map(item=>option(item.id,`${displayDate(item.date)} · ${item.naam} · ${euro(item.amount)}`,line.fixedOccurrenceId||'')).join('')}</select></label>`;
+  }
   function splitHtml(root,row,split,index){
-    return `<div class="u4-split-row" data-u4-split="${index}"><input type="number" step="0.01" value="${Number(split.amount)||0}" data-u4-split-field="amount" aria-label="Splitbedrag"><select data-u4-split-field="budgetOwner">${OWNERS.map(owner=>option(owner,ownerLabel(owner),split.budgetOwner)).join('')}</select><select data-u4-split-field="category">${categoryOptions(root,split.budgetOwner,split.category)}</select><button type="button" class="danger-ghost small" data-u4-remove-split="${index}">×</button></div>`;
+    const fixed=split.fixedExpenseId||split.transactionType==='vaste-last';
+    const month=split.fixedOccurrenceMonth||String(row.bankOriginal.bankDate).slice(0,7);
+    return `<div data-u4-split="${index}"><div class="u4-split-row"><input type="number" step="0.01" value="${Number(split.amount)||0}" data-u4-split-field="amount" aria-label="Splitbedrag"><select data-u4-split-field="budgetOwner">${OWNERS.map(owner=>option(owner,ownerLabel(owner),split.budgetOwner)).join('')}</select><select data-u4-split-field="category">${categoryOptions(root,split.budgetOwner,split.category,month)}</select><button type="button" class="danger-ghost small" data-u4-remove-split="${index}">×</button></div><div class="u4-context-grid"><label>Splitsoort<select data-u4-split-field="transactionType">${option('uitgave','Gewone uitgave',split.transactionType||'uitgave')}${option('vaste-last','Vaste last',split.transactionType)}${TYPE_GROUPS.flatMap(group=>group.items).filter(([type])=>type!=='uitgave').map(([type,label])=>option(type,label,split.transactionType)).join('')}</select></label>${fixed?`<label>Vaste last<select data-u4-split-field="fixedExpenseId">${fixedOptions(root,split.budgetOwner,split.fixedExpenseId,month)}</select></label>${occurrenceFields(root,row,split,true)}`:''}${['sparen','naar-spaarrekening','van-spaarrekening'].includes(split.transactionType)?`<label>Spaardoel<select data-u4-split-field="savingsGoalId">${goalOptions(root,split.savingsGoalId)}</select></label>`:''}${['terugbetaling','refund'].includes(split.transactionType)?refundFieldsHtml(root,row,split,true):''}</div></div>`;
+  }
+  function sourceConfirmationFields(root,draft,row){
+    const candidates=(root.state.transactions||[]).filter(tx=>tx.source==='manual'&&getTransactionAccountContext(tx,{accountProfiles:root.state.accountProfiles})===row.accountOwner&&!(root.state.manualTransactionReplacements||[]).some(replacement=>replacement.active!==false&&replacement.manualTransaction?.id===tx.id));
+    return candidates.length?`<label class="wide">Handmatige registratie vervangen<select data-u4-replacement-choice><option value="">Geen vervanging</option>${candidates.map(tx=>option(tx.id,`${Math.abs(Math.abs(Number(tx.amount))-Math.abs(Number(row.bankOriginal.amount)))<.005&&daysBetween(tx.date,row.bankOriginal.bankDate)<=3?'Mogelijke match · ':''}${displayDate(tx.date)} · ${tx.description||tx.category} · ${euro(tx.amount)}`,'')).join('')}</select></label><button type="button" class="ghost small" data-u4-confirm-replacement>Bevestig vervanging → Nakijken</button>`:'';
+  }
+  function pairConfirmationFields(root,draft){
+    const ids=new Set((root.state.transactions||[]).filter(tx=>tx.importBatchId===draft.id).map(tx=>tx.id));
+    const pairs=(root.state.internalTransferPairs||[]).filter(pair=>(pair.transactionIds||[]).some(id=>ids.has(id)));
+    return pairs.length?`<details class="u4-section"><summary><span>Interne transferparen</span><span>${pairs.length}</span></summary><div class="u4-section-list">${pairs.map(pair=>`<div class="u4-receipt"><span>${euro(pair.amount)} · ${esc(pair.status)}${pair.status==='voorgesteld'?' · buiten externe huishoudtotalen, nog onbevestigd':''}</span>${pair.status==='voorgesteld'?`<button type="button" class="ghost small" data-u4-confirm-pair="${escAttr(pair.id)}">Bevestig transferpaar</button>`:''}</div>`).join('')}</div></details>`:'';
   }
   function repaymentRelation(root,row){
     const counter=(root.state.accountProfiles||[]).find(profile=>normalizeIban(profile.identifier)===normalizeIban(row.bankOriginal.counterpartyAccount));
@@ -1505,31 +1440,37 @@ import { cloneState as clone } from "../core/state.js";
   }
   function transferFieldsHtml(root,row){
     if(!transferType(row.processing.transactionType))return '';
-    return `<div class="u4-context-block wide"><strong>Interne overboeking</strong><div class="u4-context-grid"><label>Van rekening<select data-u4-field="sourceAccountProfileId">${profileOptions(root,row.processing.sourceAccountProfileId||'')}</select></label><label>Naar rekening<select data-u4-field="destinationAccountProfileId">${profileOptions(root,row.processing.destinationAccountProfileId||'')}</select></label></div><span class="u4-muted">Interne overboekingen tellen niet als inkomen of uitgave.</span></div>`;
+    return `<div class="u4-context-block wide"><strong>Interne overboeking</strong><div class="u4-context-grid"><label>Van rekening<select data-u4-field="sourceAccountProfileId">${profileOptions(root,row.processing.sourceAccountProfileId||'')}</select></label><label>Naar rekening<select data-u4-field="destinationAccountProfileId">${profileOptions(root,row.processing.destinationAccountProfileId||'')}</select></label></div><span class="u4-muted">Accountcashflow blijft meetellen. Onbevestigde transfers blijven apart buiten externe huishoudtotalen.</span></div>`;
+  }
+  function refundFieldsHtml(root,row,line,split=false){
+    const attr=split?'data-u4-split-field':'data-u4-field',month=line.refundMonth||'';
+    const owner=line.budgetOwner||row.processing.budgetOwner;
+    return `<div class="u4-context-grid"><label>Refundmaand<input type="month" ${attr}="refundMonth" value="${esc(month)}"></label><label>Refundcategorie<input ${attr}="refundCategory" value="${esc(line.refundCategory||'')}" placeholder="Historische categorie"></label></div>`;
   }
   function dependentFieldsHtml(root,row){
     const p=row.processing;const family=transactionFamily(p);
     if(family==='uitgave'){
       const category=p.fixedExpenseId||p.transactionType==='vaste-last'?'Vaste lasten':p.category;
-      return `<div class="u4-dependent-grid"><label>Categorie<select data-u4-field="category">${categoryOptions(root,p.budgetOwner,category)}</select></label>${category==='Vaste lasten'?`<label>Vaste last<select data-u4-field="fixedExpenseId">${fixedOptions(root,p.budgetOwner,p.fixedExpenseId)}</select></label>`:''}</div>`;
+      return `<div class="u4-dependent-grid"><label>Categorie<select data-u4-field="category">${categoryOptions(root,p.budgetOwner,category,String(p.processingDate||row.bankOriginal?.bankDate).slice(0,7))}</select></label>${category==='Vaste lasten'?`<label>Vaste last<select data-u4-field="fixedExpenseId">${fixedOptions(root,p.budgetOwner,p.fixedExpenseId,p.fixedOccurrenceMonth||String(row.bankOriginal?.bankDate).slice(0,7))}</select></label>${occurrenceFields(root,row,p)}`:''}</div>`;
     }
     if(family==='inkomen')return `<div class="u4-dependent-grid"><label>Soort inkomen<select data-u4-field="transactionType">${INCOME_TYPES.map(type=>option(type,TYPE_GROUPS[1].items.find(item=>item[0]===type)?.[1]||type,p.transactionType)).join('')}</select></label></div>`;
-    if(family==='sparen')return `<div class="u4-dependent-grid"><label>Spaardoel<select data-u4-field="savingsGoalId">${goalOptions(root,p.savingsGoalId)}</select></label></div>`;
+    if(family==='sparen')return `<div class="u4-dependent-grid"><label>Spaarbeweging<select data-u4-field="transactionType">${option('sparen','Naar spaardoel',p.transactionType)}${option('naar-spaarrekening','Naar spaarrekening',p.transactionType)}${option('van-spaarrekening','Van spaarrekening',p.transactionType)}</select></label><label>Spaardoel<select data-u4-field="savingsGoalId">${goalOptions(root,p.savingsGoalId)}</select></label></div>`;
     if(family==='overboeking')return `<div class="u4-dependent-grid"><label>Soort overboeking<select data-u4-field="transactionType">${TYPE_GROUPS[2].items.filter(item=>TRANSFER_TYPES.includes(item[0])).map(([type,label])=>option(type,label,p.transactionType)).join('')}</select></label></div>${transferFieldsHtml(root,row)}`;
     if(family==='zakgeld')return '<p class="u4-dependent-hint">Kies Dion of Dara bij Budgeteigenaar.</p>';
     if(family==='extra-bijdrage')return '<p class="u4-dependent-hint">De budgeteigenaar ontvangt deze extra bijdrage.</p>';
-    if(family==='terugbetaling')return `<div class="u4-dependent-grid"><label>Soort terugbetaling<select data-u4-field="transactionType">${option('terugbetaling','Terugbetaling aankoop',p.transactionType)}${option('terugbetaling-voorschot','Terugbetaling voorschot',p.transactionType)}</select></label></div>${repaymentHtml(root,row)}`;
+    if(family==='terugbetaling')return `<div class="u4-dependent-grid"><label>Soort terugbetaling<select data-u4-field="transactionType">${option('terugbetaling','Terugbetaling aankoop',p.transactionType)}${option('terugbetaling-voorschot','Terugbetaling voorschot',p.transactionType)}</select></label></div>${p.transactionType==='terugbetaling'?refundFieldsHtml(root,row,p):repaymentHtml(root,row)}`;
     return '';
   }
   function rowHtml(root,row){
     const p=row.processing;const original=row.bankOriginal;
     const family=transactionFamily(p);
     const reviewState=importReviewState(row);
-    const statusLabel=reviewState==='goedgekeurd'?'Goedgekeurd':reviewState==='onbekend'?'Onbekend':'Nakijken';
+    const statusLabel=reviewState==='niet-meetellen'?'Niet meetellen':reviewState==='goedgekeurd'?'Goedgekeurd':reviewState==='onbekend'?'Onbekend':'Nakijken';
     return `<article class="u4-import-row" data-u4-row="${escAttr(row.id)}">
-      <div class="u4-import-row-main"><div><strong>${esc(p.description||original.rawDescription||original.description||'Onbekende transactie')}</strong><span class="u4-muted">${esc(displayDate(p.processingDate))} · ${euro(p.processedAmount)}</span>${row.reasons?.length?`<div class="u4-row-reasons">${esc(row.reasons.join(' · '))}</div>`:''}</div><div class="u4-row-approval"><span class="u4-status ${reviewState}">${statusLabel}</span>${reviewState==='goedgekeurd'?'<button type="button" class="ghost small" data-u4-reopen>Opnieuw nakijken</button>':`<button type="button" class="primary small" data-u4-approve>✓ ${reviewState==='onbekend'?'Categoriseren en goedkeuren':'Goedkeuren'}</button>`}</div></div>
+      <div class="u4-import-row-main"><div><strong>${esc(p.description||original.rawDescription||original.description||'Onbekende transactie')}</strong><span class="u4-muted">${esc(displayDate(p.processingDate))} · ${euro(p.processedAmount)}</span>${Math.abs(Number(p.processedAmount)-Math.abs(Number(original.amount)))>.004?`<span class="u4-muted">Verwerking ${euro(p.processedAmount)} · bankcashflow ${euro(original.amount)}</span>`:''}${row.reasons?.length?`<div class="u4-row-reasons">${esc(row.reasons.join(' · '))}</div>`:''}</div><div class="u4-row-approval"><span class="u4-status ${reviewState}">${statusLabel}</span>${['goedgekeurd','niet-meetellen'].includes(reviewState)?'<button type="button" class="ghost small" data-u4-reopen>Opnieuw nakijken</button>':`<button type="button" class="primary small" data-u4-approve>✓ ${reviewState==='onbekend'?'Categoriseren en goedkeuren':'Goedkeuren'}</button>`}</div></div>
+      ${(root.state.transactions||[]).filter(tx=>tx.importTransactionId===row.id).map(tx=>`<button type="button" class="ghost small" data-u4-coverage="${escAttr(tx.id)}">Spaardekking · ${esc(tx.category)}${tx.splitId?' · split '+esc(tx.splitId):''}</button>`).join('')}
       <div class="u4-row-grid">
-        <label>Datum<input type="date" data-u4-field="processingDate" value="${esc(p.processingDate)}"></label>
+        <label>Verwerkingsdatum<input type="date" data-u4-field="processingDate" value="${esc(p.processingDate)}"></label>
         <label>Bedrag<input type="number" step="0.01" data-u4-field="processedAmount" value="${Number(p.processedAmount)||0}"></label>
         <label>Budgeteigenaar<select data-u4-field="budgetOwner">${ownerOptions(row)}</select></label>
         <label>Transactie<select data-u4-family>${familyOptions(family)}</select></label>
@@ -1539,7 +1480,7 @@ import { cloneState as clone } from "../core/state.js";
         <div class="u4-original wide">Origineel: ${esc(displayDate(original.bankDate))} · ${euro(original.amount)}<br>${esc(original.accountIdentifier||'Geen rekeningkenmerk')} → ${esc(original.counterpartyAccount||'Geen tegenrekening')}<br>Regel ${Number(original.lineNumber)||'—'} · ${esc(original.fingerprint)}</div>
         ${['uitgave','terugbetaling'].includes(family)?`<label>Budgetpost<input data-u4-field="budgetItemId" value="${esc(p.budgetItemId)}"></label>${p.transactionType==='vaste-last'?`<label>Afwijkend vast bedrag<select data-u4-field="fixedAmountMode">${option('none','Planning niet aanpassen',p.fixedAmountMode||'none')}${option('month','Alleen deze maand',p.fixedAmountMode)}${option('from','Vanaf deze maand',p.fixedAmountMode)}</select></label>`:''}<label>Voorschot<select data-u4-field="advanceMode">${option('auto','Automatisch bij andere eigenaar',p.advanceMode)}${option('none','Geen voorschot',p.advanceMode)}${option('force','Altijd voorschot',p.advanceMode)}</select></label>`:''}
         <label>Meetellen<select data-u4-field="include">${option('true','Meetellen',String(p.include))}${option('false','Niet meetellen',String(p.include))}</select></label>
-        <label class="wide">Notitie<input data-u4-field="note" value="${esc(p.note)}"></label>
+        ${sourceConfirmationFields(root,UI.draft,row)}<label class="wide">Notitie<input data-u4-field="note" value="${esc(p.note)}"></label>
       </div>${['uitgave','terugbetaling'].includes(family)?`<div class="u4-split-list">${(p.splits||[]).map((split,index)=>splitHtml(root,row,split,index)).join('')}</div><button type="button" class="ghost small" data-u4-add-split>+ Splitsregel</button>`:''}</details>
     </article>`;
   }
@@ -1547,21 +1488,22 @@ import { cloneState as clone } from "../core/state.js";
     return `<details class="u4-section u4-bulk-section"><summary><span>Meerdere transacties aanpassen</span><span>Optioneel</span></summary><div class="u4-section-list"><p class="u4-muted">Pas één keuze in één keer toe. Goedgekeurde transacties worden standaard overgeslagen en iedere aangepaste regel moet daarna expliciet worden goedgekeurd.</p><div class="u4-profile-grid"><label>Toepassen op<select data-u4-bulk-scope><option value="review">Alleen Nakijken</option><option value="unknown">Alleen Onbekend</option><option value="uncategorized">Alleen ongecategoriseerd</option><option value="all">Alle niet-goedgekeurde transacties</option></select></label><label>Budgeteigenaar<select data-u4-bulk-owner><option value="">Niet wijzigen</option>${OWNERS.map(owner=>option(owner,ownerLabel(owner),'')).join('')}</select></label><label>Categorie<select data-u4-bulk-category><option value="">Niet wijzigen</option>${categoryOptions(root,'gezamenlijk','')}</select></label><label>Transactie<select data-u4-bulk-type><option value="">Niet wijzigen</option>${typeOptions('')}</select></label></div><button type="button" class="ghost small" data-u4-apply-bulk>Voorbeeld en toepassen</button></div></details>`;
   }
   async function showMatchDialog(root,draft,source,modal){
+    const validation=rowProcessingValidation(source,root.state);if(!validation.ok){showValidationErrors(root,draft,validation.errors.map(error=>({...error,rowId:source.id})));return;}
     const matches=matchCandidates(draft,source);
     if(!matches.length){
-      const previous={certainty:source.certainty,approvalSource:source.approvalSource,approvedAt:source.approvedAt,reasons:clone(source.reasons||[])};
+      const previous={certainty:source.certainty,approvalSource:source.approvalSource,approvedAt:source.approvedAt,processingStatus:source.processingStatus,reasons:clone(source.reasons||[])};
       markExplicitlyApproved(source);
       renderDraftModalPreservingView(root,draft,modal,source.id);
-      Promise.resolve().then(()=>persistImportDraft(root,draft)).catch(error=>{
-        source.certainty=previous.certainty;source.approvalSource=previous.approvalSource;source.approvedAt=previous.approvedAt;source.reasons=previous.reasons;
+      Promise.resolve().then(()=>approveStoredSource(root,draft,source)).catch(error=>{
+        if(!error.coreApplied){source.processingStatus=previous.processingStatus;source.certainty=previous.certainty;source.approvalSource=previous.approvalSource;source.approvedAt=previous.approvedAt;source.reasons=previous.reasons;}
         renderDraftModalPreservingView(root,draft,document.getElementById('u4ImportModalRoot'),source.id);
-        alert(`Goedkeuren kon niet lokaal worden opgeslagen en is teruggedraaid. Probeer het opnieuw.\n\n${error?.message||error}`);
+        alert(error.coreApplied?`De goedkeuring is bewaard; importdetails worden uit het lokale journal hersteld. ${error.message}`:`Goedkeuring is afgebroken. ${error.message}`);
       });
       return;
     }
     document.querySelector('.u4-match-overlay')?.remove();
     const overlay=document.createElement('div');overlay.className='u4-match-overlay';
-    overlay.innerHTML=`<div class="u4-match-dialog" role="dialog" aria-modal="true" aria-labelledby="u4-match-title"><div class="u4-match-head"><div><h3 id="u4-match-title">Vergelijkbare transacties gevonden</h3><p>${matches.length} mogelijke matches. Vink uit wat niet mee aangepast en goedgekeurd moet worden.</p></div><button type="button" class="ghost small" data-u4-match-close>Sluiten</button></div><div class="u4-match-change"><strong>Wordt toegepast</strong><span>${ownerLabel(source.processing.budgetOwner)} · ${esc(source.processing.category)} · ${esc(TYPE_GROUPS.flatMap(g=>g.items).find(item=>item[0]===source.processing.transactionType)?.[1]||source.processing.transactionType)} · Goedgekeurd</span></div><div class="u4-match-list">${matches.map(({row,score,reasons})=>`<label class="u4-match-row"><input type="checkbox" data-u4-match-id="${esc(row.id)}" ${score>=4?'checked':''}><span><strong>${esc(displayDate(row.processing.processingDate))} · ${esc(row.processing.description||row.bankOriginal.description||'Onbekend')}</strong><small>${euro(row.processing.processedAmount)} · ${esc(row.processing.category||'Ongecategoriseerd')} · ${esc(reasons.join(', '))}</small></span></label>`).join('')}</div><div class="u4-match-feedback" data-u4-match-feedback aria-live="polite"></div><div class="u4-match-actions"><button type="button" class="ghost" data-u4-match-only>Alleen deze transactie</button><button type="button" class="primary" data-u4-match-apply>Geselecteerde goedkeuren</button></div></div>`;
+    overlay.innerHTML=`<div class="u4-match-dialog" role="dialog" aria-modal="true" aria-labelledby="u4-match-title"><div class="u4-match-head"><div><h3 id="u4-match-title">Vergelijkbare transacties gevonden</h3><p>${matches.length} mogelijke matches. Geselecteerde regels krijgen alleen een voorstel en blijven Nakijken.</p></div><button type="button" class="ghost small" data-u4-match-close>Sluiten</button></div><div class="u4-match-change"><strong>Wordt toegepast</strong><span>${ownerLabel(source.processing.budgetOwner)} · ${esc(source.processing.category)} · ${esc(TYPE_GROUPS.flatMap(g=>g.items).find(item=>item[0]===source.processing.transactionType)?.[1]||source.processing.transactionType)} · Goedgekeurd</span></div><div class="u4-match-list">${matches.map(({row,score,reasons})=>`<label class="u4-match-row"><input type="checkbox" data-u4-match-id="${esc(row.id)}" ${score>=4?'checked':''}><span><strong>${esc(displayDate(row.processing.processingDate))} · ${esc(row.processing.description||row.bankOriginal.description||'Onbekend')}</strong><small>${euro(row.processing.processedAmount)} · ${esc(row.processing.category||'Ongecategoriseerd')} · ${esc(reasons.join(', '))}</small></span></label>`).join('')}</div><div class="u4-match-feedback" data-u4-match-feedback aria-live="polite"></div><div class="u4-match-actions"><button type="button" class="ghost" data-u4-match-only>Alleen deze transactie</button><button type="button" class="primary" data-u4-match-apply>Voorstel overnemen</button></div></div>`;
     document.body.appendChild(overlay);
     const close=()=>overlay.remove();
     overlay.querySelector('[data-u4-match-close]').onclick=close;
@@ -1569,23 +1511,28 @@ import { cloneState as clone } from "../core/state.js";
     let busy=false;
     const actionButtons=[...overlay.querySelectorAll('[data-u4-match-only],[data-u4-match-apply],[data-u4-match-close]')];
     const feedback=overlay.querySelector('[data-u4-match-feedback]');
-    function commitSelection(applyMatches,button){
+    async function commitSelection(applyMatches,button){
       if(busy)return;
       busy=true;
       actionButtons.forEach(item=>item.disabled=true);
       button.textContent='Bezig…';
       feedback.textContent='Wijzigingen worden toegepast.';
       const snapshots=new Map();
-      const remember=row=>snapshots.set(row.id,{processing:clone(row.processing),certainty:row.certainty,approvalSource:row.approvalSource,approvedAt:row.approvedAt,reasons:clone(row.reasons||[])});
+      const remember=row=>snapshots.set(row.id,{processing:clone(row.processing),certainty:row.certainty,approvalSource:row.approvalSource,approvedAt:row.approvedAt,processingStatus:row.processingStatus,reasons:clone(row.reasons||[])});
       try{
+        const selected=applyMatches?[...overlay.querySelectorAll('[data-u4-match-id]:checked')].map(input=>draft.rows.find(row=>row.id===input.dataset.u4MatchId)).filter(Boolean):[];
+        for(const target of selected){const preview=clone(target);copiedProcessing(source,preview);const validation=rowProcessingValidation(preview,root.state);if(!validation.ok)throw new Error(validation.errors.map(item=>item.message).join(' '));if(sourceIsActive(root,draft,target))reopenTransactionSource(root.state,draft.id,target.id,{dryRun:true});}
+        for(const target of selected){if(sourceIsActive(root,draft,target))await reopenStoredSource(root,draft,target);}
         remember(source);
         markExplicitlyApproved(source);
         if(applyMatches){
           overlay.querySelectorAll('[data-u4-match-id]:checked').forEach(input=>{
             const target=draft.rows.find(row=>row.id===input.dataset.u4MatchId);
-            if(target){remember(target);copiedProcessing(source,target);markExplicitlyApproved(target);}
+            if(target){remember(target);copiedProcessing(source,target);reopenForReview(target);}
           });
         }
+
+        for(const id of snapshots.keys()){const validation=rowProcessingValidation(draft.rows.find(row=>row.id===id),root.state);if(!validation.ok)throw new Error(validation.errors.map(item=>item.message).join(' '));}
 
         // Verwijder de dialog eerst en geef de browser minimaal één volledig frame om dit te tekenen.
         // De zware her-render van de importlijst en opslag starten pas daarna.
@@ -1598,20 +1545,20 @@ import { cloneState as clone } from "../core/state.js";
         scheduleAfterDialogPaint(()=>{
           renderDraftModalPreservingView(root,draft,modal,source.id);
           setTimeout(()=>{
-            persistImportDraft(root,draft).catch(error=>{
+            (async()=>{let applied=false;for(const id of [source.id]){try{await approveStoredSource(root,draft,draft.rows.find(row=>row.id===id));applied=true;}catch(error){error.coreApplied=error.coreApplied||applied;throw error;}}if(applyMatches)await persistImportDraft(root,draft);})().catch(error=>{
               snapshots.forEach((snapshot,id)=>{
                 const row=draft.rows.find(item=>item.id===id);
-                if(row){row.processing=snapshot.processing;row.certainty=snapshot.certainty;row.approvalSource=snapshot.approvalSource;row.approvedAt=snapshot.approvedAt;row.reasons=snapshot.reasons;}
+                if(row&&!(error.coreApplied&&(root.state.transactions||[]).some(tx=>tx.importBatchId===draft.id&&tx.importTransactionId===id&&['goedgekeurd','niet-meetellen'].includes(tx.processingStatus)))){row.processingStatus=snapshot.processingStatus;row.processing=snapshot.processing;row.certainty=snapshot.certainty;row.approvalSource=snapshot.approvalSource;row.approvedAt=snapshot.approvedAt;row.reasons=snapshot.reasons;}
               });
               renderDraftModalPreservingView(root,draft,document.getElementById('u4ImportModalRoot'),source.id);
-              alert(`De wijziging kon niet lokaal worden opgeslagen en is teruggedraaid. Probeer het opnieuw.\n\n${error?.message||error}`);
+              alert(error.coreApplied?`De opgeslagen goedkeuringen blijven actief; importdetails worden uit het lokale journal hersteld. ${error.message}`:`De wijziging is afgebroken. ${error.message}`);
             });
           },0);
         });
       }catch(error){
         snapshots.forEach((snapshot,id)=>{
           const row=draft.rows.find(item=>item.id===id);
-          if(row){row.processing=snapshot.processing;row.certainty=snapshot.certainty;row.approvalSource=snapshot.approvalSource;row.approvedAt=snapshot.approvedAt;row.reasons=snapshot.reasons;}
+          if(row&&!(error.coreApplied&&(root.state.transactions||[]).some(tx=>tx.importBatchId===draft.id&&tx.importTransactionId===id&&['goedgekeurd','niet-meetellen'].includes(tx.processingStatus)))){row.processingStatus=snapshot.processingStatus;row.processing=snapshot.processing;row.certainty=snapshot.certainty;row.approvalSource=snapshot.approvalSource;row.approvedAt=snapshot.approvedAt;row.reasons=snapshot.reasons;}
         });
         busy=false;
         actionButtons.forEach(item=>item.disabled=false);
@@ -1637,24 +1584,24 @@ import { cloneState as clone } from "../core/state.js";
     </div><button type="button" class="primary small" data-u4-apply-profile>Profiel gebruiken</button></div></details>`;
   }
   function renderDraftModal(root,draft){
-    updateDraftSummary(draft);
+    updateDraftSummary(draft,{touch:false});
     const isConcept=draft.status==='concept';
     const canCorrect=draft.status==='verwerkt'||draft.status==='correctie-nodig';
-    const active=draft.rows.filter(row=>row.bankOriginal.valid&&!row.duplicate);
+    const active=draft.rows.filter(row=>row.bankOriginal.valid&&!row.importError&&!row.duplicate);
     const unknown=active.filter(row=>importReviewState(row)==='onbekend').slice(0,UI.visibleRows);
     const review=active.filter(row=>importReviewState(row)==='nakijken').slice(0,UI.visibleRows);
-    const approved=active.filter(row=>importReviewState(row)==='goedgekeurd').slice(0,UI.visibleRows);
+    const approved=active.filter(row=>['goedgekeurd','niet-meetellen'].includes(importReviewState(row))).slice(0,UI.visibleRows);
     const modal=ensureModalRoot();
     modal.innerHTML=`<div class="u4-import-modal" role="dialog" aria-modal="true" aria-label="Bankimport controleren">
       <header class="u4-modal-head"><div><h2>${isConcept?'Bankimport controleren':'Importdetails'}</h2><p>${esc(draft.fileName)} · ${esc(draft.bank)} · ${esc(displayDate(draft.periodFrom)||'—')} t/m ${esc(displayDate(draft.periodTo)||'—')} · ${esc(draft.status)}</p></div><button type="button" class="ghost" data-u4-close>Sluiten</button></header>
-      <main class="u4-modal-body">${isConcept?profileEditor(root,draft)+bulkEditor(root,draft):''}
+      <main class="u4-modal-body">${draft.syncConflict?`<div class="u4-original">Synchronisatieconflict: de cloudstand blijft behouden. De lokale keuze is veilig bewaard.<button class="ghost small" data-u4-conflict-cloud>Cloudstand behouden</button><button class="primary small" data-u4-conflict-local>Lokale verwerking opnieuw nakijken</button></div>`:''}${isConcept?profileEditor(root,draft)+bulkEditor(root,draft):''}
         <div class="u4-import-summary"><div><span>Nieuw</span><strong>${draft.summary.newCount}</strong></div><div><span>Duplicaten</span><strong>${draft.summary.duplicateCount}</strong></div><div><span>Inkomsten</span><strong>${euro(draft.summary.totalIncome)}</strong></div><div><span>Uitgaven</span><strong>${euro(draft.summary.totalExpenses)}</strong></div></div>
         <details class="u4-section u4-section-unknown" ${draft.summary.unknownCount?'open':''}><summary><span>Onbekend</span><span>${draft.summary.unknownCount}</span></summary><div class="u4-section-list">${unknown.map(row=>rowHtml(root,row)).join('')||'<div class="u4-empty">Alle transacties zijn herkend.</div>'}</div></details>
         <details class="u4-section u4-section-review" ${draft.summary.unknownCount?'':'open'}><summary><span>Nakijken</span><span>${draft.summary.reviewCount}</span></summary><div class="u4-section-list">${review.map(row=>rowHtml(root,row)).join('')||'<div class="u4-empty">Geen herkende transacties om na te kijken.</div>'}</div></details>
         <details class="u4-section u4-section-approved"><summary><span>Goedgekeurd</span><span>${draft.summary.approvedCount}</span></summary><div class="u4-section-list">${approved.map(row=>rowHtml(root,row)).join('')||'<div class="u4-empty">Nog geen transacties expliciet goedgekeurd.</div>'}</div></details>
         ${draft.summary.duplicateCount?`<details class="u4-section"><summary><span>Eerder geïmporteerd — overgeslagen</span><span>${draft.summary.duplicateCount}</span></summary><div class="u4-section-list">${draft.rows.filter(row=>row.duplicate).map(row=>`<div class="u4-original">${esc(displayDate(row.bankOriginal.bankDate))} · ${esc(row.bankOriginal.description)} · ${euro(row.bankOriginal.amount)}</div>`).join('')}</div></details>`:''}
-      </main>
-      <footer class="u4-modal-actions"><span class="u4-muted" data-u4-save-status>${isConcept?'Wijzigingen worden automatisch lokaal bewaard.':canCorrect?'Aanpassingen worden pas financieel verwerkt na bevestiging.':'Deze import is financieel teruggedraaid.'}</span>${canCorrect?'<button type="button" class="danger-ghost" data-u4-undo>Import ongedaan maken</button><button type="button" class="primary" data-u4-reconcile>Wijzigingen verwerken</button>':isConcept?'<button type="button" class="ghost" data-u4-save-concept>Concept opslaan</button><button type="button" class="primary" data-u4-process>Alles verwerken</button>':''}</footer>
+      ${draft.rows.some(row=>row.importError)?`<details class="u4-section" open><summary>Importfouten</summary>${draft.rows.filter(row=>row.importError).map(row=>`<div class="u4-original">${esc(row.importError.message)} · bronregel ${row.bankOriginal.lineNumber}</div>`).join('')}</details>`:''}${draft.rows.some(row=>row.possibleDuplicate)?'<p class="u4-muted">Gelijke bankvelden gevonden: mogelijke duplicaten zijn niet automatisch overgeslagen.</p>':''}${pairConfirmationFields(root,draft)}</main>
+      <footer class="u4-modal-actions"><span class="u4-muted" data-u4-save-status>Iedere bron wordt afzonderlijk goedgekeurd. ${batchLifecycle(draft)==='withdrawn'?'Deze batch is teruggetrokken.':''}</span><button type="button" class="ghost" data-u4-save-concept>Concept opslaan</button>${batchLifecycle(draft)==='withdrawn'?'<button type="button" class="primary" data-u4-restore>Herstellen</button>':'<button type="button" class="danger-ghost" data-u4-withdraw>Terugtrekken</button>'}<button type="button" class="danger-ghost" data-u4-delete-batch>Verwijderen</button>${batchLifecycle(draft)==='active'?'<button type="button" class="primary" data-u4-process>Goedgekeurde verwerken</button>':''}</footer>
     </div>`;
     modal.classList.add('open');
     bindDraftModal(root,draft,modal);
@@ -1699,9 +1646,10 @@ import { cloneState as clone } from "../core/state.js";
       const resolved=await resolveImportDetails(id,{
         localRead:async()=>local,
         cloudRead:importId=>fetchImportFromCloud(root,importId),
-        localWrite:record=>ImportStore.putImport(record)
+        localWrite:record=>ImportStore.putImport(record),refresh:root.CloudAdapter?.isConnected?.()===true,pendingRead:async id=>(await ImportStore.listSync()).some(row=>row.importId===id),onConflict:(local,remote)=>preserveImportConflict(root,local,remote)
       });
-      UI.draft=resolved.record;renderDraftModal(root,resolved.record);
+      if(resolved.record.lifecycle==='deleted'){closeDraft();return resolved.record;}
+      resolved.record.syncConflict=(await ImportStore.getJournal(`conflict-${id}`))?.status==='conflict';UI.draft=resolved.record;renderDraftModal(root,resolved.record);
       return resolved.record;
     }catch(error){
       renderCloudImportState(root,id,error);
@@ -1721,12 +1669,16 @@ import { cloneState as clone } from "../core/state.js";
       const ok=root.commitChange(()=>{root.state.accountProfiles.push(profile);},{render:false});
       if(!ok)throw new Error('Rekeningprofiel opslaan mislukt.');
     }
+    const activeRows=draft.rows.filter(row=>sourceIsActive(root,draft,row));
+    activeRows.forEach(row=>reopenTransactionSource(root.state,draft.id,row.id,{dryRun:true}));
+    for(const row of activeRows)await reopenStoredSource(root,draft,row);
     draft.accountProfileId=profile.id;draft.accountOwner=profile.accountOwner;
     draft.rows.forEach(row=>{
       row.accountProfileId=profile.id;row.accountOwner=profile.accountOwner;
-      const fixedExpenses=root.state.recurringFixedExpenses?.[root.state.meta.scenario]||[];
+      const sourceMonth=String(row.bankOriginal.bankDate).slice(0,7);
+      const fixedExpenses=/^\d{4}-(0[1-9]|1[0-2])$/.test(sourceMonth)?resolveFixedExpensesForMonth(root.state,sourceMonth):[];
       const proposal=classifyOriginal(row.bankOriginal,profile,root.state.recognitionRules,root.state.accountProfiles,fixedExpenses);
-      row.certainty=proposal.certainty;row.recognitionState=proposal.recognitionState;row.approvalSource='';row.approvedAt='';row.reasons=proposal.reasons;row.processing={...proposal.processing,...row.processing,budgetOwner:row.processing.budgetOwner||profile.accountOwner};
+      row.certainty=proposal.certainty;row.processingStatus=proposal.certainty;row.recognitionState=proposal.recognitionState;row.approvalSource='';row.approvedAt='';row.reasons=proposal.reasons;row.processing={...proposal.processing,...row.processing,budgetOwner:row.processing.budgetOwner||profile.accountOwner};
     });
     await saveDraft(root,draft,{sync:true});renderDraftModal(root,draft);
   }
@@ -1771,11 +1723,13 @@ import { cloneState as clone } from "../core/state.js";
     });
     if(modal.dataset.u4DraftDelegated==='true')return;
     modal.dataset.u4DraftDelegated='true';
-    modal.addEventListener('change',event=>{
+    modal.addEventListener('change',async event=>{
       root=UI.root;draft=UI.draft;modal=ensureModalRoot();
       const container=event.target.closest('[data-u4-row]');if(!container)return;
       const row=draft.rows.find(item=>item.id===container.dataset.u4Row);if(!row)return;
-      const wasApproved=isExplicitlyApproved(row);let rerender=false;
+      if(batchLifecycle(draft)!=='active'){alert('Herstel eerst deze teruggetrokken batch.');renderDraftModal(root,draft);return;}
+      const wasApproved=isExplicitlyApproved(row)||sourceIsActive(root,draft,row);let rerender=false;
+      if(wasApproved){try{await reopenStoredSource(root,draft,row);}catch(error){alert(error.message);renderDraftModal(root,draft);return;}}
       if(event.target.hasAttribute('data-u4-family')){
         applyTransactionFamily(row,event.target.value);
         rerender=true;
@@ -1793,7 +1747,8 @@ import { cloneState as clone } from "../core/state.js";
         if(field==='include'&&value===false)row.processing.transactionType='niet-meetellen';
         if(field==='budgetOwner'&&row.processing.fixedExpenseId){
           const wasFixed=row.processing.transactionType==='vaste-last'||row.processing.category==='Vaste lasten'||Boolean(row.processing.fixedExpenseId);
-          const fixedRows=root.state.recurringFixedExpenses?.[root.state.meta.scenario]||[];
+          const processingMonth=String(row.bankOriginal.bankDate).slice(0,7);
+          const fixedRows=/^\d{4}-(0[1-9]|1[0-2])$/.test(processingMonth)?resolveFixedExpensesForMonth(root.state,processingMonth):[];
           const selectedFixed=fixedRows.find(item=>item.id===row.processing.fixedExpenseId);
           if(!selectedFixed||(selectedFixed.financialFor||selectedFixed.rekening||'gezamenlijk')!==value){row.processing.fixedExpenseId='';if(wasFixed){row.processing.transactionType='vaste-last';row.processing.category='Vaste lasten';}}
         }
@@ -1804,12 +1759,18 @@ import { cloneState as clone } from "../core/state.js";
           const relation=repaymentRelation(root,row);
           row.processing.repaymentAllocations=relation?proposeRepaymentAllocations(root.state,relation.debtor,relation.creditor,row.processing.processedAmount):[];
         }
-        rerender=['transactionType','budgetOwner','category','include','fixedExpenseId'].includes(field);
+        if(field==='fixedOccurrenceId')row.processing.fixedOccurrenceMonth=String(value).slice(-10,-3);
+        if(['fixedExpenseId','fixedOccurrenceMonth'].includes(field))row.processing.fixedOccurrenceId='';
+        rerender=['transactionType','budgetOwner','category','include','fixedExpenseId','processingDate','fixedOccurrenceMonth','fixedOccurrenceId'].includes(field);
       }else if(event.target.hasAttribute('data-u4-row-certainty'))reopenForReview(row);
       else if(event.target.dataset.u4SplitField){
         const split=row.processing.splits[Number(event.target.closest('[data-u4-split]').dataset.u4Split)];
         let value=event.target.value;if(event.target.dataset.u4SplitField==='amount')value=round2(Math.abs(Number(value)||0));
-        split[event.target.dataset.u4SplitField]=value;
+        const field=event.target.dataset.u4SplitField;split[field]=value;
+        if(field==='fixedOccurrenceId')split.fixedOccurrenceMonth=String(value).slice(-10,-3);
+        if(['fixedExpenseId','fixedOccurrenceMonth','budgetOwner'].includes(field))split.fixedOccurrenceId='';
+        if(field==='transactionType'&&value!=='vaste-last'){split.fixedExpenseId='';split.fixedOccurrenceId='';}
+        rerender=['transactionType','fixedExpenseId','fixedOccurrenceMonth','fixedOccurrenceId','budgetOwner'].includes(field);
       }else if(event.target.dataset.u4AllocationField){
         const allocation=row.processing.repaymentAllocations[Number(event.target.closest('[data-u4-allocation]').dataset.u4Allocation)];
         allocation[event.target.dataset.u4AllocationField]=round2(Math.abs(Number(event.target.value)||0));
@@ -1820,10 +1781,17 @@ import { cloneState as clone } from "../core/state.js";
       scheduleImportDraftPersist(root,draft,{delay:350,syncCloud:true,updateSummary:true}).catch(error=>console.warn('Automatisch lokaal opslaan mislukt.',error));
     });
     modal.addEventListener('click',async event=>{
+      const coverage=event.target.closest('[data-u4-coverage]');if(coverage){modal.classList.remove('open');window.FinizeTransactions?.openCoverage(coverage.dataset.u4Coverage);return;}
       root=UI.root;draft=UI.draft;modal=ensureModalRoot();
       const container=event.target.closest('[data-u4-row]');const row=container?draft.rows.find(item=>item.id===container.dataset.u4Row):null;
+      const pairButton=event.target.closest('[data-u4-confirm-pair]');
+      if(pairButton){try{if(!root.commitChange(()=>confirmInternalTransferPair(root.state,pairButton.dataset.u4ConfirmPair),{render:false}))throw new Error('Transferpaar opslaan mislukt.');renderDraftModalPreservingView(root,draft,modal);}catch(error){alert(error.message);}return;}
+      if(event.target.closest('[data-u4-confirm-replacement]')&&row){
+        const manualId=container.querySelector('[data-u4-replacement-choice]')?.value;if(!manualId){alert('Kies eerst de handmatige registratie.');return;}
+        const snapshot=clone(row);try{await replaceManualSource(root,draft,row,manualId);renderDraftModalPreservingView(root,draft,modal,row.id);}catch(error){if(!error.coreApplied)Object.assign(row,snapshot);alert(error.coreApplied?'Vervanging is bewaard; importdetails worden uit het lokale journal hersteld.':error.message);}return;
+      }
       if(event.target.closest('[data-u4-approve]')&&row){event.preventDefault();event.stopPropagation();await showMatchDialog(root,draft,row,modal);return;}
-      if(event.target.closest('[data-u4-reopen]')&&row){reopenForReview(row);renderDraftModalPreservingView(root,draft,modal,row.id);scheduleImportDraftPersist(root,draft,{delay:0}).catch(error=>console.warn('Opnieuw nakijken opslaan mislukt.',error));return;}
+      if(event.target.closest('[data-u4-reopen]')&&row){try{await reopenStoredSource(root,draft,row);}catch(error){alert(error.message);return;}renderDraftModalPreservingView(root,draft,modal,row.id);scheduleImportDraftPersist(root,draft,{delay:0}).catch(error=>console.warn('Opnieuw nakijken opslaan mislukt.',error));return;}
       if(event.target.closest('[data-u4-apply-bulk]')){
         const scope=modal.querySelector('[data-u4-bulk-scope]')?.value||'review';const owner=modal.querySelector('[data-u4-bulk-owner]')?.value||'';const category=modal.querySelector('[data-u4-bulk-category]')?.value||'';const type=modal.querySelector('[data-u4-bulk-type]')?.value||'';
         if(!owner&&!category&&!type){alert('Kies minimaal één veld om aan te passen.');return;}
@@ -1834,11 +1802,12 @@ import { cloneState as clone } from "../core/state.js";
         renderDraftModal(root,draft);scheduleImportDraftPersist(root,draft,{delay:0}).catch(error=>console.warn('Bulkbewerking opslaan mislukt.',error));return;
       }
       if(event.target.closest('[data-u4-add-split]')&&row){
-        row.processing.splits=row.processing.splits||[];row.processing.splits.push({id:uid('split'),amount:0,budgetOwner:row.processing.budgetOwner,category:row.processing.category,budgetItemId:'',savingsGoalId:'',advanceMode:'auto',include:true});
+        if(isExplicitlyApproved(row)||sourceIsActive(root,draft,row)){try{await reopenStoredSource(root,draft,row);}catch(error){alert(error.message);return;}}
+        row.processing.splits=row.processing.splits||[];row.processing.splits.push({id:uid('split'),transactionType:'uitgave',amount:0,budgetOwner:row.processing.budgetOwner,category:row.processing.category,budgetItemId:'',savingsGoalId:'',advanceMode:'auto',include:true});
         renderDraftModalPreservingView(root,draft,modal,row.id);scheduleImportDraftPersist(root,draft,{delay:0}).catch(error=>console.warn('Splitsregel opslaan mislukt.',error));return;
       }
       const remove=event.target.closest('[data-u4-remove-split]');
-      if(remove&&row){row.processing.splits.splice(Number(remove.dataset.u4RemoveSplit),1);renderDraftModalPreservingView(root,draft,modal,row.id);scheduleImportDraftPersist(root,draft,{delay:0}).catch(error=>console.warn('Splitsregel verwijderen opslaan mislukt.',error));return;}
+      if(remove&&row){if(isExplicitlyApproved(row)||sourceIsActive(root,draft,row)){try{await reopenStoredSource(root,draft,row);}catch(error){alert(error.message);return;}}row.processing.splits.splice(Number(remove.dataset.u4RemoveSplit),1);renderDraftModalPreservingView(root,draft,modal,row.id);scheduleImportDraftPersist(root,draft,{delay:0}).catch(error=>console.warn('Splitsregel verwijderen opslaan mislukt.',error));return;}
       const saveButton=event.target.closest('[data-u4-save-concept]');
       if(saveButton){
         const status=modal.querySelector('[data-u4-save-status]');
@@ -1863,12 +1832,14 @@ import { cloneState as clone } from "../core/state.js";
         }
         return;
       }
+      if(event.target.closest('[data-u4-conflict-cloud],[data-u4-conflict-local]')){try{await resolveImportConflict(root,draft.id,event.target.closest('[data-u4-conflict-local]')?'local':'cloud');await openDraft(root,draft.id);}catch(error){alert(error.message);}return;}
+      if(event.target.closest('[data-u4-withdraw],[data-u4-restore],[data-u4-delete-batch]')){const type=event.target.closest('[data-u4-delete-batch]')?'delete':event.target.closest('[data-u4-restore]')?'restore':'withdraw';if(type==='delete'&&!confirm('Deze batch permanent verwijderen? Alleen technisch verwijderbewijs blijft bewaard.'))return;try{await commitImportCommand(root,draft,{type});if(type==='delete')closeDraft();else renderDraftModal(root,draft);root.renderActiveTab();}catch(error){alert(error.message);}return;}
       if(event.target.closest('[data-u4-process]')){
         if(typeof root.FinizeUpdate4Process!=='function'){alert('De verwerkingslaag wordt in de volgende fase geactiveerd. Het concept blijft bewaard.');return;}
         await root.FinizeUpdate4Process(draft);
       }
       if(event.target.closest('[data-u4-undo]')){
-        if(confirm('Deze import en alle bijbehorende financiële gevolgen ongedaan maken?'))await undoImport(root,draft);
+        if(confirm('Deze import terugtrekken?'))await commitImportCommand(root,draft,{type:'withdraw'});
       }
       if(event.target.closest('[data-u4-reconcile]')){
         if(confirm('De bestaande import vervangen door deze aangepaste verwerking?'))await reconcileImport(root,draft);
@@ -1876,19 +1847,13 @@ import { cloneState as clone } from "../core/state.js";
     });
   }
   function bindImportPanel(rootElement,root,owner=''){
+    rootElement.querySelector('[data-u4-conflicts]')?.addEventListener('click',()=>renderImportConflicts(root));
     rootElement.querySelector('[data-u4-file]')?.addEventListener('change',event=>{
       const file=event.target.files?.[0];if(!file)return;
-      if(root.state.activeImportId){
-        const activeSummary=(root.state.importSummaries||[]).find(summary=>summary.id===root.state.activeImportId);
-        const activeOwner=activeSummary?importSummaryOwner(root,activeSummary):'';
-        event.target.value='';
-        if(owner&&activeOwner&&activeOwner!==owner){alert(`Er staat al een bankimport klaar voor ${ownerLabel(activeOwner)}. Rond die eerst af vanuit de juiste tab.`);return;}
-        openDraft(root,root.state.activeImportId);return;
-      }
       const reader=new FileReader();
       reader.onload=async loaded=>{
         try{
-          const draft=createImportDraft({text:String(loaded.target.result||''),fileName:file.name,profiles:root.state.accountProfiles,rules:root.state.recognitionRules,transactions:root.state.transactions,fixedExpenses:root.state.recurringFixedExpenses?.[root.state.meta.scenario]||[],entryOwner:owner});
+          const draft=createImportDraft({text:String(loaded.target.result||''),fileName:file.name,profiles:root.state.accountProfiles,rules:root.state.recognitionRules,transactions:root.state.transactions,existingImports:await ImportStore.listImports(),fixedExpenses:root.state.recurringFixedExpenses||[],entryOwner:owner});
           if(owner&&draft.accountProfileId&&draft.accountOwner!==owner)throw new Error(`Dit bankbestand hoort bij ${ownerLabel(draft.accountOwner)}. Open de juiste persoonlijke of gezamenlijke tab.`);
           if(owner){
             draft.entryOwner=owner;
@@ -1907,7 +1872,7 @@ import { cloneState as clone } from "../core/state.js";
     rootElement.querySelector('[data-u4-manage-rules]')?.addEventListener('click',()=>renderRules(root));
   }
   function renderImportHistory(root,owner=''){
-    const modal=ensureModalRoot();const allSummaries=(root.state.importSummaries||[]).slice().sort((a,b)=>String(b.updatedAt||b.importDate).localeCompare(String(a.updatedAt||a.importDate)));const summaries=owner?allSummaries.filter(summary=>importSummaryOwner(root,summary)===owner):allSummaries;
+    const modal=ensureModalRoot();const allSummaries=[...(root.state.importSummaries||[]),...[...UI.conflicts.values()].filter(c=>c.localChoice?.rows&&!(root.state.importSummaries||[]).some(s=>s.id===c.importId)).map(c=>({...compactSummary(c.localChoice),status:'synchronisatieconflict'}))].sort((a,b)=>String(b.updatedAt||b.importDate).localeCompare(String(a.updatedAt||a.importDate)));const summaries=owner?allSummaries.filter(summary=>importSummaryOwner(root,summary)===owner):allSummaries;
     modal.innerHTML=`<div class="u4-import-modal"><header class="u4-modal-head"><h2>Alle imports</h2><button class="ghost" data-u4-close>Sluiten</button></header><main class="u4-modal-body"><div class="u4-import-history">${renderImportHistoryGroups(root,summaries)||'<div class="u4-empty">Nog geen imports.</div>'}</div></main></div>`;
     modal.classList.add('open');modal.querySelector('[data-u4-close]').addEventListener('click',closeDraft);modal.querySelectorAll('[data-u4-open-receipt]').forEach(item=>item.addEventListener('click',()=>openDraft(root,item.dataset.u4OpenReceipt)));
   }
@@ -1957,50 +1922,175 @@ import { cloneState as clone } from "../core/state.js";
     if(root.state.activeImportId)ImportStore.getImport(root.state.activeImportId).then(draft=>{UI.draft=draft||null;}).catch(()=>{});
   }
 
-  async function queueImportSync(record){
-    await ImportStore.putSync({id:record.id,importId:record.id,queuedAt:new Date().toISOString(),attempts:0});
+  async function preserveImportConflict(root,local,remote,conflicts=[]){
+    const id=`conflict-${local.id}`;
+    const existing=await ImportStore.getJournal(id);
+    const conflict={...existing,id,operation:'conflict',status:'conflict',importId:local.id,localChoice:clone(local),cloudChoice:clone(remote),conflicts,createdAt:existing?.createdAt||new Date().toISOString()};await ImportStore.putJournal(conflict);UI.conflicts.set(local.id,conflict);
+    if(UI.draft?.id===local.id)UI.draft.syncConflict=true;
+    updateImportSaveStatus('Synchronisatieconflict: de cloudstand blijft behouden; je lokale keuze is veilig bewaard.',true);
+    root.dispatchEvent?.(new CustomEvent('finize:import-conflict',{detail:{id:local.id}}));
   }
-
-  async function flushImportSync(root){
-    ImportPerformance.syncRequested=true;
-    if(ImportPerformance.syncPromise)return ImportPerformance.syncPromise;
-    ImportPerformance.syncPromise=(async()=>{
-      let overall=true;
-      while(ImportPerformance.syncRequested){
-        ImportPerformance.syncRequested=false;
-        const cloud=root.CloudAdapter;
-        if(!cloud?.isConnected?.()&&cloud?.isConfigured?.()&&typeof cloud.connect==='function')await cloud.connect();
-        if(!cloud?.isConnected?.()||!cloud.modules?.firestore||!cloud.db)return false;
-        const firestore=cloud.modules.firestore;
-        for(const item of await ImportStore.listSync()){
-          const record=await ImportStore.getImport(item.importId);
-          if(!record){await ImportStore.deleteSync(item.id);continue;}
-          try{
-            const envelope=buildCloudImportEnvelope(record);
-            for(let index=0;index<envelope.chunks.length;index++){
-              const chunkRef=cloudImportChunkRef(cloud,firestore,record.id,String(index).padStart(4,'0'));
-              await firestore.setDoc(chunkRef,envelope.chunks[index],{merge:false});
-            }
-            const importRef=cloudImportRef(cloud,firestore,record.id);
-            await firestore.setDoc(importRef,envelope.header,{merge:false});
-            await ImportStore.deleteSync(item.id);
-          }catch(error){
-            const classified=classifyCloudError(error,'De import kon niet worden gesynchroniseerd.');
-            item.attempts=(item.attempts||0)+1;item.lastError=classified.message;item.lastErrorCode=classified.code;item.updatedAt=new Date().toISOString();
-            await ImportStore.putSync(item);
-            overall=false;
-            break;
-          }
+  function renderImportConflicts(root){
+    const modal=ensureModalRoot();modal.innerHTML=`<div class="u4-import-modal"><header class="u4-modal-head"><h2>Synchronisatieconflicten</h2><button class="ghost" data-u4-close>Sluiten</button></header><main class="u4-modal-body">${[...UI.conflicts.values()].map(conflict=>`<div class="u4-receipt"><strong>${esc(conflict.localChoice?.fileName||conflict.importId)}</strong><p>Cloudstand blijft actief. Lokale keuze is veilig opgeslagen.</p><button class="ghost small" data-u4-resolve="${escAttr(conflict.importId)}" data-choice="cloud">Cloudstand behouden</button>${conflict.localChoice?.rows||conflict.localChoice?.lifecycle==='deleted'?`<button class="primary small" data-u4-resolve="${escAttr(conflict.importId)}" data-choice="local">Lokale keuze opnieuw toetsen</button>`:'<p class="u4-muted">De lokale snapshot is bewaard. Beoordeel de betrokken imports afzonderlijk.</p>'}</div>`).join('')}</main></div>`;modal.classList.add('open');modal.querySelector('[data-u4-close]').onclick=closeDraft;
+    modal.querySelectorAll('[data-u4-resolve]').forEach(button=>button.onclick=async()=>{button.disabled=true;try{await resolveImportConflict(root,button.dataset.u4Resolve,button.dataset.choice);renderImportConflicts(root);root.renderActiveTab();}catch(error){button.disabled=false;alert(error.message);}});
+  }
+  async function preservePendingImportsBeforeRemote(root,remote){
+    let preserved=false;
+    for(const queued of await ImportStore.listSync()){
+      const summary=(remote.importSummaries||[]).find(row=>row.id===queued.importId)||(remote.importDeletionProofs||[]).find(row=>row.id===queued.importId);
+      if(summary?.operationId===queued.operationId){const local=await ImportStore.getImport(queued.importId);if(local)await ImportStore.confirmCloudReceipt(pendingQueueReceipt(local),local);continue;}
+      const local=await ImportStore.getImport(queued.importId);if(!local)continue;
+      await preserveImportConflict(root,local,summary||{id:queued.importId,version:0},[{kind:'initial-pending-import'}]);preserved=true;
+    }
+    return preserved;
+  }
+  async function resolveImportConflict(root,id,choice){
+    const conflict=await ImportStore.getJournal(`conflict-${id}`);if(!conflict||conflict.status!=='conflict')return false;
+    if(id==='compact-state'){if(choice!=='cloud')throw new Error('Deze keuze omvat meerdere imports. Heropen en beoordeel de veilig bewaarde imports afzonderlijk.');conflict.status='resolved';delete conflict.localChoice;delete conflict.cloudChoice;await ImportStore.putJournal(conflict);UI.conflicts.delete(id);root.CloudAdapter.conflict=UI.conflicts.size>0;return true;}
+    const local=conflict.localChoice;let remote;try{remote=await fetchImportFromCloud(root,id);}catch(error){if(error.code!=='cloud-missing')throw error;remote={...clone(local),rows:[],version:0,baseVersion:0,operationId:'',lifecycle:'active'};}
+    if(choice==='local'&&(['deleted','withdrawn'].includes(local.lifecycle)||local.lifecycle==='active'&&remote.lifecycle==='withdrawn')){await ImportStore.deleteImport(id);await ImportStore.putImport(remote);await commitImportCommand(root,remote,{type:local.lifecycle==='deleted'?'delete':local.lifecycle==='withdrawn'?'withdraw':'restore'});}
+    else if(choice==='cloud'){
+      await ImportStore.deleteSync(id);await ImportStore.deleteImport(id);await ImportStore.putImport(remote);
+    }else{
+      if(remote.lifecycle==='deleted')throw new Error('Deze batch is permanent verwijderd. Een nieuwe import heeft een nieuw batch-ID nodig.');
+      await ImportStore.deleteImport(id);await ImportStore.putImport(remote);
+      await commitImportCommand(root,remote,{type:'source-choices',rows:clone(local.rows||[])});
+    }
+    conflict.status='resolved';delete conflict.localChoice;delete conflict.cloudChoice;await ImportStore.putJournal(conflict);
+    UI.conflicts.delete(id);
+    if(root.CloudAdapter){root.CloudAdapter.conflict=UI.conflicts.size>0;root.CloudAdapter.queueSave?.(root.state);root.CloudAdapter.flushQueue?.();}return true;
+  }
+  function commitImportCommand(root,draft,command){const id=String(draft.id),previous=ImportPerformance.chains.get(id)||Promise.resolve();const operation=previous.catch(()=>{}).then(()=>commitImportCommandUnlocked(root,draft,command));ImportPerformance.chains.set(id,operation);operation.finally(()=>{if(ImportPerformance.chains.get(id)===operation)ImportPerformance.chains.delete(id);}).catch(()=>{});return operation;}
+  async function commitImportCommandUnlocked(root,draft,command){
+    const sourceToken=JSON.stringify(draft.rows?.find(row=>row.id===command.rowId));
+    const stored=await ImportStore.getImport(draft.id);
+    if(command.operationId&&stored?.operationId===command.operationId)return {state:clone(root.state),batch:clone(stored),noop:true};
+    if(stored&&importVersion(stored)!==importVersion(draft))throw cloudImportError('import-conflict','Importdetails zijn intussen gewijzigd. Heropen deze batch.');
+    if(command.type==='delete'){const dependent=(await ImportStore.listJournal()).find(entry=>entry.importId!==draft.id&&['pending','conflict'].includes(entry.status)&&[...(entry.candidate?.transactions||[]),...(entry.localChoice?.state?.transactions||[])].some(tx=>tx.importBatchId===draft.id));if(dependent)throw new Error('Een nog openstaande lokale keuze gebruikt deze batch. Los eerst dat conflict op.');}
+    const intent={...command,operationId:command.operationId||uid('import-op'),timestamp:command.timestamp||new Date().toISOString(),deviceId:root.state.meta?.updatedBy||''};
+    let planned;
+    if(['withdraw','restore','delete'].includes(intent.type))planned=planImportCommand(root.state,draft,intent,{validateRow:rowProcessingValidation});
+    else{
+      const candidate=clone(root.state),nextBatch=clone(draft),row=nextBatch.rows.find(row=>row.id===intent.rowId);
+      if(!row&&intent.type!=='source-choices')throw new Error('Importbron ontbreekt.');
+      if(row?.importError)throw cloudImportError(row.importError.code,row.importError.message);
+      if(batchLifecycle(draft)!=='active')throw new Error('Herstel eerst deze teruggetrokken batch.');
+      if(intent.type==='source-choices'){
+        const existingSourceIds=new Set(nextBatch.rows.map(source=>source.id));
+        if(!nextBatch.rows.length)nextBatch.rows=clone(intent.rows||[]);
+        for(const source of nextBatch.rows){const desired=(intent.rows||[]).find(value=>value.id===source.id);if(!desired)continue;
+          assertOriginalBankDataUnchanged([source],[desired]);
+          if(existingSourceIds.has(source.id)&&JSON.stringify(source.processing)===JSON.stringify(desired.processing)&&getTransactionProcessingStatus({...source,source:'csv'})===getTransactionProcessingStatus({...desired,source:'csv'}))continue;
+          reopenTransactionSource(candidate,draft.id,source.id);
+          source.processing=clone(desired.processing);source.approvalHistory=[...(source.approvalHistory||[]),{approvalSource:source.approvalSource||'',approvedAt:source.approvedAt||'',status:source.processingStatus||source.certainty}];reopenForReview(source);
         }
+        assertFinancialMutationSafe(root.state,candidate);
+      }else if(intent.type==='source-approve'){
+        const single={...nextBatch,rows:[row]},plan=planImportEffects(single,candidate);if(!plan.ok)throw new Error(plan.errors.map(e=>e.message).join(' '));
+        applySourceApproval(candidate,nextBatch,row,plan);
+        nextBatch.effectManifest=nextBatch.effectManifest||{};const effects=effectManifest(plan);
+        for(const key of ['transactionIds','savingIds','advanceIds','repaymentIds','replacementIds','internalPairIds'])nextBatch.effectManifest[key]=[...new Set([...(nextBatch.effectManifest[key]||[]),...(effects[key]||[])])];
+      }else if(intent.type==='source-reopen'){reopenTransactionSource(candidate,draft.id,row.id);reopenForReview(row);}
+      else if(intent.type==='source-replacement'){confirmManualReplacement(candidate,row,intent.manualId,draft.id);synchronizeChangedSavings(candidate,root.state);assertFinancialMutationSafe(root.state,candidate);}
+      else throw new Error('Onbekende bronactie.');
+      nextBatch.version=importVersion(draft)+1;nextBatch.operationId=intent.operationId;nextBatch.updatedAt=intent.timestamp;nextBatch.lifecycle='active';
+      nextBatch.status=deriveBatchReviewStatus(nextBatch).status;
+      const summary=(candidate.importSummaries||[]).find(s=>s.id===draft.id);if(summary)Object.assign(summary,compactSummary(nextBatch));
+      else candidate.importSummaries=[...(candidate.importSummaries||[]),compactSummary(nextBatch)];
+      planned={state:candidate,batch:nextBatch};
+    }
+    if(planned.noop)return planned;
+    assertNoDuplicateSources(root.state,planned.state);
+    planned.batch.baseVersion=Number(draft.baseVersion??draft.version??0);
+    // Capture both sides before touching either persistent representation. Recovery uses the
+    // operation receipt, never transaction count or viewport. A changing core aborts the command.
+    const baseSignature=JSON.stringify(root.state);
+    const journal={id:intent.operationId,importId:draft.id,operation:'import-command',status:'pending',intent,baseSignature,candidate:planned.state,batch:planned.batch,previousBatch:clone(stored||draft)};
+    await ImportStore.putJournal(journal);
+    if(command.rowId&&JSON.stringify(draft.rows?.find(row=>row.id===command.rowId))!==sourceToken){journal.status='rolled-back';await ImportStore.putJournal(journal);throw new Error('De verwerking is intussen gewijzigd. Keur de huidige verwerking opnieuw expliciet goed.');}
+    if(JSON.stringify(root.state)!==baseSignature){journal.status='conflict';await ImportStore.putJournal(journal);await preserveImportConflict(root,planned.batch,stored||{id:draft.id,version:0},[{kind:'local-core-changed'}]);throw new Error('De financiële state wijzigde tijdens de actie. De keuze is bewaard; probeer opnieuw op de actuele stand.');}
+    const previousQueue=(await ImportStore.listSync()).find(item=>item.importId===draft.id);
+    await ImportStore.putImport(planned.batch);
+    await queueImportSync(planned.batch);
+    if(JSON.stringify(root.state)!==baseSignature){journal.status='conflict';await ImportStore.putJournal(journal);await preserveImportConflict(root,planned.batch,stored||{id:draft.id,version:0},[{kind:'local-core-changed'}]);throw new Error('De state wijzigde tijdens de opslagcommit. De keuze blijft veilig bewaard; beoordeel de actuele stand.');}
+    const ok=root.commitChange(()=>applyFinancialCandidate(root.state,planned.state),{render:false,mutationMode:'correction'});
+    if(!ok){journal.status='rolled-back';await ImportStore.putJournal(journal);await ImportStore.rollbackImport(planned.batch,journal.previousBatch,previousQueue);throw new Error('Financiële commit is afgebroken; oorspronkelijke effecten blijven behouden.');}
+    applyFinancialCandidate(draft,clone(planned.batch));
+    journal.status='completed';delete journal.candidate;delete journal.previousBatch;delete journal.baseSignature;
+    if(planned.deleted){await purgeDeletedBatch(draft.id,intent.operationId);delete journal.candidate;delete journal.previousBatch;delete journal.baseSignature;journal.batch=clone(planned.batch);}
+    await ImportStore.putJournal(journal);
+    flushImportSync(root).catch(()=>{});return planned;
+  }
+  async function purgeDeletedBatch(id,except=''){
+    for(const entry of await ImportStore.listJournal()){if(entry.importId===id&&entry.id!==except)await ImportStore.deleteJournal(entry.id);else if(entry.id!==except&&!['pending','conflict'].includes(entry.status)&&entry.candidate){delete entry.candidate;delete entry.baseSignature;await ImportStore.putJournal(entry);}}
+    const pending=ImportPerformance.pending.get(id);if(pending){clearTimeout(pending.timer);ImportPerformance.pending.delete(id);pending.resolvers.forEach(r=>r.reject(new Error('De batch is permanent verwijderd.')));}
+  }
+  async function queueImportSync(record){
+    await ImportStore.putSync({...pendingQueueReceipt(record),queuedAt:new Date().toISOString(),attempts:0});
+  }
+  async function stageImportCloudWrites(root,snapshot){
+    const cloud=root.CloudAdapter,firestore=cloud?.modules?.firestore;
+    if(!firestore?.runTransaction)throw new Error('Transactionele import-cloudopslag is niet beschikbaar. De lokale keuze blijft bewaard.');
+    const stages=[];
+    for(const item of await ImportStore.listSync()){
+      if((await ImportStore.getJournal(`conflict-${item.importId}`))?.status==='conflict')continue;
+      const record=await ImportStore.getImport(item.importId);if(!record)continue;
+      const summary=(snapshot.importSummaries||[]).find(row=>row.id===record.id)||(snapshot.importDeletionProofs||[]).find(row=>row.id===record.id);
+      if(!summary||importVersion(summary)!==importVersion(record)||String(summary.operationId||'')!==String(record.operationId||''))throw cloudImportError('import-pending-snapshot','Importdetails en financiële snapshot behoren nog niet tot dezelfde versie.');
+      const envelope=record.lifecycle==='deleted'?{header:clone(record),chunks:[],sourceChunks:[]}:buildCloudImportEnvelope(record);
+      for(let index=0;index<envelope.chunks.length;index++)await firestore.setDoc(cloudImportChunkRef(cloud,firestore,record.id,`${record.operationId?record.operationId+'-':''}${String(index).padStart(4,'0')}`),envelope.chunks[index],{merge:false});
+      for(let index=0;index<envelope.sourceChunks.length;index++)await firestore.setDoc(cloudImportChunkRef(cloud,firestore,record.id,`${record.operationId}-source-${index}`),{generation:record.operationId,index,text:envelope.sourceChunks[index]},{merge:false});
+      stages.push({record,receipt:pendingQueueReceipt(record),header:envelope.header,ref:cloudImportRef(cloud,firestore,record.id)});
+    }
+    return {
+      stages,
+      async readAndValidate(transaction){
+        const snapshots=[];for(const stage of stages)snapshots.push(await transaction.get(stage.ref));
+        for(let i=0;i<stages.length;i++){
+          const stage=stages[i],remote=snapshots[i].exists()?snapshots[i].data():null;
+          try{stage.echo=assertImportBase(remote,stage.record)==='echo';}catch(error){error.importConflict={local:stage.record,remote};throw error;}
+        }
+      },
+      publish(transaction){for(const stage of stages)if(!stage.echo)transaction.set(stage.ref,stage.header);},
+      async acknowledge(){for(const stage of stages){
+        await ImportStore.confirmCloudReceipt(stage.receipt,stage.record);
+        if(stage.record.lifecycle==='deleted'&&!await cleanupDeletedCloudChunks(root,stage.record.id))await queueImportSync(stage.record);
+      }}
+    };
+  }
+  async function cleanupDeletedCloudChunks(root,id){
+    const cloud=root.CloudAdapter,f=cloud.modules.firestore;
+    // Tombstone is already committed. It permanently rejects stale writes; chunk cleanup retries.
+    if(!f.getDocs||!f.collection||!f.deleteDoc)return false;
+    const snapshot=await f.getDocs(f.collection(cloudImportRef(cloud,f,id),'chunks'));
+    for(const doc of snapshot.docs||[])await f.deleteDoc(doc.ref);
+    return true;
+  }
+  async function flushImportSync(root){
+    ImportPerformance.syncRequested=true;if(ImportPerformance.syncPromise)return ImportPerformance.syncPromise;
+    ImportPerformance.syncPromise=(async()=>{
+      const cloud=root.CloudAdapter;
+      if(!cloud?.isConnected?.()||cloud.initialSyncComplete===false)return false;
+      if(cloud.docRef){
+        for(const item of await ImportStore.listSync()){const legacy=await ImportStore.getImport(item.importId);if(legacy&&!legacy.operationId){await persistImportDraftImmediate(root,legacy,{syncCloud:false});await queueImportSync(legacy);}}
+        cloud.queueSave(root.state);const ok=await cloud.flushQueue();return ok;
       }
-      return overall;
-    })().finally(()=>{ImportPerformance.syncPromise=null;});
-    return ImportPerformance.syncPromise;
+      // Connector/test compatibility without compact-state adapter: still require guarded headers.
+      if(!cloud.modules?.firestore?.runTransaction)return false;
+      while(ImportPerformance.syncRequested){ImportPerformance.syncRequested=false;
+        const staged=await stageImportCloudWrites(root,root.state);
+        await cloud.modules.firestore.runTransaction(cloud.db,async tx=>{await staged.readAndValidate(tx);staged.publish(tx);});await staged.acknowledge();
+      }return true;
+    })().catch(async error=>{
+      if(error.importConflict)await preserveImportConflict(root,error.importConflict.local,error.importConflict.remote);
+      return false;
+    }).finally(()=>{ImportPerformance.syncPromise=null;});return ImportPerformance.syncPromise;
   }
 
   async function recoverJournal(root){
     const entries=await ImportStore.listJournal();
     for(const entry of entries.filter(item=>item.status==='pending')){
+      if(entry.operation==='import-command'){const receipt=(root.state.importSummaries||[]).find(row=>row.id===entry.importId)||(root.state.importDeletionProofs||[]).find(row=>row.id===entry.importId);if(receipt?.operationId===entry.intent.operationId){await ImportStore.putImport(entry.batch);await queueImportSync(entry.batch);entry.status='completed';if(entry.batch.lifecycle==='deleted'){await purgeDeletedBatch(entry.importId,entry.id);delete entry.candidate;delete entry.previousBatch;delete entry.baseSignature;}}else if(JSON.stringify(root.state)===entry.baseSignature){await ImportStore.putImport(entry.batch);await queueImportSync(entry.batch);if(JSON.stringify(root.state)!==entry.baseSignature)throw new Error('State wijzigde tijdens journalherstel; keuze blijft bewaard.');if(!root.commitChange(()=>applyFinancialCandidate(root.state,entry.candidate),{render:false,mutationMode:'correction'}))throw new Error('Herstelcommit mislukt.');entry.status='completed';}else{entry.status='conflict';await preserveImportConflict(root,entry.batch,(await ImportStore.getImport(entry.importId))||{id:entry.importId,version:0},[{kind:'journal-core-changed'}]);}if(entry.status==='completed'){delete entry.candidate;delete entry.previousBatch;delete entry.baseSignature;}await ImportStore.putJournal(entry);continue;}
       if(entry.operation==='discard'){
         if(root.state?.activeImportId===entry.importId){
           entry.status='rolled-back';
@@ -2023,6 +2113,12 @@ import { cloneState as clone } from "../core/state.js";
         await ImportStore.putJournal(entry);
         continue;
       }
+      if(['source-approve','source-replacement'].includes(entry.operation)){
+        const applied=entry.operation==='source-approve'?(root.state.transactions||[]).some(tx=>tx.importBatchId===entry.importId&&tx.importTransactionId===entry.rowId&&tx.processingStatus==='goedgekeurd'||tx.importBatchId===entry.importId&&tx.importTransactionId===entry.rowId&&tx.processingStatus==='niet-meetellen'):(root.state.manualTransactionReplacements||[]).some(item=>item.id===`replacement-${entry.importId}-${entry.manualId}`&&item.active!==false);
+        if(applied){const draft=await ImportStore.getImport(entry.importId),row=draft?.rows.find(row=>row.id===entry.rowId);if(!row)throw new Error('Importbron ontbreekt bij herstel; journal blijft behouden.');Object.assign(row,clone(entry.row));if(entry.manifest)draft.effectManifest=clone(entry.manifest);if(entry.operation==='source-replacement'){draft.effectManifest=draft.effectManifest||{};draft.effectManifest.replacementIds=[...new Set([...(draft.effectManifest.replacementIds||[]),`replacement-${entry.importId}-${entry.manualId}`])];}await persistImportDraft(root,draft);entry.status='completed';}else entry.status='rolled-back';
+        await ImportStore.putJournal(entry);continue;
+      }
+      if(entry.operation==='source-reopen'){const rows=(root.state.transactions||[]).filter(tx=>tx.importBatchId===entry.importId&&tx.importTransactionId===entry.rowId);if(rows.length&&rows.every(tx=>tx.processingStatus==='nakijken')){const draft=await ImportStore.getImport(entry.importId);const row=draft?.rows.find(row=>row.id===entry.rowId);if(row){reopenForReview(row);await ImportStore.putImport(draft);}entry.status='completed';}else entry.status='rolled-back';await ImportStore.putJournal(entry);continue;}
       const processed=(root.state?.transactions||[]).some(tx=>tx.importBatchId===entry.importId);
       entry.status=entry.operation==='undo'?!processed?'completed':'rolled-back':processed?'completed':'rolled-back';
       entry.recoveredAt=new Date().toISOString();
@@ -2032,16 +2128,17 @@ import { cloneState as clone } from "../core/state.js";
 
   function install(root){
     if(!root?.state)return;
-    normalizeCore(root.state);
+    ImportStore.setScope(root.CloudAdapter?.importScope?.()||'legacy');ImportStore.legacyReferences=new Set((root.state.importSummaries||[]).map(row=>String(row.id)));
+    root.FinizeImportSync={onCloudAccepted:async()=>{if(root.CloudAdapter?.conflict)return;const queued=await ImportStore.listSync();if(queued.length)flushImportSync(root);},beforeInitialRemote:remote=>preservePendingImportsBeforeRemote(root,remote),prepareCloudSnapshot:snapshot=>stageImportCloudWrites(root,snapshot),setScope:()=>{ImportStore.setScope(root.CloudAdapter?.importScope?.()||'legacy');ImportStore.legacyReferences=new Set((root.state.importSummaries||[]).map(row=>String(row.id)));},findConflicts:findImportConflicts,preserveConflict:(local,remote,conflicts)=>preserveImportConflict(root,local,remote,conflicts),refresh:()=>{if(UI.draft&&!ImportPerformance.pending.has(UI.draft.id)&&!ImportPerformance.chains.has(UI.draft.id))openDraft(root,UI.draft.id);}};
+    // The core load route has already migrated and validated the complete state.
     const validation=validateCore(root.state);
     if(!validation.ok){console.error('Update 4 migratie ongeldig',validation.errors);return;}
-    try{
-      if(typeof root.localSave==='function')root.localSave(root.state);
-    }catch(error){console.error('Update 4 lokale migratie opslaan mislukt',error);}
+    // Import installation is read-only: it must not perform a second migration/write.
     root.FinizeUpdate4=Object.freeze({
       schemaVersion:SCHEMA_VERSION,
-      normalize:candidate=>normalizeCore(clone(candidate)),
+      normalize:candidate=>root.migrateBudgetState(candidate),
       validate:candidate=>validateCore(candidate),
+      getTransactionAccountContext,getTransactionSource,getTransactionProcessingStatus,isTransactionFinanciallyActive,getTransactionOriginalBankData,
       normalizeIban,
       chunkRows,
       rowsChecksum,
@@ -2052,6 +2149,7 @@ import { cloneState as clone } from "../core/state.js";
       resolveImportDetails,
       reconcileActiveImportReference,
       discardImportConcept,
+      openImportDetails:async(id,rowId='')=>{const draft=await openDraft(root,id);if(rowId){const modal=ensureModalRoot(),row=[...modal.querySelectorAll('[data-u4-row]')].find(node=>node.dataset.u4Row===rowId);if(row){row.closest('.u4-section')?.setAttribute('open','');row.scrollIntoView({block:'center'});}}return draft;},
       parseBankCsv,
       createImportDraft,
       fingerprint,
@@ -2062,6 +2160,9 @@ import { cloneState as clone } from "../core/state.js";
       learnedRecognitionRules,
       validateDraft,
       planImportEffects,
+      planImportCommand,
+      resolveConflict:(id,choice)=>resolveImportConflict(root,id,choice),
+      batchCommand:(id,type)=>ImportStore.getImport(id).then(draft=>commitImportCommand(root,draft,{type})),
       undoImportEffects,
       directionalBalances,
       proposeRepaymentAllocations,
@@ -2074,7 +2175,7 @@ import { cloneState as clone } from "../core/state.js";
       root.addEventListener?.('finize:cloud-connected',()=>recoverJournal(root).then(()=>flushImportSync(root)).catch(error=>console.warn('Importsynchronisatie uitgesteld.',error)));
     }
     Promise.resolve()
-      .then(()=>recoverJournal(root))
+      .then(async()=>{for(const entry of await ImportStore.listJournal())if(entry.status==='conflict'&&entry.operation==='conflict')UI.conflicts.set(entry.importId,entry);await recoverJournal(root);})
       .then(()=>reconcileActiveImportReference(root))
       .catch(error=>console.warn('Update 4 opslaginitialisatie uitgesteld.',error))
       .finally(()=>{
@@ -2084,7 +2185,7 @@ import { cloneState as clone } from "../core/state.js";
       });
   }
 
-  return {SCHEMA_VERSION,CLOUD_STORAGE_VERSION,CLOUD_READ_CONCURRENCY,OWNERS,IMPORT_STATUSES,normalizeIban,normalizeRule,normalizeTransaction,normalizeCore,validateCore,calculateGoalSavedAmount,reconcileGoalSavedAmounts,chunkRows,canonicalValue,rowsChecksum,buildCloudImportEnvelope,assembleCloudImport,mapWithConcurrency,classifyCloudError,fetchImportFromCloud,resolveImportDetails,reconcileActiveImportReference,deleteCloudImportBestEffort,discardImportConcept,normalizeText,matchIdentity,matchCandidates,detectDelimiter,parseDelimited,parseDate,parseAmount,detectFormat,inferMapping,hashText,fingerprint,organizationName,proposeType,recognitionProposal,fixedAmountAt,fixedRecognition,isExplicitlyApproved,importReviewState,markExplicitlyApproved,classifyOriginal,parseBankCsv,findProfile,createImportDraft,updateDraftSummary,compactSummary,validateDraft,transactionKind,expenseImpact,financialRows,advanceForTransaction,savingsForTransaction,detectInternalPairs,directionalBalances,proposeRepaymentAllocations,planImportEffects,applyImportPlan,learnedRecognitionRules,rememberRecognitionRules,effectManifest,undoImportEffects,transactionFamily,applyTransactionFamily,ImportStore,persistImportDraft,scheduleImportDraftPersist,flushScheduledImportDraft,queueImportSync,flushImportSync,recoverJournal,install,round2,uid,clone,testRenderDraftModal:renderDraftModal};
+  return {getTransactionAccountContext,getTransactionSource,getTransactionProcessingStatus,isTransactionFinanciallyActive,getTransactionOriginalBankData,SCHEMA_VERSION,CLOUD_STORAGE_VERSION,CLOUD_READ_CONCURRENCY,OWNERS,IMPORT_STATUSES,normalizeIban,normalizeRule,normalizeTransaction,normalizeCore,validateCore,calculateGoalSavedAmount,reconcileGoalSavedAmounts,chunkRows,canonicalValue,rowsChecksum,buildCloudImportEnvelope,assembleCloudImport,mapWithConcurrency,classifyCloudError,fetchImportFromCloud,resolveImportDetails,reconcileActiveImportReference,deleteCloudImportBestEffort,discardImportConcept,rowProcessingValidation,reopenStoredSource,approveStoredSource,normalizeText,matchIdentity,matchCandidates,detectDelimiter,parseDelimited,parseDate,parseAmount,detectFormat,inferMapping,hashText,fingerprint,organizationName,proposeType,recognitionProposal,fixedAmountAt,fixedRecognition,isExplicitlyApproved,importReviewState,markExplicitlyApproved,classifyOriginal,parseBankCsv,findProfile,createImportDraft,updateDraftSummary,compactSummary,validateDraft,transactionKind,expenseImpact,financialRows,advanceForTransaction,savingsForTransaction,detectInternalPairs,directionalBalances,proposeRepaymentAllocations,planImportCommand,commitImportCommand,deriveBatchReviewStatus,stageImportCloudWrites,preserveImportConflict,resolveImportConflict,preservePendingImportsBeforeRemote,planImportEffects,applyImportPlan,learnedRecognitionRules,rememberRecognitionRules,effectManifest,undoImportEffects,transactionFamily,applyTransactionFamily,ImportStore,persistImportDraft,scheduleImportDraftPersist,flushScheduledImportDraft,queueImportSync,flushImportSync,recoverJournal,install,round2,uid,clone,testRenderDraftModal:renderDraftModal};
 });
 
 const FinizeImportRuntime=globalThis.FinizeUpdate4Runtime;

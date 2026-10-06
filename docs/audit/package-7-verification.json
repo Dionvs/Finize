@@ -1,0 +1,427 @@
+{
+  "package": 7,
+  "status": "READY",
+  "date": "2026-10-06",
+  "schemaBefore": 11,
+  "schemaAfter": 11,
+  "cacheBefore": "finize-v101-functional-consolidation",
+  "cacheAfter": "finize-v102-release-candidate",
+  "storageVersions": {
+    "ImportStore": 1,
+    "importEnvelope": 2
+  },
+  "freeze": {
+    "files": 185,
+    "manifestSha256": "9f8eb9a7cabfdb321721eddca77e549bf06b84f7df6e11e2a3ebf802be2c82b7",
+    "gitHead": "1836cfcf792d87bb5393246bddfd852386c9a897",
+    "gitHeadUnchanged": true,
+    "diffSha256": "d74bc3b6581cdfac3fc017518fb1cd0debaab01109568861eb41e8e556c1c37b"
+  },
+  "tests": {
+    "nodeFiles": 45,
+    "registeredNodeCases": 402,
+    "nodeFailed": 0,
+    "nodeSkipped": 0,
+    "browserCases": 150,
+    "browserFailed": 0,
+    "browserSkipped": 0,
+    "browserFlaky": 0,
+    "P7NodeCases": 29,
+    "P7BrowserCases": 14,
+    "auditChecks": 138,
+    "widths": [
+      390,
+      1440
+    ]
+  },
+  "quality": {
+    "syntax": {
+      "exitCode": 0,
+      "output": "JavaScript-syntax geldig, inclusief 0 inline scripts."
+    },
+    "css": {
+      "exitCode": 0,
+      "output": "CSS geldig: 971 hoofdnodes, 0 bekende ongedefinieerde tokens."
+    },
+    "generated": {
+      "exitCode": 0,
+      "output": "Gegenereerde runtime is byte-reproduceerbaar."
+    },
+    "allSourceSyntax": {
+      "files": 47,
+      "passed": true
+    },
+    "independentBuild": {
+      "exitCode": 0,
+      "output": "app.js en app.css reproduceerbaar gebouwd."
+    },
+    "reproducibility": {
+      "app.js": {
+        "runtimeSha256": "9aba0986d1e28e94d5c5e2a6b6307b5f9c0d4341ba97fb718dc016aa369c10a3",
+        "cleanBuildSha256": "9aba0986d1e28e94d5c5e2a6b6307b5f9c0d4341ba97fb718dc016aa369c10a3",
+        "equal": true
+      },
+      "app.css": {
+        "runtimeSha256": "ba99ba8633c996ca0106b6db6417e2fd6141a635bd00ab202d2307fb2def975f",
+        "cleanBuildSha256": "ba99ba8633c996ca0106b6db6417e2fd6141a635bd00ab202d2307fb2def975f",
+        "equal": true
+      }
+    },
+    "unchangedCritical": {
+      "app.css": true,
+      "firestore.rules": true,
+      "package.json": true,
+      "pnpm-lock.yaml": true,
+      "firebase.json": true,
+      "playwright.config.cjs": true,
+      ".github/workflows/verify.yml": true,
+      "src/styles/auth.css": true,
+      "src/styles/base.css": true,
+      "src/styles/dashboard.css": true,
+      "src/styles/desktop.css": true,
+      "src/styles/goals.css": true,
+      "src/styles/import.css": true,
+      "src/styles/iphone.css": true,
+      "src/styles/settings.css": true,
+      "src/styles/tablet.css": true,
+      "src/styles/tokens.css": true,
+      "tests/browser/v50-visual-baseline.spec.cjs-snapshots/v50-1024.png": true,
+      "tests/browser/v50-visual-baseline.spec.cjs-snapshots/v50-1440.png": true,
+      "tests/browser/v50-visual-baseline.spec.cjs-snapshots/v50-360.png": true,
+      "tests/browser/v50-visual-baseline.spec.cjs-snapshots/v50-390.png": true,
+      "tests/browser/v50-visual-baseline.spec.cjs-snapshots/v50-430.png": true,
+      "tests/browser/v50-visual-baseline.spec.cjs-snapshots/v50-768.png": true,
+      "docs/package-1-data-foundation.md": true,
+      "docs/package-2-planning-timeline.md": true,
+      "docs/package-3-transaction-engine.md": true,
+      "docs/package-4-savings-refunds-forecast.md": true,
+      "docs/package-5-import-lifecycle.md": true,
+      "docs/package-6-functional-consolidation.md": true
+    },
+    "financialBaselineEqual": true,
+    "importBaselineEqual": true,
+    "releaseScan": {
+      "privateCredentials": [],
+      "debugStatements": [],
+      "localAbsolutePaths": [],
+      "fixtureImports": []
+    },
+    "publicFirebaseConfig": "Existing browser API configuration retained; no service-account/private credentials."
+  },
+  "baseline": {
+    "persistentAndFinancialExactEqual": true,
+    "financialBeforeSha256": "a05aed96d85c7af6ef8de3982a7d3bebac111e4827bbe943457258e691733f45",
+    "financialAfterSha256": "a05aed96d85c7af6ef8de3982a7d3bebac111e4827bbe943457258e691733f45",
+    "canonicalSha256": "641e9b79ef0b8550ac2c8e5c984c9e67982aa2ed95080896f56a2985189664ff",
+    "importExactEqual": true,
+    "importCaptureSha256": "fd38e81987e004daf36458c9fe585bf70f9a03515c511ce8997a1e267022a021",
+    "historicalFixtureUnchanged": "af0ad3bb97c315ffe4bfd73e477fc78cb192d9e0d952457c456d5179eb7bc6a5",
+    "historicalTransactions": 186,
+    "historicalBankOriginal": 171,
+    "historicalLedgerEntries": 29,
+    "visualLedgerEntries": 6,
+    "importBatches": 6,
+    "importRows": 176,
+    "summary": [
+      {
+        "fixture": "visual-fixture",
+        "month": "2026-07",
+        "dionAllowance": 1166.58,
+        "daraAllowance": 1433.23,
+        "householdAvailable": 1788.97,
+        "actualIncome": 0,
+        "realExpense": 0,
+        "buffers": {
+          "gezamenlijk": 500,
+          "dion": 1192.16,
+          "dara": 96.81
+        },
+        "reserves": {
+          "fixedReserve": 2360.19,
+          "budgetReserve": 500,
+          "savingsReserve": 0
+        },
+        "completeComparison": "exact recursive equal"
+      },
+      {
+        "fixture": "historical-backup",
+        "month": "2026-06",
+        "dionAllowance": 1189.92,
+        "daraAllowance": 1300.36,
+        "householdAvailable": 930.49,
+        "actualIncome": 0,
+        "realExpense": 584.71,
+        "buffers": {
+          "gezamenlijk": 754,
+          "dion": 170.97,
+          "dara": 5.52
+        },
+        "reserves": {
+          "fixedReserve": 2979.72,
+          "budgetReserve": 600,
+          "savingsReserve": 154
+        },
+        "completeComparison": "exact recursive equal"
+      },
+      {
+        "fixture": "historical-backup",
+        "month": "2026-07",
+        "dionAllowance": 1086.27,
+        "daraAllowance": 2660.6,
+        "householdAvailable": 1841.94,
+        "actualIncome": 5335.85,
+        "realExpense": 4164.83,
+        "buffers": {
+          "gezamenlijk": 9.92,
+          "dion": 466.26,
+          "dara": 1365.76
+        },
+        "reserves": {
+          "fixedReserve": 2679.72,
+          "budgetReserve": 650,
+          "savingsReserve": 154
+        },
+        "completeComparison": "exact recursive equal"
+      },
+      {
+        "fixture": "historical-backup",
+        "month": "2026-08",
+        "dionAllowance": 876.42,
+        "daraAllowance": 1233.86,
+        "householdAvailable": 930.29,
+        "actualIncome": 0,
+        "realExpense": 452.71,
+        "buffers": {
+          "gezamenlijk": 854,
+          "dion": 137.27,
+          "dara": -60.98
+        },
+        "reserves": {
+          "fixedReserve": 2679.72,
+          "budgetReserve": 700,
+          "savingsReserve": 154
+        },
+        "completeComparison": "exact recursive equal"
+      }
+    ],
+    "categories": {
+      "A": "6 proven contractbug groups, only invalid/security/offline edgecases change; untouched datasets exact equal",
+      "B": "cache marker/generated bundle/docs/test representation; no financial effect",
+      "C": 0,
+      "D": 8
+    }
+  },
+  "A": [
+    {
+      "id": "A1",
+      "severity": "high",
+      "problem": "Orphan fixed occurrence approved without fixedExpenseId bypassed normal variable burden.",
+      "fix": "Central processing validation requires corresponding fixed link before new processing.",
+      "beforeEvidence": "p7-failing-before-fixes.log (M12/C18)",
+      "afterEvidence": "P7 M12/C18 Node + browser validation",
+      "existingContract": "P3/P6 valid fixed link and full preflight before mutation"
+    },
+    {
+      "id": "A2",
+      "severity": "medium",
+      "problem": "Finite amounts beyond safe integer-cent representation passed approval.",
+      "fix": "Number.isSafeInteger on canonical cents in engine/manual validation.",
+      "beforeEvidence": "p7-failing-before-fixes.log (M13/I20)",
+      "afterEvidence": "P7 M13/I20 Node + 390/1440px amount validation",
+      "existingContract": "P3/P4 exact cent validation"
+    },
+    {
+      "id": "A3",
+      "severity": "high",
+      "problem": "Stored configuration/status/planning/review/transfer IDs could inject dynamic HTML/attributes.",
+      "fix": "Context-aware textSafe/attrSafe, data values retained.",
+      "beforeEvidence": "p7-security-before.json; p7-attributes-before.json; p7-legacy-attributes-before.json",
+      "afterEvidence": "P7 Q1-Q8 390/1440px; private legacy renderer harness explicitly identified",
+      "existingContract": "Existing dynamic HTML security contract"
+    },
+    {
+      "id": "A4",
+      "severity": "high",
+      "problem": "Data/back-up instructed deploying obsolete public Firestore rules.",
+      "fix": "Reference actual secured firestore.rules and separately authorized rules release.",
+      "beforeEvidence": "p7-security-before.json (Q9)",
+      "afterEvidence": "P7 Q9 390/1440px",
+      "existingContract": "P5 household authorization / no public storage"
+    },
+    {
+      "id": "A5",
+      "severity": "medium",
+      "problem": "Public manual save entered commit/rollback before validation, swallowed invalid command into false and could discard transient read caches.",
+      "fix": "Same cloned preflight as manual UI before commitChange.",
+      "beforeEvidence": "p7-preflight-before.json; invalid date returns no concrete validation error",
+      "afterEvidence": "P7 browser M12/M13 invalid date/orphan state exactly unchanged",
+      "existingContract": "P6 shared create/edit validation and dependency preflight"
+    },
+    {
+      "id": "A6",
+      "severity": "high",
+      "problem": "Failed or mismatched navigation poisoned cached index; mismatched install could replace working worker with mixed asset shell.",
+      "fix": "Only successful matching-version HTML cached; install rejects mismatched root/index and removes candidate cache.",
+      "beforeEvidence": "p7-pwa-before.log; p7-pwa-install-before.log",
+      "afterEvidence": "P7 W1/W2/W3/W5 Node + actual Chrome worker/cache/offline tests",
+      "existingContract": "Existing PWA offline startup and stale asset prevention"
+    }
+  ],
+  "D": [
+    {
+      "id": "D1",
+      "code": "transaction-model.mjs account resolution; transaction-processing.mjs source guards; core/runtime.js import command adapters",
+      "risk": "Ambiguous legacy physical context/source identity is not guessed. Historical fixture has 44 transactions without reliable physical context.",
+      "guard": "Readable compatibility preserved; unsafe edit/source action blocked; only explicit unique provenance may enable recovery."
+    },
+    {
+      "id": "D2",
+      "code": "transaction-engine.mjs legacy-savings-goal-missing / legacy-refund-context-missing",
+      "risk": "Old savings/refund data may lack reliable goal/correction context.",
+      "guard": "No goal/refundMonth heuristic; explicit source reprocessing with full preflight only."
+    },
+    {
+      "id": "D3",
+      "code": "core/runtime.js monthRecords/closure locks; transaction-processing.mjs manual date guards",
+      "risk": "Stored closure snapshots remain immutable and may differ from newer live semantics. Original and target bankmonth locks tested; no new fixed/refund correction-month closure policy introduced.",
+      "guard": "Explicit existing reopen/correction; no snapshot rebuild or date guessing."
+    },
+    {
+      "id": "D4",
+      "code": "transaction-processing.mjs advance guards; import-lifecycle.mjs complete dependency preflight",
+      "risk": "Independent repayments/replacements can prevent safe lifecycle or edit.",
+      "guard": "Concrete conflict before mutation; no dependent history deletion."
+    },
+    {
+      "id": "D5",
+      "code": "import/runtime.js cleanupDeletedCloudChunks/outbox/retry",
+      "risk": "Offline permanent delete needs online cleanup of immutable cloud chunks.",
+      "guard": "Technical terminal tombstone blocks stale resurrection; no financial delete audit retained; queued cleanup resumes online."
+    },
+    {
+      "id": "D6",
+      "code": "firestore.rules; CloudAdapter; ImportStore",
+      "risk": "Static rules/client contracts and cloudmocks are green; emulator is not installed/configured, production has not been verified. Real browser storage quota/network failure remain environmental risks.",
+      "guard": "Failed durable writes block financial commit; journal/conflict choices preserve intent. Authorized release smoke must validate real deployed client/rules compatibility."
+    },
+    {
+      "id": "D7",
+      "code": "core/runtime.js renderRowsTable / legacy reviewqueue renderers / compatibility wrappers",
+      "risk": "Legacy/test/exported islands intentionally retained; no aggressive deletion.",
+      "guard": "Caller classification and escaping tests; no second active financial engine."
+    },
+    {
+      "id": "D8",
+      "code": "historical planning/visual fixture; unchanged stylesheet sources",
+      "risk": "Existing visual/mojibake quirks and signed legacy planning entries retained; visual fixture includes negative fixed planning.",
+      "guard": "Frozen baseline and snapshots unchanged; no unapproved cap/reclassification or redesign."
+    }
+  ],
+  "p7ModifiedFiles": [
+    "README.md",
+    "app.js",
+    "docs/v50-architecture.md",
+    "index.html",
+    "service-worker.js",
+    "src/core/runtime.js",
+    "src/core/transaction-engine.mjs",
+    "src/core/transaction-processing.mjs",
+    "tests/html-inline-syntax.test.cjs",
+    "tests/service-worker-cache.test.cjs",
+    "tests/update4-final-regression.test.cjs",
+    "tests/update5-responsive-structure.test.cjs"
+  ],
+  "p7AddedFiles": [
+    "tests/package7-release-audit.test.cjs",
+    "tests/browser/package7-release-audit.spec.cjs",
+    "docs/package-7-release-audit.md",
+    "docs/audit/package-7-audit-register.json",
+    "docs/audit/package-7-verification.json"
+  ],
+  "removedFiles": [],
+  "cumulativeLaterCommitFiles": [
+    "README.md",
+    "app.js",
+    "docs/audit/package-7-audit-register.json",
+    "docs/audit/package-7-verification.json",
+    "docs/package-1-data-foundation.md",
+    "docs/package-2-planning-timeline.md",
+    "docs/package-3-transaction-engine.md",
+    "docs/package-4-savings-refunds-forecast.md",
+    "docs/package-5-import-lifecycle.md",
+    "docs/package-6-functional-consolidation.md",
+    "docs/package-7-release-audit.md",
+    "docs/v50-architecture.md",
+    "firestore.rules",
+    "index.html",
+    "service-worker.js",
+    "src/core/data-normalization.mjs",
+    "src/core/planning-timeline.mjs",
+    "src/core/recurring-occurrences.mjs",
+    "src/core/runtime.js",
+    "src/core/transaction-engine.mjs",
+    "src/core/transaction-model.mjs",
+    "src/core/transaction-processing.mjs",
+    "src/import/import-identity.mjs",
+    "src/import/import-lifecycle.mjs",
+    "src/import/import-sync-protocol.mjs",
+    "src/import/runtime.js",
+    "src/import/update4-runtime.cjs",
+    "tests/browser/desktop-special-tabs.spec.cjs",
+    "tests/browser/dynamic-html-security.spec.cjs",
+    "tests/browser/import-listener-stability.spec.cjs",
+    "tests/browser/import-review-simplification.spec.cjs",
+    "tests/browser/modal-and-commit-stability.spec.cjs",
+    "tests/browser/package1-data-foundation.spec.cjs",
+    "tests/browser/package2-planning-timeline.spec.cjs",
+    "tests/browser/package3-transaction-engine.spec.cjs",
+    "tests/browser/package4-allowance-planning-correction.spec.cjs",
+    "tests/browser/package4-savings-refunds-forecast.spec.cjs",
+    "tests/browser/package5-import-lifecycle.spec.cjs",
+    "tests/browser/package6-functional-consolidation.spec.cjs",
+    "tests/browser/package7-release-audit.spec.cjs",
+    "tests/browser/update6-account-navigation.spec.cjs",
+    "tests/browser/v50-visual-baseline.spec.cjs",
+    "tests/browser/v50-visual-baseline.spec.cjs-snapshots/v50-360.png",
+    "tests/browser/v50-visual-baseline.spec.cjs-snapshots/v50-390.png",
+    "tests/browser/v50-visual-baseline.spec.cjs-snapshots/v50-430.png",
+    "tests/helpers/migration-runtime.cjs",
+    "tests/helpers/package5-fixture.cjs",
+    "tests/html-inline-syntax.test.cjs",
+    "tests/package1-data-foundation.test.cjs",
+    "tests/package2-planning-timeline.test.cjs",
+    "tests/package3-processing-integration.test.cjs",
+    "tests/package3-transaction-engine.test.cjs",
+    "tests/package4-allowance-planning-correction.test.cjs",
+    "tests/package4-processing-integration.test.cjs",
+    "tests/package4-savings-refunds-forecast.test.cjs",
+    "tests/package5-lifecycle.test.cjs",
+    "tests/package5-sync.test.cjs",
+    "tests/package6-functional-consolidation.test.cjs",
+    "tests/package7-release-audit.test.cjs",
+    "tests/service-worker-cache.test.cjs",
+    "tests/update3-administration.test.cjs",
+    "tests/update3-core.test.cjs",
+    "tests/update3-migration.test.cjs",
+    "tests/update4-1-expense-impact.test.cjs",
+    "tests/update4-2-savings-ledger.test.cjs",
+    "tests/update4-4-zero-income.test.cjs",
+    "tests/update4-cloud-import.test.cjs",
+    "tests/update4-final-regression.test.cjs",
+    "tests/update4-import-engine.test.cjs",
+    "tests/update4-ledgers.test.cjs",
+    "tests/update4-migration-storage.test.cjs",
+    "tests/update4-stabilization-regression.test.cjs",
+    "tests/update4-ui-structure.test.cjs",
+    "tests/update4-undo.test.cjs",
+    "tests/update5-allowance-budget-regression.test.cjs",
+    "tests/update5-budget-history-saving-overrides.test.cjs",
+    "tests/update5-responsive-structure.test.cjs"
+  ],
+  "firestoreVerification": "static rules/client contracts + isolated cloudmocks; no emulator/production verification",
+  "productionFirestoreTouched": false,
+  "commit": false,
+  "push": false,
+  "deploy": false,
+  "openProductQuestions": []
+}

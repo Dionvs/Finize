@@ -4,7 +4,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const html = require('./helpers/runtime-source.cjs');
-const start = html.indexOf('function calcScenario(state)');
+const start = html.indexOf('function calcScenario(');
 const end = html.indexOf('/* ---------- default data', start);
 assert.ok(start >= 0 && end > start, 'calcScenario is niet gevonden');
 
@@ -12,7 +12,7 @@ const source = html.slice(start, end);
 assert.doesNotMatch(
   source,
   /Math\.max\s*\(\s*variabelBudgetTotaal\s*,\s*variabelTotaal\s*\)/,
-  'Werkelijke gezamenlijke uitgaven mogen de geplande kostenpot niet beïnvloeden'
+  'Zakgeld gebruikt volledige maandplanning, geen actual- of overschrijdingsregel'
 );
 
 function round2(value) {
@@ -50,6 +50,7 @@ function runScenario(scenario, jointActual, personalActual = {}, savingOverrides
     Math,
     round2,
     isPlainObject: value => !!value && typeof value === 'object' && !Array.isArray(value),
+    monthlyFinancialForecast:month=>require('../src/core/transaction-engine.mjs').financialForecastForMonth({planning:monthly,monthlySavingOverrides:allSavingOverrides||{[selectedMonth]:savingOverrides},transactions:Object.entries(actuals).map(([owner,amount])=>({id:owner,source:'manual',date:month+'-05',amount,transactionType:'uitgave',category:'Overig',owner,financialFor:owner,accountContext:owner})),spaardoelen:{}},month,{plannedIncome:{dion:{salary:3000},dara:{salary:2000}},fixedOccurrences:[{id:'fixed-joint',financialFor:'gezamenlijk',amount:1000},{id:'fixed-dion',financialFor:'dion',amount:200},{id:'fixed-dara',financialFor:'dara',amount:150}]}),
     getSelectedMonth: () => selectedMonth,
     getDistributionIncomeParts: owner => ({
       salary: owner === 'dion' ? 3000 : 2000,
@@ -115,14 +116,14 @@ assert.equal(manualSaving.dara.savingsSource, 'handmatig');
 assert.equal(manualSaving.dion.zakgeld, automaticSaving.dion.zakgeld, 'Een spaaroverride mag de zakgeldverdeling niet wijzigen');
 
 const jointSavingsByMonth = {
-  '2026-07': { gezamenlijkVoor: 300 },
-  '2026-08': { gezamenlijkVoor: 700 }
+  '2026-07': { gezamenlijk: 300 },
+  '2026-08': { gezamenlijk: 700 }
 };
 const julyJointSaving = runScenario('voor', 750, {}, {}, '2026-07', jointSavingsByMonth);
 const augustJointSaving = runScenario('voor', 750, {}, {}, '2026-08', jointSavingsByMonth);
 const afterSaleJointSaving = runScenario('na', 750, {}, {}, '2026-08', jointSavingsByMonth);
 assert.equal(julyJointSaving.spaarpotDezeMaand, 300, 'Juli houdt zijn eigen gezamenlijke spaarbedrag');
 assert.equal(augustJointSaving.spaarpotDezeMaand, 700, 'Augustus houdt zijn eigen gezamenlijke spaarbedrag');
-assert.equal(afterSaleJointSaving.spaarpotDezeMaand, 500, 'Voor en na verkoop houden afzonderlijke maandwaarden');
+assert.equal(afterSaleJointSaving.spaarpotDezeMaand, 700, 'Een legacy scenarioargument heeft geen invloed op de normale baseline');
 
 console.log('UPDATE5_ALLOWANCE_BUDGET_REGRESSION_OK');

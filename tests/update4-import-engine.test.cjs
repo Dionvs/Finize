@@ -34,7 +34,7 @@ assert.equal(joint.accountOwner,'gezamenlijk');
 assert.equal(joint.rows[1].processing.transactionType,'interne-overboeking');
 assert.equal(joint.rows[1].certainty,'nakijken');
 
-const duplicate=u4.createImportDraft({text:fixture('ing-dion.csv'),fileName:'overlap.csv',profiles,rules,id:'batch-overlap',transactions:[{bankOriginal:{fingerprint:dion.rows[1].bankOriginal.fingerprint}}]});
+const duplicate=u4.createImportDraft({text:fixture('ing-dion.csv'),fileName:'overlap.csv',profiles,rules,id:'batch-overlap',existingImports:[{...dion,rows:[dion.rows[1]]}]});
 assert.equal(duplicate.summary.duplicateCount,1);
 assert.equal(duplicate.summary.newCount,1);
 

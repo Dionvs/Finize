@@ -12,17 +12,17 @@ const sw = fs.readFileSync(path.join(root, 'service-worker.js'), 'utf8');
 
 assert.match(markup, /app\.css/);
 assert.match(markup, /app\.js/);
-assert.match(sw, /finize-v95-import-review-status/);
-assert.match(js, /const dashboardTotalIncome = r\.totaalSalaris;/);
+assert.match(sw, /finize-v102-release-candidate/);
+assert.match(js, /const dashboardTotalIncome = incomeBreakdown\.total;/);
 assert.match(sw, /\.\/app\.css/);
 assert.match(sw, /\.\/app\.js/);
 assert.doesNotMatch(html, /data-month-copy-previous|Kopieer vorige maand/);
 assert.match(html, /data-variable-scope/);
-assert.match(html, /setVariableBudgetDefaultsFromMonth\(scenario,owner,month,cleaned\)/);
+assert.match(html, /setBudgetForMonth\(state,owner,month,cleaned,\{scope:saveScope\}\)/);
 assert.match(html, /data-personal-saving-edit/);
 assert.match(html, /Spaargeld deze maand <strong>\$\{eur\(pot\)\}<\/strong>/);
 assert.match(html, /'Over deze maand'/);
-assert.match(html, /jointVisibleIncome - r\.vasteLastenTotaal - variableUsed - spaarpotVoorGroep - jointAllowance/);
+assert.match(html, /r\.forecast\.owners\[key\]\.available/);
 assert.match(html, /dashboardIncomeBreakdown\(getSelectedMonth\(\)\)\.total/);
 assert.doesNotMatch(html, /renderManageSection\('Sparen'/);
 assert.match(html, /function openPersonalSavingEditModal\(owner\)/);
@@ -33,7 +33,7 @@ assert.match(html, /data-u3-open="planning" data-u3-planning-owner="\$\{(?:owner
 assert.match(html, /function u3OpenPlanning\(owner=''\)/);
 assert.doesNotMatch(js, /data-open-owner-fixed/);
 assert.match(js, /if\(field\)field\.hidden=!isJoint/);
-assert.match(js, /else delete item\.distributionMode/);
+assert.match(js, /distributionMode:changes\.financialFor==='gezamenlijk'/);
 assert.match(html, /function openTotalIncomeEditModal\(\)/);
 assert.match(html, /Werkelijk inkomen aanpassen/);
 assert.match(html, /u5-fixed-costs-overview/);
@@ -78,7 +78,7 @@ assert.doesNotMatch(html, /Werkelijk maandresultaat|Deze realisatie verandert he
 assert.match(html, /class="card span-6 u5-planned-flow"/);
 assert.match(html, /class="card span-6 u5-allowance-split"/);
 assert.match(html, /function renderRecurringFixedManage\(owner\)/);
-assert.match(html, /state\.recurringFixedExpenses\?\.\[scenario\]/);
+assert.match(html, /resolveFixedExpensesForMonth\(state,getSelectedMonth\(\)\)/);
 
 for (const marker of ['u5-goal-master','Tabelweergave','goalImageSource','renderGoalGroup','renderDataTab','Gevarenzone']) {
   assert.match(js, new RegExp(marker), `Update 5-marker ontbreekt: ${marker}`);

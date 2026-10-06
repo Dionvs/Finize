@@ -9,18 +9,18 @@ const state=u4.normalizeCore({
   activeImportId:'undo-import',
   accountProfiles:[],
   recognitionRules:[],
-  recurringFixedExpenses:{voor:[{id:'rent',naam:'Huur',bedrag:900,amountHistory:[{id:'old',effectiveFrom:'2026-01-01',amount:900}],monthOverrides:{}}],na:[]},
+  recurringFixedExpenses:{voor:[{id:'rent',naam:'Huur',begindatum:'2026-01-01',bedrag:900,amountHistory:[{id:'old',effectiveFrom:'2026-01-01',amount:900}],monthOverrides:{}}],na:[]},
   spaardoelen:{gezamenlijk:[{id:'buffer',naam:'Buffer',algespaard:100}],dion:[],dara:[]},
   advanceLedger:[{id:'older',transactionId:'old-tx',month:'2026-06',debtor:'dion',creditor:'gezamenlijk',originalAmount:40,outstandingAmount:40,status:'open',createdAt:'2026-06-01',repaymentAllocationIds:[]}],
   monthRecords:{'2026-07':{month:'2026-07',status:'afgesloten',lateImportTransactionIds:[]}}
 });
-const imported={id:'imported-1',date:'2026-07-04',amount:25,description:'Import',kind:'interne-overboeking',transactionType:'sparen',savingsGoalId:'buffer',accountOwner:'dion',budgetOwner:'dion',processing:{advanceMode:'none'},importBatchId:'undo-import',createdAt:'2026-07-04'};
+const imported={id:'imported-1',date:'2026-07-04',amount:25,description:'Import',kind:'interne-overboeking',transactionType:'sparen',source:'csv',processingStatus:'goedgekeurd',approvalSource:'manual',certainty:'goedgekeurd',accountContext:'gezamenlijk',financialFor:'gezamenlijk',savingsGoalId:'buffer',accountOwner:'dion',budgetOwner:'dion',processing:{advanceMode:'none'},importBatchId:'undo-import',createdAt:'2026-07-04'};
 const plan={
   ok:true,
   importId:'undo-import',
   transactions:[imported],
   replacements:[{id:'replacement-1',manualTransaction:u4.clone(manual),replacementTransactionId:imported.id}],
-  savingsEntries:[u4.savingsForTransaction(imported)],
+  savingsEntries:[u4.savingsForTransaction(imported,state)],
   advances:[],
   repayments:[{id:'repayment-1',transactionId:imported.id,advanceId:'older',amount:15,date:'2026-07-04',status:'actief'}],
   internalPairs:[{id:'pair-1',transactionIds:[imported.id,'other'],amount:25,status:'voorgesteld'}],
@@ -31,10 +31,11 @@ const plan={
 };
 
 u4.applyImportPlan(state,plan);
-assert.equal(state.transactions.some(tx=>tx.id===manual.id),false);
+assert.equal(state.transactions.some(tx=>tx.id===manual.id),true,'replacement retains original manual data');
+assert.equal(require('../src/core/transaction-engine.mjs').selectTransactionProjections(state).some(p=>p.transaction.id===manual.id),false,'replacement suppresses financial duplicate');
 assert.equal(state.spaardoelen.gezamenlijk[0].algespaard,125);
 assert.equal(state.advanceLedger[0].outstandingAmount,25);
-assert.equal(state.recurringFixedExpenses.voor[0].monthOverrides['2026-07'],925);
+assert.equal(state.recurringFixedExpenses.voor[0].monthOverrides['2026-07'].amount,925);
 assert.equal(state.monthRecords['2026-07'].status,'correctie-nodig');
 
 const draft={id:'undo-import',status:'correctie-nodig',effectManifest:u4.effectManifest(plan)};

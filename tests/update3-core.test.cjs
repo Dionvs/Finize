@@ -20,6 +20,8 @@ const context = {
   round2: value => Math.round((Number(value) + Number.EPSILON) * 100) / 100,
   getSelectedMonth: () => '2026-07'
 };
+Object.assign(context,require('../src/core/planning-timeline.mjs'));
+Object.assign(context,require('../src/core/transaction-model.mjs'),require('../src/core/transaction-engine.mjs'),require('../src/core/recurring-occurrences.mjs'));
 vm.createContext(context);
 vm.runInContext(html.slice(start, end), context, { filename: 'update3-recurrence-inline.js' });
 

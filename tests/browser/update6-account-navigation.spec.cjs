@@ -94,8 +94,8 @@ test('persoonlijke inkomenskaart toont op mobiel en desktop dezelfde totale bron
   await page.evaluate(()=>{
     const month=window.state.meta.selectedMonth;
     window.state.transactions.push(
-      {id:'income-refund-test',date:month+'-10',owner:'dion',kind:'terugbetaling',transactionType:'terugbetaling',amount:25,description:'Terugbetaling'},
-      {id:'income-other-test',date:month+'-11',owner:'dion',kind:'inkomen',transactionType:'vergoeding',amount:50,description:'Vergoeding'}
+      {id:'income-refund-test',date:month+'-10',owner:'dion',kind:'terugbetaling',reviewStatus:'bevestigd',transactionType:'terugbetaling',amount:25,description:'Terugbetaling'},
+      {id:'income-other-test',date:month+'-11',accountContext:'dion',owner:'dion',kind:'inkomen',reviewStatus:'bevestigd',transactionType:'vergoeding',amount:50,description:'Vergoeding'}
     );
     window.renderActiveTab();
   });
@@ -103,7 +103,7 @@ test('persoonlijke inkomenskaart toont op mobiel en desktop dezelfde totale bron
   const desktopCard=page.locator('#tab-dion .overview-kpi-row [data-personal-kpi="income"]');
   await expect(desktopCard).toContainText('Totaal inkomen');
   await expect(desktopCard).toContainText('Zakgeld');
-  await expect(desktopCard).toContainText('Terugbetalingen');
+  await expect(desktopCard).not.toContainText('Terugbetalingen');
   await expect(desktopCard).toContainText('Vergoedingen');
   const desktopTotal=await desktopCard.locator('.metric-value').innerText();
 
@@ -112,7 +112,7 @@ test('persoonlijke inkomenskaart toont op mobiel en desktop dezelfde totale bron
   await expect(mobileCard).toBeVisible();
   await expect(mobileCard).toContainText('Totaal inkomen');
   await expect(mobileCard).toContainText('Zakgeld');
-  await expect(mobileCard).toContainText('Terugbetalingen');
+  await expect(mobileCard).not.toContainText('Terugbetalingen');
   await expect(mobileCard).toContainText('Vergoedingen');
   await expect(mobileCard.locator('.mobile-kpi-value')).toHaveText(desktopTotal);
 });

@@ -18,7 +18,7 @@ function planned(state,amount=250){
   u4.reconcileGoalSavedAmounts(state,['buffer']);
 }
 function importPlan(state,amount,id='save'){
-  const tx={id,date:'2026-07-20',amount,kind:'interne-overboeking',transactionType:'sparen',savingsGoalId:'buffer',accountOwner:'gezamenlijk',budgetOwner:'gezamenlijk',processing:{advanceMode:'none'},createdAt:'2026-07-20'};
+  const tx={id,date:'2026-07-20',amount,kind:'interne-overboeking',transactionType:'sparen',source:'csv',processingStatus:'goedgekeurd',approvalSource:'manual',certainty:'goedgekeurd',accountContext:'gezamenlijk',financialFor:'gezamenlijk',savingsGoalId:'buffer',accountOwner:'gezamenlijk',budgetOwner:'gezamenlijk',processing:{advanceMode:'none'},createdAt:'2026-07-20'};
   return {importId:'import',transactions:[tx],replacements:[],savingsEntries:[u4.savingsForTransaction(tx,state)],advances:[],repayments:[],internalPairs:[],fixedAdjustments:[],affectedMonths:['2026-07'],counts:{}};
 }
 

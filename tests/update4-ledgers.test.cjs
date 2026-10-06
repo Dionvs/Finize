@@ -21,8 +21,8 @@ assert.deepEqual(u4.proposeRepaymentAllocations(state,'gezamenlijk','dion',70),[
   {id:'allocation-a',advanceId:'a',amount:65}
 ]);
 
-const tx={id:'save',date:'2026-07-02',amount:50,kind:'interne-overboeking',transactionType:'sparen',savingsGoalId:'buffer',accountOwner:'dion',budgetOwner:'dion',processing:{advanceMode:'none'},createdAt:'2026-07-02'};
-const plan={importId:'import',transactions:[tx],replacements:[],savingsEntries:[u4.savingsForTransaction(tx)],advances:[],repayments:[],internalPairs:[],affectedMonths:['2026-07'],counts:{},duplicateCount:0,totalIncome:0,totalExpenses:0};
+const tx={id:'save',date:'2026-07-02',amount:50,kind:'interne-overboeking',transactionType:'sparen',source:'csv',processingStatus:'goedgekeurd',approvalSource:'manual',certainty:'goedgekeurd',accountContext:'gezamenlijk',financialFor:'gezamenlijk',savingsGoalId:'buffer',accountOwner:'dion',budgetOwner:'dion',processing:{advanceMode:'none'},createdAt:'2026-07-02'};
+const plan={importId:'import',transactions:[tx],replacements:[],savingsEntries:[u4.savingsForTransaction(tx,state)],advances:[],repayments:[],internalPairs:[],affectedMonths:['2026-07'],counts:{},duplicateCount:0,totalIncome:0,totalExpenses:0};
 u4.applyImportPlan(state,plan);
 assert.equal(state.spaardoelen.gezamenlijk[0].algespaard,150);
 u4.applyImportPlan(state,plan);

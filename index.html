@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="Finize">
 <link rel="apple-touch-icon" href="./icons/icon-192.png">
 <link rel="icon" type="image/png" href="finize-logo.png">
-  <link rel="stylesheet" href="./app.css?v=95-import-review-status">
+  <link rel="stylesheet" href="./app.css?v=102-release-candidate">
 </head>
 <body class="v4-app auth-pending">
 <div id="authRoot" role="region" aria-label="Finize account" aria-live="polite">
@@ -39,7 +39,7 @@
   <div class="v4-sidebar-spacer"></div>
   <div class="v4-sidebar-card">
     <strong id="v4SidebarMonth">Maand</strong>
-    <span id="v4SidebarScenario">Scenario</span>
+
   </div>
   <div class="v4-sidebar-foot"><span>Hulp & feedback</span><span>‹</span></div>
 </aside>
@@ -51,10 +51,8 @@
       <button type="button" class="month-picker-btn" id="monthPickerButton" aria-expanded="false" aria-controls="monthPickerPanel">Maand</button>
       <div class="month-popover" id="monthPickerPanel"></div>
     </div>
-    <div class="scenario-toggle" id="scenarioToggle">
-      <button data-scenario="voor">Voor verkoop</button>
-      <button data-scenario="na">Na verkoop</button>
-    </div>
+    <!-- Preserve the existing header footprint while the scenario controls are retired. -->
+    <span class="v4-desktop-only-block" aria-hidden="true" style="width:295px;height:51px;flex-shrink:0;visibility:hidden"></span>
   </div>
 </div>
 
@@ -91,6 +89,6 @@
   </button>
 </nav>
 
-  <script src="./app.js?v=95-import-review-status"></script>
+  <script src="./app.js?v=102-release-candidate"></script>
 </body>
 </html>

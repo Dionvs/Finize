@@ -15,7 +15,7 @@ test('transacties worden alleen vanuit persoonlijk en gezamenlijk toegevoegd', a
   await expect(modal.getByRole('heading',{name:'Uitgave toevoegen'})).toBeVisible();
   await expect(modal.getByRole('button',{name:/Bankbestand importeren/})).toBeVisible();
   await modal.getByRole('button',{name:/Handmatig invoeren/}).click();
-  await expect(modal.getByRole('heading',{name:'Gezamenlijke uitgave'})).toBeVisible();
+  await expect(modal.getByRole('heading',{name:'Gezamenlijk transactie toevoegen'})).toBeVisible();
   await expect(modal.getByLabel('Eigenaar')).toHaveCount(0);
   await modal.locator('#btnCloseJointTransaction').click();
   await expect(modal).not.toHaveClass(/open/);
@@ -24,7 +24,7 @@ test('transacties worden alleen vanuit persoonlijk en gezamenlijk toegevoegd', a
   await page.getByRole('button',{name:'+ Uitgave van Dion'}).click();
   await expect(modal.getByRole('heading',{name:'Uitgave toevoegen'})).toBeVisible();
   await modal.getByRole('button',{name:/Handmatig invoeren/}).click();
-  await expect(modal.getByRole('heading',{name:'Dion uitgave'})).toBeVisible();
+  await expect(modal.getByRole('heading',{name:'Dion transactie toevoegen'})).toBeVisible();
   await expect(modal.getByLabel('Eigenaar')).toHaveCount(0);
   await modal.locator('#personalTxAmount').fill('12.34');
   await modal.locator('#personalTxDescription').fill('Persoonlijke test');
@@ -45,19 +45,19 @@ test('bankimport opent vanuit de gekozen uitgavenknop en staat niet op dashboard
   await expect(importModal.locator('[data-u4-file]')).toHaveCount(1);
 });
 
-test('zonder huishouden toont persoonlijk totaal alle inkomstenbronnen', async ({ page }) => {
+test('zonder huishouden toont persoonlijk zakgeld en fysieke persoonlijke inkomsten, geen salaris', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => {
     const month=window.state.meta.selectedMonth;
-    window.state.transactions.push({id:'standalone-income-test',date:month+'-12',owner:'dion',kind:'inkomen',transactionType:'overige-inkomsten',amount:40,description:'Los inkomen'});
+    window.state.transactions.push({id:'standalone-income-test',date:month+'-12',accountContext:'dion',owner:'dion',kind:'inkomen',reviewStatus:'bevestigd',transactionType:'overige-inkomsten',amount:40,description:'Los inkomen'});
     window.renderActiveTab();
   });
   await page.locator('.v4-sidebar .tab-btn[data-tab="dion"]').click();
   const card=page.locator('#tab-dion .overview-kpi-row [data-personal-kpi="income"]');
   await expect(card).toContainText('Totaal inkomen');
-  await expect(card).toContainText('Salaris');
+  await expect(card).not.toContainText('Salaris');
   await expect(card).toContainText('Overige inkomsten');
-  await expect(card).not.toContainText('Zakgeld');
+  await expect(card).toContainText('Zakgeld');
 });
 
 test('gezamenlijk over deze maand gebruikt alle inkomsten en trekt zakgeld alleen visueel af', async ({ page }) => {
@@ -69,7 +69,7 @@ test('gezamenlijk over deze maand gebruikt alle inkomsten en trekt zakgeld allee
   const incomeBefore=parseEuro(await incomeCard.locator('.metric-value').innerText());
   await page.evaluate(() => {
     const month=window.state.meta.selectedMonth;
-    window.state.transactions.push({id:'joint-extra-income-test',date:month+'-14',owner:'gezamenlijk',kind:'inkomen',transactionType:'overige-inkomsten',amount:125,description:'Gezamenlijk extra inkomen'});
+    window.state.transactions.push({id:'joint-extra-income-test',date:month+'-14',owner:'gezamenlijk',kind:'inkomen',reviewStatus:'bevestigd',transactionType:'overige-inkomsten',amount:125,description:'Gezamenlijk extra inkomen'});
     window.renderActiveTab();
   });
   const incomeAfter=parseEuro(await incomeCard.locator('.metric-value').innerText());
@@ -87,28 +87,28 @@ test('gezamenlijk over deze maand gebruikt alle inkomsten en trekt zakgeld allee
 test('gezamenlijk spaarbedrag blijft per maand gescheiden', async ({ page }) => {
   await page.goto('/');
   await page.locator('.v4-sidebar .tab-btn[data-tab="gezamenlijk"]').click();
-  const originalDefault=await page.evaluate(() => window.state[window.state.meta.scenario].spaarpotDezeMaand);
+  const originalDefault=await page.evaluate(() => window.state.planning.spaarpotDezeMaand);
   await page.evaluate(() => {
     window.state.meta.selectedMonth='2026-07';
     window.state.monthlySavingOverrides=window.state.monthlySavingOverrides||{};
     window.state.monthlySavingOverrides['2026-08']={
       ...(window.state.monthlySavingOverrides['2026-08']||{}),
-      gezamenlijkVoor:700
+      gezamenlijk:700
     };
     window.renderActiveTab();
   });
   await page.locator('#tab-gezamenlijk .savings-month-button').click();
   await page.locator('#savingEditInput').fill('300');
   await page.locator('#btnSaveSavingEdit').click();
-  expect(await page.evaluate(() => window.state.monthlySavingOverrides['2026-07'].gezamenlijkVoor)).toBe(300);
-  expect(await page.evaluate(() => window.state[window.state.meta.scenario].spaarpotDezeMaand)).toBe(originalDefault);
+  expect(await page.evaluate(() => window.state.monthlySavingOverrides['2026-07'].gezamenlijk)).toBe(300);
+  expect(await page.evaluate(() => window.state.planning.spaarpotDezeMaand)).toBe(originalDefault);
 
   await page.evaluate(() => {
     window.state.meta.selectedMonth='2026-08';
     window.renderActiveTab();
   });
   await expect(page.locator('#tab-gezamenlijk .savings-month-button strong')).toContainText('700');
-  expect(await page.evaluate(() => window.state.monthlySavingOverrides['2026-07'].gezamenlijkVoor)).toBe(300);
+  expect(await page.evaluate(() => window.state.monthlySavingOverrides['2026-07'].gezamenlijk)).toBe(300);
 });
 
 test('gezamenlijk inkomen vervangt standaardsalaris en negeert oude dubbele teruggaven', async ({ page }) => {
@@ -127,12 +127,12 @@ test('gezamenlijk inkomen vervangt standaardsalaris en negeert oude dubbele teru
     };
     state.meta.selectedMonth=month;
     state.transactions=[
-      {id:'salary-a',date:`${month}-05`,owner:'gezamenlijk',kind:'inkomen',processing:{transactionType:'salaris',include:true},amount:800,description:'Werkgever Dion — Deel 1'},
-      {id:'salary-b',date:`${month}-24`,owner:'gezamenlijk',kind:'inkomen',transactionType:'salaris',amount:1200,description:'Werkgever Dion — Deel 2'},
-      {id:'extra',date:`${month}-08`,owner:'gezamenlijk',kind:'inkomen',transactionType:'overige-inkomsten',amount:50,description:'Naam: Cadeau'},
-      {id:'refund',date:`${month}-09`,owner:'dion',kind:'uitgave',transactionType:'terugbetaling',amount:20,description:'Naam: Terugbetaling'},
-      {id:'duo',date:`${month}-20`,owner:'dion',kind:'inkomen',transactionType:'overige-inkomsten',amount:300.5,description:'DUO Hoofdrekening'},
-      {id:'transfer',date:`${month}-21`,owner:'gezamenlijk',kind:'interne-overboeking',transactionType:'van-spaarrekening',amount:500,description:'Oranje Spaarrekening'}
+      {id:'salary-a',date:`${month}-05`,owner:'gezamenlijk',kind:'inkomen',reviewStatus:'bevestigd',processing:{transactionType:'salaris',include:true},amount:800,description:'Werkgever Dion — Deel 1'},
+      {id:'salary-b',date:`${month}-24`,owner:'gezamenlijk',kind:'inkomen',reviewStatus:'bevestigd',transactionType:'salaris',amount:1200,description:'Werkgever Dion — Deel 2'},
+      {id:'extra',date:`${month}-08`,owner:'gezamenlijk',kind:'inkomen',reviewStatus:'bevestigd',transactionType:'overige-inkomsten',amount:50,description:'Naam: Cadeau'},
+      {id:'refund',date:`${month}-09`,owner:'dion',kind:'uitgave',reviewStatus:'bevestigd',transactionType:'terugbetaling',amount:20,description:'Naam: Terugbetaling'},
+      {id:'duo',date:`${month}-20`,owner:'dion',kind:'inkomen',reviewStatus:'bevestigd',transactionType:'overige-inkomsten',amount:300.5,description:'DUO Hoofdrekening'},
+      {id:'transfer',date:`${month}-21`,owner:'gezamenlijk',reviewStatus:'bevestigd',kind:'interne-overboeking',transactionType:'van-spaarrekening',amount:500,description:'Oranje Spaarrekening'}
     ];
     state.incomeDefaultsHistory={
       dion:[{id:'dion-default',effectiveFrom:'0000-01',salary:2000,refund:300}],
@@ -156,7 +156,7 @@ test('gezamenlijk inkomen vervangt standaardsalaris en negeert oude dubbele teru
     renderActiveTab();
   });
   const incomeCard=page.locator('#tab-gezamenlijk .overview-kpi-row .icon-kpi').filter({hasText:'Totaal gezamenlijk inkomen'});
-  expect(parseEuro(await incomeCard.locator('.metric-value').innerText())).toBe(5400.5);
+  expect(parseEuro(await incomeCard.locator('.metric-value').innerText())).toBe(5380.5);
   await page.evaluate(() => {
     const saved=window.__incomeTestSavedState;
     Object.assign(state,saved);
@@ -182,8 +182,8 @@ test('twee herkende werkgevers vervangen in juli beide persoonlijke standaardsal
     };
     state.meta.selectedMonth='2026-07';
     state.transactions=[
-      {id:'salary-dion',date:'2026-07-06',owner:'gezamenlijk',kind:'inkomen',transactionType:'salaris',amount:1294.74,description:'St-iek Fysiotherapie B.V. — Salaris juni'},
-      {id:'salary-dara',date:'2026-07-24',owner:'gezamenlijk',kind:'inkomen',transactionType:'salaris',amount:3610.09,description:'Stichting SBOH — Maand 7 2026'}
+      {id:'salary-dion',date:'2026-07-06',owner:'gezamenlijk',kind:'inkomen',reviewStatus:'bevestigd',transactionType:'salaris',amount:1294.74,description:'St-iek Fysiotherapie B.V. — Salaris juni'},
+      {id:'salary-dara',date:'2026-07-24',owner:'gezamenlijk',kind:'inkomen',reviewStatus:'bevestigd',transactionType:'salaris',amount:3610.09,description:'Stichting SBOH — Maand 7 2026'}
     ];
     state.incomeDefaultsHistory={
       dion:[{id:'dion-default',effectiveFrom:'0000-01',salary:2650,refund:0}],
@@ -290,11 +290,12 @@ test('een no-op veroorzaakt geen revision of lokale write', async ({ page }) => 
 
 test('backdrop sluit ook na interne klikken en na opnieuw openen', async ({ page }) => {
   await page.goto('/');
+  await page.locator('.v4-sidebar .tab-btn[data-tab="dion"]').click();
   for (let cycle = 0; cycle < 2; cycle += 1) {
     await page.evaluate(() => openTransactionModal());
     const modal = page.locator('#transactionModal');
     await expect(modal).toHaveClass(/open/);
-    await modal.locator('#txAmount').click();
+    await modal.locator('#personalTxAmount').click();
     await expect(modal).toHaveClass(/open/);
     await modal.click({ position: { x: 2, y: 2 } });
     await expect(modal).not.toHaveClass(/open/);
