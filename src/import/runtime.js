@@ -636,7 +636,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
   }
 
   const UI={draft:null,visibleRows:60,root:null,conflicts:new Map()};
-  const ImportPerformance={pending:new Map(),chains:new Map(),syncPromise:null,syncRequested:false};
+  const ImportPerformance={pending:new Map(),chains:new Map(),syncPromise:null,syncRequested:false,syncDiagnostics:[],diagnosticSignature:''};
   function esc(value){return String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));}
   function escAttr(value){return esc(value).replace(/`/g,'&#96;').replace(/[\u0000-\u001f\u007f]/g,'');}
   function euro(value){return new Intl.NumberFormat('nl-NL',{style:'currency',currency:'EUR'}).format(Number(value)||0);}
@@ -2028,15 +2028,29 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
   async function queueImportSync(record){
     await ImportStore.putSync({...pendingQueueReceipt(record),queuedAt:new Date().toISOString(),attempts:0});
   }
+  function reportImportSyncDiagnostics(diagnostics){
+    ImportPerformance.syncDiagnostics=diagnostics;
+    const signature=JSON.stringify(diagnostics);
+    if(diagnostics.length&&signature!==ImportPerformance.diagnosticSignature)console.warn('Importsynchronisatie wacht; lokale wachtrij blijft behouden: '+signature);
+    ImportPerformance.diagnosticSignature=signature;
+  }
+  async function collectImportCloudIntents(snapshot){
+    const intents=[],diagnostics=[];
+    for(const item of await ImportStore.listSync()){
+      if((await ImportStore.getJournal(`conflict-${item.importId}`))?.status==='conflict'){diagnostics.push({importId:item.importId,code:'import-conflict'});continue;}
+      const record=await ImportStore.getImport(item.importId);if(!record){diagnostics.push({importId:item.importId,code:'import-details-missing'});continue;}
+      const summary=(snapshot.importSummaries||[]).find(row=>row.id===record.id)||(snapshot.importDeletionProofs||[]).find(row=>row.id===record.id);
+      if(!summary||importVersion(summary)!==importVersion(record)||String(summary.operationId||'')!==String(record.operationId||'')){diagnostics.push({importId:item.importId,code:'import-pending-snapshot'});reportImportSyncDiagnostics(diagnostics);throw cloudImportError('import-pending-snapshot','Importdetails en financiële snapshot behoren nog niet tot dezelfde versie.');}
+      intents.push(record);
+    }
+    reportImportSyncDiagnostics(diagnostics);
+    return intents;
+  }
   async function stageImportCloudWrites(root,snapshot){
     const cloud=root.CloudAdapter,firestore=cloud?.modules?.firestore;
     if(!firestore?.runTransaction)throw new Error('Transactionele import-cloudopslag is niet beschikbaar. De lokale keuze blijft bewaard.');
     const stages=[];
-    for(const item of await ImportStore.listSync()){
-      if((await ImportStore.getJournal(`conflict-${item.importId}`))?.status==='conflict')continue;
-      const record=await ImportStore.getImport(item.importId);if(!record)continue;
-      const summary=(snapshot.importSummaries||[]).find(row=>row.id===record.id)||(snapshot.importDeletionProofs||[]).find(row=>row.id===record.id);
-      if(!summary||importVersion(summary)!==importVersion(record)||String(summary.operationId||'')!==String(record.operationId||''))throw cloudImportError('import-pending-snapshot','Importdetails en financiële snapshot behoren nog niet tot dezelfde versie.');
+    for(const record of await collectImportCloudIntents(snapshot)){
       const envelope=record.lifecycle==='deleted'?{header:clone(record),chunks:[],sourceChunks:[]}:buildCloudImportEnvelope(record);
       for(let index=0;index<envelope.chunks.length;index++)await firestore.setDoc(cloudImportChunkRef(cloud,firestore,record.id,`${record.operationId?record.operationId+'-':''}${String(index).padStart(4,'0')}`),envelope.chunks[index],{merge:false});
       for(let index=0;index<envelope.sourceChunks.length;index++)await firestore.setDoc(cloudImportChunkRef(cloud,firestore,record.id,`${record.operationId}-source-${index}`),{generation:record.operationId,index,text:envelope.sourceChunks[index]},{merge:false});
@@ -2072,13 +2086,16 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
       const cloud=root.CloudAdapter;
       if(!cloud?.isConnected?.()||cloud.initialSyncComplete===false)return false;
       if(cloud.docRef){
-        for(const item of await ImportStore.listSync()){const legacy=await ImportStore.getImport(item.importId);if(legacy&&!legacy.operationId){await persistImportDraftImmediate(root,legacy,{syncCloud:false});await queueImportSync(legacy);}}
+        for(const item of await ImportStore.listSync()){if((await ImportStore.getJournal(`conflict-${item.importId}`))?.status==='conflict')continue;const legacy=await ImportStore.getImport(item.importId);if(legacy&&!legacy.operationId){await persistImportDraftImmediate(root,legacy,{syncCloud:false});await queueImportSync(legacy);}}
+        // A preserved orphan/conflict is not a publishable operation. Never commit core just to retry it.
+        if(!(await collectImportCloudIntents(root.state)).length)return !ImportPerformance.syncDiagnostics.length;
         cloud.queueSave(root.state);const ok=await cloud.flushQueue();return ok;
       }
       // Connector/test compatibility without compact-state adapter: still require guarded headers.
       if(!cloud.modules?.firestore?.runTransaction)return false;
       while(ImportPerformance.syncRequested){ImportPerformance.syncRequested=false;
         const staged=await stageImportCloudWrites(root,root.state);
+        if(!staged.stages.length)return !ImportPerformance.syncDiagnostics.length;
         await cloud.modules.firestore.runTransaction(cloud.db,async tx=>{await staged.readAndValidate(tx);staged.publish(tx);});await staged.acknowledge();
       }return true;
     })().catch(async error=>{
@@ -2129,7 +2146,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
   function install(root){
     if(!root?.state)return;
     ImportStore.setScope(root.CloudAdapter?.importScope?.()||'legacy');ImportStore.legacyReferences=new Set((root.state.importSummaries||[]).map(row=>String(row.id)));
-    root.FinizeImportSync={onCloudAccepted:async()=>{if(root.CloudAdapter?.conflict)return;const queued=await ImportStore.listSync();if(queued.length)flushImportSync(root);},beforeInitialRemote:remote=>preservePendingImportsBeforeRemote(root,remote),prepareCloudSnapshot:snapshot=>stageImportCloudWrites(root,snapshot),setScope:()=>{ImportStore.setScope(root.CloudAdapter?.importScope?.()||'legacy');ImportStore.legacyReferences=new Set((root.state.importSummaries||[]).map(row=>String(row.id)));},findConflicts:findImportConflicts,preserveConflict:(local,remote,conflicts)=>preserveImportConflict(root,local,remote,conflicts),refresh:()=>{if(UI.draft&&!ImportPerformance.pending.has(UI.draft.id)&&!ImportPerformance.chains.has(UI.draft.id))openDraft(root,UI.draft.id);}};
+    root.FinizeImportSync={get pendingDiagnostics(){return clone(ImportPerformance.syncDiagnostics);},onCloudAccepted:async()=>{if(root.CloudAdapter?.conflict)return;const queued=await ImportStore.listSync();if(queued.length)flushImportSync(root);},beforeInitialRemote:remote=>preservePendingImportsBeforeRemote(root,remote),prepareCloudSnapshot:snapshot=>stageImportCloudWrites(root,snapshot),setScope:()=>{ImportStore.setScope(root.CloudAdapter?.importScope?.()||'legacy');ImportStore.legacyReferences=new Set((root.state.importSummaries||[]).map(row=>String(row.id)));},findConflicts:findImportConflicts,preserveConflict:(local,remote,conflicts)=>preserveImportConflict(root,local,remote,conflicts),refresh:()=>{if(UI.draft&&!ImportPerformance.pending.has(UI.draft.id)&&!ImportPerformance.chains.has(UI.draft.id))openDraft(root,UI.draft.id);}};
     // The core load route has already migrated and validated the complete state.
     const validation=validateCore(root.state);
     if(!validation.ok){console.error('Update 4 migratie ongeldig',validation.errors);return;}

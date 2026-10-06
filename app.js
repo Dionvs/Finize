@@ -5139,7 +5139,9 @@
             (_b = (_a2 = window.FinizeImportSync) == null ? void 0 : _a2.onCloudAccepted) == null ? void 0 : _b.call(_a2);
             return;
           }
-          const documentData = await this.cloudStore().hydrate(snap.data());
+          const rawDocumentData = snap.data();
+          const ownCommitAtArrival = !!this.activeCommitId && String(rawDocumentData.commitId || "") === this.activeCommitId;
+          const documentData = await this.cloudStore().hydrate(rawDocumentData);
           if (this.docRef !== subscriptionRef) return;
           const remote = documentData.state;
           let normalizedRemote;
@@ -5175,7 +5177,8 @@
             console.warn("Vertraagde oudere cloudsnapshot genegeerd.");
             return;
           }
-          const isOwnCommit = !!this.activeCommitId && remoteCommitId === this.activeCommitId;
+          const confirmedEcho = remoteCommitId === this.lastConfirmedCommitId && remoteVersion === this.cloudVersion && remoteSignature === this.lastCloudSignature;
+          const isOwnCommit = !!remoteCommitId && (ownCommitAtArrival || remoteCommitId === this.activeCommitId || confirmedEcho);
           if (isOwnCommit) {
             this.initialSyncComplete = true;
             this.cloudVersion = remoteVersion;
@@ -5183,6 +5186,10 @@
             this.lastConfirmedCommitId = remoteCommitId;
             this.lastConfirmedRevision = remoteRevision;
             this.confirmedState = cloneState(normalizedRemote);
+            if (!this.pendingState && !this.writeInFlight) {
+              this.status = "Cloud opgeslagen";
+              renderCloudStatus();
+            }
             return;
           }
           const cloudChanged = this.initialSyncComplete && (remoteVersion !== this.cloudVersion || remoteSignature !== this.lastCloudSignature);
@@ -5281,6 +5288,20 @@
         }
         const { firestore } = this.modules;
         const importStage = await ((_a2 = window.FinizeImportSync) == null ? void 0 : _a2.prepareCloudSnapshot(cloudSnapshot));
+        if (Array.isArray(importStage == null ? void 0 : importStage.stages) && this.confirmedState && JSON.stringify(cloudSnapshot) === JSON.stringify(this.confirmedState)) {
+          const echoOnly = await firestore.runTransaction(this.db, async (transaction) => {
+            const current = await transaction.get(this.docRef);
+            assertCloudBase(current.exists() ? current.data() : null, expectedVersion, expectedSignature);
+            await importStage.readAndValidate(transaction);
+            return importStage.stages.every((stage) => stage.echo);
+          });
+          if (echoOnly) {
+            await importStage.acknowledge();
+            this.status = this.pendingState ? "Opslaan…" : "Cloud opgeslagen";
+            renderCloudStatus();
+            return true;
+          }
+        }
         const descriptor = await this.cloudStore().prepare(cloudSnapshot, commitId);
         console.info("Finize cloudgeneration bevestigd: " + JSON.stringify({ schema: descriptor.schema, generation: commitId, chunkCount: descriptor.chunkCount, totalByteLength: descriptor.totalByteLength, totalSha256: descriptor.totalSha256, integrity: "readback-sha256-ok", components: Object.entries(cloudSnapshot).map(([field, value]) => ({ field, byteLength: new TextEncoder().encode(JSON.stringify(value)).length })).sort((a, b) => b.byteLength - a.byteLength) }));
         const nextVersion = await firestore.runTransaction(this.db, async (transaction) => {
@@ -10821,7 +10842,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       };
     }
     const UI = { draft: null, visibleRows: 60, root: null, conflicts: /* @__PURE__ */ new Map() };
-    const ImportPerformance = { pending: /* @__PURE__ */ new Map(), chains: /* @__PURE__ */ new Map(), syncPromise: null, syncRequested: false };
+    const ImportPerformance = { pending: /* @__PURE__ */ new Map(), chains: /* @__PURE__ */ new Map(), syncPromise: null, syncRequested: false, syncDiagnostics: [], diagnosticSignature: "" };
     function esc(value) {
       return String(value != null ? value : "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
     }
@@ -12994,17 +13015,42 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     async function queueImportSync(record) {
       await ImportStore.putSync({ ...pendingQueueReceipt(record), queuedAt: (/* @__PURE__ */ new Date()).toISOString(), attempts: 0 });
     }
+    function reportImportSyncDiagnostics(diagnostics) {
+      ImportPerformance.syncDiagnostics = diagnostics;
+      const signature2 = JSON.stringify(diagnostics);
+      if (diagnostics.length && signature2 !== ImportPerformance.diagnosticSignature) console.warn("Importsynchronisatie wacht; lokale wachtrij blijft behouden: " + signature2);
+      ImportPerformance.diagnosticSignature = signature2;
+    }
+    async function collectImportCloudIntents(snapshot2) {
+      var _a2;
+      const intents = [], diagnostics = [];
+      for (const item of await ImportStore.listSync()) {
+        if (((_a2 = await ImportStore.getJournal(`conflict-${item.importId}`)) == null ? void 0 : _a2.status) === "conflict") {
+          diagnostics.push({ importId: item.importId, code: "import-conflict" });
+          continue;
+        }
+        const record = await ImportStore.getImport(item.importId);
+        if (!record) {
+          diagnostics.push({ importId: item.importId, code: "import-details-missing" });
+          continue;
+        }
+        const summary = (snapshot2.importSummaries || []).find((row) => row.id === record.id) || (snapshot2.importDeletionProofs || []).find((row) => row.id === record.id);
+        if (!summary || importVersion(summary) !== importVersion(record) || String(summary.operationId || "") !== String(record.operationId || "")) {
+          diagnostics.push({ importId: item.importId, code: "import-pending-snapshot" });
+          reportImportSyncDiagnostics(diagnostics);
+          throw cloudImportError("import-pending-snapshot", "Importdetails en financiële snapshot behoren nog niet tot dezelfde versie.");
+        }
+        intents.push(record);
+      }
+      reportImportSyncDiagnostics(diagnostics);
+      return intents;
+    }
     async function stageImportCloudWrites(root2, snapshot2) {
-      var _a2, _b;
+      var _a2;
       const cloud = root2.CloudAdapter, firestore = (_a2 = cloud == null ? void 0 : cloud.modules) == null ? void 0 : _a2.firestore;
       if (!(firestore == null ? void 0 : firestore.runTransaction)) throw new Error("Transactionele import-cloudopslag is niet beschikbaar. De lokale keuze blijft bewaard.");
       const stages = [];
-      for (const item of await ImportStore.listSync()) {
-        if (((_b = await ImportStore.getJournal(`conflict-${item.importId}`)) == null ? void 0 : _b.status) === "conflict") continue;
-        const record = await ImportStore.getImport(item.importId);
-        if (!record) continue;
-        const summary = (snapshot2.importSummaries || []).find((row) => row.id === record.id) || (snapshot2.importDeletionProofs || []).find((row) => row.id === record.id);
-        if (!summary || importVersion(summary) !== importVersion(record) || String(summary.operationId || "") !== String(record.operationId || "")) throw cloudImportError("import-pending-snapshot", "Importdetails en financiële snapshot behoren nog niet tot dezelfde versie.");
+      for (const record of await collectImportCloudIntents(snapshot2)) {
         const envelope = record.lifecycle === "deleted" ? { header: cloneState(record), chunks: [], sourceChunks: [] } : buildCloudImportEnvelope(record);
         for (let index = 0; index < envelope.chunks.length; index++) await firestore.setDoc(cloudImportChunkRef(cloud, firestore, record.id, `${record.operationId ? record.operationId + "-" : ""}${String(index).padStart(4, "0")}`), envelope.chunks[index], { merge: false });
         for (let index = 0; index < envelope.sourceChunks.length; index++) await firestore.setDoc(cloudImportChunkRef(cloud, firestore, record.id, `${record.operationId}-source-${index}`), { generation: record.operationId, index, text: envelope.sourceChunks[index] }, { merge: false });
@@ -13047,25 +13093,28 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       ImportPerformance.syncRequested = true;
       if (ImportPerformance.syncPromise) return ImportPerformance.syncPromise;
       ImportPerformance.syncPromise = (async () => {
-        var _a2, _b, _c;
+        var _a2, _b, _c, _d;
         const cloud = root2.CloudAdapter;
         if (!((_a2 = cloud == null ? void 0 : cloud.isConnected) == null ? void 0 : _a2.call(cloud)) || cloud.initialSyncComplete === false) return false;
         if (cloud.docRef) {
           for (const item of await ImportStore.listSync()) {
+            if (((_b = await ImportStore.getJournal(`conflict-${item.importId}`)) == null ? void 0 : _b.status) === "conflict") continue;
             const legacy = await ImportStore.getImport(item.importId);
             if (legacy && !legacy.operationId) {
               await persistImportDraftImmediate(root2, legacy, { syncCloud: false });
               await queueImportSync(legacy);
             }
           }
+          if (!(await collectImportCloudIntents(root2.state)).length) return !ImportPerformance.syncDiagnostics.length;
           cloud.queueSave(root2.state);
           const ok = await cloud.flushQueue();
           return ok;
         }
-        if (!((_c = (_b = cloud.modules) == null ? void 0 : _b.firestore) == null ? void 0 : _c.runTransaction)) return false;
+        if (!((_d = (_c = cloud.modules) == null ? void 0 : _c.firestore) == null ? void 0 : _d.runTransaction)) return false;
         while (ImportPerformance.syncRequested) {
           ImportPerformance.syncRequested = false;
           const staged = await stageImportCloudWrites(root2, root2.state);
+          if (!staged.stages.length) return !ImportPerformance.syncDiagnostics.length;
           await cloud.modules.firestore.runTransaction(cloud.db, async (tx) => {
             await staged.readAndValidate(tx);
             staged.publish(tx);
@@ -13181,7 +13230,9 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       if (!(root2 == null ? void 0 : root2.state)) return;
       ImportStore.setScope(((_b = (_a2 = root2.CloudAdapter) == null ? void 0 : _a2.importScope) == null ? void 0 : _b.call(_a2)) || "legacy");
       ImportStore.legacyReferences = new Set((root2.state.importSummaries || []).map((row) => String(row.id)));
-      root2.FinizeImportSync = { onCloudAccepted: async () => {
+      root2.FinizeImportSync = { get pendingDiagnostics() {
+        return cloneState(ImportPerformance.syncDiagnostics);
+      }, onCloudAccepted: async () => {
         var _a3;
         if ((_a3 = root2.CloudAdapter) == null ? void 0 : _a3.conflict) return;
         const queued = await ImportStore.listSync();

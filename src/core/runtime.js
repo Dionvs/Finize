@@ -2261,7 +2261,10 @@ const CloudAdapter = {
         window.FinizeImportSync?.onCloudAccepted?.();
         return;
       }
-      const documentData = await this.cloudStore().hydrate(snap.data());
+      const rawDocumentData=snap.data();
+      // Capture in-flight identity before hydration yields; confirmed identity survives saveNow's finally.
+      const ownCommitAtArrival=!!this.activeCommitId&&String(rawDocumentData.commitId||'')===this.activeCommitId;
+      const documentData = await this.cloudStore().hydrate(rawDocumentData);
       if(this.docRef!==subscriptionRef)return;
       const remote = documentData.state;
       let normalizedRemote;
@@ -2296,7 +2299,8 @@ const CloudAdapter = {
         console.warn('Vertraagde oudere cloudsnapshot genegeerd.');
         return;
       }
-      const isOwnCommit = !!this.activeCommitId && remoteCommitId === this.activeCommitId;
+      const confirmedEcho=remoteCommitId===this.lastConfirmedCommitId&&remoteVersion===this.cloudVersion&&remoteSignature===this.lastCloudSignature;
+      const isOwnCommit = !!remoteCommitId && (ownCommitAtArrival || remoteCommitId===this.activeCommitId || confirmedEcho);
 
       if (isOwnCommit){
         this.initialSyncComplete = true;
@@ -2305,6 +2309,7 @@ const CloudAdapter = {
         this.lastConfirmedCommitId = remoteCommitId;
         this.lastConfirmedRevision = remoteRevision;
         this.confirmedState = clone(normalizedRemote);
+        if(!this.pendingState&&!this.writeInFlight){this.status='Cloud opgeslagen';renderCloudStatus();}
         return;
       }
 
@@ -2400,6 +2405,20 @@ const CloudAdapter = {
       }
       const {firestore} = this.modules;
       const importStage=await window.FinizeImportSync?.prepareCloudSnapshot(cloudSnapshot);
+      // Full state equality, not the metadata-only signature. Pending import publications still commit.
+      if(Array.isArray(importStage?.stages)&&this.confirmedState&&JSON.stringify(cloudSnapshot)===JSON.stringify(this.confirmedState)){
+        const echoOnly=await firestore.runTransaction(this.db,async transaction=>{
+          const current=await transaction.get(this.docRef);
+          assertCloudBase(current.exists()?current.data():null,expectedVersion,expectedSignature);
+          await importStage.readAndValidate(transaction);
+          return importStage.stages.every(stage=>stage.echo);
+        });
+        if(echoOnly){
+          await importStage.acknowledge();
+          this.status=this.pendingState?'Opslaan…':'Cloud opgeslagen';renderCloudStatus();
+          return true;
+        }
+      }
       const descriptor=await this.cloudStore().prepare(cloudSnapshot,commitId);
       console.info('Finize cloudgeneration bevestigd: '+JSON.stringify({schema:descriptor.schema,generation:commitId,chunkCount:descriptor.chunkCount,totalByteLength:descriptor.totalByteLength,totalSha256:descriptor.totalSha256,integrity:'readback-sha256-ok',components:Object.entries(cloudSnapshot).map(([field,value])=>({field,byteLength:new TextEncoder().encode(JSON.stringify(value)).length})).sort((a,b)=>b.byteLength-a.byteLength)}));
       const nextVersion = await firestore.runTransaction(this.db, async transaction=>{
