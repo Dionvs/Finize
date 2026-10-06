@@ -16,7 +16,7 @@ export function cloudStateSignature(state) {
 
 export function assertCloudBase(documentData, expectedVersion, expectedSignature) {
   const actualVersion = cloudDocumentVersion(documentData);
-  const actualSignature = cloudStateSignature(documentData?.state);
+  const actualSignature = cloudStateSignature(documentData?.state || { meta: documentData?.stateMeta });
   if (actualVersion !== expectedVersion || actualSignature !== expectedSignature) {
     const error = new Error("De cloud is intussen op een ander apparaat gewijzigd.");
     error.code = CLOUD_CONFLICT_CODE;
@@ -33,7 +33,7 @@ export function isStaleCloudSnapshot(documentData, currentVersion, currentSignat
   if (incomingVersion < currentVersion) return true;
   return incomingVersion === currentVersion
     && !!currentSignature
-    && cloudStateSignature(documentData?.state) !== currentSignature;
+    && cloudStateSignature(documentData?.state || { meta: documentData?.stateMeta }) !== currentSignature;
 }
 
 export function removeStaleIncomeOverrides(target) {

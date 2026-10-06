@@ -1,3 +1,5 @@
+import { createStateBackupStore, readLegacyStateBackup } from '../storage/state-backups.mjs';
+import { createChunkedCloudStore, cloudStateManifest } from '../storage/cloud-chunks.mjs';
 import { createMigrationBackupStore, readLegacyMigrationBackup } from '../storage/migration-backups.mjs';
 import { assertNoDuplicateSources } from '../import/import-identity.mjs';
 import { findImportConflicts } from '../import/import-sync-protocol.mjs';
@@ -1885,9 +1887,9 @@ async function ensureMigrationBackup(original,source='local',metadata={}){
     sourceSchema:fromVersion,source,household:activeAuthSession?.assignment?.householdId||'legacy',
     revision:original.meta?.revision??null,syncVersion:metadata.syncVersion??original.meta?.syncVersion??null
   });
-  if(result.created){
+  {
     const {payload,...metadata}=result.record;
-    console.info('Finize migratieback-up bevestigd: '+JSON.stringify({...metadata,integrity:'readback-sha256-ok'}));
+    console.info('Finize migratieback-up bevestigd: '+JSON.stringify({...metadata,created:result.created,integrity:'readback-sha256-ok'}));
   }
   return true;
 }
@@ -2046,9 +2048,8 @@ function localSave(state,{preserveBackup=false}={}){
     localStorage.setItem(keys.state, serialized);
   }catch(error){
     if (!isStorageQuotaError(error)) throw error;
-    if(preserveBackup)throw error;
-    localStorage.removeItem(keys.backup);
-    localStorage.setItem(keys.state, serialized);
+    // Never delete an older backup to make space for a newer state.
+    throw error;
   }
   return true;
 }
@@ -2147,6 +2148,7 @@ const CloudAdapter = {
     }
   },
   async acceptRemote(documentData, normalizedRemote, backupReason='voor Firestore-sync'){
+    const acceptanceScope=activeStorageKeys()?.state, acceptanceRef=this.docRef;
     if (this.initialSyncComplete && isStaleCloudSnapshot(
       {...documentData, state:normalizedRemote},
       this.cloudVersion,
@@ -2160,7 +2162,9 @@ const CloudAdapter = {
     if(normalizedCloudData && !await ensureMigrationBackup(documentData.state,'cloud',{syncVersion:documentData.syncVersion}))throw new Error('Migratieback-up ontbreekt; cloudstate is niet vervangen.');
     // Backup I/O can yield to a newer listener; apply the existing revision guard again.
     if(this.initialSyncComplete && isStaleCloudSnapshot({...documentData,state:normalizedRemote},this.cloudVersion,this.lastCloudSignature))return false;
-    if (backupReason) DataAdapter.backup(state, backupReason);
+    if (backupReason && !await DataAdapter.backup(state, backupReason)) throw new Error('Noodback-up niet bevestigd; state is niet vervangen.');
+    if(activeStorageKeys()?.state!==acceptanceScope || this.docRef!==acceptanceRef)return false;
+    if(this.initialSyncComplete && isStaleCloudSnapshot({...documentData,state:normalizedRemote},this.cloudVersion,this.lastCloudSignature))return false;
     clearTimeout(this.saveTimer);
     this.pendingState = null;
     this.remoteStateWaiting = null;
@@ -2219,7 +2223,8 @@ const CloudAdapter = {
     merged.meta.updatedBy = getDeviceId();
     const validation = validateBudgetState(merged);
     if (!validation.ok) throw new Error(validation.errors.join(' '));
-    if (backupReason) DataAdapter.backup(state, backupReason);
+    if (backupReason && !await DataAdapter.backup(state, backupReason)) throw new Error('Noodback-up niet bevestigd; state is niet vervangen.');
+    if(this.initialSyncComplete && isStaleCloudSnapshot({...documentData,state:normalizedRemote},this.cloudVersion,this.lastCloudSignature))return false;
     clearTimeout(this.saveTimer);
     this.cloudVersion = cloudDocumentVersion(documentData);
     this.lastCloudSignature = cloudStateSignature(normalizedRemote);
@@ -2241,7 +2246,10 @@ const CloudAdapter = {
   attachSnapshot(){
     if (this.unsubscribe || !this.docRef) return;
     const {firestore} = this.modules;
+    const subscriptionRef=this.docRef;
     this.unsubscribe = firestore.onSnapshot(this.docRef, async snap=>{
+      try{
+      if(this.docRef!==subscriptionRef)return;
       if (!snap.exists()){
         this.initialSyncComplete = true;
         this.cloudVersion = 0;
@@ -2253,7 +2261,8 @@ const CloudAdapter = {
         window.FinizeImportSync?.onCloudAccepted?.();
         return;
       }
-      const documentData = snap.data();
+      const documentData = await this.cloudStore().hydrate(snap.data());
+      if(this.docRef!==subscriptionRef)return;
       const remote = documentData.state;
       let normalizedRemote;
       try{ normalizedRemote = migrateBudgetState(remote); }
@@ -2331,6 +2340,7 @@ const CloudAdapter = {
       }
 
       await this.acceptRemote(documentData, normalizedRemote);
+      }catch(error){console.error('Cloudstate niet geaccepteerd; bestaande state behouden',error);this.status='Synchronisatie mislukt';renderCloudStatus();}
     }, err=>{
       console.error('Firestore live-sync fout', err);
       this.status = navigator.onLine ? 'Synchronisatie mislukt' : 'Offline — lokaal bewaard';
@@ -2381,14 +2391,6 @@ const CloudAdapter = {
     try{
       const cloudSnapshot = clone(snapshot);
       await GoalImageStore.expandStateForTransfer(cloudSnapshot);
-      const payloadBytes = new Blob([JSON.stringify(cloudSnapshot)]).size;
-      if (payloadBytes > 900000){
-        this.lastFailureRetryable = false;
-        this.status = 'Synchronisatie mislukt';
-        console.error('Cloudopslag overgeslagen: app-data is groter dan 900 kB.');
-        renderCloudStatus();
-        return false;
-      }
       const validation = validateBudgetState(cloudSnapshot);
       if (!validation.ok){
         this.lastFailureRetryable = false;
@@ -2398,22 +2400,23 @@ const CloudAdapter = {
       }
       const {firestore} = this.modules;
       const importStage=await window.FinizeImportSync?.prepareCloudSnapshot(cloudSnapshot);
+      const descriptor=await this.cloudStore().prepare(cloudSnapshot,commitId);
+      console.info('Finize cloudgeneration bevestigd: '+JSON.stringify({schema:descriptor.schema,generation:commitId,chunkCount:descriptor.chunkCount,totalByteLength:descriptor.totalByteLength,totalSha256:descriptor.totalSha256,integrity:'readback-sha256-ok',components:Object.entries(cloudSnapshot).map(([field,value])=>({field,byteLength:new TextEncoder().encode(JSON.stringify(value)).length})).sort((a,b)=>b.byteLength-a.byteLength)}));
       const nextVersion = await firestore.runTransaction(this.db, async transaction=>{
         const currentSnapshot = await transaction.get(this.docRef);
         const currentData = currentSnapshot.exists() ? currentSnapshot.data() : null;
         const currentVersion = assertCloudBase(currentData, expectedVersion, expectedSignature);
+        const sealed=await transaction.get(this.cloudStore().generationRef(commitId));
+        if(!sealed.exists() || !sealed.data().complete || sealed.data().totalSha256!==descriptor.totalSha256)throw new Error('Cloudgeneration is niet volledig bevestigd.');
         await importStage?.readAndValidate(transaction);
         importStage?.publish(transaction);
         const version = currentVersion + 1;
-        transaction.set(this.docRef, {
-          state:cloudSnapshot,
+        transaction.set(this.docRef, cloudStateManifest(descriptor, {
           updatedAt: firestore.serverTimestamp(),
-          revision:Number(cloudSnapshot.meta?.revision)||0,
           updatedBy:cloudSnapshot.meta?.updatedBy || getDeviceId(),
-          app:'finize',
           syncVersion:version,
           commitId
-        });
+        }));
         return version;
       });
       await importStage?.acknowledge();
@@ -2426,7 +2429,7 @@ const CloudAdapter = {
       renderCloudStatus();
       return true;
     }catch(e){
-      if(e?.importConflict){await window.FinizeImportSync.preserveConflict(e.importConflict.local,e.importConflict.remote);const fresh=await this.modules.firestore.getDoc(this.docRef);if(fresh.exists()){const data=fresh.data();await this.acceptRemote(data,migrateBudgetState(data.state),'lokale importkeuze bij conflict');}this.lastFailureRetryable=false;this.conflict=true;this.status='Synchronisatieconflict — lokale keuze bewaard';return false;}
+      if(e?.importConflict){await window.FinizeImportSync.preserveConflict(e.importConflict.local,e.importConflict.remote);const fresh=await this.modules.firestore.getDoc(this.docRef);if(fresh.exists()){const data=await this.cloudStore().hydrate(fresh.data());await this.acceptRemote(data,migrateBudgetState(data.state),'lokale importkeuze bij conflict');}this.lastFailureRetryable=false;this.conflict=true;this.status='Synchronisatieconflict — lokale keuze bewaard';return false;}
       if (e?.code === CLOUD_CONFLICT_CODE){
         this.lastFailureRetryable = true;
         console.warn('Cloud wijzigde tijdens opslaan; lokale wijziging wordt op de nieuwste cloudstand herhaald.', e);
@@ -2435,7 +2438,7 @@ const CloudAdapter = {
           if (!latest){
             const freshSnapshot = await this.modules.firestore.getDoc(this.docRef);
             if (!freshSnapshot.exists()) throw new Error('Het cloud-document ontbreekt.');
-            const documentData = freshSnapshot.data();
+            const documentData = await this.cloudStore().hydrate(freshSnapshot.data());
             const normalizedRemote = migrateBudgetState(documentData.state);
             const remoteValidation = validateBudgetState(normalizedRemote);
             if (!remoteValidation.ok) throw new Error(remoteValidation.errors.join(' '));
@@ -2469,7 +2472,9 @@ const CloudAdapter = {
     if (this.writeInFlight || this.pendingState){
       throw new Error('Wacht tot de huidige wijziging in de cloud is opgeslagen.');
     }
-    if(!DataAdapter.backup(state, backupReason))throw new Error('Back-up maken mislukt; herstel is niet uitgevoerd.');
+    const restoreBase=JSON.stringify(state), restoreVersion=this.cloudVersion, restoreRef=this.docRef;
+    if(!await DataAdapter.backup(state, backupReason))throw new Error('Back-up maken mislukt; herstel is niet uitgevoerd.');
+    if(this.docRef!==restoreRef || this.cloudVersion!==restoreVersion || this.writeInFlight || this.pendingState || JSON.stringify(state)!==restoreBase)throw new Error('De stand veranderde tijdens de noodback-up; herstel is niet uitgevoerd.');
     const restored = clone(restoredState);
     ensurePersistentIds(restored);
     await GoalImageStore.initializeState(restored);
@@ -2514,6 +2519,7 @@ const CloudAdapter = {
     this.status = 'Offline — lokaal bewaard';
     renderCloudStatus();
   },
+  cloudStore(){return createChunkedCloudStore(this.modules.firestore,this.db,this.docRef);},
   importRef(importId){
     const path = cloudImportDocumentPath(activeAuthSession,importId);
     if (!path || !this.db || !this.modules?.firestore) return null;
@@ -2527,6 +2533,7 @@ const CloudAdapter = {
 };
 window.CloudAdapter = CloudAdapter;
 
+const stateBackupStore = createStateBackupStore();
 const DataAdapter = {
   loadedFromStorage:false,
   // Lokaal blijft altijd de eerste veiligheidslaag. Firestore is optionele live-sync erbovenop.
@@ -2558,26 +2565,40 @@ const DataAdapter = {
       return migrated;
     }catch(e){ console.error('laden mislukt; oorspronkelijke opslag behouden', e); throw e; }
   },
-  backup(state, reason){
+  async backup(state, reason){
     try{
       const keys = activeStorageKeys();
       if (!keys) return false;
-      localStorage.setItem(keys.backup, JSON.stringify({
-        savedAt: new Date().toISOString(),
-        label: backupLabel(),
-        reason,
-        state
-      }));
+      const envelope={savedAt:new Date().toISOString(),label:backupLabel(),reason,state};
+      const record=await stateBackupStore.persist(keys.backup,envelope,{household:activeAuthSession?.assignment?.householdId||'local',syncVersion:CloudAdapter.cloudVersion});
+      this.backupRead={scope:keys.backup,loaded:true,value:JSON.parse(record.payload)};
+      console.info('Finize noodback-up bevestigd: '+JSON.stringify({type:record.type,schema:record.schema,revision:record.revision,syncVersion:record.syncVersion,byteLength:record.byteLength,sha256:record.sha256,integrity:'readback-sha256-ok'}));
       return true;
     }catch(e){ console.error('back-up maken mislukt', e); return false; }
   },
-  loadBackup(){
-    try{
-      const keys = activeStorageKeys();
-      if (!keys) return null;
-      const raw = localStorage.getItem(keys.backup);
-      return raw ? JSON.parse(raw) : null;
-    }catch(e){ console.error('back-up laden mislukt', e); return null; }
+  async loadBackup(){
+    const keys = activeStorageKeys();
+    if (!keys) return null;
+    const record=await stateBackupStore.latest(keys.backup);
+    const modern=record?JSON.parse(record.payload):null;
+    const legacy=readLegacyStateBackup(localStorage,keys.backup);
+    return legacy && (!modern || String(legacy.savedAt||'')>String(modern.savedAt||'')) ? legacy : modern;
+  },
+  backupForPresentation(){
+    const scope=activeStorageKeys()?.backup;
+    if(!scope)return null;
+    if(this.backupRead?.scope!==scope){
+      this.backupRead={scope,loaded:false,value:null};
+      this.loadBackup().then(value=>{
+        if(this.backupRead?.scope!==scope)return;
+        this.backupRead={scope,loaded:true,value};
+        if(activeTab==='data')renderActiveTab();
+      }).catch(error=>{
+        if(this.backupRead?.scope===scope)this.backupRead={scope,loaded:true,value:null};
+        console.error('Noodback-up niet leesbaar',error);
+      });
+    }
+    return this.backupRead.value;
   }
 };
 
@@ -3734,7 +3755,7 @@ function renderSpaardoelen(){
 /* ---------- data & back-up tab ---------- */
 function renderDataTab(){
   document.getElementById('tab-data')?.classList.remove('mobile-data-page');
-  const lastBackup = DataAdapter.loadBackup();
+  const lastBackup = DataAdapter.backupForPresentation();
   const lastBackupDate = lastBackup?.savedAt ? new Date(lastBackup.savedAt) : null;
   const isToday = lastBackupDate && lastBackupDate.toDateString() === new Date().toDateString();
   const backupDesc = lastBackupDate
@@ -3824,7 +3845,8 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     reader.readAsText(file);
   });
   document.getElementById('btnRestoreBackup').addEventListener('click', async ()=>{
-    const backup = DataAdapter.loadBackup();
+    let backup;
+    try{backup=await DataAdapter.loadBackup();}catch(error){alert('Noodback-up niet leesbaar: '+error.message);return;}
     if (!backup || !backup.state){
       alert('Er is nog geen lokale nood-back-up gevonden.');
       return;
@@ -3846,9 +3868,9 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       }
     }
   });
-  document.getElementById('btnReset').addEventListener('click', ()=>{
+  document.getElementById('btnReset').addEventListener('click', async ()=>{
     if (confirm('Weet je zeker dat je alle gegevens wilt wissen en opnieuw wilt beginnen? De huidige stand wordt eerst als lokale nood-back-up bewaard.')){
-      DataAdapter.backup(state, 'voor alles wissen');
+      if(!await DataAdapter.backup(state, 'voor alles wissen')){alert('Noodback-up niet bevestigd; gegevens behouden.');return;}
       const stateBeforeReset = clone(state);
       state = normalizeBudgetState(defaultState()); window.state = state; committedStateSnapshot = stateBeforeReset;
       if (!commitChange(()=>{}, {render:false})) return;
@@ -3876,7 +3898,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     try{
       const freshSnapshot = await CloudAdapter.modules.firestore.getDoc(CloudAdapter.docRef);
       if (!freshSnapshot.exists()) throw new Error('Het cloud-document ontbreekt.');
-      const documentData = freshSnapshot.data();
+      const documentData = await CloudAdapter.cloudStore().hydrate(freshSnapshot.data());
       const normalizedRemote = migrateBudgetState(documentData.state);
       const validation = validateBudgetState(normalizedRemote);
       if (!validation.ok) throw new Error(validation.errors.join(' '));

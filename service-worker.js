@@ -1,11 +1,11 @@
-const CACHE_NAME = "finize-v103-migration-backup-hotfix";
+const CACHE_NAME = "finize-v104-large-state-hotfix";
 const CACHE_PREFIX = "finize-";
 
 const CRITICAL_SHELL = [
   "./",
   "./index.html",
-  "./app.js?v=103-migration-backup-hotfix",
-  "./app.css?v=103-migration-backup-hotfix",
+  "./app.js?v=104-large-state-hotfix",
+  "./app.css?v=104-large-state-hotfix",
   "./manifest.json"
 ];
 

@@ -65,22 +65,90 @@ service cloud.firestore {
         allow delete: if false;
       }
 
-      // De bestaande Finize-state blijft één document, zodat alle huidige
-      // berekeningen en het transactionele syncprotocol ongewijzigd blijven.
+      // Current is the CAS-protected pointer. Legacy inline documents remain readable.
       match /budgetState/current {
+        function validStatePointer() {
+          let data = request.resource.data;
+          let generation = get(/databases/$(database)/documents/households/$(householdId)/budgetState/current/generations/$(data.activeGeneration)).data;
+          return data.stateFormat == 'finize-json-chunks-v1'
+            && data.schema == 11 && data.app == 'finize'
+            && data.baseVersion == data.syncVersion - 1
+            && generation.complete == true
+            && generation.generation == data.activeGeneration
+            && generation.stateFormat == data.stateFormat
+            && generation.schema == data.schema
+            && generation.chunkCount == data.chunkCount
+            && generation.totalByteLength == data.totalByteLength
+            && generation.totalSha256 == data.totalSha256
+            && generation.stateMeta == data.stateMeta
+            && data.revision == data.stateMeta.revision;
+        }
         allow read: if linkedTo(householdId);
         allow create: if linkedTo(householdId)
           && request.resource.data.syncVersion == 1
-          && request.resource.data.commitId is string;
+          && request.resource.data.commitId is string
+          && (!('stateFormat' in request.resource.data) || validStatePointer());
         allow update: if linkedTo(householdId)
           && request.resource.data.syncVersion is int
           && request.resource.data.commitId is string
+          && ((!('stateFormat' in request.resource.data) && !('stateFormat' in resource.data)) || validStatePointer())
+          && (!('revision' in resource.data) || request.resource.data.revision >= resource.data.revision)
           && (
             (!('syncVersion' in resource.data) && request.resource.data.syncVersion == 1)
             || ('syncVersion' in resource.data
               && request.resource.data.syncVersion == resource.data.syncVersion + 1)
           );
         allow delete: if false;
+
+        match /generations/{generationId} {
+          function validDescriptor() {
+            let data = request.resource.data;
+            return data.generation == generationId
+              && data.stateFormat == 'finize-json-chunks-v1'
+              && data.schema == 11 && data.stateMeta.schemaVersion == 11
+              && data.stateMeta.revision is int
+              && data.chunkCount is int && data.chunkCount > 0 && data.chunkCount <= 10000
+              && data.totalByteLength is int && data.totalByteLength > 0
+              && data.totalByteLength <= data.chunkCount * 240000
+              && data.totalSha256 is string && data.totalSha256.size() == 64;
+          }
+          function completeChain() {
+            let last = get(/databases/$(database)/documents/households/$(householdId)/budgetState/current/generations/$(generationId)/chunks/$(string(resource.data.chunkCount - 1))).data;
+            return last.generation == generationId
+              && last.sequence == resource.data.chunkCount - 1
+              && last.chunkCount == resource.data.chunkCount
+              && last.cumulativeBytes == resource.data.totalByteLength;
+          }
+          allow read: if linkedTo(householdId);
+          allow create: if linkedTo(householdId) && validDescriptor() && request.resource.data.complete == false;
+          allow update: if linkedTo(householdId)
+            && (request.resource.data == resource.data
+              || (resource.data.complete == false && request.resource.data.complete == true
+                && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['complete']) && completeChain()));
+          allow delete: if false;
+
+          match /chunks/{chunkId} {
+            function validChunk() {
+              let data = request.resource.data;
+              let generation = get(/databases/$(database)/documents/households/$(householdId)/budgetState/current/generations/$(generationId)).data;
+              return generation.complete == false
+                && data.generation == generationId && data.chunkCount == generation.chunkCount
+                && data.sequence is int && data.sequence >= 0 && data.sequence < generation.chunkCount
+                && chunkId == string(data.sequence)
+                && data.payload is string && data.payload.size() <= 240000
+                && data.byteLength is int && data.byteLength > 0 && data.byteLength <= 240000
+                && data.sha256 is string && data.sha256.size() == 64
+                && data.cumulativeBytes is int
+                && ((data.sequence == 0 && data.cumulativeBytes == data.byteLength)
+                  || (data.sequence > 0 && data.cumulativeBytes == data.byteLength
+                    + get(/databases/$(database)/documents/households/$(householdId)/budgetState/current/generations/$(generationId)/chunks/$(string(data.sequence - 1))).data.cumulativeBytes));
+            }
+            allow read: if linkedTo(householdId);
+            allow create: if linkedTo(householdId) && validChunk();
+            allow update: if linkedTo(householdId) && request.resource.data == resource.data;
+            allow delete: if false;
+          }
+        }
       }
 
       match /imports/{importId} {

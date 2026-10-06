@@ -534,6 +534,183 @@
     return text ? JSON.parse(text) : null;
   }
 
+  // src/storage/state-backups.mjs
+  var STATE_BACKUP_DB = "finize-state-backups";
+  function createStateBackupStore({ indexedDB: indexedDB2 = globalThis.indexedDB, crypto = globalThis.crypto, now = () => (/* @__PURE__ */ new Date()).toISOString() } = {}) {
+    let opening;
+    async function operation(mode2, action) {
+      if (!indexedDB2) throw new Error("IndexedDB is niet beschikbaar; noodback-up niet bevestigd.");
+      opening || (opening = new Promise((resolve, reject) => {
+        const request = indexedDB2.open(STATE_BACKUP_DB, 1);
+        request.onupgradeneeded = () => request.result.createObjectStore("snapshots", { keyPath: "id" }).createIndex("scope", "scope");
+        request.onerror = () => reject(request.error);
+        request.onblocked = () => reject(new Error("Noodback-upopslag is geblokkeerd."));
+        request.onsuccess = () => {
+          const db2 = request.result;
+          db2.onversionchange = () => {
+            db2.close();
+            opening = void 0;
+          };
+          resolve(db2);
+        };
+      }).catch((error) => {
+        opening = void 0;
+        throw error;
+      }));
+      const db = await opening;
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction("snapshots", mode2), request = action(tx.objectStore("snapshots"));
+        let result;
+        request.onsuccess = () => {
+          result = request.result;
+        };
+        tx.oncomplete = () => resolve(result);
+        tx.onerror = tx.onabort = () => reject(tx.error || request.error || new Error("Noodback-uptransactie mislukt."));
+      });
+    }
+    async function verify(record, scope, expected) {
+      var _a2;
+      if (!record || record.scope !== scope || record.type !== "last-good" || record.storageVersion !== 1 || typeof record.payload !== "string" || record.byteLength !== new TextEncoder().encode(record.payload).length || record.sha256 !== await backupDigest(record.payload, crypto) || expected !== void 0 && record.payload !== expected) throw new Error("Noodback-upintegriteit klopt niet; vervanging geblokkeerd.");
+      const envelope = JSON.parse(record.payload);
+      if (!envelope.state || Number(((_a2 = envelope.state.meta) == null ? void 0 : _a2.schemaVersion) || 0) !== record.schema) throw new Error("Noodback-upmetadata klopt niet.");
+      return record;
+    }
+    async function persist2(scope, envelope, metadata = {}) {
+      var _a2, _b, _c, _d, _e;
+      if (!scope) throw new Error("Noodback-upcontext ontbreekt.");
+      const payload = JSON.stringify(envelope), sha256 = await backupDigest(payload, crypto), createdAt = now();
+      const record = {
+        ...metadata,
+        scope,
+        type: "last-good",
+        storageVersion: 1,
+        createdAt,
+        schema: Number(((_b = (_a2 = envelope.state) == null ? void 0 : _a2.meta) == null ? void 0 : _b.schemaVersion) || 0),
+        revision: (_e = (_d = (_c = envelope.state) == null ? void 0 : _c.meta) == null ? void 0 : _d.revision) != null ? _e : null,
+        payload,
+        byteLength: new TextEncoder().encode(payload).length,
+        sha256,
+        id: `${scope}:${createdAt}:${sha256}`
+      };
+      const previous = await operation("readonly", (store) => store.get(record.id));
+      if (!previous) {
+        try {
+          await operation("readwrite", (store) => store.add(record));
+        } catch (error) {
+          if ((error == null ? void 0 : error.name) !== "ConstraintError") throw error;
+        }
+      }
+      return verify(await operation("readonly", (store) => store.get(record.id)), scope, payload);
+    }
+    async function latest2(scope) {
+      if (!scope) return null;
+      const records = await operation("readonly", (store) => store.index("scope").getAll(scope));
+      records.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      return records.length ? verify(records[0], scope) : null;
+    }
+    return Object.freeze({ persist: persist2, latest: latest2 });
+  }
+  function readLegacyStateBackup(storage, key) {
+    const raw = key && storage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  }
+
+  // src/storage/cloud-chunks.mjs
+  var CLOUD_STATE_FORMAT = "finize-json-chunks-v1";
+  var CLOUD_CHUNK_BYTES = 24e4;
+  var byteLength = (value) => new TextEncoder().encode(value).length;
+  var canonical = (value) => JSON.stringify(value, (_, item) => item && typeof item === "object" && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).sort().map((key) => [key, item[key]])) : item);
+  var fail = (message) => {
+    throw new Error(`Cloudstate-integriteit: ${message}`);
+  };
+  async function encodeCloudState(state2, generation, crypto = globalThis.crypto) {
+    var _a2;
+    if (((_a2 = state2 == null ? void 0 : state2.meta) == null ? void 0 : _a2.schemaVersion) !== 11 || !/^[a-zA-Z0-9_-]{1,160}$/.test(generation)) fail("schema/generation ongeldig");
+    const payload = JSON.stringify(state2), parts = [];
+    let part = "", size = 0;
+    for (const char of payload) {
+      const point = char.codePointAt(0), length = point <= 127 ? 1 : point <= 2047 ? 2 : point <= 65535 ? 3 : 4;
+      if (size + length > CLOUD_CHUNK_BYTES) {
+        parts.push(part);
+        part = "";
+        size = 0;
+      }
+      part += char;
+      size += length;
+    }
+    if (part) parts.push(part);
+    let cumulativeBytes = 0;
+    const chunks = [];
+    for (let sequence = 0; sequence < parts.length; sequence++) {
+      const payload2 = parts[sequence], length = byteLength(payload2);
+      cumulativeBytes += length;
+      chunks.push({ generation, sequence, chunkCount: parts.length, byteLength: length, cumulativeBytes, sha256: await backupDigest(payload2, crypto), payload: payload2 });
+    }
+    return { descriptor: { stateFormat: CLOUD_STATE_FORMAT, schema: 11, generation, chunkCount: chunks.length, totalByteLength: byteLength(payload), totalSha256: await backupDigest(payload, crypto), stateMeta: structuredClone(state2.meta), complete: false }, chunks };
+  }
+  async function decodeCloudState(manifest, descriptor, chunks, crypto = globalThis.crypto) {
+    var _a2;
+    const id = manifest.activeGeneration;
+    if (manifest.stateFormat !== CLOUD_STATE_FORMAT || !(descriptor == null ? void 0 : descriptor.complete) || descriptor.generation !== id || descriptor.schema !== 11 || descriptor.stateFormat !== CLOUD_STATE_FORMAT || !Number.isSafeInteger(manifest.chunkCount) || manifest.chunkCount < 1 || manifest.chunkCount !== descriptor.chunkCount || chunks.length !== descriptor.chunkCount || manifest.totalSha256 !== descriptor.totalSha256 || manifest.totalByteLength !== descriptor.totalByteLength || canonical(manifest.stateMeta) !== canonical(descriptor.stateMeta)) fail("generation/manifest niet compleet of onjuist");
+    let total = 0;
+    for (let sequence = 0; sequence < chunks.length; sequence++) {
+      const chunk = chunks[sequence];
+      if (!chunk || chunk.generation !== id || chunk.sequence !== sequence || chunk.chunkCount !== chunks.length || typeof chunk.payload !== "string" || chunk.byteLength !== byteLength(chunk.payload) || chunk.byteLength > CLOUD_CHUNK_BYTES || chunk.sha256 !== await backupDigest(chunk.payload, crypto)) fail(`deel ${sequence} ontbreekt of is corrupt`);
+      total += chunk.byteLength;
+      if (chunk.cumulativeBytes !== total) fail(`deel ${sequence} volgorde/lengte ongeldig`);
+    }
+    const payload = chunks.map((chunk) => chunk.payload).join("");
+    if (total !== manifest.totalByteLength || await backupDigest(payload, crypto) !== manifest.totalSha256) fail("totale checksum/lengte ongeldig");
+    const state2 = JSON.parse(payload);
+    if (((_a2 = state2 == null ? void 0 : state2.meta) == null ? void 0 : _a2.schemaVersion) !== 11 || canonical(state2.meta) !== canonical(manifest.stateMeta)) fail("state/schema/metadata ongeldig");
+    return state2;
+  }
+  function cloudStateManifest(descriptor, { syncVersion, commitId, updatedAt, updatedBy }) {
+    const { complete, generation, ...metadata } = descriptor;
+    if (!complete) fail("incomplete generation kan niet worden geactiveerd");
+    return { ...metadata, activeGeneration: generation, app: "finize", revision: Number(descriptor.stateMeta.revision) || 0, baseVersion: syncVersion - 1, syncVersion, commitId, updatedAt, updatedBy };
+  }
+  function createChunkedCloudStore(firestore, db, currentRef) {
+    const currentPath = typeof currentRef === "string" ? currentRef : currentRef.path;
+    const generationRef = (id) => firestore.doc(db, `${currentPath}/generations/${id}`);
+    const chunkRef = (id, sequence) => firestore.doc(db, `${currentPath}/generations/${id}/chunks/${sequence}`);
+    const read = (ref) => (firestore.getDocFromServer || firestore.getDoc)(ref);
+    async function hydrate(documentData) {
+      if (!(documentData == null ? void 0 : documentData.stateFormat)) return documentData;
+      if (documentData.stateFormat !== CLOUD_STATE_FORMAT) fail("onbekend opslagformaat");
+      const descriptorSnapshot = await read(generationRef(documentData.activeGeneration));
+      if (!descriptorSnapshot.exists()) fail("generation ontbreekt");
+      const descriptor = descriptorSnapshot.data();
+      if (!Number.isSafeInteger(descriptor.chunkCount) || descriptor.chunkCount < 1 || descriptor.chunkCount > 1e4) fail("deelcount ongeldig");
+      const chunks = [];
+      for (let sequence = 0; sequence < descriptor.chunkCount; sequence++) {
+        const snapshot2 = await read(chunkRef(documentData.activeGeneration, sequence));
+        chunks.push(snapshot2.exists() ? snapshot2.data() : null);
+      }
+      return { ...documentData, state: await decodeCloudState(documentData, descriptor, chunks) };
+    }
+    async function prepare(state2, generation) {
+      const encoded = await encodeCloudState(state2, generation);
+      await firestore.setDoc(generationRef(generation), encoded.descriptor);
+      for (const chunk of encoded.chunks) await firestore.setDoc(chunkRef(generation, chunk.sequence), chunk);
+      const complete = { ...encoded.descriptor, complete: true };
+      const manifest = cloudStateManifest(complete, { syncVersion: 0, commitId: generation, updatedAt: "", updatedBy: "" });
+      const persisted = [];
+      for (const chunk of encoded.chunks) {
+        const snapshot2 = await read(chunkRef(generation, chunk.sequence));
+        persisted.push(snapshot2.exists() ? snapshot2.data() : null);
+      }
+      const storedDescriptor = await read(generationRef(generation));
+      if (!storedDescriptor.exists() || canonical({ ...storedDescriptor.data(), stateMeta: canonical(storedDescriptor.data().stateMeta) }) !== canonical({ ...encoded.descriptor, stateMeta: canonical(encoded.descriptor.stateMeta) })) fail("generationdescriptor gewijzigd");
+      await decodeCloudState(manifest, complete, persisted);
+      await firestore.updateDoc(generationRef(generation), { complete: true });
+      const sealed = await read(generationRef(generation));
+      await decodeCloudState(manifest, sealed.data(), persisted);
+      return sealed.data();
+    }
+    return Object.freeze({ hydrate, prepare, generationRef });
+  }
+
   // src/import/import-identity.mjs
   var original = (row) => row.bankOriginal || row;
   var accountKey = (row, batch) => String(row.accountContext || row.accountOwner || (batch == null ? void 0 : batch.accountOwner) || "") + "|" + String(original(row).accountIdentifier || (batch == null ? void 0 : batch.accountProfileId) || "");
@@ -2266,7 +2443,7 @@
   }
   function assertCloudBase(documentData, expectedVersion, expectedSignature) {
     const actualVersion = cloudDocumentVersion(documentData);
-    const actualSignature = cloudStateSignature(documentData == null ? void 0 : documentData.state);
+    const actualSignature = cloudStateSignature((documentData == null ? void 0 : documentData.state) || { meta: documentData == null ? void 0 : documentData.stateMeta });
     if (actualVersion !== expectedVersion || actualSignature !== expectedSignature) {
       const error = new Error("De cloud is intussen op een ander apparaat gewijzigd.");
       error.code = CLOUD_CONFLICT_CODE;
@@ -2280,7 +2457,7 @@
     const incomingVersion = cloudDocumentVersion(documentData);
     if (!Number.isSafeInteger(currentVersion) || currentVersion < 0) return false;
     if (incomingVersion < currentVersion) return true;
-    return incomingVersion === currentVersion && !!currentSignature && cloudStateSignature(documentData == null ? void 0 : documentData.state) !== currentSignature;
+    return incomingVersion === currentVersion && !!currentSignature && cloudStateSignature((documentData == null ? void 0 : documentData.state) || { meta: documentData == null ? void 0 : documentData.stateMeta }) !== currentSignature;
   }
   function removeStaleIncomeOverrides(target) {
     let changed = false;
@@ -4557,9 +4734,9 @@
       revision: (_d = (_c = original2.meta) == null ? void 0 : _c.revision) != null ? _d : null,
       syncVersion: (_g = (_f = metadata.syncVersion) != null ? _f : (_e = original2.meta) == null ? void 0 : _e.syncVersion) != null ? _g : null
     });
-    if (result.created) {
+    {
       const { payload, ...metadata2 } = result.record;
-      console.info("Finize migratieback-up bevestigd: " + JSON.stringify({ ...metadata2, integrity: "readback-sha256-ok" }));
+      console.info("Finize migratieback-up bevestigd: " + JSON.stringify({ ...metadata2, created: result.created, integrity: "readback-sha256-ok" }));
     }
     return true;
   }
@@ -4709,9 +4886,7 @@
       localStorage.setItem(keys.state, serialized);
     } catch (error) {
       if (!isStorageQuotaError(error)) throw error;
-      if (preserveBackup) throw error;
-      localStorage.removeItem(keys.backup);
-      localStorage.setItem(keys.state, serialized);
+      throw error;
     }
     return true;
   }
@@ -4831,7 +5006,8 @@
       }
     },
     async acceptRemote(documentData, normalizedRemote, backupReason = "voor Firestore-sync") {
-      var _a2, _b, _c, _d, _e, _f, _g, _h, _i;
+      var _a2, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
+      const acceptanceScope = (_a2 = activeStorageKeys()) == null ? void 0 : _a2.state, acceptanceRef = this.docRef;
       if (this.initialSyncComplete && isStaleCloudSnapshot(
         { ...documentData, state: normalizedRemote },
         this.cloudVersion,
@@ -4840,11 +5016,13 @@
         console.warn("Vertraagde oudere cloudsnapshot genegeerd.");
         return false;
       }
-      const pendingImportConflict = !this.initialSyncComplete && await ((_b = (_a2 = window.FinizeImportSync) == null ? void 0 : _a2.beforeInitialRemote) == null ? void 0 : _b.call(_a2, normalizedRemote));
+      const pendingImportConflict = !this.initialSyncComplete && await ((_c = (_b = window.FinizeImportSync) == null ? void 0 : _b.beforeInitialRemote) == null ? void 0 : _c.call(_b, normalizedRemote));
       const normalizedCloudData = documentData.state !== void 0 && JSON.stringify(documentData.state) !== JSON.stringify(normalizedRemote);
       if (normalizedCloudData && !await ensureMigrationBackup(documentData.state, "cloud", { syncVersion: documentData.syncVersion })) throw new Error("Migratieback-up ontbreekt; cloudstate is niet vervangen.");
       if (this.initialSyncComplete && isStaleCloudSnapshot({ ...documentData, state: normalizedRemote }, this.cloudVersion, this.lastCloudSignature)) return false;
-      if (backupReason) DataAdapter.backup(state, backupReason);
+      if (backupReason && !await DataAdapter.backup(state, backupReason)) throw new Error("Noodback-up niet bevestigd; state is niet vervangen.");
+      if (((_d = activeStorageKeys()) == null ? void 0 : _d.state) !== acceptanceScope || this.docRef !== acceptanceRef) return false;
+      if (this.initialSyncComplete && isStaleCloudSnapshot({ ...documentData, state: normalizedRemote }, this.cloudVersion, this.lastCloudSignature)) return false;
       clearTimeout(this.saveTimer);
       this.pendingState = null;
       this.remoteStateWaiting = null;
@@ -4852,7 +5030,7 @@
       this.cloudVersion = cloudDocumentVersion(documentData);
       this.lastCloudSignature = cloudStateSignature(normalizedRemote);
       this.lastConfirmedCommitId = String(documentData.commitId || "");
-      this.lastConfirmedRevision = Number((_c = normalizedRemote.meta) == null ? void 0 : _c.revision) || 0;
+      this.lastConfirmedRevision = Number((_e = normalizedRemote.meta) == null ? void 0 : _e.revision) || 0;
       this.confirmedState = cloneState(normalizedRemote);
       this.conflict = false;
       this.lastFailureRetryable = true;
@@ -4860,7 +5038,7 @@
       state = normalizedRemote;
       window.state = state;
       committedStateSnapshot = cloneState(state);
-      (_e = (_d = window.FinizeImportSync) == null ? void 0 : _d.setScope) == null ? void 0 : _e.call(_d);
+      (_g = (_f = window.FinizeImportSync) == null ? void 0 : _f.setScope) == null ? void 0 : _g.call(_f);
       try {
         await GoalImageStore.initializeState(state);
         localSave(state, { preserveBackup: normalizedCloudData });
@@ -4886,8 +5064,8 @@
         this.status = "Synchronisatieconflict — lokale keuze bewaard";
         renderCloudStatus();
       }
-      (_g = (_f = window.FinizeImportSync) == null ? void 0 : _f.refresh) == null ? void 0 : _g.call(_f);
-      (_i = (_h = window.FinizeImportSync) == null ? void 0 : _h.onCloudAccepted) == null ? void 0 : _i.call(_h);
+      (_i = (_h = window.FinizeImportSync) == null ? void 0 : _h.refresh) == null ? void 0 : _i.call(_h);
+      (_k = (_j = window.FinizeImportSync) == null ? void 0 : _j.onCloudAccepted) == null ? void 0 : _k.call(_j);
       return true;
     },
     async rebasePendingOntoRemote(documentData, normalizedRemote, localSnapshot = this.pendingState, backupReason = "lokale wijzigingen voor cloudherstel") {
@@ -4917,7 +5095,8 @@
       merged.meta.updatedBy = getDeviceId();
       const validation = validateBudgetState(merged);
       if (!validation.ok) throw new Error(validation.errors.join(" "));
-      if (backupReason) DataAdapter.backup(state, backupReason);
+      if (backupReason && !await DataAdapter.backup(state, backupReason)) throw new Error("Noodback-up niet bevestigd; state is niet vervangen.");
+      if (this.initialSyncComplete && isStaleCloudSnapshot({ ...documentData, state: normalizedRemote }, this.cloudVersion, this.lastCloudSignature)) return false;
       clearTimeout(this.saveTimer);
       this.cloudVersion = cloudDocumentVersion(documentData);
       this.lastCloudSignature = cloudStateSignature(normalizedRemote);
@@ -4944,97 +5123,106 @@
     attachSnapshot() {
       if (this.unsubscribe || !this.docRef) return;
       const { firestore } = this.modules;
+      const subscriptionRef = this.docRef;
       this.unsubscribe = firestore.onSnapshot(this.docRef, async (snap) => {
         var _a2, _b, _c, _d, _e, _f;
-        if (!snap.exists()) {
-          this.initialSyncComplete = true;
-          this.cloudVersion = 0;
-          this.lastCloudSignature = "";
-          this.lastConfirmedCommitId = "";
-          this.status = this.pendingState ? "Opslaan…" : "Lokaal opgeslagen";
-          renderCloudStatus();
-          if (this.pendingState) this.flushQueue();
-          (_b = (_a2 = window.FinizeImportSync) == null ? void 0 : _a2.onCloudAccepted) == null ? void 0 : _b.call(_a2);
-          return;
-        }
-        const documentData = snap.data();
-        const remote = documentData.state;
-        let normalizedRemote;
         try {
-          normalizedRemote = migrateBudgetState(remote);
-        } catch (error) {
-          console.error("Firestore-data kon niet worden gemigreerd", error);
-          this.status = "Synchronisatie mislukt";
-          renderCloudStatus();
-          return;
-        }
-        const validation = validateBudgetState(normalizedRemote);
-        if (!validation.ok) {
-          console.error("Firestore-data ongeldig", validation.errors);
-          this.status = "Synchronisatie mislukt";
-          renderCloudStatus();
-          return;
-        }
-        if ((_c = snap.metadata) == null ? void 0 : _c.hasPendingWrites) {
-          this.status = "Opslaan…";
-          renderCloudStatus();
-          return;
-        }
-        const remoteRevision = Number((_d = normalizedRemote.meta) == null ? void 0 : _d.revision) || 0;
-        const remoteVersion = cloudDocumentVersion(documentData);
-        const remoteSignature = cloudStateSignature(normalizedRemote);
-        const remoteCommitId = String(documentData.commitId || "");
-        if (this.initialSyncComplete && isStaleCloudSnapshot(
-          { ...documentData, state: normalizedRemote },
-          this.cloudVersion,
-          this.lastCloudSignature
-        )) {
-          console.warn("Vertraagde oudere cloudsnapshot genegeerd.");
-          return;
-        }
-        const isOwnCommit = !!this.activeCommitId && remoteCommitId === this.activeCommitId;
-        if (isOwnCommit) {
-          this.initialSyncComplete = true;
-          this.cloudVersion = remoteVersion;
-          this.lastCloudSignature = remoteSignature;
-          this.lastConfirmedCommitId = remoteCommitId;
-          this.lastConfirmedRevision = remoteRevision;
-          this.confirmedState = cloneState(normalizedRemote);
-          return;
-        }
-        const cloudChanged = this.initialSyncComplete && (remoteVersion !== this.cloudVersion || remoteSignature !== this.lastCloudSignature);
-        if (this.writeInFlight && cloudChanged) {
-          this.remoteStateWaiting = { documentData, normalizedRemote };
-          this.status = "Opslaan…";
-          renderCloudStatus();
-          return;
-        }
-        if (this.pendingState && (!this.initialSyncComplete || cloudChanged)) {
-          if (!this.initialSyncComplete) {
-            const localSnapshot = cloneState(this.pendingState);
-            const conflicts = findImportConflicts(normalizedRemote, localSnapshot, normalizedRemote);
-            const imported = JSON.stringify(localSnapshot.importSummaries || []) !== JSON.stringify(normalizedRemote.importSummaries || []) || JSON.stringify(((_e = localSnapshot.transactions) == null ? void 0 : _e.filter((tx) => tx.importBatchId)) || []) !== JSON.stringify(((_f = normalizedRemote.transactions) == null ? void 0 : _f.filter((tx) => tx.importBatchId)) || []);
-            if (imported) await this.preserveImportStateConflict(localSnapshot, normalizedRemote, [{ kind: "initial-import-state" }]);
-            console.warn("Lokale wijzigingen zijn als nood-back-up bewaard; de eerste cloudstand blijft leidend.");
-            await this.acceptRemote(documentData, normalizedRemote, "lokale wijzigingen voor cloudherstel");
-            if (imported) {
-              this.conflict = true;
-              this.status = "Synchronisatieconflict — lokale keuze bewaard";
-              renderCloudStatus();
-            }
+          if (this.docRef !== subscriptionRef) return;
+          if (!snap.exists()) {
+            this.initialSyncComplete = true;
+            this.cloudVersion = 0;
+            this.lastCloudSignature = "";
+            this.lastConfirmedCommitId = "";
+            this.status = this.pendingState ? "Opslaan…" : "Lokaal opgeslagen";
+            renderCloudStatus();
+            if (this.pendingState) this.flushQueue();
+            (_b = (_a2 = window.FinizeImportSync) == null ? void 0 : _a2.onCloudAccepted) == null ? void 0 : _b.call(_a2);
             return;
           }
-          console.warn("Lokale wijziging opnieuw toegepast op de nieuwste cloudstand.");
-          await this.rebasePendingOntoRemote(documentData, normalizedRemote);
-          this.flushQueue();
-          return;
-        }
-        if (this.pendingState || this.writeInFlight) {
-          this.status = "Opslaan…";
+          const documentData = await this.cloudStore().hydrate(snap.data());
+          if (this.docRef !== subscriptionRef) return;
+          const remote = documentData.state;
+          let normalizedRemote;
+          try {
+            normalizedRemote = migrateBudgetState(remote);
+          } catch (error) {
+            console.error("Firestore-data kon niet worden gemigreerd", error);
+            this.status = "Synchronisatie mislukt";
+            renderCloudStatus();
+            return;
+          }
+          const validation = validateBudgetState(normalizedRemote);
+          if (!validation.ok) {
+            console.error("Firestore-data ongeldig", validation.errors);
+            this.status = "Synchronisatie mislukt";
+            renderCloudStatus();
+            return;
+          }
+          if ((_c = snap.metadata) == null ? void 0 : _c.hasPendingWrites) {
+            this.status = "Opslaan…";
+            renderCloudStatus();
+            return;
+          }
+          const remoteRevision = Number((_d = normalizedRemote.meta) == null ? void 0 : _d.revision) || 0;
+          const remoteVersion = cloudDocumentVersion(documentData);
+          const remoteSignature = cloudStateSignature(normalizedRemote);
+          const remoteCommitId = String(documentData.commitId || "");
+          if (this.initialSyncComplete && isStaleCloudSnapshot(
+            { ...documentData, state: normalizedRemote },
+            this.cloudVersion,
+            this.lastCloudSignature
+          )) {
+            console.warn("Vertraagde oudere cloudsnapshot genegeerd.");
+            return;
+          }
+          const isOwnCommit = !!this.activeCommitId && remoteCommitId === this.activeCommitId;
+          if (isOwnCommit) {
+            this.initialSyncComplete = true;
+            this.cloudVersion = remoteVersion;
+            this.lastCloudSignature = remoteSignature;
+            this.lastConfirmedCommitId = remoteCommitId;
+            this.lastConfirmedRevision = remoteRevision;
+            this.confirmedState = cloneState(normalizedRemote);
+            return;
+          }
+          const cloudChanged = this.initialSyncComplete && (remoteVersion !== this.cloudVersion || remoteSignature !== this.lastCloudSignature);
+          if (this.writeInFlight && cloudChanged) {
+            this.remoteStateWaiting = { documentData, normalizedRemote };
+            this.status = "Opslaan…";
+            renderCloudStatus();
+            return;
+          }
+          if (this.pendingState && (!this.initialSyncComplete || cloudChanged)) {
+            if (!this.initialSyncComplete) {
+              const localSnapshot = cloneState(this.pendingState);
+              const conflicts = findImportConflicts(normalizedRemote, localSnapshot, normalizedRemote);
+              const imported = JSON.stringify(localSnapshot.importSummaries || []) !== JSON.stringify(normalizedRemote.importSummaries || []) || JSON.stringify(((_e = localSnapshot.transactions) == null ? void 0 : _e.filter((tx) => tx.importBatchId)) || []) !== JSON.stringify(((_f = normalizedRemote.transactions) == null ? void 0 : _f.filter((tx) => tx.importBatchId)) || []);
+              if (imported) await this.preserveImportStateConflict(localSnapshot, normalizedRemote, [{ kind: "initial-import-state" }]);
+              console.warn("Lokale wijzigingen zijn als nood-back-up bewaard; de eerste cloudstand blijft leidend.");
+              await this.acceptRemote(documentData, normalizedRemote, "lokale wijzigingen voor cloudherstel");
+              if (imported) {
+                this.conflict = true;
+                this.status = "Synchronisatieconflict — lokale keuze bewaard";
+                renderCloudStatus();
+              }
+              return;
+            }
+            console.warn("Lokale wijziging opnieuw toegepast op de nieuwste cloudstand.");
+            await this.rebasePendingOntoRemote(documentData, normalizedRemote);
+            this.flushQueue();
+            return;
+          }
+          if (this.pendingState || this.writeInFlight) {
+            this.status = "Opslaan…";
+            renderCloudStatus();
+            return;
+          }
+          await this.acceptRemote(documentData, normalizedRemote);
+        } catch (error) {
+          console.error("Cloudstate niet geaccepteerd; bestaande state behouden", error);
+          this.status = "Synchronisatie mislukt";
           renderCloudStatus();
-          return;
         }
-        await this.acceptRemote(documentData, normalizedRemote);
       }, (err) => {
         console.error("Firestore live-sync fout", err);
         this.status = navigator.onLine ? "Synchronisatie mislukt" : "Offline — lokaal bewaard";
@@ -5084,14 +5272,6 @@
       try {
         const cloudSnapshot = cloneState(snapshot2);
         await GoalImageStore.expandStateForTransfer(cloudSnapshot);
-        const payloadBytes = new Blob([JSON.stringify(cloudSnapshot)]).size;
-        if (payloadBytes > 9e5) {
-          this.lastFailureRetryable = false;
-          this.status = "Synchronisatie mislukt";
-          console.error("Cloudopslag overgeslagen: app-data is groter dan 900 kB.");
-          renderCloudStatus();
-          return false;
-        }
         const validation = validateBudgetState(cloudSnapshot);
         if (!validation.ok) {
           this.lastFailureRetryable = false;
@@ -5101,23 +5281,24 @@
         }
         const { firestore } = this.modules;
         const importStage = await ((_a2 = window.FinizeImportSync) == null ? void 0 : _a2.prepareCloudSnapshot(cloudSnapshot));
+        const descriptor = await this.cloudStore().prepare(cloudSnapshot, commitId);
+        console.info("Finize cloudgeneration bevestigd: " + JSON.stringify({ schema: descriptor.schema, generation: commitId, chunkCount: descriptor.chunkCount, totalByteLength: descriptor.totalByteLength, totalSha256: descriptor.totalSha256, integrity: "readback-sha256-ok", components: Object.entries(cloudSnapshot).map(([field, value]) => ({ field, byteLength: new TextEncoder().encode(JSON.stringify(value)).length })).sort((a, b) => b.byteLength - a.byteLength) }));
         const nextVersion = await firestore.runTransaction(this.db, async (transaction) => {
-          var _a3, _b2;
+          var _a3;
           const currentSnapshot = await transaction.get(this.docRef);
           const currentData = currentSnapshot.exists() ? currentSnapshot.data() : null;
           const currentVersion = assertCloudBase(currentData, expectedVersion, expectedSignature);
+          const sealed = await transaction.get(this.cloudStore().generationRef(commitId));
+          if (!sealed.exists() || !sealed.data().complete || sealed.data().totalSha256 !== descriptor.totalSha256) throw new Error("Cloudgeneration is niet volledig bevestigd.");
           await (importStage == null ? void 0 : importStage.readAndValidate(transaction));
           importStage == null ? void 0 : importStage.publish(transaction);
           const version = currentVersion + 1;
-          transaction.set(this.docRef, {
-            state: cloudSnapshot,
+          transaction.set(this.docRef, cloudStateManifest(descriptor, {
             updatedAt: firestore.serverTimestamp(),
-            revision: Number((_a3 = cloudSnapshot.meta) == null ? void 0 : _a3.revision) || 0,
-            updatedBy: ((_b2 = cloudSnapshot.meta) == null ? void 0 : _b2.updatedBy) || getDeviceId(),
-            app: "finize",
+            updatedBy: ((_a3 = cloudSnapshot.meta) == null ? void 0 : _a3.updatedBy) || getDeviceId(),
             syncVersion: version,
             commitId
-          });
+          }));
           return version;
         });
         await (importStage == null ? void 0 : importStage.acknowledge());
@@ -5134,7 +5315,7 @@
           await window.FinizeImportSync.preserveConflict(e.importConflict.local, e.importConflict.remote);
           const fresh = await this.modules.firestore.getDoc(this.docRef);
           if (fresh.exists()) {
-            const data = fresh.data();
+            const data = await this.cloudStore().hydrate(fresh.data());
             await this.acceptRemote(data, migrateBudgetState(data.state), "lokale importkeuze bij conflict");
           }
           this.lastFailureRetryable = false;
@@ -5150,7 +5331,7 @@
             if (!latest2) {
               const freshSnapshot = await this.modules.firestore.getDoc(this.docRef);
               if (!freshSnapshot.exists()) throw new Error("Het cloud-document ontbreekt.");
-              const documentData = freshSnapshot.data();
+              const documentData = await this.cloudStore().hydrate(freshSnapshot.data());
               const normalizedRemote = migrateBudgetState(documentData.state);
               const remoteValidation = validateBudgetState(normalizedRemote);
               if (!remoteValidation.ok) throw new Error(remoteValidation.errors.join(" "));
@@ -5184,7 +5365,9 @@
       if (this.writeInFlight || this.pendingState) {
         throw new Error("Wacht tot de huidige wijziging in de cloud is opgeslagen.");
       }
-      if (!DataAdapter.backup(state, backupReason)) throw new Error("Back-up maken mislukt; herstel is niet uitgevoerd.");
+      const restoreBase = JSON.stringify(state), restoreVersion = this.cloudVersion, restoreRef = this.docRef;
+      if (!await DataAdapter.backup(state, backupReason)) throw new Error("Back-up maken mislukt; herstel is niet uitgevoerd.");
+      if (this.docRef !== restoreRef || this.cloudVersion !== restoreVersion || this.writeInFlight || this.pendingState || JSON.stringify(state) !== restoreBase) throw new Error("De stand veranderde tijdens de noodback-up; herstel is niet uitgevoerd.");
       const restored = cloneState(restoredState);
       ensurePersistentIds(restored);
       await GoalImageStore.initializeState(restored);
@@ -5231,6 +5414,9 @@
       this.status = "Offline — lokaal bewaard";
       renderCloudStatus();
     },
+    cloudStore() {
+      return createChunkedCloudStore(this.modules.firestore, this.db, this.docRef);
+    },
     importRef(importId) {
       var _a2;
       const path = cloudImportDocumentPath(activeAuthSession, importId);
@@ -5245,6 +5431,7 @@
     }
   };
   window.CloudAdapter = CloudAdapter;
+  var stateBackupStore = createStateBackupStore();
   var DataAdapter = {
     loadedFromStorage: false,
     // Lokaal blijft altijd de eerste veiligheidslaag. Firestore is optionele live-sync erbovenop.
@@ -5282,32 +5469,47 @@
         throw e;
       }
     },
-    backup(state2, reason) {
+    async backup(state2, reason) {
+      var _a2;
       try {
         const keys = activeStorageKeys();
         if (!keys) return false;
-        localStorage.setItem(keys.backup, JSON.stringify({
-          savedAt: (/* @__PURE__ */ new Date()).toISOString(),
-          label: backupLabel(),
-          reason,
-          state: state2
-        }));
+        const envelope = { savedAt: (/* @__PURE__ */ new Date()).toISOString(), label: backupLabel(), reason, state: state2 };
+        const record = await stateBackupStore.persist(keys.backup, envelope, { household: ((_a2 = activeAuthSession == null ? void 0 : activeAuthSession.assignment) == null ? void 0 : _a2.householdId) || "local", syncVersion: CloudAdapter.cloudVersion });
+        this.backupRead = { scope: keys.backup, loaded: true, value: JSON.parse(record.payload) };
+        console.info("Finize noodback-up bevestigd: " + JSON.stringify({ type: record.type, schema: record.schema, revision: record.revision, syncVersion: record.syncVersion, byteLength: record.byteLength, sha256: record.sha256, integrity: "readback-sha256-ok" }));
         return true;
       } catch (e) {
         console.error("back-up maken mislukt", e);
         return false;
       }
     },
-    loadBackup() {
-      try {
-        const keys = activeStorageKeys();
-        if (!keys) return null;
-        const raw = localStorage.getItem(keys.backup);
-        return raw ? JSON.parse(raw) : null;
-      } catch (e) {
-        console.error("back-up laden mislukt", e);
-        return null;
+    async loadBackup() {
+      const keys = activeStorageKeys();
+      if (!keys) return null;
+      const record = await stateBackupStore.latest(keys.backup);
+      const modern = record ? JSON.parse(record.payload) : null;
+      const legacy = readLegacyStateBackup(localStorage, keys.backup);
+      return legacy && (!modern || String(legacy.savedAt || "") > String(modern.savedAt || "")) ? legacy : modern;
+    },
+    backupForPresentation() {
+      var _a2, _b;
+      const scope = (_a2 = activeStorageKeys()) == null ? void 0 : _a2.backup;
+      if (!scope) return null;
+      if (((_b = this.backupRead) == null ? void 0 : _b.scope) !== scope) {
+        this.backupRead = { scope, loaded: false, value: null };
+        this.loadBackup().then((value) => {
+          var _a3;
+          if (((_a3 = this.backupRead) == null ? void 0 : _a3.scope) !== scope) return;
+          this.backupRead = { scope, loaded: true, value };
+          if (activeTab === "data") renderActiveTab();
+        }).catch((error) => {
+          var _a3;
+          if (((_a3 = this.backupRead) == null ? void 0 : _a3.scope) === scope) this.backupRead = { scope, loaded: true, value: null };
+          console.error("Noodback-up niet leesbaar", error);
+        });
       }
+      return this.backupRead.value;
     }
   };
   var state = migrateBudgetState(defaultState());
@@ -6539,7 +6741,7 @@
   function renderDataTab() {
     var _a2;
     (_a2 = document.getElementById("tab-data")) == null ? void 0 : _a2.classList.remove("mobile-data-page");
-    const lastBackup = DataAdapter.loadBackup();
+    const lastBackup = DataAdapter.backupForPresentation();
     const lastBackupDate = (lastBackup == null ? void 0 : lastBackup.savedAt) ? new Date(lastBackup.savedAt) : null;
     const isToday = lastBackupDate && lastBackupDate.toDateString() === (/* @__PURE__ */ new Date()).toDateString();
     const backupDesc = lastBackupDate ? `${isToday ? "Vandaag" : lastBackupDate.toLocaleDateString("nl-NL")} om ${lastBackupDate.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" })}` : "Nog geen back-up gemaakt";
@@ -6628,7 +6830,13 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       reader.readAsText(file);
     });
     document.getElementById("btnRestoreBackup").addEventListener("click", async () => {
-      const backup = DataAdapter.loadBackup();
+      let backup;
+      try {
+        backup = await DataAdapter.loadBackup();
+      } catch (error) {
+        alert("Noodback-up niet leesbaar: " + error.message);
+        return;
+      }
       if (!backup || !backup.state) {
         alert("Er is nog geen lokale nood-back-up gevonden.");
         return;
@@ -6650,9 +6858,12 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
         }
       }
     });
-    document.getElementById("btnReset").addEventListener("click", () => {
+    document.getElementById("btnReset").addEventListener("click", async () => {
       if (confirm("Weet je zeker dat je alle gegevens wilt wissen en opnieuw wilt beginnen? De huidige stand wordt eerst als lokale nood-back-up bewaard.")) {
-        DataAdapter.backup(state, "voor alles wissen");
+        if (!await DataAdapter.backup(state, "voor alles wissen")) {
+          alert("Noodback-up niet bevestigd; gegevens behouden.");
+          return;
+        }
         const stateBeforeReset = cloneState(state);
         state = normalizeBudgetState(defaultState());
         window.state = state;
@@ -6683,7 +6894,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       try {
         const freshSnapshot = await CloudAdapter.modules.firestore.getDoc(CloudAdapter.docRef);
         if (!freshSnapshot.exists()) throw new Error("Het cloud-document ontbreekt.");
-        const documentData = freshSnapshot.data();
+        const documentData = await CloudAdapter.cloudStore().hydrate(freshSnapshot.data());
         const normalizedRemote = migrateBudgetState(documentData.state);
         const validation = validateBudgetState(normalizedRemote);
         if (!validation.ok) throw new Error(validation.errors.join(" "));
@@ -9628,7 +9839,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     }
     return { counts, status: counts.onbekend || counts.nakijken ? counts.goedgekeurd || counts["niet-meetellen"] ? "gedeeltelijk" : "concept" : "verwerkt" };
   }
-  function fail(message, code = "import-dependency") {
+  function fail2(message, code = "import-dependency") {
     const error = new Error(message);
     error.code = code;
     throw error;
@@ -9641,58 +9852,58 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     const sourceIds = new Set(active.map((tx) => tx.importTransactionId));
     for (const id of sourceIds) {
       const source = batch.rows.find((row) => row.id === id);
-      if (!source) fail(`Importbron ${id} ontbreekt; herstel is geblokkeerd.`);
+      if (!source) fail2(`Importbron ${id} ontbreekt; herstel is geblokkeerd.`);
       const check = validateRow(source, next);
-      if (!check.ok) fail(check.errors.map((e) => e.message).join(" "));
+      if (!check.ok) fail2(check.errors.map((e) => e.message).join(" "));
     }
     for (const tx of active) {
-      if (!tx.importTransactionId || !tx.bankOriginal) fail(`Betrouwbare bronidentiteit ontbreekt voor ${tx.id}.`);
-      if (!Number.isFinite(Number(tx.amount))) fail(`Verwerkt bedrag ontbreekt voor ${tx.id}.`);
+      if (!tx.importTransactionId || !tx.bankOriginal) fail2(`Betrouwbare bronidentiteit ontbreekt voor ${tx.id}.`);
+      if (!Number.isFinite(Number(tx.amount))) fail2(`Verwerkt bedrag ontbreekt voor ${tx.id}.`);
     }
     const missing = coverageAllocationStatus(next).find((row) => row.reason === "coverage-missing-reference" && (ids.has(row.withdrawalTransactionId) || ids.has(row.expenseTransactionId)));
-    if (missing) fail("Spaardekking verwijst naar een verwijderd endpoint. Herstel is geblokkeerd.");
+    if (missing) fail2("Spaardekking verwijst naar een verwijderd endpoint. Herstel is geblokkeerd.");
     for (const pair of next.internalTransferPairs || []) {
       if (pair.active === false || !["bevestigd", "confirmed", "uitgevoerd"].includes(pair.status)) continue;
       const old = (previous.internalTransferPairs || []).find((row) => row.id === pair.id);
       if (JSON.stringify(old) !== JSON.stringify(pair)) confirmInternalTransferPair(copy5(next), pair.id);
     }
     const coverage = coverageAllocationStatus(next).find((row) => row.reason && !["coverage-inactive-reference"].includes(row.reason));
-    if (coverage && !coverageAllocationStatus(previous).some((old) => old.id === coverage.id && old.reason === coverage.reason)) fail(`Spaardekking is ongeldig: ${coverage.reason}.`);
+    if (coverage && !coverageAllocationStatus(previous).some((old) => old.id === coverage.id && old.reason === coverage.reason)) fail2(`Spaardekking is ongeldig: ${coverage.reason}.`);
     for (const relation of next.manualTransactionReplacements || []) {
       if (relation.active === false) continue;
       const manualId = relation.manualTransactionId || ((_a2 = relation.manualTransaction) == null ? void 0 : _a2.id);
       if ((next.manualTransactionReplacements || []).filter((r) => {
         var _a3;
         return r.active !== false && (r.manualTransactionId || ((_a3 = r.manualTransaction) == null ? void 0 : _a3.id)) === manualId;
-      }).length > 1) fail(`De handmatige transactie ${manualId} heeft twee actieve vervangingen.`);
+      }).length > 1) fail2(`De handmatige transactie ${manualId} heeft twee actieve vervangingen.`);
     }
     for (const repayment of next.advanceRepayments || []) {
       if (repayment.active === false || !ids.has(repayment.transactionId)) continue;
       const advance = (next.advanceLedger || []).find((row) => row.id === repayment.advanceId && row.active !== false);
-      if (!advance) fail(`Voorschot ${repayment.advanceId} ontbreekt of is inactief.`);
+      if (!advance) fail2(`Voorschot ${repayment.advanceId} ontbreekt of is inactief.`);
     }
     return true;
   }
   function planImportCommand(state2, batch, intent, options = {}) {
     var _a2;
-    if (!(batch == null ? void 0 : batch.id) || !(intent == null ? void 0 : intent.operationId)) fail("Batch-ID en operation-ID zijn vereist.");
+    if (!(batch == null ? void 0 : batch.id) || !(intent == null ? void 0 : intent.operationId)) fail2("Batch-ID en operation-ID zijn vereist.");
     const previous = copy5(state2), candidate = copy5(state2), nextBatch = copy5(batch), id = batch.id;
     const deletion = (candidate.importDeletionProofs || []).find((row) => row.id === id);
     if (deletion) {
       if (intent.type === "delete") return { state: candidate, batch: copy5(deletion), noop: true };
-      fail("Deze batch is permanent verwijderd.", "import-deleted");
+      fail2("Deze batch is permanent verwijderd.", "import-deleted");
     }
     const current = batchLifecycle(batch);
     if (intent.type === "withdraw" && current === "withdrawn" || intent.type === "restore" && current === "active") return { state: candidate, batch: nextBatch, noop: true };
-    if (!["withdraw", "restore", "delete"].includes(intent.type)) fail("Onbekende batchactie.");
+    if (!["withdraw", "restore", "delete"].includes(intent.type)) fail2("Onbekende batchactie.");
     const rows = batchRows(candidate, id), ids = new Set(rows.map((tx) => tx.id));
     if (rows.some((tx) => !tx.importTransactionId || !tx.bankOriginal) || rows.some((tx) => {
       var _a3;
       return !((_a3 = batch.rows) == null ? void 0 : _a3.some((row) => row.id === tx.importTransactionId));
-    })) fail("Betrouwbare bronidentiteit ontbreekt; batchactie is geblokkeerd.");
+    })) fail2("Betrouwbare bronidentiteit ontbreekt; batchactie is geblokkeerd.");
     const ownAdvances = (candidate.advanceLedger || []).filter((row) => belongs(row, id, ids));
     for (const advance of ownAdvances) {
-      if ((candidate.advanceRepayments || []).some((row) => row.active !== false && row.advanceId === advance.id && !ids.has(row.transactionId)) || (advance.settlementTransferIds || []).length) fail(`Voorschot ${advance.id} heeft onafhankelijke aflossingen/verrekeningen.`);
+      if ((candidate.advanceRepayments || []).some((row) => row.active !== false && row.advanceId === advance.id && !ids.has(row.transactionId)) || (advance.settlementTransferIds || []).length) fail2(`Voorschot ${advance.id} heeft onafhankelijke aflossingen/verrekeningen.`);
     }
     const restoring = intent.type === "restore";
     nextBatch.lifecycle = restoring ? "active" : "withdrawn";
@@ -9728,7 +9939,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
           advance.status = "open";
         }
       } else if (restoring && repayment.lifecycleWasActive) {
-        if (!advance || advance.active === false || Number(advance.outstandingAmount) < Number(repayment.amount)) fail(`Aflossing ${repayment.id} kan niet volledig worden hersteld.`);
+        if (!advance || advance.active === false || Number(advance.outstandingAmount) < Number(repayment.amount)) fail2(`Aflossing ${repayment.id} kan niet volledig worden hersteld.`);
         advance.outstandingAmount = Math.round((Number(advance.outstandingAmount) - Number(repayment.amount)) * 100) / 100;
         advance.status = advance.outstandingAmount === 0 ? "voldaan" : "open";
         repayment.active = true;
