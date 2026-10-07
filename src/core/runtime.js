@@ -768,10 +768,59 @@ function personalIncomeOverview(owner, allowance, month=getSelectedMonth()){
   const items=[...sources.entries()].map(([label,amount])=>({label,amount}));
   return {total:round2(items.reduce((sum,item)=>sum+item.amount,0)),items};
 }
-function renderIncomeSources(overview){
-  return `<div class="personal-income-sources">${overview.items.map(item=>`<div><span>${textSafe(item.label)}</span><strong>${eur(item.amount)}</strong></div>`).join('')}</div>`;
+function renderIncomeSources(overview,owner='gezamenlijk'){
+  return `<div class="personal-income-sources">${overview.items.map(item=>`<div><span><button type="button" class="income-source-link" data-income-source="${attrSafe(item.label)}" data-income-owner="${attrSafe(owner)}" data-income-month="${attrSafe(getSelectedMonth())}" aria-label="Transacties bij ${attrSafe(item.label)} bekijken">${textSafe(item.label)}</button></span><strong>${eur(item.amount)}</strong></div>`).join('')}</div>`;
 }
-function renderPersonalIncomeSources(overview){return renderIncomeSources(overview);}
+function renderPersonalIncomeSources(overview,owner='gezamenlijk'){return renderIncomeSources(overview,owner);}
+function incomeSourceProjectionRows(owner,label,month){
+  const joint=owner==='gezamenlijk';
+  const projections=selectTransactionProjections(state,joint?{month}:{month,account:owner});
+  const standard=joint?{dion:getDistributionIncomeParts('dion',month),dara:getDistributionIncomeParts('dara',month)}:null;
+  const legacyOwners=joint?legacySalaryForecastOwners(state,month,standard):null;
+  return projections.filter(p=>{
+    const salary=p.transactionType==='salaris';
+    if(joint){
+      const salaryInBase=salary&&['dion','dara'].includes(legacyOwners.get(p.id)||p.financialFor);
+      return p.effects.incomeImpact!==0&&(salaryInBase?label==='Salarissen':incomeSourceLabel(p.transactionType)===label);
+    }
+    const amount=p.effects.incomeImpact||(['terugbetaling','refund'].includes(p.transactionType)?p.amount:0);
+    return !salary&&!!amount&&incomeSourceLabel(p.transactionType)===label;
+  });
+}
+function bindIncomeSourceLinks(root){
+  root.querySelectorAll('[data-income-source]').forEach(button=>button.addEventListener('click',event=>{
+    event.preventDefault();event.stopPropagation();
+    openIncomeSourceTransactions(button.dataset.incomeOwner,button.dataset.incomeSource,button.dataset.incomeMonth,button);
+  }));
+}
+function openIncomeSourceTransactions(owner,label,month,trigger){
+  if(owner!=='gezamenlijk'&&(!canViewPersonalTab(owner)||!personalKpiVisible(owner,'income')))return;
+  const overview=owner==='gezamenlijk'?dashboardIncomeBreakdown(month):personalIncomeOverview(owner,calcScenario(state,month)[owner].zakgeld,month);
+  const item=overview.items.find(row=>row.label===label);if(!item)return;
+  const all=incomeSourceProjectionRows(owner,label,month);
+  const rows=all.filter(p=>p.accountContext==='gezamenlijk'||(canViewPersonalTab(p.accountContext)&&personalKpiVisible(p.accountContext,'income')));
+  const hidden=rows.length<all.length;
+  const linkedCents=all.reduce((sum,p)=>sum+Math.round((p.effects.incomeImpact||p.amount)*100),0);
+  const unlinked=linkedCents!==Math.round(item.amount*100);
+  const modal=document.getElementById('transactionModal');
+  const fromOverview=document.getElementById('incomeEditModal').classList.contains('open');
+  if(fromOverview)document.getElementById('incomeEditModal').classList.remove('open');
+  modal.innerHTML=`<div class="modal budget-transactions-modal" role="dialog" aria-modal="true" aria-labelledby="incomeSourceTitle">
+    <div class="modal-head"><div><h2 id="incomeSourceTitle">${textSafe(label)}</h2><p>${textSafe(monthLabel(month))} · ${eur(item.amount)}</p></div><button type="button" class="ghost" data-close-income-source>Sluiten</button></div>
+    <div class="budget-transactions-list">${rows.map(p=>`<div class="budget-transaction-row" data-income-transaction-id="${attrSafe(p.transaction.id)}"><span><strong>${textSafe(p.transaction.description||p.category||'Transactie')}</strong><small>${textSafe(formatDateNL(getTransactionDate(p.transaction)))} · ${textSafe(p.accountContext?ownerLabel(p.accountContext):'Rekening onbekend')}${p.splitId?' · deeltransactie':''}</small></span><b class="value pos">${eur(p.effects.incomeImpact||p.amount)}</b></div>`).join('')}
+    ${hidden?'<p class="hint">Persoonlijke transactiedetails worden alleen getoond wanneer deze gedeeld zijn.</p>':''}
+    ${label==='Zakgeld'?'<p class="hint">Zakgeld wordt bepaald door de maandplanning. Dit is geen afzonderlijke inkomenstransactie.</p>':unlinked?'<p class="hint">Deze bron bevat ook geplande of eerder ingevoerde bedragen zonder gekoppelde transactie.</p>':!all.length?'<p class="hint">Geen gekoppelde transacties voor deze bron in deze maand.</p>':''}
+    </div></div>`;
+  const close=()=>{
+    modal.classList.remove('open');modal.removeEventListener('keydown',onKey);
+    if(fromOverview)document.getElementById('incomeEditModal').classList.add('open');
+    if(trigger?.isConnected)trigger.focus();
+  };
+  const onKey=event=>{if(event.key==='Escape'){event.stopPropagation();close();}};
+  modal.querySelector('[data-close-income-source]').addEventListener('click',close);
+  modal.addEventListener('keydown',onKey);bindModalBackdrop(modal,close);modal.classList.add('open');
+  modal.querySelector('[data-close-income-source]').focus();
+}
 function budgetCategoryMatches(tx, category){
   const txCat=String(tx?.category||'').trim().toLocaleLowerCase('nl-NL');
   const wanted=String(category||'').trim().toLocaleLowerCase('nl-NL');
@@ -3542,7 +3591,7 @@ function renderPersonOrJoint(tabId, key, label){
     </div>` : '';
   const personalKpis = !isJoint ? `
     <div class="overview-kpi-row">
-      ${personalKpiVisible(key,'income')?renderIconKpi('€','green','Totaal inkomen', eur(personalIncome.total), renderPersonalIncomeSources(personalIncome), {valueClass:personalIncome.total<0?'value neg':'value pos',kpiId:'income'}):''}
+      ${personalKpiVisible(key,'income')?renderIconKpi('€','green','Totaal inkomen', eur(personalIncome.total), renderPersonalIncomeSources(personalIncome,key), {valueClass:personalIncome.total<0?'value neg':'value pos',kpiId:'income'}):''}
       ${personalKpiVisible(key,'fixed')?renderIconKpi('▤','blue','Vaste lasten', eur(rr.persoonlijkeVasteLasten), 'Klik om te wijzigen', {valueClass: rr.persoonlijkeVasteLasten>0?'value neg':'value pos', openFixedOwner:key,kpiId:'fixed'}):''}
       ${personalKpiVisible(key,'saving')?renderIconKpi('◎','green','Over deze maand', eur(remainingThisMonth), 'Na vaste lasten, gebruikt budget en spaargeld', {valueClass:remainingThisMonth<0?'value neg':'value pos',kpiId:'saving'}):''}
       ${personalKpiVisible(key,'variable')?renderIconKpi('▥','blue','Variabel gebruikt', `${eur(variableUsed)} / ${eur(variableBudget)}`, `<span class="overview-budget-track" style="--used-pct:${variablePct}%"></span>`,{kpiId:'variable'}):''}
@@ -4563,6 +4612,7 @@ function openJointIncomeOverview(origin,trigger){
   modal.addEventListener('keydown',onKey);
   bindModalBackdrop(modal,close);
   modal.classList.add('open');
+  bindIncomeSourceLinks(modal);
   modal.querySelector('[data-close-income-overview]').focus();
 }
 function openIncomeEditModal(person, label){
@@ -4844,7 +4894,7 @@ function renderPersonalFirstRow(owner){
   const fixedRows=Object.entries(fixed).sort((a,b)=>b[1]-a[1]).map(([cat,amount])=>{ const ratio=person.persoonlijkeVasteLasten>0?amount/person.persoonlijkeVasteLasten:0; return `<div class="progress-item"><div class="progress-item-icon tone-green">${iconSvg(jointFixedCategoryIconName(cat))}</div><div class="progress-top"><strong>${cat}</strong><span>${eur(amount)} · ${pct(ratio)}</span></div><div class="progress-track"><div class="progress-fill" style="width:${Math.round(ratio*100)}%"></div></div></div>`; }).join('');
   const variableBudget=sumBedrag(data.variabel||[]); const variablePct=variableBudget>0?Math.min(100,Math.round((person.variabeleUitgaven/variableBudget)*100)):0;
   return `<div class="mobile-kpi-grid v4-mobile-only-grid joint-first-row" aria-label="${name} rij 1">
-    ${personalKpiVisible(owner,'income')?`<button type="button" class="mobile-kpi-card joint-kpi-card joint-total-income-card" data-personal-kpi-mobile="income" data-income-edit="${owner}" data-income-label="${textSafe(name)}" aria-label="Inkomen van ${textSafe(name)} aanpassen"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg('allowance')}</span></div><div class="mobile-kpi-label">Totaal inkomen</div><div class="mobile-kpi-value ${personalIncome.total<0?'value neg':'value pos'}">${eur(personalIncome.total)}</div>${renderPersonalIncomeSources(personalIncome)}</button>`:''}
+    ${personalKpiVisible(owner,'income')?`<div role="button" tabindex="0" class="mobile-kpi-card joint-kpi-card joint-total-income-card" data-personal-kpi-mobile="income" data-income-edit="${owner}" data-income-label="${textSafe(name)}" aria-label="Inkomen van ${textSafe(name)} aanpassen"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg('allowance')}</span></div><div class="mobile-kpi-label">Totaal inkomen</div><div class="mobile-kpi-value ${personalIncome.total<0?'value neg':'value pos'}">${eur(personalIncome.total)}</div>${renderPersonalIncomeSources(personalIncome,owner)}</div>`:''}
     <div class="mobile-kpi-card joint-kpi-card joint-fixed-costs-card"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg('wallet')}</span></div><div class="mobile-kpi-label">Vaste lasten</div><div class="mobile-kpi-value value neg">${eur(person.persoonlijkeVasteLasten)}</div><div class="mobile-kpi-edit-hint-placeholder">.</div></div>
     <button type="button" class="mobile-kpi-card joint-kpi-card joint-saving-card" data-personal-saving-edit="${owner}" aria-label="Spaargeld van ${textSafe(name)} voor deze maand aanpassen"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg('piggy')}</span></div><div class="mobile-kpi-label">Sparen deze maand</div><div class="mobile-kpi-value ${person.beschikbaarVoorSparen<0?'value neg':'value pos'}">${eur(person.beschikbaarVoorSparen)}</div><div class="mobile-kpi-edit-hint">${person.savingsSource==='handmatig'?'Handmatig':'Tik om aan te passen'}</div></button>
     <div class="mobile-kpi-card joint-kpi-card static joint-variable-card"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg('chart')}</span></div><div class="mobile-kpi-label">Variabel gebruikt</div><div class="mobile-kpi-value mobile-kpi-value-budget neu">${eur(person.variabeleUitgaven)} / ${eur(variableBudget)}</div><div class="mobile-kpi-budget-track" style="--used-pct:${variablePct}%"></div></div>
@@ -5019,7 +5069,11 @@ function renderActiveTab(){
     btn.addEventListener('click', ()=>{
       openIncomeEditModal(btn.dataset.incomeEdit, btn.dataset.incomeLabel);
     });
+    btn.addEventListener('keydown',event=>{
+      if(event.target===btn&&btn.tagName!=='BUTTON'&&['Enter',' '].includes(event.key)){event.preventDefault();btn.click();}
+    });
   });
+  bindIncomeSourceLinks(root);
   root.querySelectorAll('[data-open-income-overview]').forEach(btn=>{
     btn.addEventListener('click',()=>openJointIncomeOverview(btn.dataset.openIncomeOverview,btn));
   });

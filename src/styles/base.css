@@ -424,6 +424,9 @@ td.num{ text-align:right; }
 .personal-income-sources div{ display:flex; align-items:center; justify-content:space-between; gap:8px; min-width:0; color:var(--text-faint); font-size:11px; line-height:1.25; }
 .personal-income-sources span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .personal-income-sources strong{ color:var(--text-dim); font-weight:750; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.personal-income-sources .income-source-link{ display:block; max-width:100%; padding:0; border:0; border-radius:0; background:none; box-shadow:none; color:inherit; font:inherit; line-height:inherit; text-align:left; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
+.personal-income-sources .income-source-link:hover{ transform:none; box-shadow:none; text-decoration:underline; }
+.personal-income-sources .income-source-link:focus-visible{ outline:2px solid var(--text-dim); outline-offset:1px; }
 .metric-sub > .personal-income-sources{ margin-top:-2px; }
 .inline-edit{ width:100%; font-size:22px !important; font-weight:800 !important; text-align:left !important; }
 .income-metric{ gap:7px; justify-content:flex-start; }
