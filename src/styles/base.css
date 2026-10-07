@@ -4825,7 +4825,7 @@ body.v4-app[data-real-active-tab="gezamenlijk"] .joint-variable-overview-card{
 
 
   body.v4-app[data-real-active-tab="gezamenlijk"] #tab-dion,
-  body.v4-app[data-real-active-tab="gezamenlijk"] #tab-dara{ width:100% !important; max-width:none !important; margin:0 !important; }
+  body.v4-app[data-real-active-tab="gezamenlijk"] #tab-dara{ width:100% !important; max-width:none !important; margin:0 !important; padding-inline:0 !important; }
 
 
   body.v4-app[data-real-active-tab="spaardoelen"] .mobile-savings-overview{ display:grid; gap:6px; }

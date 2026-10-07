@@ -1,11 +1,11 @@
-const CACHE_NAME = "finize-v112-mobile-goal-table-scale";
+const CACHE_NAME = "finize-v113-mobile-account-margins";
 const CACHE_PREFIX = "finize-";
 
 const CRITICAL_SHELL = [
   "./",
   "./index.html",
-  "./app.js?v=112-mobile-goal-table-scale",
-  "./app.css?v=112-mobile-goal-table-scale",
+  "./app.js?v=113-mobile-account-margins",
+  "./app.css?v=113-mobile-account-margins",
   "./manifest.json"
 ];
 
