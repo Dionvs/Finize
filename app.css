@@ -5052,10 +5052,22 @@ body.v4-app .modal-content{ min-width:0; }
 body .u5-goal-table-stack > .u5-joint-goals-preview{overflow:visible;}
 body.v4-app[data-real-active-tab="gezamenlijk"] .joint-month-available-card{cursor:default !important;}
 @media (max-width:767px){
-  .u5-joint-goals-preview .goal-table th{font-size:clamp(6px,1.6vw,10px); padding:5px 1px; overflow-wrap:anywhere;}
-  .u5-joint-goals-preview .goal-table td{font-size:clamp(7px,1.8vw,11px); padding:5px 1px; white-space:normal; overflow-wrap:anywhere;}
-  .u5-joint-goals-preview .goal-table .progress-label{font-size:inherit;}
-  .u5-joint-goals-preview .goals-preview-actions{display:flex; flex-wrap:wrap; gap:6px;}
+  /* Scale the existing desktop proportions to the card, not the viewport. */
+  .u5-joint-goals-preview{container-type:inline-size;}
+  .u5-joint-goals-preview .goal-table th{font-size:1.15cqi; padding:.75cqi .3cqi; line-height:1.2; overflow-wrap:normal; word-break:normal; hyphens:none;}
+  .u5-joint-goals-preview .goal-table td{font-size:1.4cqi; padding:.75cqi .3cqi; line-height:1.25; white-space:nowrap; overflow-wrap:normal; word-break:normal;}
+  .u5-joint-goals-preview .goal-table td:first-child{white-space:normal;}
+  .u5-joint-goals-preview .goal-table tfoot td{padding-top:1cqi;}
+  body.v4-app .u5-joint-goals-preview .goal-table .progress-track{height:.9cqi; margin-top:.4cqi; border-width:.1cqi;}
+  .u5-joint-goals-preview .goal-table .progress-label{font-size:inherit; margin-top:.3cqi; white-space:nowrap;}
+  .u5-joint-goals-preview .goal-table-subgoal-toggle{gap:.6cqi;}
+  .u5-joint-goals-preview .goal-table-subgoal-toggle span{white-space:normal; overflow:visible;}
+  .u5-joint-goals-preview .goal-table-subgoal-toggle::after{width:1.6cqi; height:1.6cqi; flex-basis:1.6cqi; background-size:.9cqi;}
+  .u5-joint-goals-preview>.card-head{flex-wrap:nowrap; gap:1cqi; margin-bottom:1.8cqi;}
+  .u5-joint-goals-preview>.card-head h2{font-size:2.8cqi; line-height:1.2; white-space:nowrap;}
+  .u5-joint-goals-preview .goals-preview-actions{display:flex; flex-wrap:nowrap; gap:1cqi;}
+  .u5-joint-goals-preview .goals-preview-actions button{font-size:1.75cqi; line-height:1.2; min-height:0; padding:.9cqi 1.5cqi; white-space:nowrap;}
+  .u5-joint-goals-preview .savings-month-button{gap:.8cqi;}
 }
 
 /* Finize bron: auth.css */
