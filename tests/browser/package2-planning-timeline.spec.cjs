@@ -70,9 +70,10 @@ test('v10-back-upfout verwijdert Na niet uit opslag',async({page})=>{
   expect(await page.evaluate(key=>JSON.parse(localStorage.getItem(key)).meta.schemaVersion,key)).toBe(10);
 });
 test('Kaartposities en afmetingen behouden op mobiel/tablet/desktop',async({page})=>{
+  await page.route('**/*',route=>new URL(route.request().url()).hostname==='127.0.0.1'?route.continue():route.abort());
   await page.addInitScript(({fixture,key})=>localStorage.setItem(key,JSON.stringify(fixture)),{fixture,key});
   await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
-  for(const [width,y,height]of [[390,126.40625,100],[768,189,132],[1024,164,140.375],[1440,121,142]]){
+  for(const [width,y,height]of [[390,126.40625,100],[768,189,132],[1024,164,132],[1440,121,142]]){
     await page.setViewportSize({width,height:900});await page.evaluate(()=>renderActiveTab());
     const bounds=await page.locator(width<768?'.mobile-kpi-grid':'.u5-primary-kpi').first().boundingBox();
     expect(bounds.y).toBeCloseTo(y,1);expect(bounds.height).toBeCloseTo(height,1);

@@ -4865,7 +4865,7 @@ function renderJointFirstRow(){
     <div class="card joint-two-column-card joint-variable-overview-card">${renderJointVariableCostsCardHead()}<div class="joint-variable-overview-list">${variableRows.join('') || '<p class="hint" style="margin:0">Nog geen variabele budgetten.</p>'}</div></div>
     ${renderJointTransactionsCard()}
   </div>
-  ${renderJointSavingsOverviewCard()}`;
+  ${renderDesktopGoalsPreview(state.spaardoelen.gezamenlijk||[],r.spaarpotDezeMaand)}`;
 }
 
 function renderPersonalTransactionsCard(owner){
@@ -4896,12 +4896,12 @@ function renderPersonalFirstRow(owner){
   return `<div class="mobile-kpi-grid v4-mobile-only-grid joint-first-row" aria-label="${name} rij 1">
     ${personalKpiVisible(owner,'income')?`<div role="button" tabindex="0" class="mobile-kpi-card joint-kpi-card joint-total-income-card" data-personal-kpi-mobile="income" data-income-edit="${owner}" data-income-label="${textSafe(name)}" aria-label="Inkomen van ${textSafe(name)} aanpassen"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg('allowance')}</span></div><div class="mobile-kpi-label">Totaal inkomen</div><div class="mobile-kpi-value ${personalIncome.total<0?'value neg':'value pos'}">${eur(personalIncome.total)}</div>${renderPersonalIncomeSources(personalIncome,owner)}</div>`:''}
     <div class="mobile-kpi-card joint-kpi-card joint-fixed-costs-card"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg('wallet')}</span></div><div class="mobile-kpi-label">Vaste lasten</div><div class="mobile-kpi-value value neg">${eur(person.persoonlijkeVasteLasten)}</div><div class="mobile-kpi-edit-hint-placeholder">.</div></div>
-    <button type="button" class="mobile-kpi-card joint-kpi-card joint-saving-card" data-personal-saving-edit="${owner}" aria-label="Spaargeld van ${textSafe(name)} voor deze maand aanpassen"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg('piggy')}</span></div><div class="mobile-kpi-label">Sparen deze maand</div><div class="mobile-kpi-value ${person.beschikbaarVoorSparen<0?'value neg':'value pos'}">${eur(person.beschikbaarVoorSparen)}</div><div class="mobile-kpi-edit-hint">${person.savingsSource==='handmatig'?'Handmatig':'Tik om aan te passen'}</div></button>
+    ${personalKpiVisible(owner,'saving')?`<div class="mobile-kpi-card joint-kpi-card joint-saving-card" data-personal-kpi-mobile="saving"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg('piggy')}</span></div><div class="mobile-kpi-label">Over deze maand</div><div class="mobile-kpi-value ${r.forecast.owners[owner].available<0?'value neg':'value pos'}">${eur(r.forecast.owners[owner].available)}</div><div class="mobile-kpi-edit-hint">Na vaste lasten, gebruikt budget en spaargeld</div></div>`:''}
     <div class="mobile-kpi-card joint-kpi-card static joint-variable-card"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg('chart')}</span></div><div class="mobile-kpi-label">Variabel gebruikt</div><div class="mobile-kpi-value mobile-kpi-value-budget neu">${eur(person.variabeleUitgaven)} / ${eur(variableBudget)}</div><div class="mobile-kpi-budget-track" style="--used-pct:${variablePct}%"></div></div>
   </div>
   <div class="card joint-fullwidth-card joint-fixed-category-card v4-mobile-only-block">${renderJointFixedCostsCardHead(owner)}<div class="joint-fixed-category-body">${fixedRows || '<p class="hint">Nog geen vaste lasten.</p>'}</div></div>
   <div class="joint-two-column-row v4-mobile-only-grid"><div class="card joint-two-column-card joint-variable-overview-card">${renderJointVariableCostsCardHead(owner)}<div class="joint-variable-overview-list">${variableRows.join('') || '<p class="hint" style="margin:0">Nog geen variabele budgetten.</p>'}</div></div>${renderPersonalTransactionsCard(owner)}</div>
-  ${renderJointSavingsOverviewCard(owner, person.beschikbaarVoorSparen)}`;
+  ${renderDesktopGoalsPreview(state.spaardoelen[owner]||[],person.beschikbaarVoorSparen,owner)}`;
 }
 
 function renderEmptyVisualTab(tabId, title){

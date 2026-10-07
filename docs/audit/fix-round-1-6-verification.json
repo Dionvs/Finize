@@ -1,0 +1,149 @@
+{
+  "baselineHead": "ddbe310279591f18214ffac621b3e97bf847842f",
+  "branch": "main",
+  "schemaBefore": 11,
+  "schemaAfter": 11,
+  "cacheMarker": "finize-v107-income-source-details",
+  "releaseAssessment": "READY",
+  "node": {
+    "filesPassed": 49,
+    "filesTotal": 49,
+    "registeredCasesPassed": 462,
+    "newCasesPassed": 33
+  },
+  "browser": {
+    "total": 203,
+    "passed": 203,
+    "failed": 0,
+    "skipped": 0,
+    "flaky": 0,
+    "newCasesPassed": 12,
+    "newCasesTotal": 12,
+    "previousFailuresReproducedOnUnmodifiedV107": [
+      {
+        "file": "package1-data-foundation.spec.cjs",
+        "title": "twee devices lezen v11; cloudmigratie schrijft eenmaal en echo schrijft niet opnieuw",
+        "status": "unexpected",
+        "errors": [
+          "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+          "Error: page.evaluate: Test timeout of 30000ms exceeded."
+        ]
+      },
+      {
+        "file": "package2-planning-timeline.spec.cjs",
+        "title": "Kaartposities en afmetingen behouden op mobiel/tablet/desktop",
+        "status": "unexpected",
+        "errors": [
+          "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeCloseTo\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m, \u001b[22mprecision\u001b[2m)\u001b[22m"
+        ]
+      },
+      {
+        "file": "v50-visual-baseline.spec.cjs",
+        "title": "v50 visuele baseline op 768px",
+        "status": "unexpected",
+        "errors": [
+          "Error: \u001b[2mexpect(\u001b[22m\u001b[31mBuffer\u001b[39m\u001b[2m).\u001b[22mtoMatchSnapshot\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed"
+        ]
+      },
+      {
+        "file": "v50-visual-baseline.spec.cjs",
+        "title": "v50 visuele baseline op 1024px",
+        "status": "unexpected",
+        "errors": [
+          "Error: \u001b[2mexpect(\u001b[22m\u001b[31mBuffer\u001b[39m\u001b[2m).\u001b[22mtoMatchSnapshot\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed"
+        ]
+      }
+    ],
+    "previousFailuresResolved": true,
+    "targetedBlockerChecksPassed": 9
+  },
+  "browserPassedGroups": {
+    "income-overview.spec.cjs": 10,
+    "sync-hotfix-3.spec.cjs": 9,
+    "package5-import-lifecycle.spec.cjs": 9,
+    "package6-functional-consolidation.spec.cjs": 20,
+    "storage-hotfix-2.spec.cjs": 9
+  },
+  "checks": {
+    "syntax": "PASS",
+    "css": "PASS",
+    "build": "PASS",
+    "generatedRuntimeCheck": "PASS",
+    "diffWhitespace": "PASS"
+  },
+  "baseline": {
+    "equal": true,
+    "categories": {
+      "A": 0,
+      "B": 0,
+      "C": 0
+    },
+    "schemaBefore": 11,
+    "schemaAfter": 11,
+    "compared": [
+      "state",
+      "forecast",
+      "effects",
+      "schema"
+    ],
+    "changedTracked": [
+      "app.css",
+      "app.js",
+      "index.html",
+      "src/core/runtime.js",
+      "src/core/transaction-processing.mjs",
+      "src/import/runtime.js",
+      "src/styles/base.css",
+      "tests/browser/package4-savings-refunds-forecast.spec.cjs",
+      "tests/browser/fix-round-1-6.spec.cjs",
+      "tests/fix-round-1-6.test.cjs",
+      "docs/fix-round-1-6.md",
+      "tests/browser/package1-data-foundation.spec.cjs",
+      "tests/browser/package2-planning-timeline.spec.cjs",
+      "tests/browser/v50-visual-baseline.spec.cjs",
+      "tests/browser/v50-visual-baseline.spec.cjs-snapshots/v50-768.png",
+      "tests/browser/v50-visual-baseline.spec.cjs-snapshots/v50-1024.png",
+      "docs/audit/fix-round-1-6-test-baseline.json"
+    ],
+    "artifactNote": "Financial captures and full logs kept outside repository; no-action baseline compared recursively."
+  },
+  "protectedHashes": {
+    "src/core/transaction-engine.mjs": "6487e08d4969802d038c8d1b081859fbb8812673d7a3e00abfb2d6f85d477128",
+    "src/core/transaction-model.mjs": "61732edfc25e7b11d8866eb64d69720033d2cccb47877f027a69e8752ddbc81c",
+    "src/core/planning-timeline.mjs": "21ad0ad5293e48634bdbe66eb73b11f5650b9ea78c595d446aa677b7557025ac",
+    "src/import/import-store.js": "8025b8c1ac8e13aebe642b9ceb8da9431825edb81c905e6ee9672968ef5d8480",
+    "src/import/import-sync.js": "5f81d91e73788ffc5efce631098bcc48d9b4b82454dd63003389d67b15aa55ce",
+    "src/import/import-lifecycle.mjs": "eebc0051f9f256a464e9f3f2ccc99d6ecaed1360e02a80c9995a6fa36c7e2f8b",
+    "src/storage/cloud-state.js": "2336fa331e5aab9efd98ba85ca8780a19f61d55af22997af2bfa397627ffdc7e",
+    "firestore.rules": "5a73c7a759d1f7deeda96a9c6a5f6e62d06a455f7e3afec962994547bdf2e899",
+    "service-worker.js": "a043221cfa420ab756403a5abacb120c9d2bde551b6b4e0683dc03e63d80a1c5"
+  },
+  "snapshotHashesUnchanged": false,
+  "productionFinancialWrites": false,
+  "commit": false,
+  "push": false,
+  "deploy": false,
+  "modifiedFileHashes": {
+    "app.css": "b592c3edfd6ae5e69dce1ab6e1fd0db2926a989b6d051a50329df8fad618a649",
+    "app.js": "f90fcfd20a67f3f6a31e267b097e8deeadc841353ace9cd9785e34f10e83f436",
+    "index.html": "03e27046119524d422d829a0bcc2d4f3d8d3ab308bcb996586d4c7d6b449d2aa",
+    "src/core/runtime.js": "0096a8811bd327e0c05702d74b8fc735c7bc2755e8792751b4aff1489448b6ef",
+    "src/core/transaction-processing.mjs": "1b3632fcb07d293e4705cc2a87074aba7cd4e022cd3657014ca5cdfcf4a07255",
+    "src/import/runtime.js": "4410436ed35bdcfd7e2cddf1ee52278c39c38c5062ee32298e3597e4f3acc85c",
+    "src/styles/base.css": "ba8eec3114d26c6f727e848aabcd883e584884ff71420154dff53e4b8d4efec7",
+    "tests/browser/package4-savings-refunds-forecast.spec.cjs": "d07127cc865a065ab349b57468565a33010d4db6ad7670851d440c67589d9f6f",
+    "tests/browser/fix-round-1-6.spec.cjs": "b486159a3cd8212c5da96d370668f01fcd3176a2b43bad4b4ac18f880d41086b",
+    "tests/fix-round-1-6.test.cjs": "d3dffaff93ffed712291a8fcd3d2bb8be110e16ce7ed3d81a1c5f027981c550d",
+    "docs/fix-round-1-6.md": "04cf8ef25e27852d1be0913073312a1bc32fbd4529b117b1bf5fe26e6e45bc3c",
+    "tests/browser/package1-data-foundation.spec.cjs": "efc951c5d086e5a56bb2fd7bc6aa6706cd9a23b927c9dbea9acc61876566d7e1",
+    "tests/browser/package2-planning-timeline.spec.cjs": "fc9244e1fcd83ee2e27e943d500148847b9454a27afa69b8c0959ac34a067443",
+    "tests/browser/v50-visual-baseline.spec.cjs": "672be1aa3bbb0762569a67702e0c041a7d2c53cc8c9e33ca87438a91f21ddd8b",
+    "tests/browser/v50-visual-baseline.spec.cjs-snapshots/v50-768.png": "02302f0f85a492d9990e825d581f34d90550569e1b71861922bfd53f8650c212",
+    "tests/browser/v50-visual-baseline.spec.cjs-snapshots/v50-1024.png": "2b64854985d9b9f50c12ed31df5130cf6c5aae14606a9e354e0f08c688ae4618",
+    "docs/audit/fix-round-1-6-test-baseline.json": "2e65458d30d0b0152f038011a9ea2372bef586799511aa85c810b1a02492ce5d"
+  },
+  "snapshotUpdateAuthorized": true,
+  "snapshotUpdateAutomatic": false,
+  "snapshotUpdateManifest": "docs/audit/fix-round-1-6-test-baseline.json",
+  "testRepairRuntimeHashesUnchanged": true
+}

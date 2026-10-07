@@ -79,6 +79,18 @@ export function replaceProcessedSourceRows(state,importId,rowId,rows){
   const candidate=copy(state),result=replaceSourceInPlace(candidate,importId,rowId,rows);
   assertFinancialMutationSafe(state,candidate);applyFinancialCandidate(state,candidate);return result;
 }
+// Compose explicit source changes on one clone; validate the complete result, never partial UI states.
+export function commitProcessedSourceGroup(state,importId,{reopenIds=[],replacements=[]}={},applyEffects=()=>{}){
+  if(!importId)throw new Error('Een betrouwbare importverwijzing is vereist.');
+  const candidate=copy(state);
+  for(const id of reopenIds)reopenSourceInPlace(candidate,importId,id);
+  for(const replacement of replacements)replaceSourceInPlace(candidate,importId,replacement.rowId,replacement.rows);
+  applyEffects(candidate);
+  synchronizeChangedSavings(candidate,state);
+  assertFinancialMutationSafe(state,candidate);
+  applyFinancialCandidate(state,candidate);
+  return state;
+}
 export function createTransactionSavingsEntry(tx,state){
   const type=getTransactionClassification(tx),goalId=tx.savingsGoalId||tx.processing?.savingsGoalId;
   if(!['sparen','naar-spaarrekening','van-spaarrekening'].includes(type)||!goalId||getTransactionProcessingStatus(tx)!=='goedgekeurd')return null;

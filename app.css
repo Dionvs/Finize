@@ -5045,6 +5045,13 @@ body.v4-app .modal-content{ min-width:0; }
   }
 }
 
+/* Account goal tables use the same columns on every viewport. */
+@media (max-width:767px){
+  .u5-joint-goals-preview .goal-table-wrap{overflow-x:auto; -webkit-overflow-scrolling:touch;}
+  .u5-joint-goals-preview .goal-table{min-width:1050px;}
+  .u5-joint-goals-preview .goals-preview-actions{display:flex; flex-wrap:wrap; gap:6px;}
+}
+
 /* Finize bron: auth.css */
 body.auth-pending{overflow:hidden;background:var(--bg)}
 body.auth-pending>:not(#authRoot):not(script){visibility:hidden}

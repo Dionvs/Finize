@@ -2225,6 +2225,18 @@
     applyFinancialCandidate(state2, candidate);
     return result;
   }
+  function commitProcessedSourceGroup(state2, importId, { reopenIds = [], replacements = [] } = {}, applyEffects = () => {
+  }) {
+    if (!importId) throw new Error("Een betrouwbare importverwijzing is vereist.");
+    const candidate = copy4(state2);
+    for (const id of reopenIds) reopenSourceInPlace(candidate, importId, id);
+    for (const replacement of replacements) replaceSourceInPlace(candidate, importId, replacement.rowId, replacement.rows);
+    applyEffects(candidate);
+    synchronizeChangedSavings(candidate, state2);
+    assertFinancialMutationSafe(state2, candidate);
+    applyFinancialCandidate(state2, candidate);
+    return state2;
+  }
   function createTransactionSavingsEntry(tx, state2) {
     var _a2, _b, _c, _d;
     const type = getTransactionClassification(tx), goalId = tx.savingsGoalId || ((_a2 = tx.processing) == null ? void 0 : _a2.savingsGoalId);
@@ -8001,7 +8013,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     <div class="card joint-two-column-card joint-variable-overview-card">${renderJointVariableCostsCardHead()}<div class="joint-variable-overview-list">${variableRows.join("") || '<p class="hint" style="margin:0">Nog geen variabele budgetten.</p>'}</div></div>
     ${renderJointTransactionsCard()}
   </div>
-  ${renderJointSavingsOverviewCard()}`;
+  ${renderDesktopGoalsPreview(state.spaardoelen.gezamenlijk || [], r.spaarpotDezeMaand)}`;
   }
   function renderPersonalTransactionsCard(owner) {
     const name = ownerLabel(owner);
@@ -8039,12 +8051,12 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     return `<div class="mobile-kpi-grid v4-mobile-only-grid joint-first-row" aria-label="${name} rij 1">
     ${personalKpiVisible(owner, "income") ? `<div role="button" tabindex="0" class="mobile-kpi-card joint-kpi-card joint-total-income-card" data-personal-kpi-mobile="income" data-income-edit="${owner}" data-income-label="${textSafe(name)}" aria-label="Inkomen van ${textSafe(name)} aanpassen"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg("allowance")}</span></div><div class="mobile-kpi-label">Totaal inkomen</div><div class="mobile-kpi-value ${personalIncome.total < 0 ? "value neg" : "value pos"}">${eur(personalIncome.total)}</div>${renderPersonalIncomeSources(personalIncome, owner)}</div>` : ""}
     <div class="mobile-kpi-card joint-kpi-card joint-fixed-costs-card"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg("wallet")}</span></div><div class="mobile-kpi-label">Vaste lasten</div><div class="mobile-kpi-value value neg">${eur(person.persoonlijkeVasteLasten)}</div><div class="mobile-kpi-edit-hint-placeholder">.</div></div>
-    <button type="button" class="mobile-kpi-card joint-kpi-card joint-saving-card" data-personal-saving-edit="${owner}" aria-label="Spaargeld van ${textSafe(name)} voor deze maand aanpassen"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg("piggy")}</span></div><div class="mobile-kpi-label">Sparen deze maand</div><div class="mobile-kpi-value ${person.beschikbaarVoorSparen < 0 ? "value neg" : "value pos"}">${eur(person.beschikbaarVoorSparen)}</div><div class="mobile-kpi-edit-hint">${person.savingsSource === "handmatig" ? "Handmatig" : "Tik om aan te passen"}</div></button>
+    ${personalKpiVisible(owner, "saving") ? `<div class="mobile-kpi-card joint-kpi-card joint-saving-card" data-personal-kpi-mobile="saving"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg("piggy")}</span></div><div class="mobile-kpi-label">Over deze maand</div><div class="mobile-kpi-value ${r.forecast.owners[owner].available < 0 ? "value neg" : "value pos"}">${eur(r.forecast.owners[owner].available)}</div><div class="mobile-kpi-edit-hint">Na vaste lasten, gebruikt budget en spaargeld</div></div>` : ""}
     <div class="mobile-kpi-card joint-kpi-card static joint-variable-card"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg("chart")}</span></div><div class="mobile-kpi-label">Variabel gebruikt</div><div class="mobile-kpi-value mobile-kpi-value-budget neu">${eur(person.variabeleUitgaven)} / ${eur(variableBudget)}</div><div class="mobile-kpi-budget-track" style="--used-pct:${variablePct}%"></div></div>
   </div>
   <div class="card joint-fullwidth-card joint-fixed-category-card v4-mobile-only-block">${renderJointFixedCostsCardHead(owner)}<div class="joint-fixed-category-body">${fixedRows || '<p class="hint">Nog geen vaste lasten.</p>'}</div></div>
   <div class="joint-two-column-row v4-mobile-only-grid"><div class="card joint-two-column-card joint-variable-overview-card">${renderJointVariableCostsCardHead(owner)}<div class="joint-variable-overview-list">${variableRows.join("") || '<p class="hint" style="margin:0">Nog geen variabele budgetten.</p>'}</div></div>${renderPersonalTransactionsCard(owner)}</div>
-  ${renderJointSavingsOverviewCard(owner, person.beschikbaarVoorSparen)}`;
+  ${renderDesktopGoalsPreview(state.spaardoelen[owner] || [], person.beschikbaarVoorSparen, owner)}`;
   }
   function renderEmptyVisualTab(tabId, title) {
     const el = document.getElementById(tabId);
@@ -11034,6 +11046,145 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       status.textContent = text;
       status.classList.toggle("u4-error", Boolean(error));
     }
+    function sameEditorBase(left, right) {
+      if (importVersion(left) !== importVersion(right)) return false;
+      if ((left == null ? void 0 : left.operationId) || (right == null ? void 0 : right.operationId)) return sameImportOperation(left, right);
+      const comparable = (value) => {
+        const copy6 = cloneState(value);
+        delete copy6.confirmedBatch;
+        delete copy6.syncConflict;
+        delete copy6.baseVersion;
+        return JSON.stringify(copy6);
+      };
+      return comparable(left) === comparable(right);
+    }
+    const ImportEditors = /* @__PURE__ */ new Map();
+    function editorSession(draft) {
+      let session = ImportEditors.get(String(draft.id));
+      if (!session || session.draft !== draft) {
+        session = { draft, base: cloneState(draft), revision: 0, savedRevision: 0, write: Promise.resolve() };
+        delete session.base.confirmedBatch;
+        ImportEditors.set(String(draft.id), session);
+      }
+      return session;
+    }
+    async function beginImportEditor(root2, record) {
+      const saved = await ImportStore.getJournal(`editor-draft-${record.id}`);
+      const draft = cloneState(record);
+      delete draft.confirmedBatch;
+      const session = editorSession(draft);
+      if ((saved == null ? void 0 : saved.status) === "draft") {
+        if (sameEditorBase(saved.base, record)) {
+          applyFinancialCandidate(draft, saved.draft);
+          session.base = cloneState(record);
+          delete session.base.confirmedBatch;
+          session.revision = Number(saved.revision) || 0;
+          session.savedRevision = session.revision;
+        } else {
+          await preserveImportConflict(root2, saved.draft, record, [{ kind: "editor-base-changed" }]);
+          draft.syncConflict = true;
+        }
+      }
+      return draft;
+    }
+    function persistLocalImportEditor(root2, draft) {
+      const session = editorSession(draft), snapshot2 = cloneState(draft);
+      delete snapshot2.confirmedBatch;
+      session.revision++;
+      const revision = session.revision, base = cloneState(session.base);
+      session.write = session.write.catch(() => {
+      }).then(async () => {
+        const stored = await ImportStore.getImport(draft.id);
+        if ((stored == null ? void 0 : stored.lifecycle) === "deleted") throw new Error("Deze import is permanent verwijderd; het concept wordt niet opnieuw opgeslagen.");
+        await ImportStore.putJournal({ id: `editor-draft-${draft.id}`, importId: draft.id, operation: "editor-draft", status: "draft", revision, base, draft: snapshot2 });
+        session.savedRevision = revision;
+        return draft;
+      });
+      return session.write;
+    }
+    function commitImportEditor(root2, draft, { approveIds = [], reopenIds = [] } = {}) {
+      const session = editorSession(draft), revision = session.revision, rows = cloneState(draft.rows), requestedBase = cloneState(session.base), write = session.write;
+      const profile = { accountProfileId: draft.accountProfileId, accountOwner: draft.accountOwner };
+      session.commitCount = (session.commitCount || 0) + 1;
+      session.committing = true;
+      const previous = session.commitTail || Promise.resolve();
+      const operation = previous.catch(() => {
+      }).then(async () => {
+        var _a2;
+        await write;
+        if (((_a2 = await ImportStore.getJournal(`conflict-${draft.id}`)) == null ? void 0 : _a2.status) === "conflict") throw cloudImportError("import-conflict", "Los eerst het synchronisatieconflict op. De cloudstand blijft behouden.");
+        const base = cloneState(session.base);
+        const requested = new Map(rows.map((row) => [row.id, row])), originals = new Map(requestedBase.rows.map((row) => [row.id, row]));
+        const mergedRows = base.rows.map((current) => {
+          const desired = requested.get(current.id), original2 = originals.get(current.id);
+          return desired && original2 && (JSON.stringify(desired.processing) !== JSON.stringify(original2.processing) || desired.accountProfileId !== original2.accountProfileId || desired.accountOwner !== original2.accountOwner || getTransactionProcessingStatus({ ...desired, source: "csv" }) !== getTransactionProcessingStatus({ ...original2, source: "csv" }) || approveIds.includes(current.id) || reopenIds.includes(current.id)) ? desired : cloneState(current);
+        });
+        const result = await commitImportCommand(root2, base, { type: "editor-commit", rows: mergedRows, profile: JSON.stringify(profile) !== JSON.stringify({ accountProfileId: requestedBase.accountProfileId, accountOwner: requestedBase.accountOwner }) ? profile : null, editorRevision: revision, editorBaseVersion: importVersion(base), editorBaseOperation: base.operationId || "", approveIds: [...new Set(approveIds)], reopenIds: [...new Set(reopenIds)] });
+        session.base = cloneState(result.batch);
+        delete session.base.confirmedBatch;
+        if (session.revision === revision) {
+          applyFinancialCandidate(draft, cloneState(result.batch));
+          session.write = session.write.then(async () => {
+            if (session.revision === revision) await ImportStore.deleteJournal(`editor-draft-${draft.id}`);
+          });
+          await session.write;
+        } else {
+          const latest2 = new Map(draft.rows.map((row) => [row.id, row])), snapshot2 = new Map(rows.map((row) => [row.id, row]));
+          draft.rows = result.batch.rows.map((current) => {
+            const desired = latest2.get(current.id), captured = snapshot2.get(current.id);
+            return desired && captured && (JSON.stringify(desired.processing) !== JSON.stringify(captured.processing) || desired.accountProfileId !== captured.accountProfileId || desired.accountOwner !== captured.accountOwner || getTransactionProcessingStatus({ ...desired, source: "csv" }) !== getTransactionProcessingStatus({ ...captured, source: "csv" })) ? desired : cloneState(current);
+          });
+          for (const key of ["accountProfileId", "accountOwner"]) if (draft[key] === profile[key]) draft[key] = result.batch[key];
+          draft.version = result.batch.version;
+          draft.baseVersion = result.batch.baseVersion;
+          draft.operationId = result.batch.operationId;
+          await persistLocalImportEditor(root2, draft);
+        }
+        return result;
+      }).finally(() => {
+        session.commitCount--;
+        session.committing = session.commitCount > 0;
+      });
+      session.commitTail = operation;
+      return operation;
+    }
+    async function acknowledgeRecoveredEditor(entry) {
+      var _a2;
+      if (((_a2 = entry.intent) == null ? void 0 : _a2.type) !== "editor-commit") return;
+      const id = `editor-draft-${entry.importId}`, saved = await ImportStore.getJournal(id);
+      if ((saved == null ? void 0 : saved.status) !== "draft" || importVersion(saved.base) !== entry.intent.editorBaseVersion || String(saved.base.operationId || "") !== entry.intent.editorBaseOperation) return;
+      const expected = new Map(entry.intent.rows.map((row) => [row.id, row]));
+      const unchanged = saved.draft.rows.every((row) => {
+        var _a3;
+        return JSON.stringify(row.processing) === JSON.stringify((_a3 = expected.get(row.id)) == null ? void 0 : _a3.processing);
+      });
+      const session = ImportEditors.get(String(entry.importId));
+      if (unchanged && saved.revision === entry.intent.editorRevision) {
+        await ImportStore.deleteJournal(id);
+        if (session && session.revision === saved.revision) {
+          session.base = cloneState(entry.batch);
+          applyFinancialCandidate(session.draft, cloneState(entry.batch));
+        }
+      } else {
+        const local = new Map(saved.draft.rows.map((row) => [row.id, row]));
+        saved.draft.rows = entry.batch.rows.map((row) => {
+          var _a3;
+          const desired = local.get(row.id);
+          return desired && JSON.stringify(desired.processing) !== JSON.stringify((_a3 = expected.get(row.id)) == null ? void 0 : _a3.processing) ? desired : cloneState(row);
+        });
+        saved.base = cloneState(entry.batch);
+        delete saved.base.confirmedBatch;
+        for (const key of ["version", "baseVersion", "operationId"]) saved.draft[key] = entry.batch[key];
+        await ImportStore.putJournal(saved);
+        if (session && session.revision === saved.revision) {
+          session.base = cloneState(saved.base);
+          applyFinancialCandidate(session.draft, cloneState(saved.draft));
+        }
+      }
+    }
+    function markEditorRowChanged(row) {
+      if (isExplicitlyApproved(row)) reopenForReview(row);
+    }
     function persistImportDraftImmediate(root2, draft, { syncCloud = true, updateSummary = true } = {}) {
       if (!plain3(draft) || !draft.id) return Promise.reject(new Error("Importconcept mist een geldig ID."));
       const id = String(draft.id);
@@ -11695,6 +11846,8 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       return (root2.state.transactions || []).some((tx) => tx.importBatchId === draft.id && tx.importTransactionId === row.id && isTransactionFinanciallyActive(tx));
     }
     async function reopenStoredSource(root2, draft, row) {
+      var _a2;
+      if (((_a2 = ImportEditors.get(String(draft.id))) == null ? void 0 : _a2.draft) === draft) return commitImportEditor(root2, draft, { reopenIds: [row.id] });
       if (!(root2.state.transactions || []).some((tx) => tx.importBatchId === draft.id && tx.importTransactionId === row.id)) {
         reopenForReview(row);
         return true;
@@ -11703,10 +11856,16 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       return true;
     }
     async function approveStoredSource(root2, draft, row) {
+      var _a2;
+      if (((_a2 = ImportEditors.get(String(draft.id))) == null ? void 0 : _a2.draft) === draft) return commitImportEditor(root2, draft, { approveIds: [row.id] });
       return commitImportCommand(root2, draft, { type: "source-approve", rowId: row.id });
     }
     async function replaceManualSource(root2, draft, row, manualId) {
-      return commitImportCommand(root2, draft, { type: "source-replacement", rowId: row.id, manualId });
+      const session = ImportEditors.get(String(draft.id));
+      if ((session == null ? void 0 : session.draft) === draft) await commitImportEditor(root2, draft);
+      const result = await commitImportCommand(root2, draft, { type: "source-replacement", rowId: row.id, manualId });
+      if ((session == null ? void 0 : session.draft) === draft) session.base = cloneState(result.batch);
+      return result;
     }
     async function undoImport(root2, draft) {
       if (draft.status === "teruggedraaid") return true;
@@ -11961,7 +12120,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       if (TRANSFER_TYPES.includes(type)) return "overboeking";
       if (type === "maandelijkse-bijdrage") return "zakgeld";
       if (type === "extra-bijdrage") return "extra-bijdrage";
-      if (REPAYMENT_TYPES.includes(type)) return "terugbetaling";
+      if (REPAYMENT_TYPES.includes(type) || type === "refund") return "terugbetaling";
       return "uitgave";
     }
     function familyOptions(current) {
@@ -11972,44 +12131,56 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       const owners2 = family === "zakgeld" ? ["dion", "dara"] : OWNERS2;
       return `${family === "zakgeld" && !owners2.includes(row.processing.budgetOwner) ? '<option value="" selected>Kies Dion of Dara</option>' : ""}${owners2.map((owner) => option(owner, ownerLabel2(owner), row.processing.budgetOwner)).join("")}`;
     }
+    function setProcessingType(line, type) {
+      const previous = transactionFamily(line), next = transactionFamily({ transactionType: type, include: true });
+      line.transactionType = type;
+      if (type !== "vaste-last") {
+        line.fixedExpenseId = "";
+        line.fixedOccurrenceId = "";
+        line.fixedOccurrenceMonth = "";
+        line.fixedAmountMode = "none";
+      }
+      if (next !== "sparen") line.savingsGoalId = "";
+      if (!["terugbetaling", "refund"].includes(type)) {
+        line.refundCategory = "";
+        line.refundMonth = "";
+      }
+      if (type !== "interne-overboeking") {
+        line.sourceAccountProfileId = "";
+        line.destinationAccountProfileId = "";
+        line.internalPairId = "";
+        line.transferPairId = "";
+      }
+      if (type !== "terugbetaling-voorschot") line.repaymentAllocations = [];
+      if (!["uitgave", "terugbetaling"].includes(next)) {
+        line.budgetItemId = "";
+        line.advanceMode = "none";
+      }
+      if (previous !== next) {
+        line.category = next === "uitgave" ? "Ongecategoriseerd" : next === "sparen" ? "Sparen" : next === "inkomen" ? "Inkomen" : next === "terugbetaling" ? "Terugbetaling" : next === "overboeking" ? "Interne overboeking" : next === "zakgeld" ? "Zakgeld" : next === "extra-bijdrage" ? "Extra bijdrage" : "Niet meetellen";
+      }
+      return line;
+    }
     function applyTransactionFamily(row, family) {
       const p = row.processing;
+      const type = family === "uitgave" ? "uitgave" : family === "inkomen" ? INCOME_TYPES.includes(p.transactionType) ? p.transactionType : "overige-inkomsten" : family === "sparen" ? "sparen" : family === "overboeking" ? "interne-overboeking" : family === "zakgeld" ? "maandelijkse-bijdrage" : family === "extra-bijdrage" ? "extra-bijdrage" : family === "terugbetaling" ? "terugbetaling" : "niet-meetellen";
+      setProcessingType(p, type);
       p.fixedExpenseId = "";
+      p.fixedOccurrenceId = "";
+      p.fixedOccurrenceMonth = "";
       p.fixedAmountMode = "none";
-      p.savingsGoalId = "";
-      p.sourceAccountProfileId = "";
-      p.destinationAccountProfileId = "";
-      p.repaymentAllocations = [];
       p.budgetItemId = "";
       p.splits = [];
       p.advanceMode = "auto";
       p.include = family !== "niet-meetellen";
-      if (family === "uitgave") {
-        p.transactionType = "uitgave";
-        p.category = p.category && p.category !== "Vaste lasten" ? p.category : "Ongecategoriseerd";
-      } else if (family === "inkomen") {
-        p.transactionType = INCOME_TYPES.includes(p.transactionType) ? p.transactionType : "overige-inkomsten";
-        p.category = "Inkomen";
-      } else if (family === "sparen") {
-        p.transactionType = "sparen";
-        p.category = "Sparen";
-      } else if (family === "overboeking") {
-        p.transactionType = TRANSFER_TYPES.includes(p.transactionType) ? p.transactionType : "interne-overboeking";
-        p.category = "Interne overboeking";
-      } else if (family === "zakgeld") {
-        p.transactionType = "maandelijkse-bijdrage";
-        p.category = "Zakgeld";
-        if (!["dion", "dara"].includes(p.budgetOwner)) p.budgetOwner = "";
-      } else if (family === "extra-bijdrage") {
-        p.transactionType = "extra-bijdrage";
-        p.category = "Extra bijdrage";
-      } else if (family === "terugbetaling") {
-        p.transactionType = REPAYMENT_TYPES.includes(p.transactionType) ? p.transactionType : "terugbetaling";
-        p.category = "Terugbetaling";
-      } else {
-        p.transactionType = "niet-meetellen";
-        p.category = "Niet meetellen";
-      }
+      if (family === "zakgeld" && !["dion", "dara"].includes(p.budgetOwner)) p.budgetOwner = "";
+    }
+    function selectFixedOccurrence(root2, row, line, { resetMonth = false } = {}) {
+      if (!line.fixedExpenseId) return;
+      if (resetMonth || !line.fixedOccurrenceMonth) line.fixedOccurrenceMonth = String(row.bankOriginal.bankDate).slice(0, 7);
+      const month = line.fixedOccurrenceMonth;
+      const occurrences = u3PlannedOccurrences(resolveFixedExpensesForMonth(root2.state, month), month).filter((item) => item.itemId === line.fixedExpenseId);
+      if (!occurrences.some((item) => item.id === line.fixedOccurrenceId)) line.fixedOccurrenceId = occurrences.length === 1 ? occurrences[0].id : "";
     }
     function transferType(type) {
       return type === "interne-overboeking";
@@ -12059,12 +12230,18 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
         return b.score - a.score || String(((_a2 = b.row.processing) == null ? void 0 : _a2.processingDate) || "").localeCompare(String(((_b = a.row.processing) == null ? void 0 : _b.processingDate) || ""));
       });
     }
-    function copiedProcessing(source, target) {
-      ["description", "budgetOwner", "category", "transactionType", "budgetItemId", "fixedExpenseId", "fixedAmountMode", "savingsGoalId", "refundCategory", "advanceMode", "include", "sourceAccountProfileId", "destinationAccountProfileId"].forEach((field) => {
+    function copiedProcessing(source, target, root2) {
+      setProcessingType(target.processing, source.processing.transactionType);
+      ["description", "budgetOwner", "category", "transactionType", "budgetItemId", "fixedExpenseId", "fixedAmountMode", "savingsGoalId", "refundCategory", "refundMonth", "advanceMode", "include", "sourceAccountProfileId", "destinationAccountProfileId"].forEach((field) => {
         const value = source.processing[field];
         if (value === void 0) delete target.processing[field];
         else target.processing[field] = cloneState(value);
       });
+      if (target.processing.transactionType === "vaste-last") {
+        target.processing.fixedOccurrenceId = "";
+        target.processing.fixedOccurrenceMonth = String(target.bankOriginal.bankDate).slice(0, 7);
+        if (root2) selectFixedOccurrence(root2, target, target.processing);
+      }
     }
     function occurrenceFields(root2, row, line, split = false) {
       const month = line.fixedOccurrenceMonth || String(row.bankOriginal.bankDate).slice(0, 7);
@@ -12112,7 +12289,12 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     function refundFieldsHtml(root2, row, line, split = false) {
       const attr = split ? "data-u4-split-field" : "data-u4-field", month = line.refundMonth || "";
       const owner = line.budgetOwner || row.processing.budgetOwner;
-      return `<div class="u4-context-grid"><label>Refundmaand<input type="month" ${attr}="refundMonth" value="${esc(month)}"></label><label>Refundcategorie<input ${attr}="refundCategory" value="${esc(line.refundCategory || "")}" placeholder="Historische categorie"></label></div>`;
+      const categories = /^\d{4}-(0[1-9]|1[0-2])$/.test(month) ? expenseCategoriesForMonth(root2.state, month, owner).filter((category) => refundCategoryIsRecognizable(root2.state, category, month, owner)) : [];
+      if (line.refundCategory && refundCategoryIsRecognizable(root2.state, line.refundCategory, month, owner) && !categories.includes(line.refundCategory)) categories.push(line.refundCategory);
+      for (const tx of root2.state.transactions || []) {
+        if (String(tx.date || tx.transactionDate || "").slice(0, 7) === month && tx.category && refundCategoryIsRecognizable(root2.state, tx.category, month, owner) && !categories.includes(tx.category)) categories.push(tx.category);
+      }
+      return `<div class="u4-context-grid"><label>Refundmaand<input type="month" ${attr}="refundMonth" value="${esc(month)}"></label><label>Refundcategorie<select ${attr}="refundCategory"><option value="">Kies categorie</option>${categories.map((category) => option(category, category, line.refundCategory || "")).join("")}</select></label></div>`;
     }
     function dependentFieldsHtml(root2, row) {
       var _a2, _b;
@@ -12130,7 +12312,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       if (family === "overboeking") return `<div class="u4-dependent-grid"><label>Soort overboeking<select data-u4-field="transactionType">${TYPE_GROUPS[2].items.filter((item) => TRANSFER_TYPES.includes(item[0])).map(([type, label]) => option(type, label, p.transactionType)).join("")}</select></label></div>${transferFieldsHtml(root2, row)}`;
       if (family === "zakgeld") return '<p class="u4-dependent-hint">Kies Dion of Dara bij Budgeteigenaar.</p>';
       if (family === "extra-bijdrage") return '<p class="u4-dependent-hint">De budgeteigenaar ontvangt deze extra bijdrage.</p>';
-      if (family === "terugbetaling") return `<div class="u4-dependent-grid"><label>Soort terugbetaling<select data-u4-field="transactionType">${option("terugbetaling", "Terugbetaling aankoop", p.transactionType)}${option("terugbetaling-voorschot", "Terugbetaling voorschot", p.transactionType)}</select></label></div>${p.transactionType === "terugbetaling" ? refundFieldsHtml(root2, row, p) : repaymentHtml(root2, row)}`;
+      if (family === "terugbetaling") return `<div class="u4-dependent-grid"><label>Soort terugbetaling<select data-u4-field="transactionType">${option("terugbetaling", "Terugbetaling aankoop", p.transactionType)}${option("terugbetaling-voorschot", "Terugbetaling voorschot", p.transactionType)}</select></label></div>${["terugbetaling", "refund"].includes(p.transactionType) ? refundFieldsHtml(root2, row, p) : repaymentHtml(root2, row)}`;
       return "";
     }
     function rowHtml(root2, row) {
@@ -12141,10 +12323,10 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       const reviewState = importReviewState(row);
       const statusLabel = reviewState === "niet-meetellen" ? "Niet meetellen" : reviewState === "goedgekeurd" ? "Goedgekeurd" : reviewState === "onbekend" ? "Onbekend" : "Nakijken";
       return `<article class="u4-import-row" data-u4-row="${escAttr(row.id)}">
-      <div class="u4-import-row-main"><div><strong>${esc(p.description || original2.rawDescription || original2.description || "Onbekende transactie")}</strong><span class="u4-muted">${esc(displayDate(p.processingDate))} · ${euro(p.processedAmount)}</span>${Math.abs(Number(p.processedAmount) - Math.abs(Number(original2.amount))) > 4e-3 ? `<span class="u4-muted">Verwerking ${euro(p.processedAmount)} · bankcashflow ${euro(original2.amount)}</span>` : ""}${((_a2 = row.reasons) == null ? void 0 : _a2.length) ? `<div class="u4-row-reasons">${esc(row.reasons.join(" · "))}</div>` : ""}</div><div class="u4-row-approval"><span class="u4-status ${reviewState}">${statusLabel}</span>${["goedgekeurd", "niet-meetellen"].includes(reviewState) ? '<button type="button" class="ghost small" data-u4-reopen>Opnieuw nakijken</button>' : `<button type="button" class="primary small" data-u4-approve>✓ ${reviewState === "onbekend" ? "Categoriseren en goedkeuren" : "Goedkeuren"}</button>`}</div></div>
+      <div class="u4-import-row-main"><div><strong>${esc(p.description || original2.rawDescription || original2.description || "Onbekende transactie")}</strong><span class="u4-muted">${esc(displayDate(p.processingDate))} · ${euro(p.processedAmount)}</span>${Math.abs(Number(p.processedAmount) - Math.abs(Number(original2.amount))) > 4e-3 ? `<span class="u4-muted">Verwerking ${euro(p.processedAmount)} · bankcashflow ${euro(original2.amount)}</span>` : ""}${((_a2 = row.reasons) == null ? void 0 : _a2.length) ? `<div class="u4-row-reasons">${esc(row.reasons.join(" · "))}</div>` : ""}</div><div class="u4-row-approval">${["onbekend", "nakijken"].includes(reviewState) ? `<input type="checkbox" data-u4-select-approval="${escAttr(row.id)}" aria-label="${escAttr(p.description || original2.description || row.id)} selecteren voor groepsgoedkeuring">` : ""}<span class="u4-status ${reviewState}">${statusLabel}</span>${["goedgekeurd", "niet-meetellen"].includes(reviewState) ? '<button type="button" class="ghost small" data-u4-reopen>Opnieuw nakijken</button>' : `<button type="button" class="primary small" data-u4-approve>✓ ${reviewState === "onbekend" ? "Categoriseren en goedkeuren" : "Goedkeuren"}</button>`}</div></div>
       ${(root2.state.transactions || []).filter((tx) => tx.importTransactionId === row.id).map((tx) => `<button type="button" class="ghost small" data-u4-coverage="${escAttr(tx.id)}">Spaardekking · ${esc(tx.category)}${tx.splitId ? " · split " + esc(tx.splitId) : ""}</button>`).join("")}
       <div class="u4-row-grid">
-        <label>Verwerkingsdatum<input type="date" data-u4-field="processingDate" value="${esc(p.processingDate)}"></label>
+        <label>${p.transactionType === "vaste-last" ? "Bankdatum" : "Verwerkingsdatum"}<input type="date" data-u4-field="processingDate" value="${esc(p.transactionType === "vaste-last" ? original2.bankDate : p.processingDate)}" ${p.transactionType === "vaste-last" ? "readonly" : ""}></label>
         <label>Bedrag<input type="number" step="0.01" data-u4-field="processedAmount" value="${Number(p.processedAmount) || 0}"></label>
         <label>Budgeteigenaar<select data-u4-field="budgetOwner">${ownerOptions(row)}</select></label>
         <label>Transactie<select data-u4-family>${familyOptions(family)}</select></label>
@@ -12211,13 +12393,9 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
           const selected = applyMatches ? [...overlay.querySelectorAll("[data-u4-match-id]:checked")].map((input) => draft.rows.find((row) => row.id === input.dataset.u4MatchId)).filter(Boolean) : [];
           for (const target of selected) {
             const preview = cloneState(target);
-            copiedProcessing(source, preview);
+            copiedProcessing(source, preview, root2);
             const validation2 = rowProcessingValidation(preview, root2.state);
             if (!validation2.ok) throw new Error(validation2.errors.map((item) => item.message).join(" "));
-            if (sourceIsActive(root2, draft, target)) reopenTransactionSource(root2.state, draft.id, target.id, { dryRun: true });
-          }
-          for (const target of selected) {
-            if (sourceIsActive(root2, draft, target)) await reopenStoredSource(root2, draft, target);
           }
           remember(source);
           markExplicitlyApproved(source);
@@ -12226,7 +12404,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
               const target = draft.rows.find((row) => row.id === input.dataset.u4MatchId);
               if (target) {
                 remember(target);
-                copiedProcessing(source, target);
+                copiedProcessing(source, target, root2);
                 reopenForReview(target);
               }
             });
@@ -12255,7 +12433,6 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
                     throw error;
                   }
                 }
-                if (applyMatches) await persistImportDraft(root2, draft);
               })().catch((error) => {
                 snapshots.forEach((snapshot2, id) => {
                   const row = draft.rows.find((item) => item.id === id);
@@ -12309,6 +12486,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     </div><button type="button" class="primary small" data-u4-apply-profile>Profiel gebruiken</button></div></details>`;
     }
     function renderDraftModal(root2, draft) {
+      editorSession(draft);
       updateDraftSummary(draft, { touch: false });
       const isConcept = draft.status === "concept";
       const canCorrect = draft.status === "verwerkt" || draft.status === "correctie-nodig";
@@ -12319,14 +12497,14 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       const modal = ensureModalRoot();
       modal.innerHTML = `<div class="u4-import-modal" role="dialog" aria-modal="true" aria-label="Bankimport controleren">
       <header class="u4-modal-head"><div><h2>${isConcept ? "Bankimport controleren" : "Importdetails"}</h2><p>${esc(draft.fileName)} · ${esc(draft.bank)} · ${esc(displayDate(draft.periodFrom) || "—")} t/m ${esc(displayDate(draft.periodTo) || "—")} · ${esc(draft.status)}</p></div><button type="button" class="ghost" data-u4-close>Sluiten</button></header>
-      <main class="u4-modal-body">${draft.syncConflict ? `<div class="u4-original">Synchronisatieconflict: de cloudstand blijft behouden. De lokale keuze is veilig bewaard.<button class="ghost small" data-u4-conflict-cloud>Cloudstand behouden</button><button class="primary small" data-u4-conflict-local>Lokale verwerking opnieuw nakijken</button></div>` : ""}${isConcept ? profileEditor(root2, draft) + bulkEditor(root2, draft) : ""}
+      <main class="u4-modal-body"><p class="u4-muted" data-u4-local-notice>Lokale wijzigingen worden toegepast bij opslaan, sluiten of goedkeuren. Eerder goedgekeurde verwerking blijft tot dat moment actief.</p><button type="button" class="ghost small" data-u4-approve-selection ${batchLifecycle(draft) !== "active" ? "disabled" : ""}>Geselecteerde regels goedkeuren</button>${draft.syncConflict ? `<div class="u4-original">Synchronisatieconflict: de cloudstand blijft behouden. De lokale keuze is veilig bewaard.<button class="ghost small" data-u4-conflict-cloud>Cloudstand behouden</button><button class="primary small" data-u4-conflict-local>Lokale verwerking opnieuw nakijken</button></div>` : ""}${isConcept ? profileEditor(root2, draft) + bulkEditor(root2, draft) : ""}
         <div class="u4-import-summary"><div><span>Nieuw</span><strong>${draft.summary.newCount}</strong></div><div><span>Duplicaten</span><strong>${draft.summary.duplicateCount}</strong></div><div><span>Inkomsten</span><strong>${euro(draft.summary.totalIncome)}</strong></div><div><span>Uitgaven</span><strong>${euro(draft.summary.totalExpenses)}</strong></div></div>
         <details class="u4-section u4-section-unknown" ${draft.summary.unknownCount ? "open" : ""}><summary><span>Onbekend</span><span>${draft.summary.unknownCount}</span></summary><div class="u4-section-list">${unknown.map((row) => rowHtml(root2, row)).join("") || '<div class="u4-empty">Alle transacties zijn herkend.</div>'}</div></details>
         <details class="u4-section u4-section-review" ${draft.summary.unknownCount ? "" : "open"}><summary><span>Nakijken</span><span>${draft.summary.reviewCount}</span></summary><div class="u4-section-list">${review.map((row) => rowHtml(root2, row)).join("") || '<div class="u4-empty">Geen herkende transacties om na te kijken.</div>'}</div></details>
         <details class="u4-section u4-section-approved"><summary><span>Goedgekeurd</span><span>${draft.summary.approvedCount}</span></summary><div class="u4-section-list">${approved.map((row) => rowHtml(root2, row)).join("") || '<div class="u4-empty">Nog geen transacties expliciet goedgekeurd.</div>'}</div></details>
         ${draft.summary.duplicateCount ? `<details class="u4-section"><summary><span>Eerder geïmporteerd — overgeslagen</span><span>${draft.summary.duplicateCount}</span></summary><div class="u4-section-list">${draft.rows.filter((row) => row.duplicate).map((row) => `<div class="u4-original">${esc(displayDate(row.bankOriginal.bankDate))} · ${esc(row.bankOriginal.description)} · ${euro(row.bankOriginal.amount)}</div>`).join("")}</div></details>` : ""}
       ${draft.rows.some((row) => row.importError) ? `<details class="u4-section" open><summary>Importfouten</summary>${draft.rows.filter((row) => row.importError).map((row) => `<div class="u4-original">${esc(row.importError.message)} · bronregel ${row.bankOriginal.lineNumber}</div>`).join("")}</details>` : ""}${draft.rows.some((row) => row.possibleDuplicate) ? '<p class="u4-muted">Gelijke bankvelden gevonden: mogelijke duplicaten zijn niet automatisch overgeslagen.</p>' : ""}${pairConfirmationFields(root2, draft)}</main>
-      <footer class="u4-modal-actions"><span class="u4-muted" data-u4-save-status>Iedere bron wordt afzonderlijk goedgekeurd. ${batchLifecycle(draft) === "withdrawn" ? "Deze batch is teruggetrokken." : ""}</span><button type="button" class="ghost" data-u4-save-concept>Concept opslaan</button>${batchLifecycle(draft) === "withdrawn" ? '<button type="button" class="primary" data-u4-restore>Herstellen</button>' : '<button type="button" class="danger-ghost" data-u4-withdraw>Terugtrekken</button>'}<button type="button" class="danger-ghost" data-u4-delete-batch>Verwijderen</button>${batchLifecycle(draft) === "active" ? '<button type="button" class="primary" data-u4-process>Goedgekeurde verwerken</button>' : ""}</footer>
+      <footer class="u4-modal-actions"><span class="u4-muted" data-u4-save-status>Goedkeuring vraagt altijd een expliciete keuze per bron of geselecteerde groep. ${batchLifecycle(draft) === "withdrawn" ? "Deze batch is teruggetrokken." : ""}</span><button type="button" class="ghost" data-u4-save-concept>Concept opslaan</button>${batchLifecycle(draft) === "withdrawn" ? '<button type="button" class="primary" data-u4-restore>Herstellen</button>' : '<button type="button" class="danger-ghost" data-u4-withdraw>Terugtrekken</button>'}<button type="button" class="danger-ghost" data-u4-delete-batch>Verwijderen</button>${batchLifecycle(draft) === "active" ? '<button type="button" class="primary" data-u4-process>Goedgekeurde verwerken</button>' : ""}</footer>
     </div>`;
       modal.classList.add("open");
       bindDraftModal(root2, draft, modal);
@@ -12365,6 +12543,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     }
     async function openDraft(root2, id) {
       var _a2, _b, _c;
+      const request = UI.openSequence = (UI.openSequence || 0) + 1, sessionAtStart = ImportEditors.get(String(id)), revisionAtStart = sessionAtStart == null ? void 0 : sessionAtStart.revision, baseAtStart = sessionAtStart ? cloneState(sessionAtStart.base) : null;
       let local;
       try {
         local = await ImportStore.getImport(id);
@@ -12377,7 +12556,11 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
         const resolved = await resolveImportDetails(id, {
           localRead: async () => local,
           cloudRead: (importId) => fetchImportFromCloud(root2, importId),
-          localWrite: (record) => ImportStore.putImport(record),
+          localWrite: async (record) => {
+            const latest2 = await ImportStore.getImport(id);
+            if (local && latest2 && !sameImportOperation(local, latest2)) throw cloudImportError("import-conflict", "Een nieuwere lokale importkeuze blijft behouden.");
+            return ImportStore.putImport(record);
+          },
           refresh: ((_b = (_a2 = root2.CloudAdapter) == null ? void 0 : _a2.isConnected) == null ? void 0 : _b.call(_a2)) === true,
           pendingRead: async (id2) => (await ImportStore.listSync()).some((row) => row.importId === id2),
           onConflict: (local2, remote) => preserveImportConflict(root2, local2, remote)
@@ -12386,10 +12569,11 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
           closeDraft();
           return resolved.record;
         }
+        if (request !== UI.openSequence || sessionAtStart && (sessionAtStart.revision !== revisionAtStart || sessionAtStart.committing || !sameEditorBase(sessionAtStart.base, baseAtStart))) return (sessionAtStart == null ? void 0 : sessionAtStart.draft) || UI.draft;
         resolved.record.syncConflict = ((_c = await ImportStore.getJournal(`conflict-${id}`)) == null ? void 0 : _c.status) === "conflict";
-        UI.draft = resolved.record;
-        renderDraftModal(root2, resolved.record);
-        return resolved.record;
+        UI.draft = await beginImportEditor(root2, resolved.record);
+        renderDraftModal(root2, UI.draft);
+        return UI.draft;
       } catch (error) {
         renderCloudImportState(root2, id, error);
         return null;
@@ -12414,8 +12598,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
         if (!ok) throw new Error("Rekeningprofiel opslaan mislukt.");
       }
       const activeRows = draft.rows.filter((row) => sourceIsActive(root2, draft, row));
-      activeRows.forEach((row) => reopenTransactionSource(root2.state, draft.id, row.id, { dryRun: true }));
-      for (const row of activeRows) await reopenStoredSource(root2, draft, row);
+      activeRows.forEach(markEditorRowChanged);
       draft.accountProfileId = profile.id;
       draft.accountOwner = profile.accountOwner;
       draft.rows.forEach((row) => {
@@ -12432,7 +12615,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
         row.reasons = proposal.reasons;
         row.processing = { ...proposal.processing, ...row.processing, budgetOwner: row.processing.budgetOwner || profile.accountOwner };
       });
-      await saveDraft(root2, draft, { sync: true });
+      await persistLocalImportEditor(root2, draft);
       renderDraftModal(root2, draft);
     }
     function renderDraftModalPreservingView(root2, draft, modal, rowId = "") {
@@ -12477,7 +12660,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
         button.disabled = true;
         updateImportSaveStatus("Laatste lokale wijzigingen opslaan…");
         try {
-          await flushScheduledImportDraft(root2, draft, { syncCloud: true, updateSummary: true });
+          await commitImportEditor(root2, draft);
           closeDraft();
         } catch (error) {
           button.disabled = false;
@@ -12508,15 +12691,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
         }
         const wasApproved = isExplicitlyApproved(row) || sourceIsActive(root2, draft, row);
         let rerender = false;
-        if (wasApproved) {
-          try {
-            await reopenStoredSource(root2, draft, row);
-          } catch (error) {
-            alert(error.message);
-            renderDraftModal(root2, draft);
-            return;
-          }
-        }
+        if (wasApproved) markEditorRowChanged(row);
         if (event.target.hasAttribute("data-u4-family")) {
           applyTransactionFamily(row, event.target.value);
           rerender = true;
@@ -12525,13 +12700,14 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
           let value = event.target.value;
           if (field === "processedAmount") value = round23(Math.abs(Number(value) || 0));
           if (field === "include") value = value === "true";
-          row.processing[field] = value;
+          if (field === "transactionType") setProcessingType(row.processing, value);
+          else row.processing[field] = value;
           if (field === "category") {
-            if (value === "Vaste lasten") row.processing.transactionType = "vaste-last";
-            else if (transactionFamily(row.processing) === "uitgave") {
-              row.processing.transactionType = "uitgave";
-              row.processing.fixedExpenseId = "";
-              row.processing.fixedAmountMode = "none";
+            if (value === "Vaste lasten") {
+              setProcessingType(row.processing, "vaste-last");
+              if (!row.processing.fixedOccurrenceMonth) row.processing.fixedOccurrenceMonth = String(row.bankOriginal.bankDate).slice(0, 7);
+            } else if (transactionFamily(row.processing) === "uitgave") {
+              setProcessingType(row.processing, "uitgave");
             }
           }
           if (field === "include" && value === false) row.processing.transactionType = "niet-meetellen";
@@ -12556,22 +12732,29 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
             row.processing.repaymentAllocations = relation ? proposeRepaymentAllocations(root2.state, relation.debtor, relation.creditor, row.processing.processedAmount) : [];
           }
           if (field === "fixedOccurrenceId") row.processing.fixedOccurrenceMonth = String(value).slice(-10, -3);
-          if (["fixedExpenseId", "fixedOccurrenceMonth"].includes(field)) row.processing.fixedOccurrenceId = "";
-          rerender = ["transactionType", "budgetOwner", "category", "include", "fixedExpenseId", "processingDate", "fixedOccurrenceMonth", "fixedOccurrenceId"].includes(field);
+          if (["fixedExpenseId", "fixedOccurrenceMonth"].includes(field)) {
+            row.processing.fixedOccurrenceId = "";
+            selectFixedOccurrence(root2, row, row.processing);
+          }
+          rerender = ["transactionType", "budgetOwner", "category", "include", "fixedExpenseId", "processingDate", "fixedOccurrenceMonth", "fixedOccurrenceId", "refundMonth", "refundCategory"].includes(field);
         } else if (event.target.hasAttribute("data-u4-row-certainty")) reopenForReview(row);
         else if (event.target.dataset.u4SplitField) {
           const split = row.processing.splits[Number(event.target.closest("[data-u4-split]").dataset.u4Split)];
           let value = event.target.value;
           if (event.target.dataset.u4SplitField === "amount") value = round23(Math.abs(Number(value) || 0));
           const field = event.target.dataset.u4SplitField;
-          split[field] = value;
+          if (field === "transactionType") setProcessingType(split, value);
+          else split[field] = value;
           if (field === "fixedOccurrenceId") split.fixedOccurrenceMonth = String(value).slice(-10, -3);
-          if (["fixedExpenseId", "fixedOccurrenceMonth", "budgetOwner"].includes(field)) split.fixedOccurrenceId = "";
+          if (["fixedExpenseId", "fixedOccurrenceMonth", "budgetOwner"].includes(field)) {
+            split.fixedOccurrenceId = "";
+            selectFixedOccurrence(root2, row, split);
+          }
           if (field === "transactionType" && value !== "vaste-last") {
             split.fixedExpenseId = "";
             split.fixedOccurrenceId = "";
           }
-          rerender = ["transactionType", "fixedExpenseId", "fixedOccurrenceMonth", "fixedOccurrenceId", "budgetOwner"].includes(field);
+          rerender = ["transactionType", "fixedExpenseId", "fixedOccurrenceMonth", "fixedOccurrenceId", "budgetOwner", "refundMonth", "refundCategory"].includes(field);
         } else if (event.target.dataset.u4AllocationField) {
           const allocation = row.processing.repaymentAllocations[Number(event.target.closest("[data-u4-allocation]").dataset.u4Allocation)];
           allocation[event.target.dataset.u4AllocationField] = round23(Math.abs(Number(event.target.value) || 0));
@@ -12581,8 +12764,8 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
           rerender = true;
         }
         if (rerender) renderDraftRowCard(root2, draft, modal, row.id);
-        updateImportSaveStatus("Wijziging klaarzetten voor lokale opslag…");
-        scheduleImportDraftPersist(root2, draft, { delay: 350, syncCloud: true, updateSummary: true }).catch((error) => console.warn("Automatisch lokaal opslaan mislukt.", error));
+        updateImportSaveStatus("Wijziging lokaal bewaren; nog niet toegepast…");
+        persistLocalImportEditor(root2, draft).catch((error) => console.warn("Automatisch lokaal opslaan mislukt.", error));
       });
       modal.addEventListener("click", async (event) => {
         var _a3, _b2, _c, _d, _e, _f;
@@ -12623,6 +12806,25 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
           }
           return;
         }
+        if (event.target.closest("[data-u4-approve-selection]")) {
+          const ids = [...modal.querySelectorAll("[data-u4-select-approval]:checked")].map((input) => input.dataset.u4SelectApproval);
+          if (!ids.length) {
+            alert("Selecteer eerst de regels die je wilt goedkeuren.");
+            return;
+          }
+          if (!confirm(`${ids.length} geselecteerde regels expliciet goedkeuren?`)) return;
+          const button = event.target.closest("[data-u4-approve-selection]");
+          button.disabled = true;
+          try {
+            await commitImportEditor(root2, draft, { approveIds: ids });
+            renderDraftModalPreservingView(root2, draft, modal);
+            root2.renderActiveTab();
+          } catch (error) {
+            button.disabled = false;
+            alert(error.message);
+          }
+          return;
+        }
         if (event.target.closest("[data-u4-approve]") && row) {
           event.preventDefault();
           event.stopPropagation();
@@ -12637,7 +12839,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
             return;
           }
           renderDraftModalPreservingView(root2, draft, modal, row.id);
-          scheduleImportDraftPersist(root2, draft, { delay: 0 }).catch((error) => console.warn("Opnieuw nakijken opslaan mislukt.", error));
+          persistLocalImportEditor(root2, draft).catch((error) => console.warn("Opnieuw nakijken opslaan mislukt.", error));
           return;
         }
         if (event.target.closest("[data-u4-apply-bulk]")) {
@@ -12660,42 +12862,34 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
           if (!confirm(`${targets.length} transacties aanpassen?`)) return;
           targets.forEach((item) => {
             if (owner) item.processing.budgetOwner = owner;
-            if (category) item.processing.category = category;
-            if (type) item.processing.transactionType = type;
+            if (type) setProcessingType(item.processing, type);
+            if (category) {
+              item.processing.category = category;
+              if (category === "Vaste lasten") {
+                setProcessingType(item.processing, "vaste-last");
+                selectFixedOccurrence(root2, item, item.processing);
+              }
+            }
             reopenForReview(item);
           });
           renderDraftModal(root2, draft);
-          scheduleImportDraftPersist(root2, draft, { delay: 0 }).catch((error) => console.warn("Bulkbewerking opslaan mislukt.", error));
+          persistLocalImportEditor(root2, draft).catch((error) => console.warn("Bulkbewerking opslaan mislukt.", error));
           return;
         }
         if (event.target.closest("[data-u4-add-split]") && row) {
-          if (isExplicitlyApproved(row) || sourceIsActive(root2, draft, row)) {
-            try {
-              await reopenStoredSource(root2, draft, row);
-            } catch (error) {
-              alert(error.message);
-              return;
-            }
-          }
+          if (isExplicitlyApproved(row) || sourceIsActive(root2, draft, row)) markEditorRowChanged(row);
           row.processing.splits = row.processing.splits || [];
           row.processing.splits.push({ id: uid2("split"), transactionType: "uitgave", amount: 0, budgetOwner: row.processing.budgetOwner, category: row.processing.category, budgetItemId: "", savingsGoalId: "", advanceMode: "auto", include: true });
           renderDraftModalPreservingView(root2, draft, modal, row.id);
-          scheduleImportDraftPersist(root2, draft, { delay: 0 }).catch((error) => console.warn("Splitsregel opslaan mislukt.", error));
+          persistLocalImportEditor(root2, draft).catch((error) => console.warn("Splitsregel opslaan mislukt.", error));
           return;
         }
         const remove = event.target.closest("[data-u4-remove-split]");
         if (remove && row) {
-          if (isExplicitlyApproved(row) || sourceIsActive(root2, draft, row)) {
-            try {
-              await reopenStoredSource(root2, draft, row);
-            } catch (error) {
-              alert(error.message);
-              return;
-            }
-          }
+          if (isExplicitlyApproved(row) || sourceIsActive(root2, draft, row)) markEditorRowChanged(row);
           row.processing.splits.splice(Number(remove.dataset.u4RemoveSplit), 1);
           renderDraftModalPreservingView(root2, draft, modal, row.id);
-          scheduleImportDraftPersist(root2, draft, { delay: 0 }).catch((error) => console.warn("Splitsregel verwijderen opslaan mislukt.", error));
+          persistLocalImportEditor(root2, draft).catch((error) => console.warn("Splitsregel verwijderen opslaan mislukt.", error));
           return;
         }
         const saveButton = event.target.closest("[data-u4-save-concept]");
@@ -12705,7 +12899,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
           saveButton.textContent = "Opslaan…";
           if (status) status.textContent = "Concept wordt lokaal en in de cloud opgeslagen…";
           try {
-            await flushScheduledImportDraft(root2, draft, { syncCloud: true, updateSummary: true });
+            await commitImportEditor(root2, draft);
             await flushImportSync(root2);
             saveButton.textContent = "Opgeslagen";
             if (status) status.textContent = "Concept is lokaal en in de cloud opgeslagen.";
@@ -12735,7 +12929,9 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
           const type = event.target.closest("[data-u4-delete-batch]") ? "delete" : event.target.closest("[data-u4-restore]") ? "restore" : "withdraw";
           if (type === "delete" && !confirm("Deze batch permanent verwijderen? Alleen technisch verwijderbewijs blijft bewaard.")) return;
           try {
+            await commitImportEditor(root2, draft);
             await commitImportCommand(root2, draft, { type });
+            ImportEditors.delete(String(draft.id));
             if (type === "delete") closeDraft();
             else renderDraftModal(root2, draft);
             root2.renderActiveTab();
@@ -12978,6 +13174,8 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       delete conflict.localChoice;
       delete conflict.cloudChoice;
       await ImportStore.putJournal(conflict);
+      await ImportStore.deleteJournal(`editor-draft-${id}`);
+      ImportEditors.delete(String(id));
       UI.conflicts.delete(id);
       if (root2.CloudAdapter) {
         root2.CloudAdapter.conflict = UI.conflicts.size > 0;
@@ -12998,11 +13196,14 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       return operation;
     }
     async function commitImportCommandUnlocked(root2, draft, command) {
-      var _a2, _b, _c, _d, _e;
+      var _a2, _b, _c, _d, _e, _f, _g;
       const sourceToken = JSON.stringify((_a2 = draft.rows) == null ? void 0 : _a2.find((row) => row.id === command.rowId));
       const stored = await ImportStore.getImport(draft.id);
       if (command.operationId && (stored == null ? void 0 : stored.operationId) === command.operationId) return { state: cloneState(root2.state), batch: cloneState(stored), noop: true };
-      if (stored && importVersion(stored) !== importVersion(draft)) throw cloudImportError("import-conflict", "Importdetails zijn intussen gewijzigd. Heropen deze batch.");
+      if (stored && (importVersion(stored) !== importVersion(draft) || command.type === "editor-commit" && !sameEditorBase(stored, draft))) {
+        if (command.type === "editor-commit") await preserveImportConflict(root2, { ...cloneState(draft), rows: cloneState(command.rows) }, stored, [{ kind: "editor-base-changed" }]);
+        throw cloudImportError("import-conflict", "Importdetails zijn intussen gewijzigd. De lokale keuze blijft veilig bewaard.");
+      }
       if (command.type === "delete") {
         const dependent = (await ImportStore.listJournal()).find((entry) => {
           var _a3, _b2, _c2;
@@ -13010,15 +13211,53 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
         });
         if (dependent) throw new Error("Een nog openstaande lokale keuze gebruikt deze batch. Los eerst dat conflict op.");
       }
-      const intent = { ...command, operationId: command.operationId || uid2("import-op"), timestamp: command.timestamp || (/* @__PURE__ */ new Date()).toISOString(), deviceId: ((_b = root2.state.meta) == null ? void 0 : _b.updatedBy) || "" };
+      if (stored && sameImportOperation(stored, draft)) draft.baseVersion = Number((_c = (_b = stored.baseVersion) != null ? _b : draft.baseVersion) != null ? _c : 0);
+      if (command.type === "editor-commit" && !(command.approveIds || []).length && !(command.reopenIds || []).length && !command.profile && JSON.stringify(command.rows) === JSON.stringify(draft.rows)) return { state: cloneState(root2.state), batch: cloneState(draft), noop: true };
+      const intent = { ...command, operationId: command.operationId || uid2("import-op"), timestamp: command.timestamp || (/* @__PURE__ */ new Date()).toISOString(), deviceId: ((_d = root2.state.meta) == null ? void 0 : _d.updatedBy) || "" };
       let planned;
       if (["withdraw", "restore", "delete"].includes(intent.type)) planned = planImportCommand(root2.state, draft, intent, { validateRow: rowProcessingValidation });
       else {
         const candidate = cloneState(root2.state), nextBatch = cloneState(draft), row = nextBatch.rows.find((row2) => row2.id === intent.rowId);
-        if (!row && intent.type !== "source-choices") throw new Error("Importbron ontbreekt.");
+        if (!row && !["source-choices", "editor-commit"].includes(intent.type)) throw new Error("Importbron ontbreekt.");
         if (row == null ? void 0 : row.importError) throw cloudImportError(row.importError.code, row.importError.message);
         if (batchLifecycle(draft) !== "active") throw new Error("Herstel eerst deze teruggetrokken batch.");
-        if (intent.type === "source-choices") {
+        if (intent.type === "editor-commit") {
+          const desiredRows = intent.rows || [], selected = new Set(intent.approveIds || []), reopenIds = new Set(intent.reopenIds || []);
+          if (desiredRows.length !== nextBatch.rows.length || desiredRows.some((source) => !nextBatch.rows.some((original2) => original2.id === source.id))) throw new Error("De bronregels van deze batch zijn gewijzigd. Heropen de actuele import.");
+          assertOriginalBankDataUnchanged(nextBatch.rows, desiredRows);
+          if (intent.profile) for (const key of ["accountProfileId", "accountOwner"]) nextBatch[key] = intent.profile[key];
+          for (const source of nextBatch.rows) {
+            const desired = desiredRows.find((value) => value.id === source.id), changed2 = JSON.stringify(source.processing) !== JSON.stringify(desired.processing) || source.accountProfileId !== desired.accountProfileId || source.accountOwner !== desired.accountOwner || getTransactionProcessingStatus({ ...source, source: "csv" }) !== getTransactionProcessingStatus({ ...desired, source: "csv" });
+            if (changed2 || reopenIds.has(source.id)) {
+              source.approvalHistory = [...source.approvalHistory || [], { approvalSource: source.approvalSource || "", approvedAt: source.approvedAt || "", status: source.processingStatus || source.certainty }];
+              source.processing = cloneState(desired.processing);
+              for (const key of ["accountProfileId", "accountOwner", "recognitionState", "reasons"]) {
+                if (desired[key] !== void 0) source[key] = cloneState(desired[key]);
+              }
+              reopenForReview(source);
+              reopenIds.add(source.id);
+            }
+            if (selected.has(source.id)) markExplicitlyApproved(source);
+          }
+          if ([...selected].some((id) => !nextBatch.rows.some((source) => source.id === id))) throw new Error("Een geselecteerde bron ontbreekt.");
+          const selectedRows = nextBatch.rows.filter((source) => selected.has(source.id));
+          for (const source of selectedRows) {
+            const validation = rowProcessingValidation(source, candidate);
+            if (!validation.ok) throw new Error(validation.errors.map((error) => error.message).join(" "));
+          }
+          const changed = nextBatch.rows.some((source, index) => JSON.stringify(source) !== JSON.stringify(draft.rows[index]));
+          if (!changed && !intent.profile && !selected.size && !reopenIds.size) return { state: cloneState(root2.state), batch: cloneState(draft), noop: true };
+          const plan = selectedRows.length ? planImportEffects({ ...nextBatch, rows: selectedRows }, candidate) : null;
+          if (plan && !plan.ok) throw new Error(plan.errors.map((error) => error.message).join(" "));
+          commitProcessedSourceGroup(candidate, draft.id, { reopenIds: [...reopenIds], replacements: selectedRows.map((source) => ({ rowId: source.id, rows: plan.transactions.filter((tx) => tx.importTransactionId === source.id) })) }, (state2) => {
+            if (plan) applyImportPlanInPlace(state2, { ...plan, fixedAdjustments: [], sourceCorrection: true });
+          });
+          if (plan) {
+            nextBatch.effectManifest = nextBatch.effectManifest || {};
+            const effects = effectManifest(plan);
+            for (const key of ["transactionIds", "savingIds", "advanceIds", "repaymentIds", "replacementIds", "internalPairIds"]) nextBatch.effectManifest[key] = [.../* @__PURE__ */ new Set([...nextBatch.effectManifest[key] || [], ...effects[key] || []])];
+          }
+        } else if (intent.type === "source-choices") {
           const existingSourceIds = new Set(nextBatch.rows.map((source) => source.id));
           if (!nextBatch.rows.length) nextBatch.rows = cloneState(intent.rows || []);
           for (const source of nextBatch.rows) {
@@ -13059,11 +13298,11 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       }
       if (planned.noop) return planned;
       assertNoDuplicateSources(root2.state, planned.state);
-      planned.batch.baseVersion = Number((_d = (_c = draft.baseVersion) != null ? _c : draft.version) != null ? _d : 0);
+      planned.batch.baseVersion = Number((_f = (_e = draft.baseVersion) != null ? _e : draft.version) != null ? _f : 0);
       const baseSignature = JSON.stringify(root2.state);
       const journal = { id: intent.operationId, importId: draft.id, operation: "import-command", status: "pending", intent, baseSignature, candidate: planned.state, batch: planned.batch, previousBatch: cloneState(stored || draft) };
       await ImportStore.putJournal(journal);
-      if (command.rowId && JSON.stringify((_e = draft.rows) == null ? void 0 : _e.find((row) => row.id === command.rowId)) !== sourceToken) {
+      if (command.rowId && JSON.stringify((_g = draft.rows) == null ? void 0 : _g.find((row) => row.id === command.rowId)) !== sourceToken) {
         journal.status = "rolled-back";
         await ImportStore.putJournal(journal);
         throw new Error("De verwerking is intussen gewijzigd. Keur de huidige verwerking opnieuw expliciet goed.");
@@ -13108,6 +13347,10 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       return planned;
     }
     async function purgeDeletedBatch(id, except = "") {
+      const session = ImportEditors.get(String(id));
+      if (session) await session.write.catch(() => {
+      });
+      ImportEditors.delete(String(id));
       for (const entry of await ImportStore.listJournal()) {
         if (entry.importId === id && entry.id !== except) await ImportStore.deleteJournal(entry.id);
         else if (entry.id !== except && !["pending", "conflict"].includes(entry.status) && entry.candidate) {
@@ -13268,6 +13511,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
             await preserveImportConflict(root2, entry.batch, await ImportStore.getImport(entry.importId) || { id: entry.importId, version: 0 }, [{ kind: "journal-core-changed" }]);
           }
           if (entry.status === "completed") {
+            await acknowledgeRecoveredEditor(entry);
             delete entry.candidate;
             delete entry.previousBatch;
             delete entry.baseSignature;
@@ -13353,7 +13597,8 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
         ImportStore.setScope(((_b2 = (_a3 = root2.CloudAdapter) == null ? void 0 : _a3.importScope) == null ? void 0 : _b2.call(_a3)) || "legacy");
         ImportStore.legacyReferences = new Set((root2.state.importSummaries || []).map((row) => String(row.id)));
       }, findConflicts: findImportConflicts, preserveConflict: (local, remote, conflicts) => preserveImportConflict(root2, local, remote, conflicts), refresh: () => {
-        if (UI.draft && !ImportPerformance.pending.has(UI.draft.id) && !ImportPerformance.chains.has(UI.draft.id)) openDraft(root2, UI.draft.id);
+        const session = UI.draft && ImportEditors.get(String(UI.draft.id));
+        if (UI.draft && !(session == null ? void 0 : session.revision) && !(session == null ? void 0 : session.committing) && !ImportPerformance.pending.has(UI.draft.id) && !ImportPerformance.chains.has(UI.draft.id)) openDraft(root2, UI.draft.id);
       } };
       const validation = validateCore(root2.state);
       if (!validation.ok) {
@@ -13425,7 +13670,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
         flushImportSync(root2).catch((error) => console.warn("Importsynchronisatie uitgesteld.", error));
       });
     }
-    return { getTransactionAccountContext, getTransactionSource, getTransactionProcessingStatus, isTransactionFinanciallyActive, getTransactionOriginalBankData, SCHEMA_VERSION, CLOUD_STORAGE_VERSION, CLOUD_READ_CONCURRENCY, OWNERS: OWNERS2, IMPORT_STATUSES, normalizeIban: normalizeIban2, normalizeRule, normalizeTransaction, normalizeCore, validateCore, calculateGoalSavedAmount, reconcileGoalSavedAmounts, chunkRows, canonicalValue, rowsChecksum, buildCloudImportEnvelope, assembleCloudImport, mapWithConcurrency, classifyCloudError, fetchImportFromCloud, resolveImportDetails, reconcileActiveImportReference, deleteCloudImportBestEffort, discardImportConcept, rowProcessingValidation, reopenStoredSource, approveStoredSource, normalizeText, matchIdentity, matchCandidates, detectDelimiter, parseDelimited, parseDate, parseAmount, detectFormat, inferMapping, hashText, fingerprint, organizationName, proposeType, recognitionProposal, fixedAmountAt, fixedRecognition, isExplicitlyApproved, importReviewState, markExplicitlyApproved, classifyOriginal, parseBankCsv, findProfile, createImportDraft, updateDraftSummary, compactSummary, validateDraft, transactionKind, expenseImpact, financialRows, advanceForTransaction, savingsForTransaction, detectInternalPairs, directionalBalances, proposeRepaymentAllocations, planImportCommand, commitImportCommand, deriveBatchReviewStatus, stageImportCloudWrites, preserveImportConflict, resolveImportConflict, preservePendingImportsBeforeRemote, planImportEffects, applyImportPlan, learnedRecognitionRules, rememberRecognitionRules, effectManifest, undoImportEffects, transactionFamily, applyTransactionFamily, ImportStore, persistImportDraft, scheduleImportDraftPersist, flushScheduledImportDraft, queueImportSync, flushImportSync, recoverJournal, install, round2: round23, uid: uid2, clone: cloneState, testRenderDraftModal: renderDraftModal };
+    return { getTransactionAccountContext, getTransactionSource, getTransactionProcessingStatus, isTransactionFinanciallyActive, getTransactionOriginalBankData, beginImportEditor, persistLocalImportEditor, commitImportEditor, setProcessingType, selectFixedOccurrence, SCHEMA_VERSION, CLOUD_STORAGE_VERSION, CLOUD_READ_CONCURRENCY, OWNERS: OWNERS2, IMPORT_STATUSES, normalizeIban: normalizeIban2, normalizeRule, normalizeTransaction, normalizeCore, validateCore, calculateGoalSavedAmount, reconcileGoalSavedAmounts, chunkRows, canonicalValue, rowsChecksum, buildCloudImportEnvelope, assembleCloudImport, mapWithConcurrency, classifyCloudError, fetchImportFromCloud, resolveImportDetails, reconcileActiveImportReference, deleteCloudImportBestEffort, discardImportConcept, rowProcessingValidation, reopenStoredSource, approveStoredSource, normalizeText, matchIdentity, matchCandidates, detectDelimiter, parseDelimited, parseDate, parseAmount, detectFormat, inferMapping, hashText, fingerprint, organizationName, proposeType, recognitionProposal, fixedAmountAt, fixedRecognition, isExplicitlyApproved, importReviewState, markExplicitlyApproved, classifyOriginal, parseBankCsv, findProfile, createImportDraft, updateDraftSummary, compactSummary, validateDraft, transactionKind, expenseImpact, financialRows, advanceForTransaction, savingsForTransaction, detectInternalPairs, directionalBalances, proposeRepaymentAllocations, planImportCommand, commitImportCommand, deriveBatchReviewStatus, stageImportCloudWrites, preserveImportConflict, resolveImportConflict, preservePendingImportsBeforeRemote, planImportEffects, applyImportPlan, learnedRecognitionRules, rememberRecognitionRules, effectManifest, undoImportEffects, transactionFamily, applyTransactionFamily, ImportStore, persistImportDraft, scheduleImportDraftPersist, flushScheduledImportDraft, queueImportSync, flushImportSync, recoverJournal, install, round2: round23, uid: uid2, clone: cloneState, testRenderDraftModal: renderDraftModal };
   });
   var FinizeImportRuntime = globalThis.FinizeUpdate4Runtime;
 

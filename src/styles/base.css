@@ -5032,3 +5032,10 @@ body.v4-app .modal-content{ min-width:0; }
     body.v4-app .v4-bottom-nav .bottom-nav-btn span:last-child{ font-size:7px !important; letter-spacing:-.02em; white-space:nowrap; }
   }
 }
+
+/* Account goal tables use the same columns on every viewport. */
+@media (max-width:767px){
+  .u5-joint-goals-preview .goal-table-wrap{overflow-x:auto; -webkit-overflow-scrolling:touch;}
+  .u5-joint-goals-preview .goal-table{min-width:1050px;}
+  .u5-joint-goals-preview .goals-preview-actions{display:flex; flex-wrap:wrap; gap:6px;}
+}

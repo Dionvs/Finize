@@ -1,0 +1,97 @@
+{
+  "referenceCommit": "ddbe310279591f18214ffac621b3e97bf847842f",
+  "referenceMarker": "finize-v107-income-source-details",
+  "manualReview": true,
+  "automaticSnapshotUpdate": false,
+  "widths": {
+    "360": {
+      "bounds": {
+        "x": 10,
+        "y": 126.40625,
+        "width": 340,
+        "height": 92.5
+      },
+      "sha256": "ed129d91c8ea7101592098d0d3ecc70b5fd1804f75e6a1045a0cf267806f54a5"
+    },
+    "390": {
+      "bounds": {
+        "x": 10,
+        "y": 126.40625,
+        "width": 370,
+        "height": 100
+      },
+      "sha256": "480f2d5d9ff5149bd733cd9253e5391f17be280a792c7e1b76ffebd883b91913"
+    },
+    "430": {
+      "bounds": {
+        "x": 10,
+        "y": 126.40625,
+        "width": 410,
+        "height": 110
+      },
+      "sha256": "914ff653cfc3c2af9ce61bfb0485982eb4a4a69ba8b411160f8a2d759b943583"
+    },
+    "768": {
+      "bounds": {
+        "x": 102,
+        "y": 189,
+        "width": 315,
+        "height": 132
+      },
+      "sha256": "02302f0f85a492d9990e825d581f34d90550569e1b71861922bfd53f8650c212"
+    },
+    "1024": {
+      "bounds": {
+        "x": 268,
+        "y": 164,
+        "width": 171.5,
+        "height": 132
+      },
+      "sha256": "2b64854985d9b9f50c12ed31df5130cf6c5aae14606a9e354e0f08c688ae4618"
+    },
+    "1440": {
+      "bounds": {
+        "x": 268,
+        "y": 121,
+        "width": 275.5,
+        "height": 142
+      },
+      "sha256": "3e6a3320c87f32087a8444e53e4c11998b311aef7fbbd73f3294676979ddcf1c"
+    }
+  },
+  "updatedSnapshots": {
+    "tests/browser/v50-visual-baseline.spec.cjs-snapshots/v50-768.png": {
+      "beforeSha256": "be6c4b3bc0a80887e2809b957a7cc05383308f1c7e746a0e5b393ba0b0f3c7fc",
+      "afterSha256": "02302f0f85a492d9990e825d581f34d90550569e1b71861922bfd53f8650c212",
+      "reason": "Reviewed current published v107: scenario controls removed; income source breakdown retained."
+    },
+    "tests/browser/v50-visual-baseline.spec.cjs-snapshots/v50-1024.png": {
+      "beforeSha256": "aae645f9e5204f04064be9a4a9a25d9e145c6307951043b73b884748c012d13c",
+      "afterSha256": "2b64854985d9b9f50c12ed31df5130cf6c5aae14606a9e354e0f08c688ae4618",
+      "reason": "Reviewed current published v107: scenario controls removed; income source breakdown retained."
+    }
+  },
+  "unchangedOtherSnapshotWidths": [
+    360,
+    390,
+    430,
+    1440
+  ],
+  "geometryChange": {
+    "width": 1024,
+    "previousExpectedHeight": 140.375,
+    "reviewedV107Height": 132,
+    "toleranceUnchanged": true
+  },
+  "cloudMockContract": {
+    "storageFormat": "finize-json-chunks-v1",
+    "household": "isolated-p1",
+    "coreWritesA": 1,
+    "syncVersion": 4,
+    "schema": 11,
+    "coreWritesB": 0,
+    "cloudOriginalBackupExact": true,
+    "deviceStateForecastEffectsEqual": true
+  },
+  "runtimeChangedDuringTestRepair": false
+}

@@ -16,8 +16,7 @@ const styleSelectors = [
 ];
 
 async function keepVisualFixtureLocal(page) {
-  await page.route('https://www.gstatic.com/firebasejs/**', route => route.abort());
-  await page.route('https://firestore.googleapis.com/**', route => route.abort());
+  await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
 }
 
 test.skip(process.platform !== 'win32', 'De pixelbaseline gebruikt de Windows-letterrendering van de v50-baseline.');

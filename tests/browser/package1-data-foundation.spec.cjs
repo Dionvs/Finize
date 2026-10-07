@@ -5,6 +5,7 @@ const fixture=JSON.parse(fs.readFileSync(path.join(__dirname,'../fixtures/v50-vi
 const key='finize-budget-planner-v1';
 const migrationKey=key+'-pre-schema-v5';
 async function boot(page,state=fixture){
+  await page.route('**/*',route=>new URL(route.request().url()).hostname==='127.0.0.1'?route.continue():route.abort());
   await page.addInitScript(({state,key})=>{
     if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify(state));
     const set=Storage.prototype.setItem;
@@ -91,24 +92,48 @@ test('bankOriginal wordt bij state-commit en ImportStore-write beschermd',async(
   });
   expect(result).toEqual({created:true,edited:false,rejected:true,original:'Original',raw:'original CSV text',amount:-10});
 });
-test('twee devices lezen v11; cloudmigratie schrijft eenmaal en echo schrijft niet opnieuw',async({page,context})=>{
+// The production client stores chunked generations; count core commits separately from chunk uploads.
+async function installMigrationCloudMock(page,entries){
+  await page.evaluate(entries=>{
+    const docs=new Map(entries),ref={path:'households/isolated-p1/budgetState/current'},metrics={coreWrites:0};
+    const snapshot=reference=>({exists:()=>docs.has(reference.path),data:()=>structuredClone(docs.get(reference.path))});
+    const firestore={
+      doc:(_,path)=>({path}),getDoc:async reference=>snapshot(reference),
+      setDoc:async(reference,value)=>docs.set(reference.path,structuredClone(value)),
+      updateDoc:async(reference,value)=>docs.set(reference.path,{...docs.get(reference.path),...structuredClone(value)}),
+      serverTimestamp:()=> 'isolated-p1-server-time',
+      runTransaction:async(_,callback)=>{
+        const writes=[];const result=await callback({get:async reference=>snapshot(reference),set:(reference,value)=>writes.push([reference.path,structuredClone(value)])});
+        for(const [path,value]of writes){docs.set(path,value);if(path===ref.path)metrics.coreWrites++;}return result;
+      }
+    };
+    Object.assign(CloudAdapter,{db:{},docRef:ref,modules:{firestore},initialSyncComplete:false,cloudVersion:null,pendingState:null,confirmedState:null,conflict:false});
+    window.__p1CloudMock={docs,ref,metrics};
+  },entries);
+}
+test('twee devices lezen v11; cloudmigratie schrijft eenmaal en echo schrijft niet opnieuw',async({page,browser})=>{
   await boot(page);
-  const migratedCloud=await page.evaluate(async raw=>{
-    const copy=value=>JSON.parse(JSON.stringify(value));
-    let documentData={syncVersion:3,commitId:'old',state:copy(raw)},writes=0;
-    const cloud=window.CloudAdapter;cloud.db={};cloud.docRef={};
-    cloud.modules={firestore:{serverTimestamp:()=>0,runTransaction:async(_,callback)=>callback({get:async()=>({exists:()=>true,data:()=>documentData}),set:(_,payload)=>{writes++;documentData=copy(payload);}})}};
-    await cloud.acceptRemote(documentData,window.migrateBudgetState(raw),null);
-    while(cloud.writeInFlight||cloud.pendingState)await new Promise(resolve=>setTimeout(resolve,10));
-    await cloud.acceptRemote(documentData,window.migrateBudgetState(documentData.state),null);
-    await cloud.acceptRemote(documentData,window.migrateBudgetState(documentData.state),null);
-    return {writes,documentData};
-  },fixture);
-  expect(migratedCloud.writes).toBe(1);expect(migratedCloud.documentData.syncVersion).toBe(4);expect(migratedCloud.documentData.state.meta.schemaVersion).toBe(11);
-  const second=await context.newPage();await second.goto('/');await second.waitForFunction(()=>window.__finizeBootstrap?.rendered);
-  const secondWrites=await second.evaluate(async documentData=>{
-    const cloud=window.CloudAdapter;let writes=0;cloud.db={};cloud.docRef={};cloud.modules={firestore:{runTransaction:async()=>{writes++;throw new Error('Unexpected migration write');}}};
-    await cloud.acceptRemote(documentData,window.migrateBudgetState(documentData.state),null);return writes;
-  },migratedCloud.documentData);
-  expect(secondWrites).toBe(0);
+  await installMigrationCloudMock(page,[['households/isolated-p1/budgetState/current',{syncVersion:3,commitId:'old',state:structuredClone(fixture)}]]);
+  await page.evaluate(async()=>{const x=__p1CloudMock,data=x.docs.get(x.ref.path);await CloudAdapter.acceptRemote(data,migrateBudgetState(data.state),null);});
+  await page.waitForFunction(()=>!CloudAdapter.writeInFlight&&!CloudAdapter.pendingState&&__p1CloudMock.metrics.coreWrites===1);
+  const migratedCloud=await page.evaluate(async()=>{
+    const x=__p1CloudMock,manifest=x.docs.get(x.ref.path),data=await CloudAdapter.cloudStore().hydrate(manifest),before=JSON.stringify([...x.docs]);
+    await CloudAdapter.acceptRemote(data,migrateBudgetState(data.state),null);
+    await CloudAdapter.acceptRemote(data,migrateBudgetState(data.state),null);
+    const backups=await FinizeMigrationBackups.list();
+    return {writes:x.metrics.coreWrites,manifest,data,loadedState:structuredClone(state),forecast:FinizeTransactions.forecast(getSelectedMonth()),effects:FinizeTransactions.effects(),docs:[...x.docs],echoUnchanged:before===JSON.stringify([...x.docs]),original:backups.map(row=>JSON.parse(row.payload)).find(row=>row.package1CloudOriginal)?.package1CloudOriginal.state};
+  });
+  expect(migratedCloud.writes).toBe(1);expect(migratedCloud.manifest.syncVersion).toBe(4);expect(migratedCloud.data.state.meta.schemaVersion).toBe(11);
+  expect(migratedCloud.manifest.stateFormat).toBe('finize-json-chunks-v1');expect(migratedCloud.manifest).not.toHaveProperty('state');
+  expect(migratedCloud.echoUnchanged).toBe(true);expect(migratedCloud.original).toEqual(fixture);
+  const deviceB=await browser.newContext({baseURL:'http://127.0.0.1:4173',serviceWorkers:'block'});
+  try{
+    const second=await deviceB.newPage();await boot(second);await installMigrationCloudMock(second,migratedCloud.docs);
+    const result=await second.evaluate(async()=>{
+      const x=__p1CloudMock,before=JSON.stringify([...x.docs]),data=await CloudAdapter.cloudStore().hydrate(x.docs.get(x.ref.path));
+      await CloudAdapter.acceptRemote(data,migrateBudgetState(data.state),null);
+      return {writes:x.metrics.coreWrites,state:structuredClone(state),forecast:FinizeTransactions.forecast(getSelectedMonth()),effects:FinizeTransactions.effects(),cloudUnchanged:before===JSON.stringify([...x.docs]),version:CloudAdapter.cloudVersion};
+    });
+    expect(result.writes).toBe(0);expect(result.state).toEqual(migratedCloud.loadedState);expect(result.forecast).toEqual(migratedCloud.forecast);expect(result.effects).toEqual(migratedCloud.effects);expect(result.cloudUnchanged).toBe(true);expect(result.version).toBe(4);
+  }finally{await deviceB.close();}
 });
