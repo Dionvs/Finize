@@ -7987,15 +7987,13 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       <div class="mobile-kpi-value value neg">${eur(r.vasteLastenTotaal)}</div>
       <div class="mobile-kpi-edit-hint-placeholder" aria-hidden="true">.</div>
     </div>
-    <button type="button" class="mobile-kpi-card joint-kpi-card joint-saving-card" data-saving-edit>
+    <div class="mobile-kpi-card joint-kpi-card joint-saving-card joint-month-available-card">
       <div class="mobile-kpi-top">
         <span class="mobile-kpi-icon tone-green">${iconSvg("target")}</span>
-        <span class="mobile-kpi-chevron">›</span>
       </div>
-      <div class="mobile-kpi-label">Sparen</div>
-      <div class="mobile-kpi-value value pos">${eur(r.spaarpotDezeMaand)}</div>
-      <div class="mobile-kpi-edit-hint">${finizeIconWrap("edit")}<span>Tik om aan te passen</span></div>
-    </button>
+      <div class="mobile-kpi-label">Over deze maand</div>
+      <div class="mobile-kpi-value ${r.forecast.owners.gezamenlijk.available < 0 ? "value neg" : "value pos"}">${eur(r.forecast.owners.gezamenlijk.available)}</div>
+    </div>
     <div class="mobile-kpi-card joint-kpi-card static joint-variable-card">
       <div class="mobile-kpi-top">
         <span class="mobile-kpi-icon tone-green">${iconSvg("chart")}</span>

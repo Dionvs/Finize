@@ -5045,10 +5045,16 @@ body.v4-app .modal-content{ min-width:0; }
   }
 }
 
-/* Account goal tables use the same columns on every viewport. */
+/* Read-only account goal tables fit their card, retaining all ten columns. */
+.u5-joint-goals-preview .goal-table-wrap{overflow:visible;}
+.u5-joint-goals-preview .goal-table{width:100%; min-width:0; table-layout:fixed;}
+.u5-joint-goals-preview .goal-table .progress-track{min-width:0;}
+body .u5-goal-table-stack > .u5-joint-goals-preview{overflow:visible;}
+body.v4-app[data-real-active-tab="gezamenlijk"] .joint-month-available-card{cursor:default !important;}
 @media (max-width:767px){
-  .u5-joint-goals-preview .goal-table-wrap{overflow-x:auto; -webkit-overflow-scrolling:touch;}
-  .u5-joint-goals-preview .goal-table{min-width:1050px;}
+  .u5-joint-goals-preview .goal-table th{font-size:clamp(6px,1.6vw,10px); padding:5px 1px; overflow-wrap:anywhere;}
+  .u5-joint-goals-preview .goal-table td{font-size:clamp(7px,1.8vw,11px); padding:5px 1px; white-space:normal; overflow-wrap:anywhere;}
+  .u5-joint-goals-preview .goal-table .progress-label{font-size:inherit;}
   .u5-joint-goals-preview .goals-preview-actions{display:flex; flex-wrap:wrap; gap:6px;}
 }
 
