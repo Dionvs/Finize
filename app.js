@@ -3506,16 +3506,14 @@
     const rows = monthTransactions;
     const legacyOwners = legacySalaryForecastOwners(state, month, standard);
     const dion = incomeProjectionForMonth(state, month, "dion", standard.dion, { legacyOwners }), dara = incomeProjectionForMonth(state, month, "dara", standard.dara, { legacyOwners });
-    const projections = selectTransactionProjections(state, { month });
+    const projections = selectTransactionProjections(state, { month, account: "gezamenlijk" });
     const extraTransactions = round22(projections.reduce((sum, p) => sum + (p.transactionType === "salaris" && ["dion", "dara"].includes(legacyOwners.get(p.id) || p.financialFor) ? 0 : p.effects.incomeImpact), 0));
     const salaryBase = round22(dion.salary + dara.salary);
     const fixedRefundBase = round22(
       Math.max(0, standard.dion.refund - representedFixedRefund("dion", month, rows)) + Math.max(0, standard.dara.refund - representedFixedRefund("dara", month, rows))
     );
     const visibleBase = round22(salaryBase + fixedRefundBase);
-    const manualRefunds = round22(
-      unmatchedMonthlyRefundTotal("dion", month, monthTransactions) + unmatchedMonthlyRefundTotal("dara", month, monthTransactions) + unmatchedMonthlyRefundTotal("gezamenlijk", month, monthTransactions)
-    );
+    const manualRefunds = unmatchedMonthlyRefundTotal("gezamenlijk", month, monthTransactions);
     const extra = round22(extraTransactions + manualRefunds);
     const salaries = { dion: round22(dion.salary + Math.max(0, standard.dion.refund - representedFixedRefund("dion", month, rows))), dara: round22(dara.salary + Math.max(0, standard.dara.refund - representedFixedRefund("dara", month, rows))) };
     const sourceCents = /* @__PURE__ */ new Map([["Salarissen", Math.round(salaryBase * 100)]]);
@@ -3561,7 +3559,7 @@
   }
   function incomeSourceProjectionRows(owner, label, month) {
     const joint = owner === "gezamenlijk";
-    const projections = selectTransactionProjections(state, joint ? { month } : { month, account: owner });
+    const projections = selectTransactionProjections(state, { month, account: owner });
     const standard = joint ? { dion: getDistributionIncomeParts("dion", month), dara: getDistributionIncomeParts("dara", month) } : null;
     const legacyOwners = joint ? legacySalaryForecastOwners(state, month, standard) : null;
     return projections.filter((p) => {
@@ -12571,7 +12569,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
           cloudRead: (importId) => fetchImportFromCloud(root2, importId),
           localWrite: async (record) => {
             const latest2 = await ImportStore.getImport(id);
-            if (local && latest2 && !sameImportOperation(local, latest2)) throw cloudImportError("import-conflict", "Een nieuwere lokale importkeuze blijft behouden.");
+            if (local && latest2 && !sameEditorBase(local, latest2)) throw cloudImportError("import-conflict", "Een nieuwere lokale importkeuze blijft behouden.");
             return ImportStore.putImport(record);
           },
           refresh: ((_b = (_a2 = root2.CloudAdapter) == null ? void 0 : _a2.isConnected) == null ? void 0 : _b.call(_a2)) === true,

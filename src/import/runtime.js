@@ -1757,7 +1757,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
       const resolved=await resolveImportDetails(id,{
         localRead:async()=>local,
         cloudRead:importId=>fetchImportFromCloud(root,importId),
-        localWrite:async record=>{const latest=await ImportStore.getImport(id);if(local&&latest&&!sameImportOperation(local,latest))throw cloudImportError('import-conflict','Een nieuwere lokale importkeuze blijft behouden.');return ImportStore.putImport(record);},refresh:root.CloudAdapter?.isConnected?.()===true,pendingRead:async id=>(await ImportStore.listSync()).some(row=>row.importId===id),onConflict:(local,remote)=>preserveImportConflict(root,local,remote)
+        localWrite:async record=>{const latest=await ImportStore.getImport(id);if(local&&latest&&!sameEditorBase(local,latest))throw cloudImportError('import-conflict','Een nieuwere lokale importkeuze blijft behouden.');return ImportStore.putImport(record);},refresh:root.CloudAdapter?.isConnected?.()===true,pendingRead:async id=>(await ImportStore.listSync()).some(row=>row.importId===id),onConflict:(local,remote)=>preserveImportConflict(root,local,remote)
       });
       if(resolved.record.lifecycle==='deleted'){closeDraft();return resolved.record;}
       if(request!==UI.openSequence||sessionAtStart&&(sessionAtStart.revision!==revisionAtStart||sessionAtStart.committing||!sameEditorBase(sessionAtStart.base,baseAtStart)))return sessionAtStart?.draft||UI.draft;

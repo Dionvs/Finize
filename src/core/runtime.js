@@ -718,7 +718,7 @@ function dashboardIncomeBreakdown(month=getSelectedMonth()){
   const rows=monthTransactions;
   const legacyOwners=legacySalaryForecastOwners(state,month,standard);
   const dion=incomeProjectionForMonth(state,month,'dion',standard.dion,{legacyOwners}),dara=incomeProjectionForMonth(state,month,'dara',standard.dara,{legacyOwners});
-  const projections=selectTransactionProjections(state,{month});
+  const projections=selectTransactionProjections(state,{month,account:'gezamenlijk'});
   const extraTransactions=round2(projections.reduce((sum,p)=>sum+(p.transactionType==='salaris'&&['dion','dara'].includes(legacyOwners.get(p.id)||p.financialFor)?0:p.effects.incomeImpact),0));
   const salaryBase=round2(dion.salary+dara.salary);
   const fixedRefundBase=round2(
@@ -726,11 +726,7 @@ function dashboardIncomeBreakdown(month=getSelectedMonth()){
     Math.max(0,standard.dara.refund-representedFixedRefund('dara',month,rows))
   );
   const visibleBase=round2(salaryBase+fixedRefundBase);
-  const manualRefunds=round2(
-    unmatchedMonthlyRefundTotal('dion',month,monthTransactions)+
-    unmatchedMonthlyRefundTotal('dara',month,monthTransactions)+
-    unmatchedMonthlyRefundTotal('gezamenlijk',month,monthTransactions)
-  );
+  const manualRefunds=unmatchedMonthlyRefundTotal('gezamenlijk',month,monthTransactions);
   const extra=round2(extraTransactions+manualRefunds);
   const salaries={dion:round2(dion.salary+Math.max(0,standard.dion.refund-representedFixedRefund('dion',month,rows))),dara:round2(dara.salary+Math.max(0,standard.dara.refund-representedFixedRefund('dara',month,rows)))};
   // Presentation of the exact components already included in this total.
@@ -774,7 +770,7 @@ function renderIncomeSources(overview,owner='gezamenlijk'){
 function renderPersonalIncomeSources(overview,owner='gezamenlijk'){return renderIncomeSources(overview,owner);}
 function incomeSourceProjectionRows(owner,label,month){
   const joint=owner==='gezamenlijk';
-  const projections=selectTransactionProjections(state,joint?{month}:{month,account:owner});
+  const projections=selectTransactionProjections(state,{month,account:owner});
   const standard=joint?{dion:getDistributionIncomeParts('dion',month),dara:getDistributionIncomeParts('dara',month)}:null;
   const legacyOwners=joint?legacySalaryForecastOwners(state,month,standard):null;
   return projections.filter(p=>{

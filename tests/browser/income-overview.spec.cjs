@@ -122,14 +122,48 @@ for(const width of [390,1440]){
     await page.evaluate(()=>commitChange(()=>{state.transactions=[];state.monthlyIncomeOverrides={'2026-10':{dion:0,dara:0}};}));await nav(page,'dashboard');if(width<768)await page.locator('[data-open-income-overview="dashboard"]').click();const zero=await breakdown(width<768?page.locator('#incomeEditModal'):dashboardCard(page));expect(zero[0].label).toBe('Salarissen');expect(cents(zero[0].amount)).toBe(0);expect(errors).toEqual([]);
   });
 }
-test('source transactions preserve privacy and split projection identity',async({page})=>{
+test('source transactions preserve physical account isolation, privacy and split projection identity',async({page})=>{
   const errors=await boot(page,1440);await nav(page,'dashboard');
   await page.evaluate(()=>{window.FinizeAuth={...window.FinizeAuth,enabled:true,assignment:{role:'dion'},profile:{hiddenKpis:[]},householdMembers:[{role:'dara',sharePersonalTab:false,hiddenKpis:[]}]};});
-  await dashboardCard(page).getByRole('button',{name:'Transacties bij Belastingteruggave bekijken',exact:true}).click();await expect(page.locator('[data-income-transaction-id="personal"]')).toHaveCount(0);await expect(page.locator('#transactionModal')).toContainText('alleen getoond wanneer deze gedeeld');await page.locator('#transactionModal').getByRole('button',{name:'Sluiten',exact:true}).click();
-  await page.evaluate(()=>window.FinizeAuth.householdMembers[0].sharePersonalTab=true);await dashboardCard(page).getByRole('button',{name:'Transacties bij Belastingteruggave bekijken',exact:true}).click();await expect(page.locator('[data-income-transaction-id="personal"]')).toBeVisible();await page.locator('#transactionModal').getByRole('button',{name:'Sluiten',exact:true}).click();
+  await dashboardCard(page).getByRole('button',{name:'Transacties bij Belastingteruggave bekijken',exact:true}).click();await expect(page.locator('[data-income-transaction-id="personal"]')).toHaveCount(0);await expect(page.locator('[data-income-transaction-id="tax"]')).toBeVisible();await page.locator('#transactionModal').getByRole('button',{name:'Sluiten',exact:true}).click();
+  await page.evaluate(()=>window.FinizeAuth.householdMembers[0].sharePersonalTab=true);await dashboardCard(page).getByRole('button',{name:'Transacties bij Belastingteruggave bekijken',exact:true}).click();await expect(page.locator('[data-income-transaction-id="personal"]')).toHaveCount(0);await expect(page.locator('[data-income-transaction-id="tax"]')).toBeVisible();await page.locator('#transactionModal').getByRole('button',{name:'Sluiten',exact:true}).click();
   await page.evaluate(()=>{window.FinizeAuth.householdMembers[0].hiddenKpis=['income'];});await dashboardCard(page).getByRole('button',{name:'Transacties bij Belastingteruggave bekijken',exact:true}).click();await expect(page.locator('[data-income-transaction-id="personal"]')).toHaveCount(0);await page.locator('#transactionModal').getByRole('button',{name:'Sluiten',exact:true}).click();
   await page.evaluate(()=>{window.FinizeAuth.enabled=false;commitChange(()=>state.transactions.push({id:'split-income',source:'csv',importBatchId:'split-batch',importTransactionId:'split-row',processingStatus:'goedgekeurd',approvalSource:'manual',accountContext:'gezamenlijk',owner:'gezamenlijk',financialFor:'gezamenlijk',date:'2026-10-03',amount:50,bankOriginal:{amount:50,bankDate:'2026-10-03',description:'Split income'},transactionType:'inkomen',description:'Split income',splits:[{id:'first',amount:20,transactionType:'inkomen',category:'Overig',financialFor:'gezamenlijk'},{id:'second',amount:30,transactionType:'inkomen',category:'Overig',financialFor:'gezamenlijk'}]}));});await nav(page,'dashboard');const before=await capture(page);
   await dashboardCard(page).getByRole('button',{name:'Transacties bij Overige inkomsten bekijken',exact:true}).click();await expect(page.locator('[data-income-transaction-id^="split-income:split:"]')).toHaveCount(2);await expect(page.locator('#transactionModal')).toContainText('deeltransactie');await page.locator('#transactionModal').getByRole('button',{name:'Sluiten',exact:true}).click();expect(await capture(page)).toEqual(before);expect(errors).toEqual([]);
+});
+
+for(const width of [390,1440])test(`private receipts stay on physical account and refund corrects joint category ${width}px`,async({page})=>{
+  const errors=await boot(page,width);
+  await page.evaluate(()=>commitChange(()=>{
+    const tx=(id,type,amount,account,financialFor='gezamenlijk',extra={})=>({id,source:'manual',processingStatus:'goedgekeurd',approvalSource:'manual',date:'2026-10-04',transactionDate:'2026-10-04',accountContext:account,financialFor,budgetOwner:financialFor,transactionType:type,kind:'inkomen',amount,description:id,category:'Overig',bankOriginal:{amount,bankDate:'2026-10-04',description:id},...extra});
+    for(const account of ['dion','dara'])for(const type of ['inkomen','belastingteruggave','vergoeding','overige-inkomsten'])state.transactions.push(tx(`private-${account}-${type}`,type,10,account));
+    state.transactions.push(tx('joint-receipt-personal-destination','belastingteruggave',20,'gezamenlijk','dion'));
+    state.transactions.push(tx('past-joint-expense','uitgave',120,'gezamenlijk','gezamenlijk',{kind:'uitgave',category:'Kleding',date:'2026-09-17',transactionDate:'2026-09-17',bankOriginal:{amount:-120,bankDate:'2026-09-17',description:'Original expense'}}));
+    state.transactions.push(tx('private-refund-joint-category','terugbetaling',40,'dion','gezamenlijk',{refundCategory:'Kleding',refundMonth:'2026-09'}));
+  }));
+  const before=await capture(page),storage=await page.evaluate(()=>JSON.stringify({...localStorage}));
+  const effects=await page.evaluate(()=>({privateCash:FinizeTransactions.effects({month:'2026-10',account:'dion'}).find(p=>p.id==='private-refund-joint-category'),jointBudget:FinizeTransactions.effects({month:'2026-09',owner:'gezamenlijk',dimension:'budget'}).reduce((sum,p)=>sum+p.effects.budgetImpact,0),jointRows:FinizeTransactions.effects({month:'2026-10',account:'gezamenlijk'}).map(p=>p.id)}));
+  expect(effects.privateCash.accountContext).toBe('dion');expect(effects.privateCash.effects.accountCashflow).toBe(40);expect(effects.privateCash.effects.incomeImpact).toBe(0);expect(effects.jointBudget).toBe(80);
+  expect(effects.jointRows).not.toContain('private-refund-joint-category');expect(effects.jointRows).toContain('joint-receipt-personal-destination');
+  for(const tab of ['dashboard','gezamenlijk']){
+    await nav(page,tab);if(width<768)await page.locator(`[data-open-income-overview="${tab}"]`).click();
+    const card=width<768?page.locator('#incomeEditModal'):tab==='dashboard'?dashboardCard(page):jointCard(page);
+    const rows=await breakdown(card);expect(cents(rows.find(row=>row.label==='Belastingteruggave').amount)).toBe(5000);expect(cents(rows.find(row=>row.label==='Vergoedingen').amount)).toBe(2000);expect(cents(rows.find(row=>row.label==='Overige inkomsten').amount)).toBe(9000);
+    await card.getByRole('button',{name:'Transacties bij Belastingteruggave bekijken',exact:true}).click();await expect(page.locator('[data-income-transaction-id="tax"]')).toBeVisible();await expect(page.locator('[data-income-transaction-id="joint-receipt-personal-destination"]')).toBeVisible();await expect(page.locator('[data-income-transaction-id^="private-"],[data-income-transaction-id="personal"]')).toHaveCount(0);
+    await page.locator('#transactionModal').getByRole('button',{name:'Sluiten',exact:true}).click();if(width<768)await card.getByRole('button',{name:'Sluiten',exact:true}).click();
+  }
+  for(const owner of ['dion','dara']){
+    await nav(page,owner);if(width<768)await page.locator(`[data-open-income-overview="${owner}"]`).click();
+    const card=width<768?page.locator('#incomeEditModal'):page.locator(`#tab-${owner} .overview-kpi-row [data-personal-kpi="income"]`);
+    for(const label of ['Overige inkomsten','Belastingteruggave','Vergoedingen']){
+      await card.getByRole('button',{name:`Transacties bij ${label} bekijken`,exact:true}).click();await expect(page.locator(`[data-income-transaction-id^="private-${owner}-"]`)).not.toHaveCount(0);await expect(page.locator('[data-income-transaction-id="joint-receipt-personal-destination"]')).toHaveCount(0);await page.locator('#transactionModal').getByRole('button',{name:'Sluiten',exact:true}).click();
+    }
+    if(owner==='dion'){
+      await card.getByRole('button',{name:'Transacties bij Terugbetalingen bekijken',exact:true}).click();await expect(page.locator('[data-income-transaction-id="private-refund-joint-category"]')).toBeVisible();await page.locator('#transactionModal').getByRole('button',{name:'Sluiten',exact:true}).click();
+    }
+    if(width<768)await card.getByRole('button',{name:'Sluiten',exact:true}).click();
+  }
+  expect(await capture(page)).toEqual(before);expect(await page.evaluate(()=>JSON.stringify({...localStorage}))).toBe(storage);expect(errors).toEqual([]);
 });
 
 test('personal overview respects shared-tab privacy and read-only income',async({page})=>{

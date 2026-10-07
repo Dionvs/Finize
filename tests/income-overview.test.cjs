@@ -1,13 +1,13 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const source=fs.readFileSync(require('node:path').join(__dirname,'../src/core/runtime.js'),'utf8');
-function setup({salary={dion:2600,dara:2400},refund={dion:20,dara:30},projections=[],manual=0,represented=0}={}){
+function setup({salary={dion:2600,dara:2400},refund={dion:20,dara:30},projections=[],manual=0,personalManual=0,represented=0}={}){
   const state={keep:{schemaVersion:11,unknown:'unchanged'}};
   const escape=t=>String(t).replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
-  const context={state,getSelectedMonth:()=> '2026-10',round2:n=>Math.round((n+Number.EPSILON)*100)/100,calcScenario:()=>({totaalSalaris:5050}),getDistributionIncomeParts:owner=>({salary:salary[owner],refund:refund[owner]}),selectActiveTransactions:()=>[],legacySalaryForecastOwners:()=>new Map(),incomeProjectionForMonth:(_,month,owner)=>({salary:salary[owner]}),selectTransactionProjections:(_,options)=>projections.filter(p=>!options.account||p.accountContext===options.account),representedFixedRefund:()=>represented,unmatchedMonthlyRefundTotal:owner=>owner==='gezamenlijk'?manual:0,textSafe:escape,attrSafe:escape,eur:n=>n.toFixed(2)};
+  const context={state,getSelectedMonth:()=> '2026-10',round2:n=>Math.round((n+Number.EPSILON)*100)/100,calcScenario:()=>({totaalSalaris:5050}),getDistributionIncomeParts:owner=>({salary:salary[owner],refund:refund[owner]}),selectActiveTransactions:()=>[],legacySalaryForecastOwners:()=>new Map(),incomeProjectionForMonth:(_,month,owner)=>({salary:salary[owner]}),selectTransactionProjections:(_,options)=>projections.filter(p=>!options.account||p.accountContext===options.account),representedFixedRefund:()=>represented,unmatchedMonthlyRefundTotal:owner=>owner==='gezamenlijk'?manual:personalManual,textSafe:escape,attrSafe:escape,eur:n=>n.toFixed(2)};
   vm.createContext(context);vm.runInContext(source.slice(source.indexOf('function dashboardIncomeBreakdown('),source.indexOf('function budgetCategoryMatches(')),context);
   return {context,read:()=>JSON.parse(JSON.stringify(context.dashboardIncomeBreakdown())),state};
 }
-const projection=(type,amount,financialFor='gezamenlijk')=>({id:type,transactionType:type,financialFor,effects:{incomeImpact:amount}});
+const projection=(type,amount,financialFor='gezamenlijk')=>({id:type,transactionType:type,accountContext:'gezamenlijk',financialFor,effects:{incomeImpact:amount}});
 test('joint presentation preserves existing total components and state',()=>{
   const {read,state}=setup({projections:[projection('salaris',2600,'dion'),projection('vakantiegeld',100),projection('inkomen',.09)],manual:10});const before=JSON.stringify(state),r=read();
   assert.deepEqual({...r,items:undefined},{distributionIncome:5050,extra:110.09,total:5160.09,visibleBase:5050,salaries:{dion:2620,dara:2430},items:undefined});
@@ -21,3 +21,29 @@ test('cent aggregation exactly matches total, including legacy signed adjustment
 test('shared renderer escapes labels and retains personal adapter output',()=>{const {context}=setup(),overview={items:[{label:'<img onerror=alert(1)>',amount:1}]};assert.equal(context.renderPersonalIncomeSources(overview),context.renderIncomeSources(overview));assert.ok(!context.renderIncomeSources(overview).includes('<img'));});
 test('source drilldown selects only existing included projections without mutating state',()=>{const ps=[projection('salaris',2600,'dion'),projection('vakantiegeld',100),projection('naar-spaarrekening',0)],{context,state}=setup({projections:ps});const before=JSON.stringify(state);assert.deepEqual(Array.from(context.incomeSourceProjectionRows('gezamenlijk','Salarissen','2026-10')),ps.slice(0,1));assert.deepEqual(Array.from(context.incomeSourceProjectionRows('gezamenlijk','Vakantiegeld','2026-10')),ps.slice(1,2));assert.equal(context.incomeSourceProjectionRows('gezamenlijk','Zakgeld','2026-10').length,0);assert.equal(JSON.stringify(state),before);});
 test('personal source drilldown uses physical account and existing refund presentation',()=>{const rows=[{...projection('belastingteruggave',15,'gezamenlijk'),accountContext:'dara'},{...projection('belastingteruggave',30,'dara'),accountContext:'gezamenlijk'},{...projection('terugbetaling',0,'dara'),accountContext:'dara',amount:10}];const {context}=setup({projections:rows});assert.deepEqual(Array.from(context.incomeSourceProjectionRows('dara','Belastingteruggave','2026-10')),[rows[0]]);assert.deepEqual(Array.from(context.incomeSourceProjectionRows('dara','Terugbetalingen','2026-10')),[rows[2]]);});
+
+for(const owner of ['dion','dara'])test(`private ${owner} receipts never become joint income sources regardless of destination`,()=>{
+  const types=['inkomen','belastingteruggave','vergoeding','overige-inkomsten','terugbetaling'];
+  const privateRows=types.map(type=>({...projection(type,type==='terugbetaling'?0:10,'gezamenlijk'),accountContext:owner,amount:10}));
+  const {context,read,state}=setup({refund:{dion:0,dara:0},projections:privateRows}),before=JSON.stringify(state);
+  assert.equal(read().total,5000);assert.deepEqual(read().items,[{label:'Salarissen',amount:5000}]);
+  const personal=context.personalIncomeOverview(owner,100);
+  assert.equal(personal.total,150);
+  for(const row of privateRows){
+    const label=context.incomeSourceLabel(row.transactionType);
+    assert.equal(context.incomeSourceProjectionRows('gezamenlijk',label,'2026-10').length,0);
+    assert.ok(context.incomeSourceProjectionRows(owner,label,'2026-10').includes(row));
+  }
+  assert.equal(JSON.stringify(state),before);
+});
+
+test('joint receipt stays joint even when financially assigned to a person',()=>{
+  const row=projection('belastingteruggave',30,'dion'),{context,read}=setup({projections:[row]});
+  assert.equal(read().total,5080);assert.deepEqual(Array.from(context.incomeSourceProjectionRows('gezamenlijk','Belastingteruggave','2026-10')),[row]);
+  assert.equal(context.incomeSourceProjectionRows('dion','Belastingteruggave','2026-10').length,0);
+});
+
+test('personal legacy receipts stay out of joint receipt presentation',()=>{
+  const {read,context}=setup({refund:{dion:0,dara:0},manual:5,personalManual:7});
+  assert.equal(read().total,5005);assert.equal(context.personalIncomeOverview('dion',100).total,107);
+});
