@@ -1,0 +1,20 @@
+const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const source=fs.readFileSync(require('node:path').join(__dirname,'../src/core/runtime.js'),'utf8');
+function setup({salary={dion:2600,dara:2400},refund={dion:20,dara:30},projections=[],manual=0,represented=0}={}){
+  const state={keep:{schemaVersion:11,unknown:'unchanged'}};
+  const context={state,getSelectedMonth:()=> '2026-10',round2:n=>Math.round((n+Number.EPSILON)*100)/100,calcScenario:()=>({totaalSalaris:5050}),getDistributionIncomeParts:owner=>({salary:salary[owner],refund:refund[owner]}),selectActiveTransactions:()=>[],legacySalaryForecastOwners:()=>new Map(),incomeProjectionForMonth:(_,month,owner)=>({salary:salary[owner]}),selectTransactionProjections:()=>projections,representedFixedRefund:()=>represented,unmatchedMonthlyRefundTotal:owner=>owner==='gezamenlijk'?manual:0,textSafe:t=>String(t).replaceAll('<','&lt;').replaceAll('>','&gt;'),eur:n=>n.toFixed(2)};
+  vm.createContext(context);vm.runInContext(source.slice(source.indexOf('function dashboardIncomeBreakdown('),source.indexOf('function budgetCategoryMatches(')),context);
+  return {context,read:()=>JSON.parse(JSON.stringify(context.dashboardIncomeBreakdown())),state};
+}
+const projection=(type,amount,financialFor='gezamenlijk')=>({id:type,transactionType:type,financialFor,effects:{incomeImpact:amount}});
+test('joint presentation preserves existing total components and state',()=>{
+  const {read,state}=setup({projections:[projection('salaris',2600,'dion'),projection('vakantiegeld',100),projection('inkomen',.09)],manual:10});const before=JSON.stringify(state),r=read();
+  assert.deepEqual({...r,items:undefined},{distributionIncome:5050,extra:110.09,total:5160.09,visibleBase:5050,salaries:{dion:2620,dara:2430},items:undefined});
+  assert.deepEqual(r.items,[{label:'Salarissen',amount:5000},{label:'Vaste teruggaven',amount:50},{label:'Terugbetalingen',amount:10},{label:'Vakantiegeld',amount:100},{label:'Overige inkomsten',amount:.09}]);assert.equal(JSON.stringify(state),before);
+});
+test('zero salary remains visible; irrelevant zero sources are hidden',()=>{const r=setup({salary:{dion:0,dara:0},refund:{dion:0,dara:0}}).read();assert.deepEqual(r.items,[{label:'Salarissen',amount:0}]);assert.equal(r.total,0);});
+test('all existing extra-income types group in stable display order',()=>{const r=setup({projections:['vergoeding','vakantiegeld','belastingteruggave','nabetaling','overige-inkomsten','inkomen'].map(type=>projection(type,1))}).read();assert.deepEqual(r.items.slice(2),[{label:'Vakantiegeld',amount:1},{label:'Nabetaling',amount:1},{label:'Vergoedingen',amount:1},{label:'Belastingteruggave',amount:1},{label:'Overige inkomsten',amount:2}]);});
+test('refunds, savings and pending source effects outside the total are not added',()=>{const r=setup({projections:['terugbetaling','naar-spaarrekening','van-spaarrekening','vakantiegeld'].map(type=>projection(type,0))}).read();assert.equal(r.total,5050);assert.equal(r.items.length,2);});
+test('represented fixed refunds and unknown-owner compatibility match the existing total',()=>{const r=setup({represented:20,projections:[projection('salaris',10,'unknown')]}).read();assert.deepEqual(r.items,[{label:'Salarissen',amount:5000},{label:'Vaste teruggaven',amount:10},{label:'Overige inkomsten',amount:10}]);assert.equal(r.total,5020);});
+test('cent aggregation exactly matches total, including legacy signed adjustments',()=>{for(const amount of [.01,.09,.29,1234.56,-.01]){const r=setup({projections:[projection('vergoeding',amount),projection('vergoeding',amount),projection('inkomen',.01)]}).read();assert.equal(r.items.reduce((sum,row)=>sum+Math.round(row.amount*100),0),Math.round(r.total*100));}});
+test('shared renderer escapes labels and retains personal adapter output',()=>{const {context}=setup(),overview={items:[{label:'<img onerror=alert(1)>',amount:1}]};assert.equal(context.renderPersonalIncomeSources(overview),context.renderIncomeSources(overview));assert.ok(!context.renderIncomeSources(overview).includes('<img'));});

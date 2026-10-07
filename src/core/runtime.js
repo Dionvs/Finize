@@ -733,7 +733,22 @@ function dashboardIncomeBreakdown(month=getSelectedMonth()){
   );
   const extra=round2(extraTransactions+manualRefunds);
   const salaries={dion:round2(dion.salary+Math.max(0,standard.dion.refund-representedFixedRefund('dion',month,rows))),dara:round2(dara.salary+Math.max(0,standard.dara.refund-representedFixedRefund('dara',month,rows)))};
-  return {distributionIncome,extra,total:round2(visibleBase+extra),visibleBase,salaries};
+  // Presentation of the exact components already included in this total.
+  const sourceCents=new Map([['Salarissen',Math.round(salaryBase*100)]]);
+  const addSource=(label,amount)=>sourceCents.set(label,(sourceCents.get(label)||0)+Math.round(amount*100));
+  addSource('Vaste teruggaven',fixedRefundBase);
+  addSource('Terugbetalingen',manualRefunds);
+  projections.forEach(p=>{
+    if(p.transactionType==='salaris'&&['dion','dara'].includes(legacyOwners.get(p.id)||p.financialFor))return;
+    addSource(incomeSourceLabel(p.transactionType),p.effects.incomeImpact);
+  });
+  const items=['Salarissen','Vaste teruggaven','Terugbetalingen','Vakantiegeld','Nabetaling','Vergoedingen','Belastingteruggave','Overige inkomsten']
+    .filter(label=>label==='Salarissen'||sourceCents.get(label))
+    .map(label=>({label,amount:sourceCents.get(label)/100}));
+  return {distributionIncome,extra,total:round2(visibleBase+extra),visibleBase,salaries,items};
+}
+function incomeSourceLabel(type){
+  return {terugbetaling:'Terugbetalingen',vakantiegeld:'Vakantiegeld',nabetaling:'Nabetaling',vergoeding:'Vergoedingen',belastingteruggave:'Belastingteruggave','overige-inkomsten':'Overige inkomsten'}[type]||'Overige inkomsten';
 }
 function personalIncomeOverview(owner, allowance, month=getSelectedMonth()){
   const parts=getDistributionIncomeParts(owner,month);
@@ -744,7 +759,7 @@ function personalIncomeOverview(owner, allowance, month=getSelectedMonth()){
   selectTransactionProjections(state,{month,account:owner}).forEach(p=>{
     const type=p.transactionType,amount=p.effects.incomeImpact||(['terugbetaling','refund'].includes(type)?p.amount:0);
     if(!amount||type==='salaris')return;
-    const label={terugbetaling:'Terugbetalingen',vakantiegeld:'Vakantiegeld',nabetaling:'Nabetaling',vergoeding:'Vergoedingen',belastingteruggave:'Belastingteruggave','overige-inkomsten':'Overige inkomsten'}[type]||'Overige inkomsten';
+    const label=incomeSourceLabel(type);
     add(label,amount);
   });
   const monthlyRefunds=unmatchedMonthlyRefundTotal(owner,month,monthTransactions);
@@ -753,9 +768,10 @@ function personalIncomeOverview(owner, allowance, month=getSelectedMonth()){
   const items=[...sources.entries()].map(([label,amount])=>({label,amount}));
   return {total:round2(items.reduce((sum,item)=>sum+item.amount,0)),items};
 }
-function renderPersonalIncomeSources(overview){
+function renderIncomeSources(overview){
   return `<div class="personal-income-sources">${overview.items.map(item=>`<div><span>${textSafe(item.label)}</span><strong>${eur(item.amount)}</strong></div>`).join('')}</div>`;
 }
+function renderPersonalIncomeSources(overview){return renderIncomeSources(overview);}
 function budgetCategoryMatches(tx, category){
   const txCat=String(tx?.category||'').trim().toLocaleLowerCase('nl-NL');
   const wanted=String(category||'').trim().toLocaleLowerCase('nl-NL');
@@ -3239,7 +3255,7 @@ function renderDashboard(){
     <div class="u5-primary-kpis v4-desktop-only-grid" aria-label="Geplande financiële verdeling">
       <button type="button" class="card u5-primary-kpi tone-income" data-income-edit="dion" data-income-label="Dion" aria-label="Inkomen van Dion aanpassen"><div class="metric-label">Inkomen Dion</div><div class="metric-value value pos">${eur(r.salarisDion)}</div><div class="metric-sub">Klik om aan te passen</div></button>
       <button type="button" class="card u5-primary-kpi tone-budget" data-income-edit="dara" data-income-label="Dara" aria-label="Inkomen van Dara aanpassen"><div class="metric-label">Inkomen Dara</div><div class="metric-value value pos">${eur(r.salarisDara)}</div><div class="metric-sub">Klik om aan te passen</div></button>
-      <div class="card u5-primary-kpi tone-saving"><div class="metric-label">Totaal gezamenlijke rekening</div><div class="metric-value value pos">${eur(dashboardTotalIncome)}</div><div class="metric-sub">Inkomen en vaste teruggaven</div></div>
+      <div class="card u5-primary-kpi tone-saving"><div class="metric-label">Totaal gezamenlijke rekening</div><div class="metric-value value pos">${eur(dashboardTotalIncome)}</div><div class="metric-sub">${renderIncomeSources(incomeBreakdown)}</div></div>
       <div class="card u5-primary-kpi tone-allowance u5-variable-kpi"><div class="metric-label">Variabel gebruikt</div><div class="metric-value neutral-amount">${eur(r.variabelTotaal)} / ${eur(r.variabelBudgetTotaal)}</div><div class="mobile-kpi-budget-track" style="--used-pct:${variabelBudgetPct}%" aria-label="Gezamenlijk variabel budget gebruikt: ${variabelBudgetPct}%"></div></div>
     </div>
     <div class="mobile-kpi-grid v4-mobile-only-grid">
@@ -3255,12 +3271,12 @@ function renderDashboard(){
         <div class="mobile-kpi-value value pos">${eur(r.salarisDara)}</div>
         <div class="mobile-kpi-edit-hint">${finizeIconWrap('edit')}<span>Tik om aan te passen</span></div>
       </button>
-      <div class="card mobile-kpi-card static mobile-kpi-card-total-joint mobile-kpi-card--joint-total">
+      <button type="button" class="card mobile-kpi-card static mobile-kpi-card-total-joint mobile-kpi-card--joint-total" data-open-income-overview="dashboard" aria-label="Inkomensoverzicht gezamenlijke rekening" aria-haspopup="dialog">
         <div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg('wallet')}</span></div>
         <div class="mobile-kpi-label">Totaal gezamenlijke rekening</div>
         <div class="mobile-kpi-value value pos">${eur(dashboardTotalIncome)}</div>
         <div class="mobile-kpi-edit-hint mobile-kpi-edit-hint-placeholder" aria-hidden="true">${finizeIconWrap('edit')}<span>Tik om aan te passen</span></div>
-      </div>
+      </button>
       <div class="card mobile-kpi-card static mobile-kpi-card--budget">
         <div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg('chart')}</span></div>
         <div class="mobile-kpi-label">Variabel gebruikt</div>
@@ -3512,13 +3528,14 @@ function renderPersonOrJoint(tabId, key, label){
   const variableBudget = isJoint ? r.variabelBudgetTotaal : sumBedrag(data.variabel || []);
   const variableUsed = isJoint ? r.variabelTotaal : rr.variabeleUitgaven;
   const variablePct = variableBudget > 0 ? Math.min(100, Math.round((variableUsed / variableBudget) * 100)) : 0;
-  const jointVisibleIncome = isJoint ? dashboardIncomeBreakdown(getSelectedMonth()).total : 0;
+  const jointIncome = isJoint ? dashboardIncomeBreakdown(getSelectedMonth()) : null;
+  const jointVisibleIncome = isJoint ? jointIncome.total : 0;
   const jointAllowance = isJoint ? round2(r.dion.zakgeld + r.dara.zakgeld) : 0;
   const remainingThisMonth = r.forecast.owners[key].available;
 
   const jointKpis = isJoint ? `
     <div class="overview-kpi-row">
-      ${renderIconKpi('€','green','Totaal gezamenlijk inkomen', eur(jointVisibleIncome), 'Inclusief inkomsten uit transacties', {valueClass:jointVisibleIncome<0?'value neg':'value pos'})}
+      ${renderIconKpi('€','green','Totaal gezamenlijk inkomen', eur(jointVisibleIncome), renderIncomeSources(jointIncome), {valueClass:jointVisibleIncome<0?'value neg':'value pos'})}
       ${renderIconKpi('▤','blue','Vaste lasten totaal', eur(r.vasteLastenTotaal), 'Klik om te wijzigen', {valueClass:'value neg', openFixedOwner:'gezamenlijk'})}
       ${renderIconKpi('◎','green','Over deze maand', eur(remainingThisMonth), '', {valueClass:remainingThisMonth<0?'value neg':'value pos'})}
       ${renderIconKpi('▥','blue','Variabel gebruikt', `${eur(variableUsed)} / ${eur(variableBudget)}`, `<span class="overview-budget-track" style="--used-pct:${variablePct}%"></span>`)}
@@ -4525,6 +4542,29 @@ function openPersonalSavingEditModal(owner){
 }
 
 
+function openJointIncomeOverview(origin,trigger){
+  const modal=document.getElementById('incomeEditModal');
+  const month=getSelectedMonth(),overview=dashboardIncomeBreakdown(month);
+  const title=origin==='dashboard'?'Totaal gezamenlijke rekening':'Totaal gezamenlijk inkomen';
+  modal.innerHTML=`<div class="modal income-sheet" role="dialog" aria-modal="true" aria-labelledby="incomeOverviewTitle">
+    <div class="income-sheet-handle"></div>
+    <div class="card-head"><h2 id="incomeOverviewTitle">${title}</h2><button type="button" class="ghost" data-close-income-overview>Sluiten</button></div>
+    <div class="income-sheet-meta"><span>${textSafe(monthLabel(month))}</span></div>
+    <div class="metric-value value pos">${eur(overview.total)}</div>
+    ${renderIncomeSources(overview)}
+  </div>`;
+  const close=()=>{
+    modal.classList.remove('open');
+    modal.removeEventListener('keydown',onKey);
+    if(trigger?.isConnected)trigger.focus();
+  };
+  const onKey=event=>{if(event.key==='Escape')close();};
+  modal.querySelector('[data-close-income-overview]').addEventListener('click',close);
+  modal.addEventListener('keydown',onKey);
+  bindModalBackdrop(modal,close);
+  modal.classList.add('open');
+  modal.querySelector('[data-close-income-overview]').focus();
+}
 function openIncomeEditModal(person, label){
   const modal = document.getElementById('incomeEditModal');
   const month=getSelectedMonth(),planned=resolvePlannedIncomeForMonth(state,month,person);
@@ -4733,14 +4773,14 @@ function renderJointFirstRow(){
     </div>`;
   }).join('');
   return `<div class="mobile-kpi-grid v4-mobile-only-grid joint-first-row" aria-label="Gezamenlijk rij 1">
-    <div class="mobile-kpi-card joint-kpi-card joint-total-income-card">
+    <button type="button" class="mobile-kpi-card joint-kpi-card joint-total-income-card" data-open-income-overview="gezamenlijk" aria-label="Inkomensoverzicht gezamenlijk inkomen" aria-haspopup="dialog">
       <div class="mobile-kpi-top">
         <span class="mobile-kpi-icon tone-green">${iconSvg('jointfund')}</span>
       </div>
       <div class="mobile-kpi-label">Totaal gezamenlijk inkomen</div>
       <div class="mobile-kpi-value value pos">${eur(dashboardIncomeBreakdown(getSelectedMonth()).total)}</div>
       <div class="mobile-kpi-edit-hint-placeholder" aria-hidden="true">.</div>
-    </div>
+    </button>
     <div class="mobile-kpi-card joint-kpi-card joint-fixed-costs-card">
       <div class="mobile-kpi-top">
         <span class="mobile-kpi-icon tone-green">${iconSvg('wallet')}</span>
@@ -4979,6 +5019,9 @@ function renderActiveTab(){
     btn.addEventListener('click', ()=>{
       openIncomeEditModal(btn.dataset.incomeEdit, btn.dataset.incomeLabel);
     });
+  });
+  root.querySelectorAll('[data-open-income-overview]').forEach(btn=>{
+    btn.addEventListener('click',()=>openJointIncomeOverview(btn.dataset.openIncomeOverview,btn));
   });
   root.querySelectorAll('[data-open-total-income]').forEach(btn=>{
     btn.addEventListener('click', openTotalIncomeEditModal);
