@@ -13,7 +13,8 @@ assert.doesNotMatch(runtime,/querySelectorAll\('\[data-add(?:goal|refund)\]'\)|d
 assert.doesNotMatch(runtime,/renderTeruggavenTable/,'legacy-teruggaveregels mogen niet meer als actuele editor worden gerenderd');
 assert.doesNotMatch(runtime,/data-month-income=/,'de persoonlijke desktopweergave moet de gedeelde inkomenseditor gebruiken');
 assert.match(runtime,/data-income-edit="\$\{key\}"/,'desktop moet de gedeelde inkomenseditor openen');
-assert.match(runtime,/data-income-edit="\$\{owner\}"/,'mobiel moet dezelfde gedeelde inkomenseditor openen');
+assert.match(runtime,/data-personal-kpi-mobile="income" data-open-income-overview="\$\{owner\}"/,'de mobiele inkomenskaart moet het gedeelde bronnenoverzicht openen');
+assert.match(runtime,/data-edit-overview-income[\s\S]*?addEventListener\('click',\(\)=>\{close\(\);openIncomeEditModal\(owner,ownerLabel\(owner\)\);\}\)/,'het persoonlijke bronnenoverzicht moet dezelfde gedeelde inkomenseditor bereikbaar houden');
 assert.match(presentation,/data-u2-process-owner/,'tablet en desktop moeten de bestaande verwerking openen');
 assert.match(presentation,/Spaargeschiedenis/,'tablet en desktop moeten de bestaande spaargeschiedenis tonen');
 assert.match(runtime,/data-open-owner-variable/,'variabele budgetten blijven via de gedeelde handler lopen');

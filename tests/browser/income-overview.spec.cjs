@@ -31,7 +31,7 @@ test('iPhone 390px retains visible personal breakdown and joint tap overview',as
   for(const owner of ['dion','dara']){
     await nav(page,owner);const card=page.locator(`#tab-${owner} [data-personal-kpi-mobile="income"]`);await expect(card.locator('.personal-income-sources')).toBeVisible();
     expect(await card.evaluate(card=>{const bounds=card.getBoundingClientRect();return [...card.querySelectorAll('.personal-income-sources > div')].every(row=>{const r=row.getBoundingClientRect();return r.top>=bounds.top&&r.bottom<=bounds.bottom&&r.left>=bounds.left&&r.right<=bounds.right;});})).toBe(true);
-    await screenshot(page,`income-${owner}-iphone-390`);await card.click();await expect(page.locator('#incomeEditInput')).toBeVisible();await page.locator('#btnCancelIncomeEdit').click();
+    await screenshot(page,`income-${owner}-iphone-390`);await card.click();await expect(page.locator('#incomeOverviewTitle')).toHaveText(`Totaal inkomen ${owner==='dion'?'Dion':'Dara'}`);await page.locator('[data-edit-overview-income]').click();await expect(page.locator('#incomeEditInput')).toBeVisible();await page.locator('#btnCancelIncomeEdit').click();
   }
   expect(await capture(page)).toEqual(before);expect(errors).toEqual([]);expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
 });
@@ -41,6 +41,41 @@ async function breakdown(card){return card.locator('.personal-income-sources > d
 const dashboardCard=page=>page.locator('.u5-primary-kpi').filter({has:page.locator('.metric-label').filter({hasText:/^Totaal gezamenlijke rekening$/})});
 const jointCard=page=>page.locator('#tab-gezamenlijk .overview-kpi-row .card').filter({has:page.locator('.metric-label').filter({hasText:/^Totaal gezamenlijk inkomen$/})});
 async function screenshot(page,name){if(process.env.FINIZE_INCOME_EVIDENCE){fs.mkdirSync(process.env.FINIZE_INCOME_EVIDENCE,{recursive:true});await page.screenshot({path:path.join(process.env.FINIZE_INCOME_EVIDENCE,name+'.png'),fullPage:page.viewportSize().width>=768});}}
+
+for(const iphone of [false,true]){
+  test(`personal mobile card opens readable income sources ${iphone?'iPhone':'Android'} 390px`,async({page})=>{
+    const errors=await boot(page,390,iphone),before=await capture(page),storage=await page.evaluate(()=>JSON.stringify({...localStorage}));
+    for(const owner of ['dion','dara']){
+      await nav(page,owner);
+      const card=page.locator(`#tab-${owner} [data-personal-kpi-mobile="income"]`),expectedRows=await breakdown(card),total=await card.locator('.mobile-kpi-value').innerText();
+      await card.press('Enter');
+      const overview=page.locator('#incomeEditModal');
+      await expect(overview.locator('#incomeOverviewTitle')).toHaveText(`Totaal inkomen ${owner==='dion'?'Dion':'Dara'}`);
+      await expect(overview).toContainText('oktober 2026');
+      await expect(overview.locator('input,select,textarea')).toHaveCount(0);
+      expect(await breakdown(overview)).toEqual(expectedRows);
+      expect(await overview.locator('.metric-value').innerText()).toBe(total);
+      expect(expectedRows.reduce((sum,row)=>sum+cents(row.amount),0)).toBe(cents(total));
+      expect(await overview.locator('.personal-income-sources').evaluate(container=>[...container.querySelectorAll('button,strong')].every(item=>item.scrollWidth<=item.clientWidth))).toBe(true);
+      await screenshot(page,`personal-income-${owner}-${iphone?'iphone':'android'}-390`);
+      await overview.getByRole('button',{name:'Transacties bij Zakgeld bekijken',exact:true}).click();
+      await expect(page.locator('#transactionModal')).toContainText('geen afzonderlijke inkomenstransactie');
+      await page.locator('#transactionModal').getByRole('button',{name:'Sluiten',exact:true}).click();
+      await expect(overview).toHaveClass(/open/);
+      if(owner==='dara'){
+        await overview.getByRole('button',{name:'Transacties bij Belastingteruggave bekijken',exact:true}).click();
+        await expect(page.locator('[data-income-transaction-id="personal"]')).toBeVisible();
+        await page.locator('#transactionModal').getByRole('button',{name:'Sluiten',exact:true}).click();
+      }
+      await overview.getByRole('button',{name:`Inkomen van ${owner==='dion'?'Dion':'Dara'} aanpassen`,exact:true}).click();
+      await expect(page.locator('#incomeEditInput')).toBeVisible();
+      await page.locator('#btnCancelIncomeEdit').click();
+      await card.click();await page.keyboard.press('Escape');
+      await expect(overview).not.toHaveClass(/open/);await expect(card).toBeFocused();
+    }
+    expect(await capture(page)).toEqual(before);expect(await page.evaluate(()=>JSON.stringify({...localStorage}))).toBe(storage);expect(errors).toEqual([]);
+  });
+}
 test('income overview financial baseline',async({page})=>{
   const errors=await boot(page,1440);const before=await capture(page);
   const totals={};for(const tab of ['dashboard','gezamenlijk','dion','dara']){await nav(page,tab);const card=tab==='dashboard'?dashboardCard(page):tab==='gezamenlijk'?jointCard(page):page.locator(`#tab-${tab} .overview-kpi-row [data-personal-kpi="income"]`);totals[tab]=await card.locator('.metric-value').innerText();}
@@ -95,6 +130,24 @@ test('source transactions preserve privacy and split projection identity',async(
   await page.evaluate(()=>{window.FinizeAuth.householdMembers[0].hiddenKpis=['income'];});await dashboardCard(page).getByRole('button',{name:'Transacties bij Belastingteruggave bekijken',exact:true}).click();await expect(page.locator('[data-income-transaction-id="personal"]')).toHaveCount(0);await page.locator('#transactionModal').getByRole('button',{name:'Sluiten',exact:true}).click();
   await page.evaluate(()=>{window.FinizeAuth.enabled=false;commitChange(()=>state.transactions.push({id:'split-income',source:'csv',importBatchId:'split-batch',importTransactionId:'split-row',processingStatus:'goedgekeurd',approvalSource:'manual',accountContext:'gezamenlijk',owner:'gezamenlijk',financialFor:'gezamenlijk',date:'2026-10-03',amount:50,bankOriginal:{amount:50,bankDate:'2026-10-03',description:'Split income'},transactionType:'inkomen',description:'Split income',splits:[{id:'first',amount:20,transactionType:'inkomen',category:'Overig',financialFor:'gezamenlijk'},{id:'second',amount:30,transactionType:'inkomen',category:'Overig',financialFor:'gezamenlijk'}]}));});await nav(page,'dashboard');const before=await capture(page);
   await dashboardCard(page).getByRole('button',{name:'Transacties bij Overige inkomsten bekijken',exact:true}).click();await expect(page.locator('[data-income-transaction-id^="split-income:split:"]')).toHaveCount(2);await expect(page.locator('#transactionModal')).toContainText('deeltransactie');await page.locator('#transactionModal').getByRole('button',{name:'Sluiten',exact:true}).click();expect(await capture(page)).toEqual(before);expect(errors).toEqual([]);
+});
+
+test('personal overview respects shared-tab privacy and read-only income',async({page})=>{
+  const errors=await boot(page,390),before=await capture(page),storage=await page.evaluate(()=>JSON.stringify({...localStorage}));
+  await nav(page,'dara');const card=page.locator('#tab-dara [data-personal-kpi-mobile="income"]');
+  // A card already rendered before a privacy change must still recheck permissions on click.
+  await page.evaluate(()=>{window.FinizeAuth={...window.FinizeAuth,enabled:true,assignment:{role:'dion'},profile:{hiddenKpis:[]},householdMembers:[{role:'dara',sharePersonalTab:false,hiddenKpis:[]}]};});
+  await card.click();
+  await expect(page.locator('#incomeEditModal')).not.toHaveClass(/open/);
+  await page.evaluate(()=>{window.FinizeAuth.householdMembers[0].sharePersonalTab=true;window.FinizeAuth.householdMembers[0].hiddenKpis=['income'];});
+  await card.click();
+  await expect(page.locator('#incomeEditModal')).not.toHaveClass(/open/);
+  await page.evaluate(()=>{window.FinizeAuth.householdMembers[0].hiddenKpis=[];});
+  await card.click();
+  await expect(page.locator('#incomeOverviewTitle')).toHaveText('Totaal inkomen Dara');
+  await expect(page.locator('[data-edit-overview-income]')).toHaveCount(0);
+  await page.locator('#incomeEditModal').getByRole('button',{name:'Sluiten',exact:true}).click();
+  expect(await capture(page)).toEqual(before);expect(await page.evaluate(()=>JSON.stringify({...localStorage}))).toBe(storage);expect(errors).toEqual([]);
 });
 test('source drilldown uses historical month and escapes transaction descriptions',async({page})=>{
   const errors=await boot(page,1440);await page.evaluate(()=>commitChange(()=>{state.meta.selectedMonth='2026-09';state.transactions.push({id:'past-"-income',source:'manual',processingStatus:'goedgekeurd',approvalSource:'manual',accountContext:'gezamenlijk',owner:'gezamenlijk',financialFor:'gezamenlijk',transactionType:'vakantiegeld',date:'2026-09-03',amount:7,description:'<img src=x onerror="window.incomeDescriptionXss=1">'});}));await nav(page,'dashboard');const before=await capture(page);
