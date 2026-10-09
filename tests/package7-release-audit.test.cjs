@@ -10,7 +10,7 @@ async function workerNavigation(response){
  vm.runInNewContext(fs.readFileSync('service-worker.js','utf8'),{self:{addEventListener:(key,handler)=>handlers[key]=handler,skipWaiting:()=>{},clients:{claim:()=>{}}},caches,fetch:async()=>response.clone()});
  let navigation;handlers.fetch({request:{method:'GET',mode:'navigate'},respondWith:promise=>navigation=promise});await navigation;await new Promise(resolve=>setImmediate(resolve));return {html,cached:await cached.get('./index.html').text()};
 }
-test('P7 W3 interrupted release navigation retains offline shell for cached asset version',async()=>{const fs=require('node:fs'),html=fs.readFileSync('index.html','utf8'),next=html.replaceAll('115-opslagmeldingen','106-isolated-test');const result=await workerNavigation(new Response(next));assert.equal(result.cached,result.html);});
+test('P7 W3 interrupted release navigation retains offline shell for cached asset version',async()=>{const fs=require('node:fs'),html=fs.readFileSync('index.html','utf8'),next=html.replaceAll('116-cache-isolatie','106-isolated-test');const result=await workerNavigation(new Response(next));assert.equal(result.cached,result.html);});
 test('P7 W5 failed HTTP navigation never replaces valid offline shell',async()=>{const result=await workerNavigation(new Response('<html>Service unavailable</html>',{status:503}));assert.equal(result.cached,result.html);});
 async function workerInstall(html){
  const fs=require('node:fs'),vm=require('node:vm'),handlers={},cached=new Map(),deleted=[];
@@ -19,7 +19,7 @@ async function workerInstall(html){
  vm.runInNewContext(fs.readFileSync('service-worker.js','utf8'),{self:{addEventListener:(key,handler)=>handlers[key]=handler,skipWaiting:()=>{},clients:{claim:()=>{}}},caches});
  let installing;handlers.install({waitUntil:promise=>installing=promise});return {installing,deleted};
 }
-test('P7 W2/W3 mismatched shell cannot install over the working worker',async()=>{const fs=require('node:fs'),html=fs.readFileSync('index.html','utf8').replaceAll('115-opslagmeldingen','101-functional-consolidation'),result=await workerInstall(html);await assert.rejects(result.installing,/assetversie/);assert.deepEqual(result.deleted,['finize-v115-opslagmeldingen']);});
+test('P7 W2/W3 mismatched shell cannot install over the working worker',async()=>{const fs=require('node:fs'),html=fs.readFileSync('index.html','utf8').replaceAll('116-cache-isolatie','101-functional-consolidation'),result=await workerInstall(html);await assert.rejects(result.installing,/assetversie/);assert.deepEqual(result.deleted,['finize-v116-cache-isolatie']);});
 test('P7 W1 matching shell installs successfully',async()=>{const result=await workerInstall(require('node:fs').readFileSync('index.html','utf8'));await result.installing;assert.deepEqual(result.deleted,[]);});
 function manual(s,id,changes={},account='gezamenlijk'){return commands.upsertManualFinancialTransaction(s,{id,source:'manual',date:month+'-03',amount:100,transactionType:'uitgave',category:'Kleding',financialFor:account,budgetOwner:account,...changes},account,{today});}
 function batchCommand(s,b,type){return lifecycle.planImportCommand(s,b,{type,operationId:b.id+'-'+type,timestamp:today+'T12:00:00Z'},{validateRow:runtime.rowProcessingValidation});}

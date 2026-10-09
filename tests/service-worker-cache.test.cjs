@@ -10,10 +10,11 @@ assert.match(source, /key\.startsWith\(CACHE_PREFIX\) && key !== CACHE_NAME/);
 assert.match(source, /await cache\.addAll\(CRITICAL_SHELL\)/);
 assert.match(source, /Promise\.allSettled\(OPTIONAL_SHELL\.map/);
 assert.match(source, /event\.request\.mode === "navigate"/);
-assert.match(source, /\.catch\(\(\) => caches\.match\("\.\/index\.html"\)\)/);
+assert.match(source, /\.catch\(\(\) => caches\.match\("\.\/index\.html", \{cacheName:CACHE_NAME\}\)\)/);
+assert.match(source, /caches\.match\(event\.request, \{cacheName:CACHE_NAME\}\)/);
 assert.match(source, /return cached \|\| fetch\(event\.request\);/);
 assert.doesNotMatch(
-  source.slice(source.indexOf('event.respondWith(\n    caches.match(event.request)')),
+  source.slice(source.indexOf('event.respondWith(\n    caches.match(event.request,')),
   /caches\.match\("\.\/index\.html"\)/
 );
 
@@ -22,6 +23,6 @@ const htmlJs = html.match(/src="(\.\/app\.js\?v=[^"]+)"/)?.[1];
 assert.ok(htmlCss && htmlJs, 'index.html moet versiegebonden app-assets laden');
 assert.ok(source.includes(`"${htmlCss}"`), 'serviceworker moet dezelfde CSS-versie cachen als index.html');
 assert.ok(source.includes(`"${htmlJs}"`), 'serviceworker moet dezelfde JavaScript-versie cachen als index.html');
-assert.match(source, /const CACHE_NAME = "finize-v115-opslagmeldingen"/);
+assert.match(source, /const CACHE_NAME = "finize-v116-cache-isolatie"/);
 
 console.log('SERVICE_WORKER_CACHE_OK');

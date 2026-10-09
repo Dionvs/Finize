@@ -1,11 +1,11 @@
-const CACHE_NAME = "finize-v115-opslagmeldingen";
+const CACHE_NAME = "finize-v116-cache-isolatie";
 const CACHE_PREFIX = "finize-";
 
 const CRITICAL_SHELL = [
   "./",
   "./index.html",
-  "./app.js?v=115-opslagmeldingen",
-  "./app.css?v=115-opslagmeldingen",
+  "./app.js?v=116-cache-isolatie",
+  "./app.css?v=116-cache-isolatie",
   "./manifest.json"
 ];
 
@@ -39,9 +39,8 @@ self.addEventListener("activate", event => {
           .filter(key => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME)
           .map(key => caches.delete(key))
       )
-    )
+    ).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 function isCurrentShellHtml(html) {
@@ -69,13 +68,13 @@ self.addEventListener("fetch", event => {
           await cacheNavigationShell(response).catch(() => {});
           return response;
         })
-        .catch(() => caches.match("./index.html"))
+        .catch(() => caches.match("./index.html", {cacheName:CACHE_NAME}))
     );
     return;
   }
 
   event.respondWith(
-    caches.match(event.request).then(cached => {
+    caches.match(event.request, {cacheName:CACHE_NAME}).then(cached => {
       return cached || fetch(event.request);
     })
   );

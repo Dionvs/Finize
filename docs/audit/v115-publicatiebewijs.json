@@ -1,0 +1,59 @@
+{
+  "verifiedAtUtc": "2026-10-09T06:12:09.387668+00:00",
+  "releaseCommit": "c11400db847b9a883aec530610256ffc9a52e934",
+  "pagesRun": {
+    "id": 37891388070,
+    "url": "https://github.com/Dionvs/Finize/actions/runs/37891388070",
+    "conclusion": "success"
+  },
+  "live": {
+    "release": "c11400db847b9a883aec530610256ffc9a52e934",
+    "base": "https://dionvs.github.io/Finize/",
+    "cacheVersion": "finize-v115-opslagmeldingen",
+    "assets": {
+      "index.html": {
+        "status": 200,
+        "sha256": "ebaff4932fc8328dc2accc7c613fc737e51ac23258e1856da4c97e7a1f5fb5e8"
+      },
+      "service-worker.js": {
+        "status": 200,
+        "sha256": "febbc0951df0ad3229e0ce50dea7f8e6f8b5719984d0cada0d8c89567d30baa4"
+      },
+      "app.js": {
+        "status": 200,
+        "sha256": "d68ece44a8e981d9433c5a148949e1ddec7d639af5047cbaa33d6573e4df6ca3"
+      },
+      "app.css": {
+        "status": 200,
+        "sha256": "df32bfc4b70dddacfe41271c7247c18347bbcedd0b865169d2d7d6f413166962"
+      }
+    },
+    "browser": [
+      {
+        "width": 360,
+        "pageErrors": [],
+        "horizontalOverflow": false,
+        "cacheNames": [
+          "finize-v115-opslagmeldingen"
+        ],
+        "offlineReload": true
+      },
+      {
+        "width": 1440,
+        "pageErrors": [],
+        "horizontalOverflow": false,
+        "cacheNames": [
+          "finize-v115-opslagmeldingen"
+        ],
+        "offlineReload": true
+      }
+    ]
+  },
+  "tests": {
+    "nodeFiles": 51,
+    "registeredNodeCases": 552,
+    "browserCases": 234,
+    "pnpmTestExitCode": 0
+  },
+  "followUp": "Extra upgradecontrole vond terugkerende oude cache. Opgelost in afzonderlijke v116 cache-isolatie; v115-proof bewijst geen volledige cache-upgrade."
+}
