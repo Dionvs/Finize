@@ -15,6 +15,9 @@ export function cloudStateSignature(state) {
 }
 
 export function assertCloudBase(documentData, expectedVersion, expectedSignature) {
+  // A confirmed missing document is the initial base used by attachSnapshot.
+  // Never accept disappearance of an existing revision or signed state.
+  if (!documentData && expectedVersion === 0 && expectedSignature === '') return 0;
   const actualVersion = cloudDocumentVersion(documentData);
   const actualSignature = cloudStateSignature(documentData?.state || { meta: documentData?.stateMeta });
   if (actualVersion !== expectedVersion || actualSignature !== expectedSignature) {

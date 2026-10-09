@@ -485,6 +485,7 @@
     const legacy = (tx == null ? void 0 : tx.approvalSource) === "legacy-confirmed" || (tx == null ? void 0 : tx.reviewStatus) === "bevestigd";
     const excluded = (tx == null ? void 0 : tx.reviewStatus) === "genegeerd" || (tx == null ? void 0 : tx.kind) === "niet-meetellen" || ((_a2 = tx == null ? void 0 : tx.processing) == null ? void 0 : _a2.include) === false || ((_b = tx == null ? void 0 : tx.processing) == null ? void 0 : _b.transactionType) === "niet-meetellen" || (tx == null ? void 0 : tx.transactionType) === "niet-meetellen";
     if (!manual && ["nakijken", "onbekend"].includes(tx == null ? void 0 : tx.processingStatus)) return tx.processingStatus;
+    if (explicit) return excluded ? "niet-meetellen" : "goedgekeurd";
     if (!manual && ["nakijken", "onbekend"].includes(tx == null ? void 0 : tx.reviewStatus)) return tx.reviewStatus;
     if ((tx == null ? void 0 : tx.reviewStatus) === "genegeerd" || (manual || explicit || legacy) && excluded) return "niet-meetellen";
     if (manual || explicit || legacy) return "goedgekeurd";
@@ -493,6 +494,25 @@
     const type = ((_d = tx == null ? void 0 : tx.processing) == null ? void 0 : _d.transactionType) || (tx == null ? void 0 : tx.transactionType);
     const proposal = (tx == null ? void 0 : tx.certainty) || (tx == null ? void 0 : tx.processingStatus) || (tx == null ? void 0 : tx.recognitionState) || type || category && !["onbekend", "ongecategoriseerd"].includes(String(category).toLowerCase());
     return proposal ? "nakijken" : "onbekend";
+  }
+  function approveTransactionProcessing(tx, approvedAt = (/* @__PURE__ */ new Date()).toISOString()) {
+    var _a2, _b;
+    const excluded = ((_a2 = tx.processing) == null ? void 0 : _a2.include) === false || ((_b = tx.processing) == null ? void 0 : _b.transactionType) === "niet-meetellen";
+    tx.processingStatus = excluded ? "niet-meetellen" : "goedgekeurd";
+    tx.reviewStatus = excluded ? "genegeerd" : "bevestigd";
+    tx.certainty = "goedgekeurd";
+    tx.approvalSource = "manual";
+    tx.approvedAt = approvedAt;
+    tx.reasons = [];
+    return tx;
+  }
+  function reopenTransactionProcessing(tx) {
+    tx.processingStatus = "nakijken";
+    tx.reviewStatus = "nakijken";
+    tx.certainty = "nakijken";
+    tx.approvalSource = "";
+    tx.approvedAt = "";
+    return tx;
   }
   function isTransactionFinanciallyActive(tx) {
     if ((tx == null ? void 0 : tx.recordRole) === "bank-source") return false;
@@ -2704,6 +2724,7 @@
     ].join("|");
   }
   function assertCloudBase(documentData, expectedVersion, expectedSignature) {
+    if (!documentData && expectedVersion === 0 && expectedSignature === "") return 0;
     const actualVersion = cloudDocumentVersion(documentData);
     const actualSignature = cloudStateSignature((documentData == null ? void 0 : documentData.state) || { meta: documentData == null ? void 0 : documentData.stateMeta });
     if (actualVersion !== expectedVersion || actualSignature !== expectedSignature) {
@@ -5791,6 +5812,17 @@
   var stateBackupStore = createStateBackupStore();
   var DataAdapter = {
     loadedFromStorage: false,
+    readDurableState() {
+      const keys = activeStorageKeys();
+      if (!keys) throw new Error("De oorspronkelijke opslagcontext is niet beschikbaar.");
+      const raw = localStorage.getItem(keys.state);
+      return raw ? JSON.parse(raw) : null;
+    },
+    adoptDurableState(durable) {
+      state = cloneState(durable);
+      window.state = state;
+      committedStateSnapshot = cloneState(state);
+    },
     // Lokaal blijft altijd de eerste veiligheidslaag. Firestore is optionele live-sync erbovenop.
     // Firebase Storage is voor losse bestanden; Firestore is de juiste plek voor live app-data.
     // We bewaren dezelfde state-vorm als 1 groot JSON-document voor Finize.
@@ -10287,6 +10319,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     nextBatch.updatedAt = timestamp;
     candidate.importSummaries = candidate.importSummaries || [];
     if (!candidate.importSummaries.some((row) => row.id === nextBatch.id)) candidate.importSummaries.push({ id: nextBatch.id, lifecycle: nextBatch.lifecycle, status: nextBatch.status, version: nextBatch.version, operationId });
+    else Object.assign(candidate.importSummaries.find((row) => row.id === nextBatch.id), { version: nextBatch.version, operationId });
     ensureImportBankSources(candidate, nextBatch);
     const repairedHeader = bankSourceForImport(candidate, nextBatch.id, rowId);
     if (oldHeader && repairedHeader && JSON.stringify(oldHeader.bankOriginal) !== JSON.stringify(repairedHeader.bankOriginal)) {
@@ -10298,6 +10331,76 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     const before = selectBankTransactions(state2).reduce((sum, row) => sum + Math.round(row.bankAmount * 100), 0), after = selectBankTransactions(candidate).reduce((sum, row) => sum + Math.round(row.bankAmount * 100), 0);
     if (before !== after) throw new Error("Deze herstelkoppeling zou het rekeningtotaal veranderen. Laat de bron eerst handmatig controleren.");
     return { state: candidate, batch: nextBatch, rowId };
+  }
+
+  // src/storage/commit-outcome.mjs
+  var COMMIT_OUTCOMES = Object.freeze(["committed", "rejected", "uncertain"]);
+  function inspectCommitOutcome(state2, operation) {
+    var _a2, _b;
+    if (!state2 || !((_a2 = operation == null ? void 0 : operation.intent) == null ? void 0 : _a2.operationId)) return "uncertain";
+    const receipt = [...state2.importSummaries || [], ...state2.importDeletionProofs || []].find((row) => row.id === operation.importId);
+    if ((receipt == null ? void 0 : receipt.operationId) === operation.intent.operationId && Number(receipt.version) === Number((_b = operation.batch) == null ? void 0 : _b.version)) return "committed";
+    return JSON.stringify(state2) === operation.baseSignature ? "rejected" : "uncertain";
+  }
+  async function readCommitOutcome(readState, operation) {
+    try {
+      const state2 = await readState();
+      return { outcome: inspectCommitOutcome(state2, operation), state: state2 };
+    } catch (e) {
+      return { outcome: "uncertain", state: null };
+    }
+  }
+  function commitOutcomeError(cause, outcome, operationId) {
+    const error = new Error(outcome === "uncertain" ? "De uitkomst van de opslag is onzeker. Finize moet de opgeslagen toestand controleren voordat je opnieuw goedkeurt. " + ((cause == null ? void 0 : cause.message) || "") : (cause == null ? void 0 : cause.message) || "De financiële wijziging is afgewezen.", { cause });
+    error.commitOutcome = outcome;
+    error.operationId = operationId;
+    error.code = cause == null ? void 0 : cause.code;
+    error.storageFailure = true;
+    return error;
+  }
+
+  // src/import/approval-group.mjs
+  async function runApprovalGroup(requests, approve) {
+    const results = [];
+    let stopped = false;
+    for (const request of requests) {
+      if (stopped) {
+        results.push({ rowId: request.rowId, operationId: request.operationId, status: "niet-geprobeerd" });
+        continue;
+      }
+      try {
+        const result = await approve(request);
+        if ((result == null ? void 0 : result.outcome) !== "committed") {
+          throw Object.assign(new Error("De duurzame goedkeuring is nog niet bevestigd."), {
+            commitOutcome: (result == null ? void 0 : result.outcome) || "uncertain",
+            operationId: (result == null ? void 0 : result.operationId) || request.operationId
+          });
+        }
+        results.push({ rowId: request.rowId, operationId: (result == null ? void 0 : result.operationId) || request.operationId, status: "geslaagd", outcome: "committed" });
+      } catch (error) {
+        const conflict = (error == null ? void 0 : error.code) === "import-conflict";
+        const invalid = (error == null ? void 0 : error.code) === "approval-validation";
+        const uncertain = (error == null ? void 0 : error.commitOutcome) === "uncertain";
+        results.push({
+          rowId: request.rowId,
+          operationId: (error == null ? void 0 : error.operationId) || request.operationId,
+          status: uncertain ? "onzeker" : conflict ? "conflicterend" : "ongeldig",
+          outcome: (error == null ? void 0 : error.commitOutcome) || "rejected",
+          message: (error == null ? void 0 : error.message) || String(error)
+        });
+        stopped = uncertain || !invalid && !conflict;
+      }
+    }
+    return { results, total: requests.length, committed: results.filter((row) => row.status === "geslaagd").length };
+  }
+  function approvalGroupSummary(group) {
+    const labels = { ongeldig: "ongeldig", conflicterend: "conflict", "niet-geprobeerd": "niet geprobeerd", onzeker: "uitkomst onzeker" };
+    const parts = [`${group.committed} van ${group.total} transacties goedgekeurd.`];
+    for (const [status, label] of Object.entries(labels)) {
+      const count = group.results.filter((row) => row.status === status).length;
+      if (count) parts.push(`${count} ${label}.`);
+    }
+    return parts.join(" ");
   }
 
   // src/import/import-lifecycle.mjs
@@ -11192,29 +11295,16 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       return { required: true, safe, item, expected, tolerance, reason: safe ? "" : `bedrag wijkt meer dan ${tolerance.toFixed(2)} af` };
     }
     function isExplicitlyApproved(row) {
-      return (row == null ? void 0 : row.certainty) === "goedgekeurd" && (row == null ? void 0 : row.approvalSource) === "manual";
+      return (row == null ? void 0 : row.approvalSource) === "manual" && ["goedgekeurd", "niet-meetellen"].includes(getTransactionProcessingStatus({ ...row, source: "csv" }));
     }
     function importReviewState(row) {
-      var _a2;
-      if (isExplicitlyApproved(row)) return ((_a2 = row.processing) == null ? void 0 : _a2.include) === false ? "niet-meetellen" : "goedgekeurd";
-      if (getTransactionProcessingStatus(row) === "onbekend") return "onbekend";
-      return "nakijken";
+      return getTransactionProcessingStatus({ ...row, source: "csv" });
     }
     function markExplicitlyApproved(row) {
-      var _a2;
-      row.processingStatus = ((_a2 = row.processing) == null ? void 0 : _a2.include) === false ? "niet-meetellen" : "goedgekeurd";
-      row.certainty = "goedgekeurd";
-      row.approvalSource = "manual";
-      row.approvedAt = (/* @__PURE__ */ new Date()).toISOString();
-      row.reasons = [];
-      return row;
+      return approveTransactionProcessing(row);
     }
     function reopenForReview(row) {
-      row.processingStatus = "nakijken";
-      row.certainty = "nakijken";
-      row.approvalSource = "";
-      row.approvedAt = "";
-      return row;
+      return reopenTransactionProcessing(row);
     }
     function titleCaseMerchant(value) {
       return String(value || "").trim().toLocaleLowerCase("nl-NL").replace(/(^|[\s-])\p{L}/gu, (char) => char.toLocaleUpperCase("nl-NL"));
@@ -11436,8 +11526,8 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       target.activeImportId = draft.status === "concept" ? draft.id : target.activeImportId === draft.id ? "" : target.activeImportId;
       ensureImportBankSources(target, draft);
     }
-    function commitSummary(root2, draft) {
-      if (!root2.commitChange(() => applyImportSummary(root2.state, draft), { render: false })) throw new Error("Importsamenvatting kon niet worden opgeslagen.");
+    async function commitSummary(root2, draft) {
+      if (!await root2.commitChange(() => applyImportSummary(root2.state, draft), { render: false, throwOnError: true })) throw new Error("Importsamenvatting kon niet worden opgeslagen.");
     }
     function updateImportSaveStatus(text, error = false) {
       if (typeof document === "undefined") return;
@@ -11526,7 +11616,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       });
       return session.write;
     }
-    function commitImportEditor(root2, draft, { approveIds = [], reopenIds = [] } = {}) {
+    function commitImportEditor(root2, draft, { approveIds = [], reopenIds = [], operationId } = {}) {
       if (!approveIds.length && !reopenIds.length) return persistLocalImportEditor(root2, draft).then(() => ({ state: cloneState(root2.state), batch: cloneState(draft), localConcept: true }));
       const session = editorSession(draft), revision = session.revision, rows = cloneState(draft.rows), requestedBase = cloneState(session.base), write = session.write;
       const profile = { accountProfileId: draft.accountProfileId, accountOwner: draft.accountOwner };
@@ -11546,7 +11636,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
           const desired = requested.get(current.id), original2 = originals.get(current.id);
           return desired && original2 && (approveIds.includes(current.id) || reopenIds.includes(current.id)) && (JSON.stringify(desired.processing) !== JSON.stringify(original2.processing) || desired.accountProfileId !== original2.accountProfileId || desired.accountOwner !== original2.accountOwner || getTransactionProcessingStatus({ ...desired, source: "csv" }) !== getTransactionProcessingStatus({ ...original2, source: "csv" }) || approveIds.includes(current.id) || reopenIds.includes(current.id)) ? desired : cloneState(current);
         });
-        const result = await commitImportCommand(root2, base, { type: "editor-commit", rows: mergedRows, profile: JSON.stringify(profile) !== JSON.stringify({ accountProfileId: requestedBase.accountProfileId, accountOwner: requestedBase.accountOwner }) ? profile : null, editorRevision: revision, editorBaseVersion: importVersion(base), editorBaseOperation: base.operationId || "", approveIds: [...new Set(approveIds)], reopenIds: [...new Set(reopenIds)] });
+        const result = await commitImportCommand(root2, base, { type: "editor-commit", operationId, rows: mergedRows, profile: JSON.stringify(profile) !== JSON.stringify({ accountProfileId: requestedBase.accountProfileId, accountOwner: requestedBase.accountOwner }) ? profile : null, editorRevision: revision, editorBaseVersion: importVersion(base), editorBaseOperation: base.operationId || "", approveIds: [...new Set(approveIds)], reopenIds: [...new Set(reopenIds)] });
         if (ImportStore.scope !== session.scope) return result;
         session.base = cloneState(result.batch);
         delete session.base.confirmedBatch;
@@ -11651,7 +11741,8 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
         const baseSignature = JSON.stringify(root2.state), candidate = cloneState(root2.state);
         applyImportSummary(candidate, draft);
         const previousQueue = (await ImportStore.listSync()).find((item) => item.importId === id);
-        const journal = { id: draft.operationId, importId: id, operation: "import-command", status: "pending", intent: { type: "draft-save", operationId: draft.operationId }, baseSignature, candidate, batch: cloneState(draft), previousBatch: stored ? cloneState(stored) : null };
+        const scope = ImportStore.scope;
+        const journal = { id: draft.operationId, importId: id, operation: "import-command", commitContractVersion: 1, status: "pending", intent: { type: "draft-save", operationId: draft.operationId }, baseSignature, candidate, batch: cloneState(draft), previousBatch: stored ? cloneState(stored) : null, previousQueue };
         await ImportStore.putJournal(journal);
         if (JSON.stringify(root2.state) !== baseSignature) {
           journal.status = "conflict";
@@ -11659,21 +11750,24 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
           await preserveImportConflict(root2, draft, stored || { id, version: 0 }, [{ kind: "local-core-changed" }]);
           throw new Error("De state wijzigde tijdens opslaan. De importkeuze is veilig bewaard.");
         }
-        await ImportStore.putImport(draft);
-        if (syncCloud) await queueImportSync(draft);
+        let detailsWritten = false;
         try {
-          commitSummary(root2, draft);
+          await ImportStore.putImport(draft);
+          detailsWritten = true;
+          if (syncCloud) await queueImportSync(draft);
+          if (ImportStore.scope !== scope) throw new Error("Het huishouden is tijdens opslaan gewijzigd.");
+          await commitSummary(root2, draft);
         } catch (error) {
-          journal.status = "rolled-back";
-          await ImportStore.putJournal(journal);
-          await ImportStore.rollbackImport(draft, stored, previousQueue);
-          throw error;
+          await reconcileFailedImportCommit(root2, journal, error, scope, detailsWritten);
         }
         journal.status = "completed";
         delete journal.candidate;
         delete journal.previousBatch;
         delete journal.baseSignature;
-        await ImportStore.putJournal(journal);
+        try {
+          await ImportStore.putJournal(journal);
+        } catch (e) {
+        }
         if (syncCloud) flushImportSync(root2).catch((error) => console.warn("Importsynchronisatie wordt later opnieuw geprobeerd.", error));
         return draft;
       });
@@ -11748,10 +11842,10 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       }
       if (local) {
         if (local.status === "concept") {
-          if (!summary) commitSummary(root2, local);
+          if (!summary) await commitSummary(root2, local);
           return { action: summary ? "local" : "summary-restored", activeImportId: activeId };
         }
-        commitSummary(root2, local);
+        await commitSummary(root2, local);
         return { action: "cleared-finished", activeImportId: "" };
       }
       if (!summary || summary.status !== "concept") {
@@ -12717,7 +12811,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     }
     function copiedProcessing(source, target, root2) {
       setProcessingType(target.processing, source.processing.transactionType);
-      ["description", "budgetOwner", "category", "transactionType", "budgetItemId", "fixedExpenseId", "fixedAmountMode", "savingsGoalId", "refundCategory", "refundMonth", "advanceMode", "include", "sourceAccountProfileId", "destinationAccountProfileId"].forEach((field) => {
+      ["budgetOwner", "category", "transactionType", "budgetItemId", "fixedExpenseId", "fixedAmountMode", "savingsGoalId", "refundCategory", "refundMonth", "advanceMode", "include", "sourceAccountProfileId", "destinationAccountProfileId"].forEach((field) => {
         const value = source.processing[field];
         if (value === void 0) delete target.processing[field];
         else target.processing[field] = cloneState(value);
@@ -12845,136 +12939,123 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     function bulkEditor(root2, draft) {
       return `<details class="u4-section u4-bulk-section"><summary><span>Meerdere transacties aanpassen</span><span>Optioneel</span></summary><div class="u4-section-list"><p class="u4-muted">Pas één keuze in één keer toe. Goedgekeurde transacties worden standaard overgeslagen en iedere aangepaste regel moet daarna expliciet worden goedgekeurd.</p><div class="u4-profile-grid"><label>Toepassen op<select data-u4-bulk-scope><option value="review">Alleen Nakijken</option><option value="unknown">Alleen Onbekend</option><option value="uncategorized">Alleen ongecategoriseerd</option><option value="all">Alle niet-goedgekeurde transacties</option></select></label><label>Budgeteigenaar<select data-u4-bulk-owner><option value="">Niet wijzigen</option>${OWNERS2.map((owner) => option(owner, ownerLabel2(owner), "")).join("")}</select></label><label>Categorie<select data-u4-bulk-category><option value="">Niet wijzigen</option>${categoryOptions(root2, "gezamenlijk", "")}</select></label><label>Transactie<select data-u4-bulk-type><option value="">Niet wijzigen</option>${typeOptions("")}</select></label></div><button type="button" class="ghost small" data-u4-apply-bulk>Voorbeeld en toepassen</button></div></details>`;
     }
+    async function approveSelectedSources(root2, draft, ids, { template = null } = {}) {
+      const scope = ImportStore.scope, session = editorSession(draft);
+      if (session.approving) throw cloudImportError("import-conflict", "Deze selectie wordt al verwerkt.");
+      const requests = [...new Set(ids)].map((rowId) => ({ rowId, operationId: uid2("approval"), row: cloneState(draft.rows.find((row) => row.id === rowId) || null) }));
+      session.approving = true;
+      try {
+        return await runApprovalGroup(requests, async (request) => {
+          if (ImportStore.scope !== scope) throw new Error("Het huishouden is intussen gewijzigd. Heropen de oorspronkelijke import.");
+          const target = draft.rows.find((row) => row.id === request.rowId);
+          if (!target || !request.row || target.duplicate || target.importError) throw Object.assign(new Error("De geselecteerde bankbron ontbreekt of kan niet worden verwerkt."), { code: "approval-validation" });
+          const previous = cloneState(target);
+          try {
+            target.processing = cloneState(request.row.processing);
+            target.bankSourceRevision = request.row.bankSourceRevision;
+            if (template && template.id !== target.id) {
+              copiedProcessing(template, target, root2);
+              reopenForReview(target);
+            }
+            const validation = rowProcessingValidation(target, root2.state);
+            if (!validation.ok) throw Object.assign(new Error(validation.errors.map((error) => error.message).join(" ")), { code: "approval-validation" });
+            const source = bankSourceForImport(root2.state, draft.id, target.id);
+            if (isExplicitlyApproved(target) && (source == null ? void 0 : source.approvedProcessing) && JSON.stringify(source.approvedProcessing) === JSON.stringify(target.processing)) return { outcome: "committed", operationId: request.operationId };
+            return await commitImportEditor(root2, draft, { approveIds: [target.id], operationId: request.operationId });
+          } catch (error) {
+            if (error.commitOutcome !== "committed") applyFinancialCandidate(target, previous);
+            throw error;
+          }
+        });
+      } finally {
+        session.approving = false;
+      }
+    }
+    function showApprovalResult(root2, draft, modal, result, focusId = "") {
+      var _a2, _b, _c;
+      renderDraftModalPreservingView(root2, draft, modal, focusId);
+      (_a2 = root2.renderActiveTab) == null ? void 0 : _a2.call(root2);
+      const body = modal.querySelector(".u4-modal-body");
+      const feedback = document.createElement("div");
+      feedback.setAttribute("data-u4-group-result", "");
+      feedback.setAttribute("role", "status");
+      feedback.textContent = approvalGroupSummary(result);
+      for (const item of result.results.filter((row) => row.status !== "geslaagd")) {
+        const source = draft.rows.find((row) => row.id === item.rowId), line = document.createElement("p");
+        line.textContent = `${((_b = source == null ? void 0 : source.bankOriginal) == null ? void 0 : _b.bankDate) || ""} · ${euro(((_c = source == null ? void 0 : source.bankOriginal) == null ? void 0 : _c.amount) || 0)} · ${item.message || "Niet geprobeerd"}`;
+        feedback.appendChild(line);
+      }
+      body == null ? void 0 : body.prepend(feedback);
+      updateImportSaveStatus(approvalGroupSummary(result), result.committed < result.total);
+    }
     async function showMatchDialog(root2, draft, source, modal) {
-      var _a2, _b;
+      var _a2, _b, _c;
       const validation = rowProcessingValidation(source, root2.state);
       if (!validation.ok) {
         showValidationErrors(root2, draft, validation.errors.map((error) => ({ ...error, rowId: source.id })));
         return;
       }
-      const matches = matchCandidates(draft, source);
+      const matches = matchCandidates(draft, source), template = cloneState(source);
       if (!matches.length) {
-        const previous = { certainty: source.certainty, approvalSource: source.approvalSource, approvedAt: source.approvedAt, processingStatus: source.processingStatus, reasons: cloneState(source.reasons || []) };
-        markExplicitlyApproved(source);
-        renderDraftModalPreservingView(root2, draft, modal, source.id);
-        Promise.resolve().then(() => approveStoredSource(root2, draft, source)).catch((error) => {
-          if (!error.coreApplied) {
-            source.processingStatus = previous.processingStatus;
-            source.certainty = previous.certainty;
-            source.approvalSource = previous.approvalSource;
-            source.approvedAt = previous.approvedAt;
-            source.reasons = previous.reasons;
-          }
-          renderDraftModalPreservingView(root2, draft, document.getElementById("u4ImportModalRoot"), source.id);
-          alert(error.coreApplied ? `De goedkeuring is bewaard; importdetails worden uit het lokale journal hersteld. ${error.message}` : `Goedkeuring is afgebroken. ${error.message}
+        const button = (_a2 = findDraftRowElement(modal, source.id)) == null ? void 0 : _a2.querySelector("[data-u4-approve]");
+        if (button) button.disabled = true;
+        modal.inert = true;
+        try {
+          const result = await approveSelectedSources(root2, draft, [source.id]);
+          showApprovalResult(root2, draft, modal, result, source.id);
+          const failed = result.results.find((item) => item.status !== "geslaagd");
+          if (failed) alert(failed.outcome === "uncertain" ? failed.message : `Goedkeuring is afgebroken. ${failed.message}
 
 De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieuw proberen.`);
-        });
+        } finally {
+          modal.inert = false;
+        }
         return;
       }
-      (_a2 = document.querySelector(".u4-match-overlay")) == null ? void 0 : _a2.remove();
+      (_b = document.querySelector(".u4-match-overlay")) == null ? void 0 : _b.remove();
       const overlay = document.createElement("div");
       overlay.className = "u4-match-overlay";
-      overlay.innerHTML = `<div class="u4-match-dialog" role="dialog" aria-modal="true" aria-labelledby="u4-match-title"><div class="u4-match-head"><div><h3 id="u4-match-title">Vergelijkbare transacties gevonden</h3><p>${matches.length} mogelijke matches. Geselecteerde regels krijgen alleen een voorstel en blijven Nakijken.</p></div><button type="button" class="ghost small" data-u4-match-close>Sluiten</button></div><div class="u4-match-change"><strong>Wordt toegepast</strong><span>${ownerLabel2(source.processing.budgetOwner)} · ${esc(source.processing.category)} · ${esc(((_b = TYPE_GROUPS.flatMap((g) => g.items).find((item) => item[0] === source.processing.transactionType)) == null ? void 0 : _b[1]) || source.processing.transactionType)} · Goedgekeurd</span></div><div class="u4-match-list">${matches.map(({ row, score, reasons }) => `<label class="u4-match-row"><input type="checkbox" data-u4-match-id="${esc(row.id)}" ${score >= 4 ? "checked" : ""}><span><strong>${esc(displayDate(row.processing.processingDate))} · ${esc(row.processing.description || row.bankOriginal.description || "Onbekend")}</strong><small>${euro(row.processing.processedAmount)} · ${esc(row.processing.category || "Ongecategoriseerd")} · ${esc(reasons.join(", "))}</small></span></label>`).join("")}</div><div class="u4-match-feedback" data-u4-match-feedback aria-live="polite"></div><div class="u4-match-actions"><button type="button" class="ghost" data-u4-match-only>Alleen deze transactie</button><button type="button" class="primary" data-u4-match-apply>Voorstel overnemen</button></div></div>`;
+      const candidates = [{ row: source, score: 99, reasons: ["Oorspronkelijke transactie"] }, ...matches];
+      overlay.innerHTML = `<div class="u4-match-dialog" role="dialog" aria-modal="true" aria-labelledby="u4-match-title"><div class="u4-match-head"><div><h3 id="u4-match-title">Vergelijkbare transacties gevonden</h3><p>Kies welke afzonderlijke bankbewegingen je definitief wilt goedkeuren.</p></div><button type="button" class="ghost small" data-u4-match-close>Sluiten</button></div><div class="u4-match-change"><strong>Gezamenlijke verwerking</strong><span>${esc(ownerLabel2(source.processing.budgetOwner))} · ${esc(source.processing.category)} · ${esc(((_c = TYPE_GROUPS.flatMap((g) => g.items).find((item) => item[0] === source.processing.transactionType)) == null ? void 0 : _c[1]) || source.processing.transactionType)}</span></div><div class="u4-match-list">${candidates.map(({ row, score, reasons }) => `<label class="u4-match-row"><input type="checkbox" data-u4-match-id="${escAttr(row.id)}" ${score >= 4 ? "checked" : ""}><span><strong>${esc(displayDate(row.bankOriginal.bankDate))} · ${esc(row.bankOriginal.description || "Onbekend")}</strong><small>${euro(row.bankOriginal.amount)} · ${esc(importReviewState(row))} · ${esc(reasons.join(", "))}</small></span></label>`).join("")}</div><div class="u4-match-feedback" data-u4-match-feedback aria-live="polite"></div><div class="u4-match-actions"><button type="button" class="ghost" data-u4-match-only>Alleen deze transactie</button><button type="button" class="primary" data-u4-match-apply></button></div></div>`;
       document.body.appendChild(overlay);
-      const close = () => overlay.remove();
+      let busy2 = false;
+      const apply = overlay.querySelector("[data-u4-match-apply]");
+      const count = () => {
+        const n = overlay.querySelectorAll("[data-u4-match-id]:checked").length;
+        apply.textContent = `Geselecteerde transacties goedkeuren (${n})`;
+        apply.disabled = n === 0;
+      };
+      overlay.addEventListener("change", count);
+      count();
+      const close = () => {
+        if (!busy2) overlay.remove();
+      };
       overlay.querySelector("[data-u4-match-close]").onclick = close;
       overlay.addEventListener("click", (event) => {
         if (event.target === overlay) close();
       });
-      let busy2 = false;
-      const actionButtons = [...overlay.querySelectorAll("[data-u4-match-only],[data-u4-match-apply],[data-u4-match-close]")];
-      const feedback = overlay.querySelector("[data-u4-match-feedback]");
-      async function commitSelection(applyMatches, button) {
+      async function commitSelection(only) {
         if (busy2) return;
         busy2 = true;
-        actionButtons.forEach((item) => item.disabled = true);
-        button.textContent = "Bezig…";
-        feedback.textContent = "Wijzigingen worden toegepast.";
-        const snapshots = /* @__PURE__ */ new Map();
-        const remember = (row) => snapshots.set(row.id, { processing: cloneState(row.processing), certainty: row.certainty, approvalSource: row.approvalSource, approvedAt: row.approvedAt, processingStatus: row.processingStatus, reasons: cloneState(row.reasons || []) });
+        const ids = only ? [source.id] : [...overlay.querySelectorAll("[data-u4-match-id]:checked")].map((input) => input.dataset.u4MatchId);
+        overlay.querySelectorAll("button,input").forEach((node) => node.disabled = true);
+        modal.inert = true;
+        overlay.querySelector("[data-u4-match-feedback]").textContent = "Geselecteerde transacties worden afzonderlijk opgeslagen…";
         try {
-          const selected = applyMatches ? [...overlay.querySelectorAll("[data-u4-match-id]:checked")].map((input) => draft.rows.find((row) => row.id === input.dataset.u4MatchId)).filter(Boolean) : [];
-          for (const target of selected) {
-            const preview = cloneState(target);
-            copiedProcessing(source, preview, root2);
-            const validation2 = rowProcessingValidation(preview, root2.state);
-            if (!validation2.ok) throw new Error(validation2.errors.map((item) => item.message).join(" "));
-          }
-          remember(source);
-          markExplicitlyApproved(source);
-          if (applyMatches) {
-            overlay.querySelectorAll("[data-u4-match-id]:checked").forEach((input) => {
-              const target = draft.rows.find((row) => row.id === input.dataset.u4MatchId);
-              if (target) {
-                remember(target);
-                copiedProcessing(source, target, root2);
-                reopenForReview(target);
-              }
-            });
-          }
-          for (const id of snapshots.keys()) {
-            const validation2 = rowProcessingValidation(draft.rows.find((row) => row.id === id), root2.state);
-            if (!validation2.ok) throw new Error(validation2.errors.map((item) => item.message).join(" "));
-          }
-          close();
-          const scheduleAfterDialogPaint = (callback) => {
-            if (typeof requestAnimationFrame === "function") {
-              requestAnimationFrame(() => requestAnimationFrame(callback));
-            } else setTimeout(callback, 0);
-          };
-          scheduleAfterDialogPaint(() => {
-            renderDraftModalPreservingView(root2, draft, modal, source.id);
-            setTimeout(() => {
-              (async () => {
-                let applied = false;
-                for (const id of [source.id]) {
-                  try {
-                    await approveStoredSource(root2, draft, draft.rows.find((row) => row.id === id));
-                    applied = true;
-                  } catch (error) {
-                    error.coreApplied = error.coreApplied || applied;
-                    throw error;
-                  }
-                }
-              })().catch((error) => {
-                snapshots.forEach((snapshot2, id) => {
-                  const row = draft.rows.find((item) => item.id === id);
-                  if (row && !(error.coreApplied && (root2.state.transactions || []).some((tx) => tx.importBatchId === draft.id && tx.importTransactionId === id && ["goedgekeurd", "niet-meetellen"].includes(tx.processingStatus)))) {
-                    row.processingStatus = snapshot2.processingStatus;
-                    row.processing = snapshot2.processing;
-                    row.certainty = snapshot2.certainty;
-                    row.approvalSource = snapshot2.approvalSource;
-                    row.approvedAt = snapshot2.approvedAt;
-                    row.reasons = snapshot2.reasons;
-                  }
-                });
-                renderDraftModalPreservingView(root2, draft, document.getElementById("u4ImportModalRoot"), source.id);
-                alert(error.coreApplied ? `De opgeslagen goedkeuringen blijven actief; importdetails worden uit het lokale journal hersteld. ${error.message}` : `De wijziging is afgebroken. ${error.message}`);
-              });
-            }, 0);
-          });
+          const result = await approveSelectedSources(root2, draft, ids, { template });
+          overlay.remove();
+          modal.inert = false;
+          showApprovalResult(root2, draft, modal, result, source.id);
         } catch (error) {
-          snapshots.forEach((snapshot2, id) => {
-            const row = draft.rows.find((item) => item.id === id);
-            if (row && !(error.coreApplied && (root2.state.transactions || []).some((tx) => tx.importBatchId === draft.id && tx.importTransactionId === id && ["goedgekeurd", "niet-meetellen"].includes(tx.processingStatus)))) {
-              row.processingStatus = snapshot2.processingStatus;
-              row.processing = snapshot2.processing;
-              row.certainty = snapshot2.certainty;
-              row.approvalSource = snapshot2.approvalSource;
-              row.approvedAt = snapshot2.approvedAt;
-              row.reasons = snapshot2.reasons;
-            }
-          });
           busy2 = false;
-          actionButtons.forEach((item) => item.disabled = false);
-          button.textContent = applyMatches ? "Geselecteerde aanpassen" : "Alleen deze transactie";
-          feedback.textContent = `Aanpassen mislukt: ${(error == null ? void 0 : error.message) || error}`;
-          feedback.classList.add("u4-error");
+          modal.inert = false;
+          overlay.querySelectorAll("button,input").forEach((node) => node.disabled = false);
+          count();
+          overlay.querySelector("[data-u4-match-feedback]").textContent = error.message;
         }
       }
-      overlay.querySelector("[data-u4-match-only]").onclick = (event) => commitSelection(false, event.currentTarget);
-      overlay.querySelector("[data-u4-match-apply]").onclick = (event) => commitSelection(true, event.currentTarget);
+      overlay.querySelector("[data-u4-match-only]").onclick = () => commitSelection(true);
+      apply.onclick = () => commitSelection(false);
     }
     function profileEditor(root2, draft) {
       const profiles = (root2.state.accountProfiles || []).filter((profile) => !draft.entryOwner || profile.accountOwner === draft.entryOwner);
@@ -13050,6 +13131,7 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
       const request = UI.openSequence = (UI.openSequence || 0) + 1, sessionAtStart = ImportEditors.get(String(id)), revisionAtStart = sessionAtStart == null ? void 0 : sessionAtStart.revision, baseAtStart = sessionAtStart ? cloneState(sessionAtStart.base) : null;
       let local;
       try {
+        await recoverJournal(root2, { importId: id });
         local = await ImportStore.getImport(id);
       } catch (error) {
         renderCloudImportState(root2, id, error);
@@ -13129,8 +13211,13 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
         var _a2;
         return (_a2 = details.closest("[data-u4-row]")) == null ? void 0 : _a2.dataset.u4Row;
       }).filter(Boolean);
+      const sections = [...modal.querySelectorAll(".u4-section")].map((section) => ({ name: [...section.classList].find((name) => name.startsWith("u4-section-")), open: section.open }));
       renderDraftModal(root2, draft);
       const next = document.getElementById("u4ImportModalRoot");
+      for (const section of sections) {
+        const node = section.name && (next == null ? void 0 : next.querySelector("." + section.name));
+        if (node) node.open = section.open;
+      }
       requestAnimationFrame(() => {
         var _a2;
         const nextScroller = next == null ? void 0 : next.querySelector(".u4-import-modal");
@@ -13401,13 +13488,15 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
           if (!confirm(`${ids.length} geselecteerde regels expliciet goedkeuren?`)) return;
           const button = event.target.closest("[data-u4-approve-selection]");
           button.disabled = true;
+          modal.inert = true;
           try {
-            await commitImportEditor(root2, draft, { approveIds: ids });
-            renderDraftModalPreservingView(root2, draft, modal);
-            root2.renderActiveTab();
+            const result = await approveSelectedSources(root2, draft, ids);
+            showApprovalResult(root2, draft, modal, result);
           } catch (error) {
             button.disabled = false;
             alert(error.message);
+          } finally {
+            modal.inert = false;
           }
           return;
         }
@@ -13772,6 +13861,41 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
       }
       return true;
     }
+    function readImportCommit(root2, journal) {
+      return readCommitOutcome(() => {
+        var _a2;
+        return ((_a2 = root2.DataAdapter) == null ? void 0 : _a2.readDurableState) ? root2.DataAdapter.readDurableState() : cloneState(root2.state);
+      }, journal);
+    }
+    async function rollbackPreparedImport(journal) {
+      const current = await ImportStore.getImport(journal.importId);
+      if (current && sameImportOperation(current, journal.batch)) await ImportStore.rollbackImport(journal.batch, journal.previousBatch, journal.previousQueue);
+      else if (current && !sameEditorBase(current, journal.previousBatch)) throw cloudImportError("import-conflict", "Een nieuwere importkeuze wordt niet teruggedraaid.");
+      else if (!current && journal.previousBatch) await ImportStore.putImport(journal.previousBatch);
+    }
+    async function reconcileFailedImportCommit(root2, journal, error, scope, detailsWritten = true) {
+      var _a2;
+      const actual = ImportStore.scope === scope ? await readImportCommit(root2, journal) : { outcome: "uncertain" };
+      if (actual.outcome === "committed") {
+        if ((_a2 = root2.DataAdapter) == null ? void 0 : _a2.adoptDurableState) root2.DataAdapter.adoptDurableState(actual.state);
+        else applyFinancialCandidate(root2.state, actual.state);
+        return;
+      }
+      let outcome = actual.outcome;
+      if (outcome === "rejected" && detailsWritten) {
+        try {
+          await rollbackPreparedImport(journal);
+        } catch (e) {
+          outcome = "uncertain";
+        }
+      }
+      journal.status = outcome === "rejected" ? "rolled-back" : "uncertain";
+      try {
+        if (ImportStore.scope === scope) await ImportStore.putJournal(journal);
+      } catch (e) {
+      }
+      throw commitOutcomeError(error, outcome, journal.id);
+    }
     function commitImportCommand(root2, draft, command) {
       const id = String(draft.id), previous = ImportPerformance.chains.get(id) || Promise.resolve();
       const operation = previous.catch(() => {
@@ -13788,7 +13912,13 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
       const commandScope = ImportStore.scope, sourceToken = JSON.stringify((_a2 = draft.rows) == null ? void 0 : _a2.find((row) => row.id === command.rowId));
       const stored = await ImportStore.getImport(draft.id);
       if (ImportStore.scope !== commandScope) throw new Error("Het huishouden is intussen gewijzigd. Heropen de import in het oorspronkelijke huishouden.");
-      if (command.operationId && (stored == null ? void 0 : stored.operationId) === command.operationId) return { state: cloneState(root2.state), batch: cloneState(stored), noop: true };
+      const unresolved = (await ImportStore.listJournal()).find((entry) => entry.operation === "import-command" && entry.importId === draft.id && ["pending", "uncertain"].includes(entry.status));
+      if (unresolved) throw commitOutcomeError(new Error("Heropen de import om de eerdere opslag eerst te controleren."), "uncertain", unresolved.id);
+      if (command.operationId && (stored == null ? void 0 : stored.operationId) === command.operationId) {
+        const proof = await readImportCommit(root2, { importId: draft.id, intent: command, batch: stored });
+        if (proof.outcome !== "committed") throw commitOutcomeError(new Error("Een importrecord alleen bewijst geen financiële commit."), "uncertain", command.operationId);
+        return { state: cloneState(root2.state), batch: cloneState(stored), noop: true, outcome: "committed", operationId: command.operationId };
+      }
       if (stored && (importVersion(stored) !== importVersion(draft) || command.type === "editor-commit" && !sameEditorBase(stored, draft))) {
         if (command.type === "editor-commit") await preserveImportConflict(root2, { ...cloneState(draft), rows: cloneState(command.rows) }, stored, [{ kind: "editor-base-changed" }]);
         throw cloudImportError("import-conflict", "Importdetails zijn intussen gewijzigd. De lokale keuze blijft veilig bewaard.");
@@ -13870,6 +14000,7 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
           }
           assertFinancialMutationSafe(root2.state, candidate);
         } else if (intent.type === "source-approve") {
+          markExplicitlyApproved(row);
           const single = { ...nextBatch, rows: [row] }, plan = planImportEffects(single, candidate);
           if (!plan.ok) throw new Error(plan.errors.map((e) => e.message).join(" "));
           applySourceApproval(candidate, nextBatch, row, plan);
@@ -13900,8 +14031,13 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
       planned.batch.baseVersion = Number((_g = (_f = draft.baseVersion) != null ? _f : draft.version) != null ? _g : 0);
       if (ImportStore.scope !== commandScope) throw new Error("Het huishouden is intussen gewijzigd. De oorspronkelijke verwerking blijft behouden.");
       const baseSignature = JSON.stringify(root2.state);
-      const journal = { id: intent.operationId, importId: draft.id, operation: "import-command", status: "pending", intent, baseSignature, candidate: planned.state, batch: planned.batch, previousBatch: cloneState(stored || draft) };
-      await ImportStore.putJournal(journal);
+      const previousQueue = (await ImportStore.listSync()).find((item) => item.importId === draft.id);
+      const journal = { id: intent.operationId, importId: draft.id, operation: "import-command", commitContractVersion: 1, status: "pending", intent, baseSignature, candidate: planned.state, batch: planned.batch, previousBatch: cloneState(stored || draft), previousQueue };
+      try {
+        await ImportStore.putJournal(journal);
+      } catch (error) {
+        await reconcileFailedImportCommit(root2, journal, error, commandScope, false);
+      }
       if (command.rowId && JSON.stringify((_h = draft.rows) == null ? void 0 : _h.find((row) => row.id === command.rowId)) !== sourceToken) {
         journal.status = "rolled-back";
         await ImportStore.putJournal(journal);
@@ -13914,7 +14050,6 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
         await preserveImportConflict(root2, planned.batch, stored || { id: draft.id, version: 0 }, [{ kind: "local-core-changed" }]);
         throw new Error("De financiële state wijzigde tijdens de actie. De keuze is bewaard; probeer opnieuw op de actuele stand.");
       }
-      const previousQueue = (await ImportStore.listSync()).find((item) => item.importId === draft.id);
       let detailsWritten = false;
       try {
         if (ImportStore.scope !== commandScope) throw new Error("Het huishouden is intussen gewijzigd. De oorspronkelijke verwerking blijft behouden.");
@@ -13927,16 +14062,13 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
           await preserveImportConflict(root2, planned.batch, stored || { id: draft.id, version: 0 }, [{ kind: "local-core-changed" }]);
           throw new Error("De state wijzigde tijdens de opslagcommit. De keuze blijft veilig bewaard; beoordeel de actuele stand.");
         }
-        const ok = root2.commitChange(() => applyFinancialCandidate(root2.state, planned.state), { render: false, mutationMode: "correction", throwOnError: true });
+        const ok = await root2.commitChange(() => applyFinancialCandidate(root2.state, planned.state), { render: false, mutationMode: "correction", throwOnError: true });
         if (!ok) throw new Error("Financiële commit is afgebroken; oorspronkelijke effecten blijven behouden.");
       } catch (error) {
-        if (ImportStore.scope === commandScope) {
-          journal.status = "rolled-back";
-          await ImportStore.putJournal(journal);
-          if (detailsWritten) await ImportStore.rollbackImport(planned.batch, journal.previousBatch, previousQueue);
-        }
-        throw error;
+        await reconcileFailedImportCommit(root2, journal, error, commandScope, detailsWritten);
       }
+      planned.outcome = "committed";
+      planned.operationId = intent.operationId;
       applyFinancialCandidate(draft, cloneState(planned.batch));
       journal.status = "completed";
       delete journal.candidate;
@@ -14096,37 +14228,37 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
       });
       return ImportPerformance.syncPromise;
     }
-    async function recoverJournal(root2) {
+    async function recoverJournal(root2, { importId } = {}) {
       var _a2, _b;
+      const scope = ImportStore.scope;
+      const assertScope = () => {
+        if (ImportStore.scope !== scope) throw new Error("Het huishouden is tijdens herstel gewijzigd.");
+      };
       const entries = await ImportStore.listJournal();
-      for (const entry of entries.filter((item) => item.status === "pending")) {
+      assertScope();
+      for (const entry of entries.filter((item) => (!importId || item.importId === importId) && ["pending", "uncertain"].includes(item.status))) {
+        assertScope();
         if (entry.operation === "import-command") {
-          const receipt = (root2.state.importSummaries || []).find((row) => row.id === entry.importId) || (root2.state.importDeletionProofs || []).find((row) => row.id === entry.importId);
-          if ((receipt == null ? void 0 : receipt.operationId) === entry.intent.operationId) {
+          const actual = await readImportCommit(root2, entry);
+          assertScope();
+          if (actual.outcome === "committed") {
             await ImportStore.putImport(entry.batch);
+            assertScope();
             await queueImportSync(entry.batch);
+            assertScope();
             entry.status = "completed";
-            if (entry.batch.lifecycle === "deleted") {
-              await purgeDeletedBatch(entry.importId, entry.id);
-              delete entry.candidate;
-              delete entry.previousBatch;
-              delete entry.baseSignature;
-            }
-          } else if (JSON.stringify(root2.state) === entry.baseSignature) {
-            await ImportStore.putImport(entry.batch);
-            await queueImportSync(entry.batch);
-            if (JSON.stringify(root2.state) !== entry.baseSignature) throw new Error("State wijzigde tijdens journalherstel; keuze blijft bewaard.");
-            if (!root2.commitChange(() => applyFinancialCandidate(root2.state, entry.candidate), { render: false, mutationMode: "correction" })) throw new Error("Herstelcommit mislukt.");
-            entry.status = "completed";
-          } else {
-            entry.status = "conflict";
-            await preserveImportConflict(root2, entry.batch, await ImportStore.getImport(entry.importId) || { id: entry.importId, version: 0 }, [{ kind: "journal-core-changed" }]);
-          }
-          if (entry.status === "completed") {
+            if (entry.batch.lifecycle === "deleted") await purgeDeletedBatch(entry.importId, entry.id);
             await acknowledgeRecoveredEditor(entry);
             delete entry.candidate;
             delete entry.previousBatch;
             delete entry.baseSignature;
+          } else if (actual.outcome === "rejected") {
+            await rollbackPreparedImport(entry);
+            entry.status = "rolled-back";
+          } else {
+            entry.status = "uncertain";
+            await ImportStore.putJournal(entry);
+            throw commitOutcomeError(new Error("De opgeslagen financiële toestand wijkt af. Je invoer blijft bewaard."), "uncertain", entry.id);
           }
           await ImportStore.putJournal(entry);
           continue;
@@ -14201,7 +14333,7 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
       const current = await ImportStore.getImport(plan.batch.id);
       if (ImportStore.scope !== repairScope || JSON.stringify(root2.state) !== signature2 || JSON.stringify(current || null) !== batchSignature) throw new Error("De transactie of import is intussen gewijzigd. Heropen de actuele stand; de herstelkeuze overschrijft geen nieuwere gegevens.");
       const previousQueue = (await ImportStore.listSync()).find((row) => row.importId === plan.batch.id);
-      const journal = { id: operationId, importId: plan.batch.id, operation: "import-command", status: "pending", intent: { type: "source-repair", operationId, backupId: record.id }, baseSignature: signature2, candidate: plan.state, batch: plan.batch, previousBatch: baseBatch ? cloneState(baseBatch) : null };
+      const journal = { id: operationId, importId: plan.batch.id, operation: "import-command", commitContractVersion: 1, status: "pending", intent: { type: "source-repair", operationId, backupId: record.id }, baseSignature: signature2, candidate: plan.state, batch: plan.batch, previousBatch: baseBatch ? cloneState(baseBatch) : null, previousQueue };
       await ImportStore.putJournal(journal);
       if (ImportStore.scope !== repairScope || JSON.stringify(root2.state) !== signature2) throw new Error("De financiële toestand wijzigde tijdens herstel. Probeer opnieuw op de actuele stand.");
       let detailsWritten = false;
@@ -14210,20 +14342,20 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
         detailsWritten = true;
         await queueImportSync(plan.batch);
         if (ImportStore.scope !== repairScope || JSON.stringify(root2.state) !== signature2) throw new Error("De financiële toestand wijzigde tijdens opslag van het herstel.");
-        if (!root2.commitChange(() => applyFinancialCandidate(root2.state, plan.state), { render: false, mutationMode: "correction" })) throw new Error("Het herstel kon niet worden opgeslagen.");
+        if (!await root2.commitChange(() => applyFinancialCandidate(root2.state, plan.state), { render: false, mutationMode: "correction", throwOnError: true })) throw new Error("Het herstel kon niet worden opgeslagen.");
       } catch (error) {
-        if (ImportStore.scope === repairScope) {
-          if (detailsWritten) await ImportStore.rollbackImport(plan.batch, baseBatch, previousQueue);
-          journal.status = "rolled-back";
-          await ImportStore.putJournal(journal);
-        }
-        throw error;
+        await reconcileFailedImportCommit(root2, journal, error, repairScope, detailsWritten);
       }
+      plan.outcome = "committed";
+      plan.operationId = operationId;
       journal.status = "completed";
       delete journal.candidate;
       delete journal.previousBatch;
       delete journal.baseSignature;
-      await ImportStore.putJournal(journal);
+      try {
+        await ImportStore.putJournal(journal);
+      } catch (e) {
+      }
       flushImportSync(root2).catch(() => {
       });
       return plan;
@@ -14376,7 +14508,7 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
         flushImportSync(root2).catch((error) => console.warn("Importsynchronisatie uitgesteld.", error));
       });
     }
-    return { inspectSourceAvailability, sourceRepairCandidates, planSourceRepair, commitSourceRepair, openTransactionSource, addProcessingSplit, removeProcessingSplit, redistributeProcessing, splitDifference, getTransactionAccountContext, getTransactionSource, getTransactionProcessingStatus, isTransactionFinanciallyActive, getTransactionOriginalBankData, beginImportEditor, persistLocalImportEditor, commitImportEditor, setProcessingType, selectFixedOccurrence, SCHEMA_VERSION, CLOUD_STORAGE_VERSION, CLOUD_READ_CONCURRENCY, OWNERS: OWNERS2, IMPORT_STATUSES, normalizeIban: normalizeIban2, normalizeRule, normalizeTransaction, normalizeCore, validateCore, calculateGoalSavedAmount, reconcileGoalSavedAmounts, chunkRows, canonicalValue, rowsChecksum, buildCloudImportEnvelope, assembleCloudImport, mapWithConcurrency, classifyCloudError, fetchImportFromCloud, resolveImportDetails, reconcileActiveImportReference, deleteCloudImportBestEffort, discardImportConcept, rowProcessingValidation, reopenStoredSource, approveStoredSource, normalizeText, matchIdentity, matchCandidates, detectDelimiter, parseDelimited, parseDate, parseAmount, detectFormat, inferMapping, hashText, fingerprint, organizationName, proposeType, recognitionProposal, fixedAmountAt, fixedRecognition, isExplicitlyApproved, importReviewState, markExplicitlyApproved, classifyOriginal, parseBankCsv, findProfile, createImportDraft, updateDraftSummary, compactSummary, validateDraft, transactionKind, expenseImpact, financialRows, advanceForTransaction, savingsForTransaction, detectInternalPairs, directionalBalances, proposeRepaymentAllocations, planImportCommand, commitImportCommand, deriveBatchReviewStatus, stageImportCloudWrites, preserveImportConflict, resolveImportConflict, preservePendingImportsBeforeRemote, planImportEffects, applyImportPlan, learnedRecognitionRules, rememberRecognitionRules, effectManifest, undoImportEffects, transactionFamily, applyTransactionFamily, ImportStore, persistImportDraft, scheduleImportDraftPersist, flushScheduledImportDraft, queueImportSync, flushImportSync, recoverJournal, install, round2: round23, uid: uid2, clone: cloneState, testRenderDraftModal: renderDraftModal };
+    return { approveSelectedSources, inspectSourceAvailability, sourceRepairCandidates, planSourceRepair, commitSourceRepair, openTransactionSource, addProcessingSplit, removeProcessingSplit, redistributeProcessing, splitDifference, getTransactionAccountContext, getTransactionSource, getTransactionProcessingStatus, isTransactionFinanciallyActive, getTransactionOriginalBankData, beginImportEditor, persistLocalImportEditor, commitImportEditor, setProcessingType, selectFixedOccurrence, SCHEMA_VERSION, CLOUD_STORAGE_VERSION, CLOUD_READ_CONCURRENCY, OWNERS: OWNERS2, IMPORT_STATUSES, normalizeIban: normalizeIban2, normalizeRule, normalizeTransaction, normalizeCore, validateCore, calculateGoalSavedAmount, reconcileGoalSavedAmounts, chunkRows, canonicalValue, rowsChecksum, buildCloudImportEnvelope, assembleCloudImport, mapWithConcurrency, classifyCloudError, fetchImportFromCloud, resolveImportDetails, reconcileActiveImportReference, deleteCloudImportBestEffort, discardImportConcept, rowProcessingValidation, reopenStoredSource, approveStoredSource, normalizeText, matchIdentity, matchCandidates, detectDelimiter, parseDelimited, parseDate, parseAmount, detectFormat, inferMapping, hashText, fingerprint, organizationName, proposeType, recognitionProposal, fixedAmountAt, fixedRecognition, isExplicitlyApproved, importReviewState, markExplicitlyApproved, classifyOriginal, parseBankCsv, findProfile, createImportDraft, updateDraftSummary, compactSummary, validateDraft, transactionKind, expenseImpact, financialRows, advanceForTransaction, savingsForTransaction, detectInternalPairs, directionalBalances, proposeRepaymentAllocations, planImportCommand, commitImportCommand, deriveBatchReviewStatus, stageImportCloudWrites, preserveImportConflict, resolveImportConflict, preservePendingImportsBeforeRemote, planImportEffects, applyImportPlan, learnedRecognitionRules, rememberRecognitionRules, effectManifest, undoImportEffects, transactionFamily, applyTransactionFamily, ImportStore, persistImportDraft, scheduleImportDraftPersist, flushScheduledImportDraft, queueImportSync, flushImportSync, recoverJournal, install, round2: round23, uid: uid2, clone: cloneState, testRenderDraftModal: renderDraftModal };
   });
   var FinizeImportRuntime = globalThis.FinizeUpdate4Runtime;
 

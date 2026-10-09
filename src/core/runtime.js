@@ -2620,6 +2620,15 @@ window.CloudAdapter = CloudAdapter;
 const stateBackupStore = createStateBackupStore();
 const DataAdapter = {
   loadedFromStorage:false,
+  readDurableState(){
+    const keys=activeStorageKeys();
+    if(!keys)throw new Error('De oorspronkelijke opslagcontext is niet beschikbaar.');
+    const raw=localStorage.getItem(keys.state);
+    return raw?JSON.parse(raw):null;
+  },
+  adoptDurableState(durable){
+    state=clone(durable);window.state=state;committedStateSnapshot=clone(state);
+  },
   // Lokaal blijft altijd de eerste veiligheidslaag. Firestore is optionele live-sync erbovenop.
   // Firebase Storage is voor losse bestanden; Firestore is de juiste plek voor live app-data.
   // We bewaren dezelfde state-vorm als 1 groot JSON-document voor Finize.

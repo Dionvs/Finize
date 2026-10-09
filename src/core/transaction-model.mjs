@@ -42,6 +42,8 @@ export function getTransactionProcessingStatus(tx) {
     tx?.processing?.include === false || tx?.processing?.transactionType === 'niet-meetellen' || tx?.transactionType === 'niet-meetellen';
   // A deliberate reopen wins over the old confirmed copy and recognition certainty.
   if (!manual && ['nakijken','onbekend'].includes(tx?.processingStatus)) return tx.processingStatus;
+  // Explicit current approval wins over a leftover legacy review label.
+  if (explicit) return excluded ? 'niet-meetellen' : 'goedgekeurd';
   if (!manual && ['nakijken','onbekend'].includes(tx?.reviewStatus)) return tx.reviewStatus;
   if (tx?.reviewStatus === 'genegeerd' || ((manual || explicit || legacy) && excluded)) return 'niet-meetellen';
   if (manual || explicit || legacy) return 'goedgekeurd';
@@ -52,6 +54,26 @@ export function getTransactionProcessingStatus(tx) {
   const proposal=tx?.certainty||tx?.processingStatus||tx?.recognitionState||type||
     (category&&!['onbekend','ongecategoriseerd'].includes(String(category).toLowerCase()));
   return proposal?'nakijken':'onbekend';
+}
+
+export function approveTransactionProcessing(tx, approvedAt = new Date().toISOString()) {
+  const excluded = tx.processing?.include === false || tx.processing?.transactionType === 'niet-meetellen';
+  tx.processingStatus = excluded ? 'niet-meetellen' : 'goedgekeurd';
+  tx.reviewStatus = excluded ? 'genegeerd' : 'bevestigd';
+  tx.certainty = 'goedgekeurd';
+  tx.approvalSource = 'manual';
+  tx.approvedAt = approvedAt;
+  tx.reasons = [];
+  return tx;
+}
+
+export function reopenTransactionProcessing(tx) {
+  tx.processingStatus = 'nakijken';
+  tx.reviewStatus = 'nakijken';
+  tx.certainty = 'nakijken';
+  tx.approvalSource = '';
+  tx.approvedAt = '';
+  return tx;
 }
 
 export function isTransactionFinanciallyActive(tx) {

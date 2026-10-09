@@ -46,6 +46,7 @@ export function planSourceRepair(state,txId,batch,bank,{confirmed=false,operatio
   nextBatch.rows=nextBatch.rows.filter(row=>row.id!==rowId).concat(recovered);nextBatch.version=Number(nextBatch.version||0)+1;nextBatch.operationId=operationId;nextBatch.updatedAt=timestamp;
   candidate.importSummaries=candidate.importSummaries||[];
   if(!candidate.importSummaries.some(row=>row.id===nextBatch.id))candidate.importSummaries.push({id:nextBatch.id,lifecycle:nextBatch.lifecycle,status:nextBatch.status,version:nextBatch.version,operationId});
+  else Object.assign(candidate.importSummaries.find(row=>row.id===nextBatch.id),{version:nextBatch.version,operationId});
   ensureImportBankSources(candidate,nextBatch);
   const repairedHeader=bankSourceForImport(candidate,nextBatch.id,rowId);
   if(oldHeader&&repairedHeader&&JSON.stringify(oldHeader.bankOriginal)!==JSON.stringify(repairedHeader.bankOriginal)){
