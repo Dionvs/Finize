@@ -14,6 +14,7 @@ import { cloneState as clone } from "./state.js";
 import { CURRENT_SCHEMA_VERSION, migrateStateData, detectSchemaVersion, ensureStableRowIds, stableId } from './data-normalization.mjs';
 import { resolveRecurringAmount, resolveRecurringConfig, resolveFixedExpensesForMonth, resolveIncomeSourcesForMonth, resolveVariableBudgetsForMonth, resolvePlannedIncomeForMonth, setRecurringFromMonth, endRecurringFromMonth, nextPlanningMonth, setBudgetForMonth, setPlannedIncomeFromMonth, validateTimelineState, expenseCategoriesForMonth, setSavingsPlanForMonth, setIncomeSourceForMonth, endIncomeSourceFromMonth } from './planning-timeline.mjs';
 import { markManualTransaction, normalizeDataTransaction, assertOriginalBankDataUnchanged } from './transaction-model.mjs';
+import { describeMutationError } from './mutation-errors.mjs';
 import { plannedOccurrences, occurrenceDates } from './recurring-occurrences.mjs';
 import { projectTransaction, selectTransactionProjections, selectActiveTransactions, sumTransactionEffects, categoryActuals, fixedOccurrenceActuals, actualIncomeForMonth, incomeProjectionForMonth, legacySalaryForecastOwners, getTransactionFinancialMonth, confirmInternalTransferPair, financialForecastForMonth, categoryFinancialActuals, categoryProcessingDetails, coverageAllocationStatus, projectionLineReference, coverageMessage } from './transaction-engine.mjs';
 import { getTransactionClassification, getTransactionFinancialDestination, getTransactionAccountContext, getTransactionSource, getTransactionDate, INCOME_TRANSACTION_TYPES } from './transaction-model.mjs';
@@ -2624,10 +2625,10 @@ const DataAdapter = {
   // We bewaren dezelfde state-vorm als 1 groot JSON-document voor Finize.
   save(state,options){
     try{
-      localSave(state,options);
+      if(!localSave(state,options))throw new Error('Er is geen actief huishouden voor lokale opslag. Open je huishouden opnieuw en probeer nogmaals.');
       CloudAdapter.queueSave(state);
       return true;
-    }catch(e){ console.error('opslaan mislukt', e); return false; }
+    }catch(e){ console.error('opslaan mislukt', e); if(options?.throwOnError)throw e; return false; }
   },
   async load(){
     try{
@@ -2734,7 +2735,7 @@ function commitChange(change, options={}){
     state.meta.updatedBy = getDeviceId();
     const validation = validateBudgetState(state);
     if (!validation.ok) throw new Error(validation.errors.join(' '));
-    if (!DataAdapter.save(state)) throw new Error('Lokale opslag is mislukt.');
+    if (!DataAdapter.save(state,{throwOnError:true})) throw new Error('Lokale opslag is mislukt. Probeer opnieuw; wis de Finize-sitegegevens niet.');
     committedStateSnapshot = clone(state);
     if (options.render !== false) renderCloudStatus();
     return true;
@@ -2745,6 +2746,9 @@ function commitChange(change, options={}){
     CloudAdapter.status = 'Synchronisatie mislukt';
     renderCloudStatus();
     console.error('Wijziging opslaan mislukt', e);
+    // Import commands must receive the cause after rollback, not only a false result.
+    // Existing boolean callers retain their contract.
+    if(options.throwOnError)throw describeMutationError(e);
     return false;
   }
 }

@@ -1683,6 +1683,17 @@
     });
   }
 
+  // src/core/mutation-errors.mjs
+  function describeMutationError(error) {
+    if (["QuotaExceededError", "NS_ERROR_DOM_QUOTA_REACHED"].includes(error == null ? void 0 : error.name) || [22, 1014].includes(error == null ? void 0 : error.code)) {
+      return new Error("De browseropslag is vol. Maak eerst een back-up via Gegevens en maak ruimte vrij op je toestel. Wis de Finize-sitegegevens niet; daarin kunnen nog niet gesynchroniseerde transacties staan.", { cause: error });
+    }
+    if ((error == null ? void 0 : error.name) === "SecurityError") {
+      return new Error("De browser blokkeert lokale opslag. Sta opslag voor Finize toe in de browserinstellingen en probeer opnieuw.", { cause: error });
+    }
+    return error instanceof Error ? error : new Error(String((error == null ? void 0 : error.message) || error || "Onbekende opslagfout. Probeer opnieuw; blijft dit gebeuren, meld dan bij welke transactie het optreedt."));
+  }
+
   // src/core/recurring-occurrences.mjs
   var U3_FREQUENCY_UNITS = ["weken", "maanden", "jaren"];
   function u3IsoDate(date) {
@@ -5785,11 +5796,12 @@
     // We bewaren dezelfde state-vorm als 1 groot JSON-document voor Finize.
     save(state2, options) {
       try {
-        localSave(state2, options);
+        if (!localSave(state2, options)) throw new Error("Er is geen actief huishouden voor lokale opslag. Open je huishouden opnieuw en probeer nogmaals.");
         CloudAdapter.queueSave(state2);
         return true;
       } catch (e) {
         console.error("opslaan mislukt", e);
+        if (options == null ? void 0 : options.throwOnError) throw e;
         return false;
       }
     },
@@ -5907,7 +5919,7 @@
       state.meta.updatedBy = getDeviceId();
       const validation = validateBudgetState(state);
       if (!validation.ok) throw new Error(validation.errors.join(" "));
-      if (!DataAdapter.save(state)) throw new Error("Lokale opslag is mislukt.");
+      if (!DataAdapter.save(state, { throwOnError: true })) throw new Error("Lokale opslag is mislukt. Probeer opnieuw; wis de Finize-sitegegevens niet.");
       committedStateSnapshot = cloneState(state);
       if (options.render !== false) renderCloudStatus();
       return true;
@@ -5918,6 +5930,7 @@
       CloudAdapter.status = "Synchronisatie mislukt";
       renderCloudStatus();
       console.error("Wijziging opslaan mislukt", e);
+      if (options.throwOnError) throw describeMutationError(e);
       return false;
     }
   }
@@ -12853,7 +12866,9 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
             source.reasons = previous.reasons;
           }
           renderDraftModalPreservingView(root2, draft, document.getElementById("u4ImportModalRoot"), source.id);
-          alert(error.coreApplied ? `De goedkeuring is bewaard; importdetails worden uit het lokale journal hersteld. ${error.message}` : `Goedkeuring is afgebroken. ${error.message}`);
+          alert(error.coreApplied ? `De goedkeuring is bewaard; importdetails worden uit het lokale journal hersteld. ${error.message}` : `Goedkeuring is afgebroken. ${error.message}
+
+De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieuw proberen.`);
         });
         return;
       }
@@ -13912,7 +13927,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
           await preserveImportConflict(root2, planned.batch, stored || { id: draft.id, version: 0 }, [{ kind: "local-core-changed" }]);
           throw new Error("De state wijzigde tijdens de opslagcommit. De keuze blijft veilig bewaard; beoordeel de actuele stand.");
         }
-        const ok = root2.commitChange(() => applyFinancialCandidate(root2.state, planned.state), { render: false, mutationMode: "correction" });
+        const ok = root2.commitChange(() => applyFinancialCandidate(root2.state, planned.state), { render: false, mutationMode: "correction", throwOnError: true });
         if (!ok) throw new Error("Financiële commit is afgebroken; oorspronkelijke effecten blijven behouden.");
       } catch (error) {
         if (ImportStore.scope === commandScope) {

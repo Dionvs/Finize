@@ -60,11 +60,11 @@ test.describe('P7 W1-W8 PWA/cache/reconnect',{tag:'@pwa'},()=>{
   await page.route('https://www.gstatic.com/firebasejs/**',r=>r.abort());await page.route('https://firestore.googleapis.com/**',r=>r.abort());
   await page.goto('/');await page.evaluate(()=>navigator.serviceWorker.ready);await page.reload();
   const result=await page.evaluate(async()=>{await caches.open('finize-obsolete-p7');await caches.open('other-app-p7');const registration=await navigator.serviceWorker.getRegistration();const installing=registration.installing;return {marker:(await caches.keys()).find(k=>k.startsWith('finize-v')),installing:!!installing,assets:[document.querySelector('script[src*="app.js"]').getAttribute('src'),document.querySelector('link[href*="app.css"]').getAttribute('href')]};});
-  expect(result.marker).toBe('finize-v114-csv-verwerking');expect(result.assets).toEqual(['./app.js?v=114-csv-verwerking','./app.css?v=114-csv-verwerking']);
+  expect(result.marker).toBe('finize-v115-opslagmeldingen');expect(result.assets).toEqual(['./app.js?v=115-opslagmeldingen','./app.css?v=115-opslagmeldingen']);
   // Exercise the actual worker activate handler, preserving another application's cache.
   const source=fs.readFileSync(path.join(__dirname,'../../service-worker.js'),'utf8');const evicted=await page.evaluate(async source=>{let activate;const self={addEventListener:(type,fn)=>{if(type==='activate')activate=fn;},skipWaiting:()=>{},clients:{claim:()=>{}}};new Function('self','caches',source)(self,caches);let promise;activate({waitUntil:p=>{promise=p;}});await promise;return caches.keys();},source);
   expect(evicted).not.toContain('finize-obsolete-p7');expect(evicted).toContain('other-app-p7');expect(evicted).toContain(result.marker);
-  const cached=await page.evaluate(async assets=>{const cache=await caches.open('finize-v114-csv-verwerking');return Promise.all(assets.map(async asset=>{const response=await cache.match(asset);return {ok:!!response,text:response?await response.text():''};}));},result.assets);
+  const cached=await page.evaluate(async assets=>{const cache=await caches.open('finize-v115-opslagmeldingen');return Promise.all(assets.map(async asset=>{const response=await cache.match(asset);return {ok:!!response,text:response?await response.text():''};}));},result.assets);
   expect(cached.every(item=>item.ok)).toBe(true);expect(cached[0].text).toBe(fs.readFileSync(path.join(__dirname,'../../app.js'),'utf8'));expect(cached[1].text).toBe(fs.readFileSync(path.join(__dirname,'../../app.css'),'utf8'));
  });
  test('P7 W4/W6/W8 offline/reconnect retains persisted state, journal and source details',async({page,context})=>{

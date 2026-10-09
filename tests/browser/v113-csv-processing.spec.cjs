@@ -15,6 +15,42 @@ async function boot(page,width){
  },{render:true}));return errors;
 }
 const csv=(label='Albert Heijn',amount=-100)=>`Datum;Omschrijving;Rekening;Bedrag\n2026-10-03;${label};NL01JOINT;${amount}`;
+for(const [name,expected] of [['QuotaExceededError','De browseropslag is vol'],['SecurityError','De browser blokkeert lokale opslag'],['Error','Onvoldoende saldo in spaardoel Vakantie: €40,00 beschikbaar, €70,00 nodig.']]){
+ test(`CSV opslag toont oorzaak ${name} en behoudt goedgekeurde verwerking`,async({page})=>{
+  await boot(page,360);const row=await upload(page,csv());await row.locator('[data-u4-field="category"]').selectOption('Kleding');await save(page,row);await expect.poll(()=>totals(page)).toMatchObject({budget:100});await expand(page);
+  await row.locator('[data-u4-field="category"]').selectOption('Boodschappen');
+  const before=await page.evaluate(()=>JSON.stringify(state));
+  const stored=await page.evaluate(async()=>JSON.stringify(await FinizeUpdate4.importStore.getImport(state.importSummaries[0].id)));
+  await page.evaluate(({name,expected})=>{
+   window.restoreStorageForTest=Storage.prototype.setItem;
+   Storage.prototype.setItem=function(key,value){if(key.startsWith('finize-budget-planner-v1'))throw name==='Error'?new Error(expected):new DOMException('Browser storage failure',name);return window.restoreStorageForTest.call(this,key,value);};
+  },{name,expected});
+  const dialog=page.waitForEvent('dialog');await row.locator('[data-u4-approve]').click();const message=(await dialog).message();expect(message).toContain(expected);expect(message).toContain('De bestaande verwerking is niet gewijzigd');expect(message).not.toContain('Financiële commit is afgebroken');
+  expect(await page.evaluate(()=>JSON.stringify(state))).toBe(before);
+  expect(await page.evaluate(async()=>JSON.stringify(await FinizeUpdate4.importStore.getImport(state.importSummaries[0].id)))).toBe(stored);
+  expect(await totals(page)).toMatchObject({bank:-100,budget:100,sources:1});
+  await page.evaluate(()=>{Storage.prototype.setItem=window.restoreStorageForTest;});
+  await save(page,row);await expect.poll(()=>page.evaluate(()=>FinizeTransactions.effects().filter(p=>p.active).map(p=>p.category))).toEqual(['Boodschappen']);
+ });
+}
+test('ING septemberbetaling verwerkt in oktober zonder wijziging bankgegevens',async({page})=>{
+ const errors=await boot(page,360);
+ const text='"Datum";"Naam / Omschrijving";"Rekening";"Tegenrekening";"Code";"Af Bij";"Bedrag (EUR)";"Mutatiesoort";"Mededelingen"\n"2026/09/26";"Residence Valkenburg B V";"NL01JOINT";"NL55BANK0000000055";"GT";"Af";"189,56";"Overschrijving";"Betaling"';
+ const row=await upload(page,text);await row.locator('[data-u4-field="category"]').selectOption('Kleding');await save(page,row);
+ await expect.poll(()=>page.evaluate(()=>FinizeTransactions.total('budgetImpact',{month:'2026-09'}))).toBe(189.56);
+ expect(await page.evaluate(()=>FinizeTransactions.bankSources({month:'2026-09'}).map(t=>({date:t.date,amount:t.bankAmount})))).toEqual([{date:'2026-09-26',amount:-189.56}]);expect(errors).toEqual([]);
+});
+test('Centrale commit behoudt financieel saldobericht na rollback en booleancontract',async({page})=>{
+ await boot(page,1440);
+ const result=await page.evaluate(()=>{
+  const before=JSON.stringify(state);let message='';
+  try{commitChange(()=>{state.savingsGoalLedger[0].effectiveAmount=-70;},{render:false,throwOnError:true});}catch(error){message=error.message;}
+  const rolledBack=JSON.stringify(state)===before;
+  const booleanResult=commitChange(()=>{state.savingsGoalLedger[0].effectiveAmount=-70;},{render:false});
+  return {message,rolledBack,booleanResult,unchanged:JSON.stringify(state)===before};
+ });
+ expect(result.message).toContain('Onvoldoende saldo in spaardoel Vakantie');expect(result.message).toContain('Corrigeer eerst');expect(result).toMatchObject({rolledBack:true,booleanResult:false,unchanged:true});
+});
 async function upload(page,text){await page.evaluate(()=>openBankImportForOwner('gezamenlijk'));await page.locator('[data-u4-file]').setInputFiles({name:'bank.csv',mimeType:'text/csv',buffer:Buffer.from(text)});await expect(page.locator('[data-u4-row]').first()).toBeAttached();await expand(page);return page.locator('[data-u4-row]').first();}
 async function expand(page){await page.locator('#u4ImportModalRoot details').evaluateAll(nodes=>nodes.forEach(node=>node.open=true));}
 async function save(page,row){await row.locator('[data-u4-approve]').click();if(await page.locator('[data-u4-match-only]').isVisible())await page.locator('[data-u4-match-only]').click();}

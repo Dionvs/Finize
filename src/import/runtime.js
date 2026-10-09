@@ -1671,7 +1671,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
       Promise.resolve().then(()=>approveStoredSource(root,draft,source)).catch(error=>{
         if(!error.coreApplied){source.processingStatus=previous.processingStatus;source.certainty=previous.certainty;source.approvalSource=previous.approvalSource;source.approvedAt=previous.approvedAt;source.reasons=previous.reasons;}
         renderDraftModalPreservingView(root,draft,document.getElementById('u4ImportModalRoot'),source.id);
-        alert(error.coreApplied?`De goedkeuring is bewaard; importdetails worden uit het lokale journal hersteld. ${error.message}`:`Goedkeuring is afgebroken. ${error.message}`);
+        alert(error.coreApplied?`De goedkeuring is bewaard; importdetails worden uit het lokale journal hersteld. ${error.message}`:`Goedkeuring is afgebroken. ${error.message}\n\nDe bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieuw proberen.`);
       });
       return;
     }
@@ -2263,7 +2263,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
       await queueImportSync(planned.batch);
       if(ImportStore.scope!==commandScope)throw new Error('Het huishouden is intussen gewijzigd. De oorspronkelijke verwerking blijft behouden.');
       if(JSON.stringify(root.state)!==baseSignature){await preserveImportConflict(root,planned.batch,stored||{id:draft.id,version:0},[{kind:'local-core-changed'}]);throw new Error('De state wijzigde tijdens de opslagcommit. De keuze blijft veilig bewaard; beoordeel de actuele stand.');}
-      const ok=root.commitChange(()=>applyFinancialCandidate(root.state,planned.state),{render:false,mutationMode:'correction'});
+      const ok=root.commitChange(()=>applyFinancialCandidate(root.state,planned.state),{render:false,mutationMode:'correction',throwOnError:true});
       if(!ok)throw new Error('Financiële commit is afgebroken; oorspronkelijke effecten blijven behouden.');
     }catch(error){
       if(ImportStore.scope===commandScope){
