@@ -1,0 +1,615 @@
+{
+  "state": {
+    "meta": {
+      "schemaVersion": 11,
+      "revision": 1
+    },
+    "planning": {
+      "verdeling": {
+        "minimumDion": 0.4
+      },
+      "spaarpotDezeMaand": 250
+    },
+    "budgetDefaultsHistory": {
+      "gezamenlijk": [
+        {
+          "effectiveFrom": "0000-01",
+          "rows": [
+            {
+              "id": "food",
+              "post": "Kleding",
+              "bedrag": 500
+            }
+          ]
+        }
+      ],
+      "dion": [],
+      "dara": []
+    },
+    "incomeDefaultsHistory": {
+      "dion": [
+        {
+          "effectiveFrom": "0000-01",
+          "salary": 3000
+        }
+      ],
+      "dara": [
+        {
+          "effectiveFrom": "0000-01",
+          "salary": 2000
+        }
+      ]
+    },
+    "transactions": [
+      {
+        "id": "tx-baseline-a",
+        "date": "2026-10-03",
+        "transactionDate": "2026-10-03",
+        "amount": 300,
+        "description": "baseline-a",
+        "category": "Kleding",
+        "kind": "uitgave",
+        "transactionType": "uitgave",
+        "reviewStatus": "bevestigd",
+        "accountOwner": "gezamenlijk",
+        "budgetOwner": "gezamenlijk",
+        "account": "gezamenlijk",
+        "financialFor": "gezamenlijk",
+        "owner": "gezamenlijk",
+        "accountProfileId": "joint",
+        "source": "csv",
+        "accountContext": "gezamenlijk",
+        "accountContextEvidence": "account-profile",
+        "processingStatus": "goedgekeurd",
+        "approvalSource": "manual",
+        "approvedAt": "2026-10-08T21:16:45.497Z",
+        "certainty": "goedgekeurd",
+        "importBatchId": "batch",
+        "importTransactionId": "baseline-a",
+        "splitId": "",
+        "bankOriginal": {
+          "valid": true,
+          "bankDate": "2026-10-03",
+          "amount": -300,
+          "description": "baseline-a",
+          "rawDescription": "baseline-a",
+          "accountIdentifier": "NL01JOINT",
+          "rawCells": [
+            "baseline-a",
+            "-300"
+          ]
+        },
+        "sourceIdentityProof": null,
+        "batchLifecycle": "active",
+        "processing": {
+          "processingDate": "2026-10-03",
+          "processedAmount": 300,
+          "description": "baseline-a",
+          "category": "Kleding",
+          "budgetOwner": "gezamenlijk",
+          "advanceMode": "none",
+          "fixedAmountMode": "none",
+          "include": true,
+          "splits": [],
+          "transactionType": "uitgave",
+          "fixedExpenseId": "",
+          "fixedOccurrenceId": "",
+          "fixedOccurrenceMonth": "",
+          "budgetItemId": "",
+          "savingsGoalId": "",
+          "refundCategory": "",
+          "refundMonth": ""
+        },
+        "expenseImpact": 300,
+        "accountDelta": -300,
+        "fixedExpenseId": "",
+        "fixedOccurrenceId": "",
+        "fixedOccurrenceMonth": "",
+        "incomeSourceId": "",
+        "incomeOccurrenceId": "",
+        "savingsGoalId": "",
+        "refundCategory": "",
+        "refundMonth": "",
+        "note": "",
+        "createdAt": "2026-10-08T21:16:45.505Z"
+      },
+      {
+        "id": "tx-baseline-s",
+        "date": "2026-10-03",
+        "transactionDate": "2026-10-03",
+        "amount": 250,
+        "description": "baseline-s",
+        "category": "Kleding",
+        "kind": "interne-overboeking",
+        "transactionType": "sparen",
+        "reviewStatus": "bevestigd",
+        "accountOwner": "gezamenlijk",
+        "budgetOwner": "gezamenlijk",
+        "account": "gezamenlijk",
+        "financialFor": "gezamenlijk",
+        "owner": "gezamenlijk",
+        "accountProfileId": "joint",
+        "source": "csv",
+        "accountContext": "gezamenlijk",
+        "accountContextEvidence": "account-profile",
+        "processingStatus": "goedgekeurd",
+        "approvalSource": "manual",
+        "approvedAt": "2026-10-08T21:16:45.497Z",
+        "certainty": "goedgekeurd",
+        "importBatchId": "batch",
+        "importTransactionId": "baseline-s",
+        "splitId": "",
+        "bankOriginal": {
+          "valid": true,
+          "bankDate": "2026-10-03",
+          "amount": -250,
+          "description": "baseline-s",
+          "rawDescription": "baseline-s",
+          "accountIdentifier": "NL01JOINT",
+          "rawCells": [
+            "baseline-s",
+            "-250"
+          ]
+        },
+        "sourceIdentityProof": null,
+        "batchLifecycle": "active",
+        "processing": {
+          "processingDate": "2026-10-03",
+          "processedAmount": 250,
+          "description": "baseline-s",
+          "category": "Kleding",
+          "budgetOwner": "gezamenlijk",
+          "advanceMode": "none",
+          "fixedAmountMode": "none",
+          "include": true,
+          "splits": [],
+          "transactionType": "sparen",
+          "savingsGoalId": "goal",
+          "fixedExpenseId": "",
+          "fixedOccurrenceId": "",
+          "fixedOccurrenceMonth": "",
+          "budgetItemId": "",
+          "refundCategory": "",
+          "refundMonth": ""
+        },
+        "expenseImpact": 0,
+        "accountDelta": -250,
+        "fixedExpenseId": "",
+        "fixedOccurrenceId": "",
+        "fixedOccurrenceMonth": "",
+        "incomeSourceId": "",
+        "incomeOccurrenceId": "",
+        "savingsGoalId": "goal",
+        "refundCategory": "",
+        "refundMonth": "",
+        "note": "",
+        "createdAt": "2026-10-08T21:16:45.507Z"
+      }
+    ],
+    "recurringFixedExpenses": [],
+    "spaardoelen": {
+      "gezamenlijk": [
+        {
+          "id": "goal",
+          "naam": "Vakantie",
+          "algespaard": 2250
+        }
+      ],
+      "dion": [],
+      "dara": []
+    },
+    "savingsGoalLedger": [
+      {
+        "id": "opening",
+        "goalId": "goal",
+        "source": "legacy-opening",
+        "effectiveAmount": 2000,
+        "active": true
+      },
+      {
+        "id": "saving-tx-baseline-s",
+        "transactionId": "tx-baseline-s",
+        "sourceTransactionId": "",
+        "importBatchId": "batch",
+        "goalId": "goal",
+        "month": "2026-10",
+        "plannedAmount": 0,
+        "actualAmount": 250,
+        "effectiveAmount": 250,
+        "matchedContributionId": "",
+        "status": "uitgevoerd",
+        "source": "bank-import",
+        "active": true,
+        "createdAt": "2026-10-08T21:16:45.507Z",
+        "updatedAt": "2026-10-08T21:16:45.497Z"
+      }
+    ],
+    "savingsCoverageAllocations": [],
+    "monthlySavingOverrides": {},
+    "accountProfiles": [
+      {
+        "id": "joint",
+        "accountOwner": "gezamenlijk",
+        "identifier": "NL01JOINT"
+      }
+    ],
+    "importSummaries": [
+      {
+        "id": "batch",
+        "accountProfileId": "joint",
+        "accountOwner": "gezamenlijk",
+        "status": "verwerkt",
+        "lifecycle": "active",
+        "version": 1,
+        "operationId": "batch-initial",
+        "newCount": 2,
+        "duplicateCount": 0,
+        "uncategorizedCount": 0,
+        "totalIncome": 0,
+        "totalExpenses": 550,
+        "updatedAt": "2026-10-08T21:16:45.498Z",
+        "processedAt": "2026-10-08T21:16:45.509Z",
+        "counts": {
+          "expenses": 1,
+          "income": 0,
+          "internal": 1,
+          "savings": 1,
+          "refunds": 0,
+          "advances": 0,
+          "uncategorized": 0
+        }
+      }
+    ],
+    "advanceLedger": [],
+    "advanceRepayments": [],
+    "internalTransferPairs": [],
+    "manualTransactionReplacements": [],
+    "monthRecords": {
+      "2026-08": {
+        "status": "afgesloten",
+        "snapshot": {
+          "income": 123,
+          "expenses": 55
+        },
+        "closureHistory": [
+          {
+            "source": "original"
+          }
+        ]
+      }
+    }
+  },
+  "effects": [
+    {
+      "id": "tx-baseline-a",
+      "sourceKey": "batch:baseline-a",
+      "source": "csv",
+      "accountContext": "gezamenlijk",
+      "financialFor": "gezamenlijk",
+      "status": "goedgekeurd",
+      "active": true,
+      "transactionType": "uitgave",
+      "category": "Kleding",
+      "amount": 300,
+      "calendarMonth": "2026-10",
+      "financialMonth": "2026-10",
+      "fixedMonth": null,
+      "fixedOccurrenceId": "",
+      "fixedExpenseId": "",
+      "incomeSourceId": "",
+      "incomeOccurrenceId": "",
+      "splitId": "",
+      "effects": {
+        "accountCashflow": -300,
+        "householdCashflow": -300,
+        "externalHouseholdCashflow": -300,
+        "unconfirmedTransferCashflow": 0,
+        "incomeImpact": 0,
+        "realExpense": 300,
+        "budgetImpact": 300,
+        "fixedRealization": 0,
+        "savingsEffect": 0,
+        "refundEffect": 0,
+        "advanceRepaymentEffect": 0,
+        "savingsDeposit": 0,
+        "savingsWithdrawal": 0,
+        "goalDelta": 0,
+        "savingsFunded": 0,
+        "unusedSavings": 0,
+        "refundCorrection": 0,
+        "categoryOnlyRefundCorrection": 0,
+        "refundCashflow": 0,
+        "fixedRegularImpact": 0
+      },
+      "diagnostics": [],
+      "transaction": {
+        "id": "tx-baseline-a",
+        "date": "2026-10-03",
+        "transactionDate": "2026-10-03",
+        "amount": 300,
+        "description": "baseline-a",
+        "category": "Kleding",
+        "kind": "uitgave",
+        "transactionType": "uitgave",
+        "reviewStatus": "bevestigd",
+        "accountOwner": "gezamenlijk",
+        "budgetOwner": "gezamenlijk",
+        "account": "gezamenlijk",
+        "financialFor": "gezamenlijk",
+        "owner": "gezamenlijk",
+        "accountProfileId": "joint",
+        "source": "csv",
+        "accountContext": "gezamenlijk",
+        "accountContextEvidence": "account-profile",
+        "processingStatus": "goedgekeurd",
+        "approvalSource": "manual",
+        "approvedAt": "2026-10-08T21:16:45.497Z",
+        "certainty": "goedgekeurd",
+        "importBatchId": "batch",
+        "importTransactionId": "baseline-a",
+        "splitId": "",
+        "bankOriginal": {
+          "valid": true,
+          "bankDate": "2026-10-03",
+          "amount": -300,
+          "description": "baseline-a",
+          "rawDescription": "baseline-a",
+          "accountIdentifier": "NL01JOINT",
+          "rawCells": [
+            "baseline-a",
+            "-300"
+          ]
+        },
+        "sourceIdentityProof": null,
+        "batchLifecycle": "active",
+        "processing": {
+          "processingDate": "2026-10-03",
+          "processedAmount": 300,
+          "description": "baseline-a",
+          "category": "Kleding",
+          "budgetOwner": "gezamenlijk",
+          "advanceMode": "none",
+          "fixedAmountMode": "none",
+          "include": true,
+          "splits": [],
+          "transactionType": "uitgave",
+          "fixedExpenseId": "",
+          "fixedOccurrenceId": "",
+          "fixedOccurrenceMonth": "",
+          "budgetItemId": "",
+          "savingsGoalId": "",
+          "refundCategory": "",
+          "refundMonth": ""
+        },
+        "expenseImpact": 300,
+        "accountDelta": -300,
+        "fixedExpenseId": "",
+        "fixedOccurrenceId": "",
+        "fixedOccurrenceMonth": "",
+        "incomeSourceId": "",
+        "incomeOccurrenceId": "",
+        "savingsGoalId": "",
+        "refundCategory": "",
+        "refundMonth": "",
+        "note": "",
+        "createdAt": "2026-10-08T21:16:45.505Z"
+      },
+      "savingsGoalId": "",
+      "refundCategory": "",
+      "refundMonth": "",
+      "budgetCategory": "Kleding",
+      "regularExpenseBase": 300,
+      "coverageAllocations": []
+    },
+    {
+      "id": "tx-baseline-s",
+      "sourceKey": "batch:baseline-s",
+      "source": "csv",
+      "accountContext": "gezamenlijk",
+      "financialFor": "gezamenlijk",
+      "status": "goedgekeurd",
+      "active": true,
+      "transactionType": "sparen",
+      "category": "Kleding",
+      "amount": 250,
+      "calendarMonth": "2026-10",
+      "financialMonth": "2026-10",
+      "fixedMonth": null,
+      "fixedOccurrenceId": "",
+      "fixedExpenseId": "",
+      "incomeSourceId": "",
+      "incomeOccurrenceId": "",
+      "splitId": "",
+      "effects": {
+        "accountCashflow": -250,
+        "householdCashflow": -250,
+        "externalHouseholdCashflow": 0,
+        "unconfirmedTransferCashflow": 0,
+        "incomeImpact": 0,
+        "realExpense": 0,
+        "budgetImpact": 0,
+        "fixedRealization": 0,
+        "savingsEffect": 250,
+        "refundEffect": 0,
+        "advanceRepaymentEffect": 0,
+        "savingsDeposit": 250,
+        "savingsWithdrawal": 0,
+        "goalDelta": 250,
+        "savingsFunded": 0,
+        "unusedSavings": 0,
+        "refundCorrection": 0,
+        "categoryOnlyRefundCorrection": 0,
+        "refundCashflow": 0,
+        "fixedRegularImpact": 0
+      },
+      "diagnostics": [],
+      "transaction": {
+        "id": "tx-baseline-s",
+        "date": "2026-10-03",
+        "transactionDate": "2026-10-03",
+        "amount": 250,
+        "description": "baseline-s",
+        "category": "Kleding",
+        "kind": "interne-overboeking",
+        "transactionType": "sparen",
+        "reviewStatus": "bevestigd",
+        "accountOwner": "gezamenlijk",
+        "budgetOwner": "gezamenlijk",
+        "account": "gezamenlijk",
+        "financialFor": "gezamenlijk",
+        "owner": "gezamenlijk",
+        "accountProfileId": "joint",
+        "source": "csv",
+        "accountContext": "gezamenlijk",
+        "accountContextEvidence": "account-profile",
+        "processingStatus": "goedgekeurd",
+        "approvalSource": "manual",
+        "approvedAt": "2026-10-08T21:16:45.497Z",
+        "certainty": "goedgekeurd",
+        "importBatchId": "batch",
+        "importTransactionId": "baseline-s",
+        "splitId": "",
+        "bankOriginal": {
+          "valid": true,
+          "bankDate": "2026-10-03",
+          "amount": -250,
+          "description": "baseline-s",
+          "rawDescription": "baseline-s",
+          "accountIdentifier": "NL01JOINT",
+          "rawCells": [
+            "baseline-s",
+            "-250"
+          ]
+        },
+        "sourceIdentityProof": null,
+        "batchLifecycle": "active",
+        "processing": {
+          "processingDate": "2026-10-03",
+          "processedAmount": 250,
+          "description": "baseline-s",
+          "category": "Kleding",
+          "budgetOwner": "gezamenlijk",
+          "advanceMode": "none",
+          "fixedAmountMode": "none",
+          "include": true,
+          "splits": [],
+          "transactionType": "sparen",
+          "savingsGoalId": "goal",
+          "fixedExpenseId": "",
+          "fixedOccurrenceId": "",
+          "fixedOccurrenceMonth": "",
+          "budgetItemId": "",
+          "refundCategory": "",
+          "refundMonth": ""
+        },
+        "expenseImpact": 0,
+        "accountDelta": -250,
+        "fixedExpenseId": "",
+        "fixedOccurrenceId": "",
+        "fixedOccurrenceMonth": "",
+        "incomeSourceId": "",
+        "incomeOccurrenceId": "",
+        "savingsGoalId": "goal",
+        "refundCategory": "",
+        "refundMonth": "",
+        "note": "",
+        "createdAt": "2026-10-08T21:16:45.507Z"
+      },
+      "savingsGoalId": "goal",
+      "refundCategory": "",
+      "refundMonth": "",
+      "budgetCategory": "Kleding",
+      "regularExpenseBase": 0,
+      "coverageAllocations": []
+    }
+  ],
+  "forecast": {
+    "month": "2026-10",
+    "owners": {
+      "gezamenlijk": {
+        "owner": "gezamenlijk",
+        "income": 0,
+        "salary": 0,
+        "salarySource": "none",
+        "extraIncome": 0,
+        "fixedBurden": 0,
+        "variableBurden": 300,
+        "savingsDeposit": 250,
+        "savingsFunded": 0,
+        "unusedSavings": 0,
+        "refundCashflow": 0,
+        "available": 200,
+        "availableBeforeAllowance": 4450
+      },
+      "dion": {
+        "owner": "dion",
+        "income": 3000,
+        "salary": 3000,
+        "salarySource": "planned",
+        "extraIncome": 0,
+        "fixedBurden": 0,
+        "variableBurden": 0,
+        "savingsDeposit": 0,
+        "savingsFunded": 0,
+        "unusedSavings": 0,
+        "refundCashflow": 0,
+        "available": 2550,
+        "allowance": 2550
+      },
+      "dara": {
+        "owner": "dara",
+        "income": 2000,
+        "salary": 2000,
+        "salarySource": "planned",
+        "extraIncome": 0,
+        "fixedBurden": 0,
+        "variableBurden": 0,
+        "savingsDeposit": 0,
+        "savingsFunded": 0,
+        "unusedSavings": 0,
+        "refundCashflow": 0,
+        "available": 1700,
+        "allowance": 1700
+      }
+    },
+    "household": {
+      "income": 5000,
+      "available": 4450,
+      "actualIncome": 0,
+      "realExpense": 300,
+      "savingsFunded": 0,
+      "unusedSavings": 0,
+      "refundCashflow": 0
+    },
+    "ratioDion": 0.6,
+    "ratioDara": 0.4,
+    "distributable": 4250,
+    "allowanceBasis": {
+      "owners": {
+        "gezamenlijk": {
+          "fixedReserve": 0,
+          "budgetReserve": 500,
+          "savingsReserve": 250,
+          "totalReserve": 750
+        },
+        "dion": {
+          "fixedReserve": 0,
+          "budgetReserve": 0,
+          "savingsReserve": 2550,
+          "totalReserve": 2550,
+          "automaticallyAvailableForSavings": 2550
+        },
+        "dara": {
+          "fixedReserve": 0,
+          "budgetReserve": 0,
+          "savingsReserve": 1700,
+          "totalReserve": 1700,
+          "automaticallyAvailableForSavings": 1700
+        }
+      },
+      "distributable": 4250,
+      "income": 5000
+    },
+    "coverage": []
+  }
+}

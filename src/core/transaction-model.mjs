@@ -55,6 +55,7 @@ export function getTransactionProcessingStatus(tx) {
 }
 
 export function isTransactionFinanciallyActive(tx) {
+  if(tx?.recordRole==='bank-source')return false;
   return !['withdrawn','deleted'].includes(tx?.batchLifecycle) && getTransactionProcessingStatus(tx) === 'goedgekeurd';
 }
 

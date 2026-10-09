@@ -9,7 +9,7 @@ export function assertImportBase(remote,record){
 }
 export function pendingQueueReceipt(record){return {id:record.id,importId:record.id,version:importVersion(record),operationId:record.operationId||'',baseVersion:Number(record.baseVersion||0)};}
 export function acknowledgeMatches(queued,uploaded){return queued?.operationId===uploaded?.operationId&&queued?.version===uploaded?.version;}
-const sourceKey=tx=>tx.importBatchId&&tx.importTransactionId?tx.importBatchId+':'+tx.importTransactionId:null;
+const sourceKey=tx=>tx.bankSourceId||(tx.importBatchId&&tx.importTransactionId?tx.importBatchId+':'+tx.importTransactionId:null);
 const signature=value=>JSON.stringify(value??null);
 export function findImportConflicts(base,local,remote){
  const conflicts=[];

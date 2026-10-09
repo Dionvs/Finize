@@ -69,7 +69,7 @@ test('gezamenlijk over deze maand gebruikt alle inkomsten en trekt zakgeld allee
   const incomeBefore=parseEuro(await incomeCard.locator('.metric-value').innerText());
   await page.evaluate(() => {
     const month=window.state.meta.selectedMonth;
-    window.state.transactions.push({id:'joint-extra-income-test',date:month+'-14',owner:'gezamenlijk',kind:'inkomen',reviewStatus:'bevestigd',transactionType:'overige-inkomsten',amount:125,description:'Gezamenlijk extra inkomen'});
+    window.state.transactions.push({id:'joint-extra-income-test',source:'manual',processingStatus:'goedgekeurd',accountContext:'gezamenlijk',financialFor:'gezamenlijk',date:month+'-14',owner:'gezamenlijk',kind:'inkomen',reviewStatus:'bevestigd',transactionType:'overige-inkomsten',amount:125,description:'Gezamenlijk extra inkomen'});
     window.renderActiveTab();
   });
   const incomeAfter=parseEuro(await incomeCard.locator('.metric-value').innerText());
@@ -134,6 +134,7 @@ test('gezamenlijk inkomen vervangt standaardsalaris en negeert oude dubbele teru
       {id:'duo',date:`${month}-20`,owner:'dion',kind:'inkomen',reviewStatus:'bevestigd',transactionType:'overige-inkomsten',amount:300.5,description:'DUO Hoofdrekening'},
       {id:'transfer',date:`${month}-21`,owner:'gezamenlijk',reviewStatus:'bevestigd',kind:'interne-overboeking',transactionType:'van-spaarrekening',amount:500,description:'Oranje Spaarrekening'}
     ];
+    state.transactions=state.transactions.map(tx=>({...tx,source:'csv',processingStatus:'goedgekeurd',approvalSource:'legacy-confirmed',accountContext:tx.id==='duo'?'gezamenlijk':tx.owner,financialFor:tx.owner}));
     state.incomeDefaultsHistory={
       dion:[{id:'dion-default',effectiveFrom:'0000-01',salary:2000,refund:300}],
       dara:[{id:'dara-default',effectiveFrom:'0000-01',salary:3000,refund:0}]

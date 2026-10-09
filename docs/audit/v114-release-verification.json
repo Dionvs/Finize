@@ -1,0 +1,25 @@
+{
+  "cacheVersion": "finize-v114-csv-verwerking",
+  "assets": [
+    "./app.js?v=114-csv-verwerking",
+    "./app.css?v=114-csv-verwerking"
+  ],
+  "nodeFilesPassed": 50,
+  "registeredNodeCasesPassed": 551,
+  "browserPassed": 229,
+  "failed": 0,
+  "productionBuild": "passed",
+  "syntax": "passed",
+  "css": "passed (existing --line warning)",
+  "generatedRuntime": "byte-reproducible",
+  "diffCheck": "passed",
+  "sha256": {
+    "app.js": "a188f7050bc9ee2e37457cdea1ff99777db32e0db3e501cfde32412ac8ac4b11",
+    "app.css": "df32bfc4b70dddacfe41271c7247c18347bbcedd0b865169d2d7d6f413166962",
+    "index.html": "df84418246eafb87defea1d91e472b142d203f48fb745c47840eb38bab7d6f52",
+    "service-worker.js": "5d9c1899d93addb687a0c710920544f7c14fd4908e9f3523f34ab4dace90c7da"
+  },
+  "deploymentTarget": "https://dionvs.github.io/Finize/",
+  "productionFirestoreTested": false,
+  "productionDataMigration": false
+}

@@ -1,3 +1,4 @@
+import { selectBankTransactions, isBankSource } from './bank-sources.mjs';
 import { createStateBackupStore, readLegacyStateBackup } from '../storage/state-backups.mjs';
 import { createChunkedCloudStore, cloudStateManifest } from '../storage/cloud-chunks.mjs';
 import { createMigrationBackupStore, readLegacyMigrationBackup } from '../storage/migration-backups.mjs';
@@ -14,7 +15,7 @@ import { CURRENT_SCHEMA_VERSION, migrateStateData, detectSchemaVersion, ensureSt
 import { resolveRecurringAmount, resolveRecurringConfig, resolveFixedExpensesForMonth, resolveIncomeSourcesForMonth, resolveVariableBudgetsForMonth, resolvePlannedIncomeForMonth, setRecurringFromMonth, endRecurringFromMonth, nextPlanningMonth, setBudgetForMonth, setPlannedIncomeFromMonth, validateTimelineState, expenseCategoriesForMonth, setSavingsPlanForMonth, setIncomeSourceForMonth, endIncomeSourceFromMonth } from './planning-timeline.mjs';
 import { markManualTransaction, normalizeDataTransaction, assertOriginalBankDataUnchanged } from './transaction-model.mjs';
 import { plannedOccurrences, occurrenceDates } from './recurring-occurrences.mjs';
-import { projectTransaction, selectTransactionProjections, selectActiveTransactions, sumTransactionEffects, categoryActuals, fixedOccurrenceActuals, actualIncomeForMonth, incomeProjectionForMonth, legacySalaryForecastOwners, getTransactionFinancialMonth, confirmInternalTransferPair, financialForecastForMonth, categoryFinancialActuals, coverageAllocationStatus, projectionLineReference, coverageMessage } from './transaction-engine.mjs';
+import { projectTransaction, selectTransactionProjections, selectActiveTransactions, sumTransactionEffects, categoryActuals, fixedOccurrenceActuals, actualIncomeForMonth, incomeProjectionForMonth, legacySalaryForecastOwners, getTransactionFinancialMonth, confirmInternalTransferPair, financialForecastForMonth, categoryFinancialActuals, categoryProcessingDetails, coverageAllocationStatus, projectionLineReference, coverageMessage } from './transaction-engine.mjs';
 import { getTransactionClassification, getTransactionFinancialDestination, getTransactionAccountContext, getTransactionSource, getTransactionDate, INCOME_TRANSACTION_TYPES } from './transaction-model.mjs';
 import { synchronizeChangedSavings, assertFinancialMutationSafe, upsertManualFinancialTransaction, setSavingsCoverageAllocation, removeSavingsCoverageAllocation, correctGoalBalance, localTransactionToday, assertManualCandidateSafe } from './transaction-processing.mjs';
 import { DEFAULT_FIREBASE_CONFIG, FIREBASE_SDK_VERSION } from "../config/firebase.js";
@@ -669,11 +670,8 @@ function isBudgetExpenseTransaction(tx){const p=projectTransaction(tx,{state});r
 function getTransactionExpenseImpact(tx){return projectTransaction(tx,{state,materialized:!!tx.importBatchId}).effects.budgetImpact;}
 
 function sumTransactions(owner=null, category=null, month=getSelectedMonth()){
-  const rows=selectTransactionProjections(state,{month,owner,dimension:'budget'});
-  return round2(rows.reduce((sum,p)=>{const label=p.effects.refundCorrection?p.refundCategory:p.category;
-    if(category&&!budgetCategoryMatches({category:label},category))return sum;
-    return sum+p.effects.budgetImpact;
-  },0));
+  const actuals=categoryActuals(state,month,owner);
+  return round2(Object.entries(actuals).reduce((sum,[label,amount])=>category&&!budgetCategoryMatches({category:label},category)?sum:sum+amount,0));
 }
 function transactionsByCategory(owner,month=getSelectedMonth()){return categoryActuals(state,month,owner);}
 
@@ -1077,10 +1075,15 @@ function renderJointVariableCostsCardHead(owner='gezamenlijk'){
 function jointVariableCategoryOptions(selectedCategory='',owner='gezamenlijk',month=getSelectedMonth()){
   return expenseCategoriesForMonth(state,month,owner,{existingCategory:selectedCategory});
 }
+function currentBankTransactions(options={}){
+  const imports=[...(window.FinizeUpdate4?.importStore?.bankReadCache?.values?.()||[])];
+  return selectBankTransactions(state,{...options,imports});
+}
 function getAccountMonthTransactions(account,month=getSelectedMonth()){
-  return selectActiveTransactions(state,{month,account});
+  return currentBankTransactions({month,account});
 }
 function transactionDisplayAmount(tx){
+  if(tx.bankAmount!==undefined)return tx.bankAmount;
   const p=projectTransaction(tx,{state,materialized:!!tx.importBatchId});
   const credit=p.transactionType==='inkomen'||INCOME_TRANSACTION_TYPES.includes(p.transactionType)||['van-spaarrekening','terugbetaling','refund'].includes(p.transactionType)||tx.kind==='inkomen';
   return (credit?1:-1)*p.amount;
@@ -1096,7 +1099,7 @@ function renderJointTransactionsCard(){
     <span class="joint-transaction-meta"><span class="joint-transaction-date" title="${formatDateNL(tx.date)}">${formatDayMonth(tx.date)}</span><span class="joint-transaction-category" title="${textSafe(tx.category || 'Overig')}">${textSafe(tx.category || 'Overig')}</span></span>
     <span class="joint-transaction-description"><span class="joint-transaction-description-text" title="${textSafe(tx.description || '')}">${textSafe(tx.description || '—')}</span>${tx.note ? `<span class="joint-transaction-note" title="${textSafe(tx.note)}">${textSafe(tx.note)}</span>` : ''}</span>
     <strong class="joint-transaction-amount">${eur(transactionDisplayAmount(tx))}</strong>
-    <button type="button" class="joint-transaction-delete" data-remove-transaction="${attrSafe(tx.id)}" aria-label="Transactie verwijderen">×</button>
+    <button type="button" class="joint-transaction-delete" data-remove-transaction="${attrSafe(tx.id)}" aria-label="${getTransactionSource(tx)==='csv'?'Import beheren':'Transactie verwijderen'}">×</button>
   </div>`).join('');
   return `<div class="card joint-two-column-card joint-transactions-card">${renderJointTransactionsCardHead()}<div class="joint-transactions-list">${rowsHtml || '<p class="joint-transactions-empty">Nog geen uitgaven deze maand.</p>'}</div><div class="joint-transactions-total"><span>Totaal uitgaven</span><strong>${eur(sumTransactionEffects(state,'realExpense',{month:getSelectedMonth(),account:'gezamenlijk'}))}</strong></div></div>`;
 }
@@ -2925,7 +2928,8 @@ function handleTableClicks(root){
   root.querySelectorAll('[data-remove-transaction]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const id = btn.dataset.removeTransaction;
-      const tx=(state.transactions||[]).find(item=>item.id===id);
+      const tx=(state.transactions||[]).find(item=>item.id===id)||currentBankTransactions().find(item=>item.id===id);
+      if(routeImportedTransactionEdit(tx))return;
       try{if(tx)assertMonthMutationAllowed(transactionMonth(tx));}catch(error){alert(error.message);return;}
       removeWithUndo('transactions', id, 'Transactie verwijderd');
     });
@@ -3191,7 +3195,7 @@ function renderDashboard(){
   const budgetRows = (scenarioData.gezamenlijk.variabel||[]).filter(row=>row.post || row.bedrag).map(row=>{
     const budget = Number(row.bedrag)||0;
     const used = sumTransactions('gezamenlijk', row.post);
-    const ratio = budget > 0 ? Math.min(1, used / budget) : 0;
+    const ratio = budget > 0 ? Math.max(0,Math.min(1, used / budget)) : 0;
     const label=row.post || row.categorie || 'Budget';
     return `<button type="button" class="budget-preview-item budget-preview-button" data-open-budget-transactions="${textSafe(label)}" aria-label="Open transacties voor ${textSafe(label)}">
       <div class="budget-preview-thumb tone-green">${iconSvg(categoryIconName(label))}</div>
@@ -3379,7 +3383,7 @@ function renderTransactionsTable(owner){
       <td>${textSafe(tx.category || 'Overig')}</td>
       <td>${textSafe(tx.description || '')}<div class="progress-label" style="text-align:left">${textSafe(tx.note || '')}</div></td>
       <td class="num"><span class="value neg">${eur(transactionDisplayAmount(tx))}</span></td>
-      <td class="row-actions"><button class="danger-ghost" data-remove-transaction="${attrSafe(tx.id)}" title="Verwijderen">×</button></td>
+      <td class="row-actions"><button class="danger-ghost" data-remove-transaction="${attrSafe(tx.id)}" title="${getTransactionSource(tx)==='csv'?'Import beheren':'Verwijderen'}">×</button></td>
     </tr>`).join('');
   const emptyIcon = owner ? '⌘' : '▤';
   const emptyText = owner ? `Je persoonlijke uitgaven verschijnen hier zodra je ze toevoegt.` : `Toegevoegde uitgaven verschijnen hier.`;
@@ -3398,7 +3402,7 @@ function renderBudgetUsageList(owner='gezamenlijk'){
     const label=row.post || row.categorie || 'Budget';
     return `<button type="button" class="progress-item budget-usage-button" data-open-budget-transactions="${textSafe(label)}" data-budget-owner="${owner}" aria-label="Open transacties voor ${textSafe(label)}">
       <div class="progress-top"><strong>${textSafe(row.post || row.categorie)}</strong><span><span class="neutral-amount">${eur(used)}</span> / <span class="neutral-amount">${eur(budget)}</span> <span class="status-badge ${status.cls}">${status.label}</span></span></div>
-      <div class="progress-track"><div class="progress-fill" style="width:${Math.min(100, Math.round(status.ratio*100))}%"></div></div>
+      <div class="progress-track"><div class="progress-fill" style="width:${Math.max(0,Math.min(100, Math.round(status.ratio*100)))}%"></div></div>
     </button>`;
   }).join('') || '<p class="hint">Nog geen budgetten.</p>'}</div>`;
 }
@@ -4115,10 +4119,10 @@ function bindBankImport(root){
 
 function routeImportedTransactionEdit(tx){
   if(!tx||getTransactionSource(tx)!=='csv')return false;
-  if(tx.importBatchId&&window.FinizeUpdate4?.openImportDetails){
-    document.getElementById('transactionModal')?.classList.remove('open','joint-transaction-modal-open');
-    window.FinizeUpdate4.openImportDetails(tx.importBatchId,tx.importTransactionId).catch(error=>alert(error.message));
-  }else alert('Deze legacy CSV-transactie mist een betrouwbare import-/bronverwijzing. Bewerken is geblokkeerd om bankgegevens, bronapproval en gekoppelde administratie te behouden. Koppel eerst de oorspronkelijke importbron.');
+  document.getElementById('transactionModal')?.classList.remove('open','joint-transaction-modal-open');
+  const persisted=(state.transactions||[]).some(item=>item.id===tx.id);
+  const opening=persisted?window.FinizeUpdate4?.openTransactionSource(tx.id):window.FinizeUpdate4?.openImportDetails(tx.importBatchId,tx.importTransactionId);
+  opening?.catch(error=>alert(error.message));
   return true;
 }
 const MANUAL_PROCESSING_TYPES=[['uitgave','Uitgave'],['vaste-last','Vaste last'],['inkomen','Inkomen'],...INCOME_TRANSACTION_TYPES.map(type=>[type,({salaris:'Salaris',vakantiegeld:'Vakantiegeld',nabetaling:'Nabetaling',vergoeding:'Vergoeding',belastingteruggave:'Belastingteruggave','overige-inkomsten':'Overige inkomsten'})[type]]),['sparen','Naar spaardoel'],['naar-spaarrekening','Naar spaarrekening'],['van-spaarrekening','Van spaarrekening'],['terugbetaling','Refund']];
@@ -4158,7 +4162,7 @@ function readFinancialProcessingFields(prefix){
 function openContextTransactionModal(owner,transactionId=''){
   if(!U3_ACCOUNTS.includes(owner))return;
   const modal=document.getElementById('transactionModal'),joint=owner==='gezamenlijk',prefix=joint?'jointTx':'personalTx',suffix=joint?'JointTransaction':'PersonalTransaction',month=getSelectedMonth();
-  const existing=(state.transactions||[]).find(tx=>tx.id===transactionId);
+  const existing=(state.transactions||[]).find(tx=>tx.id===transactionId)||(transactionId?currentBankTransactions().find(tx=>tx.id===transactionId):null);
   if(transactionId&&!existing){showQuickToast('De transactie bestaat niet meer.');return;}
   if(routeImportedTransactionEdit(existing))return;
   const today=localTransactionToday();
@@ -4874,7 +4878,7 @@ function renderPersonalTransactionsCard(owner){
     <span class="joint-transaction-meta"><span class="joint-transaction-date">${formatDayMonth(tx.date)}</span><span class="joint-transaction-category">${textSafe(tx.category || 'Overig')}</span></span>
     <span class="joint-transaction-description"><span class="joint-transaction-description-text">${textSafe(tx.description || '—')}</span>${tx.note ? `<span class="joint-transaction-note">${textSafe(tx.note)}</span>` : ''}</span>
     <strong class="joint-transaction-amount">${eur(transactionDisplayAmount(tx))}</strong>
-    <button type="button" class="joint-transaction-delete" data-remove-transaction="${attrSafe(tx.id)}" aria-label="Transactie verwijderen">×</button>
+    <button type="button" class="joint-transaction-delete" data-remove-transaction="${attrSafe(tx.id)}" aria-label="${getTransactionSource(tx)==='csv'?'Import beheren':'Transactie verwijderen'}">×</button>
   </div>`).join('');
   const total = round2(sumTransactionEffects(state,'realExpense',{month:getSelectedMonth(),account:owner}));
   return `<div class="card joint-two-column-card joint-transactions-card"><div class="card-head joint-transactions-card-head"><div class="card-head-title"><h2>${name} transacties <span>— ${monthLabel(getSelectedMonth())}</span></h2><button type="button" class="joint-transaction-add-btn" data-open-personal-transaction="${owner}" aria-label="Uitgave toevoegen">${iconSvg('receipt')}</button></div></div><div class="joint-transactions-list">${rowsHtml || '<p class="joint-transactions-empty">Nog geen uitgaven deze maand.</p>'}</div><div class="joint-transactions-total"><span>Totaal uitgaven</span><strong>${eur(total)}</strong></div></div>`;
@@ -4932,8 +4936,7 @@ function parkMonthControlBeforeRender(){
 function openBudgetTransactionsModal(category,owner='gezamenlijk'){
   const modal=document.getElementById('transactionModal');
   const month=getSelectedMonth();
-  const projections=selectTransactionProjections(state,{owner}).filter(p=>(p.effects.refundCorrection?p.refundMonth:p.fixedOccurrenceId?p.fixedMonth:p.calendarMonth)===month&&budgetCategoryMatches({category:p.effects.refundCorrection?p.refundCategory:p.budgetCategory||p.category},category)&&(p.effects.realExpense>0||p.effects.refundCorrection>0));
-  const rows=projections.map(p=>({...p.transaction,id:p.transaction.sourceTransactionId||p.id,category:p.effects.refundCorrection?p.refundCategory:p.budgetCategory||p.category,displayImpact:p.effects.refundCorrection?-p.effects.refundCorrection:p.fixedOccurrenceId?p.effects.fixedRegularImpact:p.effects.budgetImpact,realExpense:p.effects.realExpense,savingsFunded:p.effects.savingsFunded,refundCorrection:p.effects.refundCorrection,categoryOnlyRefundCorrection:p.effects.categoryOnlyRefundCorrection})).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+  const rows=categoryProcessingDetails(state,month,owner).filter(tx=>budgetCategoryMatches(tx,category)).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
   const total=round2(rows.reduce((sum,tx)=>sum+tx.displayImpact,0));
   modal.innerHTML=`<div class="modal budget-transactions-modal"><div class="modal-head"><div><h2>${textSafe(category)}</h2><p>${monthLabel(month)} · ${rows.length} transactie${rows.length===1?'':'s'} · ${eur(total)}</p></div><button type="button" class="ghost" data-close-budget-transactions>Sluiten</button></div><div class="budget-transactions-list">${rows.length?rows.map(tx=>`<button type="button" class="budget-transaction-row" data-open-budget-transaction-id="${textSafe(tx.id)}"><span><strong>${textSafe(tx.description||tx.category||'Transactie')}</strong><small>${formatDateNL(tx.date)} · ${textSafe(tx.category||'Overig')}${tx.savingsFunded?' · gedekt '+eur(tx.savingsFunded):''}${tx.categoryOnlyRefundCorrection?' · aparte categoriecorrectie':tx.refundCorrection?' · refundcorrectie':''}</small></span><b class="${tx.displayImpact<0?'value pos':'value neg'}">${eur(tx.displayImpact)}</b></button>`).join(''):'<p class="muted-empty">Geen budgettransacties in deze categorie.</p>'}</div></div>`;
   modal.classList.add('open');
@@ -5917,7 +5920,8 @@ function u3OpeningBalance(account,month){
   return round2(Number(closure?.accountControl?.[account]?.administrativeEnd ?? setting.openingBalance)||0);
 }
 function u3ConfirmedTransfersInCalendarMonth(account,month){
-  const actualIds=new Set(selectActiveTransactions(state).map(tx=>tx.id));
+  const banks=currentBankTransactions(),keys=new Set(banks.map(tx=>tx.bankSourceId||tx.id));
+  const actualIds=new Set([...banks.map(tx=>tx.id),...(state.transactions||[]).filter(tx=>keys.has(tx.bankSourceId||tx.id)).map(tx=>tx.id)]);
   return (state.internalTransfers||[]).filter(row=>row.status==='uitgevoerd'&&String(row.date||'').slice(0,7)===month&&!actualIds.has(row.actualTransactionId)&&!(row.transactionIds||[]).some(id=>actualIds.has(id))).reduce((sum,row)=>{
     const amount=Number(row.actualAmount??row.calculatedAmount)||0;
     if(row.sourceAccount===account) return sum-amount;
@@ -5929,10 +5933,7 @@ function u3AccountControl(month=getSelectedMonth()){
   const result={};
   U3_ACCOUNTS.forEach(account=>{
     const opening=u3OpeningBalance(account,month);
-    const transactionDelta=selectTransactionProjections(state,{month}).reduce((sum,p)=>{
-      const compatibilityAccount=p.accountContext||p.transaction.account||p.transaction.owner;
-      return compatibilityAccount===account?sum+p.effects.accountCashflow:sum;
-    },0);
+    const transactionDelta=currentBankTransactions({month,account}).reduce((sum,tx)=>sum+tx.bankAmount,0);
     const transferDelta=u3ConfirmedTransfersInCalendarMonth(account,month);
     const corrections=(state.monthCorrections||[]).filter(row=>row.account===account&&row.effectiveMonth===month&&row.status!=='vervallen').reduce((sum,row)=>sum+(Number(row.amount)||0),0);
     result[account]={opening,transactionDelta:round2(transactionDelta),transferDelta:round2(transferDelta),corrections:round2(corrections),calculatedEnd:round2(opening+transactionDelta+transferDelta+corrections)};
@@ -6449,7 +6450,7 @@ window.FinizePlanning=Object.freeze({
   income:(month,owner)=>resolvePlannedIncomeForMonth(state,month,owner)
 });
 window.FinizeManual=Object.freeze({open:(owner,id='')=>openContextTransactionModal(owner,id),categories:(owner,month)=>expenseCategoriesForMonth(state,month,owner),save:(tx,account)=>{upsertManualFinancialTransaction(clone(state),tx,account);return commitChange(()=>upsertManualFinancialTransaction(state,tx,account),{render:false});}});
-window.FinizeTransactions=Object.freeze({project:tx=>projectTransaction(tx,{state}),effects:options=>selectTransactionProjections(state,options),total:(dimension,options)=>sumTransactionEffects(state,dimension,options),fixedActual:occurrence=>fixedOccurrenceActuals(state,occurrence),income:(month,owner)=>actualIncomeForMonth(state,month,owner),forecast:month=>monthlyFinancialForecast(month),coverage:()=>coverageAllocationStatus(state),openCoverage:id=>openSavingsCoverageModal(id),confirmPair:id=>commitChange(()=>confirmInternalTransferPair(state,id))});
+window.FinizeTransactions=Object.freeze({bankSources:options=>currentBankTransactions(options),bankTotal:options=>round2(currentBankTransactions(options).reduce((sum,tx)=>sum+tx.bankAmount,0)),project:tx=>projectTransaction(tx,{state}),effects:options=>selectTransactionProjections(state,options),total:(dimension,options)=>sumTransactionEffects(state,dimension,options),fixedActual:occurrence=>fixedOccurrenceActuals(state,occurrence),income:(month,owner)=>actualIncomeForMonth(state,month,owner),forecast:month=>monthlyFinancialForecast(month),coverage:()=>coverageAllocationStatus(state),openCoverage:id=>openSavingsCoverageModal(id),confirmPair:id=>commitChange(()=>confirmInternalTransferPair(state,id))});
 window.FinizeUpdate3=Object.freeze({
   schemaVersion:U3_SCHEMA_VERSION,
   occurrenceDates:(item,month)=>u3OccurrenceDates(clone(item),month),

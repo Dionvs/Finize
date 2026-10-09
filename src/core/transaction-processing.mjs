@@ -1,3 +1,4 @@
+import { isBankSource, bankSourceForImport } from './bank-sources.mjs';
 import { expenseCategoriesForMonth } from './planning-timeline.mjs';
 import { plannedOccurrences } from './recurring-occurrences.mjs';
 import { markManualTransaction, getTransactionClassification, getTransactionProcessingStatus, getTransactionSource, getTransactionAccountContext, getTransactionFinancialDestination, getTransactionDate, ACCOUNT_CONTEXTS } from './transaction-model.mjs';
@@ -17,7 +18,8 @@ export function applyFinancialCandidate(target,candidate){
 }
 // Explicit source commands only: never called by a render, normalize or migration.
 function reopenSourceInPlace(state,importId,rowId,{dryRun=false}={}) {
-  const rows=(state.transactions||[]).filter(tx=>tx.importBatchId===importId&&tx.importTransactionId===rowId),ids=new Set(rows.map(tx=>tx.id));
+  const header=bankSourceForImport(state,importId,rowId);
+  const rows=(state.transactions||[]).filter(tx=>!isBankSource(tx)&&(header?tx.bankSourceId===header.bankSourceId:tx.importBatchId===importId&&tx.importTransactionId===rowId)),ids=new Set(rows.map(tx=>tx.id));
   if(!rows.length)return {transactionIds:[],goalIds:[]};
   const advances=(state.advanceLedger||[]).filter(entry=>ids.has(entry.transactionId)&&entry.active!==false);
   if(advances.some(advance=>(state.advanceRepayments||[]).some(entry=>entry.advanceId===advance.id&&entry.active!==false&&!ids.has(entry.transactionId))))throw new Error('Dit voorschot heeft latere aflossingen. Heropening is geblokkeerd om die administratie te behouden.');
@@ -46,11 +48,13 @@ function reopenSourceInPlace(state,importId,rowId,{dryRun=false}={}) {
   return {transactionIds:[...ids],goalIds};
 }
 function replaceSourceInPlace(state,importId,rowId,newRows) {
-  const old=(state.transactions||[]).filter(tx=>tx.importBatchId===importId&&tx.importTransactionId===rowId);
+  const header=bankSourceForImport(state,importId,rowId);
+  const matches=tx=>!isBankSource(tx)&&(header?tx.bankSourceId===header.bankSourceId:tx.importBatchId===importId&&tx.importTransactionId===rowId);
+  const old=(state.transactions||[]).filter(matches);
   const indices=old.map(tx=>state.transactions.indexOf(tx)),insert=indices.length?Math.min(...indices):state.transactions.length;
   const oldById=new Map(old.map(tx=>[tx.id,tx]));
   const sourceHistory=[...new Map(old.flatMap(tx=>[...(tx.sourceApprovalHistory||[]),...(tx.approvalHistory||[])]).map(entry=>[JSON.stringify(entry),entry])).values()];
-  state.transactions=(state.transactions||[]).filter(tx=>!(tx.importBatchId===importId&&tx.importTransactionId===rowId));
+  state.transactions=(state.transactions||[]).filter(tx=>!matches(tx));
   const next=newRows.map(tx=>({...tx,...(oldById.get(tx.id)?.approvalHistory?{approvalHistory:copy(oldById.get(tx.id).approvalHistory)}:{})}));
   if(next.length&&sourceHistory.length)next[0].sourceApprovalHistory=copy(sourceHistory);
   state.transactions.splice(insert,0,...copy(next));
@@ -62,12 +66,12 @@ function replaceSourceInPlace(state,importId,rowId,newRows) {
 
 export function assertFinancialMutationSafe(previous,next){
   const previousBalances=new Map(allGoals(previous).map(({goal})=>[goal.id,calculateGoalSavedAmount(previous,goal.id)]));
-  allGoals(next).forEach(({goal})=>{const balance=calculateGoalSavedAmount(next,goal.id);if(balance<0&&balance!==previousBalances.get(goal.id))throw new Error(`De wijziging maakt spaardoel “${goal.naam||goal.id}” negatief (${money(balance)}). Corrigeer eerst de afhankelijke spaarbewegingen.`);});
+  allGoals(next).forEach(({goal})=>{const balance=calculateGoalSavedAmount(next,goal.id);if(balance<0&&balance!==previousBalances.get(goal.id))throw new Error(`Onvoldoende saldo in spaardoel ${goal.naam||goal.id}: ${money(previousBalances.get(goal.id)||0).toLocaleString('nl-NL',{style:'currency',currency:'EUR'})} beschikbaar. De wijziging maakt het saldo negatief: ${money(balance).toLocaleString('nl-NL',{style:'currency',currency:'EUR'})}. Corrigeer eerst de afhankelijke spaarbewegingen.`);});
   const codes=new Set(['coverage-exceeds-withdrawal','coverage-exceeds-expense','coverage-cents']);
   const errors=coverageAllocationStatus(next).filter(row=>codes.has(row.reason));
   if(errors.length)throw new Error(coverageMessage(errors[0].reason));
-  const refund=selectTransactionProjections(next).find(p=>p.diagnostics.some(d=>d.code==='refund-exceeds-category'));
-  if(refund)throw new Error(`Refunds zijn hoger dan de resterende categoriebelasting voor ${refund.refundCategory} in ${refund.refundMonth}. Pas eerst de refund of spaardekking aan.`);
+  const direct=selectTransactionProjections(next).find(p=>p.diagnostics.some(d=>d.code==='coverage-exceeds-withdrawal'));
+  if(direct)throw new Error('Directe budgettoerekening en spaardekking zijn samen hoger dan de spaaropname.');
 }
 export function reopenTransactionSource(state,importId,rowId,options={}){
   if(!importId||!rowId)throw new Error('Een betrouwbare import- en bronverwijzing is vereist.');

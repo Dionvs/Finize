@@ -24,17 +24,17 @@ state.activeImportId=draft.id;
 
 const invalid=u4.planImportEffects(draft,state);
 assert.equal(invalid.ok,true);
-assert.equal(invalid.transactions.length,3,'salaris plus twee splits verwacht');
+assert.equal(invalid.transactions.filter(tx=>tx.recordRole!=='bank-source').length,3,'salaris plus twee splits verwacht');
 assert.equal(invalid.transactions.filter(tx=>tx.importTransactionId===draft.rows[1].id).reduce((sum,tx)=>sum+tx.accountDelta,0),-42.18);
 assert.equal(invalid.counts.advances,1);
 
 u4.applyImportPlan(state,invalid);
-assert.equal(state.transactions.length,3);
+assert.equal(state.transactions.filter(tx=>tx.recordRole!=='bank-source').length,3);
 assert.equal(state.activeImportId,'');
 assert.equal(state.monthRecords['2026-07'].status,'correctie-nodig');
 assert.equal(state.importSummaries[0].status,'correctie-nodig');
 u4.applyImportPlan(state,invalid);
-assert.equal(state.transactions.length,3,'opnieuw toepassen mag niet dubbel tellen');
+assert.equal(state.transactions.filter(tx=>tx.recordRole!=='bank-source').length,3,'opnieuw toepassen mag niet dubbel tellen');
 
 draft.rows[1].processing.splits[0].amount=39;
 const broken=u4.validateDraft(draft,state);

@@ -1,11 +1,11 @@
-const CACHE_NAME = "finize-v113-mobile-account-margins";
+const CACHE_NAME = "finize-v114-csv-verwerking";
 const CACHE_PREFIX = "finize-";
 
 const CRITICAL_SHELL = [
   "./",
   "./index.html",
-  "./app.js?v=113-mobile-account-margins",
-  "./app.css?v=113-mobile-account-margins",
+  "./app.js?v=114-csv-verwerking",
+  "./app.css?v=114-csv-verwerking",
   "./manifest.json"
 ];
 

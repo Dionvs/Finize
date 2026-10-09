@@ -40,7 +40,7 @@ test('importcontrole splitst onbekend, nakijken en alleen handmatig goedgekeurd'
 
 test('gedeeltelijke verwerking houdt onbekende regels open en activeert expliciete goedkeuring',async({page})=>{
   await openReview(page);
-  expect(await page.evaluate(()=>state.transactions.filter(tx=>tx.importBatchId==='review-test').length)).toBe(0);
+  expect(await page.evaluate(()=>state.transactions.filter(tx=>tx.recordRole!=='bank-source'&&tx.importBatchId==='review-test').length)).toBe(0);
   await page.locator('[data-u4-row="review-row"] [data-u4-approve]').click();
   await expect(page.locator('.u4-section-approved [data-u4-row="review-row"]')).toHaveCount(1);
   await expect.poll(()=>page.evaluate(()=>state.transactions.some(tx=>tx.importTransactionId==='review-row'&&tx.processingStatus==='goedgekeurd'))).toBe(true);

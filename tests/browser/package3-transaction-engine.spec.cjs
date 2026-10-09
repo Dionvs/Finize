@@ -42,12 +42,12 @@ for(const width of [390,1440])test(`Pakket 3 transacties, splits, fixed actuals,
  expect(await page.evaluate(()=>FinizeTransactions.project(state.transactions.at(-1)))).toMatchObject({accountContext:'dara',financialFor:'dara',status:'goedgekeurd',active:true});
  await draft(page,'p3-fixed','gezamenlijk',[{amount:-150,label:'Hypotheekdeel',unknown:true},{amount:-20,label:'Extra afschrijving',processing:{transactionType:'vaste-last',category:'Vaste lasten',fixedExpenseId:'p3-hyp',fixedOccurrenceMonth:'2026-10',fixedOccurrenceId:'p3-hyp:2026-10-01'}},{amount:-9,label:'Niet meetellen',processing:{transactionType:'niet-meetellen',include:false}}]);
  const originals=await page.evaluate(()=>__p3Draft.rows.map(row=>structuredClone(row.bankOriginal)));
- const row=page.locator('[data-u4-row="p3-fixed-0"]');await openMore(page,'p3-fixed-0');await row.locator('[data-u4-add-split]').click();await openMore(page,'p3-fixed-0');await row.locator('[data-u4-add-split]').click();
+ const row=page.locator('[data-u4-row="p3-fixed-0"]');await openMore(page,'p3-fixed-0');await row.locator('[data-u4-add-split]').click();
  await openMore(page,'p3-fixed-0');await row.locator('[data-u4-split="0"] [data-u4-split-field="amount"]').fill('100');
  await row.locator('[data-u4-split="1"] [data-u4-split-field="amount"]').fill('40');await row.locator('[data-u4-approve]').click();
- await expect(page.locator('.u4-validation-dialog')).toContainText('exact');await page.locator('[data-u4-validation-close]').click();expect(await page.evaluate(()=>state.transactions.filter(tx=>tx.importBatchId==='p3-fixed').length)).toBe(0);
+ await expect(page.locator('.u4-validation-dialog')).toContainText('te verdelen');await page.locator('[data-u4-validation-close]').click();expect(await page.evaluate(()=>state.transactions.filter(tx=>tx.recordRole!=='bank-source'&&tx.importBatchId==='p3-fixed').length)).toBe(0);
  await openMore(page,'p3-fixed-0');await row.locator('[data-u4-split="1"] [data-u4-split-field="amount"]').fill('50');
- await row.locator('[data-u4-split="0"] [data-u4-split-field="transactionType"]').selectOption('vaste-last');await openMore(page,'p3-fixed-0');
+ await row.locator('[data-u4-split="0"] [data-u4-split-field="destination"]').selectOption('Vaste lasten');await openMore(page,'p3-fixed-0');
  await row.locator('[data-u4-split="0"] [data-u4-split-field="fixedOccurrenceMonth"]').fill('2026-10');await openMore(page,'p3-fixed-0');
  await row.locator('[data-u4-split="0"] [data-u4-split-field="fixedExpenseId"]').selectOption('p3-hyp');await openMore(page,'p3-fixed-0');
  await row.locator('[data-u4-split="0"] [data-u4-split-field="fixedOccurrenceId"]').selectOption('p3-hyp:2026-10-01');
@@ -55,7 +55,7 @@ for(const width of [390,1440])test(`Pakket 3 transacties, splits, fixed actuals,
  const fixed=()=>page.evaluate(()=>FinizeTransactions.fixedActual({id:'p3-hyp:2026-10-01',month:'2026-10',amount:100}));
  expect(await fixed()).toMatchObject({planned:100,actual:120,deviation:20,status:'Betaald'});
  expect(await page.evaluate(()=>({budget:FinizeTransactions.total('budgetImpact',{month:'2026-11'}),cash:FinizeTransactions.total('accountCashflow',{month:'2026-11',account:'gezamenlijk'}),income:FinizeUpdate3.actualIncome('2026-11')}))).toEqual({budget:50,cash:-170,income:0});
- await page.evaluate(()=>FinizeUpdate4Runtime.testRenderDraftModal(window,__p3Draft));await sections(page);await page.locator('[data-u4-row="p3-fixed-0"] [data-u4-reopen]').click();await expect.poll(()=>fixed().then(p=>p.actual)).toBe(20);
+ await page.evaluate(()=>FinizeUpdate4Runtime.testRenderDraftModal(window,__p3Draft));await sections(page);await page.locator('[data-u4-row="p3-fixed-0"] [data-u4-reopen]').click();await expect.poll(()=>fixed().then(p=>p.actual)).toBe(120); // editing keeps the approved payment active
  await approve(page,'p3-fixed-0');await expect.poll(()=>fixed().then(p=>p.actual)).toBe(120);
  expect(await page.evaluate(()=>__p3Draft.rows.map(row=>row.bankOriginal))).toEqual(originals);
  await page.locator('[data-u4-close]').first().click();await expect(page.locator('#u4ImportModalRoot')).not.toHaveClass(/open/);
@@ -63,7 +63,7 @@ for(const width of [390,1440])test(`Pakket 3 transacties, splits, fixed actuals,
  for(const id of ['p3-income-0','p3-income-1'])await approve(page,id);await process(page);
  expect(await page.evaluate(()=>FinizeUpdate3.actualIncome('2026-10','dion'))).toBe(2745);
  await page.evaluate(()=>document.querySelector('#tabs [data-tab="gezamenlijk"]').click());
- const incomeCard=width===390?page.locator('#tab-gezamenlijk .mobile-kpi-card.joint-total-income-card'):page.locator('#tab-gezamenlijk .overview-kpi-row .icon-kpi').filter({hasText:'Totaal gezamenlijk inkomen'});await expect(incomeCard).toContainText('5.755,00'); // actual salary replaces forecast; extra income separately
+ const incomeCard=width===390?page.locator('#tab-gezamenlijk .mobile-kpi-card.joint-total-income-card'):page.locator('#tab-gezamenlijk .overview-kpi-row .icon-kpi').filter({hasText:'Totaal gezamenlijk inkomen'});await expect(incomeCard).toContainText('5.655,00'); // actual salary and extra income; purchase refund is not salary or income
  await page.locator('[data-u4-close]').first().click();await expect(page.locator('#u4ImportModalRoot')).not.toHaveClass(/open/);
  const before=await page.evaluate(()=>({tx:structuredClone(state.transactions),ledger:structuredClone(state.savingsGoalLedger),planning:structuredClone(state.planning),revision:state.meta.revision}));
  await page.setViewportSize({width:width===390?1440:390,height:900});await page.evaluate(()=>{state.meta.selectedMonth='2026-09';renderActiveTab();});
@@ -81,7 +81,7 @@ for(const width of [390,1440])test(`Pakket 3 expliciete replacement en transferp
  await expect.poll(()=>page.evaluate(()=>FinizeTransactions.total('budgetImpact',{month:'2026-10'}))).toBe(0);
  expect(await page.evaluate(()=>state.transactions.some(tx=>tx.id==='p3-manual'))).toBe(true);
  expect(await page.evaluate(()=>({status:__p3Draft.rows[0].certainty,amount:__p3Draft.rows[0].processing.processedAmount,description:__p3Draft.rows[0].processing.description}))).toEqual({status:'nakijken',amount:55,description:'Official bank source'});
- await row.locator('[data-u4-approve]').click();await expect(page.locator('.u4-validation-dialog')).toContainText('exact');await page.locator('[data-u4-validation-close]').click();
+ await row.locator('[data-u4-approve]').click();await expect(page.locator('.u4-validation-dialog')).toContainText('te verdelen');await page.locator('[data-u4-validation-close]').click();
  await openMore(page,'p3-replacement-0');await row.locator('[data-u4-split="1"] [data-u4-split-field="amount"]').fill('25');await approve(page,'p3-replacement-0');await process(page);
  expect(await page.evaluate(()=>FinizeTransactions.total('budgetImpact',{month:'2026-10'}))).toBe(55);
  await page.locator('[data-u4-close]').first().click();await expect(page.locator('#u4ImportModalRoot')).not.toHaveClass(/open/);
@@ -106,7 +106,7 @@ for(const width of [390,1440])test(`Legacy CSV zonder importreferentie blijft in
  await page.evaluate(()=>{commitChange(()=>state.transactions.push({id:'legacy-bank',source:'csv',approvalSource:'legacy-confirmed',processingStatus:'goedgekeurd',accountContext:'dion',account:'dion',owner:'dion',financialFor:'dion',budgetOwner:'dion',date:'2026-10-01',amount:25,kind:'uitgave',category:'Overig',description:'Legacy bank source',bankOriginal:{bankDate:'2026-10-01',amount:-25,description:'Legacy bank source'}}),{render:false});document.querySelector('#tabs [data-tab="dion"]').click();});
  const before=await page.evaluate(()=>JSON.stringify(state));let message='';page.on('dialog',async dialog=>{message=dialog.message();await dialog.accept();});
  await editPersonalSource(page,width,'Legacy bank source');
- await expect.poll(()=>message).toContain('bronverwijzing');expect(await page.evaluate(()=>JSON.stringify(state))).toBe(before);
+ await expect(page.locator('[data-u4-repair-file]')).toBeVisible();await expect(page.locator('#u4ImportModalRoot')).toContainText('bronkoppeling ontbreekt');expect(await page.evaluate(()=>JSON.stringify(state))).toBe(before);
  expect(await page.evaluate(()=>FinizeTransactions.total('budgetImpact',{month:'2026-10'}))).toBe(25);
  await expect(page.locator('#transactionModal')).not.toHaveClass(/open/);
 });

@@ -36,6 +36,8 @@ const state = {
 const context = {
   console, Date, Math, Number, String, Array, Object, Map, Set,
   state,
+  selectBankTransactions:require('../src/core/bank-sources.mjs').selectBankTransactions,
+  currentBankTransactions:options=>require('../src/core/bank-sources.mjs').selectBankTransactions(state,options),
   U3_ACCOUNTS:['gezamenlijk','dion','dara'],
   round2:value=>Math.round((Number(value)+Number.EPSILON)*100)/100,
   getSelectedMonth:()=> '2026-07',

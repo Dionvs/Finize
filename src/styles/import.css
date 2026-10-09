@@ -236,3 +236,10 @@
 .u4-import-history{ display:grid; gap:18px; }
 .u4-import-month{ display:grid; gap:9px; }
 .u4-import-month h3{ margin:0; padding:0 2px 7px; border-bottom:1px solid var(--border-soft); color:var(--text-dim); font-size:14px; text-transform:capitalize; }
+
+/* One source, compact allocation rows; native fields remain keyboard accessible. */
+.u4-split-line{padding:12px 0;border-bottom:1px solid var(--line,#d8dfe4);min-width:0}
+.u4-split-row{grid-template-columns:minmax(80px,110px) minmax(0,1fr) 44px;align-items:center}
+.u4-split-row>label{min-width:0}.u4-split-row input,.u4-split-row select{width:100%;min-width:0}
+.u4-split-row button{min-height:44px}.u4-split-line .u4-context-grid{margin-top:8px}
+@media(max-width:600px){.u4-split-row{grid-template-columns:85px minmax(0,1fr) 36px;gap:5px}.u4-split-row select{font-size:14px}.u4-split-line .u4-context-grid{grid-template-columns:1fr 1fr}}

@@ -1,0 +1,75 @@
+{
+  "verifiedAtUtc": "2026-10-08T22:24:40.969422+00:00",
+  "branch": "agent/v113-csv-verwerking",
+  "status": "local_verified",
+  "releasePublished": false,
+  "productionDataChanged": false,
+  "schemaVersion": 11,
+  "massMigrationRequired": false,
+  "commands": {
+    "pnpm run build": "passed",
+    "pnpm test": "passed",
+    "check:syntax": "passed",
+    "check:css": "passed (existing undefined token --line)",
+    "check:generated": "passed byte-reproducible",
+    "git diff --check": "passed"
+  },
+  "tests": {
+    "nodeFilesPassed": 50,
+    "registeredNodeCasesPassed": 551,
+    "registeredNodeCasesFailed": 0,
+    "newV113NodeCasesPassed": 85,
+    "browserPassed": 229,
+    "browserFailed": 0,
+    "newV113BrowserCasesPassed": 11,
+    "browserDuration": "3.7m",
+    "viewportWidths": [
+      360,
+      1440
+    ],
+    "offlinePwaWorkflow": true
+  },
+  "financialReference": {
+    "referenceSha256": "bac9ae9ac3a7f86ea72f8fdd95192a095824a6609887f9928a004cff9a8de2e3",
+    "originalEffectCount": 2,
+    "effectsUnchanged": true,
+    "forecastUnchanged": true,
+    "planningUnchanged": true,
+    "closedSnapshotsUnchanged": true,
+    "stateReadOnly": true
+  },
+  "backup": {
+    "path": "backups\\v113-csv-verwerking",
+    "readBackSha256VerifiedFiles": 198
+  },
+  "uiDetection": [],
+  "notVerified": [
+    "physical Android device",
+    "other browser engines",
+    "production Firestore",
+    "simultaneous real devices",
+    "complete personal production history audit"
+  ],
+  "releasePreparationRemaining": [
+    "separate release authorization",
+    "release version and PWA cache identity renewal"
+  ],
+  "sha256": {
+    "app.js": "a188f7050bc9ee2e37457cdea1ff99777db32e0db3e501cfde32412ac8ac4b11",
+    "app.css": "df32bfc4b70dddacfe41271c7247c18347bbcedd0b865169d2d7d6f413166962",
+    "src/core/runtime.js": "2c6928629ee9f1dafa38cd17e4808f7dfb63827bdaeb6fd91edbc23c748aec56",
+    "src/core/bank-sources.mjs": "2f3540ef5d75ac46d032c80034bb3e28b733f53c37c6a6489e2a1f4a2f5c6272",
+    "src/core/processing-lines.mjs": "58a9ca874a7de1d1950af8d651e70db4ba6c3bf328cee17358fed4c3c3784946",
+    "src/core/transaction-engine.mjs": "ec2a700d0ce0addfbf3b930b59b714c745a5bf8ba9d894235d84a62006324fb3",
+    "src/core/transaction-model.mjs": "70fdaeb2d15a52586a1d6ff96cd5fc24f4662162a241d8a32149661940e9bed0",
+    "src/core/transaction-processing.mjs": "a4152cb084628676a09b728fd136cfe424f245351a28ee0fa608fc6eed1b039f",
+    "src/import/runtime.js": "aaa5ad53abc9483eef07f0ab5e93d42d96aa8af84bdeb5f7543b5aae3394b2f1",
+    "src/import/source-repair.mjs": "df3353e13f440bbfc02c73ca88e1e72dbe0eabe2734750a440a2e0e677fe7ed5",
+    "src/import/import-lifecycle.mjs": "ea310edaeaac45a9a0d55e77e666dd170641229d9936d317bedbdb01f61fbdd4",
+    "src/import/import-sync-protocol.mjs": "027d896f62c211cbe1989b489783f7889a9772a430eb25c46421dffba1d7fbd8",
+    "src/styles/import.css": "cc855d6b73f0a33dc8dbf4bbc58eb0f6b72e6a45192caf2709444cb8aaabd233",
+    "tests/v113-csv-processing.test.cjs": "062cd27c7004878fa1d116fcecd83c288ee37cede93ab10dc9ca3ff8f932f4e5",
+    "tests/browser/v113-csv-processing.spec.cjs": "feee8cedeea8e8baf9d32d9201f28a6942c602534a234d169e2237de2134a303",
+    "tests/fixtures/v113-financial-reference.json": "bac9ae9ac3a7f86ea72f8fdd95192a095824a6609887f9928a004cff9a8de2e3"
+  }
+}
