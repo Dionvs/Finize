@@ -2,7 +2,7 @@ import { isBankSource, bankSourceForImport } from './bank-sources.mjs';
 import { expenseCategoriesForMonth } from './planning-timeline.mjs';
 import { plannedOccurrences } from './recurring-occurrences.mjs';
 import { markManualTransaction, getTransactionClassification, getTransactionProcessingStatus, getTransactionSource, getTransactionAccountContext, getTransactionFinancialDestination, getTransactionDate, ACCOUNT_CONTEXTS } from './transaction-model.mjs';
-import { transactionSourceKey, projectTransaction, selectTransactionProjections, validateTransactionProcessing, refundCategoryIsRecognizable, validateSavingsCoverageAllocation, coverageAllocationStatus, coverageMessage, confirmInternalTransferPair } from './transaction-engine.mjs';
+import { transactionSourceKey, projectTransaction, selectDependencyProjections as selectTransactionProjections, validateTransactionProcessing, refundCategoryIsRecognizable, validateSavingsCoverageAllocation, coverageAllocationStatus, coverageMessage, confirmInternalTransferPair } from './transaction-engine.mjs';
 import { calculateGoalSavedAmount, allGoals, reconcileGoalSavedAmounts } from './data-normalization.mjs';
 const copy=value=>JSON.parse(JSON.stringify(value));
 const money=value=>Math.round((Number(value)+Number.EPSILON)*100)/100;

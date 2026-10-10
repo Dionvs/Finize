@@ -230,6 +230,13 @@ service cloud.firestore {
         function opAfter(id) {
           return getAfter(/databases/$(database)/documents/households/$(householdId)/financialEpochs/$(epoch)/operations/$(id)).data;
         }
+        function preservesPeriodContract(data) {
+          return !('integrityMode' in head()) || head().integrityMode != 'manifest'
+            || (data.targetHead.integrityMode == 'manifest'
+              && data.verificationMode == 'patch'
+              && data.targetHead.manifestHashes is map
+              && data.targetHead.settingsHash is string);
+        }
         match /meta/head {
           allow read: if ownEpoch();
           allow create: if linkedTo(householdId)
@@ -253,6 +260,7 @@ service cloud.firestore {
           allow create: if ownEpoch()
             && request.resource.data.storageVersion == 2 && request.resource.data.epoch == epoch
             && request.resource.data.id == operationId && request.resource.data.phase == 'prepared'
+            && preservesPeriodContract(request.resource.data)
             && request.resource.data.baseRevision == head().revision && head().phase == 'ready'
             && request.resource.data.targetHead.revision == head().revision + 1
             && request.resource.data.memberCount is int && request.resource.data.memberCount >= 0
@@ -300,6 +308,11 @@ service cloud.firestore {
         match /periods/{month} {
           allow read: if ownEpoch();
           allow create, update: if ownEpoch() && applyingChange('periods',month);
+          allow delete: if false;
+        }
+        match /manifests/{id} {
+          allow read: if ownEpoch();
+          allow create, update: if ownEpoch() && applyingChange('manifests',id);
           allow delete: if false;
         }
         match /globals/{id} {

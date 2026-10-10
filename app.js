@@ -1462,7 +1462,7 @@
     return result;
   }
   function selectTransactionProjections(state2, { month = null, dimension = "calendar", account = null, owner = null, includeInactive = false } = {}) {
-    if (state2 == null ? void 0 : state2.__finizePartialHistory) throw Object.assign(new Error("De volledige historie is niet geladen. Gebruik de geverifieerde maandprojectie; ontbrekende transacties zijn geen nul."), { code: "period-incomplete" });
+    if (state2 == null ? void 0 : state2.__finizePartialHistory) state2 = periodDependencyState(state2, month);
     const groups = /* @__PURE__ */ new Map();
     (state2.transactions || []).filter((tx) => !isBankSource(tx)).forEach((tx) => {
       const key = transactionSourceKey(tx);
@@ -1491,7 +1491,25 @@
       return true;
     });
   }
+  function periodDependencyState(state2, month) {
+    var _a2, _b, _c;
+    if (!(state2 == null ? void 0 : state2.__finizePartialHistory)) return state2;
+    if (!month || !((_a2 = state2.verifiedPeriods) == null ? void 0 : _a2.includes(month)) || !((_c = (_b = state2.__finizePeriodContext) == null ? void 0 : _b.periods) == null ? void 0 : _c.some((row) => row.month === month))) throw Object.assign(new Error("Een vereiste financiële periode is niet geverifieerd. Ontbrekende historie is geen nul."), { code: "period-incomplete" });
+    return { ...state2, __finizePartialHistory: false };
+  }
+  function selectDependencyProjections(state2, options = {}) {
+    var _a2, _b;
+    if ((state2 == null ? void 0 : state2.__finizePartialHistory) && !((_b = (_a2 = state2.__finizePeriodContext) == null ? void 0 : _a2.periods) == null ? void 0 : _b.length)) throw Object.assign(new Error("De financiële afhankelijkheidsbasis ontbreekt."), { code: "period-incomplete" });
+    return selectTransactionProjections((state2 == null ? void 0 : state2.__finizePartialHistory) ? { ...state2, __finizePartialHistory: false } : state2, options);
+  }
   function sumTransactionEffects(state2, dimension, options = {}) {
+    var _a2, _b;
+    if ((state2 == null ? void 0 : state2.__finizePartialHistory) && !options.month) {
+      if (options.account || options.owner) throw Object.assign(new Error("Kies een geverifieerde maand voor een rekening- of eigenaartotaal."), { code: "period-incomplete" });
+      const proof = state2.__finizePeriodContext, base = (proof == null ? void 0 : proof.localCumulative) || JSON.parse(((_a2 = proof == null ? void 0 : proof.global) == null ? void 0 : _a2.payload) || "null");
+      if (!Number.isSafeInteger((_b = base == null ? void 0 : base.totalsCents) == null ? void 0 : _b[dimension])) throw Object.assign(new Error("De vereiste cumulatieve projectie ontbreekt."), { code: "period-incomplete" });
+      return base.totalsCents[dimension] / 100;
+    }
     return money(selectTransactionProjections(state2, { ...options, ...dimension === "budgetImpact" ? { dimension: "budget" } : {} }).reduce((sum, p) => sum + Number(p.effects[dimension] || 0), 0));
   }
   function categoryActuals(state2, month, owner) {
@@ -1747,6 +1765,7 @@
   }
   function projectTransaction(tx, { state: state2 = {}, ...options } = {}) {
     var _a2;
+    state2 = periodDependencyState(state2, getTransactionFinancialMonth(tx));
     const present = (state2.transactions || []).some((row) => row === tx || row.id === tx.id);
     const candidate = present ? state2 : { ...state2, transactions: [...state2.transactions || [], tx] };
     const base = projectBaseTransaction(tx, { state: candidate, ...options });
@@ -1758,11 +1777,11 @@
     return base;
   }
   function coverageAllocationStatus(state2) {
-    const rows = selectTransactionProjections(state2, { includeInactive: true }), statuses = new Map(rows.flatMap((p) => p.coverageAllocations || []).map((a) => [a.id, a]));
+    const rows = selectDependencyProjections(state2, { includeInactive: true }), statuses = new Map(rows.flatMap((p) => p.coverageAllocations || []).map((a) => [a.id, a]));
     return (state2.savingsCoverageAllocations || []).map((a) => a.active === false ? { id: a.id, active: false, reason: "removed", amountCents: a.amountCents } : statuses.get(a.id) || { id: a.id, active: false, reason: "coverage-missing-reference", amountCents: a.amountCents });
   }
   function validateSavingsCoverageAllocation(state2, allocation) {
-    const rows = selectTransactionProjections(state2, { includeInactive: true }), withdrawal = allocationEndpoint(rows, allocation, "withdrawal"), expense = allocationEndpoint(rows, allocation, "expense");
+    const rows = selectDependencyProjections(state2, { includeInactive: true }), withdrawal = allocationEndpoint(rows, allocation, "withdrawal"), expense = allocationEndpoint(rows, allocation, "expense");
     const code = coverageEligibility(withdrawal, expense, state2);
     if (code) throw new Error(coverageMessage(code));
     if (!Number.isSafeInteger(allocation.amountCents) || allocation.amountCents <= 0) throw new Error(coverageMessage("coverage-cents"));
@@ -1771,6 +1790,7 @@
     return { "coverage-missing-reference": "De gekoppelde bronregel bestaat niet meer.", "coverage-inactive-reference": "Beide transacties moeten financieel actief zijn.", "coverage-withdrawal": "Kies een actieve spaaropname met een geldig spaardoel.", "coverage-expense": "Kies een echte uitgave met reguliere maandbelasting.", "coverage-month": "Spaardekking kan alleen binnen dezelfde bankkalendermaand.", "coverage-fixed-month": "Bij vaste lasten moeten bankmaand en geplande occurrence-maand gelijk zijn.", "coverage-cents": "Het dekkingsbedrag moet positief zijn en uit gehele eurocenten bestaan.", "coverage-exceeds-withdrawal": "De totale dekking is hoger dan de spaaropname.", "coverage-exceeds-expense": "De totale dekking is hoger dan de relevante uitgave." }[code] || code;
   }
   function categoryFinancialActuals(state2, month, owner = null) {
+    state2 = periodDependencyState(state2, month);
     const map = /* @__PURE__ */ new Map(), ensure = (category) => {
       const key = categoryKey(category);
       if (!map.has(key)) map.set(key, { category, realExpense: 0, savingsFunded: 0, refundCorrection: 0, categoryOnlyRefundCorrection: 0, budgetImpact: 0 });
@@ -1802,6 +1822,7 @@
     return [...map.values()];
   }
   function categoryProcessingDetails(state2, month, owner = null) {
+    state2 = periodDependencyState(state2, month);
     const details = [];
     for (const p of selectTransactionProjections(state2)) {
       if (!owner || p.financialFor === owner) {
@@ -1817,6 +1838,7 @@
   }
   function financialForecastForMonth(state2, month, { compatibilityIncome = {}, plannedIncome = null, fixedOccurrences = null } = {}) {
     var _a2, _b, _c, _d, _e;
+    state2 = periodDependencyState(state2, month);
     if (!validMonth(month)) throw new Error("Ongeldige prognosemaand.");
     const planned = Object.fromEntries(["dion", "dara"].map((owner) => {
       var _a3, _b2;
@@ -1939,7 +1961,7 @@
           const periods = collection === "transactions" ? [...new Set([String(((_b = row.bankOriginal) == null ? void 0 : _b.bankDate) || row.date || "").slice(0, 7), ...lines.flatMap((line) => {
             var _a3;
             return [getTransactionFinancialMonth(line), getTransactionFinancialMonth(line, { dimension: "fixed" }), line.refundMonth || ((_a3 = line.processing) == null ? void 0 : _a3.refundMonth)];
-          })].filter((month) => /^\d{4}-\d{2}$/.test(month)))] : [];
+          })].filter((month) => /^\d{4}-\d{2}$/.test(month)))] : collection === "savingsGoalLedger" && /^\d{4}-\d{2}$/.test(row.month) ? [row.month] : [];
           records.push({ id: JSON.stringify([collection, row.id]), collection, recordId: row.id, value: clone2(row), periods });
         }
       } else {
@@ -1974,6 +1996,16 @@
       transaction.onerror = transaction.onabort = () => reject(transaction.error || fail("storage-aborted", "De lokale opslagtransactie is afgebroken."));
     });
   }
+  async function financialSnapshot(transaction) {
+    const head = await requestResult(transaction.objectStore("financialHead").get("current"));
+    if (!head) return { head: null, records: [] };
+    const records = transaction.objectStore("financialRecords");
+    if (!head.partialHistory) return { head, records: await requestResult(records.getAll()) };
+    const keys = Object.entries(head.layout).flatMap(([collection, layout]) => (layout.kind === "list" ? layout.ids : [""]).map((id) => JSON.stringify([collection, id])));
+    const selected = await Promise.all(keys.map((id) => requestResult(records.get(id))));
+    if (selected.some((row) => !row)) throw fail("storage-integrity", "Een vereiste lokale periodeafhankelijkheid ontbreekt.");
+    return { head, records: selected };
+  }
   function createHouseholdStore(scope = "legacy", { verifySource = async () => {
   } } = {}) {
     let cachedHead = null, cachedRecords = /* @__PURE__ */ new Map();
@@ -1984,7 +2016,7 @@
     }
     async function load({ allowUnverified = false } = {}) {
       const db = await openHouseholdDatabase(scope), tx = db.transaction(["financialHead", "financialRecords"], "readonly"), done = completed(tx);
-      const [head, records] = await Promise.all([requestResult(tx.objectStore("financialHead").get("current")), requestResult(tx.objectStore("financialRecords").getAll()), done]);
+      const [{ head, records }] = await Promise.all([financialSnapshot(tx), done]);
       if (!head) return null;
       if (!allowUnverified && !head.verified) throw fail("storage-migration", "De opslagmigratie moet eerst worden gecontroleerd.");
       const state2 = decodeHouseholdState(head, records);
@@ -1993,12 +2025,15 @@
       cachedRecords = new Map(records.map((record) => [record.id, JSON.stringify(record)]));
       return state2;
     }
-    async function commit(state2, { expectedHash = ((_a2) => (_a2 = cachedHead == null ? void 0 : cachedHead.sha256) != null ? _a2 : null)(), operationId = crypto.randomUUID(), importMutation = null, migration = null, queueCloud = true, cloudAcceptance = null } = {}) {
+    async function commit(state2, { expectedHash = ((_a2) => (_a2 = cachedHead == null ? void 0 : cachedHead.sha256) != null ? _a2 : null)(), operationId = crypto.randomUUID(), importMutation = null, migration = null, queueCloud = true, cloudAcceptance = null, periodAcceptance = null, resolutionAcceptance = null } = {}) {
       var _a3, _b, _c, _d;
       await verifySource(migration || (cachedHead == null ? void 0 : cachedHead.migration));
       if (cloudAcceptance && (importMutation || queueCloud)) throw fail("storage-contract", "Een cloudontvangst accepteert geen parallelle lokale importbewerking.");
+      if (periodAcceptance && (!state2.__finizePartialHistory || queueCloud || importMutation || cloudAcceptance)) throw fail("storage-contract", "Periodeontvangst gebruikt één gecontroleerde lokale commit zonder financiële heruitvoering.");
+      if (resolutionAcceptance && (!state2.__finizePartialHistory || !queueCloud || periodAcceptance || cloudAcceptance || importMutation)) throw fail("storage-contract", "Conflictoplossing vereist één atomaire periodecommit met outbox.");
       const encoded = encodeHouseholdState(state2), sha256 = await backupDigest(JSON.stringify(state2));
       const next = { id: "current", storageVersion: LOCAL_STORAGE_VERSION, schemaVersion: 11, storageRevision: ((cachedHead == null ? void 0 : cachedHead.storageRevision) || 0) + 1, revision: Number((_a3 = state2.meta) == null ? void 0 : _a3.revision) || 0, layout: encoded.layout, sha256, verified: !migration, migration: migration || (cachedHead == null ? void 0 : cachedHead.migration) || null, operationId };
+      if (state2.__finizePartialHistory) next.partialHistory = true;
       const desired = new Set(encoded.records.map((record) => record.id));
       const changes = encoded.records.filter((record) => cachedRecords.get(record.id) !== JSON.stringify(record)).map((record) => ({ record, before: cachedRecords.has(record.id) ? JSON.parse(cachedRecords.get(record.id)) : null }));
       const removed = [...cachedRecords].filter(([id]) => !desired.has(id)).map(([, value]) => JSON.parse(value));
@@ -2019,7 +2054,11 @@
         tx.onerror = tx.onabort = () => reject(failure || tx.error || fail("storage-aborted", "De lokale financiële commit is afgebroken."));
         const heads = tx.objectStore("financialHead"), get = heads.get("current"), operation = tx.objectStore("operationReceipts").get(operationId);
         operation.onsuccess = () => {
-          var _a4, _b2, _c2;
+          var _a4, _b2, _c2, _d2;
+          if (((_a4 = get.result) == null ? void 0 : _a4.partialHistory) && !state2.__finizePartialHistory) {
+            abort(fail("storage-contract", "Een periodeadministratie kan niet via het oude volledige-statecontract worden overschreven."));
+            return;
+          }
           if (get.result && !get.result.verified) {
             abort(fail("storage-migration", "Een ongecontroleerde migratiestand accepteert geen financiële wijzigingen."));
             return;
@@ -2030,7 +2069,7 @@
               abort(fail("storage-operation-reused", "Dit operatie-ID is al gebruikt voor een andere financiële wijziging."));
               return;
             }
-            if (((_a4 = get.result) == null ? void 0 : _a4.sha256) !== sha256) {
+            if (((_b2 = get.result) == null ? void 0 : _b2.sha256) !== sha256) {
               abort(fail("storage-operation-committed", "Deze operatie is al bevestigd; lees eerst de nieuwere duurzame stand."));
               return;
             }
@@ -2038,20 +2077,37 @@
             confirmedHead = get.result;
             return;
           }
-          if (((_c2 = (_b2 = get.result) == null ? void 0 : _b2.sha256) != null ? _c2 : null) !== expectedHash) {
+          if (((_d2 = (_c2 = get.result) == null ? void 0 : _c2.sha256) != null ? _d2 : null) !== expectedHash) {
             abort(fail("storage-conflict", "De duurzame financiële stand is intussen gewijzigd. Herlaad de actuele stand; je invoer blijft behouden."));
             return;
           }
           const publish = () => {
+            var _a5;
             try {
               const records = tx.objectStore("financialRecords");
-              for (const record of removed) records.delete(record.id);
+              if (!state2.__finizePartialHistory) for (const record of removed) records.delete(record.id);
               for (const change of changes) records.put(change.record);
               heads.put(next);
               tx.objectStore("operationReceipts").put(receipt);
+              if (state2.__finizePartialHistory && !((_a5 = get.result) == null ? void 0 : _a5.partialHistory)) tx.objectStore("journal").put({ id: "pre-period-head-" + next.storageRevision, operation: "preserved-full-history-head", head: clone2(get.result), scope });
+              if (periodAcceptance) tx.objectStore("financialOutbox").put({ ...clone2(periodAcceptance), id: "cloud-base", localSha256: sha256 });
+              if (resolutionAcceptance) {
+                const journal = tx.objectStore("journal"), read2 = journal.get(resolutionAcceptance.id), outbox = tx.objectStore("financialOutbox"), all = outbox.getAll();
+                read2.onsuccess = () => {
+                  if (!read2.result || read2.result.status !== "conflict" || read2.result.localHash !== expectedHash) {
+                    abort(fail("storage-conflict", "De beoordeelde conflictstand is gewijzigd."));
+                    return;
+                  }
+                  journal.put({ ...read2.result, resolution: { ...clone2(resolutionAcceptance.resolution), outcome: "pending" } });
+                };
+                all.onsuccess = () => {
+                  for (const row of all.result) if (row.conflictId === resolutionAcceptance.id) outbox.put({ ...row, status: "pending" });
+                };
+                outbox.put({ ...clone2(resolutionAcceptance.base), id: "cloud-base" });
+              }
               if (queueCloud) {
                 const outbox = tx.objectStore("financialOutbox");
-                outbox.put({ id: operationId, operationId, status: "pending", storageRevision: next.storageRevision, revision: next.revision, sha256, previousHash: expectedHash, layout: encoded.layout, changes, removed, queuedAt: receipt.committedAt });
+                outbox.put({ id: operationId, operationId, status: "pending", storageRevision: next.storageRevision, revision: next.revision, sha256, previousHash: expectedHash, layout: encoded.layout, changes, removed, queuedAt: receipt.committedAt, ...resolutionAcceptance ? { conflictId: resolutionAcceptance.id } : {} });
                 outbox.put({ id: "current", operationId, status: "pending", storageRevision: next.storageRevision, sha256 });
               }
               if (importMutation) {
@@ -2074,7 +2130,10 @@
                 if (JSON.stringify(imports2.result) !== cloudAcceptance.expectedImportsSignature || queue.result.length) throw fail("import-conflict", "Lokale importkeuzes wijzigden tijdens cloudontvangst.");
                 for (const old of imports2.result) {
                   const incoming = cloudAcceptance.imports.find((row) => row.id === old.id);
-                  if (!incoming) throw fail("import-conflict", "Een lokale import ontbreekt in de externe stand.");
+                  if (!incoming) {
+                    if (cloudAcceptance.partial === true) continue;
+                    throw fail("import-conflict", "Een lokale import ontbreekt in de externe stand.");
+                  }
                   assertOriginalBankDataUnchanged(old.rows, incoming.rows);
                 }
                 publish();
@@ -2165,7 +2224,7 @@
     }
     async function inspectOperation(id) {
       const db = await openHouseholdDatabase(scope), tx = db.transaction(["financialHead", "financialRecords", "operationReceipts"], "readonly"), done = completed(tx);
-      const [head, records, receipt] = await Promise.all([requestResult(tx.objectStore("financialHead").get("current")), requestResult(tx.objectStore("financialRecords").getAll()), requestResult(tx.objectStore("operationReceipts").get(id)), done]);
+      const [{ head, records }, receipt] = await Promise.all([financialSnapshot(tx), requestResult(tx.objectStore("operationReceipts").get(id)), done]);
       const state2 = head ? decodeHouseholdState(head, records) : null;
       if (head && await backupDigest(JSON.stringify(state2)) !== head.sha256) throw fail("storage-integrity", "Het operatiebewijs heeft geen betrouwbare financiële stand.");
       cachedHead = head;
@@ -2174,7 +2233,24 @@
     }
     async function readCloudSnapshot() {
       const db = await openHouseholdDatabase(scope), tx = db.transaction(stores, "readonly"), done = completed(tx);
-      const [head, records, imports, outbox, receipts, journals, importQueue] = await Promise.all([requestResult(tx.objectStore("financialHead").get("current")), requestResult(tx.objectStore("financialRecords").getAll()), requestResult(tx.objectStore("imports").getAll()), requestResult(tx.objectStore("financialOutbox").getAll()), requestResult(tx.objectStore("operationReceipts").getAll()), requestResult(tx.objectStore("journal").getAll()), requestResult(tx.objectStore("syncQueue").getAll()), done]);
+      const financial = financialSnapshot(tx), pending = requestResult(tx.objectStore("financialOutbox").getAll()), queued = requestResult(tx.objectStore("syncQueue").getAll());
+      const importsRead = (async () => {
+        const { head: head2 } = await financial;
+        if (!(head2 == null ? void 0 : head2.partialHistory)) return requestResult(tx.objectStore("imports").getAll());
+        const queue = await queued;
+        return (await Promise.all([...new Set(queue.map((row) => row.importId || row.id))].map((id) => requestResult(tx.objectStore("imports").get(id))))).filter(Boolean);
+      })();
+      const receiptsRead = (async () => {
+        const rows = await pending;
+        return (await Promise.all(rows.filter((row) => row.id !== "current" && ["pending", "conflict"].includes(row.status)).map((row) => requestResult(tx.objectStore("operationReceipts").get(row.id))))).filter(Boolean);
+      })();
+      const journalsRead = (async () => {
+        const { head: head2 } = await financial;
+        if (!(head2 == null ? void 0 : head2.partialHistory)) return requestResult(tx.objectStore("journal").getAll());
+        const rows = await pending;
+        return (await Promise.all([...new Set(rows.map((row) => row.conflictId).filter(Boolean))].map((id) => requestResult(tx.objectStore("journal").get(id))))).filter(Boolean);
+      })();
+      const [{ head, records }, imports, outbox, receipts, journals, importQueue] = await Promise.all([financial, importsRead, pending, receiptsRead, journalsRead, queued, done]);
       if (!(head == null ? void 0 : head.verified)) throw fail("storage-migration", "Synchronisatie vereist geverifieerde lokale opslag.");
       const state2 = decodeHouseholdState(head, records);
       if (await backupDigest(JSON.stringify(state2)) !== head.sha256) throw fail("storage-integrity", "De lokale synchronisatiebasis heeft een afwijkende hash.");
@@ -2373,6 +2449,36 @@
     return { emulator: { host, projectId }, get, query, commit, metrics };
   }
 
+  // src/storage/record-manifest.mjs
+  var manifestBucket = (row) => (row.collection.startsWith("@") ? "i" : "s") + row.logicalId.slice(0, 2);
+  async function recordManifests(records, existingIds = []) {
+    const buckets = new Map(existingIds.map((id) => [id, { id, entries: {} }]));
+    for (const row of records.filter((row2) => !row2.removed)) {
+      const id = manifestBucket(row);
+      if (!buckets.has(id)) buckets.set(id, { id, entries: {} });
+      buckets.get(id).entries[row.id] = await digest(row);
+    }
+    const manifests = [...buckets.values()].sort((a, b) => a.id.localeCompare(b.id));
+    return { manifests, manifestHashes: Object.fromEntries(await Promise.all(manifests.map(async (row) => [row.id, await digest(row)]))) };
+  }
+  async function manifestRoots(hashes) {
+    const root2 = (prefix) => digest(Object.fromEntries(Object.entries(hashes).filter(([id]) => id.startsWith(prefix))));
+    return { stateHash: await root2("s"), importsHash: await root2("i") };
+  }
+  async function verifyRecordManifests(head, records, manifests) {
+    if (!head.manifestHashes) throw storageError("manifest-missing", "Deze cloudversie vereist eerst een gecontroleerde manifestmigratie.");
+    const computed = await recordManifests(records, Object.keys(head.manifestHashes));
+    if (canonical(computed.manifestHashes) !== canonical(head.manifestHashes)) throw storageError("record-integrity", "De recordmanifesten sluiten niet aan op de canonieke bronnen.");
+    for (const expected of computed.manifests) {
+      const stored = manifests.find((row) => row.id === expected.id);
+      if (!stored || await digest(stored) !== head.manifestHashes[expected.id]) throw storageError("record-integrity", "Een geverifieerd recordmanifest ontbreekt.");
+    }
+    if (head.integrityMode === "manifest") {
+      const roots = await manifestRoots(head.manifestHashes);
+      if (roots.stateHash !== head.stateHash || roots.importsHash !== head.importsHash) throw storageError("record-integrity", "De administratie wijkt af van het manifestcontract.");
+    }
+  }
+
   // src/storage/cloud-record-model.mjs
   var RECORD_STORAGE_VERSION = 2;
   var MAX_RECORD_PAYLOAD = 18e4;
@@ -2406,12 +2512,12 @@
       expanded["@rows:" + batch.id] = rows || [];
       return header;
     });
-    const encoded = encodeHouseholdState(expanded), months = financialPeriods(state2, options.periods), dependencies = transactionPeriodDependencies(state2, months), records = [], ordinals = /* @__PURE__ */ new Map();
+    const encoded = encodeHouseholdState(expanded), months = options.onlyPeriods || financialPeriods(state2, options.periods), dependencies = transactionPeriodDependencies(state2, months), records = [], ordinals = /* @__PURE__ */ new Map();
     for (const record of encoded.records) {
       const ordinal = ordinals.get(record.collection) || 0;
       ordinals.set(record.collection, ordinal + 1);
       const payload = canonical(record.value), chunks = parts(payload), key = await digest(record.id), source = rawSource(record.value), sourceHash = source ? await digest(source) : "";
-      const periods = record.collection === "transactions" ? months.filter((month) => dependencies.get(month).has(record.recordId)) : [];
+      const periods = record.collection === "transactions" ? months.filter((month) => dependencies.get(month).has(record.recordId)) : record.periods;
       for (let part = 0; part < chunks.length; part++) records.push({ id: key + "-" + part, logicalId: key, recordKey: record.id, collection: record.collection, recordId: record.recordId, kind: encoded.layout[record.collection].kind, ordinal, part, partCount: chunks.length, logicalHash: await digest(payload), payload: chunks[part], hash: await digest(chunks[part]), sourceHash, periods, removed: false });
     }
     const periodDocuments = [];
@@ -2421,7 +2527,8 @@
     }
     const global = { id: "financial", projectionVersion: 1, payload: canonical(cumulativeFinancials(state2)) };
     const layout = Object.fromEntries(Object.entries(encoded.layout).map(([key, value]) => [key, value.kind]));
-    return { records, periods: periodDocuments, global, layout, stateHash: await digest(state2), importsHash: await digest(imports), recordCount: records.length, importCount: imports.length, periodHashes: Object.fromEntries(await Promise.all(periodDocuments.map(async (row) => [row.month, await digest(row)]))), globalHash: await digest(global) };
+    const settings = { id: "settings", dependencies: records.filter((row) => row.collection !== "transactions" && !row.collection.startsWith("@") && !row.periods.length).map((row) => ({ id: row.id, hash: row.hash })).sort((a, b) => a.id.localeCompare(b.id)) };
+    return { records, periods: periodDocuments, global, settings, settingsHash: await digest(settings), ...await recordManifests(records), layout, stateHash: await digest(state2), importsHash: await digest(imports), recordCount: records.length, importCount: imports.length, periodHashes: Object.fromEntries(await Promise.all(periodDocuments.map(async (row) => [row.month, await digest(row)]))), globalHash: await digest(global) };
   }
   async function decodeRecordValues(records) {
     const groups = /* @__PURE__ */ new Map();
@@ -2456,11 +2563,11 @@
       batch.rows = expanded["@rows:" + batch.id] || [];
       delete expanded["@rows:" + batch.id];
     }
-    if (await digest(expanded) !== head.stateHash || await digest(imports) !== head.importsHash) throw storageError("record-integrity", "De teruggelezen administratie of importhistorie wijkt af.");
+    if (head.integrityMode !== "manifest" && (await digest(expanded) !== head.stateHash || await digest(imports) !== head.importsHash)) throw storageError("record-integrity", "De teruggelezen administratie of importhistorie wijkt af.");
     return { state: expanded, imports };
   }
   function recordChanges(previous, next) {
-    const documents = (snapshot2) => new Map([...((snapshot2 == null ? void 0 : snapshot2.records) || []).map((row) => ["records/" + row.id, row]), ...((snapshot2 == null ? void 0 : snapshot2.periods) || []).map((row) => ["periods/" + row.id, row]), ...(snapshot2 == null ? void 0 : snapshot2.global) ? [["globals/financial", snapshot2.global]] : []]);
+    const documents = (snapshot2) => new Map([...((snapshot2 == null ? void 0 : snapshot2.records) || []).map((row) => ["records/" + row.id, row]), ...((snapshot2 == null ? void 0 : snapshot2.periods) || []).map((row) => ["periods/" + row.id, row]), ...((snapshot2 == null ? void 0 : snapshot2.manifests) || []).map((row) => ["manifests/" + row.id, row]), ...(snapshot2 == null ? void 0 : snapshot2.settings) ? [["globals/settings", snapshot2.settings]] : [], ...(snapshot2 == null ? void 0 : snapshot2.global) ? [["globals/financial", snapshot2.global]] : []]);
     const a = documents(previous), b = documents(next), result = [];
     for (const path of /* @__PURE__ */ new Set([...a.keys(), ...b.keys()])) {
       const before = a.get(path) || null, value = b.get(path) || null;
@@ -2569,579 +2676,6 @@
     return Object.freeze({ hydrate, prepare, generationRef });
   }
 
-  // src/storage/cloud-records.mjs
-  var same = (a, b) => canonical(a) === canonical(b);
-  var batches = (values) => Array.from({ length: Math.ceil(values.length / 8) }, (_, index) => values.slice(index * 8, index * 8 + 8));
-  function createRecordCloudStore({ transport, householdId, applicationProjection, readLegacyImports } = {}) {
-    if (!(transport == null ? void 0 : transport.emulator) || !/^demo-/.test(transport.emulator.projectId) || !/^127\.0\.0\.1:\d+$/.test(transport.emulator.host)) throw storageError("emulator-only", "Nieuwe cloudopslag is nog niet voor productie vrijgegeven.");
-    if (!/^[A-Za-z0-9_-]{1,120}$/.test(householdId || "")) throw storageError("household-scope", "Een geldig huishouden is verplicht.");
-    const household = `households/${householdId}`, controlPath = household + "/financialStorage/current", legacyPath = household + "/budgetState/current";
-    const epochPath = (epoch2) => household + "/financialEpochs/" + epoch2;
-    async function context({ allowMigration = false, allowPending = false } = {}) {
-      const control = await transport.get(controlPath), c = control == null ? void 0 : control.data;
-      if ((c == null ? void 0 : c.storageVersion) !== RECORD_STORAGE_VERSION || !["active", ...allowMigration ? ["preparing", "verified"] : []].includes(c.phase)) throw storageError("storage-version", "Het recordmodel is nog niet geverifieerd en geactiveerd.");
-      const root2 = epochPath(c.epoch), head = await transport.get(root2 + "/meta/head");
-      if (!head || head.data.epoch !== c.epoch || head.data.storageVersion !== RECORD_STORAGE_VERSION) throw storageError("storage-version", "Het cloudversiecontract is inconsistent.");
-      if (!allowPending && head.data.phase !== "ready") throw storageError("cloud-pending", "Een onderbroken cloudpublicatie moet eerst worden gecontroleerd en hervat.");
-      return { control, head, root: root2 };
-    }
-    async function components(root2) {
-      const [records, periods, global] = await Promise.all([transport.query(root2 + "/records"), transport.query(root2 + "/periods"), transport.get(root2 + "/globals/financial")]);
-      return { records: records.map((row) => row.data), periods: periods.map((row) => row.data), global: (global == null ? void 0 : global.data) || null };
-    }
-    async function verifyAt(root2, head) {
-      const values = await components(root2), decoded = await decodeRecordSnapshot(head, values.records);
-      if (head.globalHash !== await digest(values.global)) throw storageError("cloud-integrity", "De cumulatieve cloudprojectie wijkt af.");
-      for (const [month, hash] of Object.entries(head.periodHashes)) {
-        const period = values.periods.find((row) => row.month === month);
-        if (!period || await digest(period) !== hash) throw storageError("cloud-integrity", "Financiële maandprojectie ontbreekt of is corrupt: " + month);
-        const dependencies = values.records.filter((row) => row.periods.includes(month)).map((row) => ({ id: row.id, hash: row.hash })).sort((a, b) => a.id.localeCompare(b.id));
-        if (!same(dependencies, period.dependencies)) throw storageError("cloud-integrity", "Financiële maandafhankelijkheden zijn niet compleet: " + month);
-      }
-      return { ...decoded, ...values, head };
-    }
-    async function verifyIntegrity(options = {}) {
-      const c = await context(options), result = await verifyAt(c.root, c.head.data), after = await transport.get(c.root + "/meta/head");
-      if (!same(after.data, c.head.data)) throw storageError("cloud-conflict", "De cloudstand wijzigde tijdens integriteitscontrole.");
-      return result;
-    }
-    async function assertLegacySource(control) {
-      var _a2;
-      const legacy = await transport.get(legacyPath);
-      if ((((_a2 = legacy == null ? void 0 : legacy.data) == null ? void 0 : _a2.syncVersion) || 0) !== control.sourceVersion || await digest((legacy == null ? void 0 : legacy.data) || null) !== control.sourcePointerHash) throw storageError("migration-source-conflict", "De beschermde oude cloudbron wijzigde tijdens migratie.");
-      const headers = (await transport.query(household + "/imports")).map((row) => ({ path: row.path, data: row.data })).sort((a, b) => a.path.localeCompare(b.path));
-      if (await digest(headers) !== control.sourceImportHeadersHash) throw storageError("migration-source-conflict", "De oude importheaders wijzigden tijdens de migratiecontrole.");
-    }
-    async function migrate({ state: state2, imports = [], epoch: epoch2, legacyPointer, checkpoint = () => {
-    } }) {
-      var _a2, _b, _c, _d, _e;
-      if (!/^[A-Za-z0-9_-]{1,120}$/.test(epoch2 || "")) throw storageError("migration-epoch", "Ongeldig migratie-epoch.");
-      let existing = await transport.get(controlPath);
-      if (!existing) {
-        const legacy = await transport.get(legacyPath);
-        if (!same((legacy == null ? void 0 : legacy.data) || null, legacyPointer || null)) throw storageError("migration-source-conflict", "De gelezen oude cloudstand is intussen gewijzigd.");
-        let sourceState = (_a2 = legacy == null ? void 0 : legacy.data) == null ? void 0 : _a2.state;
-        if ((_b = legacy == null ? void 0 : legacy.data) == null ? void 0 : _b.stateFormat) {
-          const pointer = legacy.data, path = legacyPath + "/generations/" + pointer.activeGeneration, descriptor = (_c = await transport.get(path)) == null ? void 0 : _c.data;
-          if (!descriptor) throw storageError("migration-incomplete", "De oude generatie ontbreekt.");
-          const chunks = [];
-          for (let i = 0; i < descriptor.chunkCount; i++) chunks.push(((_d = await transport.get(path + "/chunks/" + i)) == null ? void 0 : _d.data) || null);
-          sourceState = await decodeCloudState(pointer, descriptor, chunks);
-        }
-        if (sourceState && !same(sourceState, state2)) throw storageError("migration-source-conflict", "De migratiekandidaat wijkt af van de teruggelezen oude financiële bron.");
-        const oldHeaders = await transport.query(household + "/imports");
-        const sourceImports = readLegacyImports ? await readLegacyImports(oldHeaders, transport) : oldHeaders.map((row) => {
-          if (!Array.isArray(row.data.rows)) throw storageError("migration-incomplete", "De bestaande importdelen vereisen een volledige legacy-readback.");
-          return row.data;
-        });
-        if (!same(sourceImports, imports)) throw storageError("migration-source-conflict", "Niet alle bestaande cloudimports en CSV-bronnen zijn verliesloos meegenomen.");
-        const control = { storageVersion: 2, minClientVersion: 117, epoch: epoch2, phase: "preparing", sourceVersion: ((_e = legacy == null ? void 0 : legacy.data) == null ? void 0 : _e.syncVersion) || 0, sourcePointerHash: await digest((legacy == null ? void 0 : legacy.data) || null), sourceImportHeadersHash: await digest(oldHeaders.map((row) => ({ path: row.path, data: row.data })).sort((a, b) => a.path.localeCompare(b.path))), sourceStateHash: await digest(state2), sourceImportsHash: await digest(imports) };
-        const head = { storageVersion: 2, epoch: epoch2, phase: "ready", revision: 0, lastOperation: "", pendingOperation: "", stateHash: "", importsHash: "", layout: {}, recordCount: 0, importCount: 0, periodHashes: {}, globalHash: "" };
-        await transport.commit([{ path: controlPath, data: control }, { path: epochPath(epoch2) + "/meta/head", data: head }], /* @__PURE__ */ new Map([[controlPath, null], [epochPath(epoch2) + "/meta/head", null]]));
-        existing = { data: control };
-      }
-      if (existing.data.epoch !== epoch2 || existing.data.sourceStateHash !== await digest(state2) || existing.data.sourceImportsHash !== await digest(imports)) throw storageError("migration-source-conflict", "Een ander migratie-epoch of andere bron is al beschermd.");
-      await checkpoint("protected");
-      if (existing.data.phase === "active") return verifyIntegrity();
-      await assertLegacySource(existing.data);
-      await commit({ state: state2, imports, operationId: "migration-" + epoch2, expectedRevision: 0, allowMigration: true, checkpoint });
-      const result = await verifyIntegrity({ allowMigration: true });
-      await checkpoint("verified-readback");
-      const latest2 = await transport.get(controlPath);
-      await assertLegacySource(latest2.data);
-      await transport.commit([{ path: controlPath, data: { ...latest2.data, phase: "verified", verifiedStateHash: result.head.stateHash, verifiedRecordCount: result.head.recordCount, verifiedPeriodCount: Object.keys(result.head.periodHashes).length } }], /* @__PURE__ */ new Map([[controlPath, latest2.version]]));
-      return result;
-    }
-    async function activate({ approveTestCutover = false } = {}) {
-      if (approveTestCutover !== true) throw storageError("cutover-approval", "Omschakeling vereist een afzonderlijke expliciete testgoedkeuring.");
-      const c = await context({ allowMigration: true });
-      if (c.control.data.phase === "active") return c.head.data;
-      if (c.control.data.phase !== "verified") throw storageError("migration-incomplete", "De migratie is nog niet volledig teruggelezen.");
-      await assertLegacySource(c.control.data);
-      await verifyAt(c.root, c.head.data);
-      await transport.commit([{ path: controlPath, data: { ...c.control.data, phase: "active" } }], /* @__PURE__ */ new Map([[controlPath, c.control.version]]));
-      return c.head.data;
-    }
-    async function stageOperation(c, next, operationId, members, checkpoint) {
-      const path = c.root + "/operations/" + operationId, old = await transport.get(path);
-      if (old && old.data.phase !== "prepared") {
-        if (old.data.stateHash !== next.stateHash || old.data.importsHash !== next.importsHash || old.data.memberHash !== await digest(members)) throw storageError("operation-reused", "Dit operatie-ID hoort al bij een andere wijziging.");
-        return old.data;
-      }
-      const previous = c.head.data.revision ? await components(c.root) : null, changes = recordChanges(previous, next).sort((a, b) => a.path.localeCompare(b.path));
-      const targetHead = { storageVersion: 2, epoch: c.control.data.epoch, phase: "ready", revision: c.head.data.revision + 1, lastOperation: operationId, pendingOperation: "", stateHash: next.stateHash, importsHash: next.importsHash, layout: next.layout, recordCount: next.recordCount, importCount: next.importCount, periodHashes: next.periodHashes, globalHash: next.globalHash };
-      const operation = { storageVersion: 2, epoch: c.control.data.epoch, id: operationId, phase: "prepared", baseRevision: c.head.data.revision, stateHash: next.stateHash, importsHash: next.importsHash, changeCount: changes.length, changeHash: await digest(changes), targetHead, memberCount: members.length, memberHash: await digest(members) };
-      if (old && !same(old.data, operation)) throw storageError("operation-reused", "Het voorbereide operatiebewijs wijkt af.");
-      if (!old) await transport.commit([{ path, data: operation }], /* @__PURE__ */ new Map([[path, null]]));
-      await checkpoint("operation-prepared");
-      for (const batch of batches(changes)) await transport.commit(batch.map((change) => ({ path: path + "/changes/" + change.id, data: change })));
-      for (const batch of batches(members)) await transport.commit(batch.map((member) => ({ path: path + "/members/" + member.id, data: member })));
-      await checkpoint("changes-staged");
-      return operation;
-    }
-    async function recover(operationId, { allowMigration = false, checkpoint = () => {
-    } } = {}) {
-      const c = await context({ allowMigration, allowPending: true }), operationPath = c.root + "/operations/" + operationId, stored = await transport.get(operationPath), operation = stored == null ? void 0 : stored.data;
-      if (!operation) throw storageError("operation-missing", "Het voorbereide cloudoperatiebewijs ontbreekt.");
-      if (operation.phase === "committed") return { outcome: "committed", operationId, revision: operation.targetHead.revision, replayed: true };
-      const changes = (await transport.query(operationPath + "/changes")).map((row) => row.data).sort((a, b) => a.id.localeCompare(b.id));
-      if (changes.length !== operation.changeCount || await digest([...changes].sort((a, b) => a.path.localeCompare(b.path))) !== operation.changeHash) throw storageError("operation-incomplete", "De voorbereide cloudwijziging is niet volledig; financiële publicatie is geblokkeerd.");
-      const memberProofs = (await transport.query(operationPath + "/members")).map((row) => row.data).sort((a, b) => a.id.localeCompare(b.id));
-      if (memberProofs.length !== operation.memberCount || await digest(memberProofs) !== operation.memberHash) throw storageError("operation-incomplete", "De lokale operatiebewijzen zijn niet compleet.");
-      if (c.head.data.phase === "ready") {
-        if (c.head.data.revision !== operation.baseRevision) throw storageError("cloud-conflict", "De cloudbasis wijzigde; de lokale en externe versies blijven bewaard.");
-        await transport.commit([{ path: c.root + "/meta/head", data: { ...c.head.data, phase: "applying", pendingOperation: operationId } }, { path: operationPath, data: { ...operation, phase: "applying" } }], /* @__PURE__ */ new Map([[c.root + "/meta/head", c.head.version], [operationPath, stored.version]]));
-      } else if (c.head.data.pendingOperation !== operationId) throw storageError("cloud-pending", "Een andere cloudoperatie moet eerst worden hervat.");
-      await checkpoint("locked");
-      for (const batch of batches(changes)) {
-        await transport.commit(batch.map((change) => ({ path: c.root + "/" + change.path, data: change.after })));
-        await checkpoint("records-applied");
-      }
-      await verifyAt(c.root, operation.targetHead);
-      await checkpoint("target-verified");
-      const [head, op] = await Promise.all([transport.get(c.root + "/meta/head"), transport.get(operationPath)]);
-      if (head.data.pendingOperation !== operationId || head.data.revision !== operation.baseRevision) throw storageError("cloud-conflict", "Het publicatiebewijs is intussen gewijzigd.");
-      const members = memberProofs.map((member) => ({ path: c.root + "/receipts/" + member.id, data: { ...member, epoch: operation.epoch, storageVersion: 2, cloudOperation: operationId, cloudRevision: operation.targetHead.revision, outcome: "prepared" } }));
-      for (const batch of batches(members)) await transport.commit(batch);
-      await checkpoint("members-staged");
-      await transport.commit([{ path: c.root + "/meta/head", data: operation.targetHead }, { path: operationPath, data: { ...operation, phase: "committed" } }], /* @__PURE__ */ new Map([[c.root + "/meta/head", head.version], [operationPath, op.version]]));
-      await checkpoint("committed");
-      return { outcome: "committed", operationId, revision: operation.targetHead.revision, replayed: false };
-    }
-    async function commit({ state: state2, imports = [], operationId, expectedRevision, members = [], allowMigration = false, checkpoint = () => {
-    } }) {
-      members = [...members].sort((a, b) => a.id.localeCompare(b.id));
-      if (!/^[A-Za-z0-9_-]{1,160}$/.test(operationId || "") || members.some((member) => !/^[A-Za-z0-9_-]{1,160}$/.test(member.id || ""))) throw storageError("operation-id", "Een stabiel geldig operatie-ID is verplicht.");
-      const c = await context({ allowMigration, allowPending: true }), existing = await transport.get(c.root + "/operations/" + operationId);
-      if (existing) {
-        if (existing.data.stateHash !== await digest(state2) || existing.data.importsHash !== await digest(imports) || existing.data.memberHash !== await digest(members)) throw storageError("operation-reused", "Een operatie-ID kan niet opnieuw voor andere gegevens worden gebruikt.");
-        if (existing.data.phase === "committed") return { outcome: "committed", operationId, revision: existing.data.targetHead.revision, replayed: true };
-        if (existing.data.phase === "prepared" && c.head.data.phase === "ready") {
-          const next2 = await buildRecordSnapshot(state2, imports, { periods: Object.keys(c.head.data.periodHashes), applicationProjection });
-          await stageOperation(c, next2, operationId, members, checkpoint);
-        }
-        return recover(operationId, { allowMigration, checkpoint });
-      }
-      if (c.head.data.phase !== "ready") throw storageError("cloud-pending", "De vorige cloudpublicatie is nog niet compleet.");
-      if (c.head.data.revision !== expectedRevision) throw storageError("cloud-conflict", "Een ander apparaat heeft de cloud gewijzigd. Geen lokale goedkeuring wordt overschreven.");
-      const next = await buildRecordSnapshot(state2, imports, { periods: Object.keys(c.head.data.periodHashes), applicationProjection });
-      await stageOperation(c, next, operationId, members, checkpoint);
-      return recover(operationId, { allowMigration, checkpoint });
-    }
-    async function loadPeriod(month) {
-      const c = await context(), [period, global, rows] = await Promise.all([transport.get(c.root + "/periods/" + month), transport.get(c.root + "/globals/financial"), transport.query(c.root + "/records", { field: "periods", op: "ARRAY_CONTAINS", value: month })]);
-      const result = await verifiedPeriodResult(c.head.data, period == null ? void 0 : period.data, rows.map((row) => row.data), global == null ? void 0 : global.data), after = await transport.get(c.root + "/meta/head");
-      if (!same(c.head.data, after == null ? void 0 : after.data)) throw storageError("cloud-conflict", "De financiële periode wijzigde tijdens het laden. Probeer opnieuw.");
-      result.transactions = (await decodeRecordValues(result.records)).filter((row) => row.collection === "transactions").map((row) => row.value);
-      result.state = { __finizePartialHistory: true, verifiedPeriods: [month], transactions: clone3(result.transactions) };
-      return result;
-    }
-    async function loadImport(id) {
-      var _a2, _b;
-      const c = await context(), logicalId = await digest(JSON.stringify(["@imports", id]));
-      const [headers, rows] = await Promise.all([transport.query(c.root + "/records", { field: "logicalId", value: logicalId }), transport.query(c.root + "/records", { field: "collection", value: "@rows:" + id })]);
-      const values = await decodeRecordValues([...headers, ...rows].map((row) => row.data)), header = (_a2 = values.find((row) => row.collection === "@imports")) == null ? void 0 : _a2.value;
-      if (!header) throw storageError("import-incomplete", "De cloudimport ontbreekt.");
-      const result = { ...header, rows: values.filter((row) => row.collection === "@rows:" + id).sort((a, b) => a.ordinal - b.ordinal).map((row) => row.value) };
-      if (!same(c.head.data, (_b = await transport.get(c.root + "/meta/head")) == null ? void 0 : _b.data)) throw storageError("cloud-conflict", "De import wijzigde tijdens laden.");
-      return result;
-    }
-    async function operationReceipt(id) {
-      var _a2, _b;
-      const c = await context({ allowPending: true }), receipt = (_a2 = await transport.get(c.root + "/receipts/" + id)) == null ? void 0 : _a2.data;
-      if (!receipt) return null;
-      const operation = (_b = await transport.get(c.root + "/operations/" + receipt.cloudOperation)) == null ? void 0 : _b.data;
-      return (operation == null ? void 0 : operation.phase) === "committed" && operation.targetHead.revision === receipt.cloudRevision ? { ...receipt, outcome: "committed" } : null;
-    }
-    async function exportRollback() {
-      var _a2;
-      const result = await verifyIntegrity(), root2 = epochPath(result.head.epoch), ops = await transport.query(root2 + "/operations");
-      const operations = await Promise.all(ops.map(async (row) => ({ ...row.data, members: (await transport.query(row.path + "/members")).map((member) => member.data), changes: (await transport.query(row.path + "/changes")).map((change) => change.data) })));
-      if (!same(result.head, (_a2 = await transport.get(root2 + "/meta/head")) == null ? void 0 : _a2.data)) throw storageError("cloud-conflict", "De cloudstand wijzigde tijdens het maken van het herstelpakket.");
-      return { storageVersion: 2, epoch: result.head.epoch, revision: result.head.revision, stateHash: result.head.stateHash, importsHash: result.head.importsHash, state: result.state, imports: result.imports, operations, receipts: (await transport.query(root2 + "/receipts")).map((row) => row.data), warning: "Exporteer deze actuele stand; zet nooit uitsluitend een oud generatiepointer terug." };
-    }
-    async function operationStatus(id) {
-      var _a2;
-      const c = await context({ allowPending: true });
-      return ((_a2 = await transport.get(c.root + "/operations/" + id)) == null ? void 0 : _a2.data) || null;
-    }
-    return { householdId, migrate, activate, commit, recover, loadPeriod, loadImport, verifyIntegrity, operationReceipt, operationStatus, exportRollback, context, transport };
-  }
-
-  // src/storage/record-sync.mjs
-  var same2 = (a, b) => canonical(a) === canonical(b);
-  function conflictApprovalReview(value) {
-    const local = new Map((value.local.transactions || []).map((row) => [row.id, row]));
-    return (value.remote.transactions || []).filter((row) => getTransactionProcessingStatus(row) === "goedgekeurd" && !same2(row, local.get(row.id))).map((row) => ({ id: row.id, bankSourceId: row.bankSourceId || "", remote: row, local: local.get(row.id) || null }));
-  }
-  function createRecordSync({ localStore, cloudStore, onStatus = () => {
-  }, prepareState = async (state2) => state2, onAdopt = () => {
-  }, validateIncoming = () => {
-  } }) {
-    if (localStore.scope !== cloudStore.householdId) throw storageError("household-scope", "De lokale en cloudadministratie horen niet bij hetzelfde huishouden.");
-    let running = null;
-    async function readLocal() {
-      const snapshot2 = await localStore.readCloudSnapshot();
-      return { ...snapshot2, localState: snapshot2.state, state: await prepareState(structuredClone(snapshot2.state)) };
-    }
-    async function conflict(snapshot2, remote, reason) {
-      const id = "record-conflict-" + await digest({ local: snapshot2.head.sha256, remote: remote.head.stateHash, revision: remote.head.revision });
-      const value = { id, reason, epoch: remote.head.epoch, remoteRevision: remote.head.revision, local: snapshot2.state, localImports: snapshot2.imports, remote: remote.state, remoteImports: remote.imports, operationIds: snapshot2.operations.map((row) => row.id), localHash: snapshot2.head.sha256, remoteHash: remote.head.stateHash };
-      await localStore.preserveRecordConflict(value);
-      onStatus("Synchronisatieconflict — beide financiële standen bewaard");
-      return { outcome: "conflict", conflict: value };
-    }
-    async function establishBase() {
-      const local = await readLocal(), remote = await cloudStore.verifyIntegrity();
-      if (!same2(local.state, remote.state) || !same2(local.imports, remote.imports)) return conflict(local, remote, "initial-offline-difference");
-      await localStore.acknowledgeRecordCloud([], { epoch: remote.head.epoch, revision: remote.head.revision, localSha256: local.head.sha256, stateHash: remote.head.stateHash, importsHash: remote.head.importsHash });
-      return { outcome: "matched", revision: remote.head.revision };
-    }
-    async function performSync() {
-      var _a2;
-      const active = await cloudStore.context({ allowPending: true });
-      if (active.head.data.phase === "applying") await cloudStore.recover(active.head.data.pendingOperation);
-      const snapshot2 = await readLocal();
-      if (!snapshot2.operations.length) {
-        for (const value of snapshot2.conflicts || []) {
-          const resolution = value.resolution;
-          if (!(resolution == null ? void 0 : resolution.operationId)) continue;
-          const op = await cloudStore.operationStatus(resolution.operationId);
-          if ((op == null ? void 0 : op.phase) === "committed" && op.stateHash === await digest(snapshot2.state) && op.importsHash === await digest(snapshot2.imports)) {
-            await localStore.acknowledgeRecordCloud([], { epoch: op.epoch, revision: op.targetHead.revision, localSha256: snapshot2.head.sha256, stateHash: op.stateHash, importsHash: op.importsHash }, snapshot2.imports, { ...resolution, id: value.id, outcome: "committed" });
-            return { outcome: "committed", replayed: true, revision: op.targetHead.revision };
-          }
-        }
-        return ((_a2 = snapshot2.conflicts) == null ? void 0 : _a2.length) ? { outcome: "conflict", conflictIds: snapshot2.conflicts.map((row) => row.id) } : { outcome: "idle" };
-      }
-      const members = snapshot2.operations.map((row) => ({ id: row.id, sha256: row.sha256, storageRevision: row.storageRevision }));
-      const receipts = [];
-      for (const member of members) {
-        const proof = await cloudStore.operationReceipt(member.id);
-        if (proof) {
-          if (proof.sha256 !== member.sha256) throw storageError("operation-reused", "Cloudbewijs en lokale operatie verschillen.");
-          receipts.push(proof);
-        }
-      }
-      const c = await cloudStore.context();
-      if (receipts.length === members.length) {
-        const last = receipts.reduce((a, b) => a.cloudRevision > b.cloudRevision ? a : b);
-        const resolutions = [...new Set(snapshot2.operations.map((row) => row.conflictId).filter(Boolean))].map((id) => ({ id, choice: "confirmed-cloud-proof", operationId: last.cloudOperation }));
-        await localStore.acknowledgeRecordCloud(members.map((member) => member.id), { epoch: last.epoch, revision: last.cloudRevision, localSha256: snapshot2.head.sha256, stateHash: await digest(snapshot2.state), importsHash: await digest(snapshot2.imports) }, snapshot2.imports, resolutions);
-        onStatus("Cloud opgeslagen");
-        return { outcome: "committed", replayed: true, revision: last.cloudRevision };
-      }
-      if (receipts.length) {
-        const receiptIds = new Set(receipts.map((row) => row.id)), latest2 = receipts.reduce((a, b) => a.cloudRevision > b.cloudRevision ? a : b), confirmed = members.filter((row) => receiptIds.has(row.id)).sort((a, b) => a.storageRevision - b.storageRevision).at(-1);
-        await localStore.acknowledgeRecordCloud([...receiptIds], { epoch: latest2.epoch, revision: latest2.cloudRevision, localSha256: confirmed.sha256, stateHash: c.head.data.stateHash, importsHash: c.head.data.importsHash });
-        return performSync();
-      }
-      if (snapshot2.operations.some((row) => row.status === "conflict")) return { outcome: "conflict", conflictIds: [...new Set(snapshot2.operations.filter((row) => row.status === "conflict").map((row) => row.conflictId))] };
-      const equalCurrent = c.head.data.stateHash === await digest(snapshot2.state) && c.head.data.importsHash === await digest(snapshot2.imports);
-      if (!equalCurrent && (!snapshot2.cloudBase || snapshot2.cloudBase.epoch !== c.head.data.epoch || snapshot2.cloudBase.revision !== c.head.data.revision || snapshot2.operations[0].previousHash !== snapshot2.cloudBase.localSha256)) return conflict(snapshot2, await cloudStore.verifyIntegrity(), "cloud-revision-changed");
-      const operationId = "outbox-" + await digest(members.map((member) => member.id));
-      onStatus("Cloud synchroniseren…");
-      let result;
-      try {
-        result = await cloudStore.commit({ state: snapshot2.state, imports: snapshot2.imports, operationId, expectedRevision: c.head.data.revision, members });
-      } catch (error) {
-        if (error.code === "cloud-conflict") return conflict(snapshot2, await cloudStore.verifyIntegrity(), "concurrent-device");
-        error.commitOutcome = "uncertain";
-        error.operationId = operationId;
-        onStatus("Offline wijzigingen blijven in de duurzame wachtrij");
-        throw error;
-      }
-      for (const member of members) {
-        const proof = await cloudStore.operationReceipt(member.id);
-        if ((proof == null ? void 0 : proof.outcome) !== "committed" || proof.sha256 !== member.sha256) throw storageError("cloud-uncertain", "De cloudbevestiging moet eerst worden gecontroleerd.");
-      }
-      await localStore.acknowledgeRecordCloud(members.map((member) => member.id), { epoch: c.head.data.epoch, revision: result.revision, localSha256: snapshot2.head.sha256, stateHash: await digest(snapshot2.state), importsHash: await digest(snapshot2.imports) }, snapshot2.imports);
-      onStatus("Cloud opgeslagen");
-      return result;
-    }
-    function sync() {
-      if (running) return running;
-      running = performSync().finally(() => {
-        running = null;
-      });
-      return running;
-    }
-    async function pull() {
-      var _a2, _b, _c, _d;
-      const snapshot2 = await readLocal();
-      if (snapshot2.operations.length || ((_a2 = snapshot2.importQueue) == null ? void 0 : _a2.length)) return { outcome: "pending-local" };
-      if ((_b = snapshot2.conflicts) == null ? void 0 : _b.length) return { outcome: "conflict", conflictIds: snapshot2.conflicts.map((row) => row.id) };
-      const remote = await cloudStore.verifyIntegrity(), base = snapshot2.cloudBase;
-      const pristine = snapshot2.head.storageRevision === 1 && !((_c = snapshot2.head.migration) == null ? void 0 : _c.sourceSha256) && !snapshot2.imports.length;
-      if (!pristine && (!base || base.epoch !== remote.head.epoch || base.localSha256 !== snapshot2.head.sha256 || base.importsHash !== await digest(snapshot2.imports))) return conflict(snapshot2, remote, "unconfirmed-local-base");
-      if (base && remote.head.revision < base.revision) throw storageError("cloud-conflict", "Een oudere cloudrevisie mag de lokale administratie niet vervangen.");
-      if (!pristine) {
-        const incoming = new Map(remote.state.transactions.map((row) => [row.id, row]));
-        const lost = (snapshot2.state.transactions || []).filter((row) => row.recordRole === "bank-source" || row.source === "manual").some((row) => !incoming.has(row.id) || getTransactionProcessingStatus(row) === "goedgekeurd" && getTransactionProcessingStatus(incoming.get(row.id)) !== "goedgekeurd");
-        if (lost) return conflict(snapshot2, remote, "existing-approval-missing");
-      }
-      if (same2(snapshot2.state, remote.state) && same2(snapshot2.imports, remote.imports)) {
-        await localStore.acknowledgeRecordCloud([], { epoch: remote.head.epoch, revision: remote.head.revision, localSha256: snapshot2.head.sha256, stateHash: remote.head.stateHash, importsHash: remote.head.importsHash });
-        return { outcome: "matched", revision: remote.head.revision };
-      }
-      validateIncoming(remote.state);
-      const operationId = "cloud-pull-" + remote.head.epoch + "-" + remote.head.revision, sha256 = await backupDigest(JSON.stringify(remote.state));
-      try {
-        await localStore.load();
-        await localStore.commit(remote.state, { expectedHash: snapshot2.head.sha256, operationId, queueCloud: false, cloudAcceptance: { imports: remote.imports, expectedImportsSignature: JSON.stringify(snapshot2.imports), base: { epoch: remote.head.epoch, revision: remote.head.revision, stateHash: remote.head.stateHash, importsHash: remote.head.importsHash } } });
-      } catch (error) {
-        let proof;
-        try {
-          proof = await localStore.inspectOperation(operationId);
-        } catch (e) {
-          error.commitOutcome = "uncertain";
-          error.operationId = operationId;
-          throw error;
-        }
-        if (((_d = proof.receipt) == null ? void 0 : _d.sha256) !== sha256 || await backupDigest(JSON.stringify(proof.state)) !== sha256) {
-          error.commitOutcome = !proof.receipt && await backupDigest(JSON.stringify(proof.state)) === snapshot2.head.sha256 ? "rejected" : "uncertain";
-          error.operationId = operationId;
-          throw error;
-        }
-      }
-      await onAdopt(remote.state, { previousState: snapshot2.localState });
-      onStatus("Cloud ontvangen — lokaal duurzaam bevestigd");
-      return { outcome: "committed", revision: remote.head.revision };
-    }
-    async function resolveConflict(value, { choice, expectedRemoteRevision, operationId, reviewedRemoteChanges = [] } = {}) {
-      var _a2;
-      if (choice !== "local") throw storageError("approval-review-required", "De externe stand toepassen vereist eerst een expliciete beoordeling van afwijkende lokale goedkeuringen. Beide versies blijven bewaard.");
-      const local = await readLocal(), c = await cloudStore.context();
-      if (value.scope && value.scope !== localStore.scope || value.epoch !== c.head.data.epoch || c.head.data.revision !== expectedRemoteRevision || value.remoteRevision !== expectedRemoteRevision || value.localHash !== local.head.sha256) throw storageError("cloud-conflict", "De beoordeelde conflictversies zijn intussen gewijzigd.");
-      if (value.remoteHash !== c.head.data.stateHash || await digest(value.remote) !== value.remoteHash || await digest(value.remoteImports) !== c.head.data.importsHash || !same2(value.local, local.state) || !same2(value.localImports, local.imports)) throw storageError("cloud-conflict", "De conflictinhoud hoort niet bij de bewezen lokale en externe standen.");
-      const reviewed = conflictApprovalReview(value).map((row) => row.id).sort();
-      if (!same2([...new Set(reviewedRemoteChanges)].sort(), reviewed)) throw storageError("approval-review-required", "Beoordeel en bevestig eerst iedere afwijkende externe financiële goedkeuring. Beide versies blijven bewaard.");
-      const members = local.operations.map((row) => ({ id: row.id, sha256: row.sha256, storageRevision: row.storageRevision }));
-      await localStore.markRecordResolution(value.id, { choice, operationId, reviewedRemoteChanges: reviewed });
-      const result = await cloudStore.commit({ state: local.state, imports: local.imports, operationId, expectedRevision: expectedRemoteRevision, members });
-      for (const member of members) if (((_a2 = await cloudStore.operationReceipt(member.id)) == null ? void 0 : _a2.sha256) !== member.sha256) throw storageError("cloud-uncertain", "Conflictbevestiging moet worden gecontroleerd.");
-      await localStore.acknowledgeRecordCloud(members.map((row) => row.id), { epoch: c.head.data.epoch, revision: result.revision, localSha256: local.head.sha256, stateHash: await digest(local.state), importsHash: await digest(local.imports) }, local.imports, { id: value.id, choice, operationId, reviewedRemoteChanges: reviewed });
-      onStatus("Cloud opgeslagen — conflictkeuze en beide versies bewaard");
-      return result;
-    }
-    return { sync, pull, establishBase, resolveConflict, conflictApprovalReview, readLocal, loadPeriod: (month) => cloudStore.loadPeriod(month), loadImport: (id) => cloudStore.loadImport(id), cloudStore, localStore };
-  }
-
-  // src/storage/record-session.mjs
-  function installRecordSessions(root2, { getLocalStore, applicationProjection, readLegacyImports, prepareState, onAdopt, validateIncoming }) {
-    root2.FinizeCloudRecords = {
-      async createEmulatorSession(options) {
-        if (!["localhost", "127.0.0.1"].includes(root2.location.hostname)) throw storageError("emulator-only", "Een recordsessie vereist de lokale testapplicatie.");
-        const localStore = getLocalStore();
-        if (options.householdId !== localStore.scope) throw storageError("household-scope", "De testsessie hoort bij een ander huishouden.");
-        const transport = createEmulatorRecordTransport(options), cloudStore = createRecordCloudStore({ ...options, transport, applicationProjection, readLegacyImports });
-        const sync = createRecordSync({ localStore, cloudStore, prepareState, onAdopt, validateIncoming, onStatus: (status) => {
-          var _a2;
-          root2.CloudAdapter.status = status;
-          (_a2 = root2.renderCloudStatus) == null ? void 0 : _a2.call(root2);
-        } });
-        return {
-          ...sync,
-          transport,
-          async attach({ automatic = true } = {}) {
-            var _a2;
-            if (getLocalStore().scope !== localStore.scope) throw storageError("household-scope", "Het actieve huishouden is gewijzigd.");
-            await cloudStore.context();
-            const cloud = root2.CloudAdapter;
-            (_a2 = cloud.unsubscribe) == null ? void 0 : _a2.call(cloud);
-            cloud.unsubscribe = null;
-            clearTimeout(cloud.saveTimer);
-            clearTimeout(cloud.retryTimer);
-            Object.assign(cloud, { recordSession: sync, recordAutomatic: automatic, db: null, docRef: null, initialSyncComplete: true, conflict: false, status: "Testcloud verbonden" });
-            return sync;
-          }
-        };
-      }
-    };
-  }
-
-  // src/import/import-identity.mjs
-  var original = (row) => row.bankOriginal || row;
-  var accountKey = (row, batch) => String(row.accountContext || row.accountOwner || (batch == null ? void 0 : batch.accountOwner) || "") + "|" + String(original(row).accountIdentifier || (batch == null ? void 0 : batch.accountProfileId) || "");
-  function immutableBankFields(row) {
-    const bank = original(row);
-    return JSON.stringify([bank.bankDate, bank.transactionTime || "", bank.bookingDate || "", bank.amount, bank.rawDescription || bank.description, bank.description, bank.counterpartyAccount || "", bank.currency || "", bank.reference || "", bank.code || "", bank.notes || "", bank.rawCells || []]);
-  }
-  function classifyCsvDuplicate(row, batch, existingBatches = []) {
-    let possible = null;
-    for (const oldBatch of existingBatches) {
-      if (oldBatch.lifecycle === "deleted") continue;
-      for (const oldRow of oldBatch.rows || []) {
-        if (accountKey(row, batch) !== accountKey(oldRow, oldBatch)) continue;
-        const sameFields = immutableBankFields(row) === immutableBankFields(oldRow);
-        const proof = row.sourceIdentityProof, oldProof = oldRow.sourceIdentityProof;
-        const sameFile = (proof == null ? void 0 : proof.kind) === "file-row" && (oldProof == null ? void 0 : oldProof.kind) === "file-row" && Number.isSafeInteger(proof.rowOrdinal) && proof.rowOrdinal > 0 && proof.rowOrdinal === oldProof.rowOrdinal && (typeof batch.originalCsv === "string" && batch.originalCsv === oldBatch.originalCsv || /^[a-f0-9]{64}$/.test(proof.fileDigest || "") && proof.fileDigest === oldProof.fileDigest);
-        const bankIdentity = (proof == null ? void 0 : proof.kind) === "bank-id" && (oldProof == null ? void 0 : oldProof.kind) === "bank-id" && typeof proof.authority === "string" && proof.authority.trim() !== "" && typeof proof.id === "string" && proof.id.trim() !== "" && proof.authority === oldProof.authority && proof.id === oldProof.id;
-        if (sameFields && (sameFile || bankIdentity)) return { duplicate: true, duplicateSource: { batchId: oldBatch.id, rowId: oldRow.id }, reason: "proven-source-identity" };
-        if (sameFields) possible = { duplicate: false, possibleDuplicate: { batchId: oldBatch.id, rowId: oldRow.id }, reason: "equal-bank-fields" };
-      }
-    }
-    return possible || { duplicate: false };
-  }
-  function validCalendarDate(date) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date))) return false;
-    const parsed = /* @__PURE__ */ new Date(date + "T12:00:00Z");
-    return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === date;
-  }
-  function importDateError(original2, today) {
-    if (!validCalendarDate(original2.bankDate)) return { code: "invalid-transaction-date", row: original2.lineNumber, date: original2.bankDate, message: "Ongeldige transactiedatum." };
-    if (original2.bankDate > today) return { code: "future-transaction-date", row: original2.lineNumber, date: original2.bankDate, message: `Bankregel ${original2.lineNumber}: transactiedatum ${original2.bankDate} ligt in de toekomst.` };
-    return null;
-  }
-  function csvFileDigest(text) {
-    const bytes2 = new TextEncoder().encode(String(text)), length = bytes2.length, padded = new Uint8Array((Math.floor((length + 8) / 64) + 1) * 64);
-    padded.set(bytes2);
-    padded[length] = 128;
-    const view = new DataView(padded.buffer);
-    view.setUint32(padded.length - 8, Math.floor(length / 536870912));
-    view.setUint32(padded.length - 4, length * 8);
-    const k = [1116352408, 1899447441, 3049323471, 3921009573, 961987163, 1508970993, 2453635748, 2870763221, 3624381080, 310598401, 607225278, 1426881987, 1925078388, 2162078206, 2614888103, 3248222580, 3835390401, 4022224774, 264347078, 604807628, 770255983, 1249150122, 1555081692, 1996064986, 2554220882, 2821834349, 2952996808, 3210313671, 3336571891, 3584528711, 113926993, 338241895, 666307205, 773529912, 1294757372, 1396182291, 1695183700, 1986661051, 2177026350, 2456956037, 2730485921, 2820302411, 3259730800, 3345764771, 3516065817, 3600352804, 4094571909, 275423344, 430227734, 506948616, 659060556, 883997877, 958139571, 1322822218, 1537002063, 1747873779, 1955562222, 2024104815, 2227730452, 2361852424, 2428436474, 2756734187, 3204031479, 3329325298];
-    const h = [1779033703, 3144134277, 1013904242, 2773480762, 1359893119, 2600822924, 528734635, 1541459225], w = new Uint32Array(64), rot = (n, b) => n >>> b | n << 32 - b;
-    for (let offset = 0; offset < padded.length; offset += 64) {
-      for (let n = 0; n < 16; n++) w[n] = view.getUint32(offset + n * 4);
-      for (let n = 16; n < 64; n++) {
-        const a2 = w[n - 15], b2 = w[n - 2];
-        w[n] = w[n - 16] + (rot(a2, 7) ^ rot(a2, 18) ^ a2 >>> 3) + w[n - 7] + (rot(b2, 17) ^ rot(b2, 19) ^ b2 >>> 10) >>> 0;
-      }
-      let [a, b, c, d, e, f, g, z] = h;
-      for (let n = 0; n < 64; n++) {
-        const first = z + (rot(e, 6) ^ rot(e, 11) ^ rot(e, 25)) + (e & f ^ ~e & g) + k[n] + w[n] >>> 0, second = (rot(a, 2) ^ rot(a, 13) ^ rot(a, 22)) + (a & b ^ a & c ^ b & c) >>> 0;
-        z = g;
-        g = f;
-        f = e;
-        e = d + first >>> 0;
-        d = c;
-        c = b;
-        b = a;
-        a = first + second >>> 0;
-      }
-      [a, b, c, d, e, f, g, z].forEach((v, n) => h[n] = h[n] + v >>> 0);
-    }
-    return h.map((n) => n.toString(16).padStart(8, "0")).join("");
-  }
-  function assertNoDuplicateSources(previous, next) {
-    var _a2;
-    const groups = /* @__PURE__ */ new Map();
-    for (const tx of next.transactions || []) {
-      if (!tx.importBatchId || !tx.importTransactionId || tx.batchLifecycle === "withdrawn" || tx.processingStatus !== "goedgekeurd") continue;
-      const proof = tx.sourceIdentityProof;
-      if ((proof == null ? void 0 : proof.kind) !== "file-row" || !proof.fileDigest) continue;
-      const key = JSON.stringify([tx.accountContext, ((_a2 = tx.bankOriginal) == null ? void 0 : _a2.accountIdentifier) || tx.accountProfileId, proof.fileDigest, proof.rowOrdinal]);
-      const source = tx.importBatchId + ":" + tx.importTransactionId;
-      const old = groups.get(key);
-      if (old && old.source !== source) {
-        const unchanged = (previous.transactions || []).some((row) => row.id === tx.id && JSON.stringify(row) === JSON.stringify(tx)) && (previous.transactions || []).some((row) => row.id === old.tx.id && JSON.stringify(row) === JSON.stringify(old.tx));
-        if (!unchanged) throw Object.assign(new Error("Dezelfde bewezen CSV-bron heeft twee actieve imports. Herstel/goedkeuring is geblokkeerd."), { code: "duplicate-source-conflict" });
-      } else groups.set(key, { source, tx });
-    }
-  }
-
-  // src/storage/legacy-import-readback.mjs
-  async function readLegacyCloudImports(headers, transport, { assembleCloudImport }) {
-    var _a2, _b;
-    const imports = [];
-    for (const entry of headers) {
-      const header = entry.data, id = entry.path.split("/").pop();
-      if (Array.isArray(header.rows)) {
-        imports.push(header);
-        continue;
-      }
-      if (header.lifecycle === "deleted") {
-        imports.push({ ...header, rows: [] });
-        continue;
-      }
-      if (!Number.isSafeInteger(header.chunkCount) || header.chunkCount < 0 || header.chunkCount > 1e4) throw storageError("migration-incomplete", "De oude importindeling is ongeldig.");
-      const chunks = [];
-      for (let index = 0; index < header.chunkCount; index++) chunks.push((_a2 = await transport.get(entry.path + "/chunks/" + (header.generation ? header.generation + "-" : "") + String(index).padStart(4, "0"))) == null ? void 0 : _a2.data);
-      const batch = assembleCloudImport(header, chunks, id);
-      if (header.sourceChunkCount) {
-        if (!Number.isSafeInteger(header.sourceChunkCount) || header.sourceChunkCount < 1 || header.sourceChunkCount > 1e4) throw storageError("migration-incomplete", "De oude CSV-indeling is ongeldig.");
-        const texts = [];
-        for (let index = 0; index < header.sourceChunkCount; index++) {
-          const chunk = (_b = await transport.get(entry.path + "/chunks/" + header.generation + "-source-" + index)) == null ? void 0 : _b.data;
-          if ((chunk == null ? void 0 : chunk.generation) !== header.generation || chunk.index !== index || typeof chunk.text !== "string") throw storageError("migration-incomplete", "Een oorspronkelijk CSV-deel ontbreekt.");
-          texts.push(chunk.text);
-        }
-        batch.originalCsv = texts.join("");
-        if (csvFileDigest(batch.originalCsv) !== header.fileDigest) throw storageError("migration-integrity", "Originele CSV-controlecode wijkt af.");
-      }
-      batch.baseVersion = Number(header.version) || 0;
-      imports.push(batch);
-    }
-    return imports;
-  }
-
-  // src/import/import-sync-protocol.mjs
-  var copy4 = (value) => JSON.parse(JSON.stringify(value));
-  var importVersion = (record) => Number.isSafeInteger(Number(record == null ? void 0 : record.version)) ? Number(record.version) : 0;
-  function sameImportOperation(left, right) {
-    return !!(left == null ? void 0 : left.operationId) && left.operationId === (right == null ? void 0 : right.operationId) && importVersion(left) === importVersion(right);
-  }
-  function assertImportBase(remote, record) {
-    if (sameImportOperation(remote, record)) return "echo";
-    if ((remote == null ? void 0 : remote.lifecycle) === "deleted") throw Object.assign(new Error("Deze import is permanent verwijderd op een ander apparaat."), { code: "import-deleted" });
-    if (importVersion(remote) !== Number(record.baseVersion || 0)) throw Object.assign(new Error("De cloudimport is intussen gewijzigd. De lokale keuze is veilig bewaard; kies expliciet welke verwerking behouden blijft."), { code: "import-conflict" });
-    return "write";
-  }
-  function pendingQueueReceipt(record) {
-    return { id: record.id, importId: record.id, version: importVersion(record), operationId: record.operationId || "", baseVersion: Number(record.baseVersion || 0) };
-  }
-  function acknowledgeMatches(queued, uploaded) {
-    return (queued == null ? void 0 : queued.operationId) === (uploaded == null ? void 0 : uploaded.operationId) && (queued == null ? void 0 : queued.version) === (uploaded == null ? void 0 : uploaded.version);
-  }
-  var sourceKey = (tx) => tx.bankSourceId || (tx.importBatchId && tx.importTransactionId ? tx.importBatchId + ":" + tx.importTransactionId : null);
-  var signature = (value) => JSON.stringify(value != null ? value : null);
-  function findImportConflicts(base, local, remote) {
-    const conflicts = [];
-    const groups = (state2) => {
-      const result = /* @__PURE__ */ new Map();
-      for (const tx of (state2 == null ? void 0 : state2.transactions) || []) {
-        const key = sourceKey(tx);
-        if (key) {
-          if (!result.has(key)) result.set(key, []);
-          result.get(key).push(tx);
-        }
-      }
-      return result;
-    };
-    const a = groups(base), b = groups(local), c = groups(remote);
-    for (const key of /* @__PURE__ */ new Set([...a.keys(), ...b.keys(), ...c.keys()])) {
-      if (signature(a.get(key)) !== signature(b.get(key)) && signature(a.get(key)) !== signature(c.get(key)) && signature(b.get(key)) !== signature(c.get(key))) conflicts.push({ kind: "source", sourceKey: key });
-    }
-    for (const field of ["importSummaries", "importDeletionProofs", "manualTransactionReplacements", "internalTransferPairs", "savingsCoverageAllocations"]) {
-      const maps = [base, local, remote].map((state2) => new Map(((state2 == null ? void 0 : state2[field]) || []).map((row) => [row.id, row])));
-      for (const id of new Set(maps.flatMap((map) => [...map.keys()]))) {
-        const [x, y, z] = maps.map((map) => map.get(id));
-        if (signature(x) !== signature(y) && signature(x) !== signature(z) && signature(y) !== signature(z)) conflicts.push({ kind: field, id });
-      }
-    }
-    return conflicts;
-  }
-  function mergeImportDetails(base, local, remote) {
-    if (remote.lifecycle === "deleted") return { record: copy4(remote), conflicts: [{ kind: "deleted", id: remote.id }] };
-    const result = copy4(remote), conflicts = [];
-    const old = new Map(((base == null ? void 0 : base.rows) || []).map((row) => [row.id, row])), rows = new Map((remote.rows || []).map((row) => [row.id, row]));
-    if ((local.lifecycle || "active") !== ((base == null ? void 0 : base.lifecycle) || "active") && (remote.lifecycle || "active") !== ((base == null ? void 0 : base.lifecycle) || "active") && local.lifecycle !== remote.lifecycle) conflicts.push({ kind: "lifecycle", id: local.id });
-    for (const row of local.rows || []) {
-      if (signature(row) === signature(old.get(row.id))) continue;
-      const cloud = rows.get(row.id);
-      if (signature(cloud) !== signature(old.get(row.id)) && signature(row) !== signature(cloud)) conflicts.push({ kind: "source", id: row.id });
-      else rows.set(row.id, copy4(row));
-    }
-    result.rows = [...rows.values()];
-    return { record: result, conflicts };
-  }
-
-  // src/core/state.js
-  function cloneState(value) {
-    return JSON.parse(JSON.stringify(value));
-  }
-
   // src/core/data-normalization.mjs
   var OWNERS = ACCOUNT_CONTEXTS;
   var plain2 = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
@@ -3204,7 +2738,11 @@
     return Number.isFinite(value) ? round2(value) : 0;
   }
   function calculateGoalSavedAmount(state2, goalId) {
-    return round2(((state2 == null ? void 0 : state2.savingsGoalLedger) || []).filter((entry) => entry.goalId === goalId).reduce((sum, entry) => sum + contributionAmount(entry), 0));
+    var _a2, _b, _c;
+    let baseline = (state2 == null ? void 0 : state2.__finizePartialHistory) ? (_b = (_a2 = state2.__finizePeriodContext) == null ? void 0 : _a2.ledgerBaseline) == null ? void 0 : _b[goalId] : 0;
+    if ((state2 == null ? void 0 : state2.__finizePartialHistory) && baseline === void 0 && ((_c = state2.__finizePeriodContext) == null ? void 0 : _c.explicitFullHistory) && !Object.values(JSON.parse(state2.__finizePeriodContext.global.payload).goals || {}).flat().some((goal) => goal.id === goalId)) baseline = 0;
+    if ((state2 == null ? void 0 : state2.__finizePartialHistory) && !Number.isFinite(baseline)) throw Object.assign(new Error("De geverifieerde historische spaardoelbasis ontbreekt."), { code: "period-incomplete" });
+    return round2(Number(baseline || 0) + ((state2 == null ? void 0 : state2.savingsGoalLedger) || []).filter((entry) => entry.goalId === goalId).reduce((sum, entry) => sum + contributionAmount(entry), 0));
   }
   function reconcileGoalSavedAmounts(state2, goalIds = null) {
     const selected = goalIds ? new Set(goalIds) : null;
@@ -3375,16 +2913,496 @@
     });
   }
 
-  // src/core/mutation-errors.mjs
-  function describeMutationError(error) {
-    const explain = (message) => Object.assign(new Error(message, { cause: error }), Object.fromEntries(["commitOutcome", "operationId", "storageFailure"].filter((key) => (error == null ? void 0 : error[key]) !== void 0).map((key) => [key, error[key]])));
-    if (["QuotaExceededError", "NS_ERROR_DOM_QUOTA_REACHED"].includes(error == null ? void 0 : error.name) || [22, 1014].includes(error == null ? void 0 : error.code)) {
-      return explain("De browseropslag is vol. Maak eerst een back-up via Gegevens en maak ruimte vrij op je toestel. Wis de Finize-sitegegevens niet; daarin kunnen nog niet gesynchroniseerde transacties staan.");
+  // src/storage/period-workspace.mjs
+  var same = (a, b) => canonical(a) === canonical(b);
+  var copy4 = (value) => structuredClone(value);
+  var transactionGlobals = /* @__PURE__ */ new Set(["transactions", "meta", "spaardoelen", "savingsGoalLedger", "importSummaries", "activeImportId", "transactionReviewQueue", "recognitionRules", "advanceLedger", "advanceRepayments", "internalTransferPairs", "savingsCoverageAllocations", "manualTransactionReplacements", "monthRecords", "__finizePartialHistory", "verifiedPeriods", "__finizePeriodContext"]);
+  function workspaceNeedsFullHistory(before, after) {
+    const ids = (value) => Object.values(value.spaardoelen || {}).flatMap((rows) => rows.map((row) => row.id)).sort();
+    if (!same(ids(before), ids(after))) return true;
+    const life = (row) => (row == null ? void 0 : row.lifecycle) || ((row == null ? void 0 : row.status) === "teruggedraaid" ? "withdrawn" : "active");
+    if ((before.importSummaries || []).some((row) => {
+      const next = (after.importSummaries || []).find((value) => value.id === row.id);
+      return !next || life(row) !== life(next);
+    })) return true;
+    const loaded = new Set(before.verifiedPeriods || []);
+    return [.../* @__PURE__ */ new Set([...Object.keys(before), ...Object.keys(after)])].some((key) => {
+      if (same(before[key], after[key]) || transactionGlobals.has(key)) return false;
+      return !key.startsWith("monthly") || !Object.keys({ ...before[key], ...after[key] }).filter((month) => {
+        var _a2, _b;
+        return !same((_a2 = before[key]) == null ? void 0 : _a2[month], (_b = after[key]) == null ? void 0 : _b[month]);
+      }).every((month) => loaded.has(month));
+    });
+  }
+  function mergeWorkspaceIntent(before, after, expanded, { strict = true } = {}) {
+    function merge(a, b, current, path) {
+      if (same(a, b)) return copy4(current);
+      const list2 = (value) => Array.isArray(value) && value.every((row) => typeof (row == null ? void 0 : row.id) === "string") && new Set(value.map((row) => row.id)).size === value.length;
+      if (list2(a) && list2(b) && list2(current)) {
+        const values = new Map(current.map((row) => [row.id, row])), old = new Map(a.map((row) => [row.id, row])), next = new Map(b.map((row) => [row.id, row]));
+        for (const id of /* @__PURE__ */ new Set([...old.keys(), ...next.keys()])) if (!same(old.get(id), next.get(id))) {
+          if (!next.has(id)) {
+            if (strict && !same(values.get(id), old.get(id))) throw storageError("storage-conflict", "Een afhankelijke regel wijzigde tijdens voorbereiden: " + path);
+            values.delete(id);
+          } else values.set(id, merge(old.get(id), next.get(id), values.get(id), path + "." + id));
+        }
+        return [...values.values()];
+      }
+      if (a && b && current && typeof a === "object" && typeof b === "object" && typeof current === "object" && !Array.isArray(a) && !Array.isArray(b) && !Array.isArray(current)) {
+        const result2 = copy4(current);
+        for (const key of /* @__PURE__ */ new Set([...Object.keys(a), ...Object.keys(b)])) if (!same(a[key], b[key])) {
+          if (!(key in b)) {
+            if (strict && !same(current[key], a[key])) throw storageError("storage-conflict", "Een verwijderde afhankelijkheid wijzigde: " + path + "." + key);
+            delete result2[key];
+          } else result2[key] = merge(a[key], b[key], current[key], path + "." + key);
+        }
+        return result2;
+      }
+      if (strict && !same(current, a)) throw storageError("storage-conflict", "Een afhankelijke waarde wijzigde tijdens voorbereiden: " + path);
+      return copy4(b);
     }
-    if ((error == null ? void 0 : error.name) === "SecurityError") {
-      return explain("De browser blokkeert lokale opslag. Sta opslag voor Finize toe in de browserinstellingen en probeer opnieuw.");
+    const result = copy4(expanded);
+    for (const key of /* @__PURE__ */ new Set([...Object.keys(before), ...Object.keys(after)])) if (!["meta", "__finizePartialHistory", "verifiedPeriods", "__finizePeriodContext"].includes(key) && !same(before[key], after[key])) {
+      if (!(key in after)) delete result[key];
+      else result[key] = merge(before[key], after[key], expanded[key], key);
     }
-    return error instanceof Error ? error : new Error(String((error == null ? void 0 : error.message) || error || "Onbekende opslagfout. Probeer opnieuw; blijft dit gebeuren, meld dan bij welke transactie het optreedt."));
+    return result;
+  }
+  function completeDependencyState(state2) {
+    const result = copy4(state2);
+    delete result.__finizePartialHistory;
+    delete result.__finizePeriodContext;
+    delete result.verifiedPeriods;
+    return result;
+  }
+  async function workspaceState(proof, selectedMonth = ((_a2) => (_a2 = proof.periods[0]) == null ? void 0 : _a2.month)()) {
+    const values = await decodeRecordValues(proof.records), layout = {};
+    for (const [key, kind] of Object.entries(proof.head.layout)) if (!key.startsWith("@")) layout[key] = kind === "list" ? { kind, ids: values.filter((row) => row.collection === key).sort((a, b) => a.ordinal - b.ordinal).map((row) => row.recordId) } : { kind };
+    const state2 = decodeHouseholdState({ storageVersion: 1, schemaVersion: 11, layout }, values);
+    state2.__finizePartialHistory = true;
+    state2.verifiedPeriods = proof.periods.map((row) => row.month);
+    state2.meta.selectedMonth = selectedMonth;
+    state2.__finizePeriodContext = copy4(proof);
+    return state2;
+  }
+  function refreshWorkspaceTotals(before, next) {
+    if (!next.__finizePartialHistory) return;
+    assertWorkspaceMutation(before, next);
+    const a = cumulativeFinancials(completeDependencyState(before)), b = cumulativeFinancials(completeDependencyState(next)), result = copy4(before.__finizePeriodContext.localCumulative || JSON.parse(before.__finizePeriodContext.global.payload));
+    for (const key of Object.keys(result.totalsCents)) result.totalsCents[key] += b.totalsCents[key] - a.totalsCents[key];
+    for (const key of ["bankSourceCount", "approvedEffectCount"]) result[key] += b[key] - a[key];
+    result.goals = b.goals;
+    next.__finizePeriodContext.localCumulative = result;
+  }
+  function requiredMutationPeriods(before, after) {
+    var _a2, _b, _c;
+    const a = new Map(encodeHouseholdState({ transactions: before.transactions, savingsGoalLedger: before.savingsGoalLedger }).records.map((row) => [row.id, row]));
+    const b = new Map(encodeHouseholdState({ transactions: after.transactions, savingsGoalLedger: after.savingsGoalLedger }).records.map((row) => [row.id, row]));
+    const changed = [.../* @__PURE__ */ new Set([...a.keys(), ...b.keys()])].filter((id) => !same(a.get(id), b.get(id)));
+    const ids = new Set(changed.map((id) => JSON.parse(id)[1]));
+    for (const key of ["internalTransferPairs", "savingsCoverageAllocations", "manualTransactionReplacements"]) {
+      const old = new Map((before[key] || []).map((row) => [row.id, row]));
+      for (const ref of [...after[key] || [], ...before[key] || []]) if (!same(old.get(ref.id), (after[key] || []).find((row) => row.id === ref.id))) for (const id of [...ref.transactionIds || [], ref.withdrawalTransactionId, ref.expenseTransactionId, ref.manualTransactionId, ref.importedTransactionId].filter(Boolean)) ids.add(id);
+    }
+    const changedMonths = Object.keys({ ...before.monthRecords, ...after.monthRecords }).filter((month) => {
+      var _a3, _b2;
+      return !same((_a3 = before.monthRecords) == null ? void 0 : _a3[month], (_b2 = after.monthRecords) == null ? void 0 : _b2[month]);
+    });
+    for (const key of /* @__PURE__ */ new Set([...Object.keys(before), ...Object.keys(after)])) if (key.startsWith("monthly")) {
+      for (const month of Object.keys({ ...before[key], ...after[key] })) if (/^\d{4}-\d{2}$/.test(month) && !same((_a2 = before[key]) == null ? void 0 : _a2[month], (_b = after[key]) == null ? void 0 : _b[month])) changedMonths.push(month);
+    }
+    const direct = [...a.values(), ...b.values()].filter((row) => ids.has(row.recordId)).flatMap((row) => row.periods);
+    return [.../* @__PURE__ */ new Set([...changedMonths, ...direct, ...changed.flatMap((id) => {
+      var _a3, _b2;
+      return [...((_a3 = a.get(id)) == null ? void 0 : _a3.periods) || [], ...((_b2 = b.get(id)) == null ? void 0 : _b2.periods) || []];
+    }), ...(((_c = before.__finizePeriodContext) == null ? void 0 : _c.records) || []).filter((row) => row.collection === "transactions" && ids.has(row.recordId)).flatMap((row) => row.periods)])].sort();
+  }
+  function assertWorkspaceMutation(before, after) {
+    var _a2;
+    const loaded = new Set(before.verifiedPeriods || []), needed = requiredMutationPeriods(before, after);
+    if (needed.some((month) => !loaded.has(month))) throw storageError("dependency-required", "Laad eerst de afhankelijke financiële maanden: " + needed.filter((month) => !loaded.has(month)).join(", "));
+    if (workspaceNeedsFullHistory(before, after) && !((_a2 = before.__finizePeriodContext) == null ? void 0 : _a2.explicitFullHistory)) throw storageError("full-history-required", "Deze bewerking vereist controle van globale planning, historische doelverwijzingen of een volledige importlevenscyclus.");
+    for (const key of ["internalTransferPairs", "savingsCoverageAllocations", "manualTransactionReplacements"]) if (!same(before[key], after[key])) {
+      const ids = new Set((after.transactions || []).map((row) => row.id));
+      for (const ref of after[key] || []) {
+        if (ref.active === false) continue;
+        const links = [...ref.transactionIds || [], ref.withdrawalTransactionId, ref.expenseTransactionId, ref.manualTransactionId, ref.importedTransactionId].filter(Boolean);
+        if (links.some((id) => !ids.has(id))) throw storageError("dependency-required", "Een vereiste gekoppelde bankbron is niet geladen.");
+      }
+    }
+  }
+  function createPeriodWorkspace({ transport, context, loadPeriod, stageOperation, recover, applicationProjection }) {
+    async function openWorkspace(months, { explicitFullHistory = false } = {}) {
+      var _a2, _b, _c, _d, _e;
+      const c = await context(), head = c.head.data;
+      if (explicitFullHistory) {
+        months = [.../* @__PURE__ */ new Set([...months, ...Object.keys(head.periodHashes)])];
+        months = [.../* @__PURE__ */ new Set([...months, ...[...new Set(months.map((month) => month.slice(0, 4)))].flatMap((year) => Array.from({ length: 12 }, (_, i) => year + "-" + String(i + 1).padStart(2, "0")))])];
+      }
+      if (!head.manifestHashes || !head.settingsHash) throw storageError("manifest-missing", "Een gecontroleerde eenmalige manifestmigratie is nodig.");
+      const settings = (_a2 = await transport.get(c.root + "/globals/settings")) == null ? void 0 : _a2.data;
+      if (!settings || await digest(settings) !== head.settingsHash) throw storageError("period-incomplete", "De vereiste instellingen zijn niet geverifieerd.");
+      const records = [];
+      for (const dep of settings.dependencies) {
+        const row = (_b = await transport.get(c.root + "/records/" + dep.id)) == null ? void 0 : _b.data;
+        if (!row || row.hash !== dep.hash) throw storageError("period-incomplete", "Een vereiste instelling ontbreekt.");
+        records.push(row);
+      }
+      const periods = [], emptyMonths = [], globalDocument = (_c = await transport.get(c.root + "/globals/financial")) == null ? void 0 : _c.data;
+      if (!globalDocument || await digest(globalDocument) !== head.globalHash) throw storageError("period-incomplete", "De cumulatieve basis is niet geverifieerd.");
+      const global = JSON.parse(globalDocument.payload);
+      for (const month of [...new Set(months)]) {
+        if (!head.periodHashes[month]) {
+          if ((await transport.query(c.root + "/records", { field: "periods", op: "ARRAY_CONTAINS", value: month })).length) throw storageError("period-incomplete", "Deze financiële maand heeft bronnen maar geen projectiebewijs.");
+          emptyMonths.push(month);
+          continue;
+        }
+        const result = await loadPeriod(month);
+        if (result.revision !== head.revision || result.epoch !== head.epoch) throw storageError("cloud-conflict", "De periodebasis wijzigde tijdens laden.");
+        for (const row of result.records) if (!records.some((old) => old.id === row.id)) records.push(row);
+        periods.push((await transport.get(c.root + "/periods/" + month)).data);
+      }
+      if (!months.length) throw storageError("invalid-period", "Kies ten minste één financiële maand.");
+      const values = await decodeRecordValues(records), layout = {};
+      for (const [key, kind] of Object.entries(head.layout)) if (!key.startsWith("@")) layout[key] = kind === "list" ? { kind, ids: values.filter((row) => row.collection === key).sort((a, b) => a.ordinal - b.ordinal).map((row) => row.recordId) } : { kind };
+      const state2 = decodeHouseholdState({ storageVersion: 1, schemaVersion: 11, layout }, values);
+      const emptyPeriod = (month) => ({ id: month, month, projectionVersion: 1, dependencies: [], payload: canonical(periodFinancials({ ...state2, transactions: [], savingsGoalLedger: state2.savingsGoalLedger.filter((row) => !row.month || row.month === month) }, month, { applicationProjection })) });
+      for (const month of emptyMonths) periods.push(emptyPeriod(month));
+      const proof = { epoch: head.epoch, revision: head.revision, head: copy4(head), records, periods, global: globalDocument, settings, imports: [], explicitFullHistory };
+      proof.emptyPeriods = emptyMonths;
+      proof.summaries = {};
+      for (const year of new Set(months.map((month) => month.slice(0, 4)))) for (let i = 1; i <= 12; i++) {
+        const month = year + "-" + String(i).padStart(2, "0");
+        let document2 = periods.find((row) => row.month === month);
+        if (!document2 && head.periodHashes[month]) {
+          document2 = (_d = await transport.get(c.root + "/periods/" + month)) == null ? void 0 : _d.data;
+          if (!document2 || await digest(document2) !== head.periodHashes[month]) throw storageError("period-incomplete", "Een vereiste Dashboard-projectie ontbreekt.");
+        }
+        if (!document2) {
+          if ((await transport.query(c.root + "/records", { field: "periods", op: "ARRAY_CONTAINS", value: month })).length) throw storageError("period-incomplete", "Een maandbron heeft geen geverifieerde projectie.");
+          document2 = emptyPeriod(month);
+        }
+        proof.summaries[month] = JSON.parse(document2.payload);
+      }
+      proof.ledgerBaseline = Object.fromEntries(Object.values(global.goals || {}).flatMap((goals) => goals.map((goal) => [goal.id, Math.round(Number(goal.algespaard || 0) * 100) / 100 - (state2.savingsGoalLedger || []).filter((entry) => entry.goalId === goal.id).reduce((sum, entry) => sum + contributionAmount(entry), 0)])));
+      state2.__finizePartialHistory = true;
+      state2.verifiedPeriods = periods.map((row) => row.month);
+      state2.meta.selectedMonth = months[0];
+      state2.__finizePeriodContext = proof;
+      if (!same(head, (_e = await transport.get(c.root + "/meta/head")) == null ? void 0 : _e.data)) throw storageError("cloud-conflict", "De administratie wijzigde tijdens periodeladen.");
+      return state2;
+    }
+    async function importRecords(id, c) {
+      var _a2;
+      const logicalId = await digest(JSON.stringify(["@imports", id])), headers = await transport.query(c.root + "/records", { field: "logicalId", value: logicalId }), rows = await transport.query(c.root + "/records", { field: "collection", value: "@rows:" + id });
+      const records = [...headers, ...rows].map((row) => row.data), buckets = /* @__PURE__ */ new Map();
+      for (const row of records) {
+        const key = manifestBucket(row);
+        if (!buckets.has(key)) {
+          const manifest = (_a2 = await transport.get(c.root + "/manifests/" + key)) == null ? void 0 : _a2.data;
+          if (!manifest || await digest(manifest) !== c.head.data.manifestHashes[key]) throw storageError("record-integrity", "Het importmanifest ontbreekt.");
+          buckets.set(key, manifest);
+        }
+        if (buckets.get(key).entries[row.id] !== await digest(row)) throw storageError("record-integrity", "Het importrecord wijkt af van het manifest.");
+      }
+      await decodeRecordValues(records);
+      return records;
+    }
+    async function prepareWorkspaceCommit(before, state2, imports = []) {
+      var _a2, _b;
+      assertWorkspaceMutation(before, state2);
+      const c = await context(), proof = before.__finizePeriodContext;
+      if (!proof || proof.epoch !== c.head.data.epoch || proof.revision !== c.head.data.revision || !same(proof.head, c.head.data)) throw storageError("cloud-conflict", "De geverifieerde periodebasis is verouderd; behoud de lokale bewerking.");
+      const selected = requiredMutationPeriods(before, state2);
+      const affected = workspaceNeedsFullHistory(before, state2) ? state2.verifiedPeriods : selected.length ? selected : [state2.meta.selectedMonth];
+      if (affected.some((month) => !state2.verifiedPeriods.includes(month))) throw storageError("dependency-required", "Niet alle wijzigingsafhankelijkheden zijn geladen.");
+      const scratch = completeDependencyState(state2), oldState = completeDependencyState(before);
+      const next = await buildRecordSnapshot(scratch, imports, { onlyPeriods: affected, applicationProjection });
+      const oldRecords = copy4(proof.records);
+      for (const batch of imports) for (const row of await importRecords(batch.id, c)) if (!oldRecords.some((old2) => old2.id === row.id)) oldRecords.push(row);
+      const ordinals = new Map(oldRecords.map((row) => [row.logicalId, row.ordinal]));
+      let ordinal = c.head.data.recordCount;
+      for (const row of next.records) {
+        if (!ordinals.has(row.logicalId)) ordinals.set(row.logicalId, ordinal++);
+        row.ordinal = ordinals.get(row.logicalId);
+        const old2 = oldRecords.find((old3) => old3.id === row.id);
+        if (row.collection === "transactions") row.periods = [.../* @__PURE__ */ new Set([...((old2 == null ? void 0 : old2.periods) || []).filter((month) => !affected.includes(month)), ...row.periods])].sort();
+      }
+      const old = { records: oldRecords, periods: proof.periods.filter((row) => affected.includes(row.month) && proof.head.periodHashes[row.month]), global: proof.global, settings: proof.settings };
+      const changes = recordChanges(old, { ...next, manifests: [] });
+      const hashes = copy4(c.head.data.manifestHashes), buckets = /* @__PURE__ */ new Map();
+      for (const change of changes.filter((row) => row.path.startsWith("records/"))) {
+        const key = manifestBucket(change.after);
+        if (!buckets.has(key)) {
+          const stored = ((_a2 = await transport.get(c.root + "/manifests/" + key)) == null ? void 0 : _a2.data) || { id: key, entries: {} };
+          if (hashes[key] && await digest(stored) !== hashes[key]) throw storageError("record-integrity", "Een gewijzigd recordmanifest wijkt af.");
+          buckets.set(key, { before: hashes[key] ? copy4(stored) : null, after: copy4(stored) });
+        }
+        const bucket = buckets.get(key);
+        if (!change.before && !bucket.after.entries[change.after.id]) {
+          const previous = (_b = await transport.get(c.root + "/" + change.path)) == null ? void 0 : _b.data;
+          if (previous) {
+            if (!previous.removed) throw storageError("record-integrity", "Een bestaand record ontbreekt uit het actuele manifest.");
+            if (previous.sourceHash !== change.after.sourceHash) throw storageError("source-immutable", "Een terugkerende bankbron heeft andere oorspronkelijke gegevens.");
+            change.before = previous;
+          }
+        }
+        if (change.before && !change.before.removed && bucket.after.entries[change.before.id] !== await digest(change.before) || !change.before && bucket.after.entries[change.after.id]) throw storageError("cloud-conflict", "Het oorspronkelijke financiële record wijzigde.");
+        if (change.after.removed) delete bucket.after.entries[change.after.id];
+        else bucket.after.entries[change.after.id] = await digest(change.after);
+      }
+      for (const [id, bucket] of buckets) {
+        hashes[id] = await digest(bucket.after);
+        changes.push({ id: "manifests_" + id, path: "manifests/" + id, ...bucket });
+      }
+      const a = cumulativeFinancials(oldState), b = cumulativeFinancials(scratch), cumulative = JSON.parse(proof.global.payload);
+      for (const key of Object.keys(cumulative.totalsCents)) cumulative.totalsCents[key] += b.totalsCents[key] - a.totalsCents[key];
+      for (const key of ["bankSourceCount", "approvedEffectCount"]) cumulative[key] += b[key] - a[key];
+      cumulative.goals = b.goals;
+      const global = { id: "financial", projectionVersion: 1, payload: canonical(cumulative) };
+      const globalChange = changes.find((row) => row.path === "globals/financial");
+      if (globalChange) globalChange.after = global;
+      else if (!same(global, proof.global)) changes.push({ id: "globals_financial", path: "globals/financial", before: proof.global, after: global });
+      const periodHashes = { ...c.head.data.periodHashes, ...next.periodHashes }, roots = await manifestRoots(hashes);
+      const recordDelta = changes.filter((row) => row.path.startsWith("records/")).reduce((n, row) => n + (!row.before || row.before.removed ? 1 : 0) - (row.after.removed ? 1 : 0), 0);
+      const importDelta = changes.filter((row) => row.path.startsWith("records/") && row.after.collection === "@imports" && row.after.part === 0).reduce((n, row) => n + (!row.before || row.before.removed ? 1 : 0) - (row.after.removed ? 1 : 0), 0);
+      return { ...next, ...roots, layout: { ...c.head.data.layout, ...next.layout }, globalHash: await digest(global), periodHashes, manifestHashes: hashes, recordCount: c.head.data.recordCount + recordDelta, importCount: c.head.data.importCount + importDelta, targeted: true, preparedChanges: changes, requestHash: await digest({ before, state: state2, imports }) };
+    }
+    async function commitWorkspace({ before, state: state2, imports = [], operationId, members = [], checkpoint = () => {
+    } }) {
+      var _a2;
+      if (!/^[A-Za-z0-9_-]{1,160}$/.test(operationId || "")) throw storageError("operation-id", "Een stabiel operatie-ID is vereist.");
+      members = [...members].sort((a, b) => a.id.localeCompare(b.id));
+      const c = await context({ allowPending: true }), existing = (_a2 = await transport.get(c.root + "/operations/" + operationId)) == null ? void 0 : _a2.data, requestHash = await digest({ before, state: state2, imports });
+      if (existing) {
+        if (existing.requestHash !== requestHash || existing.memberHash !== await digest(members)) throw storageError("operation-reused", "Het operatie-ID hoort bij andere periodegegevens.");
+        if (existing.phase === "prepared" && c.head.data.phase === "ready") await stageOperation(c, await prepareWorkspaceCommit(before, state2, imports), operationId, members, checkpoint);
+        return recover(operationId, { checkpoint });
+      }
+      const next = await prepareWorkspaceCommit(before, state2, imports);
+      await stageOperation(c, next, operationId, members, checkpoint);
+      return recover(operationId, { checkpoint });
+    }
+    return { openWorkspace, prepareWorkspaceCommit, commitWorkspace };
+  }
+
+  // src/storage/cloud-records.mjs
+  var same2 = (a, b) => canonical(a) === canonical(b);
+  var batches = (values) => Array.from({ length: Math.ceil(values.length / 8) }, (_, index) => values.slice(index * 8, index * 8 + 8));
+  function createRecordCloudStore({ transport, householdId, applicationProjection, readLegacyImports } = {}) {
+    if (!(transport == null ? void 0 : transport.emulator) || !/^demo-/.test(transport.emulator.projectId) || !/^127\.0\.0\.1:\d+$/.test(transport.emulator.host)) throw storageError("emulator-only", "Nieuwe cloudopslag is nog niet voor productie vrijgegeven.");
+    if (!/^[A-Za-z0-9_-]{1,120}$/.test(householdId || "")) throw storageError("household-scope", "Een geldig huishouden is verplicht.");
+    const household = `households/${householdId}`, controlPath = household + "/financialStorage/current", legacyPath = household + "/budgetState/current";
+    const epochPath = (epoch2) => household + "/financialEpochs/" + epoch2;
+    async function context({ allowMigration = false, allowPending = false } = {}) {
+      const control = await transport.get(controlPath), c = control == null ? void 0 : control.data;
+      if ((c == null ? void 0 : c.storageVersion) !== RECORD_STORAGE_VERSION || !["active", ...allowMigration ? ["preparing", "verified"] : []].includes(c.phase)) throw storageError("storage-version", "Het recordmodel is nog niet geverifieerd en geactiveerd.");
+      const root2 = epochPath(c.epoch), head = await transport.get(root2 + "/meta/head");
+      if (!head || head.data.epoch !== c.epoch || head.data.storageVersion !== RECORD_STORAGE_VERSION) throw storageError("storage-version", "Het cloudversiecontract is inconsistent.");
+      if (!allowPending && head.data.phase !== "ready") throw storageError("cloud-pending", "Een onderbroken cloudpublicatie moet eerst worden gecontroleerd en hervat.");
+      return { control, head, root: root2 };
+    }
+    async function components(root2) {
+      const [records, periods, global, manifests, settings] = await Promise.all([transport.query(root2 + "/records"), transport.query(root2 + "/periods"), transport.get(root2 + "/globals/financial"), transport.query(root2 + "/manifests"), transport.get(root2 + "/globals/settings")]);
+      return { records: records.map((row) => row.data), periods: periods.map((row) => row.data), global: (global == null ? void 0 : global.data) || null, manifests: manifests.map((row) => row.data), settings: (settings == null ? void 0 : settings.data) || null };
+    }
+    async function verifyAt(root2, head) {
+      const values = await components(root2), decoded = await decodeRecordSnapshot(head, values.records);
+      if (head.manifestHashes) await verifyRecordManifests(head, values.records, values.manifests);
+      if (head.settingsHash && head.settingsHash !== await digest(values.settings)) throw storageError("cloud-integrity", "De globale instellingen wijken af.");
+      if (head.globalHash !== await digest(values.global)) throw storageError("cloud-integrity", "De cumulatieve cloudprojectie wijkt af.");
+      for (const [month, hash] of Object.entries(head.periodHashes)) {
+        const period = values.periods.find((row) => row.month === month);
+        if (!period || await digest(period) !== hash) throw storageError("cloud-integrity", "Financiële maandprojectie ontbreekt of is corrupt: " + month);
+        const dependencies = values.records.filter((row) => row.periods.includes(month)).map((row) => ({ id: row.id, hash: row.hash })).sort((a, b) => a.id.localeCompare(b.id));
+        if (!same2(dependencies, period.dependencies)) throw storageError("cloud-integrity", "Financiële maandafhankelijkheden zijn niet compleet: " + month);
+      }
+      return { ...decoded, ...values, head };
+    }
+    async function verifyIntegrity(options = {}) {
+      const c = await context(options), result = await verifyAt(c.root, c.head.data), after = await transport.get(c.root + "/meta/head");
+      if (!same2(after.data, c.head.data)) throw storageError("cloud-conflict", "De cloudstand wijzigde tijdens integriteitscontrole.");
+      return result;
+    }
+    async function assertLegacySource(control) {
+      var _a2;
+      const legacy = await transport.get(legacyPath);
+      if ((((_a2 = legacy == null ? void 0 : legacy.data) == null ? void 0 : _a2.syncVersion) || 0) !== control.sourceVersion || await digest((legacy == null ? void 0 : legacy.data) || null) !== control.sourcePointerHash) throw storageError("migration-source-conflict", "De beschermde oude cloudbron wijzigde tijdens migratie.");
+      const headers = (await transport.query(household + "/imports")).map((row) => ({ path: row.path, data: row.data })).sort((a, b) => a.path.localeCompare(b.path));
+      if (await digest(headers) !== control.sourceImportHeadersHash) throw storageError("migration-source-conflict", "De oude importheaders wijzigden tijdens de migratiecontrole.");
+    }
+    async function migrate({ state: state2, imports = [], epoch: epoch2, legacyPointer, checkpoint = () => {
+    } }) {
+      var _a2, _b, _c, _d, _e;
+      if (!/^[A-Za-z0-9_-]{1,120}$/.test(epoch2 || "")) throw storageError("migration-epoch", "Ongeldig migratie-epoch.");
+      let existing = await transport.get(controlPath);
+      if (!existing) {
+        const legacy = await transport.get(legacyPath);
+        if (!same2((legacy == null ? void 0 : legacy.data) || null, legacyPointer || null)) throw storageError("migration-source-conflict", "De gelezen oude cloudstand is intussen gewijzigd.");
+        let sourceState = (_a2 = legacy == null ? void 0 : legacy.data) == null ? void 0 : _a2.state;
+        if ((_b = legacy == null ? void 0 : legacy.data) == null ? void 0 : _b.stateFormat) {
+          const pointer = legacy.data, path = legacyPath + "/generations/" + pointer.activeGeneration, descriptor = (_c = await transport.get(path)) == null ? void 0 : _c.data;
+          if (!descriptor) throw storageError("migration-incomplete", "De oude generatie ontbreekt.");
+          const chunks = [];
+          for (let i = 0; i < descriptor.chunkCount; i++) chunks.push(((_d = await transport.get(path + "/chunks/" + i)) == null ? void 0 : _d.data) || null);
+          sourceState = await decodeCloudState(pointer, descriptor, chunks);
+        }
+        if (sourceState && !same2(sourceState, state2)) throw storageError("migration-source-conflict", "De migratiekandidaat wijkt af van de teruggelezen oude financiële bron.");
+        const oldHeaders = await transport.query(household + "/imports");
+        const sourceImports = readLegacyImports ? await readLegacyImports(oldHeaders, transport) : oldHeaders.map((row) => {
+          if (!Array.isArray(row.data.rows)) throw storageError("migration-incomplete", "De bestaande importdelen vereisen een volledige legacy-readback.");
+          return row.data;
+        });
+        if (!same2(sourceImports, imports)) throw storageError("migration-source-conflict", "Niet alle bestaande cloudimports en CSV-bronnen zijn verliesloos meegenomen.");
+        const control = { storageVersion: 2, minClientVersion: 117, epoch: epoch2, phase: "preparing", sourceVersion: ((_e = legacy == null ? void 0 : legacy.data) == null ? void 0 : _e.syncVersion) || 0, sourcePointerHash: await digest((legacy == null ? void 0 : legacy.data) || null), sourceImportHeadersHash: await digest(oldHeaders.map((row) => ({ path: row.path, data: row.data })).sort((a, b) => a.path.localeCompare(b.path))), sourceStateHash: await digest(state2), sourceImportsHash: await digest(imports) };
+        const head = { storageVersion: 2, epoch: epoch2, phase: "ready", revision: 0, lastOperation: "", pendingOperation: "", stateHash: "", importsHash: "", layout: {}, recordCount: 0, importCount: 0, periodHashes: {}, globalHash: "" };
+        await transport.commit([{ path: controlPath, data: control }, { path: epochPath(epoch2) + "/meta/head", data: head }], /* @__PURE__ */ new Map([[controlPath, null], [epochPath(epoch2) + "/meta/head", null]]));
+        existing = { data: control };
+      }
+      if (existing.data.epoch !== epoch2 || existing.data.sourceStateHash !== await digest(state2) || existing.data.sourceImportsHash !== await digest(imports)) throw storageError("migration-source-conflict", "Een ander migratie-epoch of andere bron is al beschermd.");
+      await checkpoint("protected");
+      if (existing.data.phase === "active") return verifyIntegrity();
+      await assertLegacySource(existing.data);
+      await commit({ state: state2, imports, operationId: "migration-" + epoch2, expectedRevision: 0, allowMigration: true, checkpoint });
+      const result = await verifyIntegrity({ allowMigration: true });
+      await checkpoint("verified-readback");
+      const latest2 = await transport.get(controlPath);
+      await assertLegacySource(latest2.data);
+      await transport.commit([{ path: controlPath, data: { ...latest2.data, phase: "verified", verifiedStateHash: result.head.stateHash, verifiedRecordCount: result.head.recordCount, verifiedPeriodCount: Object.keys(result.head.periodHashes).length } }], /* @__PURE__ */ new Map([[controlPath, latest2.version]]));
+      return result;
+    }
+    async function activate({ approveTestCutover = false } = {}) {
+      if (approveTestCutover !== true) throw storageError("cutover-approval", "Omschakeling vereist een afzonderlijke expliciete testgoedkeuring.");
+      const c = await context({ allowMigration: true });
+      if (c.control.data.phase === "active") return c.head.data;
+      if (c.control.data.phase !== "verified") throw storageError("migration-incomplete", "De migratie is nog niet volledig teruggelezen.");
+      await assertLegacySource(c.control.data);
+      await verifyAt(c.root, c.head.data);
+      await transport.commit([{ path: controlPath, data: { ...c.control.data, phase: "active" } }], /* @__PURE__ */ new Map([[controlPath, c.control.version]]));
+      return c.head.data;
+    }
+    async function stageOperation(c, next, operationId, members, checkpoint) {
+      const path = c.root + "/operations/" + operationId, old = await transport.get(path);
+      if (old && old.data.phase !== "prepared") {
+        if (old.data.stateHash !== next.stateHash || old.data.importsHash !== next.importsHash || old.data.memberHash !== await digest(members)) throw storageError("operation-reused", "Dit operatie-ID hoort al bij een andere wijziging.");
+        return old.data;
+      }
+      const previous = next.preparedChanges ? null : c.head.data.revision ? await components(c.root) : null, changes = (next.preparedChanges || recordChanges(previous, next)).sort((a, b) => a.path.localeCompare(b.path));
+      const targetHead = { storageVersion: 2, epoch: c.control.data.epoch, phase: "ready", revision: c.head.data.revision + 1, lastOperation: operationId, pendingOperation: "", stateHash: next.stateHash, importsHash: next.importsHash, layout: next.layout, recordCount: next.recordCount, importCount: next.importCount, periodHashes: next.periodHashes, globalHash: next.globalHash, manifestHashes: next.manifestHashes, settingsHash: next.settingsHash, ...next.targeted ? { integrityMode: "manifest" } : {} };
+      const operation = { storageVersion: 2, epoch: c.control.data.epoch, id: operationId, phase: "prepared", baseRevision: c.head.data.revision, stateHash: next.stateHash, importsHash: next.importsHash, changeCount: changes.length, changeHash: await digest(changes), targetHead, memberCount: members.length, memberHash: await digest(members), ...next.targeted ? { verificationMode: "patch", requestHash: next.requestHash } : {} };
+      if (old && !same2(old.data, operation)) throw storageError("operation-reused", "Het voorbereide operatiebewijs wijkt af.");
+      if (!old) await transport.commit([{ path, data: operation }], /* @__PURE__ */ new Map([[path, null]]));
+      await checkpoint("operation-prepared");
+      for (const batch of batches(changes)) await transport.commit(batch.map((change) => ({ path: path + "/changes/" + change.id, data: change })));
+      for (const batch of batches(members)) await transport.commit(batch.map((member) => ({ path: path + "/members/" + member.id, data: member })));
+      await checkpoint("changes-staged");
+      return operation;
+    }
+    async function recover(operationId, { allowMigration = false, checkpoint = () => {
+    } } = {}) {
+      var _a2, _b;
+      const c = await context({ allowMigration, allowPending: true }), operationPath = c.root + "/operations/" + operationId, stored = await transport.get(operationPath), operation = stored == null ? void 0 : stored.data;
+      if (!operation) throw storageError("operation-missing", "Het voorbereide cloudoperatiebewijs ontbreekt.");
+      if (operation.phase === "committed") return { outcome: "committed", operationId, revision: operation.targetHead.revision, replayed: true };
+      const changes = (await transport.query(operationPath + "/changes")).map((row) => row.data).sort((a, b) => a.id.localeCompare(b.id));
+      if (changes.length !== operation.changeCount || await digest([...changes].sort((a, b) => a.path.localeCompare(b.path))) !== operation.changeHash) throw storageError("operation-incomplete", "De voorbereide cloudwijziging is niet volledig; financiële publicatie is geblokkeerd.");
+      const memberProofs = (await transport.query(operationPath + "/members")).map((row) => row.data).sort((a, b) => a.id.localeCompare(b.id));
+      if (memberProofs.length !== operation.memberCount || await digest(memberProofs) !== operation.memberHash) throw storageError("operation-incomplete", "De lokale operatiebewijzen zijn niet compleet.");
+      if (c.head.data.phase === "ready") {
+        if (c.head.data.revision !== operation.baseRevision) throw storageError("cloud-conflict", "De cloudbasis wijzigde; de lokale en externe versies blijven bewaard.");
+        await transport.commit([{ path: c.root + "/meta/head", data: { ...c.head.data, phase: "applying", pendingOperation: operationId } }, { path: operationPath, data: { ...operation, phase: "applying" } }], /* @__PURE__ */ new Map([[c.root + "/meta/head", c.head.version], [operationPath, stored.version]]));
+      } else if (c.head.data.pendingOperation !== operationId) throw storageError("cloud-pending", "Een andere cloudoperatie moet eerst worden hervat.");
+      await checkpoint("locked");
+      for (const batch of batches(changes)) {
+        await transport.commit(batch.map((change) => ({ path: c.root + "/" + change.path, data: change.after })));
+        await checkpoint("records-applied");
+      }
+      if (operation.verificationMode === "patch") {
+        for (const change of changes) {
+          const actual = (_a2 = await transport.get(c.root + "/" + change.path)) == null ? void 0 : _a2.data;
+          if (!same2(actual, change.after)) throw storageError("cloud-integrity", "Een gerichte wijziging is niet duurzaam teruggelezen.");
+        }
+        for (const change of changes.filter((row) => row.path.startsWith("periods/"))) {
+          const rows = await transport.query(c.root + "/records", { field: "periods", op: "ARRAY_CONTAINS", value: change.after.month });
+          await verifiedPeriodResult(operation.targetHead, change.after, rows.map((row) => row.data), (_b = await transport.get(c.root + "/globals/financial")) == null ? void 0 : _b.data);
+        }
+      } else await verifyAt(c.root, operation.targetHead);
+      await checkpoint("target-verified");
+      const [head, op] = await Promise.all([transport.get(c.root + "/meta/head"), transport.get(operationPath)]);
+      if (head.data.pendingOperation !== operationId || head.data.revision !== operation.baseRevision) throw storageError("cloud-conflict", "Het publicatiebewijs is intussen gewijzigd.");
+      const members = memberProofs.map((member) => ({ path: c.root + "/receipts/" + member.id, data: { ...member, epoch: operation.epoch, storageVersion: 2, cloudOperation: operationId, cloudRevision: operation.targetHead.revision, outcome: "prepared" } }));
+      for (const batch of batches(members)) await transport.commit(batch);
+      await checkpoint("members-staged");
+      await transport.commit([{ path: c.root + "/meta/head", data: operation.targetHead }, { path: operationPath, data: { ...operation, phase: "committed" } }], /* @__PURE__ */ new Map([[c.root + "/meta/head", head.version], [operationPath, op.version]]));
+      await checkpoint("committed");
+      return { outcome: "committed", operationId, revision: operation.targetHead.revision, replayed: false };
+    }
+    async function commit({ state: state2, imports = [], operationId, expectedRevision, members = [], allowMigration = false, checkpoint = () => {
+    } }) {
+      members = [...members].sort((a, b) => a.id.localeCompare(b.id));
+      if (!/^[A-Za-z0-9_-]{1,160}$/.test(operationId || "") || members.some((member) => !/^[A-Za-z0-9_-]{1,160}$/.test(member.id || ""))) throw storageError("operation-id", "Een stabiel geldig operatie-ID is verplicht.");
+      const c = await context({ allowMigration, allowPending: true }), existing = await transport.get(c.root + "/operations/" + operationId);
+      if (c.head.data.integrityMode === "manifest") throw storageError("period-workspace-required", "Gebruik het gerichte periodecontract voor deze administratie; een volledige oude snapshot mag dit contract niet overschrijven.");
+      if (existing) {
+        if (existing.data.stateHash !== await digest(state2) || existing.data.importsHash !== await digest(imports) || existing.data.memberHash !== await digest(members)) throw storageError("operation-reused", "Een operatie-ID kan niet opnieuw voor andere gegevens worden gebruikt.");
+        if (existing.data.phase === "committed") return { outcome: "committed", operationId, revision: existing.data.targetHead.revision, replayed: true };
+        if (existing.data.phase === "prepared" && c.head.data.phase === "ready") {
+          const next2 = await buildRecordSnapshot(state2, imports, { periods: Object.keys(c.head.data.periodHashes), applicationProjection });
+          await stageOperation(c, next2, operationId, members, checkpoint);
+        }
+        return recover(operationId, { allowMigration, checkpoint });
+      }
+      if (c.head.data.phase !== "ready") throw storageError("cloud-pending", "De vorige cloudpublicatie is nog niet compleet.");
+      if (c.head.data.revision !== expectedRevision) throw storageError("cloud-conflict", "Een ander apparaat heeft de cloud gewijzigd. Geen lokale goedkeuring wordt overschreven.");
+      const next = await buildRecordSnapshot(state2, imports, { periods: Object.keys(c.head.data.periodHashes), applicationProjection });
+      await stageOperation(c, next, operationId, members, checkpoint);
+      return recover(operationId, { allowMigration, checkpoint });
+    }
+    async function loadPeriod(month) {
+      const c = await context(), [period, global, rows] = await Promise.all([transport.get(c.root + "/periods/" + month), transport.get(c.root + "/globals/financial"), transport.query(c.root + "/records", { field: "periods", op: "ARRAY_CONTAINS", value: month })]);
+      const result = await verifiedPeriodResult(c.head.data, period == null ? void 0 : period.data, rows.map((row) => row.data), global == null ? void 0 : global.data), after = await transport.get(c.root + "/meta/head");
+      if (!same2(c.head.data, after == null ? void 0 : after.data)) throw storageError("cloud-conflict", "De financiële periode wijzigde tijdens het laden. Probeer opnieuw.");
+      result.transactions = (await decodeRecordValues(result.records)).filter((row) => row.collection === "transactions").map((row) => row.value);
+      result.state = { __finizePartialHistory: true, verifiedPeriods: [month], transactions: clone3(result.transactions) };
+      return result;
+    }
+    async function loadImport(id) {
+      var _a2, _b;
+      const c = await context(), logicalId = await digest(JSON.stringify(["@imports", id]));
+      const [headers, rows] = await Promise.all([transport.query(c.root + "/records", { field: "logicalId", value: logicalId }), transport.query(c.root + "/records", { field: "collection", value: "@rows:" + id })]);
+      const values = await decodeRecordValues([...headers, ...rows].map((row) => row.data)), header = (_a2 = values.find((row) => row.collection === "@imports")) == null ? void 0 : _a2.value;
+      if (!header) throw storageError("import-incomplete", "De cloudimport ontbreekt.");
+      const result = { ...header, rows: values.filter((row) => row.collection === "@rows:" + id).sort((a, b) => a.ordinal - b.ordinal).map((row) => row.value) };
+      if (!same2(c.head.data, (_b = await transport.get(c.root + "/meta/head")) == null ? void 0 : _b.data)) throw storageError("cloud-conflict", "De import wijzigde tijdens laden.");
+      return result;
+    }
+    async function operationReceipt(id) {
+      var _a2, _b;
+      const c = await context({ allowPending: true }), receipt = (_a2 = await transport.get(c.root + "/receipts/" + id)) == null ? void 0 : _a2.data;
+      if (!receipt) return null;
+      const operation = (_b = await transport.get(c.root + "/operations/" + receipt.cloudOperation)) == null ? void 0 : _b.data;
+      return (operation == null ? void 0 : operation.phase) === "committed" && operation.targetHead.revision === receipt.cloudRevision ? { ...receipt, outcome: "committed" } : null;
+    }
+    async function exportRollback() {
+      var _a2;
+      const result = await verifyIntegrity(), root2 = epochPath(result.head.epoch), ops = await transport.query(root2 + "/operations");
+      const operations = await Promise.all(ops.map(async (row) => ({ ...row.data, members: (await transport.query(row.path + "/members")).map((member) => member.data), changes: (await transport.query(row.path + "/changes")).map((change) => change.data) })));
+      if (!same2(result.head, (_a2 = await transport.get(root2 + "/meta/head")) == null ? void 0 : _a2.data)) throw storageError("cloud-conflict", "De cloudstand wijzigde tijdens het maken van het herstelpakket.");
+      return { storageVersion: 2, epoch: result.head.epoch, revision: result.head.revision, stateHash: result.head.stateHash, importsHash: result.head.importsHash, state: result.state, imports: result.imports, operations, receipts: (await transport.query(root2 + "/receipts")).map((row) => row.data), warning: "Exporteer deze actuele stand; zet nooit uitsluitend een oud generatiepointer terug." };
+    }
+    async function operationStatus(id) {
+      var _a2;
+      const c = await context({ allowPending: true });
+      return ((_a2 = await transport.get(c.root + "/operations/" + id)) == null ? void 0 : _a2.data) || null;
+    }
+    async function preparePeriodStorage() {
+      const c = await context();
+      if (c.head.data.manifestHashes && c.head.data.settingsHash) return { outcome: "ready" };
+      const full = await verifyIntegrity();
+      return commit({ state: full.state, imports: full.imports, expectedRevision: full.head.revision, operationId: "period-manifests-" + full.head.epoch + "-" + full.head.revision });
+    }
+    const workspace = createPeriodWorkspace({ transport, context, loadPeriod, loadImport, stageOperation, recover, applicationProjection });
+    return { householdId, migrate, activate, commit, recover, loadPeriod, loadImport, verifyIntegrity, operationReceipt, operationStatus, exportRollback, preparePeriodStorage, context, transport, ...workspace };
   }
 
   // src/core/transaction-processing.mjs
@@ -3492,7 +3510,7 @@
     const codes = /* @__PURE__ */ new Set(["coverage-exceeds-withdrawal", "coverage-exceeds-expense", "coverage-cents"]);
     const errors = coverageAllocationStatus(next).filter((row) => codes.has(row.reason));
     if (errors.length) throw new Error(coverageMessage(errors[0].reason));
-    const direct = selectTransactionProjections(next).find((p) => p.diagnostics.some((d) => d.code === "coverage-exceeds-withdrawal"));
+    const direct = selectDependencyProjections(next).find((p) => p.diagnostics.some((d) => d.code === "coverage-exceeds-withdrawal"));
     if (direct) throw new Error("Directe budgettoerekening en spaardekking zijn samen hoger dan de spaaropname.");
   }
   function reopenTransactionSource(state2, importId, rowId, options = {}) {
@@ -3553,7 +3571,7 @@
       if (changedSources.has(transactionSourceKey(tx))) changed.add(tx.id);
     });
     if (!changed.size) return [];
-    const goals = /* @__PURE__ */ new Set(), projection = selectTransactionProjections(state2, { includeInactive: true });
+    const goals = /* @__PURE__ */ new Set(), projection = selectDependencyProjections(state2, { includeInactive: true });
     (state2.savingsGoalLedger || []).filter((entry) => (changed.has(entry.transactionId) || changed.has(entry.sourceTransactionId)) && entry.source !== "planned").forEach((entry) => {
       goals.add(entry.goalId);
       const p = projection.find((row) => row.id === entry.transactionId), tx = newRows.get(entry.transactionId) || (p == null ? void 0 : p.transaction);
@@ -3731,6 +3749,558 @@
     assertManualCandidateSafe(previous, candidate, next.id);
     applyFinancialCandidate(state2, candidate);
     return next;
+  }
+
+  // src/storage/record-sync.mjs
+  var same3 = (a, b) => canonical(a) === canonical(b);
+  function conflictApprovalReview(value) {
+    const local = new Map((value.local.transactions || []).map((row) => [row.id, row]));
+    return (value.remote.transactions || []).filter((row) => getTransactionProcessingStatus(row) === "goedgekeurd" && !same3(row, local.get(row.id))).map((row) => ({ id: row.id, bankSourceId: row.bankSourceId || "", remote: row, local: local.get(row.id) || null }));
+  }
+  function createRecordSync({ localStore, cloudStore, onStatus = () => {
+  }, prepareState = async (state2) => state2, onAdopt = () => {
+  }, validateIncoming = () => {
+  } }) {
+    if (localStore.scope !== cloudStore.householdId) throw storageError("household-scope", "De lokale en cloudadministratie horen niet bij hetzelfde huishouden.");
+    let running = null;
+    async function readLocal() {
+      const snapshot2 = await localStore.readCloudSnapshot();
+      return { ...snapshot2, localState: snapshot2.state, state: await prepareState(structuredClone(snapshot2.state)) };
+    }
+    async function conflict(snapshot2, remote, reason) {
+      const id = "record-conflict-" + await digest({ local: snapshot2.head.sha256, remote: remote.head.stateHash, revision: remote.head.revision });
+      const value = { id, reason, epoch: remote.head.epoch, remoteRevision: remote.head.revision, local: snapshot2.state, localImports: snapshot2.imports, remote: remote.state, remoteImports: remote.imports, operationIds: snapshot2.operations.map((row) => row.id), localHash: snapshot2.head.sha256, remoteHash: remote.head.stateHash };
+      await localStore.preserveRecordConflict(value);
+      onStatus("Synchronisatieconflict — beide financiële standen bewaard");
+      return { outcome: "conflict", conflict: value };
+    }
+    async function establishBase() {
+      const local = await readLocal(), remote = await cloudStore.verifyIntegrity();
+      if (!same3(local.state, remote.state) || !same3(local.imports, remote.imports)) return conflict(local, remote, "initial-offline-difference");
+      await localStore.acknowledgeRecordCloud([], { epoch: remote.head.epoch, revision: remote.head.revision, localSha256: local.head.sha256, stateHash: remote.head.stateHash, importsHash: remote.head.importsHash });
+      return { outcome: "matched", revision: remote.head.revision };
+    }
+    async function performSync() {
+      var _a2;
+      const active = await cloudStore.context({ allowPending: true });
+      if (active.head.data.phase === "applying") await cloudStore.recover(active.head.data.pendingOperation);
+      const snapshot2 = await readLocal();
+      if (snapshot2.state.__finizePartialHistory) return syncWorkspace(snapshot2);
+      if (!snapshot2.operations.length) {
+        for (const value of snapshot2.conflicts || []) {
+          const resolution = value.resolution;
+          if (!(resolution == null ? void 0 : resolution.operationId)) continue;
+          const op = await cloudStore.operationStatus(resolution.operationId);
+          if ((op == null ? void 0 : op.phase) === "committed" && op.stateHash === await digest(snapshot2.state) && op.importsHash === await digest(snapshot2.imports)) {
+            await localStore.acknowledgeRecordCloud([], { epoch: op.epoch, revision: op.targetHead.revision, localSha256: snapshot2.head.sha256, stateHash: op.stateHash, importsHash: op.importsHash }, snapshot2.imports, { ...resolution, id: value.id, outcome: "committed" });
+            return { outcome: "committed", replayed: true, revision: op.targetHead.revision };
+          }
+        }
+        return ((_a2 = snapshot2.conflicts) == null ? void 0 : _a2.length) ? { outcome: "conflict", conflictIds: snapshot2.conflicts.map((row) => row.id) } : { outcome: "idle" };
+      }
+      const members = snapshot2.operations.map((row) => ({ id: row.id, sha256: row.sha256, storageRevision: row.storageRevision }));
+      const receipts = [];
+      for (const member of members) {
+        const proof = await cloudStore.operationReceipt(member.id);
+        if (proof) {
+          if (proof.sha256 !== member.sha256) throw storageError("operation-reused", "Cloudbewijs en lokale operatie verschillen.");
+          receipts.push(proof);
+        }
+      }
+      const c = await cloudStore.context();
+      if (receipts.length === members.length) {
+        const last = receipts.reduce((a, b) => a.cloudRevision > b.cloudRevision ? a : b);
+        const resolutions = [...new Set(snapshot2.operations.map((row) => row.conflictId).filter(Boolean))].map((id) => ({ id, choice: "confirmed-cloud-proof", operationId: last.cloudOperation }));
+        await localStore.acknowledgeRecordCloud(members.map((member) => member.id), { epoch: last.epoch, revision: last.cloudRevision, localSha256: snapshot2.head.sha256, stateHash: await digest(snapshot2.state), importsHash: await digest(snapshot2.imports) }, snapshot2.imports, resolutions);
+        onStatus("Cloud opgeslagen");
+        return { outcome: "committed", replayed: true, revision: last.cloudRevision };
+      }
+      if (receipts.length) {
+        const receiptIds = new Set(receipts.map((row) => row.id)), latest2 = receipts.reduce((a, b) => a.cloudRevision > b.cloudRevision ? a : b), confirmed = members.filter((row) => receiptIds.has(row.id)).sort((a, b) => a.storageRevision - b.storageRevision).at(-1);
+        await localStore.acknowledgeRecordCloud([...receiptIds], { epoch: latest2.epoch, revision: latest2.cloudRevision, localSha256: confirmed.sha256, stateHash: c.head.data.stateHash, importsHash: c.head.data.importsHash });
+        return performSync();
+      }
+      if (snapshot2.operations.some((row) => row.status === "conflict")) return { outcome: "conflict", conflictIds: [...new Set(snapshot2.operations.filter((row) => row.status === "conflict").map((row) => row.conflictId))] };
+      const equalCurrent = c.head.data.stateHash === await digest(snapshot2.state) && c.head.data.importsHash === await digest(snapshot2.imports);
+      if (!equalCurrent && (!snapshot2.cloudBase || snapshot2.cloudBase.epoch !== c.head.data.epoch || snapshot2.cloudBase.revision !== c.head.data.revision || snapshot2.operations[0].previousHash !== snapshot2.cloudBase.localSha256)) return conflict(snapshot2, await cloudStore.verifyIntegrity(), "cloud-revision-changed");
+      const operationId = "outbox-" + await digest(members.map((member) => member.id));
+      onStatus("Cloud synchroniseren…");
+      let result;
+      try {
+        result = await cloudStore.commit({ state: snapshot2.state, imports: snapshot2.imports, operationId, expectedRevision: c.head.data.revision, members });
+      } catch (error) {
+        if (error.code === "cloud-conflict") return conflict(snapshot2, await cloudStore.verifyIntegrity(), "concurrent-device");
+        error.commitOutcome = "uncertain";
+        error.operationId = operationId;
+        onStatus("Offline wijzigingen blijven in de duurzame wachtrij");
+        throw error;
+      }
+      for (const member of members) {
+        const proof = await cloudStore.operationReceipt(member.id);
+        if ((proof == null ? void 0 : proof.outcome) !== "committed" || proof.sha256 !== member.sha256) throw storageError("cloud-uncertain", "De cloudbevestiging moet eerst worden gecontroleerd.");
+      }
+      await localStore.acknowledgeRecordCloud(members.map((member) => member.id), { epoch: c.head.data.epoch, revision: result.revision, localSha256: snapshot2.head.sha256, stateHash: await digest(snapshot2.state), importsHash: await digest(snapshot2.imports) }, snapshot2.imports);
+      onStatus("Cloud opgeslagen");
+      return result;
+    }
+    function sync() {
+      if (running) return running;
+      running = performSync().finally(() => {
+        running = null;
+      });
+      return running;
+    }
+    async function releaseFullWindow(snapshot2) {
+      var _a2;
+      if (!((_a2 = snapshot2.state.__finizePeriodContext) == null ? void 0 : _a2.explicitFullHistory)) return;
+      const current = await readLocal();
+      if (!current.operations.length) await openMonth(current.state.meta.selectedMonth, { resetWindow: true });
+    }
+    async function syncWorkspace(snapshot2) {
+      var _a2, _b;
+      if (!snapshot2.operations.length) {
+        await releaseFullWindow(snapshot2);
+        return { outcome: "idle" };
+      }
+      if (snapshot2.operations.some((row) => row.status === "conflict")) return { outcome: "conflict" };
+      const proof = ((_a2 = snapshot2.cloudBase) == null ? void 0 : _a2.workspace) || snapshot2.state.__finizePeriodContext;
+      const before = await workspaceState(proof, snapshot2.state.meta.selectedMonth), members = snapshot2.operations.map((row) => ({ id: row.id, sha256: row.sha256, storageRevision: row.storageRevision }));
+      const resolutions = (snapshot2.conflicts || []).filter((row) => {
+        var _a3;
+        return ((_a3 = row.resolution) == null ? void 0 : _a3.outcome) === "pending";
+      }).map((row) => ({ id: row.id, ...row.resolution, outcome: "committed" }));
+      const receipts = [];
+      for (const member of members) {
+        const receipt = await cloudStore.operationReceipt(member.id);
+        if (receipt) {
+          if (receipt.sha256 !== member.sha256) throw storageError("operation-reused", "Het lokale en externe periodebewijs verschillen.");
+          receipts.push(receipt);
+        }
+      }
+      if (receipts.length) {
+        const latest2 = receipts.reduce((a, b) => a.cloudRevision > b.cloudRevision ? a : b), confirmed2 = await cloudStore.openWorkspace(snapshot2.state.verifiedPeriods);
+        if (confirmed2.__finizePeriodContext.revision !== latest2.cloudRevision) return conflict(snapshot2, { state: confirmed2, imports: [], head: confirmed2.__finizePeriodContext.head }, "newer-period-after-ack-loss");
+        const ids = new Set(receipts.map((row) => row.id)), last = members.filter((row) => ids.has(row.id)).sort((a, b) => a.storageRevision - b.storageRevision).at(-1);
+        await localStore.acknowledgeRecordCloud([...ids], { epoch: latest2.epoch, revision: latest2.cloudRevision, localSha256: last.sha256, stateHash: confirmed2.__finizePeriodContext.head.stateHash, importsHash: confirmed2.__finizePeriodContext.head.importsHash, workspace: confirmed2.__finizePeriodContext }, snapshot2.imports, receipts.length === members.length ? resolutions : null);
+        if (receipts.length === members.length) {
+          await releaseFullWindow(snapshot2);
+          onStatus("Cloud opgeslagen");
+          return { outcome: "committed", replayed: true, revision: latest2.cloudRevision };
+        }
+        return syncWorkspace(await readLocal());
+      }
+      const operationId = "period-outbox-" + await digest(members.map((row) => row.id));
+      let result;
+      try {
+        result = await cloudStore.commitWorkspace({ before, state: snapshot2.state, imports: snapshot2.imports, operationId, members });
+      } catch (error) {
+        if (error.code === "cloud-conflict") {
+          const remote = await cloudStore.openWorkspace(snapshot2.state.verifiedPeriods);
+          return conflict(snapshot2, { state: remote, imports: [], head: remote.__finizePeriodContext.head }, "period-revision-changed");
+        }
+        error.commitOutcome = "uncertain";
+        error.operationId = operationId;
+        throw error;
+      }
+      for (const member of members) if (((_b = await cloudStore.operationReceipt(member.id)) == null ? void 0 : _b.sha256) !== member.sha256) throw storageError("cloud-uncertain", "Een gericht cloudbewijs moet eerst worden gecontroleerd.");
+      const confirmed = await cloudStore.openWorkspace(snapshot2.state.verifiedPeriods);
+      if (confirmed.__finizePeriodContext.revision !== result.revision) throw storageError("cloud-conflict", "Een nieuwere cloudstand vereist aparte ontvangst. De lokale outbox blijft behouden.");
+      await localStore.acknowledgeRecordCloud(members.map((row) => row.id), { epoch: proof.epoch, revision: result.revision, localSha256: snapshot2.head.sha256, stateHash: confirmed.__finizePeriodContext.head.stateHash, importsHash: confirmed.__finizePeriodContext.head.importsHash, workspace: confirmed.__finizePeriodContext }, snapshot2.imports, resolutions);
+      await releaseFullWindow(snapshot2);
+      onStatus("Cloud opgeslagen");
+      return result;
+    }
+    async function openMonth(month, { explicitFullHistory = false, additionalMonths = [], resetWindow = false } = {}) {
+      var _a2, _b, _c, _d;
+      const snapshot2 = await readLocal(), partial = snapshot2.state.__finizePartialHistory;
+      if ((_a2 = snapshot2.conflicts) == null ? void 0 : _a2.length) return { outcome: "conflict" };
+      if (!partial && snapshot2.operations.length) return { outcome: "pending-local" };
+      if (resetWindow && snapshot2.operations.length) return { outcome: "pending-local" };
+      const pristine = snapshot2.head.storageRevision === 1 && !((_b = snapshot2.head.migration) == null ? void 0 : _b.sourceSha256);
+      if (!partial && !pristine && (!snapshot2.cloudBase || snapshot2.cloudBase.localSha256 !== snapshot2.head.sha256)) throw storageError("unconfirmed-local-base", "Bevestig eerst de bestaande lokale administratie; de oude historie blijft beschermd.");
+      let incoming, fromCache = false;
+      try {
+        const c = await cloudStore.context(), months = explicitFullHistory ? Object.keys(c.head.data.periodHashes) : [month, ...additionalMonths, ...partial && !resetWindow ? snapshot2.state.verifiedPeriods : []].filter((value, index, all) => all.indexOf(value) === index);
+        if (!months.includes(month)) months.unshift(month);
+        incoming = await cloudStore.openWorkspace(months, { explicitFullHistory });
+      } catch (error) {
+        if (explicitFullHistory || !partial || !snapshot2.state.verifiedPeriods.includes(month) || error.code && !["firestore-error", "cloud-pending"].includes(error.code)) throw error;
+        incoming = copyState(snapshot2.localState);
+        incoming.meta.selectedMonth = month;
+        fromCache = true;
+        onStatus("Offline — eerder geverifieerde financiële maand");
+      }
+      if (partial && snapshot2.operations.length && !fromCache) {
+        const base = await workspaceState(((_c = snapshot2.cloudBase) == null ? void 0 : _c.workspace) || snapshot2.state.__finizePeriodContext, snapshot2.state.meta.selectedMonth);
+        if (base.__finizePeriodContext.revision !== incoming.__finizePeriodContext.revision) return conflict(snapshot2, { state: incoming, imports: [], head: incoming.__finizePeriodContext.head }, "open-period-revision-changed");
+        const next = copyState(incoming), oldRows = new Map(base.transactions.map((row) => [row.id, row])), localRows = new Map(snapshot2.state.transactions.map((row) => [row.id, row]));
+        next.transactions = next.transactions.filter((row) => !oldRows.has(row.id) || localRows.has(row.id));
+        for (const [id2, row] of localRows) if (!same3(oldRows.get(id2), row)) {
+          const at = next.transactions.findIndex((value) => value.id === id2);
+          if (at < 0) next.transactions.push(copyState(row));
+          else next.transactions[at] = copyState(row);
+        }
+        for (const key of Object.keys(snapshot2.state)) if (!["transactions", "meta", "__finizePartialHistory", "verifiedPeriods", "__finizePeriodContext"].includes(key) && !same3(base[key], snapshot2.state[key])) next[key] = copyState(snapshot2.state[key]);
+        next.meta = { ...snapshot2.state.meta, selectedMonth: month };
+        refreshWorkspaceTotals(incoming, next);
+        incoming = next;
+      }
+      if (partial && !snapshot2.operations.length && !fromCache) {
+        const rows = new Map(incoming.transactions.map((row) => [row.id, row]));
+        const relevant = (row) => {
+          var _a3;
+          return !resetWindow || String(((_a3 = row.bankOriginal) == null ? void 0 : _a3.bankDate) || row.transactionDate || row.date || "").startsWith(month) || snapshot2.state.__finizePeriodContext.records.some((record) => record.collection === "transactions" && record.recordId === row.id && record.periods.includes(month));
+        };
+        const lost = snapshot2.state.transactions.some((row) => relevant(row) && getTransactionProcessingStatus(row) === "goedgekeurd" && (!rows.has(row.id) || getTransactionProcessingStatus(rows.get(row.id)) !== "goedgekeurd"));
+        if (lost) return conflict(snapshot2, { state: incoming, imports: [], head: incoming.__finizePeriodContext.head }, "period-approval-missing");
+      }
+      incoming.meta.selectedMonth = month;
+      validateIncoming(incoming);
+      const id = "period-view-" + crypto.randomUUID(), expected = await backupDigest(JSON.stringify(incoming));
+      const workspace = copyState(incoming.__finizePeriodContext);
+      delete workspace.localCumulative;
+      const periodAcceptance = fromCache && snapshot2.cloudBase ? snapshot2.cloudBase : { epoch: workspace.epoch, revision: workspace.revision, stateHash: workspace.head.stateHash, importsHash: workspace.head.importsHash, workspace };
+      try {
+        await localStore.commit(incoming, { expectedHash: snapshot2.head.sha256, operationId: id, queueCloud: false, periodAcceptance });
+      } catch (error) {
+        const proof = await localStore.inspectOperation(id);
+        if (((_d = proof.receipt) == null ? void 0 : _d.sha256) !== expected) {
+          error.commitOutcome = proof.state && await backupDigest(JSON.stringify(proof.state)) === snapshot2.head.sha256 ? "rejected" : "uncertain";
+          throw error;
+        }
+      }
+      await onAdopt(incoming, { previousState: snapshot2.localState });
+      return { outcome: "committed", month, loadedTransactions: incoming.transactions.length, fullHistoryLoaded: false };
+    }
+    async function pull() {
+      var _a2, _b, _c, _d;
+      const localState = await localStore.load();
+      if (localState == null ? void 0 : localState.__finizePartialHistory) return openMonth(localState.meta.selectedMonth);
+      const snapshot2 = await readLocal();
+      if (snapshot2.operations.length || ((_a2 = snapshot2.importQueue) == null ? void 0 : _a2.length)) return { outcome: "pending-local" };
+      if ((_b = snapshot2.conflicts) == null ? void 0 : _b.length) return { outcome: "conflict", conflictIds: snapshot2.conflicts.map((row) => row.id) };
+      const remote = await cloudStore.verifyIntegrity(), base = snapshot2.cloudBase;
+      const pristine = snapshot2.head.storageRevision === 1 && !((_c = snapshot2.head.migration) == null ? void 0 : _c.sourceSha256) && !snapshot2.imports.length;
+      if (!pristine && (!base || base.epoch !== remote.head.epoch || base.localSha256 !== snapshot2.head.sha256 || base.importsHash !== await digest(snapshot2.imports))) return conflict(snapshot2, remote, "unconfirmed-local-base");
+      if (base && remote.head.revision < base.revision) throw storageError("cloud-conflict", "Een oudere cloudrevisie mag de lokale administratie niet vervangen.");
+      if (!pristine) {
+        const incoming = new Map(remote.state.transactions.map((row) => [row.id, row]));
+        const lost = (snapshot2.state.transactions || []).filter((row) => row.recordRole === "bank-source" || row.source === "manual").some((row) => !incoming.has(row.id) || getTransactionProcessingStatus(row) === "goedgekeurd" && getTransactionProcessingStatus(incoming.get(row.id)) !== "goedgekeurd");
+        if (lost) return conflict(snapshot2, remote, "existing-approval-missing");
+      }
+      if (same3(snapshot2.state, remote.state) && same3(snapshot2.imports, remote.imports)) {
+        await localStore.acknowledgeRecordCloud([], { epoch: remote.head.epoch, revision: remote.head.revision, localSha256: snapshot2.head.sha256, stateHash: remote.head.stateHash, importsHash: remote.head.importsHash });
+        return { outcome: "matched", revision: remote.head.revision };
+      }
+      validateIncoming(remote.state);
+      const operationId = "cloud-pull-" + remote.head.epoch + "-" + remote.head.revision, sha256 = await backupDigest(JSON.stringify(remote.state));
+      try {
+        await localStore.load();
+        await localStore.commit(remote.state, { expectedHash: snapshot2.head.sha256, operationId, queueCloud: false, cloudAcceptance: { imports: remote.imports, expectedImportsSignature: JSON.stringify(snapshot2.imports), base: { epoch: remote.head.epoch, revision: remote.head.revision, stateHash: remote.head.stateHash, importsHash: remote.head.importsHash } } });
+      } catch (error) {
+        let proof;
+        try {
+          proof = await localStore.inspectOperation(operationId);
+        } catch (e) {
+          error.commitOutcome = "uncertain";
+          error.operationId = operationId;
+          throw error;
+        }
+        if (((_d = proof.receipt) == null ? void 0 : _d.sha256) !== sha256 || await backupDigest(JSON.stringify(proof.state)) !== sha256) {
+          error.commitOutcome = !proof.receipt && await backupDigest(JSON.stringify(proof.state)) === snapshot2.head.sha256 ? "rejected" : "uncertain";
+          error.operationId = operationId;
+          throw error;
+        }
+      }
+      await onAdopt(remote.state, { previousState: snapshot2.localState });
+      onStatus("Cloud ontvangen — lokaal duurzaam bevestigd");
+      return { outcome: "committed", revision: remote.head.revision };
+    }
+    async function resolveConflict(value, { choice, expectedRemoteRevision, operationId, reviewedRemoteChanges = [] } = {}) {
+      var _a2, _b;
+      if (choice !== "local") throw storageError("approval-review-required", "De externe stand toepassen vereist eerst een expliciete beoordeling van afwijkende lokale goedkeuringen. Beide versies blijven bewaard.");
+      const local = await readLocal(), c = await cloudStore.context();
+      if (value.scope && value.scope !== localStore.scope || value.epoch !== c.head.data.epoch || c.head.data.revision !== expectedRemoteRevision || value.remoteRevision !== expectedRemoteRevision || value.localHash !== local.head.sha256) throw storageError("cloud-conflict", "De beoordeelde conflictversies zijn intussen gewijzigd.");
+      if (local.state.__finizePartialHistory) {
+        const saved = local.conflicts.find((row) => row.id === value.id);
+        if (!saved || saved.remoteHash !== c.head.data.stateHash || !same3(saved.local, value.local) || !same3(saved.remote, value.remote) || !same3(saved.localImports, value.localImports) || !same3(value.local, local.state)) throw storageError("cloud-conflict", "De conflictinhoud wijkt af van het duurzame beoordelingsbewijs.");
+        const reviewed2 = conflictApprovalReview(value).map((row) => row.id).sort();
+        if (!same3([...new Set(reviewedRemoteChanges)].sort(), reviewed2)) throw storageError("approval-review-required", "Bevestig iedere afwijkende externe goedkeuring; beide versies blijven bewaard.");
+        const base = await workspaceState(((_a2 = local.cloudBase) == null ? void 0 : _a2.workspace) || local.state.__finizePeriodContext, local.state.meta.selectedMonth), remote = await cloudStore.openWorkspace(local.state.verifiedPeriods, { explicitFullHistory: local.state.__finizePeriodContext.explicitFullHistory });
+        if (remote.__finizePeriodContext.revision !== expectedRemoteRevision) throw storageError("cloud-conflict", "De externe stand is intussen gewijzigd.");
+        const old = new Map(base.transactions.map((row) => [row.id, row])), incoming = new Map(remote.transactions.map((row) => [row.id, row]));
+        const chosen = new Map(local.state.transactions.map((row) => [row.id, row]));
+        for (const id of /* @__PURE__ */ new Set([...old.keys(), ...chosen.keys()])) {
+          const row = chosen.get(id), external = incoming.get(id);
+          if (!same3(row, old.get(id)) && !same3(external, old.get(id)) && !same3(row, external)) throw storageError("financial-reapproval-required", "Dezelfde bankverwerking is op beide apparaten gewijzigd. Een nieuwe financiële beoordeling is vereist; beide goedkeuringen blijven beschermd.");
+        }
+        const merged = mergeWorkspaceIntent(base, local.state, remote, { strict: false });
+        synchronizeChangedSavings(merged, remote);
+        reconcileGoalSavedAmounts(merged);
+        refreshWorkspaceTotals(remote, merged);
+        assertFinancialMutationSafe(remote, merged);
+        assertOriginalBankDataUnchanged(remote.transactions, merged.transactions);
+        validateIncoming(merged);
+        merged.meta = { ...merged.meta, revision: Math.max(Number(local.state.meta.revision) || 0, Number(remote.meta.revision) || 0) + 1 };
+        const resolution = { choice, operationId, reviewedRemoteChanges: reviewed2 };
+        await localStore.commit(merged, { expectedHash: local.head.sha256, operationId, queueCloud: true, resolutionAcceptance: { id: value.id, resolution, base: { epoch: value.epoch, revision: expectedRemoteRevision, workspace: remote.__finizePeriodContext, stateHash: c.head.data.stateHash, importsHash: c.head.data.importsHash } } });
+        await onAdopt(merged, { previousState: local.localState });
+        return sync();
+      }
+      if (value.remoteHash !== c.head.data.stateHash || await digest(value.remote) !== value.remoteHash || await digest(value.remoteImports) !== c.head.data.importsHash || !same3(value.local, local.state) || !same3(value.localImports, local.imports)) throw storageError("cloud-conflict", "De conflictinhoud hoort niet bij de bewezen lokale en externe standen.");
+      const reviewed = conflictApprovalReview(value).map((row) => row.id).sort();
+      if (!same3([...new Set(reviewedRemoteChanges)].sort(), reviewed)) throw storageError("approval-review-required", "Beoordeel en bevestig eerst iedere afwijkende externe financiële goedkeuring. Beide versies blijven bewaard.");
+      const members = local.operations.map((row) => ({ id: row.id, sha256: row.sha256, storageRevision: row.storageRevision }));
+      await localStore.markRecordResolution(value.id, { choice, operationId, reviewedRemoteChanges: reviewed });
+      const result = await cloudStore.commit({ state: local.state, imports: local.imports, operationId, expectedRevision: expectedRemoteRevision, members });
+      for (const member of members) if (((_b = await cloudStore.operationReceipt(member.id)) == null ? void 0 : _b.sha256) !== member.sha256) throw storageError("cloud-uncertain", "Conflictbevestiging moet worden gecontroleerd.");
+      await localStore.acknowledgeRecordCloud(members.map((row) => row.id), { epoch: c.head.data.epoch, revision: result.revision, localSha256: local.head.sha256, stateHash: await digest(local.state), importsHash: await digest(local.imports) }, local.imports, { id: value.id, choice, operationId, reviewedRemoteChanges: reviewed });
+      onStatus("Cloud opgeslagen — conflictkeuze en beide versies bewaard");
+      return result;
+    }
+    return { sync, pull, openMonth, openFullHistory: (month, reason) => {
+      if (!reason) throw storageError("history-reason", "Geef de noodzakelijke historische afhankelijkheid op.");
+      return openMonth(month, { explicitFullHistory: true });
+    }, establishBase, resolveConflict, conflictApprovalReview, readLocal, loadPeriod: (month) => cloudStore.loadPeriod(month), loadImport: (id) => cloudStore.loadImport(id), cloudStore, localStore };
+  }
+  var copyState = (value) => structuredClone(value);
+
+  // src/storage/record-session.mjs
+  function installRecordSessions(root2, { getLocalStore, applicationProjection, readLegacyImports, prepareState, onAdopt, validateIncoming }) {
+    root2.FinizeCloudRecords = {
+      async createEmulatorSession(options) {
+        if (!["localhost", "127.0.0.1"].includes(root2.location.hostname)) throw storageError("emulator-only", "Een recordsessie vereist de lokale testapplicatie.");
+        const localStore = getLocalStore();
+        if (options.householdId !== localStore.scope) throw storageError("household-scope", "De testsessie hoort bij een ander huishouden.");
+        const transport = createEmulatorRecordTransport(options), cloudStore = createRecordCloudStore({ ...options, transport, applicationProjection, readLegacyImports });
+        const sync = createRecordSync({ localStore, cloudStore, prepareState, onAdopt, validateIncoming, onStatus: (status) => {
+          var _a2;
+          root2.CloudAdapter.status = status;
+          (_a2 = root2.renderCloudStatus) == null ? void 0 : _a2.call(root2);
+        } });
+        return {
+          ...sync,
+          transport,
+          async attach({ automatic = true, periodLoading = true } = {}) {
+            var _a2;
+            if (getLocalStore().scope !== localStore.scope) throw storageError("household-scope", "Het actieve huishouden is gewijzigd.");
+            await cloudStore.context();
+            const cloud = root2.CloudAdapter;
+            (_a2 = cloud.unsubscribe) == null ? void 0 : _a2.call(cloud);
+            cloud.unsubscribe = null;
+            clearTimeout(cloud.saveTimer);
+            clearTimeout(cloud.retryTimer);
+            Object.assign(cloud, { recordSession: sync, recordAutomatic: automatic, db: null, docRef: null, initialSyncComplete: true, conflict: false, status: "Testcloud verbonden" });
+            if (periodLoading) {
+              await cloudStore.preparePeriodStorage();
+              const state2 = await localStore.load(), snapshot2 = await localStore.readCloudSnapshot();
+              if (!state2.__finizePartialHistory && snapshot2.operations.length) {
+                if ((await sync.establishBase()).outcome !== "matched") throw storageError("cloud-conflict", "De bestaande administratie moet eerst veilig worden bevestigd.");
+                await sync.sync();
+              }
+              const result = await sync.openMonth(state2.meta.selectedMonth || (/* @__PURE__ */ new Date()).toISOString().slice(0, 7));
+              if (result.outcome !== "committed") throw storageError("period-incomplete", "De actieve maand kan nog niet veilig worden geopend.");
+              cloud.pendingState = null;
+            }
+            return sync;
+          }
+        };
+      }
+    };
+  }
+
+  // src/import/import-identity.mjs
+  var original = (row) => row.bankOriginal || row;
+  var accountKey = (row, batch) => String(row.accountContext || row.accountOwner || (batch == null ? void 0 : batch.accountOwner) || "") + "|" + String(original(row).accountIdentifier || (batch == null ? void 0 : batch.accountProfileId) || "");
+  function immutableBankFields(row) {
+    const bank = original(row);
+    return JSON.stringify([bank.bankDate, bank.transactionTime || "", bank.bookingDate || "", bank.amount, bank.rawDescription || bank.description, bank.description, bank.counterpartyAccount || "", bank.currency || "", bank.reference || "", bank.code || "", bank.notes || "", bank.rawCells || []]);
+  }
+  function classifyCsvDuplicate(row, batch, existingBatches = []) {
+    let possible = null;
+    for (const oldBatch of existingBatches) {
+      if (oldBatch.lifecycle === "deleted") continue;
+      for (const oldRow of oldBatch.rows || []) {
+        if (accountKey(row, batch) !== accountKey(oldRow, oldBatch)) continue;
+        const sameFields = immutableBankFields(row) === immutableBankFields(oldRow);
+        const proof = row.sourceIdentityProof, oldProof = oldRow.sourceIdentityProof;
+        const sameFile = (proof == null ? void 0 : proof.kind) === "file-row" && (oldProof == null ? void 0 : oldProof.kind) === "file-row" && Number.isSafeInteger(proof.rowOrdinal) && proof.rowOrdinal > 0 && proof.rowOrdinal === oldProof.rowOrdinal && (typeof batch.originalCsv === "string" && batch.originalCsv === oldBatch.originalCsv || /^[a-f0-9]{64}$/.test(proof.fileDigest || "") && proof.fileDigest === oldProof.fileDigest);
+        const bankIdentity = (proof == null ? void 0 : proof.kind) === "bank-id" && (oldProof == null ? void 0 : oldProof.kind) === "bank-id" && typeof proof.authority === "string" && proof.authority.trim() !== "" && typeof proof.id === "string" && proof.id.trim() !== "" && proof.authority === oldProof.authority && proof.id === oldProof.id;
+        if (sameFields && (sameFile || bankIdentity)) return { duplicate: true, duplicateSource: { batchId: oldBatch.id, rowId: oldRow.id }, reason: "proven-source-identity" };
+        if (sameFields) possible = { duplicate: false, possibleDuplicate: { batchId: oldBatch.id, rowId: oldRow.id }, reason: "equal-bank-fields" };
+      }
+    }
+    return possible || { duplicate: false };
+  }
+  function validCalendarDate(date) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date))) return false;
+    const parsed = /* @__PURE__ */ new Date(date + "T12:00:00Z");
+    return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === date;
+  }
+  function importDateError(original2, today) {
+    if (!validCalendarDate(original2.bankDate)) return { code: "invalid-transaction-date", row: original2.lineNumber, date: original2.bankDate, message: "Ongeldige transactiedatum." };
+    if (original2.bankDate > today) return { code: "future-transaction-date", row: original2.lineNumber, date: original2.bankDate, message: `Bankregel ${original2.lineNumber}: transactiedatum ${original2.bankDate} ligt in de toekomst.` };
+    return null;
+  }
+  function csvFileDigest(text) {
+    const bytes2 = new TextEncoder().encode(String(text)), length = bytes2.length, padded = new Uint8Array((Math.floor((length + 8) / 64) + 1) * 64);
+    padded.set(bytes2);
+    padded[length] = 128;
+    const view = new DataView(padded.buffer);
+    view.setUint32(padded.length - 8, Math.floor(length / 536870912));
+    view.setUint32(padded.length - 4, length * 8);
+    const k = [1116352408, 1899447441, 3049323471, 3921009573, 961987163, 1508970993, 2453635748, 2870763221, 3624381080, 310598401, 607225278, 1426881987, 1925078388, 2162078206, 2614888103, 3248222580, 3835390401, 4022224774, 264347078, 604807628, 770255983, 1249150122, 1555081692, 1996064986, 2554220882, 2821834349, 2952996808, 3210313671, 3336571891, 3584528711, 113926993, 338241895, 666307205, 773529912, 1294757372, 1396182291, 1695183700, 1986661051, 2177026350, 2456956037, 2730485921, 2820302411, 3259730800, 3345764771, 3516065817, 3600352804, 4094571909, 275423344, 430227734, 506948616, 659060556, 883997877, 958139571, 1322822218, 1537002063, 1747873779, 1955562222, 2024104815, 2227730452, 2361852424, 2428436474, 2756734187, 3204031479, 3329325298];
+    const h = [1779033703, 3144134277, 1013904242, 2773480762, 1359893119, 2600822924, 528734635, 1541459225], w = new Uint32Array(64), rot = (n, b) => n >>> b | n << 32 - b;
+    for (let offset = 0; offset < padded.length; offset += 64) {
+      for (let n = 0; n < 16; n++) w[n] = view.getUint32(offset + n * 4);
+      for (let n = 16; n < 64; n++) {
+        const a2 = w[n - 15], b2 = w[n - 2];
+        w[n] = w[n - 16] + (rot(a2, 7) ^ rot(a2, 18) ^ a2 >>> 3) + w[n - 7] + (rot(b2, 17) ^ rot(b2, 19) ^ b2 >>> 10) >>> 0;
+      }
+      let [a, b, c, d, e, f, g, z] = h;
+      for (let n = 0; n < 64; n++) {
+        const first = z + (rot(e, 6) ^ rot(e, 11) ^ rot(e, 25)) + (e & f ^ ~e & g) + k[n] + w[n] >>> 0, second = (rot(a, 2) ^ rot(a, 13) ^ rot(a, 22)) + (a & b ^ a & c ^ b & c) >>> 0;
+        z = g;
+        g = f;
+        f = e;
+        e = d + first >>> 0;
+        d = c;
+        c = b;
+        b = a;
+        a = first + second >>> 0;
+      }
+      [a, b, c, d, e, f, g, z].forEach((v, n) => h[n] = h[n] + v >>> 0);
+    }
+    return h.map((n) => n.toString(16).padStart(8, "0")).join("");
+  }
+  function assertNoDuplicateSources(previous, next) {
+    var _a2;
+    const groups = /* @__PURE__ */ new Map();
+    for (const tx of next.transactions || []) {
+      if (!tx.importBatchId || !tx.importTransactionId || tx.batchLifecycle === "withdrawn" || tx.processingStatus !== "goedgekeurd") continue;
+      const proof = tx.sourceIdentityProof;
+      if ((proof == null ? void 0 : proof.kind) !== "file-row" || !proof.fileDigest) continue;
+      const key = JSON.stringify([tx.accountContext, ((_a2 = tx.bankOriginal) == null ? void 0 : _a2.accountIdentifier) || tx.accountProfileId, proof.fileDigest, proof.rowOrdinal]);
+      const source = tx.importBatchId + ":" + tx.importTransactionId;
+      const old = groups.get(key);
+      if (old && old.source !== source) {
+        const unchanged = (previous.transactions || []).some((row) => row.id === tx.id && JSON.stringify(row) === JSON.stringify(tx)) && (previous.transactions || []).some((row) => row.id === old.tx.id && JSON.stringify(row) === JSON.stringify(old.tx));
+        if (!unchanged) throw Object.assign(new Error("Dezelfde bewezen CSV-bron heeft twee actieve imports. Herstel/goedkeuring is geblokkeerd."), { code: "duplicate-source-conflict" });
+      } else groups.set(key, { source, tx });
+    }
+  }
+
+  // src/storage/legacy-import-readback.mjs
+  async function readLegacyCloudImports(headers, transport, { assembleCloudImport }) {
+    var _a2, _b;
+    const imports = [];
+    for (const entry of headers) {
+      const header = entry.data, id = entry.path.split("/").pop();
+      if (Array.isArray(header.rows)) {
+        imports.push(header);
+        continue;
+      }
+      if (header.lifecycle === "deleted") {
+        imports.push({ ...header, rows: [] });
+        continue;
+      }
+      if (!Number.isSafeInteger(header.chunkCount) || header.chunkCount < 0 || header.chunkCount > 1e4) throw storageError("migration-incomplete", "De oude importindeling is ongeldig.");
+      const chunks = [];
+      for (let index = 0; index < header.chunkCount; index++) chunks.push((_a2 = await transport.get(entry.path + "/chunks/" + (header.generation ? header.generation + "-" : "") + String(index).padStart(4, "0"))) == null ? void 0 : _a2.data);
+      const batch = assembleCloudImport(header, chunks, id);
+      if (header.sourceChunkCount) {
+        if (!Number.isSafeInteger(header.sourceChunkCount) || header.sourceChunkCount < 1 || header.sourceChunkCount > 1e4) throw storageError("migration-incomplete", "De oude CSV-indeling is ongeldig.");
+        const texts = [];
+        for (let index = 0; index < header.sourceChunkCount; index++) {
+          const chunk = (_b = await transport.get(entry.path + "/chunks/" + header.generation + "-source-" + index)) == null ? void 0 : _b.data;
+          if ((chunk == null ? void 0 : chunk.generation) !== header.generation || chunk.index !== index || typeof chunk.text !== "string") throw storageError("migration-incomplete", "Een oorspronkelijk CSV-deel ontbreekt.");
+          texts.push(chunk.text);
+        }
+        batch.originalCsv = texts.join("");
+        if (csvFileDigest(batch.originalCsv) !== header.fileDigest) throw storageError("migration-integrity", "Originele CSV-controlecode wijkt af.");
+      }
+      batch.baseVersion = Number(header.version) || 0;
+      imports.push(batch);
+    }
+    return imports;
+  }
+
+  // src/import/import-sync-protocol.mjs
+  var copy6 = (value) => JSON.parse(JSON.stringify(value));
+  var importVersion = (record) => Number.isSafeInteger(Number(record == null ? void 0 : record.version)) ? Number(record.version) : 0;
+  function sameImportOperation(left, right) {
+    return !!(left == null ? void 0 : left.operationId) && left.operationId === (right == null ? void 0 : right.operationId) && importVersion(left) === importVersion(right);
+  }
+  function assertImportBase(remote, record) {
+    if (sameImportOperation(remote, record)) return "echo";
+    if ((remote == null ? void 0 : remote.lifecycle) === "deleted") throw Object.assign(new Error("Deze import is permanent verwijderd op een ander apparaat."), { code: "import-deleted" });
+    if (importVersion(remote) !== Number(record.baseVersion || 0)) throw Object.assign(new Error("De cloudimport is intussen gewijzigd. De lokale keuze is veilig bewaard; kies expliciet welke verwerking behouden blijft."), { code: "import-conflict" });
+    return "write";
+  }
+  function pendingQueueReceipt(record) {
+    return { id: record.id, importId: record.id, version: importVersion(record), operationId: record.operationId || "", baseVersion: Number(record.baseVersion || 0) };
+  }
+  function acknowledgeMatches(queued, uploaded) {
+    return (queued == null ? void 0 : queued.operationId) === (uploaded == null ? void 0 : uploaded.operationId) && (queued == null ? void 0 : queued.version) === (uploaded == null ? void 0 : uploaded.version);
+  }
+  var sourceKey = (tx) => tx.bankSourceId || (tx.importBatchId && tx.importTransactionId ? tx.importBatchId + ":" + tx.importTransactionId : null);
+  var signature = (value) => JSON.stringify(value != null ? value : null);
+  function findImportConflicts(base, local, remote) {
+    const conflicts = [];
+    const groups = (state2) => {
+      const result = /* @__PURE__ */ new Map();
+      for (const tx of (state2 == null ? void 0 : state2.transactions) || []) {
+        const key = sourceKey(tx);
+        if (key) {
+          if (!result.has(key)) result.set(key, []);
+          result.get(key).push(tx);
+        }
+      }
+      return result;
+    };
+    const a = groups(base), b = groups(local), c = groups(remote);
+    for (const key of /* @__PURE__ */ new Set([...a.keys(), ...b.keys(), ...c.keys()])) {
+      if (signature(a.get(key)) !== signature(b.get(key)) && signature(a.get(key)) !== signature(c.get(key)) && signature(b.get(key)) !== signature(c.get(key))) conflicts.push({ kind: "source", sourceKey: key });
+    }
+    for (const field of ["importSummaries", "importDeletionProofs", "manualTransactionReplacements", "internalTransferPairs", "savingsCoverageAllocations"]) {
+      const maps = [base, local, remote].map((state2) => new Map(((state2 == null ? void 0 : state2[field]) || []).map((row) => [row.id, row])));
+      for (const id of new Set(maps.flatMap((map) => [...map.keys()]))) {
+        const [x, y, z] = maps.map((map) => map.get(id));
+        if (signature(x) !== signature(y) && signature(x) !== signature(z) && signature(y) !== signature(z)) conflicts.push({ kind: field, id });
+      }
+    }
+    return conflicts;
+  }
+  function mergeImportDetails(base, local, remote) {
+    if (remote.lifecycle === "deleted") return { record: copy6(remote), conflicts: [{ kind: "deleted", id: remote.id }] };
+    const result = copy6(remote), conflicts = [];
+    const old = new Map(((base == null ? void 0 : base.rows) || []).map((row) => [row.id, row])), rows = new Map((remote.rows || []).map((row) => [row.id, row]));
+    if ((local.lifecycle || "active") !== ((base == null ? void 0 : base.lifecycle) || "active") && (remote.lifecycle || "active") !== ((base == null ? void 0 : base.lifecycle) || "active") && local.lifecycle !== remote.lifecycle) conflicts.push({ kind: "lifecycle", id: local.id });
+    for (const row of local.rows || []) {
+      if (signature(row) === signature(old.get(row.id))) continue;
+      const cloud = rows.get(row.id);
+      if (signature(cloud) !== signature(old.get(row.id)) && signature(row) !== signature(cloud)) conflicts.push({ kind: "source", id: row.id });
+      else rows.set(row.id, copy6(row));
+    }
+    result.rows = [...rows.values()];
+    return { record: result, conflicts };
+  }
+
+  // src/core/state.js
+  function cloneState(value) {
+    return JSON.parse(JSON.stringify(value));
+  }
+
+  // src/core/mutation-errors.mjs
+  function describeMutationError(error) {
+    const explain = (message) => Object.assign(new Error(message, { cause: error }), Object.fromEntries(["commitOutcome", "operationId", "storageFailure"].filter((key) => (error == null ? void 0 : error[key]) !== void 0).map((key) => [key, error[key]])));
+    if (["QuotaExceededError", "NS_ERROR_DOM_QUOTA_REACHED"].includes(error == null ? void 0 : error.name) || [22, 1014].includes(error == null ? void 0 : error.code)) {
+      return explain("De browseropslag is vol. Maak eerst een back-up via Gegevens en maak ruimte vrij op je toestel. Wis de Finize-sitegegevens niet; daarin kunnen nog niet gesynchroniseerde transacties staan.");
+    }
+    if ((error == null ? void 0 : error.name) === "SecurityError") {
+      return explain("De browser blokkeert lokale opslag. Sta opslag voor Finize toe in de browserinstellingen en probeer opnieuw.");
+    }
+    return error instanceof Error ? error : new Error(String((error == null ? void 0 : error.message) || error || "Onbekende opslagfout. Probeer opnieuw; blijft dit gebeuren, meld dan bij welke transactie het optreedt."));
   }
 
   // src/storage/sync-protocol.mjs
@@ -6355,6 +6925,10 @@
     },
     async connect() {
       if (this.recordSession) return true;
+      if (state == null ? void 0 : state.__finizePartialHistory) {
+        this.status = "Offline — geverifieerde perioden lokaal bewaard";
+        return false;
+      }
       if (!cloudConnectionAllowed()) {
         this.status = "Offline — lokaal bewaard";
         renderCloudStatus();
@@ -6636,6 +7210,10 @@
       });
     },
     queueSave(state2) {
+      if ((state2 == null ? void 0 : state2.__finizePartialHistory) && !this.recordSession) {
+        this.status = "Offline — periodewijzigingen duurzaam bewaard";
+        return;
+      }
       if (this.applyingRemote) return;
       this.pendingState = cloneState(state2);
       this.status = this.conflict ? "Synchronisatieconflict" : this.isConnected() ? "Opslaan…" : "Offline — lokaal bewaard";
@@ -6794,6 +7372,7 @@
       }
     },
     async restoreBackup(restoredState, backupReason) {
+      if (state.__finizePartialHistory) throw new Error("Herstel van een volledige back-up vereist een afzonderlijk gecontroleerde recordmigratie. De huidige administratie blijft behouden.");
       if (!this.isConnected()) {
         const connected = await this.connect();
         if (!connected) throw new Error("Maak eerst verbinding met de cloud om een back-up te herstellen.");
@@ -7050,7 +7629,7 @@
   var activeTab = "dashboard";
   var TODAY = /* @__PURE__ */ new Date();
   async function commitChange(change, options = {}) {
-    var _a2, _b, _c, _d, _e, _f, _g;
+    var _a2, _b, _c, _d, _e, _f, _g, _h;
     const before = cloneState(committedStateSnapshot || state);
     const scope = (_a2 = activeStorageKeys()) == null ? void 0 : _a2.state;
     try {
@@ -7058,7 +7637,27 @@
       const mutation = typeof change === "function" ? change(state) : typeof (change == null ? void 0 : change.apply) === "function" ? change.apply(state) : null;
       if (mutation && typeof mutation.then === "function") throw new Error("Een financiële mutatie moet synchroon een kandidaat maken; de opslag wordt daarna awaited.");
       if (JSON.stringify(before) === JSON.stringify(state)) return true;
+      if (before.__finizePartialHistory) {
+        try {
+          assertWorkspaceMutation(before, state);
+        } catch (error) {
+          if (!["dependency-required", "full-history-required"].includes(error.code)) throw error;
+          const intent = cloneState(state), session = CloudAdapter.recordSession;
+          state = cloneState(before);
+          window.state = state;
+          if (!session || Number(options.dependencyAttempts || 0) >= 3) throw error;
+          const result = error.code === "full-history-required" ? await session.openFullHistory(before.meta.selectedMonth, error.message) : await session.openMonth(before.meta.selectedMonth, { additionalMonths: requiredMutationPeriods(before, intent) });
+          if (((_e = activeStorageKeys()) == null ? void 0 : _e.state) !== scope) throw new Error("Het huishouden wijzigde tijdens het laden van afhankelijkheden.");
+          if (result.outcome !== "committed") throw new Error("De afhankelijkheden kunnen nog niet betrouwbaar worden geladen. Beide financiële standen blijven bewaard.");
+          const expanded = cloneState(committedStateSnapshot || state), merged = mergeWorkspaceIntent(before, intent, expanded);
+          return await commitChange(() => {
+            state = merged;
+            window.state = state;
+          }, { ...options, dependencyAttempts: Number(options.dependencyAttempts || 0) + 1 });
+        }
+      }
       synchronizeChangedSavings(state, before);
+      refreshWorkspaceTotals(before, state);
       assertFinancialMutationSafe(before, state);
       assertOriginalBankDataUnchanged(before.transactions, state.transactions);
       if (JSON.stringify(before) === JSON.stringify(state)) return true;
@@ -7100,20 +7699,20 @@
       state = cloneState(before);
       window.state = state;
       if (!await DataAdapter.save(candidate, { throwOnError: true, importMutation: options.importMutation, operationId: options.operationId })) throw new Error("Lokale opslag is mislukt. Probeer opnieuw; wis de Finize-sitegegevens niet.");
-      if (((_e = activeStorageKeys()) == null ? void 0 : _e.state) !== scope) throw Object.assign(new Error("Het huishouden wijzigde tijdens opslag; de bevestigde wijziging blijft in het oorspronkelijke huishouden."), { commitOutcome: "committed" });
+      if (((_f = activeStorageKeys()) == null ? void 0 : _f.state) !== scope) throw Object.assign(new Error("Het huishouden wijzigde tijdens opslag; de bevestigde wijziging blijft in het oorspronkelijke huishouden."), { commitOutcome: "committed" });
       state = candidate;
       window.state = state;
       committedStateSnapshot = cloneState(state);
       if (options.render !== false) renderCloudStatus();
       return true;
     } catch (e) {
-      if (e.commitOutcome === "committed" && e.durableState && ((_f = activeStorageKeys()) == null ? void 0 : _f.state) === scope) {
+      if (e.commitOutcome === "committed" && e.durableState && ((_g = activeStorageKeys()) == null ? void 0 : _g.state) === scope) {
         DataAdapter.adoptDurableState(e.durableState);
         CloudAdapter.status = "Lokaal opgeslagen — actuele stand herladen";
         renderCloudStatus();
         return true;
       }
-      if (((_g = activeStorageKeys()) == null ? void 0 : _g.state) === scope) {
+      if (((_h = activeStorageKeys()) == null ? void 0 : _h.state) === scope) {
         state = cloneState(committedStateSnapshot || before);
         window.state = state;
       }
@@ -8352,7 +8951,14 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
   `;
     document.getElementById("btnExport").addEventListener("click", async () => {
       try {
-        const exportState = cloneState(state);
+        let exportState = cloneState(state);
+        if (state.__finizePartialHistory) {
+          const session = CloudAdapter.recordSession;
+          if (!session) throw new Error("Een volledige back-up vereist verbinding met de geverifieerde cloudhistorie.");
+          const snapshot2 = await session.readLocal();
+          if (snapshot2.operations.length) throw new Error("Synchroniseer eerst de open lokale wijzigingen voordat je de volledige back-up exporteert.");
+          exportState = (await session.cloudStore.verifyIntegrity()).state;
+        }
         await GoalImageStore.expandStateForTransfer(exportState);
         downloadJson("dion-dara-budget-backup-" + (/* @__PURE__ */ new Date()).toISOString().slice(0, 10) + ".json", exportState);
       } catch (error) {
@@ -8739,7 +9345,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     };
   }
   function openSavingsCoverageModal(transactionId) {
-    const rows = selectTransactionProjections(state, { includeInactive: true }), anchor = rows.find((p) => p.id === transactionId), month = (anchor == null ? void 0 : anchor.calendarMonth) || getSelectedMonth();
+    const rows = selectDependencyProjections(state, { includeInactive: true }), anchor = rows.find((p) => p.id === transactionId), month = (anchor == null ? void 0 : anchor.calendarMonth) || getSelectedMonth();
     const eligible = rows.filter((p) => p.active && p.calendarMonth === month), withdrawals = eligible.filter((p) => p.transactionType === "van-spaarrekening" && p.savingsGoalId), expenses = eligible.filter((p) => p.regularExpenseBase > 0 && (!p.fixedOccurrenceId || p.fixedMonth === month));
     const modal = document.getElementById("transactionModal");
     let editing = "";
@@ -9882,6 +10488,26 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     panel.querySelectorAll("button").forEach((button) => button.disabled = true);
     try {
       const selected = yearBtn ? yearBtn.dataset.monthYear + "-" + getSelectedMonth().slice(5, 7) : monthBtn.dataset.monthValue;
+      if (state.__finizePartialHistory) {
+        try {
+          if (CloudAdapter.recordSession) {
+            const result = await CloudAdapter.recordSession.openMonth(selected);
+            if (result.outcome !== "committed") throw new Error("De financiële maand kan nog niet veilig worden geopend.");
+          } else {
+            if (!state.verifiedPeriods.includes(selected)) throw new Error("Deze maand is niet offline beschikbaar. Maak verbinding om de vereiste financiële gegevens te laden.");
+            const next = cloneState(state);
+            next.meta.selectedMonth = selected;
+            await DataAdapter.store().commit(next, { queueCloud: false });
+            DataAdapter.adoptDurableState(next);
+            renderActiveTab();
+          }
+          if (monthBtn) closeMonthPicker();
+          if (yearBtn) openMonthPicker();
+        } catch (error) {
+          alert(error.message);
+        }
+        return;
+      }
       setSelectedMonth(selected);
       if (!await persist()) return;
       if (monthBtn) closeMonthPicker();
@@ -10624,7 +11250,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     return round22(Number((_e = (_d = (_c = closure == null ? void 0 : closure.accountControl) == null ? void 0 : _c[account]) == null ? void 0 : _d.administrativeEnd) != null ? _e : setting.openingBalance) || 0);
   }
   function u3ConfirmedTransfersInCalendarMonth(account, month) {
-    const banks = currentBankTransactions(), keys = new Set(banks.map((tx) => tx.bankSourceId || tx.id));
+    const banks = currentBankTransactions({ month }), keys = new Set(banks.map((tx) => tx.bankSourceId || tx.id));
     const actualIds = /* @__PURE__ */ new Set([...banks.map((tx) => tx.id), ...(state.transactions || []).filter((tx) => keys.has(tx.bankSourceId || tx.id)).map((tx) => tx.id)]);
     return (state.internalTransfers || []).filter((row) => row.status === "uitgevoerd" && String(row.date || "").slice(0, 7) === month && !actualIds.has(row.actualTransactionId) && !(row.transactionIds || []).some((id) => actualIds.has(id))).reduce((sum, row) => {
       var _a2;
@@ -10747,8 +11373,13 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     return { month, version: 3, status: "open", legacy: false, income, actualIncome: forecast.household.actualIncome, fixedExpenses, variableExpenses, refunds: forecast.household.refundCashflow, savings, unusedSavings: forecast.household.unusedSavings, savingsFunded: forecast.household.savingsFunded, realExpense: forecast.household.realExpense, allowance: { dion: owners2.dion.allowance, dara: owners2.dara.allowance }, contributions, remaining: forecast.household.available, goalAllocations: (state.savingsGoalLedger || []).filter((entry) => entry.month === month && entry.active !== false).map((entry) => ({ id: entry.id, goalId: entry.goalId, amount: round22(Number(entry.effectiveAmount) || 0), status: entry.status })), closedAt: "" };
   }
   function getMonthFinancialResult(month = getSelectedMonth()) {
-    var _a2;
-    const record = (_a2 = state.monthRecords) == null ? void 0 : _a2[month];
+    var _a2, _b, _c, _d, _e;
+    if (state.__finizePartialHistory && !state.verifiedPeriods.includes(month)) {
+      const result = (_d = (_c = (_b = (_a2 = state.__finizePeriodContext) == null ? void 0 : _a2.summaries) == null ? void 0 : _b[month]) == null ? void 0 : _c.application) == null ? void 0 : _d.monthResult;
+      if (!result) throw Object.assign(new Error("De geverifieerde financiële maandprojectie ontbreekt."), { code: "period-incomplete" });
+      return cloneState(result);
+    }
+    const record = (_e = state.monthRecords) == null ? void 0 : _e[month];
     if (record && ["afgesloten", "correctie-nodig"].includes(record.status) && record.activeClosureId) {
       const closure = (record.closureHistory || []).find((item) => (item.closingId || item.id) === record.activeClosureId);
       if (closure) {
@@ -10813,10 +11444,10 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       const id = `reserve-${closureId}-${owner}`;
       if (!state.reserveLedger.some((row) => row.id === id)) state.reserveLedger.push({ id, month, owner, amount: summary.reserve[owner], reason: "Netto budgetverschil", closureId, sourceClosingId: closureId, status: "actief", createdAt: (/* @__PURE__ */ new Date()).toISOString() });
     });
-    const financialSnapshot = u3LiveFinancialSnapshot(month);
-    financialSnapshot.status = "afgesloten";
-    financialSnapshot.closedAt = (/* @__PURE__ */ new Date()).toISOString();
-    const closure = { id: closureId, closingId: closureId, month, version: revision, revision, status: "actief", createdAt: financialSnapshot.closedAt, supersedesClosingId: (previous == null ? void 0 : previous.closingId) || (previous == null ? void 0 : previous.id) || "", closedAt: financialSnapshot.closedAt, summary, financialSnapshot, accountControl, transferIds: drafts.filter((row) => row.calculatedAmount > 4e-3).map((row) => row.id), transferSnapshot: cloneState(drafts.filter((row) => row.calculatedAmount > 4e-3)), correctionIds: (state.monthCorrections || []).filter((row) => row.closureId === closureId).map((row) => row.id), updatedBy: getDeviceId() };
+    const financialSnapshot2 = u3LiveFinancialSnapshot(month);
+    financialSnapshot2.status = "afgesloten";
+    financialSnapshot2.closedAt = (/* @__PURE__ */ new Date()).toISOString();
+    const closure = { id: closureId, closingId: closureId, month, version: revision, revision, status: "actief", createdAt: financialSnapshot2.closedAt, supersedesClosingId: (previous == null ? void 0 : previous.closingId) || (previous == null ? void 0 : previous.id) || "", closedAt: financialSnapshot2.closedAt, summary, financialSnapshot: financialSnapshot2, accountControl, transferIds: drafts.filter((row) => row.calculatedAmount > 4e-3).map((row) => row.id), transferSnapshot: cloneState(drafts.filter((row) => row.calculatedAmount > 4e-3)), correctionIds: (state.monthCorrections || []).filter((row) => row.closureId === closureId).map((row) => row.id), updatedBy: getDeviceId() };
     record.status = "afgesloten";
     record.closedAt = closure.closedAt;
     record.activeClosureId = closureId;
@@ -11333,9 +11964,9 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     schemaVersion: U2_SCHEMA_VERSION,
     calculateGroup: (goals, pot, today) => calcGroep(cloneState(goals), pot, new Date(today)),
     normalizeSubgoals: (goal) => {
-      const copy8 = cloneState(goal);
-      u2NormalizeChildren(copy8);
-      return copy8;
+      const copy9 = cloneState(goal);
+      u2NormalizeChildren(copy9);
+      return copy9;
     },
     historyKey: u2HistoryKey
   });
@@ -11454,7 +12085,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
   });
 
   // src/import/source-repair.mjs
-  var copy6 = (value) => JSON.parse(JSON.stringify(value));
+  var copy7 = (value) => JSON.parse(JSON.stringify(value));
   var iban2 = (value) => String(value || "").replace(/\s/g, "").toUpperCase();
   function inspectSourceAvailability(state2, tx, batch) {
     var _a2, _b;
@@ -11484,33 +12115,33 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     if (!tx) throw new Error("De oorspronkelijke transactie bestaat niet meer.");
     if (inspectSourceAvailability(state2, tx, batch).ok) throw new Error("Deze transactie heeft al een geldige bron. Herstel is niet nodig.");
     if (!confirmed || !sourceRepairCandidates(state2, tx, [bank]).length) throw new Error("Bevestig een overeenkomst met dezelfde rekening, bankdatum en hetzelfde bedrag.");
-    const candidate = copy6(state2), nextBatch = batch ? copy6(batch) : { id: tx.importBatchId || `recovery-${tx.id}`, rows: [], accountProfileId: tx.accountProfileId, accountOwner: getTransactionAccountContext(tx, { accountProfiles: state2.accountProfiles || [] }), lifecycle: tx.batchLifecycle || "active", status: "verwerkt", version: 0, summary: {}, fileName: "Herstelde oorspronkelijke CSV-bron" };
+    const candidate = copy7(state2), nextBatch = batch ? copy7(batch) : { id: tx.importBatchId || `recovery-${tx.id}`, rows: [], accountProfileId: tx.accountProfileId, accountOwner: getTransactionAccountContext(tx, { accountProfiles: state2.accountProfiles || [] }), lifecycle: tx.batchLifecycle || "active", status: "verwerkt", version: 0, summary: {}, fileName: "Herstelde oorspronkelijke CSV-bron" };
     const rowId = tx.importTransactionId || `recovery-row-${tx.id}`;
     const existing = bankSourceForImport(candidate, nextBatch.id, rowId);
     if (existing && existing.bankSourceId !== tx.bankSourceId) throw new Error("Deze importregel is al aan een andere bankbeweging gekoppeld.");
     const related = candidate.transactions.filter((row) => !isBankSource(row) && (tx.bankSourceId ? row.bankSourceId === tx.bankSourceId : tx.importBatchId && tx.importTransactionId ? row.importBatchId === tx.importBatchId && row.importTransactionId === tx.importTransactionId : row.id === tx.id));
-    const p = copy6(tx.approvedProcessing || tx.processing || {});
+    const p = copy7(tx.approvedProcessing || tx.processing || {});
     p.processedAmount = Math.round(related.reduce((sum, row) => sum + Math.abs(Number(row.amount) || 0), 0) * 100) / 100;
     p.processingDate = p.processingDate || bank.bankDate;
     p.transactionType = p.transactionType || tx.transactionType || "uitgave";
     p.budgetOwner = p.budgetOwner || tx.budgetOwner || tx.financialFor;
     p.category = p.category || tx.category;
     p.include = p.include !== false;
-    if (related.length > 1 && !((_a2 = p.splits) == null ? void 0 : _a2.length)) p.splits = related.map((row) => ({ ...copy6(row.processing || {}), id: row.splitId || row.id, amount: Math.abs(Number(row.amount)), amountMode: "manual", transactionType: row.transactionType, category: row.category, budgetOwner: row.budgetOwner || row.financialFor }));
-    const original2 = copy6(tx.bankOriginal || bank);
+    if (related.length > 1 && !((_a2 = p.splits) == null ? void 0 : _a2.length)) p.splits = related.map((row) => ({ ...copy7(row.processing || {}), id: row.splitId || row.id, amount: Math.abs(Number(row.amount)), amountMode: "manual", transactionType: row.transactionType, category: row.category, budgetOwner: row.budgetOwner || row.financialFor }));
+    const original2 = copy7(tx.bankOriginal || bank);
     for (const field of ["bankDate", "amount", "accountIdentifier"]) if (original2[field] === void 0 || original2[field] === null || original2[field] === "") original2[field] = bank[field];
     original2.valid = true;
     const oldHeader = candidate.transactions.find((row) => isBankSource(row) && row.bankSourceId === tx.bankSourceId);
     if (oldHeader && (!((_b = oldHeader.bankOriginal) == null ? void 0 : _b.bankDate) || oldHeader.bankOriginal.amount === void 0 || oldHeader.bankOriginal.amount === null)) {
-      nextBatch.sourceRepairHistory = [...nextBatch.sourceRepairHistory || [], { operationId, timestamp, bankSourceId: oldHeader.bankSourceId, bankOriginal: copy6(oldHeader.bankOriginal) }];
+      nextBatch.sourceRepairHistory = [...nextBatch.sourceRepairHistory || [], { operationId, timestamp, bankSourceId: oldHeader.bankSourceId, bankOriginal: copy7(oldHeader.bankOriginal) }];
       candidate.transactions = candidate.transactions.filter((row) => row.id !== oldHeader.id);
     }
     related.forEach((row) => {
       row.importBatchId = nextBatch.id;
       row.importTransactionId = rowId;
-      if (!row.bankOriginal) row.bankOriginal = copy6(original2);
+      if (!row.bankOriginal) row.bankOriginal = copy7(original2);
     });
-    const recovered = { id: rowId, bankOriginal: original2, sourceIdentityProof: copy6(sourceIdentityProof || null), accountProfileId: tx.accountProfileId || nextBatch.accountProfileId, accountOwner: nextBatch.accountOwner, processing: p, processingStatus: getTransactionProcessingStatus(tx), certainty: "goedgekeurd", approvalSource: tx.approvalSource || "legacy-confirmed", approvedAt: tx.approvedAt || "", repairedAt: timestamp };
+    const recovered = { id: rowId, bankOriginal: original2, sourceIdentityProof: copy7(sourceIdentityProof || null), accountProfileId: tx.accountProfileId || nextBatch.accountProfileId, accountOwner: nextBatch.accountOwner, processing: p, processingStatus: getTransactionProcessingStatus(tx), certainty: "goedgekeurd", approvalSource: tx.approvalSource || "legacy-confirmed", approvedAt: tx.approvedAt || "", repairedAt: timestamp };
     nextBatch.rows = nextBatch.rows.filter((row) => row.id !== rowId).concat(recovered);
     nextBatch.version = Number(nextBatch.version || 0) + 1;
     nextBatch.operationId = operationId;
@@ -11524,7 +12155,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       repairedHeader.id = `${repairedHeader.id}-repair-${operationId}`;
       repairedHeader.processingRevision = (oldHeader.processingRevision || 0) + 1;
       repairedHeader.importReferences = [...new Map([...oldHeader.importReferences || [], ...repairedHeader.importReferences].map((ref) => [`${ref.batchId}:${ref.rowId}`, ref])).values()];
-      if (oldHeader.approvedProcessing) repairedHeader.approvedProcessing = copy6(oldHeader.approvedProcessing);
+      if (oldHeader.approvedProcessing) repairedHeader.approvedProcessing = copy7(oldHeader.approvedProcessing);
     }
     const before = selectBankTransactions(state2).reduce((sum, row) => sum + Math.round(row.bankAmount * 100), 0), after = selectBankTransactions(candidate).reduce((sum, row) => sum + Math.round(row.bankAmount * 100), 0);
     if (before !== after) throw new Error("Deze herstelkoppeling zou het rekeningtotaal veranderen. Laat de bron eerst handmatig controleren.");
@@ -11602,7 +12233,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
   }
 
   // src/import/import-lifecycle.mjs
-  var copy7 = (value) => JSON.parse(JSON.stringify(value));
+  var copy8 = (value) => JSON.parse(JSON.stringify(value));
   var batchRows = (state2, id) => (state2.transactions || []).filter((tx) => {
     var _a2, _b;
     return !isBankSource(tx) && (tx.importBatchId === id || ((_b = (_a2 = bankSourceForTransaction(state2, tx)) == null ? void 0 : _a2.importReferences) == null ? void 0 : _b.some((ref) => ref.batchId === id)));
@@ -11657,7 +12288,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     for (const pair of next.internalTransferPairs || []) {
       if (pair.active === false || !["bevestigd", "confirmed", "uitgevoerd"].includes(pair.status)) continue;
       const old = (previous.internalTransferPairs || []).find((row) => row.id === pair.id);
-      if (JSON.stringify(old) !== JSON.stringify(pair)) confirmInternalTransferPair(copy7(next), pair.id);
+      if (JSON.stringify(old) !== JSON.stringify(pair)) confirmInternalTransferPair(copy8(next), pair.id);
     }
     const coverage = coverageAllocationStatus(next).find((row) => row.reason && !["coverage-inactive-reference"].includes(row.reason));
     if (coverage && !coverageAllocationStatus(previous).some((old) => old.id === coverage.id && old.reason === coverage.reason)) fail3(`Spaardekking is ongeldig: ${coverage.reason}.`);
@@ -11679,10 +12310,10 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
   function planImportCommand(state2, batch, intent, options = {}) {
     var _a2;
     if (!(batch == null ? void 0 : batch.id) || !(intent == null ? void 0 : intent.operationId)) fail3("Batch-ID en operation-ID zijn vereist.");
-    const previous = copy7(state2), candidate = copy7(state2), nextBatch = copy7(batch), id = batch.id;
+    const previous = copy8(state2), candidate = copy8(state2), nextBatch = copy8(batch), id = batch.id;
     const deletion = (candidate.importDeletionProofs || []).find((row) => row.id === id);
     if (deletion) {
-      if (intent.type === "delete") return { state: candidate, batch: copy7(deletion), noop: true };
+      if (intent.type === "delete") return { state: candidate, batch: copy8(deletion), noop: true };
       fail3("Deze batch is permanent verwijderd.", "import-deleted");
     }
     const current = batchLifecycle(batch);
@@ -12722,15 +13353,15 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       if (importVersion(left) !== importVersion(right)) return false;
       if ((left == null ? void 0 : left.operationId) || (right == null ? void 0 : right.operationId)) return sameImportOperation(left, right);
       const comparable = (value) => {
-        const copy8 = cloneState(value);
-        delete copy8.confirmedBatch;
-        delete copy8.syncConflict;
-        delete copy8.baseVersion;
-        for (const row of copy8.rows || []) {
+        const copy9 = cloneState(value);
+        delete copy9.confirmedBatch;
+        delete copy9.syncConflict;
+        delete copy9.baseVersion;
+        for (const row of copy9.rows || []) {
           delete row.bankSourceRevision;
           if (row.processing) delete row.processing.editorVersion;
         }
-        return JSON.stringify(copy8);
+        return JSON.stringify(copy9);
       };
       return comparable(left) === comparable(right);
     }

@@ -58,7 +58,7 @@ function projectBaseTransaction(tx,{state={},materialized=false,sourceApproved=n
   return result;
 }
 export function selectTransactionProjections(state,{month=null,dimension='calendar',account=null,owner=null,includeInactive=false}={}) {
-  if(state?.__finizePartialHistory)throw Object.assign(new Error('De volledige historie is niet geladen. Gebruik de geverifieerde maandprojectie; ontbrekende transacties zijn geen nul.'),{code:'period-incomplete'});
+  if(state?.__finizePartialHistory)state=periodDependencyState(state,month);
   const groups=new Map();(state.transactions||[]).filter(tx=>!isBankSource(tx)).forEach(tx=>{const key=transactionSourceKey(tx);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(tx);});
   const projections=[];
   groups.forEach(group=>{
@@ -77,7 +77,24 @@ export function selectTransactionProjections(state,{month=null,dimension='calend
 export function selectActiveTransactions(state,options={}) {
   const seen=new Set();return selectTransactionProjections(state,options).map(p=>p.transaction).filter(tx=>{if(seen.has(tx.id))return false;seen.add(tx.id);return true;});
 }
-export function sumTransactionEffects(state,dimension,options={}) {return money(selectTransactionProjections(state,{...options,...(dimension==='budgetImpact'?{dimension:'budget'}:{})}).reduce((sum,p)=>sum+Number(p.effects[dimension]||0),0));}
+export function periodDependencyState(state,month){
+  if(!state?.__finizePartialHistory)return state;
+  if(!month||!state.verifiedPeriods?.includes(month)||!state.__finizePeriodContext?.periods?.some(row=>row.month===month))throw Object.assign(new Error('Een vereiste financiële periode is niet geverifieerd. Ontbrekende historie is geen nul.'),{code:'period-incomplete'});
+  return {...state,__finizePartialHistory:false};
+}
+export function selectDependencyProjections(state,options={}){
+  if(state?.__finizePartialHistory&&!state.__finizePeriodContext?.periods?.length)throw Object.assign(new Error('De financiële afhankelijkheidsbasis ontbreekt.'),{code:'period-incomplete'});
+  return selectTransactionProjections(state?.__finizePartialHistory?{...state,__finizePartialHistory:false}:state,options);
+}
+export function sumTransactionEffects(state,dimension,options={}) {
+  if(state?.__finizePartialHistory&&!options.month){
+    if(options.account||options.owner)throw Object.assign(new Error('Kies een geverifieerde maand voor een rekening- of eigenaartotaal.'),{code:'period-incomplete'});
+    const proof=state.__finizePeriodContext,base=proof?.localCumulative||JSON.parse(proof?.global?.payload||'null');
+    if(!Number.isSafeInteger(base?.totalsCents?.[dimension]))throw Object.assign(new Error('De vereiste cumulatieve projectie ontbreekt.'),{code:'period-incomplete'});
+    return base.totalsCents[dimension]/100;
+  }
+  return money(selectTransactionProjections(state,{...options,...(dimension==='budgetImpact'?{dimension:'budget'}:{})}).reduce((sum,p)=>sum+Number(p.effects[dimension]||0),0));
+}
 export function categoryActuals(state,month,owner) {
   const result={};selectTransactionProjections(state,{month,dimension:'budget'}).forEach(p=>{const category=p.effects.refundCorrection?p.refundCategory:p.category;if((!owner||p.financialFor===owner)&&p.effects.budgetImpact&&!p.directBudgetAllocations?.length)result[category]=money((result[category]||0)+p.effects.budgetImpact);(p.directBudgetAllocations||[]).filter(a=>!owner||(a.budgetOwner||p.financialFor)===owner).forEach(a=>{result[a.category]=money((result[a.category]||0)-a.amount);});});return result;
 }
@@ -270,6 +287,7 @@ function applySavingsAndRefundEffects(rows,state){
   });
 }
 export function projectTransaction(tx,{state={},...options}={}){
+  state=periodDependencyState(state,getTransactionFinancialMonth(tx));
   const present=(state.transactions||[]).some(row=>row===tx||row.id===tx.id);
   const candidate=present?state:{...state,transactions:[...(state.transactions||[]),tx]};
   const base=projectBaseTransaction(tx,{state:candidate,...options});
@@ -281,17 +299,18 @@ export function projectTransaction(tx,{state={},...options}={}){
   return base;
 }
 export function coverageAllocationStatus(state){
-  const rows=selectTransactionProjections(state,{includeInactive:true}),statuses=new Map(rows.flatMap(p=>p.coverageAllocations||[]).map(a=>[a.id,a]));
+  const rows=selectDependencyProjections(state,{includeInactive:true}),statuses=new Map(rows.flatMap(p=>p.coverageAllocations||[]).map(a=>[a.id,a]));
   return (state.savingsCoverageAllocations||[]).map(a=>a.active===false?{id:a.id,active:false,reason:'removed',amountCents:a.amountCents}:statuses.get(a.id)||{id:a.id,active:false,reason:'coverage-missing-reference',amountCents:a.amountCents});
 }
 export function validateSavingsCoverageAllocation(state,allocation){
-  const rows=selectTransactionProjections(state,{includeInactive:true}),withdrawal=allocationEndpoint(rows,allocation,'withdrawal'),expense=allocationEndpoint(rows,allocation,'expense');
+  const rows=selectDependencyProjections(state,{includeInactive:true}),withdrawal=allocationEndpoint(rows,allocation,'withdrawal'),expense=allocationEndpoint(rows,allocation,'expense');
   const code=coverageEligibility(withdrawal,expense,state);
   if(code)throw new Error(coverageMessage(code));
   if(!Number.isSafeInteger(allocation.amountCents)||allocation.amountCents<=0)throw new Error(coverageMessage('coverage-cents'));
 }
 export function coverageMessage(code){return {'coverage-missing-reference':'De gekoppelde bronregel bestaat niet meer.','coverage-inactive-reference':'Beide transacties moeten financieel actief zijn.','coverage-withdrawal':'Kies een actieve spaaropname met een geldig spaardoel.','coverage-expense':'Kies een echte uitgave met reguliere maandbelasting.','coverage-month':'Spaardekking kan alleen binnen dezelfde bankkalendermaand.','coverage-fixed-month':'Bij vaste lasten moeten bankmaand en geplande occurrence-maand gelijk zijn.','coverage-cents':'Het dekkingsbedrag moet positief zijn en uit gehele eurocenten bestaan.','coverage-exceeds-withdrawal':'De totale dekking is hoger dan de spaaropname.','coverage-exceeds-expense':'De totale dekking is hoger dan de relevante uitgave.'}[code]||code;}
 export function categoryFinancialActuals(state,month,owner=null){
+  state=periodDependencyState(state,month);
   const map=new Map(),ensure=category=>{const key=categoryKey(category);if(!map.has(key))map.set(key,{category,realExpense:0,savingsFunded:0,refundCorrection:0,categoryOnlyRefundCorrection:0,budgetImpact:0});return map.get(key);};
   selectTransactionProjections(state).forEach(p=>{
     if(owner&&p.financialFor!==owner&&!p.directBudgetAllocations?.some(a=>a.budgetOwner===owner))return;
@@ -303,6 +322,7 @@ export function categoryFinancialActuals(state,month,owner=null){
 }
 // Detail rows are financial explanations linked to their existing source, never bank mutations.
 export function categoryProcessingDetails(state,month,owner=null){
+  state=periodDependencyState(state,month);
   const details=[];
   for(const p of selectTransactionProjections(state)){
     if(!owner||p.financialFor===owner){
@@ -317,6 +337,7 @@ export function categoryProcessingDetails(state,month,owner=null){
   return details;
 }
 export function financialForecastForMonth(state,month,{compatibilityIncome={},plannedIncome=null,fixedOccurrences=null}={}){
+  state=periodDependencyState(state,month);
   if(!validMonth(month))throw new Error('Ongeldige prognosemaand.');
   const planned=Object.fromEntries(['dion','dara'].map(owner=>{
     const config=plannedIncome?.[owner]||resolvePlannedIncomeForMonth(state,month,owner),manual=state.monthlyIncomeOverrides?.[month]?.[owner];

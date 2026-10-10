@@ -1,6 +1,8 @@
 import { buildRecordSnapshot, decodeRecordSnapshot, decodeRecordValues, recordChanges, RECORD_STORAGE_VERSION, clone } from './cloud-record-model.mjs';
 import { decodeCloudState } from './cloud-chunks.mjs';
 import { canonical,digest,storageError,verifiedPeriodResult } from './period-projections.mjs';
+import { verifyRecordManifests } from './record-manifest.mjs';
+import { createPeriodWorkspace } from './period-workspace.mjs';
 const same=(a,b)=>canonical(a)===canonical(b);
 const batches=values=>Array.from({length:Math.ceil(values.length/8)},(_,index)=>values.slice(index*8,index*8+8));
 
@@ -18,11 +20,13 @@ export function createRecordCloudStore({transport,householdId,applicationProject
     return {control,head,root};
   }
   async function components(root){
-    const [records,periods,global]=await Promise.all([transport.query(root+'/records'),transport.query(root+'/periods'),transport.get(root+'/globals/financial')]);
-    return {records:records.map(row=>row.data),periods:periods.map(row=>row.data),global:global?.data||null};
+    const [records,periods,global,manifests,settings]=await Promise.all([transport.query(root+'/records'),transport.query(root+'/periods'),transport.get(root+'/globals/financial'),transport.query(root+'/manifests'),transport.get(root+'/globals/settings')]);
+    return {records:records.map(row=>row.data),periods:periods.map(row=>row.data),global:global?.data||null,manifests:manifests.map(row=>row.data),settings:settings?.data||null};
   }
   async function verifyAt(root,head){
     const values=await components(root),decoded=await decodeRecordSnapshot(head,values.records);
+    if(head.manifestHashes)await verifyRecordManifests(head,values.records,values.manifests);
+    if(head.settingsHash&&head.settingsHash!==await digest(values.settings))throw storageError('cloud-integrity','De globale instellingen wijken af.');
     if(head.globalHash!==await digest(values.global))throw storageError('cloud-integrity','De cumulatieve cloudprojectie wijkt af.');
     for(const [month,hash]of Object.entries(head.periodHashes)){
       const period=values.periods.find(row=>row.month===month);
@@ -87,9 +91,9 @@ export function createRecordCloudStore({transport,householdId,applicationProject
   async function stageOperation(c,next,operationId,members,checkpoint){
     const path=c.root+'/operations/'+operationId,old=await transport.get(path);
     if(old&&old.data.phase!=='prepared'){if(old.data.stateHash!==next.stateHash||old.data.importsHash!==next.importsHash||old.data.memberHash!==await digest(members))throw storageError('operation-reused','Dit operatie-ID hoort al bij een andere wijziging.');return old.data;}
-    const previous=c.head.data.revision?await components(c.root):null,changes=recordChanges(previous,next).sort((a,b)=>a.path.localeCompare(b.path));
-    const targetHead={storageVersion:2,epoch:c.control.data.epoch,phase:'ready',revision:c.head.data.revision+1,lastOperation:operationId,pendingOperation:'',stateHash:next.stateHash,importsHash:next.importsHash,layout:next.layout,recordCount:next.recordCount,importCount:next.importCount,periodHashes:next.periodHashes,globalHash:next.globalHash};
-    const operation={storageVersion:2,epoch:c.control.data.epoch,id:operationId,phase:'prepared',baseRevision:c.head.data.revision,stateHash:next.stateHash,importsHash:next.importsHash,changeCount:changes.length,changeHash:await digest(changes),targetHead,memberCount:members.length,memberHash:await digest(members)};
+    const previous=next.preparedChanges?null:c.head.data.revision?await components(c.root):null,changes=(next.preparedChanges||recordChanges(previous,next)).sort((a,b)=>a.path.localeCompare(b.path));
+    const targetHead={storageVersion:2,epoch:c.control.data.epoch,phase:'ready',revision:c.head.data.revision+1,lastOperation:operationId,pendingOperation:'',stateHash:next.stateHash,importsHash:next.importsHash,layout:next.layout,recordCount:next.recordCount,importCount:next.importCount,periodHashes:next.periodHashes,globalHash:next.globalHash,manifestHashes:next.manifestHashes,settingsHash:next.settingsHash,...(next.targeted?{integrityMode:'manifest'}:{})};
+    const operation={storageVersion:2,epoch:c.control.data.epoch,id:operationId,phase:'prepared',baseRevision:c.head.data.revision,stateHash:next.stateHash,importsHash:next.importsHash,changeCount:changes.length,changeHash:await digest(changes),targetHead,memberCount:members.length,memberHash:await digest(members),...(next.targeted?{verificationMode:'patch',requestHash:next.requestHash}: {})};
     if(old&&!same(old.data,operation))throw storageError('operation-reused','Het voorbereide operatiebewijs wijkt af.');
     if(!old)await transport.commit([{path,data:operation}],new Map([[path,null]]));await checkpoint('operation-prepared');
     for(const batch of batches(changes))await transport.commit(batch.map(change=>({path:path+'/changes/'+change.id,data:change})));
@@ -113,7 +117,13 @@ export function createRecordCloudStore({transport,householdId,applicationProject
       await transport.commit(batch.map(change=>({path:c.root+'/'+change.path,data:change.after})));
       await checkpoint('records-applied');
     }
-    await verifyAt(c.root,operation.targetHead);await checkpoint('target-verified');
+    if(operation.verificationMode==='patch'){
+      for(const change of changes){const actual=(await transport.get(c.root+'/'+change.path))?.data;if(!same(actual,change.after))throw storageError('cloud-integrity','Een gerichte wijziging is niet duurzaam teruggelezen.');}
+      for(const change of changes.filter(row=>row.path.startsWith('periods/'))){
+        const rows=await transport.query(c.root+'/records',{field:'periods',op:'ARRAY_CONTAINS',value:change.after.month});
+        await verifiedPeriodResult(operation.targetHead,change.after,rows.map(row=>row.data),(await transport.get(c.root+'/globals/financial'))?.data);
+      }
+    }else await verifyAt(c.root,operation.targetHead);await checkpoint('target-verified');
     const [head,op]=await Promise.all([transport.get(c.root+'/meta/head'),transport.get(operationPath)]);
     if(head.data.pendingOperation!==operationId||head.data.revision!==operation.baseRevision)throw storageError('cloud-conflict','Het publicatiebewijs is intussen gewijzigd.');
     const members=memberProofs.map(member=>({path:c.root+'/receipts/'+member.id,data:{...member,epoch:operation.epoch,storageVersion:2,cloudOperation:operationId,cloudRevision:operation.targetHead.revision,outcome:'prepared'}}));
@@ -126,6 +136,7 @@ export function createRecordCloudStore({transport,householdId,applicationProject
     members=[...members].sort((a,b)=>a.id.localeCompare(b.id));
     if(!/^[A-Za-z0-9_-]{1,160}$/.test(operationId||'')||members.some(member=>!/^[A-Za-z0-9_-]{1,160}$/.test(member.id||'')))throw storageError('operation-id','Een stabiel geldig operatie-ID is verplicht.');
     const c=await context({allowMigration,allowPending:true}),existing=await transport.get(c.root+'/operations/'+operationId);
+    if(c.head.data.integrityMode==='manifest')throw storageError('period-workspace-required','Gebruik het gerichte periodecontract voor deze administratie; een volledige oude snapshot mag dit contract niet overschrijven.');
     if(existing){
       if(existing.data.stateHash!==await digest(state)||existing.data.importsHash!==await digest(imports)||existing.data.memberHash!==await digest(members))throw storageError('operation-reused','Een operatie-ID kan niet opnieuw voor andere gegevens worden gebruikt.');
       if(existing.data.phase==='committed')return {outcome:'committed',operationId,revision:existing.data.targetHead.revision,replayed:true};
@@ -171,5 +182,12 @@ export function createRecordCloudStore({transport,householdId,applicationProject
     return {storageVersion:2,epoch:result.head.epoch,revision:result.head.revision,stateHash:result.head.stateHash,importsHash:result.head.importsHash,state:result.state,imports:result.imports,operations,receipts:(await transport.query(root+'/receipts')).map(row=>row.data),warning:'Exporteer deze actuele stand; zet nooit uitsluitend een oud generatiepointer terug.'};
   }
   async function operationStatus(id){const c=await context({allowPending:true});return (await transport.get(c.root+'/operations/'+id))?.data||null;}
-  return {householdId,migrate,activate,commit,recover,loadPeriod,loadImport,verifyIntegrity,operationReceipt,operationStatus,exportRollback,context,transport};
+  async function preparePeriodStorage(){
+    const c=await context();if(c.head.data.manifestHashes&&c.head.data.settingsHash)return {outcome:'ready'};
+    // One explicit, verified upgrade of the earlier P3 storage contract, without new bookings.
+    const full=await verifyIntegrity();
+    return commit({state:full.state,imports:full.imports,expectedRevision:full.head.revision,operationId:'period-manifests-'+full.head.epoch+'-'+full.head.revision});
+  }
+  const workspace=createPeriodWorkspace({transport,context,loadPeriod,loadImport,stageOperation,recover,applicationProjection});
+  return {householdId,migrate,activate,commit,recover,loadPeriod,loadImport,verifyIntegrity,operationReceipt,operationStatus,exportRollback,preparePeriodStorage,context,transport,...workspace};
 }

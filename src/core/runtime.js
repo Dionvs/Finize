@@ -2,6 +2,7 @@ import { selectBankTransactions, isBankSource } from './bank-sources.mjs';
 import { createStateBackupStore, readLegacyStateBackup } from '../storage/state-backups.mjs';
 import { createHouseholdStore } from '../storage/household-store.mjs';
 import { installRecordSessions } from '../storage/record-session.mjs';
+import { refreshWorkspaceTotals,assertWorkspaceMutation,requiredMutationPeriods,mergeWorkspaceIntent } from '../storage/period-workspace.mjs';
 import { readLegacyCloudImports } from '../storage/legacy-import-readback.mjs';
 import { backupDigest } from '../storage/migration-backups.mjs';
 import { createChunkedCloudStore, cloudStateManifest } from '../storage/cloud-chunks.mjs';
@@ -20,7 +21,7 @@ import { resolveRecurringAmount, resolveRecurringConfig, resolveFixedExpensesFor
 import { markManualTransaction, normalizeDataTransaction, assertOriginalBankDataUnchanged } from './transaction-model.mjs';
 import { describeMutationError } from './mutation-errors.mjs';
 import { plannedOccurrences, occurrenceDates } from './recurring-occurrences.mjs';
-import { projectTransaction, selectTransactionProjections, selectActiveTransactions, sumTransactionEffects, categoryActuals, fixedOccurrenceActuals, actualIncomeForMonth, incomeProjectionForMonth, legacySalaryForecastOwners, getTransactionFinancialMonth, confirmInternalTransferPair, financialForecastForMonth, categoryFinancialActuals, categoryProcessingDetails, coverageAllocationStatus, projectionLineReference, coverageMessage } from './transaction-engine.mjs';
+import { projectTransaction, selectTransactionProjections, selectDependencyProjections, selectActiveTransactions, sumTransactionEffects, categoryActuals, fixedOccurrenceActuals, actualIncomeForMonth, incomeProjectionForMonth, legacySalaryForecastOwners, getTransactionFinancialMonth, confirmInternalTransferPair, financialForecastForMonth, categoryFinancialActuals, categoryProcessingDetails, coverageAllocationStatus, projectionLineReference, coverageMessage } from './transaction-engine.mjs';
 import { getTransactionClassification, getTransactionFinancialDestination, getTransactionAccountContext, getTransactionSource, getTransactionDate, INCOME_TRANSACTION_TYPES } from './transaction-model.mjs';
 import { synchronizeChangedSavings, assertFinancialMutationSafe, upsertManualFinancialTransaction, setSavingsCoverageAllocation, removeSavingsCoverageAllocation, correctGoalBalance, localTransactionToday, assertManualCandidateSafe } from './transaction-processing.mjs';
 import { DEFAULT_FIREBASE_CONFIG, FIREBASE_SDK_VERSION } from "../config/firebase.js";
@@ -2174,6 +2175,7 @@ const CloudAdapter = {
   },
   async connect(){
     if(this.recordSession)return true;
+    if(state?.__finizePartialHistory){this.status='Offline — geverifieerde perioden lokaal bewaard';return false;}
     if (!cloudConnectionAllowed()){
       this.status = 'Offline — lokaal bewaard';
       renderCloudStatus();
@@ -2418,6 +2420,7 @@ const CloudAdapter = {
     });
   },
   queueSave(state){
+    if(state?.__finizePartialHistory&&!this.recordSession){this.status='Offline — periodewijzigingen duurzaam bewaard';return;}
     if (this.applyingRemote) return;
     this.pendingState = clone(state);
     this.status = this.conflict
@@ -2554,6 +2557,7 @@ const CloudAdapter = {
     }
   },
   async restoreBackup(restoredState, backupReason){
+    if(state.__finizePartialHistory)throw new Error('Herstel van een volledige back-up vereist een afzonderlijk gecontroleerde recordmigratie. De huidige administratie blijft behouden.');
     if (!this.isConnected()){
       const connected = await this.connect();
       if (!connected) throw new Error('Maak eerst verbinding met de cloud om een back-up te herstellen.');
@@ -2773,7 +2777,24 @@ async function commitChange(change, options={}){
     const mutation=typeof change==='function'?change(state):typeof change?.apply==='function'?change.apply(state):null;
     if(mutation&&typeof mutation.then==='function')throw new Error('Een financiële mutatie moet synchroon een kandidaat maken; de opslag wordt daarna awaited.');
     if(JSON.stringify(before)===JSON.stringify(state))return true;
+    if(before.__finizePartialHistory){
+      try{assertWorkspaceMutation(before,state);}
+      catch(error){
+        if(!['dependency-required','full-history-required'].includes(error.code))throw error;
+        const intent=clone(state),session=CloudAdapter.recordSession;
+        state=clone(before);window.state=state;
+        if(!session||Number(options.dependencyAttempts||0)>=3)throw error;
+        const result=error.code==='full-history-required'
+          ?await session.openFullHistory(before.meta.selectedMonth,error.message)
+          :await session.openMonth(before.meta.selectedMonth,{additionalMonths:requiredMutationPeriods(before,intent)});
+        if(activeStorageKeys()?.state!==scope)throw new Error('Het huishouden wijzigde tijdens het laden van afhankelijkheden.');
+        if(result.outcome!=='committed')throw new Error('De afhankelijkheden kunnen nog niet betrouwbaar worden geladen. Beide financiële standen blijven bewaard.');
+        const expanded=clone(committedStateSnapshot||state),merged=mergeWorkspaceIntent(before,intent,expanded);
+        return await commitChange(()=>{state=merged;window.state=state;},{...options,dependencyAttempts:Number(options.dependencyAttempts||0)+1});
+      }
+    }
     synchronizeChangedSavings(state,before);
+    refreshWorkspaceTotals(before,state);
     assertFinancialMutationSafe(before,state);
     assertOriginalBankDataUnchanged(before.transactions,state.transactions);
     if(JSON.stringify(before)===JSON.stringify(state))return true;
@@ -3985,7 +4006,13 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
   `;
   document.getElementById('btnExport').addEventListener('click', async ()=>{
     try{
-      const exportState = clone(state);
+      let exportState = clone(state);
+      if(state.__finizePartialHistory){
+        const session=CloudAdapter.recordSession;
+        if(!session)throw new Error('Een volledige back-up vereist verbinding met de geverifieerde cloudhistorie.');
+        const snapshot=await session.readLocal();if(snapshot.operations.length)throw new Error('Synchroniseer eerst de open lokale wijzigingen voordat je de volledige back-up exporteert.');
+        exportState=(await session.cloudStore.verifyIntegrity()).state;
+      }
       await GoalImageStore.expandStateForTransfer(exportState);
       downloadJson('dion-dara-budget-backup-' + new Date().toISOString().slice(0,10) + '.json', exportState);
     }catch(error){
@@ -4284,7 +4311,7 @@ function openContextTransactionModal(owner,transactionId=''){
   };
 }
 function openSavingsCoverageModal(transactionId){
-  const rows=selectTransactionProjections(state,{includeInactive:true}),anchor=rows.find(p=>p.id===transactionId),month=anchor?.calendarMonth||getSelectedMonth();
+  const rows=selectDependencyProjections(state,{includeInactive:true}),anchor=rows.find(p=>p.id===transactionId),month=anchor?.calendarMonth||getSelectedMonth();
   const eligible=rows.filter(p=>p.active&&p.calendarMonth===month),withdrawals=eligible.filter(p=>p.transactionType==='van-spaarrekening'&&p.savingsGoalId),expenses=eligible.filter(p=>p.regularExpenseBase>0&&(!p.fixedOccurrenceId||p.fixedMonth===month));
   const modal=document.getElementById('transactionModal');let editing='';
   const label=p=>`${p.transaction.description||p.category} · ${ownerLabel(p.financialFor)} · ${eur(p.amount)}${p.splitId?' · split '+p.splitId:''}`;
@@ -5337,6 +5364,17 @@ document.getElementById('monthPickerPanel').addEventListener('click', async (e)=
   panel.dataset.saving='true';panel.querySelectorAll('button').forEach(button=>button.disabled=true);
   try{
     const selected=yearBtn?yearBtn.dataset.monthYear+'-'+getSelectedMonth().slice(5,7):monthBtn.dataset.monthValue;
+    if(state.__finizePartialHistory){
+      try{
+        if(CloudAdapter.recordSession){const result=await CloudAdapter.recordSession.openMonth(selected);if(result.outcome!=='committed')throw new Error('De financiële maand kan nog niet veilig worden geopend.');}
+        else{
+          if(!state.verifiedPeriods.includes(selected))throw new Error('Deze maand is niet offline beschikbaar. Maak verbinding om de vereiste financiële gegevens te laden.');
+          const next=clone(state);next.meta.selectedMonth=selected;await DataAdapter.store().commit(next,{queueCloud:false});DataAdapter.adoptDurableState(next);renderActiveTab();
+        }
+        if(monthBtn)closeMonthPicker();if(yearBtn)openMonthPicker();
+      }catch(error){alert(error.message);}
+      return;
+    }
     setSelectedMonth(selected);
     if(!await persist())return;
     if(monthBtn)closeMonthPicker();
@@ -6002,7 +6040,7 @@ function u3OpeningBalance(account,month){
   return round2(Number(closure?.accountControl?.[account]?.administrativeEnd ?? setting.openingBalance)||0);
 }
 function u3ConfirmedTransfersInCalendarMonth(account,month){
-  const banks=currentBankTransactions(),keys=new Set(banks.map(tx=>tx.bankSourceId||tx.id));
+  const banks=currentBankTransactions({month}),keys=new Set(banks.map(tx=>tx.bankSourceId||tx.id));
   const actualIds=new Set([...banks.map(tx=>tx.id),...(state.transactions||[]).filter(tx=>keys.has(tx.bankSourceId||tx.id)).map(tx=>tx.id)]);
   return (state.internalTransfers||[]).filter(row=>row.status==='uitgevoerd'&&String(row.date||'').slice(0,7)===month&&!actualIds.has(row.actualTransactionId)&&!(row.transactionIds||[]).some(id=>actualIds.has(id))).reduce((sum,row)=>{
     const amount=Number(row.actualAmount??row.calculatedAmount)||0;
@@ -6109,6 +6147,11 @@ function u3LiveFinancialSnapshot(month=getSelectedMonth()){
   return {month,version:3,status:'open',legacy:false,income,actualIncome:forecast.household.actualIncome,fixedExpenses,variableExpenses,refunds:forecast.household.refundCashflow,savings,unusedSavings:forecast.household.unusedSavings,savingsFunded:forecast.household.savingsFunded,realExpense:forecast.household.realExpense,allowance:{dion:owners.dion.allowance,dara:owners.dara.allowance},contributions,remaining:forecast.household.available,goalAllocations:(state.savingsGoalLedger||[]).filter(entry=>entry.month===month&&entry.active!==false).map(entry=>({id:entry.id,goalId:entry.goalId,amount:round2(Number(entry.effectiveAmount)||0),status:entry.status})),closedAt:''};
 }
 function getMonthFinancialResult(month=getSelectedMonth()){
+  if(state.__finizePartialHistory&&!state.verifiedPeriods.includes(month)){
+    const result=state.__finizePeriodContext?.summaries?.[month]?.application?.monthResult;
+    if(!result)throw Object.assign(new Error('De geverifieerde financiële maandprojectie ontbreekt.'),{code:'period-incomplete'});
+    return clone(result);
+  }
   const record=state.monthRecords?.[month];
   if(record&&['afgesloten','correctie-nodig'].includes(record.status)&&record.activeClosureId){
     const closure=(record.closureHistory||[]).find(item=>(item.closingId||item.id)===record.activeClosureId);

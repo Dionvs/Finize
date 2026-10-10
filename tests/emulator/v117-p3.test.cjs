@@ -9,6 +9,121 @@ const {readLegacyCloudImports}=require('../../src/storage/legacy-import-readback
 const importRuntime=require('../../src/import/update4-runtime.cjs');
 const {csvFileDigest}=require('../../src/import/import-identity.mjs');
 const {periodFinancials,cumulativeFinancials}=require('../../src/storage/period-projections.mjs');
+const {refreshWorkspaceTotals}=require('../../src/storage/period-workspace.mjs');
+const engine=require('../../src/core/transaction-engine.mjs');
+
+test('P3 actual rules: old P3 manifest upgrade is explicit, verified and idempotent',async()=>{
+  const f=await active(),c=await f.store.context(),old=copy(c.head.data);delete old.manifestHashes;delete old.settingsHash;
+  await admin.commit([{path:c.root+'/meta/head',data:old}]);
+  await assert.rejects(()=>f.store.openWorkspace(['2026-10']),{code:'manifest-missing'});
+  assert.equal((await f.store.preparePeriodStorage()).outcome,'committed');
+  const checked=await f.store.verifyIntegrity();assert.deepEqual(checked.state,f.s);assert.equal(checked.head.revision,2);
+  assert.equal((await f.store.preparePeriodStorage()).outcome,'ready');assert.equal((await f.store.context()).head.data.revision,2);
+});
+
+test('P3 actual rules: an earlier record client cannot downgrade the manifest commit contract',async()=>{
+  const f=await active(),before=await f.store.openWorkspace(['2026-10']),next=copy(before);materialize(next,[row('fence','uitgave',-10)]);
+  await f.store.commitWorkspace({before,state:next,operationId:'manifest-fence'});
+  const c=await f.store.context(),operation=(await f.transport.get(c.root+'/operations/manifest-fence')).data,legacy=copy(operation);
+  legacy.id='old-record-client';legacy.phase='prepared';legacy.baseRevision=c.head.data.revision;legacy.targetHead.revision=c.head.data.revision+1;delete legacy.verificationMode;delete legacy.requestHash;delete legacy.targetHead.integrityMode;delete legacy.targetHead.manifestHashes;delete legacy.targetHead.settingsHash;
+  await assert.rejects(()=>f.transport.commit([{path:c.root+'/operations/'+legacy.id,data:legacy}]),{code:'permission-denied'});
+  assert.equal((await f.store.context()).head.data.integrityMode,'manifest');
+});
+
+test('P3 actual rules: explicit global planning reads every proven historical period and missing Dashboard proof blocks loading',async()=>{
+  const s=state();s.monthRecords={};s.meta.selectedMonth='2026-10';const r=row('global-old','uitgave',-10);r.bankOriginal.bankDate='2024-03-03';r.processing.processingDate='2024-03-03';materialize(s,[r]);
+  const f=await active(s),all=await f.store.openWorkspace(['2026-10'],{explicitFullHistory:true});assert.equal(all.transactions.length,2);assert(all.verifiedPeriods.includes('2024-03'));
+  const c=await f.store.context();await admin.commit([{path:c.root+'/periods/2024-03',data:{id:'2024-03',corrupt:true}}]);
+  await assert.rejects(()=>f.store.openWorkspace(['2024-10']),{code:'period-incomplete'});
+});
+
+test('P3 actual rules: ordinary period reads and single commits remain bounded with ten times the archived sources',async()=>{
+  const metrics=[];
+  for(const count of [36,360]){
+    const s=state();s.monthRecords={};s.meta.selectedMonth='2026-10';const rows=[];
+    for(let i=0;i<count;i++){const index=i%36,month=`${2023+Math.floor(index/12)}-${String(index%12+1).padStart(2,'0')}`,r=row('scale-'+i,'uitgave',-10);r.bankOriginal.bankDate=month+'-03';r.processing.processingDate=month+'-03';rows.push(r);}materialize(s,rows,'history-scale');
+    const f=await fixture(),root=`households/${f.householdId}`,encoded=await encodeCloudState(s,'scale-generation'),descriptor={...encoded.descriptor,complete:true};
+    const pointer=cloudStateManifest(descriptor,{syncVersion:1,commitId:'scale-legacy',updatedAt:'test',updatedBy:'test'});
+    await admin.commit([{path:root+'/budgetState/current',data:pointer},{path:root+'/budgetState/current/generations/scale-generation',data:descriptor},...encoded.chunks.map(chunk=>({path:root+'/budgetState/current/generations/scale-generation/chunks/'+chunk.sequence,data:chunk}))]);
+    await f.store.migrate({state:s,epoch:'scale-epoch',legacyPointer:pointer});await f.store.activate({approveTestCutover:true});
+    const start={...f.transport.metrics},before=await f.store.openWorkspace(['2026-10']),reads=f.transport.metrics.reads-start.reads;
+    let whole=0,query=f.transport.query;f.transport.query=async(path,filter)=>{if(path.endsWith('/records')&&!filter)whole++;return query(path,filter);};
+    const next=copy(before);materialize(next,[row('scale-new','uitgave',-15)],'new');refreshWorkspaceTotals(before,next);
+    const mark={...f.transport.metrics};await f.store.commitWorkspace({before,state:next,operationId:'scale-commit'});
+    metrics.push({historicalSources:count,loadedTransactions:before.transactions.length,openReads:reads,commitReads:f.transport.metrics.reads-mark.reads,wholeHistoryQueries:whole});
+    assert.equal(engine.sumTransactionEffects(await f.store.openWorkspace(['2026-10']),'budgetImpact'),count*10+15);
+  }
+  assert.equal(metrics[0].loadedTransactions,0);assert.equal(metrics[1].loadedTransactions,0);assert.equal(metrics[1].openReads,metrics[0].openReads);assert.equal(metrics[1].commitReads,metrics[0].commitReads);assert(metrics.every(row=>row.wholeHistoryQueries===0));
+  console.log('P3_SCALE_METRICS '+JSON.stringify(metrics));
+});
+
+test('P3 actual rules: partial-history workspace approves ten savings with bounded reads and verifies complete historical invariants',async()=>{
+  const s=state();s.monthRecords={};s.meta.selectedMonth='2026-10';
+  for(let i=0;i<36;i++){const month=`${2023+Math.floor(i/12)}-${String(i%12+1).padStart(2,'0')}`,r=row('old-'+month,'uitgave',-10);r.bankOriginal.bankDate=month+'-03';r.processing.processingDate=month+'-03';materialize(s,[r],'old-'+month);}
+  const f=await active(s),start={...f.transport.metrics},before=await f.store.openWorkspace(['2026-10']),openReads=f.transport.metrics.reads-start.reads;
+  assert.equal(before.transactions.length,0);assert.equal(engine.financialForecastForMonth(before,'2026-10').owners.dion.allowance,engine.financialForecastForMonth(s,'2026-10').owners.dion.allowance);
+  assert.equal(engine.sumTransactionEffects(before,'budgetImpact'),360);
+  const next=copy(before),amounts=[50,100,75,25,200,40,60,90,30,80],batch=materialize(next,amounts.map((n,i)=>row('new-'+i,'naar-spaarrekening',-n,{savingsGoalId:'goal'})),'new-ten');refreshWorkspaceTotals(before,next);
+  const full=copy(s);materialize(full,amounts.map((n,i)=>row('new-'+i,'naar-spaarrekening',-n,{savingsGoalId:'goal'})),'new-ten');
+  const mark={...f.transport.metrics};let wholeQueries=0,query=f.transport.query;f.transport.query=async(path,filter)=>{if(path.endsWith('/records')&&!filter)wholeQueries++;return query(path,filter);};
+  const result=await f.store.commitWorkspace({before,state:next,imports:[batch],operationId:'partial-ten'}),commitReads=f.transport.metrics.reads-mark.reads,commitWholeQueries=wholeQueries;
+  assert.equal(result.outcome,'committed');assert.equal(wholeQueries,0);assert.equal((await f.store.commitWorkspace({before,state:next,imports:[batch],operationId:'partial-ten'})).replayed,true);
+  const latest=await f.store.openWorkspace(['2026-10']);assert.equal(latest.transactions.length,20);assert.equal(engine.sumTransactionEffects(latest,'savingsDeposit'),750);
+  assert.deepEqual((await f.store.loadPeriod('2026-10')).financials,periodFinancials(full,'2026-10'));
+  const complete=await f.store.verifyIntegrity();assert.equal(complete.state.transactions.length,92);assert.deepEqual(JSON.parse(complete.global.payload),cumulativeFinancials(full));
+  for(const month of Object.keys(complete.head.periodHashes))assert.deepEqual((await f.store.loadPeriod(month)).financials,periodFinancials(full,month));
+  console.log('P3_TARGETED_METRICS '+JSON.stringify({historySources:36,initialLoadedTransactions:before.transactions.length,openReads,commitReads,wholeHistoryQueries:commitWholeQueries}));
+});
+
+test('P3 actual rules: historical partial correction follows refund dependencies and blocks missing periods',async()=>{
+  const s=state();s.monthRecords={};s.meta.selectedMonth='2026-10';
+  const old=row('past-expense','uitgave',-100);old.bankOriginal.bankDate='2026-08-03';old.processing.processingDate='2026-08-03';
+  materialize(s,[old,row('current-refund','terugbetaling',50,{refundMonth:'2026-08',refundCategory:'Kleding'})]);
+  const f=await active(s),one=await f.store.openWorkspace(['2026-08']),invalid=copy(one);
+  const effect=invalid.transactions.find(tx=>tx.recordRole!=='bank-source'&&tx.importTransactionId==='past-expense');effect.category='Overig';effect.processing.category='Overig';
+  await assert.rejects(()=>f.store.commitWorkspace({before:one,state:invalid,operationId:'missing-refund-month'}),{code:'dependency-required'});
+  const before=await f.store.openWorkspace(['2026-08','2026-10']),next=copy(before),changed=next.transactions.find(tx=>tx.id===effect.id);changed.category='Overig';changed.processing.category='Overig';
+  await f.store.commitWorkspace({before,state:next,operationId:'past-correction'});
+  const full=copy(s),original=full.transactions.find(tx=>tx.id===effect.id);original.category='Overig';original.processing.category='Overig';
+  for(const month of ['2026-08','2026-10'])assert.deepEqual((await f.store.loadPeriod(month)).financials,periodFinancials(full,month));
+  assert.deepEqual(JSON.parse((await f.store.verifyIntegrity()).global.payload),cumulativeFinancials(full));
+});
+
+for(const phase of ['operation-prepared','changes-staged','locked','records-applied','target-verified','members-staged','committed'])test('P3 actual rules: targeted commit resumes exactly once after '+phase,async()=>{
+  const s=state();s.meta.selectedMonth='2026-10';const f=await active(s),before=await f.store.openWorkspace(['2026-10']),next=copy(before),batch=materialize(next,[row('fault-'+phase,'naar-spaarrekening',-10,{savingsGoalId:'goal'})],'fault-batch');
+  let interrupted=false;const operationId='targeted-'+phase,members=[{id:'local-'+phase,sha256:'a'.repeat(64),storageRevision:2}];
+  await assert.rejects(()=>f.store.commitWorkspace({before,state:next,imports:[batch],operationId,members,checkpoint:point=>{if(point===phase&&!interrupted){interrupted=true;throw Error('interrupted');}}}),/interrupted/);
+  const fresh=createRecordCloudStore({transport:f.transport,householdId:f.householdId});
+  if((await fresh.context({allowPending:true})).head.data.phase==='applying')await assert.rejects(()=>fresh.loadPeriod('2026-10'),{code:'cloud-pending'});
+  assert.equal((await fresh.commitWorkspace({before,state:next,imports:[batch],operationId,members})).outcome,'committed');
+  assert.equal((await fresh.commitWorkspace({before,state:next,imports:[batch],operationId,members})).replayed,true);
+  const all=await fresh.verifyIntegrity();assert.equal(all.head.revision,2);assert.equal(all.state.transactions.length,2);assert.equal(JSON.parse(all.global.payload).totalsCents.savingsDeposit,1000);
+  assert.equal((await fresh.operationReceipt(members[0].id)).outcome,'committed');
+});
+
+test('P3 actual rules: targeted commits retain unopened CSV records and source bytes in complete exports',async()=>{
+  const s=state();s.meta.selectedMonth='2026-10';s.monthRecords={};const r=row('old-csv');r.bankOriginal.bankDate='2025-03-03';r.processing.processingDate='2025-03-03';
+  const old=materialize(s,[r],'old-csv-batch');old.originalCsv='datum;bedrag\n2025-03-03;-300';
+  const f=await fixture(s);await admin.commit([{path:`households/${f.householdId}/imports/${old.id}`,data:old}]);
+  await f.store.migrate({state:s,imports:[old],epoch:'csv-epoch',legacyPointer:f.legacy});await f.store.activate({approveTestCutover:true});
+  const before=await f.store.openWorkspace(['2026-10']),next=copy(before),batch=materialize(next,[row('new-csv','naar-spaarrekening',-25,{savingsGoalId:'goal'})],'new-csv-batch');
+  await f.store.commitWorkspace({before,state:next,imports:[batch],operationId:'csv-targeted'});
+  const verified=await f.store.verifyIntegrity();assert.equal(verified.imports.length,2);assert.deepEqual(verified.imports.find(row=>row.id===old.id),old);assert.equal(verified.state.transactions.length,4);
+  assert.deepEqual((await f.store.exportRollback()).imports.find(row=>row.id===old.id),old);
+});
+
+test('P3 actual rules: targeted competing clients and corrupt manifests cannot silently replace approvals',async()=>{
+  const s=state();s.meta.selectedMonth='2026-10';const f=await active(s),a=await f.store.openWorkspace(['2026-10']),b=copy(a),one=copy(a),two=copy(b);
+  const x=materialize(one,[row('one','naar-spaarrekening',-10,{savingsGoalId:'goal'})],'one'),y=materialize(two,[row('two','naar-spaarrekening',-20,{savingsGoalId:'goal'})],'two');
+  const results=await Promise.allSettled([f.store.commitWorkspace({before:a,state:one,imports:[x],operationId:'partial-one'}),f.store.commitWorkspace({before:b,state:two,imports:[y],operationId:'partial-two'})]);
+  assert.equal(results.filter(row=>row.status==='fulfilled').length,1);assert.equal((await f.store.verifyIntegrity()).state.transactions.length,2);
+  const nextBase=await f.store.openWorkspace(['2026-10']),next=copy(nextBase);next.meta.updatedBy='next';
+  const c=await f.store.context(),key=Object.keys(c.head.data.manifestHashes)[0],manifest=(await f.transport.get(c.root+'/manifests/'+key)).data;
+  await assert.rejects(()=>f.transport.commit([{path:c.root+'/manifests/'+key,data:{...manifest,entries:{}}}]),{code:'permission-denied'});
+  const metaRecord=nextBase.__finizePeriodContext.records.find(row=>row.collection==='meta'),bucket='s'+metaRecord.logicalId.slice(0,2);
+  await admin.commit([{path:c.root+'/manifests/'+bucket,data:{id:bucket,entries:{}}}]);
+  await assert.rejects(()=>f.store.commitWorkspace({before:nextBase,state:next,operationId:'corrupt-manifest'}),{code:'record-integrity'});
+});
 
 test('P3 actual rules: verified migration preserves legacy, ten savings sources and idempotent second client',async()=>{
   const f=await fixture();

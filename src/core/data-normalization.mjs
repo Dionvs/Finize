@@ -56,7 +56,10 @@ export function contributionAmount(entry){
     return Number.isFinite(value)?round2(value):0;
   }
 export function calculateGoalSavedAmount(state,goalId){
-    return round2((state?.savingsGoalLedger||[]).filter(entry=>entry.goalId===goalId).reduce((sum,entry)=>sum+contributionAmount(entry),0));
+  let baseline=state?.__finizePartialHistory?state.__finizePeriodContext?.ledgerBaseline?.[goalId]:0;
+  if(state?.__finizePartialHistory&&baseline===undefined&&state.__finizePeriodContext?.explicitFullHistory&&!Object.values(JSON.parse(state.__finizePeriodContext.global.payload).goals||{}).flat().some(goal=>goal.id===goalId))baseline=0;
+  if(state?.__finizePartialHistory&&!Number.isFinite(baseline))throw Object.assign(new Error('De geverifieerde historische spaardoelbasis ontbreekt.'),{code:'period-incomplete'});
+  return round2(Number(baseline||0)+(state?.savingsGoalLedger||[]).filter(entry=>entry.goalId===goalId).reduce((sum,entry)=>sum+contributionAmount(entry),0));
   }
 export function reconcileGoalSavedAmounts(state,goalIds=null){
     const selected=goalIds?new Set(goalIds):null;

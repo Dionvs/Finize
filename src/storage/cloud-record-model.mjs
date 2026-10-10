@@ -1,5 +1,6 @@
 import { encodeHouseholdState, decodeHouseholdState } from './household-store.mjs';
 import { canonical, digest, storageError, financialPeriods, transactionPeriodDependencies, periodFinancials, cumulativeFinancials } from './period-projections.mjs';
+import { recordManifests } from './record-manifest.mjs';
 export const RECORD_STORAGE_VERSION=2;
 export const MAX_RECORD_PAYLOAD=180000;
 export const clone=value=>structuredClone(value);
@@ -10,11 +11,11 @@ const rawSource=value=>value?.bankOriginal??(value?.originalCsv!==undefined?{ori
 export async function buildRecordSnapshot(state,imports=[],options={}){
   if(state?.meta?.schemaVersion!==11||state.__finizePartialHistory)throw storageError('incomplete-state','Publicatie vereist een bewezen complete financiële basis.');
   const expanded=clone(state);expanded['@imports']=imports.map(batch=>{const {rows,...header}=clone(batch);expanded['@rows:'+batch.id]=rows||[];return header;});
-  const encoded=encodeHouseholdState(expanded),months=financialPeriods(state,options.periods),dependencies=transactionPeriodDependencies(state,months),records=[],ordinals=new Map();
+  const encoded=encodeHouseholdState(expanded),months=options.onlyPeriods||financialPeriods(state,options.periods),dependencies=transactionPeriodDependencies(state,months),records=[],ordinals=new Map();
   for(const record of encoded.records){
     const ordinal=ordinals.get(record.collection)||0;ordinals.set(record.collection,ordinal+1);
     const payload=canonical(record.value),chunks=parts(payload),key=await digest(record.id),source=rawSource(record.value),sourceHash=source?await digest(source):'';
-    const periods=record.collection==='transactions'?months.filter(month=>dependencies.get(month).has(record.recordId)):[];
+    const periods=record.collection==='transactions'?months.filter(month=>dependencies.get(month).has(record.recordId)):record.periods;
     for(let part=0;part<chunks.length;part++)records.push({id:key+'-'+part,logicalId:key,recordKey:record.id,collection:record.collection,recordId:record.recordId,kind:encoded.layout[record.collection].kind,ordinal,part,partCount:chunks.length,logicalHash:await digest(payload),payload:chunks[part],hash:await digest(chunks[part]),sourceHash,periods,removed:false});
   }
   const periodDocuments=[];
@@ -24,7 +25,8 @@ export async function buildRecordSnapshot(state,imports=[],options={}){
   }
   const global={id:'financial',projectionVersion:1,payload:canonical(cumulativeFinancials(state))};
   const layout=Object.fromEntries(Object.entries(encoded.layout).map(([key,value])=>[key,value.kind]));
-  return {records,periods:periodDocuments,global,layout,stateHash:await digest(state),importsHash:await digest(imports),recordCount:records.length,importCount:imports.length,periodHashes:Object.fromEntries(await Promise.all(periodDocuments.map(async row=>[row.month,await digest(row)]))),globalHash:await digest(global)};
+  const settings={id:'settings',dependencies:records.filter(row=>row.collection!=='transactions'&&!row.collection.startsWith('@')&&!row.periods.length).map(row=>({id:row.id,hash:row.hash})).sort((a,b)=>a.id.localeCompare(b.id))};
+  return {records,periods:periodDocuments,global,settings,settingsHash:await digest(settings),...await recordManifests(records),layout,stateHash:await digest(state),importsHash:await digest(imports),recordCount:records.length,importCount:imports.length,periodHashes:Object.fromEntries(await Promise.all(periodDocuments.map(async row=>[row.month,await digest(row)]))),globalHash:await digest(global)};
 }
 
 export async function decodeRecordValues(records){
@@ -51,12 +53,12 @@ export async function decodeRecordSnapshot(head,records){
   if(records.filter(row=>!row.removed).length!==head.recordCount)throw storageError('record-integrity','Het aantal financiële records wijkt af.');
   const expanded=decodeHouseholdState({storageVersion:1,schemaVersion:11,layout},decoded),imports=expanded['@imports']||[];delete expanded['@imports'];
   for(const batch of imports){batch.rows=expanded['@rows:'+batch.id]||[];delete expanded['@rows:'+batch.id];}
-  if(await digest(expanded)!==head.stateHash||await digest(imports)!==head.importsHash)throw storageError('record-integrity','De teruggelezen administratie of importhistorie wijkt af.');
+  if(head.integrityMode!=='manifest'&&(await digest(expanded)!==head.stateHash||await digest(imports)!==head.importsHash))throw storageError('record-integrity','De teruggelezen administratie of importhistorie wijkt af.');
   return {state:expanded,imports};
 }
 
 export function recordChanges(previous,next){
-  const documents=snapshot=>new Map([...(snapshot?.records||[]).map(row=>['records/'+row.id,row]),...(snapshot?.periods||[]).map(row=>['periods/'+row.id,row]),...(snapshot?.global?[['globals/financial',snapshot.global]]:[])]);
+  const documents=snapshot=>new Map([...(snapshot?.records||[]).map(row=>['records/'+row.id,row]),...(snapshot?.periods||[]).map(row=>['periods/'+row.id,row]),...(snapshot?.manifests||[]).map(row=>['manifests/'+row.id,row]),...(snapshot?.settings?[['globals/settings',snapshot.settings]]:[]),...(snapshot?.global?[['globals/financial',snapshot.global]]:[])]);
   const a=documents(previous),b=documents(next),result=[];
   for(const path of new Set([...a.keys(),...b.keys()])){
     const before=a.get(path)||null,value=b.get(path)||null;

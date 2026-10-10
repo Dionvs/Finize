@@ -1,0 +1,871 @@
+{
+  "package": "V117 P3 aanvullende implementatie",
+  "decision": "period-integration-tested-awaiting-user-review-before-p4",
+  "createdAt": "2026-10-10T18:32:24.674Z",
+  "branch": "agent/v117-stabilisatie",
+  "baseCommit": "3227586922687c59abb3653aea3e4c31ed161b35",
+  "main": "a56e8659d0c20f6c35b008c08e8bb27f23c5541a",
+  "buildSha256": "9491027f6063c759c05dcc901ef63d3a3e7a4dee2b15e84a5bec063a28525ade",
+  "rulesSha256": "4af7169306fc619ea216301ea333adae47a9f687551bbdaf1c171d0e05eda73e",
+  "tests": {
+    "node": {
+      "files": 56,
+      "registeredCases": 589,
+      "passed": 589,
+      "failed": 0,
+      "skipped": 0,
+      "legacyAssertionFiles": 34
+    },
+    "browser": {
+      "total": 273,
+      "passed": 273,
+      "failed": 0,
+      "skipped": 0,
+      "retries": 0,
+      "duration": "8.9m"
+    },
+    "realFirestoreRules": {
+      "total": 39,
+      "passed": 39,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 153307.0904,
+      "testDouble": false,
+      "host": "127.0.0.1:8181",
+      "project": "demo-finize-v117"
+    },
+    "build": "passed",
+    "syntax": "passed",
+    "css": {
+      "result": "passed",
+      "existingUndefinedToken": "--line",
+      "stylesheetUnchanged": true
+    }
+  },
+  "measurements": {
+    "scale": [
+      {
+        "historicalSources": 36,
+        "loadedTransactions": 0,
+        "openReads": 33,
+        "commitReads": 39,
+        "wholeHistoryQueries": 0
+      },
+      {
+        "historicalSources": 360,
+        "loadedTransactions": 0,
+        "openReads": 33,
+        "commitReads": 39,
+        "wholeHistoryQueries": 0
+      }
+    ],
+    "tenSavings": {
+      "historySources": 36,
+      "initialLoadedTransactions": 0,
+      "openReads": 68,
+      "commitReads": 293,
+      "wholeHistoryQueries": 0
+    },
+    "browser": {
+      "initialHistorySources": 36,
+      "activeMonthTransactions": 0,
+      "monthReads": 73,
+      "tenApprovalSyncReads": 505,
+      "wholeFinancialReads": 0
+    },
+    "readCounter": "get=1; query=max(1,returned documents); excludes server-side rules/index charges"
+  },
+  "safety": {
+    "backupFiles": 263,
+    "backupFailures": 0,
+    "backupManifestSha256": "3c47f5ecbdfd233b8aad039105502d8b30f7053438f5ab691a01f33a74f035bf",
+    "preservedFiles": 14,
+    "preservedFailures": 0,
+    "frozenFiles": 189,
+    "frozenFailures": 0,
+    "productionWrites": false,
+    "productionRulesPublished": false,
+    "deployed": false,
+    "mainPushed": false,
+    "dataCleanup": false,
+    "p4Started": false
+  },
+  "limits": [
+    "Recordtransport blijft uitsluitend voor de lokale demo-emulator; geen productiemigratiebewijs.",
+    "Gelijktijdig afwijkende verwerking van dezelfde bankbron wordt expliciet geblokkeerd; beide versies blijven bewaard.",
+    "Volledige globale planning, importlevenscyclus en herstel-export vereisen expliciete complete afhankelijkheden.",
+    "P4-cachebeleid en 5400-bronnen-prestatieacceptatie zijn niet uitgevoerd."
+  ],
+  "logs": {
+    "node": {
+      "path": "backups/v117-stabilisatie/p3-aanvulling-final-node-3.log",
+      "sha256": "73e34d09f5b71f124c568a5acd8e6371a34100cacfbddec9b22238570f3d93a3"
+    },
+    "browser": {
+      "path": "backups/v117-stabilisatie/p3-aanvulling-final-browser-3.log",
+      "sha256": "3c62b331a201b8d7c244a6d7c9995eb6b9655470d65b5d04929af82f1b46174b"
+    },
+    "emulator": {
+      "path": "backups/v117-stabilisatie/p3-aanvulling-final-emulator-3.log",
+      "sha256": "5c5c24fc49684d59d99a5b90af5d8f44576bf11a0341468470c6cdc34dea4d77"
+    }
+  },
+  "verifiedBuildFiles": [
+    {
+      "path": "app.css",
+      "sha256": "df32bfc4b70dddacfe41271c7247c18347bbcedd0b865169d2d7d6f413166962"
+    },
+    {
+      "path": "app.js",
+      "sha256": "9491027f6063c759c05dcc901ef63d3a3e7a4dee2b15e84a5bec063a28525ade"
+    },
+    {
+      "path": "firestore.rules",
+      "sha256": "4af7169306fc619ea216301ea333adae47a9f687551bbdaf1c171d0e05eda73e"
+    },
+    {
+      "path": "scripts\\build.mjs",
+      "sha256": "4a1ae0adc2f99a072abc70305af28b243555c303c0c312424c264e60a8a8393d"
+    },
+    {
+      "path": "scripts\\capture-v50-state.cjs",
+      "sha256": "3136f1993a07d0c4f082385e90b42900b83f57318bc848dcf343a34fb626edce"
+    },
+    {
+      "path": "scripts\\check-css.mjs",
+      "sha256": "43608c9f10c396da7d86f482292ef543afd44d0905d81f0976fcc4d6d8be8f73"
+    },
+    {
+      "path": "scripts\\check-syntax.mjs",
+      "sha256": "ccfc114150b2f7c2e98705589acd9d8db0f8ee0191ac39c4654ec0ba32a63c4e"
+    },
+    {
+      "path": "scripts\\consolidate-css.mjs",
+      "sha256": "c6c2923c002397a9ece02a180238a67d65bfb20f0440ffb8b65cef4277c7583b"
+    },
+    {
+      "path": "scripts\\run-node-tests.mjs",
+      "sha256": "a93e2f1db3a9354443b97f508f5d00c5bd391d02ad69082208ea099a55eee469"
+    },
+    {
+      "path": "scripts\\serve.mjs",
+      "sha256": "3563e6e3a957bd3582b5a0064960cc9e3daa61194428c6d62685e7c62b25fadf"
+    },
+    {
+      "path": "scripts\\switch-to-app-runtime.mjs",
+      "sha256": "a4e409b14716fa06dbc2a50b3a8117fc2f582a18052dea3949e322046f610668"
+    },
+    {
+      "path": "scripts\\test-p3-emulator.mjs",
+      "sha256": "8beadfc368154eb7ba0200535cf992d74226303ad2b57728877713398ec76648"
+    },
+    {
+      "path": "scripts\\update6-firebase-admin.cjs",
+      "sha256": "2ab9279b1703a4a232ebead39f44d1f0796fc3c5a0e30b889f3a1fa7bd69e206"
+    },
+    {
+      "path": "src\\app-entry.js",
+      "sha256": "af2abab71968b31f1fdb287444645b133cc570aa41d34b6bfcd2a180fe99fd1c"
+    },
+    {
+      "path": "src\\auth\\contracts.mjs",
+      "sha256": "840020caf1c9bee48cad27bd61c6dc73844c5d2a0eb23e3b86557bdeee292068"
+    },
+    {
+      "path": "src\\auth\\runtime.js",
+      "sha256": "84e343e4ca3e00d622c22cf796be759d3c272d2e47436347712617c500add174"
+    },
+    {
+      "path": "src\\config\\firebase.js",
+      "sha256": "bb4ff31f70af247ce9503f50bd3a0b875d693c19e5b3f16505010d91027a2dbb"
+    },
+    {
+      "path": "src\\core\\bank-sources.mjs",
+      "sha256": "2d881e20f59528420aeaf76e19aeecdee0c3a9ba37902bc90dd1def1ed0804f3"
+    },
+    {
+      "path": "src\\core\\calculations.js",
+      "sha256": "596d013a6ca68eaae6e37701a223bdb3cc31855944d14b86e2ae57df3bd43f88"
+    },
+    {
+      "path": "src\\core\\data-normalization.mjs",
+      "sha256": "1657605d5fa1692ad7f4a68609bb00653c0d5f59afc317bc8c3eb598a7c35c25"
+    },
+    {
+      "path": "src\\core\\early-errors.js",
+      "sha256": "dcc4413252be05a3f4f5c84b2e8feca4c98d90b907e2924f0ec2d73c8a8f401e"
+    },
+    {
+      "path": "src\\core\\migrations.js",
+      "sha256": "cd7199727ac228dde4f66cea826b4aef5b92ae0aab04fe1406de9c96dd47100b"
+    },
+    {
+      "path": "src\\core\\mutation-errors.mjs",
+      "sha256": "7ebb3741803a5b4af23fb56737bd293e387c1184badba500587e1da830c3f233"
+    },
+    {
+      "path": "src\\core\\planning-timeline.mjs",
+      "sha256": "21ad0ad5293e48634bdbe66eb73b11f5650b9ea78c595d446aa677b7557025ac"
+    },
+    {
+      "path": "src\\core\\processing-lines.mjs",
+      "sha256": "58a9ca874a7de1d1950af8d651e70db4ba6c3bf328cee17358fed4c3c3784946"
+    },
+    {
+      "path": "src\\core\\recurring-occurrences.mjs",
+      "sha256": "4d10ed6b121a2944e3cc97c1db9007efc90b4aadff593e78e04c91a673025ef2"
+    },
+    {
+      "path": "src\\core\\runtime.js",
+      "sha256": "0b47fbd03f76e2a6f644652b51e6012ede8aabb9da44b1a1a520827b715dc5ad"
+    },
+    {
+      "path": "src\\core\\state.js",
+      "sha256": "1b091fcc58323041107f89f0c3dd8467fd23654385af3f12df109f09a2af2b44"
+    },
+    {
+      "path": "src\\core\\transaction-engine.mjs",
+      "sha256": "424bea9ba55b67a5c6ba587c09430802a0b6effc5807019c9f9ead229af02fcd"
+    },
+    {
+      "path": "src\\core\\transaction-model.mjs",
+      "sha256": "e89b21bc066b5a7e7b1c46ca648d45f4d569a1bb581298c83d70a2d82c42afa0"
+    },
+    {
+      "path": "src\\core\\transaction-processing.mjs",
+      "sha256": "9e046b44161e8ac2858eef1323df8658d9be74ed8b8b002fc89313c9060f375c"
+    },
+    {
+      "path": "src\\core\\validation.js",
+      "sha256": "8e0c1f1d638be34766699c78342e6f7c110c0d26245f7d59684a69a96a19573f"
+    },
+    {
+      "path": "src\\goals\\product-link.mjs",
+      "sha256": "05db1176871327e249dd30a1d9428318ec8e0a86704a1a16609c949b6df585f6"
+    },
+    {
+      "path": "src\\import\\approval-group.mjs",
+      "sha256": "426e66b2c6f1964c659568c8994093950fd552e2d743086f857f128c494404f1"
+    },
+    {
+      "path": "src\\import\\classifier.js",
+      "sha256": "feeec744cf3b2db017241dce9c66bedfcce1e5cded9b4fa1914ec62434a0c27e"
+    },
+    {
+      "path": "src\\import\\import-identity.mjs",
+      "sha256": "15366e180be2de8c3e07f6cfc7f2a2109daa8901073fd412b05f4f7365afe3d0"
+    },
+    {
+      "path": "src\\import\\import-lifecycle.mjs",
+      "sha256": "ea310edaeaac45a9a0d55e77e666dd170641229d9936d317bedbdb01f61fbdd4"
+    },
+    {
+      "path": "src\\import\\import-store.js",
+      "sha256": "8025b8c1ac8e13aebe642b9ceb8da9431825edb81c905e6ee9672968ef5d8480"
+    },
+    {
+      "path": "src\\import\\import-sync-protocol.mjs",
+      "sha256": "027d896f62c211cbe1989b489783f7889a9772a430eb25c46421dffba1d7fbd8"
+    },
+    {
+      "path": "src\\import\\import-sync.js",
+      "sha256": "5f81d91e73788ffc5efce631098bcc48d9b4b82454dd63003389d67b15aa55ce"
+    },
+    {
+      "path": "src\\import\\import-ui.js",
+      "sha256": "ea94baf5c7fe90d2ce291634a25d386f445fbd00e7ddc39ddfe9133f91b8e64d"
+    },
+    {
+      "path": "src\\import\\parser.js",
+      "sha256": "4ed56f718c225608bf7551dd11c1d2415e5473058505a8fc32e78ec94146ccff"
+    },
+    {
+      "path": "src\\import\\runtime.js",
+      "sha256": "704d108ee8f79b4b07f21478126ee0340079ae7428e68a50460c8026ee8fe003"
+    },
+    {
+      "path": "src\\import\\source-repair.mjs",
+      "sha256": "7a343e906e474ef5c4bee70f0170b53eca99643ca2f14819e7f42cd7641320d8"
+    },
+    {
+      "path": "src\\import\\update4-runtime.cjs",
+      "sha256": "86a35b8bc6c59b707b8b97e5cd18250b7a8e3d9cffe5ef125e8a8b28ef8cd36b"
+    },
+    {
+      "path": "src\\storage\\account-scope.mjs",
+      "sha256": "1b85099bed881e09dadad1a3b0eb371de1bf78e5b90bfe3571a9a96b18ebc0aa"
+    },
+    {
+      "path": "src\\storage\\cloud-chunks.mjs",
+      "sha256": "79e54073de848b5f3208d34464498c15d296249a78e8f2cec5ba29ee879072b3"
+    },
+    {
+      "path": "src\\storage\\cloud-record-model.mjs",
+      "sha256": "6c9cbf7caab9e57054a8a32eaf21a38aedba80aee4c11c79740d3b3772f283ba"
+    },
+    {
+      "path": "src\\storage\\cloud-records.mjs",
+      "sha256": "99848f8af541e28f5793df72a0c8f0e8c56704dce68b9fc65044465ad1b7126d"
+    },
+    {
+      "path": "src\\storage\\cloud-state.js",
+      "sha256": "2336fa331e5aab9efd98ba85ca8780a19f61d55af22997af2bfa397627ffdc7e"
+    },
+    {
+      "path": "src\\storage\\commit-outcome.mjs",
+      "sha256": "699a0165da424dac4865051bf01173797667437128a5196526d47031ddc91d5b"
+    },
+    {
+      "path": "src\\storage\\firestore-record-transport.mjs",
+      "sha256": "0e66fe130bd0a4a20ca96912671a0224da392b9a7a26fd407af7348eb0a2bbf3"
+    },
+    {
+      "path": "src\\storage\\goal-images.js",
+      "sha256": "c40c892c0386e763813547e7e89a970cc445fe1f33e32c0fa48212bb48f40129"
+    },
+    {
+      "path": "src\\storage\\household-store.mjs",
+      "sha256": "303d29fd74dda4c172956519e4440de081f0af70c3ed59ac2f53e46a8d94d569"
+    },
+    {
+      "path": "src\\storage\\legacy-import-readback.mjs",
+      "sha256": "2aafa37cf2f34d46a84c11a49042bb905768d8d898734526afa2878fb5596075"
+    },
+    {
+      "path": "src\\storage\\local-state.js",
+      "sha256": "1564d6c777b63cff1bc77fd34f3590f864eac1a65bd0e88b64a1a451235af4ca"
+    },
+    {
+      "path": "src\\storage\\migration-backups.mjs",
+      "sha256": "3a398820132dd8c558170d34c9e2728255af7dd087a2cdd52b62cd250f067bb7"
+    },
+    {
+      "path": "src\\storage\\period-projections.mjs",
+      "sha256": "68bc4d09ce6c78f61ea223f5b643c474954b9553f71f9d4bbb2ea9ea47703cd9"
+    },
+    {
+      "path": "src\\storage\\period-workspace.mjs",
+      "sha256": "049dd43037dc54f8a01e6dea5b9b14868a19bf54e5c0beb5f97ee82ff8dee3a7"
+    },
+    {
+      "path": "src\\storage\\record-manifest.mjs",
+      "sha256": "eb79414fd6ed2c4e0bf89255e4627d2ef902e35816ee7f0a81207d884923b93e"
+    },
+    {
+      "path": "src\\storage\\record-session.mjs",
+      "sha256": "a8fbe485422089a755b79b0c98255c0c4a3dd01781ea3de9510958c9e6df98dd"
+    },
+    {
+      "path": "src\\storage\\record-sync.mjs",
+      "sha256": "e6abd1b36329c61161913490061a939f459a902f163acf47491fbb01b4381327"
+    },
+    {
+      "path": "src\\storage\\service-worker-registration.js",
+      "sha256": "8a1fd755e5b51ca10d6722d15eacd8e718a1c297648cb842040f2843645a6f8b"
+    },
+    {
+      "path": "src\\storage\\state-backups.mjs",
+      "sha256": "24bd27c6b9a23c7fe4478a8610edf81d497de1fe886b2e5963117480b9f4d1ff"
+    },
+    {
+      "path": "src\\storage\\sync-protocol.mjs",
+      "sha256": "227a82026ef665751b41cf558489bde6b2c512f38faffbc0fc83d08e1bf7f020"
+    },
+    {
+      "path": "src\\styles\\auth.css",
+      "sha256": "e70f2d6bc40b9e3e581e5b90ca569bb6cc28497aeb7e81d77ace79d723eef7a7"
+    },
+    {
+      "path": "src\\styles\\base.css",
+      "sha256": "823f3b7e67bf5227d5c57f832d2742c4f7ec5e464264885f4e46824fea5f315b"
+    },
+    {
+      "path": "src\\styles\\dashboard.css",
+      "sha256": "70536b06712641c75b30d509558b274ba68432eb189d2d19599c68b6579f8280"
+    },
+    {
+      "path": "src\\styles\\desktop.css",
+      "sha256": "67eb3d537b92c8d8caf92a74bd1638ba89cdfde5780ef9a32052757445571097"
+    },
+    {
+      "path": "src\\styles\\goals.css",
+      "sha256": "0a55d8764d5adc65ce80472d4d6f15e797445e3867dba829f7d0b90eb4648fd2"
+    },
+    {
+      "path": "src\\styles\\import.css",
+      "sha256": "cc855d6b73f0a33dc8dbf4bbc58eb0f6b72e6a45192caf2709444cb8aaabd233"
+    },
+    {
+      "path": "src\\styles\\iphone.css",
+      "sha256": "eedf5106ee13e2cf8ad936cc699b2d5ded26eb69947a595724ea7dee72ef237e"
+    },
+    {
+      "path": "src\\styles\\settings.css",
+      "sha256": "b7ad3fa03708a6718d26da3212331600d7a9d59b7c40e36571da874ece215e3b"
+    },
+    {
+      "path": "src\\styles\\tablet.css",
+      "sha256": "ba0fb9cbaa81c6ec7bd54d871f370baea5816334bc2aec7e03fe27be24b3de3d"
+    },
+    {
+      "path": "src\\styles\\tokens.css",
+      "sha256": "b7020992a2144c818fa4d95173741e0960c4181cba85fcf6549a0ea011b7a072"
+    },
+    {
+      "path": "src\\ui\\icons.js",
+      "sha256": "49bf95143f7da18ddf7b22dc88c4cde32ea70e220d38b07168a6037826556517"
+    },
+    {
+      "path": "src\\ui\\modal.js",
+      "sha256": "3dd8acf7d1e311714bc7afb9540ef9b06e4752f6d1ed932cdcf9986d4ded1bac"
+    },
+    {
+      "path": "src\\ui\\platform.js",
+      "sha256": "68dbd2bb146bf6e7843ea535c5eecf12290a535cfa0cccbe2528786a94973520"
+    },
+    {
+      "path": "src\\ui\\presentation.js",
+      "sha256": "077512c096642cfc585a8af16b0d6885ee2f4ada907047877694e90dfc29801d"
+    },
+    {
+      "path": "src\\ui\\render.js",
+      "sha256": "b1b2f3c97d1fd4bce30fa82d9a0dcffe2b0e917aae3342fb8cf6cb8478e97bac"
+    },
+    {
+      "path": "tests\\browser\\bootstrap-stability.spec.cjs",
+      "sha256": "8dade660e1b526b88e0f6ec61ba5cb08911663e451ba5544e63a36e1639e0a64"
+    },
+    {
+      "path": "tests\\browser\\desktop-special-tabs.spec.cjs",
+      "sha256": "5f5fdd82e9cb0068b5a07b6406eb5845ddcd287f97d628b8e35600dd21706efb"
+    },
+    {
+      "path": "tests\\browser\\dynamic-html-security.spec.cjs",
+      "sha256": "992703fbc4324f662f506f12bf2dc4e0f918575aeec3045d10be2e12ccdb282b"
+    },
+    {
+      "path": "tests\\browser\\fix-round-1-6.spec.cjs",
+      "sha256": "747c0a84787bf6f3ad1fc5a8acc010b520c659d81e7964dd7e62232ef304422d"
+    },
+    {
+      "path": "tests\\browser\\function-parity-goals-income.spec.cjs",
+      "sha256": "768e197ef81ea5182c75a45c77d6ec39ec62c6f3e7a254748f2a0a70cd584e5d"
+    },
+    {
+      "path": "tests\\browser\\hotfix-migration-backup.spec.cjs",
+      "sha256": "71013f0b20ce7ad035078ab2e93619811fb3d9f1205ffea729a238c213a25753"
+    },
+    {
+      "path": "tests\\browser\\import-history-cloud-refresh.spec.cjs",
+      "sha256": "639a80cbd4a0b0bab4ea6ea7d9c5953d6cb3216c8af86d8e2f783ff67578301e"
+    },
+    {
+      "path": "tests\\browser\\import-history-readonly.spec.cjs",
+      "sha256": "f6219b871c0dd3a398a37f1f240b136b3a2c4a90b92c8e1748638f8d6689c93b"
+    },
+    {
+      "path": "tests\\browser\\import-listener-stability.spec.cjs",
+      "sha256": "35d59a257c7dbccb431ebb8f41ed84fb3234ff605af8c05a659a7f0f81f920c5"
+    },
+    {
+      "path": "tests\\browser\\import-review-simplification.spec.cjs",
+      "sha256": "d6a3ed9c6a7833091b193bb3e613dc9d0ee9008ac01697dad6ef5c4768ec6371"
+    },
+    {
+      "path": "tests\\browser\\income-overview.spec.cjs",
+      "sha256": "710881485b96ef2249358d2e8fc4f6decc3c0fdd6fd02aae33e090f67300b83b"
+    },
+    {
+      "path": "tests\\browser\\iphone-responsive-text.spec.cjs",
+      "sha256": "02080dc907be5f7e0ed3b2274c63d0d957285a458ea08475ae958e5ca4c48a4c"
+    },
+    {
+      "path": "tests\\browser\\modal-and-commit-stability.spec.cjs",
+      "sha256": "fe86656752f3a88a527038d5dc6b29cece34567e77605c45dd44eaafd4ad46cc"
+    },
+    {
+      "path": "tests\\browser\\package1-data-foundation.spec.cjs",
+      "sha256": "ab783dea243380c33a6057624b24683738db000fb497e8263dd7daa0a65186ad"
+    },
+    {
+      "path": "tests\\browser\\package2-planning-timeline.spec.cjs",
+      "sha256": "147ad2dba6252222f0c76399f56c6940deb070af4487b47626e6dcb0f197df7b"
+    },
+    {
+      "path": "tests\\browser\\package3-transaction-engine.spec.cjs",
+      "sha256": "0655dbfc1eb407d18e7fd1f3a49bd6dd6b5283f13b2902cf8c08c9318f3dc6d7"
+    },
+    {
+      "path": "tests\\browser\\package4-allowance-planning-correction.spec.cjs",
+      "sha256": "83416d6f1280f0761cd3551e3723bc1850746d23ab7a95a72fe77f579772e667"
+    },
+    {
+      "path": "tests\\browser\\package4-savings-refunds-forecast.spec.cjs",
+      "sha256": "ab86fd40795375bf500a790d027385bcc9c6c3d8f46f43b958ae09ddf177ba54"
+    },
+    {
+      "path": "tests\\browser\\package5-import-lifecycle.spec.cjs",
+      "sha256": "14e07a3aaf0dad51ce491755bf12f078ccf3d981e490f4ba1f1cb1d6aa8572d1"
+    },
+    {
+      "path": "tests\\browser\\package6-functional-consolidation.spec.cjs",
+      "sha256": "8e66653e990822dd5f08eb9bd6afc5387203706e0fbc6b9f36742933b2b4159a"
+    },
+    {
+      "path": "tests\\browser\\package7-release-audit.spec.cjs",
+      "sha256": "0eaf7e33bc08bd56f60df4b999490401adc320da2dc1b264b0668c125c085dd4"
+    },
+    {
+      "path": "tests\\browser\\pwa-offline.spec.cjs",
+      "sha256": "187d2e1ad1b6849f459d05dce65cc75591183ae6b4f3a5c2de5070de1db82631"
+    },
+    {
+      "path": "tests\\browser\\service-worker-upgrade.spec.cjs",
+      "sha256": "b351cb9e983bc4cf942e8907692b57cb3184694e263a9ee9b3e835e2caffe0ad"
+    },
+    {
+      "path": "tests\\browser\\storage-hotfix-2.spec.cjs",
+      "sha256": "acfaf7fe7779d72932b8e95935b45f9d8786709c6d6daa86a1b3a90c7ab3cb32"
+    },
+    {
+      "path": "tests\\browser\\subgoal-product-link.spec.cjs",
+      "sha256": "3df614f20a33b10c2536d443a311a660135356a594d51ef5b41a18d3261ed10a"
+    },
+    {
+      "path": "tests\\browser\\sync-hotfix-3.spec.cjs",
+      "sha256": "3d5d2a1f324add2ecd90be3e60d9ef205239f093a79a19edacb63a0ac345424f"
+    },
+    {
+      "path": "tests\\browser\\update6-account-navigation.spec.cjs",
+      "sha256": "1057288b1dedb56871b99bca00800a8496feea3ad53af562edfd8066a9a13928"
+    },
+    {
+      "path": "tests\\browser\\update6-auth-shell.spec.cjs",
+      "sha256": "4d37e00b7fe67f6eba15b593ba5529d63db89230b8124fea8514e23c4ca78fd5"
+    },
+    {
+      "path": "tests\\browser\\v113-csv-processing.spec.cjs",
+      "sha256": "56d5b079e829dc1e00599fa5e381749487f4334ab1a62270765ed78a4d63591a"
+    },
+    {
+      "path": "tests\\browser\\v117-p1.spec.cjs",
+      "sha256": "f5823a632112dd20ee862a882c157fa80481bc3fa3df3906945c4fd395153233"
+    },
+    {
+      "path": "tests\\browser\\v117-p2-migration.spec.cjs",
+      "sha256": "7b40d7a82108b3a619e489acc0f96145ca93ebb7d1facbd3aa325b3f43ca9ef7"
+    },
+    {
+      "path": "tests\\browser\\v117-p2.spec.cjs",
+      "sha256": "b474d59332546a7131ad29a48400d425ebaef7e9e2f0931284c296b22ac3c3d6"
+    },
+    {
+      "path": "tests\\browser\\v117-p3.spec.cjs",
+      "sha256": "4e46947ac6e0a35b9ee684d9254e76bba94cc719873e931322cb26b7580143fb"
+    },
+    {
+      "path": "tests\\browser\\v50-smoke.spec.cjs",
+      "sha256": "71ed1dcdd5f7f477dd269c9c8a6a84dd1a702aa6d656cd43026cd400581463f5"
+    },
+    {
+      "path": "tests\\browser\\v50-visual-baseline.spec.cjs",
+      "sha256": "672be1aa3bbb0762569a67702e0c041a7d2c53cc8c9e33ca87438a91f21ddd8b"
+    },
+    {
+      "path": "tests\\browser\\v50-visual-baseline.spec.cjs-snapshots\\v50-1024.png",
+      "sha256": "2b64854985d9b9f50c12ed31df5130cf6c5aae14606a9e354e0f08c688ae4618"
+    },
+    {
+      "path": "tests\\browser\\v50-visual-baseline.spec.cjs-snapshots\\v50-1440.png",
+      "sha256": "3782211782b592151439ddaf25bff0fe11dfe691f413f58fa610cc62bec6a95f"
+    },
+    {
+      "path": "tests\\browser\\v50-visual-baseline.spec.cjs-snapshots\\v50-360.png",
+      "sha256": "ed129d91c8ea7101592098d0d3ecc70b5fd1804f75e6a1045a0cf267806f54a5"
+    },
+    {
+      "path": "tests\\browser\\v50-visual-baseline.spec.cjs-snapshots\\v50-390.png",
+      "sha256": "480f2d5d9ff5149bd733cd9253e5391f17be280a792c7e1b76ffebd883b91913"
+    },
+    {
+      "path": "tests\\browser\\v50-visual-baseline.spec.cjs-snapshots\\v50-430.png",
+      "sha256": "914ff653cfc3c2af9ce61bfb0485982eb4a4a69ba8b411160f8a2d759b943583"
+    },
+    {
+      "path": "tests\\browser\\v50-visual-baseline.spec.cjs-snapshots\\v50-768.png",
+      "sha256": "02302f0f85a492d9990e825d581f34d90550569e1b71861922bfd53f8650c212"
+    },
+    {
+      "path": "tests\\cloud-sync-protocol.test.cjs",
+      "sha256": "c6c8523a8f5d951aaf94fd563e23a7105384b7c77202333f982b220e57e40f6d"
+    },
+    {
+      "path": "tests\\emulator\\v117-p3.test.cjs",
+      "sha256": "41e85df84576c158326046706b4ed52219dc20f4f26c9e4ba360b950ab0a4a01"
+    },
+    {
+      "path": "tests\\fix-round-1-6.test.cjs",
+      "sha256": "65fe8ee00aaaea7948e99bca08e6ceba563401cdf895315f7408d7d614f9d265"
+    },
+    {
+      "path": "tests\\fixtures\\ing-dara.csv",
+      "sha256": "f6acc8ac40134de5d71985f1fe42c439b645cd86bd76f9fbf64acd97c6ab9575"
+    },
+    {
+      "path": "tests\\fixtures\\ing-dion.csv",
+      "sha256": "4f1c7f77585f35eb9c32fde16897ae21b76a57ef35eee0a46224ab4c63ced713"
+    },
+    {
+      "path": "tests\\fixtures\\ing-gezamenlijk.csv",
+      "sha256": "e94177fe6747b963544c9883144aac75137668056505a10e987264eefc920b8e"
+    },
+    {
+      "path": "tests\\fixtures\\v113-financial-reference.json",
+      "sha256": "737b7def7e86e78489a0147f1d592fea0a84f16ef23216795aa41072362822bd"
+    },
+    {
+      "path": "tests\\fixtures\\v50-computed-styles.json",
+      "sha256": "69a7d7465d78b09c2ae1ea90be14bd122a565070c3364ce7eb5d46f315c476ee"
+    },
+    {
+      "path": "tests\\fixtures\\v50-visual-state.json",
+      "sha256": "044cc22db87ec4386ae0c4fcb02ada64f2ba29aefcf85a213d57f0f555c830b8"
+    },
+    {
+      "path": "tests\\function-parity-goals-income.test.cjs",
+      "sha256": "590c5265c222fa42c8b2afda47e961ee95b5069da1d9a20d7e80e38dbfe114ea"
+    },
+    {
+      "path": "tests\\helpers\\migration-runtime.cjs",
+      "sha256": "c69689f45048ed95adce66ddcfabc038ddf9d464af0f62dd224478a4ee7d3cd7"
+    },
+    {
+      "path": "tests\\helpers\\package5-fixture.cjs",
+      "sha256": "b1613b6a163f379bc03b2a143f382c530f259847a0e53ba20122256cd60f445f"
+    },
+    {
+      "path": "tests\\helpers\\runtime-source.cjs",
+      "sha256": "fea08a02254f10fd3aa60ec65737b6fc5397fc956771f9e4d19f16f0606df30b"
+    },
+    {
+      "path": "tests\\helpers\\v117-p3-emulator.cjs",
+      "sha256": "f4fa901154d8062245c623f9c673071cef790a2005a4f07ddd91ce2d20bae09e"
+    },
+    {
+      "path": "tests\\html-inline-syntax.test.cjs",
+      "sha256": "920041c76113c3007e5b43c0c9e689c919464b6623d768c60b897ea7879e9708"
+    },
+    {
+      "path": "tests\\income-overview.test.cjs",
+      "sha256": "dfa5c4dc1f8c5be050ba51fecc2878ecc1a27dde015c2715e7298456b9f7abc6"
+    },
+    {
+      "path": "tests\\mutation-errors.test.cjs",
+      "sha256": "fad1752251bea39a217148b6c37b5caefc05be15f760ee6fd44ccd6627e6ad53"
+    },
+    {
+      "path": "tests\\package1-data-foundation.test.cjs",
+      "sha256": "ebc9ae8de659bdb3012f7d112c6b72924da4e91fdc35801f545c51457c13a1da"
+    },
+    {
+      "path": "tests\\package2-planning-timeline.test.cjs",
+      "sha256": "cf914b133501f031d3a55ce5038a2f93ff80e2b94bce691665f8f608fbc850d0"
+    },
+    {
+      "path": "tests\\package3-processing-integration.test.cjs",
+      "sha256": "0ab87061c0bebb788438b09566b8728d61d867ec3eca75f482d886bc6dab3321"
+    },
+    {
+      "path": "tests\\package3-transaction-engine.test.cjs",
+      "sha256": "38a34cb9ac8656565352f2e7f30be2a0ebfd0cc140f91daea21b16c7925a746c"
+    },
+    {
+      "path": "tests\\package4-allowance-planning-correction.test.cjs",
+      "sha256": "f2049c01bdf85453e1966653166a36952d1b7ac20620533846e2e47449e13c69"
+    },
+    {
+      "path": "tests\\package4-processing-integration.test.cjs",
+      "sha256": "e9bf853c8287fb8524277ced6e43e410c1f5c805fc7c5a0078af2f413f0f4018"
+    },
+    {
+      "path": "tests\\package4-savings-refunds-forecast.test.cjs",
+      "sha256": "b7e5b3d53bc7f6770eff9abcfc1993181b870df325043153024930a9562878db"
+    },
+    {
+      "path": "tests\\package5-lifecycle.test.cjs",
+      "sha256": "7550a385173dffbdc4b86430491df8b9f7bf70266b193b8a6e2057fd20f5a9e8"
+    },
+    {
+      "path": "tests\\package5-sync.test.cjs",
+      "sha256": "5198a8015b1f1b9710ac8ebf87f119537845b69d9178a1e675a03d5d2c32c034"
+    },
+    {
+      "path": "tests\\package6-functional-consolidation.test.cjs",
+      "sha256": "262b21ddbe1a87ce88371077229b8240f68fd07e47e01a8a5f0412662cdb6304"
+    },
+    {
+      "path": "tests\\package7-release-audit.test.cjs",
+      "sha256": "1f2fef87540b2f24406a8b5419e1d8150f6c763b525ff7eb810de591d39f3665"
+    },
+    {
+      "path": "tests\\service-worker-cache.test.cjs",
+      "sha256": "cec3c8c7e109daf889f4d0b1a64151c10d91fb297ab4c45bde24c8295cddeed0"
+    },
+    {
+      "path": "tests\\service-worker-upgrade.test.cjs",
+      "sha256": "82114ae80e208e6318d87b03de9b14a8704751c2291a1bf1863126d47e86aac0"
+    },
+    {
+      "path": "tests\\storage-hotfix-2-emulator.py",
+      "sha256": "0694bcbee5308831a500c215262af7d2befba8c9b5cb499f87ddd24df4616742"
+    },
+    {
+      "path": "tests\\storage-hotfix-2.test.cjs",
+      "sha256": "b0db3acd110c3e313137a094283c5797b3d79be1a6cabb33276954575b398a11"
+    },
+    {
+      "path": "tests\\subgoal-product-link.test.cjs",
+      "sha256": "371b26ede1b3b1c2fab0eab9d4e245205602a2e74f7d6eac05ffe9996f35a8a0"
+    },
+    {
+      "path": "tests\\sync-hotfix-3.test.cjs",
+      "sha256": "3e0ad67e6822a44fa0c99bb51f75d8b843a0ab3d35f3d25e77c72e7191e20d86"
+    },
+    {
+      "path": "tests\\ui-event-stability.test.cjs",
+      "sha256": "880635a460d15fe4557c5dbb770a42f44857e7aa3fa028c2c1f3663612c938ef"
+    },
+    {
+      "path": "tests\\update2-calculations.test.cjs",
+      "sha256": "95ad0f1768e7fad2aba1bbc5d5a6b2ec21e744130a27a6d6cb3d0a797d6dc787"
+    },
+    {
+      "path": "tests\\update3-administration.test.cjs",
+      "sha256": "eccfd556b543fc98780bb83085ed1d7abb42d6bccc84a142d3dcaa7101df9eaa"
+    },
+    {
+      "path": "tests\\update3-core.test.cjs",
+      "sha256": "59afebb1a336b817cdc7276c54a847dd6937f5a4bd4b53b03ae36fe14175b9b9"
+    },
+    {
+      "path": "tests\\update3-migration.test.cjs",
+      "sha256": "eb46cb4bc5dc4d167ac83b01671de39bbe70d5d28d5b4f64a1a85c7b7ababa72"
+    },
+    {
+      "path": "tests\\update3-ui-structure.test.cjs",
+      "sha256": "c0c4f8261932972fedf1f3def88fa8203a5e946391f6ed63179f9c66c123c24a"
+    },
+    {
+      "path": "tests\\update4-1-expense-impact.test.cjs",
+      "sha256": "4d5b633de0d113c27d774da0ede2424da998fdf47ef1df40892a8e3b73757dde"
+    },
+    {
+      "path": "tests\\update4-2-savings-ledger.test.cjs",
+      "sha256": "fd3a4d1a0c131aeeb2605ea3c2d9d5dd3b2d73ab83037d790b58525cf3b6d26a"
+    },
+    {
+      "path": "tests\\update4-3-history.test.cjs",
+      "sha256": "6103017587c3f31068d84bddf06f323da02976cd41bae8eac49e8946f881d295"
+    },
+    {
+      "path": "tests\\update4-4-zero-income.test.cjs",
+      "sha256": "a76fad5dd10f13ec7a343672b4c30dfca34515f6a07bd9ca70df4a8f27307849"
+    },
+    {
+      "path": "tests\\update4-5-selected-month.test.cjs",
+      "sha256": "afe1558b2a3aa3e8b4c3cd01635087d17375747852e2b05ad07ea39f07817d16"
+    },
+    {
+      "path": "tests\\update4-6-closing.test.cjs",
+      "sha256": "b36571bc3a056c223a4d60032e18fcc83a553facc4e5f8c275cc58acca553dec"
+    },
+    {
+      "path": "tests\\update4-7-closed-month.test.cjs",
+      "sha256": "c5d5d7edb6eadd104c73d1c1bd3ea7ede33e55158779704cb848a42bfd20f454"
+    },
+    {
+      "path": "tests\\update4-cloud-import.test.cjs",
+      "sha256": "a558c56b65854a8e23b2525bb48361ae52db85432b659aed540e9fbbf0caa42f"
+    },
+    {
+      "path": "tests\\update4-final-regression.test.cjs",
+      "sha256": "041c37fe972aebeb1e442ecef2216dba682e725aef7ac89580a992194b86c914"
+    },
+    {
+      "path": "tests\\update4-import-engine.test.cjs",
+      "sha256": "5a617a0066d3b33a9b82d00017c82233a82ce1db10c5a2e2dd3b11652f0f4859"
+    },
+    {
+      "path": "tests\\update4-import-review-simplification.test.cjs",
+      "sha256": "bf84633d484a38d024e0c36091906b83db726dc2e97dc4f9b5bd1adc12a36b9e"
+    },
+    {
+      "path": "tests\\update4-ledgers.test.cjs",
+      "sha256": "0ac16e6eede20d4cb9615d05e9221b74fd5b6b549568f512cd545dd5373e5ecb"
+    },
+    {
+      "path": "tests\\update4-migration-storage.test.cjs",
+      "sha256": "0f154e9f43fc8fcc132d653282dac24104dfb54a6c7a5d668894a7e3a22126b9"
+    },
+    {
+      "path": "tests\\update4-processing.test.cjs",
+      "sha256": "c2ad09d81ae4bfb7f8fba908e1e9e1ae7e2d537ed71c130626541ce02f46a660"
+    },
+    {
+      "path": "tests\\update4-stabilization-regression.test.cjs",
+      "sha256": "1eb174369e0e684cedfeda132b4de59b7ce96f1ac081505dec30c4469e476630"
+    },
+    {
+      "path": "tests\\update4-ui-structure.test.cjs",
+      "sha256": "a3c7bba4230eb1284a1a69249da8c8ad1ad88850c350daec033bed6ebc592fca"
+    },
+    {
+      "path": "tests\\update4-undo.test.cjs",
+      "sha256": "70fdd524b05f22aefc85b2bc51df35eaf89331daa6a2c071ad4438d4be25e064"
+    },
+    {
+      "path": "tests\\update5-allowance-budget-regression.test.cjs",
+      "sha256": "e6b5812e89a713d3ad14a56874250dc648dbd216d19684809a0b39f7305c3c75"
+    },
+    {
+      "path": "tests\\update5-budget-history-saving-overrides.test.cjs",
+      "sha256": "059ea23623daa93a38fce3c5b1a33601de31f49968b79161e4dfd5ec686c78d8"
+    },
+    {
+      "path": "tests\\update5-responsive-structure.test.cjs",
+      "sha256": "7dfd59a87172ad22df00f7a23a6dceab5c1ce4024c38d94bf04a24415926017b"
+    },
+    {
+      "path": "tests\\update6-account-scope.test.cjs",
+      "sha256": "291bb25a758568b311b31d45da677c480eb82b0b639840bfe97785a5d04bae34"
+    },
+    {
+      "path": "tests\\update6-auth-contract.test.cjs",
+      "sha256": "476e1ef388591911effc6705e7ab13d5f9a42964502f24ce0cfcd854acb1c4cb"
+    },
+    {
+      "path": "tests\\update6-firestore-rules-contract.test.cjs",
+      "sha256": "4ae34913aca394c4635c3af59ea4a02f9b158a31ab1d03c88b4fda131e189950"
+    },
+    {
+      "path": "tests\\v113-csv-processing.test.cjs",
+      "sha256": "062cd27c7004878fa1d116fcecd83c288ee37cede93ab10dc9ca3ff8f932f4e5"
+    },
+    {
+      "path": "tests\\v117-p1.test.cjs",
+      "sha256": "338ea4ff1fa0be38842f3ce5a2b2b8c4a15a8b8b2a8dafaf6e0d2ea4a9313d62"
+    },
+    {
+      "path": "tests\\v117-p2.test.cjs",
+      "sha256": "83e946cad637b398a3c6783568a4f7cd46bf2280d568ac94a2861770500789ed"
+    },
+    {
+      "path": "tests\\v117-p3-periods.test.cjs",
+      "sha256": "782e6594b492809112fd4c66eb8b36ae19b9562ac7734cd510780d11c6583dea"
+    },
+    {
+      "path": "tests\\v117-p3.test.cjs",
+      "sha256": "dc0b44f98d64a197094fc907877469acadd2f790d72d6212055b6fbba4df781f"
+    }
+  ]
+}

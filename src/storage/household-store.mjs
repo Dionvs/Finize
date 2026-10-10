@@ -44,7 +44,7 @@ export function encodeHouseholdState(state) {
       layout[collection]={kind:'list',ids};
       for(const row of value){
         const lines=[row,...(row.processing?.splits||row.splits||[]).map(split=>({...row,...split,processing:{...row.processing,...split}}))];
-        const periods=collection==='transactions'?[...new Set([String(row.bankOriginal?.bankDate||row.date||'').slice(0,7),...lines.flatMap(line=>[getTransactionFinancialMonth(line),getTransactionFinancialMonth(line,{dimension:'fixed'}),line.refundMonth||line.processing?.refundMonth])].filter(month=>/^\d{4}-\d{2}$/.test(month)))]:[];
+        const periods=collection==='transactions'?[...new Set([String(row.bankOriginal?.bankDate||row.date||'').slice(0,7),...lines.flatMap(line=>[getTransactionFinancialMonth(line),getTransactionFinancialMonth(line,{dimension:'fixed'}),line.refundMonth||line.processing?.refundMonth])].filter(month=>/^\d{4}-\d{2}$/.test(month)))]:collection==='savingsGoalLedger'&&/^\d{4}-\d{2}$/.test(row.month)?[row.month]:[];
         records.push({id:JSON.stringify([collection,row.id]),collection,recordId:row.id,value:clone(row),periods});
       }
     }else{
@@ -67,6 +67,16 @@ export function decodeHouseholdState(head,records) {
 
 function requestResult(request){return new Promise((resolve,reject)=>{request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});}
 function completed(transaction){return new Promise((resolve,reject)=>{transaction.oncomplete=()=>resolve();transaction.onerror=transaction.onabort=()=>reject(transaction.error||fail('storage-aborted','De lokale opslagtransactie is afgebroken.'));});}
+async function financialSnapshot(transaction){
+  const head=await requestResult(transaction.objectStore('financialHead').get('current'));
+  if(!head)return {head:null,records:[]};
+  const records=transaction.objectStore('financialRecords');
+  if(!head.partialHistory)return {head,records:await requestResult(records.getAll())};
+  const keys=Object.entries(head.layout).flatMap(([collection,layout])=>(layout.kind==='list'?layout.ids:['']).map(id=>JSON.stringify([collection,id])));
+  const selected=await Promise.all(keys.map(id=>requestResult(records.get(id))));
+  if(selected.some(row=>!row))throw fail('storage-integrity','Een vereiste lokale periodeafhankelijkheid ontbreekt.');
+  return {head,records:selected};
+}
 
 export function createHouseholdStore(scope='legacy',{verifySource=async()=>{}}={}) {
   let cachedHead=null,cachedRecords=new Map();
@@ -77,7 +87,7 @@ export function createHouseholdStore(scope='legacy',{verifySource=async()=>{}}={
   }
   async function load({allowUnverified=false}={}){
     const db=await openHouseholdDatabase(scope),tx=db.transaction(['financialHead','financialRecords'],'readonly'),done=completed(tx);
-    const [head,records]=await Promise.all([requestResult(tx.objectStore('financialHead').get('current')),requestResult(tx.objectStore('financialRecords').getAll()),done]);
+    const [{head,records}]=await Promise.all([financialSnapshot(tx),done]);
     if(!head)return null;
     if(!allowUnverified&&!head.verified)throw fail('storage-migration','De opslagmigratie moet eerst worden gecontroleerd.');
     const state=decodeHouseholdState(head,records);
@@ -85,11 +95,14 @@ export function createHouseholdStore(scope='legacy',{verifySource=async()=>{}}={
     cachedHead=clone(head);cachedRecords=new Map(records.map(record=>[record.id,JSON.stringify(record)]));
     return state;
   }
-  async function commit(state,{expectedHash=cachedHead?.sha256??null,operationId=crypto.randomUUID(),importMutation=null,migration=null,queueCloud=true,cloudAcceptance=null}={}){
+  async function commit(state,{expectedHash=cachedHead?.sha256??null,operationId=crypto.randomUUID(),importMutation=null,migration=null,queueCloud=true,cloudAcceptance=null,periodAcceptance=null,resolutionAcceptance=null}={}){
     await verifySource(migration||cachedHead?.migration);
     if(cloudAcceptance&&(importMutation||queueCloud))throw fail('storage-contract','Een cloudontvangst accepteert geen parallelle lokale importbewerking.');
+    if(periodAcceptance&&(!state.__finizePartialHistory||queueCloud||importMutation||cloudAcceptance))throw fail('storage-contract','Periodeontvangst gebruikt één gecontroleerde lokale commit zonder financiële heruitvoering.');
+    if(resolutionAcceptance&&(!state.__finizePartialHistory||!queueCloud||periodAcceptance||cloudAcceptance||importMutation))throw fail('storage-contract','Conflictoplossing vereist één atomaire periodecommit met outbox.');
     const encoded=encodeHouseholdState(state),sha256=await backupDigest(JSON.stringify(state));
     const next={id:'current',storageVersion:LOCAL_STORAGE_VERSION,schemaVersion:11,storageRevision:(cachedHead?.storageRevision||0)+1,revision:Number(state.meta?.revision)||0,layout:encoded.layout,sha256,verified:!migration,migration:migration||cachedHead?.migration||null,operationId};
+    if(state.__finizePartialHistory)next.partialHistory=true;
     const desired=new Set(encoded.records.map(record=>record.id));
     const changes=encoded.records.filter(record=>cachedRecords.get(record.id)!==JSON.stringify(record)).map(record=>({record,before:cachedRecords.has(record.id)?JSON.parse(cachedRecords.get(record.id)):null}));
     const removed=[...cachedRecords].filter(([id])=>!desired.has(id)).map(([,value])=>JSON.parse(value));
@@ -103,6 +116,7 @@ export function createHouseholdStore(scope='legacy',{verifySource=async()=>{}}={
       tx.oncomplete=()=>resolve();tx.onerror=tx.onabort=()=>reject(failure||tx.error||fail('storage-aborted','De lokale financiële commit is afgebroken.'));
       const heads=tx.objectStore('financialHead'),get=heads.get('current'),operation=tx.objectStore('operationReceipts').get(operationId);
       operation.onsuccess=()=>{
+        if(get.result?.partialHistory&&!state.__finizePartialHistory){abort(fail('storage-contract','Een periodeadministratie kan niet via het oude volledige-statecontract worden overschreven.'));return;}
         if(get.result&&!get.result.verified){abort(fail('storage-migration','Een ongecontroleerde migratiestand accepteert geen financiële wijzigingen.'));return;}
         const existing=operation.result;
         if(existing){
@@ -114,12 +128,20 @@ export function createHouseholdStore(scope='legacy',{verifySource=async()=>{}}={
         const publish=()=>{
           try{
             const records=tx.objectStore('financialRecords');
-            for(const record of removed)records.delete(record.id);
+            if(!state.__finizePartialHistory)for(const record of removed)records.delete(record.id);
             for(const change of changes)records.put(change.record);
             heads.put(next);tx.objectStore('operationReceipts').put(receipt);
+            if(state.__finizePartialHistory&&!get.result?.partialHistory)tx.objectStore('journal').put({id:'pre-period-head-'+next.storageRevision,operation:'preserved-full-history-head',head:clone(get.result),scope});
+            if(periodAcceptance)tx.objectStore('financialOutbox').put({...clone(periodAcceptance),id:'cloud-base',localSha256:sha256});
+            if(resolutionAcceptance){
+              const journal=tx.objectStore('journal'),read=journal.get(resolutionAcceptance.id),outbox=tx.objectStore('financialOutbox'),all=outbox.getAll();
+              read.onsuccess=()=>{if(!read.result||read.result.status!=='conflict'||read.result.localHash!==expectedHash){abort(fail('storage-conflict','De beoordeelde conflictstand is gewijzigd.'));return;}journal.put({...read.result,resolution:{...clone(resolutionAcceptance.resolution),outcome:'pending'}});};
+              all.onsuccess=()=>{for(const row of all.result)if(row.conflictId===resolutionAcceptance.id)outbox.put({...row,status:'pending'});};
+              outbox.put({...clone(resolutionAcceptance.base),id:'cloud-base'});
+            }
             if(queueCloud){
               const outbox=tx.objectStore('financialOutbox');
-              outbox.put({id:operationId,operationId,status:'pending',storageRevision:next.storageRevision,revision:next.revision,sha256,previousHash:expectedHash,layout:encoded.layout,changes,removed,queuedAt:receipt.committedAt});
+              outbox.put({id:operationId,operationId,status:'pending',storageRevision:next.storageRevision,revision:next.revision,sha256,previousHash:expectedHash,layout:encoded.layout,changes,removed,queuedAt:receipt.committedAt,...(resolutionAcceptance?{conflictId:resolutionAcceptance.id}:{})});
               outbox.put({id:'current',operationId,status:'pending',storageRevision:next.storageRevision,sha256});
             }
             if(importMutation){
@@ -138,7 +160,7 @@ export function createHouseholdStore(scope='legacy',{verifySource=async()=>{}}={
           queue.onsuccess=()=>{
             try{
               if(JSON.stringify(imports.result)!==cloudAcceptance.expectedImportsSignature||queue.result.length)throw fail('import-conflict','Lokale importkeuzes wijzigden tijdens cloudontvangst.');
-              for(const old of imports.result){const incoming=cloudAcceptance.imports.find(row=>row.id===old.id);if(!incoming)throw fail('import-conflict','Een lokale import ontbreekt in de externe stand.');assertOriginalBankDataUnchanged(old.rows,incoming.rows);}
+              for(const old of imports.result){const incoming=cloudAcceptance.imports.find(row=>row.id===old.id);if(!incoming){if(cloudAcceptance.partial===true)continue;throw fail('import-conflict','Een lokale import ontbreekt in de externe stand.');}assertOriginalBankDataUnchanged(old.rows,incoming.rows);}
               publish();
             }catch(error){abort(error);}
           };return;
@@ -188,7 +210,7 @@ export function createHouseholdStore(scope='legacy',{verifySource=async()=>{}}={
   async function markCloudConflict(){const db=await openHouseholdDatabase(scope),tx=db.transaction('financialOutbox','readwrite'),store=tx.objectStore('financialOutbox'),done=completed(tx),read=store.getAll();read.onsuccess=()=>{for(const row of read.result)if(row.status==='pending')store.put({...row,status:'conflict'});};await done;}
   async function inspectOperation(id){
     const db=await openHouseholdDatabase(scope),tx=db.transaction(['financialHead','financialRecords','operationReceipts'],'readonly'),done=completed(tx);
-    const [head,records,receipt]=await Promise.all([requestResult(tx.objectStore('financialHead').get('current')),requestResult(tx.objectStore('financialRecords').getAll()),requestResult(tx.objectStore('operationReceipts').get(id)),done]);
+    const [{head,records},receipt]=await Promise.all([financialSnapshot(tx),requestResult(tx.objectStore('operationReceipts').get(id)),done]);
     const state=head?decodeHouseholdState(head,records):null;
     if(head&&await backupDigest(JSON.stringify(state))!==head.sha256)throw fail('storage-integrity','Het operatiebewijs heeft geen betrouwbare financiële stand.');
     cachedHead=head;cachedRecords=new Map(records.map(record=>[record.id,JSON.stringify(record)]));
@@ -196,7 +218,11 @@ export function createHouseholdStore(scope='legacy',{verifySource=async()=>{}}={
   }
   async function readCloudSnapshot(){
     const db=await openHouseholdDatabase(scope),tx=db.transaction(stores,'readonly'),done=completed(tx);
-    const [head,records,imports,outbox,receipts,journals,importQueue]=await Promise.all([requestResult(tx.objectStore('financialHead').get('current')),requestResult(tx.objectStore('financialRecords').getAll()),requestResult(tx.objectStore('imports').getAll()),requestResult(tx.objectStore('financialOutbox').getAll()),requestResult(tx.objectStore('operationReceipts').getAll()),requestResult(tx.objectStore('journal').getAll()),requestResult(tx.objectStore('syncQueue').getAll()),done]);
+    const financial=financialSnapshot(tx),pending=requestResult(tx.objectStore('financialOutbox').getAll()),queued=requestResult(tx.objectStore('syncQueue').getAll());
+    const importsRead=(async()=>{const {head}=await financial;if(!head?.partialHistory)return requestResult(tx.objectStore('imports').getAll());const queue=await queued;return (await Promise.all([...new Set(queue.map(row=>row.importId||row.id))].map(id=>requestResult(tx.objectStore('imports').get(id))))).filter(Boolean);})();
+    const receiptsRead=(async()=>{const rows=await pending;return (await Promise.all(rows.filter(row=>row.id!=='current'&&['pending','conflict'].includes(row.status)).map(row=>requestResult(tx.objectStore('operationReceipts').get(row.id))))).filter(Boolean);})();
+    const journalsRead=(async()=>{const {head}=await financial;if(!head?.partialHistory)return requestResult(tx.objectStore('journal').getAll());const rows=await pending;return (await Promise.all([...new Set(rows.map(row=>row.conflictId).filter(Boolean))].map(id=>requestResult(tx.objectStore('journal').get(id))))).filter(Boolean);})();
+    const [{head,records},imports,outbox,receipts,journals,importQueue]=await Promise.all([financial,importsRead,pending,receiptsRead,journalsRead,queued,done]);
     if(!head?.verified)throw fail('storage-migration','Synchronisatie vereist geverifieerde lokale opslag.');
     const state=decodeHouseholdState(head,records);
     if(await backupDigest(JSON.stringify(state))!==head.sha256)throw fail('storage-integrity','De lokale synchronisatiebasis heeft een afwijkende hash.');
