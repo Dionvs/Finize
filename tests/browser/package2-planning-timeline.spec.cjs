@@ -41,6 +41,7 @@ for(const width of [390,1440])test(`Historische/future editors en herladen op ${
   await page.getByRole('dialog').getByRole('button',{name:'Sluiten'}).click();
   await page.locator('#tab-gezamenlijk [data-open-owner-variable="gezamenlijk"]').first().click();
   await page.locator('[data-variable-field="bedrag"]').first().fill('600');await page.locator('[data-variable-save]').click();
+  await expect.poll(()=>page.evaluate(()=>FinizePlanning.budgets('2027-01','gezamenlijk')[0].bedrag)).toBe(600);
   expect(await fixedValue(page,'2027-01')).toBe(1900);
   expect(await page.evaluate(()=>FinizePlanning.budgets('2027-01','gezamenlijk')[0].bedrag)).toBe(600);
   await month(page,'2026-09');
@@ -84,6 +85,7 @@ test('twee devices/cloudmock delen historie; echo heeft geen nieuwe write',async
   await page.locator('#tab-gezamenlijk [data-u3-planning-owner="gezamenlijk"]').first().click();
   await page.getByRole('dialog').locator('.u3-admin-row').filter({hasText:'Historische hypotheek'}).getByRole('button',{name:'Bewerken'}).click();
   await page.locator('#u3RecAmount').fill('1850');await page.locator('#u3RecSave').click();
+  await expect.poll(()=>fixedValue(page,'2026-10')).toBe(1850);
   const documentData=await page.evaluate(()=>({state:structuredClone(state),syncVersion:15,commitId:'timeline-device-a'}));
   const secondContext=await browser.newContext({baseURL:'http://127.0.0.1:4173',serviceWorkers:'block'});
   const deviceB=await secondContext.newPage();await boot(deviceB);

@@ -1,0 +1,293 @@
+{
+  "package": "V117 P2",
+  "decision": "accepted-for-local-development",
+  "clientDate": "2026-10-10",
+  "hostUtc": "2026-10-10T07:45:52.2061045Z",
+  "branch": "agent/v117-stabilisatie",
+  "baseP1": "54e8d94a6e57720a6d1c4fb3139985f88b317e00",
+  "buildSha256": "1a5d4a71603a2bb13f80f16a49ce21ee2030c16b0c2ef77d1fe127e3be94d065",
+  "tests": {
+    "node": {
+      "files": 54,
+      "registeredCases": 572,
+      "passed": 572,
+      "failed": 0,
+      "skipped": 0
+    },
+    "browser": {
+      "total": 266,
+      "passed": 266,
+      "failed": 0,
+      "skipped": 0,
+      "duration": "5.4m",
+      "newP2": 25
+    },
+    "intermediateFullBrowser": {
+      "passed": 257,
+      "failed": 9,
+      "reason": "Existing tests read state before asynchronous commit completed; financial expectations retained."
+    },
+    "correctedRoutes": {
+      "passed": 10,
+      "failed": 0
+    }
+  },
+  "storageGrowth": {
+    "first": true,
+    "second": true,
+    "commitMs": 387,
+    "changeMs": 579,
+    "archiveWrites": 0,
+    "bytes": 18945967,
+    "largeHash": "92e647fcf9960b720b045808c7455c4831915471af795e1884a01b1854966f61",
+    "hash": "d3b390cfd6a2519c32a72775f76bb8804ba542daae3e1ee93733ae81e5128b3c",
+    "reloadMs": 575,
+    "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.16 Safari/537.36"
+  },
+  "invariants": {
+    "fullLocalStorage": {
+      "sources": 10,
+      "effects": 10,
+      "budgetEffectCents": 39500,
+      "mainLocalStorageWrites": 0,
+      "originalsPreserved": true,
+      "reloadExact": true
+    },
+    "rejectedCommits": {
+      "boundaries": 7,
+      "effectCents": 0,
+      "previousStatePreserved": true
+    },
+    "explicitRetryEffectCents": 3500,
+    "migration": {
+      "browserRestartPhases": 4,
+      "schemaVersion": 11,
+      "storageVersion": 1,
+      "retainedStores": [
+        "imports",
+        "journal",
+        "syncQueue"
+      ],
+      "originalLocalStoragePreserved": true,
+      "oneMigrationReceipt": true
+    },
+    "householdIsolation": [
+      "state",
+      "imports",
+      "operationReceipts",
+      "financialOutbox",
+      "goalImages",
+      "imageCache"
+    ]
+  },
+  "backup": {
+    "path": "backups/v117-stabilisatie/before-2026-10-09T19-12-24-546Z",
+    "manifest": "backup-manifest.json",
+    "manifestSha256": "c25e0f3b1ce5f82abf2098da311c0884494f9341e09c3c4219839a33e2dd1fd2",
+    "verifiedFiles": 236,
+    "hashMismatches": 0,
+    "manifestNameCollisionRepaired": true
+  },
+  "checks": {
+    "syntax": "passed",
+    "css": "passed; existing --line warning",
+    "reproducibleBuild": "passed",
+    "diffWhitespace": "passed"
+  },
+  "productionChanged": false,
+  "deployed": false,
+  "mainMergedOrPushed": false,
+  "nextPackage": "P3 paused at user request",
+  "remainingScope": [
+    "Record-oriented Firestore and emulator migration: P3",
+    "Partial period loading and projections: P3",
+    "64 MiB cache and retention: P4",
+    "36 months / 5400 bank movements: P4",
+    "Physical mobile browsers and OS power loss not proven"
+  ],
+  "changedCodeAndTests": [
+    {
+      "file": "app.js",
+      "bytes": 1394510,
+      "sha256": "1a5d4a71603a2bb13f80f16a49ce21ee2030c16b0c2ef77d1fe127e3be94d065"
+    },
+    {
+      "file": "src/auth/runtime.js",
+      "bytes": 18175,
+      "sha256": "84e343e4ca3e00d622c22cf796be759d3c272d2e47436347712617c500add174"
+    },
+    {
+      "file": "src/core/mutation-errors.mjs",
+      "bytes": 1063,
+      "sha256": "7ebb3741803a5b4af23fb56737bd293e387c1184badba500587e1da830c3f233"
+    },
+    {
+      "file": "src/core/runtime.js",
+      "bytes": 815429,
+      "sha256": "6588126e39e5098a9568375687985339893e9b63df464c8fbf0ef804d2557c7c"
+    },
+    {
+      "file": "src/import/runtime.js",
+      "bytes": 233034,
+      "sha256": "69076307e8a334377c55cd113e8208a3abf3707f0008a7556787dae40ebfc19f"
+    },
+    {
+      "file": "src/storage/commit-outcome.mjs",
+      "bytes": 1434,
+      "sha256": "699a0165da424dac4865051bf01173797667437128a5196526d47031ddc91d5b"
+    },
+    {
+      "file": "src/storage/household-store.mjs",
+      "bytes": 14472,
+      "sha256": "e6d3ba73fd8429c0cc8ef2130eb985a7c136ee38e3ca2a3f42c323316556a371"
+    },
+    {
+      "file": "tests/browser/bootstrap-stability.spec.cjs",
+      "bytes": 550,
+      "sha256": "8dade660e1b526b88e0f6ec61ba5cb08911663e451ba5544e63a36e1639e0a64"
+    },
+    {
+      "file": "tests/browser/desktop-special-tabs.spec.cjs",
+      "bytes": 34756,
+      "sha256": "f139ce6c42ef0d8e71db3c11f31fc595903ff903984287b172d657c939d58aba"
+    },
+    {
+      "file": "tests/browser/dynamic-html-security.spec.cjs",
+      "bytes": 2647,
+      "sha256": "992703fbc4324f662f506f12bf2dc4e0f918575aeec3045d10be2e12ccdb282b"
+    },
+    {
+      "file": "tests/browser/function-parity-goals-income.spec.cjs",
+      "bytes": 8537,
+      "sha256": "768e197ef81ea5182c75a45c77d6ec39ec62c6f3e7a254748f2a0a70cd584e5d"
+    },
+    {
+      "file": "tests/browser/import-history-cloud-refresh.spec.cjs",
+      "bytes": 4545,
+      "sha256": "639a80cbd4a0b0bab4ea6ea7d9c5953d6cb3216c8af86d8e2f783ff67578301e"
+    },
+    {
+      "file": "tests/browser/import-history-readonly.spec.cjs",
+      "bytes": 3494,
+      "sha256": "f6219b871c0dd3a398a37f1f240b136b3a2c4a90b92c8e1748638f8d6689c93b"
+    },
+    {
+      "file": "tests/browser/import-listener-stability.spec.cjs",
+      "bytes": 5874,
+      "sha256": "35d59a257c7dbccb431ebb8f41ed84fb3234ff605af8c05a659a7f0f81f920c5"
+    },
+    {
+      "file": "tests/browser/import-review-simplification.spec.cjs",
+      "bytes": 8676,
+      "sha256": "d6a3ed9c6a7833091b193bb3e613dc9d0ee9008ac01697dad6ef5c4768ec6371"
+    },
+    {
+      "file": "tests/browser/income-overview.spec.cjs",
+      "bytes": 27870,
+      "sha256": "710881485b96ef2249358d2e8fc4f6decc3c0fdd6fd02aae33e090f67300b83b"
+    },
+    {
+      "file": "tests/browser/iphone-responsive-text.spec.cjs",
+      "bytes": 4249,
+      "sha256": "02080dc907be5f7e0ed3b2274c63d0d957285a458ea08475ae958e5ca4c48a4c"
+    },
+    {
+      "file": "tests/browser/modal-and-commit-stability.spec.cjs",
+      "bytes": 17765,
+      "sha256": "fe86656752f3a88a527038d5dc6b29cece34567e77605c45dd44eaafd4ad46cc"
+    },
+    {
+      "file": "tests/browser/package1-data-foundation.spec.cjs",
+      "bytes": 12120,
+      "sha256": "ab783dea243380c33a6057624b24683738db000fb497e8263dd7daa0a65186ad"
+    },
+    {
+      "file": "tests/browser/package2-planning-timeline.spec.cjs",
+      "bytes": 8896,
+      "sha256": "147ad2dba6252222f0c76399f56c6940deb070af4487b47626e6dcb0f197df7b"
+    },
+    {
+      "file": "tests/browser/package3-transaction-engine.spec.cjs",
+      "bytes": 16139,
+      "sha256": "0655dbfc1eb407d18e7fd1f3a49bd6dd6b5283f13b2902cf8c08c9318f3dc6d7"
+    },
+    {
+      "file": "tests/browser/package4-savings-refunds-forecast.spec.cjs",
+      "bytes": 19616,
+      "sha256": "ab86fd40795375bf500a790d027385bcc9c6c3d8f46f43b958ae09ddf177ba54"
+    },
+    {
+      "file": "tests/browser/package6-functional-consolidation.spec.cjs",
+      "bytes": 21047,
+      "sha256": "8e66653e990822dd5f08eb9bd6afc5387203706e0fbc6b9f36742933b2b4159a"
+    },
+    {
+      "file": "tests/browser/package7-release-audit.spec.cjs",
+      "bytes": 13480,
+      "sha256": "0eaf7e33bc08bd56f60df4b999490401adc320da2dc1b264b0668c125c085dd4"
+    },
+    {
+      "file": "tests/browser/pwa-offline.spec.cjs",
+      "bytes": 1066,
+      "sha256": "187d2e1ad1b6849f459d05dce65cc75591183ae6b4f3a5c2de5070de1db82631"
+    },
+    {
+      "file": "tests/browser/service-worker-upgrade.spec.cjs",
+      "bytes": 1940,
+      "sha256": "b351cb9e983bc4cf942e8907692b57cb3184694e263a9ee9b3e835e2caffe0ad"
+    },
+    {
+      "file": "tests/browser/update6-account-navigation.spec.cjs",
+      "bytes": 8260,
+      "sha256": "1057288b1dedb56871b99bca00800a8496feea3ad53af562edfd8066a9a13928"
+    },
+    {
+      "file": "tests/browser/v113-csv-processing.spec.cjs",
+      "bytes": 19025,
+      "sha256": "56d5b079e829dc1e00599fa5e381749487f4334ab1a62270765ed78a4d63591a"
+    },
+    {
+      "file": "tests/browser/v117-p2-migration.spec.cjs",
+      "bytes": 17930,
+      "sha256": "7b40d7a82108b3a619e489acc0f96145ca93ebb7d1facbd3aa325b3f43ca9ef7"
+    },
+    {
+      "file": "tests/browser/v117-p2.spec.cjs",
+      "bytes": 12429,
+      "sha256": "b474d59332546a7131ad29a48400d425ebaef7e9e2f0931284c296b22ac3c3d6"
+    },
+    {
+      "file": "tests/browser/v50-smoke.spec.cjs",
+      "bytes": 907,
+      "sha256": "71ed1dcdd5f7f477dd269c9c8a6a84dd1a702aa6d656cd43026cd400581463f5"
+    },
+    {
+      "file": "tests/ui-event-stability.test.cjs",
+      "bytes": 1084,
+      "sha256": "880635a460d15fe4557c5dbb770a42f44857e7aa3fa028c2c1f3663612c938ef"
+    },
+    {
+      "file": "tests/v117-p2.test.cjs",
+      "bytes": 4957,
+      "sha256": "83e946cad637b398a3c6783568a4f7cd46bf2280d568ac94a2861770500789ed"
+    }
+  ],
+  "logs": [
+    {
+      "file": "backups/v117-stabilisatie/p2-node-final.log",
+      "sha256": "088cbc61bf809f648f888406ddb1178205e6c98aa008375c2566543befdb5e11"
+    },
+    {
+      "file": "backups/v117-stabilisatie/p2-browser-accepted.log",
+      "sha256": "eef1720b6a726e8bb254bd6f567b7ab0ec8ef8495a28e8bf6cd921c07c6fb666"
+    },
+    {
+      "file": "backups/v117-stabilisatie/p2-browser-final.log",
+      "sha256": "abdb79edbe49eb7ef3a19b3a55b3571fec3b452bf071418dae16bf465222d89f"
+    },
+    {
+      "file": "backups/v117-stabilisatie/p2-async-fixtures-focused.log",
+      "sha256": "ecfe162b098f2b452733685449aec0a7298b7975eb392b001e794a26e221c3a4"
+    }
+  ]
+}

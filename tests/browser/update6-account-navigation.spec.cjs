@@ -19,7 +19,7 @@ async function installAccount(page,{otherShared=false,hiddenKpis=[],role='dion'}
     };
   },{otherShared,hiddenKpis,role});
   await page.route('https://www.gstatic.com/firebasejs/**',route=>route.abort());
-  await page.goto('/');
+  await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   await expect(page.locator('#authRoot')).toBeHidden();
   await expect(page.locator('#tab-dashboard')).toHaveClass(/active/);
 }

@@ -211,6 +211,7 @@ function bindSignInActions(){
 function render(){
   if (!root) return;
   const access = authAccessState(currentUser, currentAssignment);
+  globalThis.dispatchEvent(new CustomEvent('finize:auth-session',{detail:{status:access,user:currentUser,assignment:currentAssignment}}));
   if (access === 'ready'){
     root.hidden = true;
     document.body.classList.remove('auth-pending');

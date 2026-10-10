@@ -1,5 +1,6 @@
 import { inspectSourceAvailability, sourceRepairCandidates, planSourceRepair } from './source-repair.mjs';
 import { readCommitOutcome, commitOutcomeError } from '../storage/commit-outcome.mjs';
+import { openHouseholdDatabase, HOUSEHOLD_DATABASE_VERSION } from '../storage/household-store.mjs';
 import { runApprovalGroup, approvalGroupSummary } from './approval-group.mjs';
 import { createStateBackupStore } from '../storage/state-backups.mjs';
 import { isBankSource, bankSourceForImport, ensureImportBankSources, updateSourceApproval } from '../core/bank-sources.mjs';
@@ -26,7 +27,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
 
   const SCHEMA_VERSION=CURRENT_SCHEMA_VERSION;
   const DB_NAME='finize-imports-v1';
-  const DB_VERSION=1;
+  const DB_VERSION=HOUSEHOLD_DATABASE_VERSION;
   const IMPORT_STORE='imports';
   const JOURNAL_STORE='journal';
   const SYNC_STORE='syncQueue';
@@ -103,21 +104,10 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
 
   const ImportStore={
     dbPromise:null,scope:'legacy',legacyReferences:new Set(),bankReadCache:new Map(),
-    setScope(scope){if(this.scope===scope)return;this.dbPromise?.then(db=>db.close()).catch(()=>{});this.scope=scope;this.dbPromise=null;this.bankReadCache.clear();},
+    setScope(scope){if(this.scope===scope)return;this.scope=scope;this.dbPromise=null;this.bankReadCache.clear();},
     open(){
       if(this.dbPromise)return this.dbPromise;
-      this.dbPromise=new Promise((resolve,reject)=>{
-        if(typeof indexedDB==='undefined'){reject(new Error('IndexedDB is niet beschikbaar.'));return;}
-        const request=indexedDB.open(this.scope==='legacy'?DB_NAME:`${DB_NAME}-${this.scope}`,DB_VERSION);
-        request.onupgradeneeded=()=>{
-          const db=request.result;
-          if(!db.objectStoreNames.contains(IMPORT_STORE))db.createObjectStore(IMPORT_STORE,{keyPath:'id'});
-          if(!db.objectStoreNames.contains(JOURNAL_STORE))db.createObjectStore(JOURNAL_STORE,{keyPath:'id'});
-          if(!db.objectStoreNames.contains(SYNC_STORE))db.createObjectStore(SYNC_STORE,{keyPath:'id'});
-        };
-        request.onsuccess=()=>resolve(request.result);
-        request.onerror=()=>reject(request.error||new Error('Importopslag openen mislukt.'));
-      });
+      this.dbPromise=openHouseholdDatabase(this.scope);
       this.dbPromise=this.dbPromise.catch(error=>{this.dbPromise=null;throw error;});
       return this.dbPromise;
     },
@@ -154,7 +144,17 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
         transaction.onabort=()=>reject(failure||transaction.error||new Error('Importopslag afgebroken.'));
       }));
     },
-    async getImport(id){const scope=this.scope,local=await this.request(IMPORT_STORE,'readonly',store=>store.get(String(id)));if(local&&this.scope===scope)this.bankReadCache.set(String(id),clone(local));if(local||this.scope==='legacy'||!this.legacyReferences.has(String(id)))return local;const legacy=await new Promise((resolve,reject)=>{const request=indexedDB.open(DB_NAME,DB_VERSION);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});try{const record=await new Promise((resolve,reject)=>{const tx=legacy.transaction(IMPORT_STORE,'readonly'),request=tx.objectStore(IMPORT_STORE).get(String(id));request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});if(record){await this.putImport(record);return record;}return undefined;}finally{legacy.close();}},
+    async getImport(id){
+      const scope=this.scope,referenced=this.legacyReferences.has(String(id));
+      const assertScope=()=>{if(this.scope!==scope)throw new Error('Het huishouden wijzigde tijdens het lezen van de import.');};
+      const local=await this.request(IMPORT_STORE,'readonly',store=>store.get(String(id)));assertScope();
+      if(local)this.bankReadCache.set(String(id),clone(local));
+      if(local||scope==='legacy'||!referenced)return local;
+      const legacy=await openHouseholdDatabase('legacy');assertScope();
+      const record=await new Promise((resolve,reject)=>{const tx=legacy.transaction(IMPORT_STORE,'readonly'),request=tx.objectStore(IMPORT_STORE).get(String(id));request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});assertScope();
+      if(record){await this.putImport(record);assertScope();return record;}
+      return undefined;
+    },
     async rollbackImport(expected,previous,previousQueue){
       const scope=this.scope,db=await this.open();return new Promise((resolve,reject)=>{
         const tx=db.transaction([IMPORT_STORE,SYNC_STORE],'readwrite'),imports=tx.objectStore(IMPORT_STORE),queue=tx.objectStore(SYNC_STORE);let failure;
@@ -798,17 +798,24 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
       const baseSignature=JSON.stringify(root.state),candidate=clone(root.state);applyImportSummary(candidate,draft);
       const previousQueue=(await ImportStore.listSync()).find(item=>item.importId===id);
       const scope=ImportStore.scope;
-      const journal={id:draft.operationId,importId:id,operation:'import-command',commitContractVersion:1,status:'pending',intent:{type:'draft-save',operationId:draft.operationId},baseSignature,candidate,batch:clone(draft),previousBatch:stored?clone(stored):null,previousQueue};
+      const journal={id:draft.operationId,importId:id,operation:'import-command',commitContractVersion:1,durableBaseSignature:root.DataAdapter?.commitBaseSignature?.()??JSON.stringify(root.state),status:'pending',intent:{type:'draft-save',operationId:draft.operationId},baseSignature,candidate,batch:clone(draft),previousBatch:stored?clone(stored):null,previousQueue};
       await ImportStore.putJournal(journal);
       if(JSON.stringify(root.state)!==baseSignature){journal.status='conflict';await ImportStore.putJournal(journal);await preserveImportConflict(root,draft,stored||{id,version:0},[{kind:'local-core-changed'}]);throw new Error('De state wijzigde tijdens opslaan. De importkeuze is veilig bewaard.');}
       let detailsWritten=false;
       try{
-        await ImportStore.putImport(draft);detailsWritten=true;
-        if(syncCloud)await queueImportSync(draft);
-        if(ImportStore.scope!==scope)throw new Error('Het huishouden is tijdens opslaan gewijzigd.');
-        await commitSummary(root,draft);
+        if(root.DataAdapter?.supportsAtomicImports){
+          if(ImportStore.scope!==scope)throw new Error('Het huishouden is tijdens opslaan gewijzigd.');
+          const ok=await root.commitChange(()=>applyFinancialCandidate(root.state,candidate),{render:false,throwOnError:true,operationId:journal.id,importMutation:{batch:clone(draft),previousBatch:stored?clone(stored):null,journal,queue:{...pendingQueueReceipt(draft),queuedAt:new Date().toISOString(),attempts:0}}});
+          if(!ok)throw new Error('De atomaire importopslag is afgewezen.');
+          ImportStore.bankReadCache.set(id,clone(draft));
+        }else{
+          await ImportStore.putImport(draft);detailsWritten=true;
+          if(syncCloud)await queueImportSync(draft);
+          if(ImportStore.scope!==scope)throw new Error('Het huishouden is tijdens opslaan gewijzigd.');
+          await commitSummary(root,draft);
+        }
       }catch(error){await reconcileFailedImportCommit(root,journal,error,scope,detailsWritten);}
-      journal.status='completed';delete journal.candidate;delete journal.previousBatch;delete journal.baseSignature;
+      journal.status='completed';delete journal.candidate;delete journal.previousBatch;delete journal.baseSignature;delete journal.durableBaseSignature;
       try{await ImportStore.putJournal(journal);}catch{/* Durable operation receipt confirms the save. */}
       if(syncCloud)flushImportSync(root).catch(error=>console.warn('Importsynchronisatie wordt later opnieuw geprobeerd.',error));
       return draft;
@@ -883,7 +890,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
       return {action:'cleared-finished',activeImportId:''};
     }
     if(!summary||summary.status!=='concept'){
-      const ok=root.commitChange(()=>{if(root.state.activeImportId===activeId)root.state.activeImportId='';},{render:false});
+      const ok=await root.commitChange(()=>{if(root.state.activeImportId===activeId)root.state.activeImportId='';},{render:false});
       if(!ok)throw new Error('De verouderde importblokkade kon niet worden hersteld.');
       return {action:'cleared-stale',activeImportId:''};
     }
@@ -1286,12 +1293,12 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
   async function approveStoredSource(root,draft,row){if(ImportEditors.get(String(draft.id))?.draft===draft)return commitImportEditor(root,draft,{approveIds:[row.id]});return commitImportCommand(root,draft,{type:'source-approve',rowId:row.id});}
   async function replaceManualSource(root,draft,row,manualId){const session=ImportEditors.get(String(draft.id));if(session?.draft===draft)await commitImportEditor(root,draft);const result=await commitImportCommand(root,draft,{type:'source-replacement',rowId:row.id,manualId});if(session?.draft===draft)session.base=clone(result.batch);return result;}
   async function undoImport(root,draft){
-    if((root.state.transactions||[]).some(source=>isBankSource(source)&&source.importReferences.some(ref=>ref.batchId===draft.id))){await commitImportCommand(root,draft,{type:'withdraw'});root.renderActiveTab();renderDraftModal(root,draft);return true;}
+    if(root.DataAdapter?.supportsAtomicImports||(root.state.transactions||[]).some(source=>isBankSource(source)&&source.importReferences.some(ref=>ref.batchId===draft.id))){await commitImportCommand(root,draft,{type:'withdraw'});root.renderActiveTab();renderDraftModal(root,draft);return true;}
     if(draft.status==='teruggedraaid')return true;
     undoImportEffects(clone(root.state),draft);
     const journal={id:`undo-${draft.id}`,importId:draft.id,operation:'undo',status:'pending',createdAt:new Date().toISOString()};
     await ImportStore.putJournal(journal);
-    const ok=root.commitChange(()=>undoImportEffects(root.state,draft),{render:false,mutationMode:'correction'});
+    const ok=await root.commitChange(()=>undoImportEffects(root.state,draft),{render:false,mutationMode:'correction'});
     if(!ok){journal.status='rolled-back';journal.updatedAt=new Date().toISOString();await ImportStore.putJournal(journal);throw new Error('Ongedaan maken is afgebroken; er zijn geen halve wijzigingen bewaard.');}
     draft.status='teruggedraaid';draft.undoneAt=new Date().toISOString();
     await ImportStore.putImport(draft);await queueImportSync(draft);
@@ -1301,7 +1308,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
     return true;
   }
   async function reconcileImport(root,draft){
-    if((root.state.transactions||[]).some(source=>isBankSource(source)&&source.importReferences.some(ref=>ref.batchId===draft.id))){
+    if(root.DataAdapter?.supportsAtomicImports||(root.state.transactions||[]).some(source=>isBankSource(source)&&source.importReferences.some(ref=>ref.batchId===draft.id))){
       const editor=ImportEditors.get(String(draft.id))?.draft===draft?draft:await beginImportEditor(root,draft);
       for(const row of editor.rows){const desired=draft.rows.find(item=>item.id===row.id);if(desired)row.processing=clone(desired.processing);}
       await commitImportEditor(root,editor,{approveIds:draft.rows.filter(row=>isExplicitlyApproved(row)&&!row.duplicate&&!row.importError).map(row=>row.id)});
@@ -1313,7 +1320,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
     if(!plan.ok){showValidationErrors(root,draft,plan.errors,'Correctie kan nog niet worden verwerkt');return false;}
     const journal={id:`reconcile-${draft.id}-${Date.now()}`,importId:draft.id,operation:'reconcile',status:'pending',createdAt:new Date().toISOString()};
     await ImportStore.putJournal(journal);
-    const ok=root.commitChange(()=>{undoImportEffects(root.state,draft);applyImportPlan(root.state,plan);rememberRecognitionRules(root.state,draft);},{render:false,mutationMode:'correction'});
+    const ok=await root.commitChange(()=>{undoImportEffects(root.state,draft);applyImportPlan(root.state,plan);rememberRecognitionRules(root.state,draft);},{render:false,mutationMode:'correction'});
     if(!ok){journal.status='rolled-back';journal.updatedAt=new Date().toISOString();await ImportStore.putJournal(journal);throw new Error('De correctie is volledig afgebroken omdat opslaan mislukte.');}
     draft.status=root.state.importSummaries.find(item=>item.id===draft.id)?.status||'verwerkt';
     draft.correctedAt=new Date().toISOString();draft.effectManifest=effectManifest(plan);
@@ -1825,7 +1832,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
       const identifier=normalizeIban(modal.querySelector('[data-u4-profile-identifier]').value);
       if(!name||!identifier)throw new Error('Vul een profielnaam en rekeningkenmerk in.');
       profile={id:`account-${hashText(identifier)}`,name,identifier,bank:modal.querySelector('[data-u4-profile-bank]').value.trim()||'ING',csvFormat:draft.format,accountOwner:modal.querySelector('[data-u4-profile-owner]').value,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
-      const ok=root.commitChange(()=>{root.state.accountProfiles.push(profile);},{render:false});
+      const ok=await root.commitChange(()=>{root.state.accountProfiles.push(profile);},{render:false});
       if(!ok)throw new Error('Rekeningprofiel opslaan mislukt.');
     }
     const activeRows=draft.rows.filter(row=>sourceIsActive(root,draft,row));
@@ -1974,7 +1981,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
         return;
       }
       const pairButton=event.target.closest('[data-u4-confirm-pair]');
-      if(pairButton){try{if(!root.commitChange(()=>confirmInternalTransferPair(root.state,pairButton.dataset.u4ConfirmPair),{render:false}))throw new Error('Transferpaar opslaan mislukt.');renderDraftModalPreservingView(root,draft,modal);}catch(error){alert(error.message);}return;}
+      if(pairButton){try{if(!await root.commitChange(()=>confirmInternalTransferPair(root.state,pairButton.dataset.u4ConfirmPair),{render:false}))throw new Error('Transferpaar opslaan mislukt.');renderDraftModalPreservingView(root,draft,modal);}catch(error){alert(error.message);}return;}
       if(event.target.closest('[data-u4-confirm-replacement]')&&row){
         const manualId=container.querySelector('[data-u4-replacement-choice]')?.value;if(!manualId){alert('Kies eerst de handmatige registratie.');return;}
         const snapshot=clone(row);try{await replaceManualSource(root,draft,row,manualId);renderDraftModalPreservingView(root,draft,modal,row.id);}catch(error){if(!error.coreApplied)Object.assign(row,snapshot);alert(error.coreApplied?'Vervanging is bewaard; importdetails worden uit het lokale journal hersteld.':error.message);}return;
@@ -2086,8 +2093,12 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
     const modal=ensureModalRoot();const rules=root.state.recognitionRules||[];
     modal.innerHTML=`<div class="u4-import-modal"><header class="u4-modal-head"><div><h2>Herkenningsregels</h2><p>Eigenaren worden nooit in regels opgeslagen.</p></div><button class="ghost" data-u4-close>Sluiten</button></header><main class="u4-modal-body"><div class="u4-import-receipts">${rules.map(rule=>`<article class="u4-receipt" data-u4-rule="${esc(rule.id)}"><div class="u4-row-grid"><label>Type<select data-rule-field="level">${['counterparty','description','organization','keyword','prediction'].map(level=>option(level,level,rule.level)).join('')}</select></label><label class="wide">Waarde<input data-rule-field="value" value="${esc(rule.value)}"></label><label>Categorie<input data-rule-field="category" value="${esc(rule.category)}"></label><label><input type="checkbox" data-rule-field="enabled" ${rule.enabled!==false?'checked':''}> Actief</label><label><input type="checkbox" data-rule-field="alwaysReview" ${rule.alwaysReview?'checked':''}> Altijd Nakijken</label><button class="danger-ghost small" data-u4-delete-rule="${esc(rule.id)}">Verwijderen</button></div></article>`).join('')||'<div class="u4-empty">Nog geen herkenningsregels.</div>'}</div></main></div>`;
     modal.classList.add('open');modal.querySelector('[data-u4-close]').addEventListener('click',closeDraft);
-    modal.addEventListener('change',event=>{const card=event.target.closest('[data-u4-rule]');if(!card)return;const rule=rules.find(item=>item.id===card.dataset.u4Rule);if(!rule)return;const field=event.target.dataset.ruleField;rule[field]=event.target.type==='checkbox'?event.target.checked:event.target.value;root.commitChange(()=>{}, {render:false});});
-    modal.addEventListener('click',event=>{const button=event.target.closest('[data-u4-delete-rule]');if(!button)return;root.commitChange(()=>{root.state.recognitionRules=root.state.recognitionRules.filter(rule=>rule.id!==button.dataset.u4DeleteRule);},{render:false});renderRules(root);});
+    modal.addEventListener('change',async event=>{
+      const card=event.target.closest('[data-u4-rule]');if(!card)return;
+      const field=event.target.dataset.ruleField,value=event.target.type==='checkbox'?event.target.checked:event.target.value;
+      if(!await root.commitChange(()=>{const rule=root.state.recognitionRules.find(item=>item.id===card.dataset.u4Rule);if(rule)rule[field]=value;},{render:false}))return;
+    });
+    modal.addEventListener('click',async event=>{const button=event.target.closest('[data-u4-delete-rule]');if(!button)return;if(!await root.commitChange(()=>{root.state.recognitionRules=root.state.recognitionRules.filter(rule=>rule.id!==button.dataset.u4DeleteRule);},{render:false}))return;renderRules(root);});
   }
   function injectSettlementCard(root){
     document.querySelector('[data-dashboard-accordion="settlement"]')?.remove();
@@ -2264,7 +2275,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
     if(ImportStore.scope!==commandScope)throw new Error('Het huishouden is intussen gewijzigd. De oorspronkelijke verwerking blijft behouden.');
     const baseSignature=JSON.stringify(root.state);
     const previousQueue=(await ImportStore.listSync()).find(item=>item.importId===draft.id);
-    const journal={id:intent.operationId,importId:draft.id,operation:'import-command',commitContractVersion:1,status:'pending',intent,baseSignature,candidate:planned.state,batch:planned.batch,previousBatch:clone(stored||draft),previousQueue};
+    const journal={id:intent.operationId,importId:draft.id,operation:'import-command',commitContractVersion:1,durableBaseSignature:root.DataAdapter?.commitBaseSignature?.()??baseSignature,status:'pending',intent,baseSignature,candidate:planned.state,batch:planned.batch,previousBatch:clone(stored||draft),previousQueue};
     try{await ImportStore.putJournal(journal);}
     catch(error){await reconcileFailedImportCommit(root,journal,error,commandScope,false);}
     if(command.rowId&&JSON.stringify(draft.rows?.find(row=>row.id===command.rowId))!==sourceToken){journal.status='rolled-back';await ImportStore.putJournal(journal);throw new Error('De verwerking is intussen gewijzigd. Keur de huidige verwerking opnieuw expliciet goed.');}
@@ -2273,21 +2284,25 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
     let detailsWritten=false;
     try{
       if(ImportStore.scope!==commandScope)throw new Error('Het huishouden is intussen gewijzigd. De oorspronkelijke verwerking blijft behouden.');
-      await ImportStore.putImport(planned.batch);detailsWritten=true;
-      if(ImportStore.scope!==commandScope)throw new Error('Het huishouden is intussen gewijzigd. De oorspronkelijke verwerking blijft behouden.');
-      await queueImportSync(planned.batch);
+      if(!root.DataAdapter?.supportsAtomicImports){
+        await ImportStore.putImport(planned.batch);detailsWritten=true;
+        if(ImportStore.scope!==commandScope)throw new Error('Het huishouden is intussen gewijzigd. De oorspronkelijke verwerking blijft behouden.');
+        await queueImportSync(planned.batch);
+      }
       if(ImportStore.scope!==commandScope)throw new Error('Het huishouden is intussen gewijzigd. De oorspronkelijke verwerking blijft behouden.');
       if(JSON.stringify(root.state)!==baseSignature){await preserveImportConflict(root,planned.batch,stored||{id:draft.id,version:0},[{kind:'local-core-changed'}]);throw new Error('De state wijzigde tijdens de opslagcommit. De keuze blijft veilig bewaard; beoordeel de actuele stand.');}
-      const ok=await root.commitChange(()=>applyFinancialCandidate(root.state,planned.state),{render:false,mutationMode:'correction',throwOnError:true});
+      const importMutation=root.DataAdapter?.supportsAtomicImports?{batch:planned.batch,previousBatch:stored||null,journal,queue:{...pendingQueueReceipt(planned.batch),queuedAt:new Date().toISOString(),attempts:0}}:null;
+      const ok=await root.commitChange(()=>applyFinancialCandidate(root.state,planned.state),{render:false,mutationMode:'correction',throwOnError:true,operationId:intent.operationId,importMutation});
       if(!ok)throw new Error('Financiële commit is afgebroken; oorspronkelijke effecten blijven behouden.');
+      if(ImportStore.scope===commandScope)ImportStore.bankReadCache.set(String(planned.batch.id),clone(planned.batch));
     }catch(error){
       await reconcileFailedImportCommit(root,journal,error,commandScope,detailsWritten);
     }
     planned.outcome='committed';planned.operationId=intent.operationId;
     applyFinancialCandidate(draft,clone(planned.batch));
-    journal.status='completed';delete journal.candidate;delete journal.previousBatch;delete journal.baseSignature;
+    journal.status='completed';delete journal.candidate;delete journal.previousBatch;delete journal.baseSignature;delete journal.durableBaseSignature;
     try{
-      if(planned.deleted){await purgeDeletedBatch(draft.id,intent.operationId);delete journal.candidate;delete journal.previousBatch;delete journal.baseSignature;journal.batch=clone(planned.batch);}
+      if(planned.deleted){await purgeDeletedBatch(draft.id,intent.operationId);delete journal.candidate;delete journal.previousBatch;delete journal.baseSignature;delete journal.durableBaseSignature;journal.batch=clone(planned.batch);}
       if(ImportStore.scope===commandScope)await ImportStore.putJournal(journal);
     }catch(error){
       // Core and import details already share the durable operation receipt. Recovery
@@ -2298,7 +2313,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
   }
   async function purgeDeletedBatch(id,except=''){
     const session=ImportEditors.get(String(id));if(session)await session.write.catch(()=>{});ImportEditors.delete(String(id));
-    for(const entry of await ImportStore.listJournal()){if(entry.importId===id&&entry.id!==except)await ImportStore.deleteJournal(entry.id);else if(entry.id!==except&&!['pending','conflict'].includes(entry.status)&&entry.candidate){delete entry.candidate;delete entry.baseSignature;await ImportStore.putJournal(entry);}}
+    for(const entry of await ImportStore.listJournal()){if(entry.importId===id&&entry.id!==except)await ImportStore.deleteJournal(entry.id);else if(entry.id!==except&&!['pending','conflict'].includes(entry.status)&&entry.candidate){delete entry.candidate;delete entry.baseSignature;delete entry.durableBaseSignature;await ImportStore.putJournal(entry);}}
     const pending=ImportPerformance.pending.get(id);if(pending){clearTimeout(pending.timer);ImportPerformance.pending.delete(id);pending.resolvers.forEach(r=>r.reject(new Error('De batch is permanent verwijderd.')));}
   }
   async function queueImportSync(record){
@@ -2393,7 +2408,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
         if(actual.outcome==='committed'){
           await ImportStore.putImport(entry.batch);assertScope();await queueImportSync(entry.batch);assertScope();entry.status='completed';
           if(entry.batch.lifecycle==='deleted')await purgeDeletedBatch(entry.importId,entry.id);
-          await acknowledgeRecoveredEditor(entry);delete entry.candidate;delete entry.previousBatch;delete entry.baseSignature;
+          await acknowledgeRecoveredEditor(entry);delete entry.candidate;delete entry.previousBatch;delete entry.baseSignature;delete entry.durableBaseSignature;
         }else if(actual.outcome==='rejected'){
           // Intent without a durable financial receipt must never execute at restart.
           await rollbackPreparedImport(entry);entry.status='rolled-back';
@@ -2447,17 +2462,19 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
     const current=await ImportStore.getImport(plan.batch.id);
     if(ImportStore.scope!==repairScope||JSON.stringify(root.state)!==signature||JSON.stringify(current||null)!==batchSignature)throw new Error('De transactie of import is intussen gewijzigd. Heropen de actuele stand; de herstelkeuze overschrijft geen nieuwere gegevens.');
     const previousQueue=(await ImportStore.listSync()).find(row=>row.importId===plan.batch.id);
-    const journal={id:operationId,importId:plan.batch.id,operation:'import-command',commitContractVersion:1,status:'pending',intent:{type:'source-repair',operationId,backupId:record.id},baseSignature:signature,candidate:plan.state,batch:plan.batch,previousBatch:baseBatch?clone(baseBatch):null,previousQueue};
+    const journal={id:operationId,importId:plan.batch.id,operation:'import-command',commitContractVersion:1,durableBaseSignature:root.DataAdapter?.commitBaseSignature?.()??JSON.stringify(root.state),status:'pending',intent:{type:'source-repair',operationId,backupId:record.id},baseSignature:signature,candidate:plan.state,batch:plan.batch,previousBatch:baseBatch?clone(baseBatch):null,previousQueue};
     await ImportStore.putJournal(journal);
     if(ImportStore.scope!==repairScope||JSON.stringify(root.state)!==signature)throw new Error('De financiële toestand wijzigde tijdens herstel. Probeer opnieuw op de actuele stand.');
     let detailsWritten=false;
     try{
-      await ImportStore.putImport(plan.batch);detailsWritten=true;await queueImportSync(plan.batch);
+      if(!root.DataAdapter?.supportsAtomicImports){await ImportStore.putImport(plan.batch);detailsWritten=true;await queueImportSync(plan.batch);}
       if(ImportStore.scope!==repairScope||JSON.stringify(root.state)!==signature)throw new Error('De financiële toestand wijzigde tijdens opslag van het herstel.');
-      if(!await root.commitChange(()=>applyFinancialCandidate(root.state,plan.state),{render:false,mutationMode:'correction',throwOnError:true}))throw new Error('Het herstel kon niet worden opgeslagen.');
+      const importMutation=root.DataAdapter?.supportsAtomicImports?{batch:plan.batch,previousBatch:baseBatch||null,journal,queue:{...pendingQueueReceipt(plan.batch),queuedAt:new Date().toISOString(),attempts:0}}:null;
+      if(!await root.commitChange(()=>applyFinancialCandidate(root.state,plan.state),{render:false,mutationMode:'correction',throwOnError:true,operationId,importMutation}))throw new Error('Het herstel kon niet worden opgeslagen.');
+      if(ImportStore.scope===repairScope)ImportStore.bankReadCache.set(String(plan.batch.id),clone(plan.batch));
     }catch(error){await reconcileFailedImportCommit(root,journal,error,repairScope,detailsWritten);}
     plan.outcome='committed';plan.operationId=operationId;
-    journal.status='completed';delete journal.candidate;delete journal.previousBatch;delete journal.baseSignature;
+    journal.status='completed';delete journal.candidate;delete journal.previousBatch;delete journal.baseSignature;delete journal.durableBaseSignature;
     try{await ImportStore.putJournal(journal);}catch{/* Readback proof finalizes the receipt at restart. */}
     flushImportSync(root).catch(()=>{});return plan;
   }
@@ -2539,8 +2556,8 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
       root.__finizeUpdate4CloudListener=true;
       root.addEventListener?.('finize:cloud-connected',()=>recoverJournal(root).then(()=>flushImportSync(root)).catch(error=>console.warn('Importsynchronisatie uitgesteld.',error)));
     }
-    Promise.resolve()
-      .then(async()=>{for(const entry of await ImportStore.listJournal())if(entry.status==='conflict'&&entry.operation==='conflict')UI.conflicts.set(entry.importId,entry);await recoverJournal(root);})
+    Promise.resolve(root.__finizeDataReady)
+      .then(async()=>{root.FinizeImportSync.setScope();for(const entry of await ImportStore.listJournal())if(entry.status==='conflict'&&entry.operation==='conflict')UI.conflicts.set(entry.importId,entry);await recoverJournal(root);})
       .then(()=>reconcileActiveImportReference(root))
       .then(()=>ImportStore.listImports())
       .catch(error=>console.warn('Update 4 opslaginitialisatie uitgesteld.',error))

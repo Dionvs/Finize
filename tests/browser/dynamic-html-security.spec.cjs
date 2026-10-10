@@ -1,7 +1,7 @@
 const { expect, test } = require('@playwright/test');
 
 test('financiële tekst blijft letterlijke tekst en voert geen HTML uit', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   const result = await page.evaluate(() => {
     const payload = '<img src=x onerror="window.__finizeXss=1">';
     window.__finizeXss = 0;

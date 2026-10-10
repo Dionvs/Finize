@@ -14,7 +14,7 @@ for(const width of [390,1440])for(const changed of [false,true])test(`legacy his
     const local=u.createImportDraft({id:'history-september',text:'Datum;Omschrijving;Rekening;Bedrag\n2026-09-17;Historische septemberregel;NL01TEST;-10',profiles,existingImports:[],entryOwner:'dion'});
     local.status='verwerkt';delete local.version;delete local.operationId;
     await u.ImportStore.putImport(local);
-    commitChange(()=>{state.accountProfiles=profiles;state.importSummaries=[u.compactSummary(local)];},{render:false});
+    await commitChange(()=>{state.accountProfiles=profiles;state.importSummaries=[u.compactSummary(local)];},{render:false});
     const cloudRecord={...copy(local),version:1,operationId:'cloud-history-1'},envelope=u.buildCloudImportEnvelope(cloudRecord);
     const cloud=CloudAdapter;cloud.db={};cloud.isConnected=()=>true;
     cloud.importRef=id=>'imports/'+id;cloud.importChunkRef=(id,chunk)=>'imports/'+id+'/chunks/'+chunk;

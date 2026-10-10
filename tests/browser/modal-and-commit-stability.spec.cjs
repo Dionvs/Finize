@@ -5,7 +5,7 @@ function parseEuro(text){
 }
 
 test('transacties worden alleen vanuit persoonlijk en gezamenlijk toegevoegd', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   await expect(page.locator('[data-open-transaction], [data-open-general-transaction]')).toHaveCount(0);
 
   await page.locator('.v4-sidebar .tab-btn[data-tab="gezamenlijk"]').click();
@@ -33,7 +33,7 @@ test('transacties worden alleen vanuit persoonlijk en gezamenlijk toegevoegd', a
 });
 
 test('bankimport opent vanuit de gekozen uitgavenknop en staat niet op dashboard', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   await expect(page.getByText('Bank import & uitgaven',{exact:true})).toHaveCount(0);
   await page.locator('.v4-sidebar .tab-btn[data-tab="dion"]').click();
   await page.getByRole('button',{name:'+ Uitgave van Dion'}).click();
@@ -46,7 +46,7 @@ test('bankimport opent vanuit de gekozen uitgavenknop en staat niet op dashboard
 });
 
 test('zonder huishouden toont persoonlijk zakgeld en fysieke persoonlijke inkomsten, geen salaris', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   await page.evaluate(() => {
     const month=window.state.meta.selectedMonth;
     window.state.transactions.push({id:'standalone-income-test',date:month+'-12',accountContext:'dion',owner:'dion',kind:'inkomen',reviewStatus:'bevestigd',transactionType:'overige-inkomsten',amount:40,description:'Los inkomen'});
@@ -61,7 +61,7 @@ test('zonder huishouden toont persoonlijk zakgeld en fysieke persoonlijke inkoms
 });
 
 test('gezamenlijk over deze maand gebruikt alle inkomsten en trekt zakgeld alleen visueel af', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   await page.locator('.v4-sidebar .tab-btn[data-tab="gezamenlijk"]').click();
   const cards=page.locator('#tab-gezamenlijk .overview-kpi-row .icon-kpi');
   const incomeCard=cards.filter({hasText:'Totaal gezamenlijk inkomen'});
@@ -85,7 +85,7 @@ test('gezamenlijk over deze maand gebruikt alle inkomsten en trekt zakgeld allee
 });
 
 test('gezamenlijk spaarbedrag blijft per maand gescheiden', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   await page.locator('.v4-sidebar .tab-btn[data-tab="gezamenlijk"]').click();
   const originalDefault=await page.evaluate(() => window.state.planning.spaarpotDezeMaand);
   await page.evaluate(() => {
@@ -100,6 +100,7 @@ test('gezamenlijk spaarbedrag blijft per maand gescheiden', async ({ page }) => 
   await page.locator('#tab-gezamenlijk .savings-month-button').click();
   await page.locator('#savingEditInput').fill('300');
   await page.locator('#btnSaveSavingEdit').click();
+  await expect.poll(()=>page.evaluate(()=>window.state.monthlySavingOverrides['2026-07']?.gezamenlijk)).toBe(300);
   expect(await page.evaluate(() => window.state.monthlySavingOverrides['2026-07'].gezamenlijk)).toBe(300);
   expect(await page.evaluate(() => window.state.planning.spaarpotDezeMaand)).toBe(originalDefault);
 
@@ -112,7 +113,7 @@ test('gezamenlijk spaarbedrag blijft per maand gescheiden', async ({ page }) => 
 });
 
 test('gezamenlijk inkomen vervangt standaardsalaris en negeert oude dubbele teruggaven', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   await page.locator('.v4-sidebar .tab-btn[data-tab="gezamenlijk"]').click();
   await page.evaluate(() => {
     const month='2026-07';
@@ -169,7 +170,7 @@ test('gezamenlijk inkomen vervangt standaardsalaris en negeert oude dubbele teru
 });
 
 test('twee herkende werkgevers vervangen in juli beide persoonlijke standaardsalarissen', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   await page.locator('.v4-sidebar .tab-btn[data-tab="gezamenlijk"]').click();
   await page.evaluate(() => {
     window.__julyIncomeSavedState={
@@ -209,7 +210,7 @@ test('twee herkende werkgevers vervangen in juli beide persoonlijke standaardsal
 });
 
 test('dashboard toont alleen het directe jaaroverzicht onderaan', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   await expect(page.locator('#tab-dashboard')).not.toContainText('Maandadministratie');
   await expect(page.locator('#tab-dashboard')).not.toContainText('Onderling te verrekenen');
   const year=page.locator('#tab-dashboard .dashboard-year-overview');
@@ -219,7 +220,7 @@ test('dashboard toont alleen het directe jaaroverzicht onderaan', async ({ page 
 });
 
 test('opgeslagen inkomen valt niet terug door een nieuwere cloudsnapshot', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   await page.evaluate(() => {
     CloudAdapter.unsubscribe?.();
     CloudAdapter.unsubscribe = null;
@@ -236,6 +237,7 @@ test('opgeslagen inkomen valt niet terug door een nieuwere cloudsnapshot', async
   await page.locator('[data-income-edit="dion"]').first().click();
   await page.locator('#incomeEditInput').fill('2344');
   await page.locator('#btnSaveIncomeEdit').click();
+  await expect.poll(()=>page.evaluate(()=>CloudAdapter.pendingState?.incomeDefaultsHistory.dion.at(-1)?.salary)).toBe(2344);
   const result = await page.evaluate(async () => {
     const copy = value => JSON.parse(JSON.stringify(value));
     const salary = value => [...value.incomeDefaultsHistory.dion]
@@ -262,9 +264,9 @@ test('opgeslagen inkomen valt niet terug door een nieuwere cloudsnapshot', async
 });
 
 test('een no-op veroorzaakt geen revision of lokale write', async ({ page }) => {
-  await page.goto('/');
-  const result = await page.evaluate(() => {
-    commitChange(() => {}, { render: false });
+  await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
+  const result = await page.evaluate(async () => {
+    await commitChange(() => {}, { render: false });
     const beforeRevision = Number(window.state.meta.revision) || 0;
     let saves = 0;
     const originalSave = DataAdapter.save;
@@ -272,7 +274,7 @@ test('een no-op veroorzaakt geen revision of lokale write', async ({ page }) => 
       saves += 1;
       return originalSave.apply(DataAdapter, args);
     };
-    const ok = commitChange(() => {}, { render: false });
+    const ok = await commitChange(() => {}, { render: false });
     DataAdapter.save = originalSave;
     return {
       ok,
@@ -290,7 +292,7 @@ test('een no-op veroorzaakt geen revision of lokale write', async ({ page }) => 
 });
 
 test('backdrop sluit ook na interne klikken en na opnieuw openen', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   await page.locator('.v4-sidebar .tab-btn[data-tab="dion"]').click();
   for (let cycle = 0; cycle < 2; cycle += 1) {
     await page.evaluate(() => openTransactionModal());

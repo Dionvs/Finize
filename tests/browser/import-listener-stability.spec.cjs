@@ -1,7 +1,7 @@
 const { expect, test } = require('@playwright/test');
 
 test('vijftig importrenders houden één gedelegeerde click- en change-handler', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   const counts = await page.evaluate(() => {
     document.getElementById('u4ImportModalRoot')?.remove();
     const modal = document.createElement('div');
@@ -32,7 +32,7 @@ test('vijftig importrenders houden één gedelegeerde click- en change-handler',
 });
 
 test('vaste lasten volgen de budgeteigenaar en datums zijn Nederlands', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   await page.evaluate(() => {
     state.recurringFixedExpenses = [
       {id:'fixed-joint',begindatum:'2026-01-01',actief:true,naam:'Gezamenlijke verzekering',financialFor:'gezamenlijk',rekening:'gezamenlijk'},
@@ -55,7 +55,7 @@ test('vaste lasten volgen de budgeteigenaar en datums zijn Nederlands', async ({
 });
 
 test('importkaart toont geselecteerde maand en historie heeft maandkoppen', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   const result=await page.evaluate(() => {
     state.meta.selectedMonth='2026-08';
     state.accountProfiles=[{id:'account-dion',name:'Betaalrekening',identifier:'NL01TEST0000000001',accountOwner:'dion'}];
@@ -80,7 +80,7 @@ test('importkaart toont geselecteerde maand en historie heeft maandkoppen', asyn
 });
 
 test('bankimport en historie blijven beperkt tot de gekozen rekeninghouder', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   await page.evaluate(() => {
     state.meta.selectedMonth='2026-08';
     state.accountProfiles=[

@@ -11,7 +11,7 @@ for(const width of [390,1440])test(`older CSV opens from history without changin
   await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   await page.evaluate(async()=>{
     const u=FinizeUpdate4Runtime;
-    commitChange(()=>{
+    await commitChange(()=>{
       state.meta.selectedMonth='2026-10';state.importSummaries=[];state.activeImportId='';
       state.accountProfiles=[{id:'history-dion',name:'Dion testrekening',identifier:'NL01TEST',accountOwner:'dion'}];
     },{render:false});
@@ -19,7 +19,7 @@ for(const width of [390,1440])test(`older CSV opens from history without changin
     // A stored legacy processed batch may still contain review rows; viewing it never approves them.
     draft.status='verwerkt';
     await u.ImportStore.putImport(draft);
-    commitChange(()=>state.importSummaries=[u.compactSummary(draft)],{render:false});
+    await commitChange(()=>state.importSummaries=[u.compactSummary(draft)],{render:false});
   });
   await page.reload();await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   // Instrument only after bootstrap; opening and closing details must be read-only.

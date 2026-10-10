@@ -1,7 +1,7 @@
 const {expect,test}=require('@playwright/test');
 
 async function openReview(page){
-  await page.goto('/');
+  await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   await page.evaluate(()=>{
     state.accountProfiles=[
       {id:'joint',name:'Gezamenlijk',identifier:'NL01JOINT',accountOwner:'gezamenlijk'},

@@ -57,7 +57,7 @@ test('state-opslagfout bij migratie behoudt de originele state en alle back-ups'
   await page.addInitScript(({state,key})=>{
     localStorage.setItem(key,JSON.stringify(state));localStorage.setItem(key+'-last-good-backup','retained-backup');
     const set=Storage.prototype.setItem;
-    Storage.prototype.setItem=function(name,value){if(name===key)throw new DOMException('Test state quota','QuotaExceededError');return set.call(this,name,value);};
+    const put=IDBObjectStore.prototype.put;IDBObjectStore.prototype.put=function(record,...args){if(this.name==='financialHead'){this.transaction.abort();throw new DOMException('Test state quota','QuotaExceededError');}return put.call(this,record,...args);};
   },{state:fixture,key});
   await page.goto('/');await page.waitForFunction(()=>window.__finizeInitError);
   expect(await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),key)).toEqual(fixture);
@@ -70,7 +70,7 @@ test('herstel stopt als de back-up van de huidige state niet kan worden gemaakt'
   await boot(page);
   const result=await page.evaluate(async()=>{
     const before=JSON.stringify(window.state),cloud=window.CloudAdapter;let writes=0;
-    cloud.db={};cloud.docRef={};cloud.initialSyncComplete=true;cloud.cloudVersion=1;
+    cloud.db={};cloud.docRef={};cloud.initialSyncComplete=true;cloud.cloudVersion=1;cloud.pendingState=null;
     cloud.saveNow=async()=>{writes++;return true;};window.DataAdapter.backup=()=>false;
     let error='';try{await cloud.restoreBackup(window.state,'test');}catch(e){error=e.message;}
     return {error,writes,unchanged:JSON.stringify(window.state)===before};
@@ -82,8 +82,8 @@ test('bankOriginal wordt bij state-commit en ImportStore-write beschermd',async(
   const result=await page.evaluate(async()=>{
     const bankOriginal={description:'Original',amount:-10,rawCells:['original']};
     const tx={id:'source-guard',date:window.state.meta.selectedMonth+'-01',account:'dion',owner:'dion',amount:10,bankOriginal,importBatchId:'guard-import',reviewStatus:'bevestigd'};
-    const created=window.commitChange(()=>window.state.transactions.push(tx));
-    const edited=window.commitChange(()=>window.state.transactions.find(t=>t.id===tx.id).bankOriginal.description='wrong');
+    const created=await window.commitChange(()=>window.state.transactions.push(tx));
+    const edited=await window.commitChange(()=>window.state.transactions.find(t=>t.id===tx.id).bankOriginal.description='wrong');
     const store=window.FinizeUpdate4.importStore,record={id:'guard-import',status:'verwerkt',rawText:'original CSV text',rows:[{id:'row',bankOriginal}]};
     await store.putImport(record);const altered=structuredClone(record);altered.rows[0].bankOriginal.amount=-99;
     let rejected=false;try{await store.putImport(altered);}catch(error){rejected=true;}

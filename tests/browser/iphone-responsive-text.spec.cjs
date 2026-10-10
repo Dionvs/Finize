@@ -20,7 +20,7 @@ for (const width of iphoneWidths) {
     await identifyAsIphone(page);
     await keepTestLocal(page);
     await page.setViewportSize({ width, height: 900 });
-    await page.goto('/');
+    await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
 
     await expect(page.locator('html')).toHaveClass(/finize-ios-phone/);
     const columns = await page.locator('.mobile-kpi-grid').first().evaluate(element =>

@@ -18,7 +18,7 @@ async function installAccount(page,role){
     };
   },role);
   await page.route('https://www.gstatic.com/firebasejs/**',route=>route.abort());
-  await page.goto('/');
+  await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   await expect(page.locator('#authRoot')).toBeHidden();
 }
 
@@ -105,6 +105,7 @@ test('de gedeelde doelbewerker bewaart eigenaar, verdeling en subdoelen over vie
   await subgoals.locator('[data-u2-child-name="0"]').fill('Laptop en accessoires');
   await subgoals.locator('[data-u2-child-target="0"]').fill('1200');
   await subgoals.locator('[data-u2-child-link="0"]').fill('https://example.test/laptop');
+  const revisionBefore=await page.evaluate(()=>state.meta.revision);
   await page.locator('#goalEditSave').click();
   await expect(page.locator('#incomeEditModal')).not.toHaveClass(/open/);
   const saved=await page.evaluate(()=>state.spaardoelen.dion.find(goal=>goal.id==='parity-goal'));
@@ -112,6 +113,7 @@ test('de gedeelde doelbewerker bewaart eigenaar, verdeling en subdoelen over vie
   expect(saved.subdoelen).toHaveLength(1);
   expect(saved.subdoelen[0]).toMatchObject({naam:'Laptop en accessoires',doelbedrag:1200,link:'https://example.test/laptop'});
   expect(await page.evaluate(()=>state.spaardoelen.gezamenlijk.some(goal=>goal.id==='parity-goal'))).toBe(false);
+  expect(await page.evaluate(()=>state.meta.revision)).toBe(revisionBefore+1);
 
   await openGoals(page,1280);
   await page.locator('[data-u5-goal-filter="dion"]').click();
@@ -128,6 +130,7 @@ test('inkomen gebruikt op mobiel en desktop dezelfde historie zonder legacy-writ
   await page.locator('#incomeEditInput').fill('2345.67');
   await page.locator('#incomeRefundInput').fill('89.10');
   await page.locator('#btnSaveIncomeEdit').click();
+  await expect(page.locator('#incomeEditModal')).not.toHaveClass(/open/);
   const mobileState=await page.evaluate(()=>({
     history:structuredClone(state.incomeDefaultsHistory.dion),
     legacy:JSON.stringify(state.personen.dion.vasteTeruggaven)

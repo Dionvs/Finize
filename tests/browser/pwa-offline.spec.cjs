@@ -3,7 +3,7 @@ const { expect, test } = require('@playwright/test');
 test.use({ serviceWorkers: 'allow' });
 
 test('PWA start offline en geeft geen HTML terug voor ontbrekende assets', async ({ page, context }) => {
-  await page.goto('/');
+  await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   await page.evaluate(() => navigator.serviceWorker?.ready);
   await page.reload();
 

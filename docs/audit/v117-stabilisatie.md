@@ -61,7 +61,9 @@ P1 vervangt nog niet de omvangrijke localStorage-statewrites; dat is expliciet P
 
 ## P2 — lokale opslag
 
-Nog niet gestart. Vereist één atomaire IndexedDB-commit voor financiële records, importdetails, revisies, operatiebewijs en outbox; verificatie en behoud van oude opslag; publicatie van appstate pas na bevestigde commit; alle afhankelijke aanroepers awaiten.
+Afgerond voor lokale ontwikkeling op 10 oktober 2026. Eén atomaire IndexedDB-commit bewaart financiële records, importdetails, revisies, operatiebewijs en outbox. De volledige administratie migreert verliesloos met verificatie en behoud van oude opslag; de app publiceert financiële wijzigingen pas na commitbevestiging. Huishoudens en fotocaches zijn gescheiden. De volledige suites op dezelfde definitieve build slagen: 54 Node-bestanden met 572 geregistreerde testgevallen en 266 Playwright-tests, geen mislukkingen of skips. Volle localStorage met tien CSV-groepsgoedkeuringen, zeven IndexedDB-commitgrenzen en vier migratieherstarts zijn aantoonbaar getest.
+
+Uitgebreid technisch verslag: [v117-p2-verslag.md](v117-p2-verslag.md). Bestanden, hashes en reproduceerbaar testbewijs: [v117-p2-bewijs.json](v117-p2-bewijs.json). De technische back-up is opnieuw geverifieerd; het controlemanifest heet nu `backup-manifest.json` om het oorspronkelijke PWA-bestand `manifest.json` te behouden. P3 blijft op uitdrukkelijk gebruikersverzoek gepauzeerd; geen productieaanpassing, deployment, push of merge naar main.
 
 ## P3 — cloudinfrastructuur
 

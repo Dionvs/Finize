@@ -15,7 +15,7 @@ async function boot(page,width){
 }
 async function nav(page,tab){await page.evaluate(tab=>document.querySelector(`#tabs [data-tab="${tab}"]`).click(),tab);}
 const listRows=(page,owner,width)=>page.locator('#tab-'+owner+(width<768?' .joint-transaction-row':owner==='gezamenlijk'?' [data-edit-joint-transaction]':' [data-edit-personal-transaction]'));
-async function month(page,value){await page.locator('#monthPickerButton').click();await page.locator(`[data-month-year="${value.slice(0,4)}"]`).click();await page.locator(`[data-month-value="${value}"]`).click();}
+async function month(page,value){await page.locator('#monthPickerButton').click();await page.locator(`[data-month-year="${value.slice(0,4)}"]`).click();await page.locator(`[data-month-value="${value}"]`).click();await expect.poll(()=>page.evaluate(()=>getSelectedMonth())).toBe(value);}
 async function open(page,owner,id=''){await nav(page,owner);if(id){const row=page.locator(`#tab-${owner} [data-edit-joint-transaction="${id}"],#tab-${owner} [data-edit-personal-transaction="${id}"]`);if(await row.count())await row.first().click();else await page.evaluate(({owner,id})=>FinizeManual.open(owner,id),{owner,id});}else{await page.locator(`#tab-${owner} [data-open-${owner==='gezamenlijk'?'joint':'personal'}-transaction]`).first().click();await page.locator('#transactionModal').getByRole('button',{name:/Handmatig invoeren/}).click();}return owner==='gezamenlijk'?'jointTx':'personalTx';}
 async function save(page,owner,{amount=100,type='uitgave',description='Manual P6',date='2026-10-03',category='Kleding',goal='',refundMonth='',refundCategory=''}={}){
  const prefix=await open(page,owner);await page.locator('#'+prefix+'Amount').fill(String(amount));await page.locator('#'+prefix+'Date').fill(date);await page.locator('#'+prefix+'Description').fill(description);await page.locator('#'+prefix+'Type').selectOption(type);
@@ -54,6 +54,7 @@ for(const width of [390,1440]){
    const prefix=await open(page,owner,t.id);await expect(page.locator('#'+prefix+'Date')).toHaveAttribute('max','2026-10-06');await expect(page.locator('#'+prefix+'Owner,#'+prefix+'Account,[data-manual-split]')).toHaveCount(0);
    await page.locator('#'+prefix+'Date').fill('2026-10-07');await page.locator('#btnSave'+(owner==='gezamenlijk'?'Joint':'Personal')+'Transaction').click();await expect(page.locator('[data-p4-error]')).toContainText('verleden');
    expect(await page.evaluate(id=>state.transactions.find(t=>t.id===id).date,t.id)).toBe('2026-10-03');await page.locator('#'+prefix+'Date').fill('2026-10-03');await page.locator('#'+prefix+'Amount').fill('125');await page.locator('#btnSave'+(owner==='gezamenlijk'?'Joint':'Personal')+'Transaction').click();
+   await expect(page.locator('#transactionModal')).not.toHaveClass(/open/);
    expect(await page.evaluate(id=>state.transactions.filter(t=>t.id===id).map(t=>t.amount),t.id)).toEqual([125]);
   }
   await save(page,'dion',{type:'salaris',amount:3100,description:'Actual salary'});expect(await page.evaluate(()=>FinizeTransactions.income('2026-10','dion').amount)).toBe(3100);expect(errors).toEqual([]);
@@ -75,7 +76,7 @@ for(const width of [390,1440]){
  });
  test(`P6 U8/U9/U10 physical account lists independent of financial destination ${width}px`,async({page})=>{
   const errors=await boot(page,width);
-  await page.evaluate(()=>{for(const [account,owner]of [['dion','gezamenlijk'],['dara','gezamenlijk'],['gezamenlijk','dion']])FinizeManual.save({id:'cross-'+account,source:'manual',date:'2026-10-03',amount:100,transactionType:'uitgave',financialFor:owner,budgetOwner:owner,category:'Kleding',description:'Paid by '+account},account);});
+  await page.evaluate(async ()=>{for(const [account,owner]of [['dion','gezamenlijk'],['dara','gezamenlijk'],['gezamenlijk','dion']])await FinizeManual.save({id:'cross-'+account,source:'manual',date:'2026-10-03',amount:100,transactionType:'uitgave',financialFor:owner,budgetOwner:owner,category:'Kleding',description:'Paid by '+account},account);});
   for(const owner of ['dion','dara','gezamenlijk']){await nav(page,owner);await expect(listRows(page,owner,width).filter({hasText:'Paid by '+owner})).toHaveCount(1);for(const other of ['dion','dara','gezamenlijk'].filter(x=>x!==owner))await expect(listRows(page,owner,width).filter({hasText:'Paid by '+other})).toHaveCount(0);expect(await page.evaluate(owner=>FinizeTransactions.total('accountCashflow',{month:'2026-10',account:owner}),owner)).toBe(-100);}
   expect(errors).toEqual([]);
  });

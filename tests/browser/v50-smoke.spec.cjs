@@ -8,7 +8,7 @@ for (const width of [360, 390, 430, 768, 1024, 1440]) {
     });
     page.on('pageerror', error => errors.push(error.message));
     await page.setViewportSize({ width, height: 900 });
-    await page.goto('/');
+    await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
     await expect(page).toHaveTitle('Finize');
     await expect(page.locator('body')).toBeVisible();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

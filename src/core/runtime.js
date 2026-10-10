@@ -1,5 +1,7 @@
 import { selectBankTransactions, isBankSource } from './bank-sources.mjs';
 import { createStateBackupStore, readLegacyStateBackup } from '../storage/state-backups.mjs';
+import { createHouseholdStore } from '../storage/household-store.mjs';
+import { backupDigest } from '../storage/migration-backups.mjs';
 import { createChunkedCloudStore, cloudStateManifest } from '../storage/cloud-chunks.mjs';
 import { createMigrationBackupStore, readLegacyMigrationBackup } from '../storage/migration-backups.mjs';
 import { assertNoDuplicateSources } from '../import/import-identity.mjs';
@@ -95,10 +97,10 @@ function moveItemById(sourcePath, targetPath, id, targetIndex){
 function createGoalRecord(owner){
   return {id:uid(),naam:'Nieuw doel',doelbedrag:0,algespaard:0,doeldatum:'',vasteInleg:0,vastBedrag:false,rendement:.0125,rendementPeriode:'jaarlijks',favoriet:false,eigenaar:owner,ratoVerdeling:true,subdoelen:[]};
 }
-function createGoalForOwner(owner){
+async function createGoalForOwner(owner){
   if(!manageableGoalOwnerKeys().includes(owner))return;
   const goal=createGoalRecord(owner);
-  commitChange(()=>state.spaardoelen[owner].push(goal),{render:false});
+  if(!await commitChange(()=>state.spaardoelen[owner].push(goal),{render:false}))return;
   openMobileGoalEditor(owner,goal.id);
 }
 function bindDirectGoalOrdering(root){
@@ -124,9 +126,9 @@ function bindDirectGoalOrdering(root){
       });
     });
   }
-  const move=(owner,id,targetIndex)=>{
+  const move=async (owner,id,targetIndex)=>{
     const path=`spaardoelen.${owner}`;
-    if(!commitChange(()=>moveItemById(path,path,id,targetIndex),{render:false}))return;
+    if(!await commitChange(()=>moveItemById(path,path,id,targetIndex),{render:false}))return;
     renderActiveTab();
   };
   root.querySelectorAll('[data-reorder-goal]').forEach(card=>{
@@ -136,10 +138,10 @@ function bindDirectGoalOrdering(root){
     card.querySelectorAll('[data-goal-move]').forEach(button=>{
       const direction=Number(button.dataset.goalMove)||0;
       button.disabled=index<0||index+direction<0||index+direction>=goals.length;
-      button.addEventListener('click',event=>{
+      button.addEventListener('click',async event=>{
         event.preventDefault();event.stopPropagation();
         if(button.disabled)return;
-        move(owner,id,index+direction);
+        await move(owner,id,index+direction);
       });
     });
   });
@@ -1741,6 +1743,7 @@ function cloudConnectionAllowed(){
 const GoalImageStore = {
   dbPromise:null,
   cache:new Map(),
+  storageKey(goalId){const household=activeAuthSession?.assignment?.householdId;return household?JSON.stringify([household,String(goalId)]):String(goalId);},
   ref(goalId){ return GOAL_IMAGE_REF_PREFIX + goalId; },
   keyFromRef(value){
     const raw = String(value || '');
@@ -1777,33 +1780,41 @@ const GoalImageStore = {
   },
   async put(goalId, dataUrl){
     if (!goalId || !dataUrl) return;
-    await this.transact('readwrite', store=>store.put(String(dataUrl), String(goalId)));
-    this.cache.set(String(goalId), String(dataUrl));
+    const storageKey=this.storageKey(goalId);
+    await this.transact('readwrite', store=>store.put(String(dataUrl), storageKey));
+    this.cache.set(storageKey, String(dataUrl));
   },
-  async get(goalId){
+  async get(goalId,{allowLegacy=false}={}){
     const key = String(goalId || '');
     if (!key) return '';
-    if (this.cache.has(key)) return this.cache.get(key) || '';
+    const storageKey=this.storageKey(key);
+    if (this.cache.has(storageKey)) return this.cache.get(storageKey) || '';
     const db = await this.open();
-    const value = await new Promise((resolve,reject)=>{
+    const read=lookup=>new Promise((resolve,reject)=>{
       const tx = db.transaction(GOAL_IMAGE_STORE_NAME, 'readonly');
-      const request = tx.objectStore(GOAL_IMAGE_STORE_NAME).get(key);
+      const request = tx.objectStore(GOAL_IMAGE_STORE_NAME).get(lookup);
       request.onsuccess = ()=>resolve(request.result || '');
       request.onerror = ()=>reject(request.error || new Error('Afbeelding laden mislukt.'));
     });
-    if (value) this.cache.set(key, value);
+    let value=await read(storageKey);
+    if(!value&&allowLegacy&&storageKey!==key){
+      value=await read(key);
+      if(value){if(this.storageKey(key)!==storageKey)throw new Error('Het huishouden wijzigde tijdens fotomigratie.');await this.put(key,value);}
+    }
+    if (value) this.cache.set(storageKey, value);
     return value || '';
   },
   async remove(goalId){
     const key = String(goalId || '');
     if (!key) return;
-    await this.transact('readwrite', store=>store.delete(key));
-    this.cache.delete(key);
+    const storageKey=this.storageKey(key);
+    await this.transact('readwrite', store=>store.delete(storageKey));
+    this.cache.delete(storageKey);
   },
   source(goal){
     const raw = String(goal?.afbeelding || '');
     const key = this.keyFromRef(raw);
-    if (key) return this.cache.get(key) || '';
+    if (key) return this.cache.get(this.storageKey(key)) || '';
     return raw.startsWith('data:image/') ? raw : '';
   },
   async storeOrFallback(goalId, dataUrl){
@@ -1816,7 +1827,8 @@ const GoalImageStore = {
       return dataUrl;
     }
   },
-  async initializeState(target){
+  async initializeState(target,{legacySource=null}={}){
+    const legacyReferences=new Set(['gezamenlijk','dion','dara'].flatMap(owner=>(legacySource?.spaardoelen?.[owner]||[]).map(goal=>this.keyFromRef(goal.afbeelding))));
     let changed = false;
     for (const owner of ['gezamenlijk','dion','dara']){
       for (const goal of (target?.spaardoelen?.[owner] || [])){
@@ -1828,16 +1840,12 @@ const GoalImageStore = {
           const key = this.keyFromRef(raw);
           if (key){
             try{
-              const image = await this.get(key);
+              const image = await this.get(key,{allowLegacy:legacyReferences.has(key)});
               if (!image){
-                console.warn('Ontbrekende spaardoelfotoverwijzing opgeruimd:', goal.id);
-                goal.afbeelding = '';
-                changed = true;
+                console.warn('Spaardoelfoto ontbreekt; oorspronkelijke verwijzing blijft behouden:', goal.id);
               }
             }catch(error){
-              console.warn('Defecte spaardoelfotoverwijzing opgeruimd:', goal.id, error);
-              goal.afbeelding = '';
-              changed = true;
+              console.warn('Spaardoelfoto niet leesbaar; oorspronkelijke verwijzing blijft behouden:', goal.id, error);
             }
           }
         }
@@ -2105,18 +2113,8 @@ function isStorageQuotaError(error){
     || error?.code === 1014;
 }
 
-function localSave(state,{preserveBackup=false}={}){
-  const keys = activeStorageKeys();
-  if (!keys) return false;
-  const serialized = JSON.stringify(state);
-  try{
-    localStorage.setItem(keys.state, serialized);
-  }catch(error){
-    if (!isStorageQuotaError(error)) throw error;
-    // Never delete an older backup to make space for a newer state.
-    throw error;
-  }
-  return true;
+async function localSave(target,options={}){
+  return await DataAdapter.save(target,{...options,queueCloud:false,throwOnError:true});
 }
 
 function firebaseConfigTemplate(){
@@ -2230,6 +2228,12 @@ const CloudAdapter = {
     if (backupReason && !await DataAdapter.backup(state, backupReason)) throw new Error('Noodback-up niet bevestigd; state is niet vervangen.');
     if(activeStorageKeys()?.state!==acceptanceScope || this.docRef!==acceptanceRef)return false;
     if(this.initialSyncComplete && isStaleCloudSnapshot({...documentData,state:normalizedRemote},this.cloudVersion,this.lastCloudSignature))return false;
+    const candidate=clone(normalizedRemote);
+    await GoalImageStore.initializeState(candidate);
+    if(normalizedCloudData){candidate.meta.revision=Math.max(Number(candidate.meta.revision)||0,Number(normalizedRemote.meta?.revision)||0)+1;candidate.meta.updatedAt=new Date().toISOString();candidate.meta.updatedBy=getDeviceId();}
+    await localSave(candidate,{preserveBackup:normalizedCloudData});
+    if(activeStorageKeys()?.state!==acceptanceScope || this.docRef!==acceptanceRef)return false;
+    if(this.initialSyncComplete && isStaleCloudSnapshot({...documentData,state:normalizedRemote},this.cloudVersion,this.lastCloudSignature))return false;
     clearTimeout(this.saveTimer);
     this.pendingState = null;
     this.remoteStateWaiting = null;
@@ -2242,28 +2246,18 @@ const CloudAdapter = {
     this.conflict = false;
     this.lastFailureRetryable = true;
     this.applyingRemote = true;
-    state = normalizedRemote;
+    state = candidate;
     window.state = state;
     committedStateSnapshot = clone(state);
     window.FinizeImportSync?.setScope?.();
-    try{
-      await GoalImageStore.initializeState(state);
-      localSave(state,{preserveBackup:normalizedCloudData});
-    }catch(e){
-      console.error('lokale kopie Firestore-data opslaan mislukt', e);
-    }finally{
-      this.applyingRemote = false;
-    }
+    this.applyingRemote = false;
     DataAdapter.loadedFromStorage = true;
     if (normalizedCloudData){
-      state.meta.revision = Math.max(Number(state.meta.revision) || 0, this.lastConfirmedRevision) + 1;
-      state.meta.updatedAt = new Date().toISOString();
-      state.meta.updatedBy = getDeviceId();
-      committedStateSnapshot = clone(state);
-      if(!DataAdapter.save(state,{preserveBackup:true}))return false;
+      if(!await DataAdapter.save(state,{preserveBackup:true}))return false;
       this.flushQueue();
     }else{
       this.status = 'Cloud opgeslagen';
+      try{await DataAdapter.confirmCloudSnapshot(candidate);}catch(error){console.warn('De cloudstand is bevestigd; lokale outboxbevestiging wordt later herhaald.',error);}
     }
     renderActiveTab();
     if(pendingImportConflict){this.conflict=true;this.status='Synchronisatieconflict — lokale keuze bewaard';renderCloudStatus();}
@@ -2290,6 +2284,7 @@ const CloudAdapter = {
     if (!validation.ok) throw new Error(validation.errors.join(' '));
     if (backupReason && !await DataAdapter.backup(state, backupReason)) throw new Error('Noodback-up niet bevestigd; state is niet vervangen.');
     if(this.initialSyncComplete && isStaleCloudSnapshot({...documentData,state:normalizedRemote},this.cloudVersion,this.lastCloudSignature))return false;
+    await DataAdapter.save(merged,{throwOnError:true});
     clearTimeout(this.saveTimer);
     this.cloudVersion = cloudDocumentVersion(documentData);
     this.lastCloudSignature = cloudStateSignature(normalizedRemote);
@@ -2302,7 +2297,6 @@ const CloudAdapter = {
     window.state = state;
     committedStateSnapshot = clone(state);
     this.pendingState = clone(state);
-    localSave(state);
     this.status = 'Opslaan…';
     renderActiveTab();
     return true;
@@ -2391,10 +2385,11 @@ const CloudAdapter = {
         if (!this.initialSyncComplete){
           const localSnapshot=clone(this.pendingState);const conflicts=findImportConflicts(normalizedRemote,localSnapshot,normalizedRemote);
           const imported=JSON.stringify(localSnapshot.importSummaries||[])!==JSON.stringify(normalizedRemote.importSummaries||[])||JSON.stringify(localSnapshot.transactions?.filter(tx=>tx.importBatchId)||[])!==JSON.stringify(normalizedRemote.transactions?.filter(tx=>tx.importBatchId)||[]);
-          if(imported)await this.preserveImportStateConflict(localSnapshot,normalizedRemote,[{kind:'initial-import-state'}]);
+          const offline=Boolean(await DataAdapter.store().pendingCloud())&&JSON.stringify(localSnapshot)!==JSON.stringify(normalizedRemote);
+          if(imported||offline){await this.preserveImportStateConflict(localSnapshot,normalizedRemote,[{kind:imported?'initial-import-state':'initial-financial-outbox'}]);await DataAdapter.store().markCloudConflict();}
           console.warn('Lokale wijzigingen zijn als nood-back-up bewaard; de eerste cloudstand blijft leidend.');
           await this.acceptRemote(documentData, normalizedRemote, 'lokale wijzigingen voor cloudherstel');
-          if(imported){this.conflict=true;this.status='Synchronisatieconflict — lokale keuze bewaard';renderCloudStatus();}
+          if(imported||offline){this.conflict=true;this.status='Synchronisatieconflict — lokale keuze bewaard';renderCloudStatus();}
           return;
         }
         console.warn('Lokale wijziging opnieuw toegepast op de nieuwste cloudstand.');
@@ -2480,6 +2475,7 @@ const CloudAdapter = {
         });
         if(echoOnly){
           await importStage.acknowledge();
+          await DataAdapter.confirmCloudSnapshot(snapshot);
           this.status=this.pendingState?'Opslaan…':'Cloud opgeslagen';renderCloudStatus();
           return true;
         }
@@ -2504,6 +2500,7 @@ const CloudAdapter = {
         return version;
       });
       await importStage?.acknowledge();
+      try{await DataAdapter.confirmCloudSnapshot(snapshot);}catch(error){console.warn('Cloud bevestigd; lokale outboxbevestiging wordt later herhaald.',error);}
       this.cloudVersion = nextVersion;
       this.lastCloudSignature = cloudStateSignature(cloudSnapshot);
       this.lastConfirmedCommitId = commitId;
@@ -2619,45 +2616,79 @@ window.CloudAdapter = CloudAdapter;
 
 const stateBackupStore = createStateBackupStore();
 const DataAdapter = {
+  commitBaseSignature(){return JSON.stringify(committedStateSnapshot);},
   loadedFromStorage:false,
-  readDurableState(){
-    const keys=activeStorageKeys();
-    if(!keys)throw new Error('De oorspronkelijke opslagcontext is niet beschikbaar.');
-    const raw=localStorage.getItem(keys.state);
-    return raw?JSON.parse(raw):null;
+  supportsAtomicImports:true,
+  stores:new Map(),
+  store(){
+    if(!activeStorageKeys())throw new Error('De oorspronkelijke opslagcontext is niet beschikbaar.');
+    const scope=CloudAdapter.importScope();
+    if(!this.stores.has(scope))this.stores.set(scope,createHouseholdStore(scope));
+    return this.stores.get(scope);
+  },
+  async readDurableState(){
+    return this.store().load();
   },
   adoptDurableState(durable){
     state=clone(durable);window.state=state;committedStateSnapshot=clone(state);
   },
-  // Lokaal blijft altijd de eerste veiligheidslaag. Firestore is optionele live-sync erbovenop.
-  // Firebase Storage is voor losse bestanden; Firestore is de juiste plek voor live app-data.
-  // We bewaren dezelfde state-vorm als 1 groot JSON-document voor Finize.
-  save(state,options){
+  async verifyLegacySource(migration){
+    if(!migration)return;
+    const raw=localStorage.getItem(migration.sourceKey);
+    if((raw?await backupDigest(raw):null)!==migration.sourceSha256)throw Object.assign(new Error('De beschermde oude opslag is door een oudere client gewijzigd. Beide standen blijven behouden; los dit migratieconflict eerst op.'),{code:'storage-migration-conflict'});
+  },
+  async save(target,options={}){
+    const store=this.store(),snapshot=clone(target),base=clone(committedStateSnapshot),scope=activeStorageKeys().state;
+    const operationId=options.operationId||crypto.randomUUID();
+    const enqueue=value=>{
+      if(activeStorageKeys()?.state===scope&&options.queueCloud!==false){
+        try{CloudAdapter.queueSave(value);}catch(error){console.warn('Lokaal bevestigd; de duurzame outbox bewaart de synchronisatie.',error);}
+      }
+    };
     try{
-      if(!localSave(state,options))throw new Error('Er is geen actief huishouden voor lokale opslag. Open je huishouden opnieuw en probeer nogmaals.');
-      CloudAdapter.queueSave(state);
+      await this.verifyLegacySource(store.head?.migration);
+      const expectedHash=await backupDigest(JSON.stringify(base));
+      await store.commit(snapshot,{expectedHash,operationId,importMutation:options.importMutation,queueCloud:options.queueCloud!==false});
+      enqueue(snapshot);
       return true;
-    }catch(e){ console.error('opslaan mislukt', e); if(options?.throwOnError)throw e; return false; }
+    }catch(e){
+      e.operationId=operationId;
+      try{
+        const proof=await store.inspectOperation(operationId);
+        if(proof.receipt?.sha256===await backupDigest(JSON.stringify(snapshot))){
+          if(JSON.stringify(proof.state)===JSON.stringify(snapshot)){enqueue(snapshot);return true;}
+          enqueue(proof.state);
+          e.commitOutcome='committed';e.durableState=proof.state;
+        }else e.commitOutcome=JSON.stringify(proof.state)===JSON.stringify(base)?'rejected':'uncertain';
+      }catch{e.commitOutcome='uncertain';}
+      console.error('opslaan mislukt', e); if(options?.throwOnError)throw e; return false;
+    }
   },
   async load(){
     try{
       const keys = activeStorageKeys();
       if (!keys) return null;
       const raw = localStorage.getItem(keys.state);
-      if (!raw) return null;
-      this.loadedFromStorage = true;
-      const parsed = JSON.parse(raw);
-      const migrated = migrateBudgetState(parsed);
-      if(!await ensureMigrationBackup(parsed))throw new Error('Migratieback-up ontbreekt; lokale state is behouden.');
+      const store=this.store(),existing=await store.load({allowUnverified:true});
+      if(existing){
+        const migration=store.head.migration;
+        if(raw&&migration?.sourceKey===keys.state&&await backupDigest(raw)!==migration.sourceSha256)throw new Error('De beschermde oude opslag is door een oudere client gewijzigd. Beide standen blijven behouden; los dit migratieconflict eerst op.');
+        if(raw&&migration?.sourceKey!==keys.state&&JSON.stringify(migrateBudgetState(JSON.parse(raw)))!==JSON.stringify(existing))throw new Error('Voor dit account bestaan afwijkende oude offline gegevens. De oude kopie en de huishoudopslag blijven behouden; migratie vraagt eerst conflictoplossing.');
+        if(raw&&!await ensureMigrationBackup(JSON.parse(raw)))throw new Error('De oorspronkelijke migratieback-up is niet betrouwbaar leesbaar.');
+        this.loadedFromStorage=true;return store.verifyAndActivate({verifySource:migration=>this.verifyLegacySource(migration)});
+      }
+      const parsed=raw?JSON.parse(raw):defaultState(),migrated=migrateBudgetState(parsed);
+      if(raw&&!await ensureMigrationBackup(parsed))throw new Error('Migratieback-up ontbreekt; lokale state is behouden.');
       const validation = validateBudgetState(migrated);
       if (!validation.ok){
         console.error('opgeslagen data ongeldig', validation.errors);
         throw new Error(validation.errors.join(' '));
       }
-      if(JSON.stringify(parsed)!==JSON.stringify(migrated))localSave(migrated,{preserveBackup:true});
-      return migrated;
+      const loaded=await store.migrate(migrated,{sourceKey:keys.state,sourceSha256:raw?await backupDigest(raw):null,sourceSchema:detectSchemaVersion(parsed),migratedAt:new Date().toISOString()},{verifySource:migration=>this.verifyLegacySource(migration)});
+      this.loadedFromStorage=true;return loaded;
     }catch(e){ console.error('laden mislukt; oorspronkelijke opslag behouden', e); throw e; }
   },
+  async confirmCloudSnapshot(snapshot){await this.store().acknowledgeCloud(await backupDigest(JSON.stringify(snapshot)));},
   async backup(state, reason){
     try{
       const keys = activeStorageKeys();
@@ -2703,11 +2734,13 @@ var committedStateSnapshot = clone(state);
 let activeTab = 'dashboard';
 const TODAY = new Date();
 
-function commitChange(change, options={}){
+async function commitChange(change, options={}){
   const before = clone(committedStateSnapshot||state);
+  const scope=activeStorageKeys()?.state;
   try{
-    if (typeof change === 'function') change(state);
-    else if (typeof change?.apply === 'function') change.apply(state);
+    if(change?.constructor?.name==='AsyncFunction'||change?.apply?.constructor?.name==='AsyncFunction')throw new Error('Maak de financiële kandidaat synchroon; wacht daarna op de opslagbevestiging.');
+    const mutation=typeof change==='function'?change(state):typeof change?.apply==='function'?change.apply(state):null;
+    if(mutation&&typeof mutation.then==='function')throw new Error('Een financiële mutatie moet synchroon een kandidaat maken; de opslag wordt daarna awaited.');
     if(JSON.stringify(before)===JSON.stringify(state))return true;
     synchronizeChangedSavings(state,before);
     assertFinancialMutationSafe(before,state);
@@ -2744,15 +2777,21 @@ function commitChange(change, options={}){
     state.meta.updatedBy = getDeviceId();
     const validation = validateBudgetState(state);
     if (!validation.ok) throw new Error(validation.errors.join(' '));
-    if (!DataAdapter.save(state,{throwOnError:true})) throw new Error('Lokale opslag is mislukt. Probeer opnieuw; wis de Finize-sitegegevens niet.');
+    const candidate=clone(state);
+    // Nothing may observe a financial candidate while IndexedDB is still committing.
+    state=clone(before);window.state=state;
+    if (!await DataAdapter.save(candidate,{throwOnError:true,importMutation:options.importMutation,operationId:options.operationId})) throw new Error('Lokale opslag is mislukt. Probeer opnieuw; wis de Finize-sitegegevens niet.');
+    if(activeStorageKeys()?.state!==scope)throw Object.assign(new Error('Het huishouden wijzigde tijdens opslag; de bevestigde wijziging blijft in het oorspronkelijke huishouden.'),{commitOutcome:'committed'});
+    state=candidate;window.state=state;
     committedStateSnapshot = clone(state);
     if (options.render !== false) renderCloudStatus();
     return true;
   }catch(e){
-    state = before;
-    window.state = state;
-    committedStateSnapshot = clone(before);
-    CloudAdapter.status = 'Synchronisatie mislukt';
+    if(e.commitOutcome==='committed'&&e.durableState&&activeStorageKeys()?.state===scope){
+      DataAdapter.adoptDurableState(e.durableState);CloudAdapter.status='Lokaal opgeslagen — actuele stand herladen';renderCloudStatus();return true;
+    }
+    if(activeStorageKeys()?.state===scope){state=clone(committedStateSnapshot||before);window.state=state;}
+    CloudAdapter.status = e.commitOutcome==='uncertain'?'Opslaguitkomst onzeker — herlaad vóór opnieuw proberen':'Synchronisatie mislukt';
     renderCloudStatus();
     console.error('Wijziging opslaan mislukt', e);
     // Import commands must receive the cause after rollback, not only a false result.
@@ -2762,8 +2801,8 @@ function commitChange(change, options={}){
   }
 }
 
-function persist(){
-  return commitChange(()=>{}, {render:false});
+async function persist(){
+  return await commitChange(()=>{}, {render:false});
 }
 
 function renderCloudStatus(){
@@ -2792,11 +2831,11 @@ function bindInputs(root){
   root.querySelectorAll('[data-month-income]').forEach(el=>{
     const person = el.dataset.monthIncome;
     el.value = getMonthlyIncome(person);
-    const commit = ()=>{
+    const commit = async ()=>{
       const parsed = parseFloat(String(el.value).replace(',', '.'));
       const value=Number.isFinite(parsed) ? parsed : 0;
       if(round2(Number(getMonthlyIncome(person))||0)===round2(value))return;
-      if(!commitChange(()=>setMonthlyIncome(person,value),{render:false}))return;
+      if(!await commitChange(()=>setMonthlyIncome(person,value),{render:false}))return;
       renderActiveTab();
     };
     el.addEventListener('change', commit);
@@ -2809,7 +2848,7 @@ function bindInputs(root){
     else if (el.dataset.percent === 'true') el.value = percentInputValue(raw);
     else el.value = raw === undefined || raw === null ? '' : raw;
 
-    const commit = ()=>{
+    const commit = async ()=>{
       let v = el.value;
       if (type === 'number'){
         v = v === '' ? 0 : parseFloat(v.replace(',', '.'));
@@ -2819,7 +2858,7 @@ function bindInputs(root){
       if (type === 'checkbox') v = el.checked;
       if(JSON.stringify(getPath(state,path))===JSON.stringify(v))return;
       setPath(state, path, v);
-      persist();
+      if(!await persist())return;
       renderActiveTab();
     };
     el.addEventListener('change', commit);
@@ -2831,18 +2870,19 @@ function bindInputs(root){
     if (el.type === 'checkbox') el.checked = !!item[field];
     else if (el.dataset.percent === 'true') el.value = percentInputValue(item[field]);
     else el.value = item[field] ?? '';
-    const save = ()=>{
+    const save = async ()=>{
       let value = el.type === 'checkbox' ? el.checked : el.value;
       if (el.type === 'number'){
         const parsed = bankAmount(value);
         value = Number.isFinite(parsed) ? round2(parsed) : 0;
         if (el.dataset.percent === 'true') value /= 100;
       } else if (typeof value === 'string') value = value.trim();
-      if(JSON.stringify(item[field])===JSON.stringify(value))return;
-      commitChange(()=>{
-        if(field==='algespaard'&&el.dataset.itemPath.startsWith('spaardoelen.'))u2SetGoalSavedAmount(item,value);
+      const current=findItemById(el.dataset.itemPath,el.dataset.itemId);
+      if(!current||JSON.stringify(current[field])===JSON.stringify(value))return;
+      if(!await commitChange(()=>{
+        if(field==='algespaard'&&el.dataset.itemPath.startsWith('spaardoelen.'))u2SetGoalSavedAmount(current,value);
         else updateItemById(el.dataset.itemPath, el.dataset.itemId, {[field]:value});
-      }, {render:false});
+      }, {render:false}))return;
     };
     el.addEventListener('change', save);
   });
@@ -2907,44 +2947,44 @@ function renderRowsTable(basePath, rows, opts={}){
 
 function handleTableClicks(root){
   root.querySelectorAll('[data-addrow]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
+    btn.addEventListener('click', async ()=>{
       const path = btn.dataset.addrow;
-      commitChange(()=>getPath(state, path).push({id:uid(), categorie:'', post:'', bedrag:0}), {render:false});
+      if(!await commitChange(()=>getPath(state, path).push({id:uid(), categorie:'', post:'', bedrag:0}), {render:false}))return;
       renderActiveTab();
     });
   });
   root.querySelectorAll('[data-remove-id][data-remove-path]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
+    btn.addEventListener('click', async ()=>{
       const path = btn.dataset.removePath;
       const label = path.includes('spaardoelen') ? 'Spaardoel verwijderd'
         : path.includes('variabel') ? 'Variabel budget verwijderd'
         : path.toLowerCase().includes('teruggaven') ? 'Teruggave verwijderd'
         : 'Vaste last verwijderd';
-      removeWithUndo(path, btn.dataset.removeId, label);
+      await removeWithUndo(path, btn.dataset.removeId, label);
     });
   });
   root.querySelectorAll('[data-move-row-id][data-source-path]').forEach(select=>{
-    select.addEventListener('change', ()=>{
+    select.addEventListener('change', async ()=>{
       const sourcePath = select.dataset.sourcePath;
       const targetPath = select.value;
       const id = select.dataset.moveRowId;
       if (!targetPath || targetPath === sourcePath) return;
       let movement = null;
-      if (!commitChange(()=>{ movement = moveItemById(sourcePath, targetPath, id); }, {render:false}) || !movement) return;
+      if (!await commitChange(()=>{ movement = moveItemById(sourcePath, targetPath, id); }, {render:false}) || !movement) return;
       renderActiveTab();
-      showUndoToast('Vaste last verplaatst', ()=>{
-        commitChange(()=>moveItemById(targetPath, sourcePath, id, movement.sourceIndex), {render:false});
+      showUndoToast('Vaste last verplaatst', async ()=>{
+        if(!await commitChange(()=>moveItemById(targetPath, sourcePath, id, movement.sourceIndex), {render:false}))return;
         renderActiveTab();
       });
     });
   });
   root.querySelectorAll('[data-remove-transaction]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
+    btn.addEventListener('click', async ()=>{
       const id = btn.dataset.removeTransaction;
       const tx=(state.transactions||[]).find(item=>item.id===id)||currentBankTransactions().find(item=>item.id===id);
       if(routeImportedTransactionEdit(tx))return;
       try{if(tx)assertMonthMutationAllowed(transactionMonth(tx));}catch(error){alert(error.message);return;}
-      removeWithUndo('transactions', id, 'Transactie verwijderd');
+      await removeWithUndo('transactions', id, 'Transactie verwijderd');
     });
   });
 }
@@ -3106,7 +3146,7 @@ function handleGoalClicks(root){
     toggle.setAttribute('aria-expanded','true');
     if(panel)panel.hidden=false;
   };
-  const updateChildren=(path,goalId,mutate)=>commitChange(()=>{
+  const updateChildren=async (path,goalId,mutate)=>await commitChange(()=>{
     const goal=findItemById(path,goalId);
     if(!goal)return;
     const savedAmount=Math.max(0,Number(goal.algespaard)||0);
@@ -3133,7 +3173,7 @@ function handleGoalClicks(root){
     if(!child)return;
     let value=input.value.trim();
     if(field==='doelbedrag')value=Math.max(0,round2(bankAmount(value)||0));
-    if(JSON.stringify(child[field])!==JSON.stringify(value))updateChildren(path,goalId,current=>{const target=current.subdoelen.find(item=>item.id===subgoalId);if(target)target[field]=value;});
+    if(JSON.stringify(child[field])!==JSON.stringify(value))await updateChildren(path,goalId,current=>{const target=current.subdoelen.find(item=>item.id===subgoalId);if(target)target[field]=value;});
     if(field!=='link'){reopenSubgoals(path,goalId);return;}
     const url=normalizeProductUrl(value);
     if(!url){showQuickToast('Link kon niet worden gelezen. Vul naam en bedrag handmatig in.');return;}
@@ -3141,7 +3181,7 @@ function handleGoalClicks(root){
     if(!shouldFetchProductSnapshot(latest,url)){reopenSubgoals(path,goalId);return;}
     try{
       const snapshot=await fetchProductSnapshot(url);
-      updateChildren(path,goalId,current=>{const target=current.subdoelen.find(item=>item.id===subgoalId);if(target)applyProductSnapshot(target,snapshot);});
+      await updateChildren(path,goalId,current=>{const target=current.subdoelen.find(item=>item.id===subgoalId);if(target)applyProductSnapshot(target,snapshot);});
       reopenSubgoals(path,goalId);
       if(snapshot.price===null)showQuickToast('Product gevonden, maar geen prijs. Vul het bedrag handmatig in.');
     }catch(error){
@@ -3149,30 +3189,30 @@ function handleGoalClicks(root){
       showQuickToast('Link kon niet worden gelezen. Vul naam en bedrag handmatig in.');
     }
   }));
-  root.querySelectorAll('[data-add-table-subgoal]').forEach(btn=>btn.addEventListener('click',()=>{
+  root.querySelectorAll('[data-add-table-subgoal]').forEach(btn=>btn.addEventListener('click',async ()=>{
     const [path,goalId]=btn.dataset.addTableSubgoal.split('|');
-    updateChildren(path,goalId,goal=>goal.subdoelen.push({id:uid(),naam:'Nieuw subdoel',doelbedrag:0,gespaard:0,link:'',voltooid:false}));
+    await updateChildren(path,goalId,goal=>goal.subdoelen.push({id:uid(),naam:'Nieuw subdoel',doelbedrag:0,gespaard:0,link:'',voltooid:false}));
     reopenSubgoals(path,goalId);
   }));
-  root.querySelectorAll('[data-remove-table-subgoal]').forEach(btn=>btn.addEventListener('click',()=>{
+  root.querySelectorAll('[data-remove-table-subgoal]').forEach(btn=>btn.addEventListener('click',async ()=>{
     const [path,goalId,subgoalId]=btn.dataset.removeTableSubgoal.split('|');
-    updateChildren(path,goalId,goal=>{goal.subdoelen=goal.subdoelen.filter(item=>item.id!==subgoalId);});
+    await updateChildren(path,goalId,goal=>{goal.subdoelen=goal.subdoelen.filter(item=>item.id!==subgoalId);});
     reopenSubgoals(path,goalId);
   }));
-  root.querySelectorAll('[data-move-table-subgoal]').forEach(btn=>btn.addEventListener('click',()=>{
+  root.querySelectorAll('[data-move-table-subgoal]').forEach(btn=>btn.addEventListener('click',async ()=>{
     const [path,goalId,subgoalId,deltaText]=btn.dataset.moveTableSubgoal.split('|');
-    updateChildren(path,goalId,goal=>{const index=goal.subdoelen.findIndex(item=>item.id===subgoalId);const target=index+Number(deltaText);if(index<0||target<0||target>=goal.subdoelen.length)return;const [child]=goal.subdoelen.splice(index,1);goal.subdoelen.splice(target,0,child);});
+    await updateChildren(path,goalId,goal=>{const index=goal.subdoelen.findIndex(item=>item.id===subgoalId);const target=index+Number(deltaText);if(index<0||target<0||target>=goal.subdoelen.length)return;const [child]=goal.subdoelen.splice(index,1);goal.subdoelen.splice(target,0,child);});
     reopenSubgoals(path,goalId);
   }));
   root.querySelectorAll('[data-move-goal]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
+    btn.addEventListener('click', async ()=>{
       const [path,id,directionText] = btn.dataset.moveGoal.split('|');
       const direction = Number(directionText);
       const arr = getPath(state, path);
       const idx = arr.findIndex(goal=>goal.id === id);
       const next = idx + direction;
       if (!Array.isArray(arr) || next < 0 || next >= arr.length) return;
-      commitChange(()=>moveItemById(path,path,id,next), {render:false}); renderActiveTab();
+      if(!await commitChange(()=>moveItemById(path,path,id,next), {render:false}))return; renderActiveTab();
     });
   });
 }
@@ -3675,6 +3715,7 @@ function openMobileGoalEditor(owner,id){
   const goal = index >= 0 ? state.spaardoelen?.[owner]?.[index] : null;
   if (!goal) return;
   const modal = document.getElementById('incomeEditModal');
+  modal.finizeGoalEdit=null;
   const name = ownerLabel(owner);
   modal.innerHTML = `<div class="modal goal-detail-editor"><div class="joint-variable-editor-header"><div><div class="section-kicker">${name} · ${monthLabel(getSelectedMonth())}</div><h2>Spaardoel bewerken</h2></div><button type="button" class="ghost" data-close-goal-editor>Sluiten</button></div><div class="modal-grid"><label class="full">Naam<input id="goalEditName" type="text" value="${textSafe(goal.naam || '')}"></label><label>Al gespaard<input id="goalEditSaved" type="number" step="0.01" inputmode="decimal" value="${Number(goal.algespaard)||0}"></label><label>Doelbedrag<input id="goalEditTarget" type="number" step="0.01" inputmode="decimal" value="${Number(goal.doelbedrag)||0}"></label><label>Doeldatum<input id="goalEditDate" type="date" value="${textSafe(goal.doeldatum || '')}"></label><label>Vaste inleg p/m<input id="goalEditMonthly" type="number" step="0.01" inputmode="decimal" value="${Number(goal.vasteInleg)||0}"></label><label class="goal-editor-fixed-only"><input id="goalEditFixedOnly" type="checkbox" ${goal.vastBedrag?'checked':''}> Alleen vaste inleg <span>— niet meedoen met verdeling naar rato</span></label><label>Rendement %<input id="goalEditReturn" type="number" step="0.01" inputmode="decimal" value="${Math.round((Number(goal.rendement)||0)*10000)/100}"></label><label>Periode<select id="goalEditPeriod"><option value="jaarlijks" ${goal.rendementPeriode !== 'maandelijks'?'selected':''}>Jaarlijks</option><option value="maandelijks" ${goal.rendementPeriode === 'maandelijks'?'selected':''}>Maandelijks</option></select></label><label class="full goal-editor-favorite"><input id="goalEditFavorite" type="checkbox" ${goal.favoriet?'checked':''}> Favoriet doel</label><section class="goal-calculation-card" id="goalEditCalculation"></section></div><div class="modal-actions"><button type="button" class="danger-ghost" id="goalEditDelete">Verwijderen</button><button type="button" class="primary" id="goalEditSave">Opslaan</button></div></div>`;
   modal.classList.add('open','goal-detail-editor-open');
@@ -3723,10 +3764,16 @@ function openMobileGoalEditor(owner,id){
       const savedAmount=round2(bankAmount(modal.querySelector('#goalEditSaved').value)||0);
       const ratioControl=modal.querySelector('#u2GoalRatio');
       const fixedOnly=ratioControl?!ratioControl.checked:modal.querySelector('#goalEditFixedOnly').checked;
-      const changes={naam:modal.querySelector('#goalEditName').value.trim(),doelbedrag:round2(bankAmount(modal.querySelector('#goalEditTarget').value)||0),doeldatum:modal.querySelector('#goalEditDate').value,vasteInleg:round2(bankAmount(modal.querySelector('#goalEditMonthly').value)||0),vastBedrag:fixedOnly,rendement:(bankAmount(modal.querySelector('#goalEditReturn').value)||0)/100,rendementPeriode:modal.querySelector('#goalEditPeriod').value,favoriet:modal.querySelector('#goalEditFavorite').checked,afbeelding:imageReference};
+      const extras=modal.finizeGoalEdit?.()||{};
+      const changes={naam:modal.querySelector('#goalEditName').value.trim(),doelbedrag:round2(bankAmount(modal.querySelector('#goalEditTarget').value)||0),doeldatum:modal.querySelector('#goalEditDate').value,vasteInleg:round2(bankAmount(modal.querySelector('#goalEditMonthly').value)||0),vastBedrag:fixedOnly,rendement:(bankAmount(modal.querySelector('#goalEditReturn').value)||0)/100,rendementPeriode:modal.querySelector('#goalEditPeriod').value,favoriet:modal.querySelector('#goalEditFavorite').checked,...extras,afbeelding:imageReference};
       const selectedOwner=modal.querySelector('#u2GoalOwner')?.value;
       const targetOwner=manageableGoalOwnerKeys().includes(selectedOwner)?selectedOwner:owner;
-      if(!commitChange(()=>{updateItemById(`spaardoelen.${targetOwner}`,id,changes);u2SetGoalSavedAmount(goal,savedAmount);},{render:false})) throw new Error('Lokale opslag is mislukt.');
+      if(!await commitChange(()=>{
+        const current=state.spaardoelen[owner].find(item=>item.id===id);
+        if(!current)throw new Error('Dit spaardoel is intussen verplaatst of verwijderd. Heropen de actuele stand.');
+        Object.assign(current,changes);u2NormalizeChildren(current);u2SetGoalSavedAmount(current,savedAmount);
+        if(targetOwner!==owner){moveItemById(`spaardoelen.${owner}`,`spaardoelen.${targetOwner}`,id);}
+      },{render:false})) throw new Error('Lokale opslag is mislukt.');
       if (!goalImageData){
         try{ await GoalImageStore.remove(id); }
         catch(error){ console.warn('Verwijderde spaardoelfoto kon niet uit IndexedDB worden opgeruimd.', error); }
@@ -3743,7 +3790,7 @@ function openMobileGoalEditor(owner,id){
       saveButton.disabled=false;
     }
   });
-  modal.querySelector('#goalEditDelete').addEventListener('click',()=>{ close(); removeWithUndo(`spaardoelen.${owner}`,id,'Spaardoel verwijderd'); });
+  modal.querySelector('#goalEditDelete').addEventListener('click',async ()=>{ close(); await removeWithUndo(`spaardoelen.${owner}`,id,'Spaardoel verwijderd'); });
 }
 function openMobileGoalManager(owner){
   const goals = state.spaardoelen?.[owner] || [];
@@ -3757,12 +3804,12 @@ function openMobileGoalManager(owner){
   const close=()=>{modal.classList.remove('open','goal-manager-editor-open');modal.innerHTML='';renderActiveTab();};
   modal.querySelectorAll('[data-close-goal-manager]').forEach(btn=>btn.addEventListener('click',close));
   modal.querySelectorAll('[data-open-manager-goal]').forEach(btn=>{const open=()=>{modal.classList.remove('open','goal-manager-editor-open');openMobileGoalEditor(owner,btn.dataset.openManagerGoal);};btn.addEventListener('click',open);btn.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();open();}});});
-  modal.querySelectorAll('[data-move-manager-goal]').forEach(btn=>btn.addEventListener('click',event=>{event.stopPropagation();const [id,deltaText]=btn.dataset.moveManagerGoal.split(':');const index=goals.findIndex(goal=>goal.id===id);const target=index+Number(deltaText);if(index<0||target<0||target>=goals.length)return;commitChange(()=>moveItemById(`spaardoelen.${owner}`,`spaardoelen.${owner}`,id,target),{render:false});openMobileGoalManager(owner);}));
-  modal.querySelectorAll('[data-remove-manager-goal]').forEach(btn=>btn.addEventListener('click',event=>{event.stopPropagation();modal.classList.remove('open','goal-manager-editor-open');removeWithUndo(`spaardoelen.${owner}`,btn.dataset.removeManagerGoal,'Spaardoel verwijderd');}));
-  modal.querySelector('[data-add-manager-goal]').addEventListener('click',()=>{
+  modal.querySelectorAll('[data-move-manager-goal]').forEach(btn=>btn.addEventListener('click',async event=>{event.stopPropagation();const [id,deltaText]=btn.dataset.moveManagerGoal.split(':');const index=goals.findIndex(goal=>goal.id===id);const target=index+Number(deltaText);if(index<0||target<0||target>=goals.length)return;if(!await commitChange(()=>moveItemById(`spaardoelen.${owner}`,`spaardoelen.${owner}`,id,target),{render:false}))return;openMobileGoalManager(owner);}));
+  modal.querySelectorAll('[data-remove-manager-goal]').forEach(btn=>btn.addEventListener('click',async event=>{event.stopPropagation();modal.classList.remove('open','goal-manager-editor-open');await removeWithUndo(`spaardoelen.${owner}`,btn.dataset.removeManagerGoal,'Spaardoel verwijderd');}));
+  modal.querySelector('[data-add-manager-goal]').addEventListener('click',async ()=>{
     modal.classList.remove('open','goal-manager-editor-open');
     modal.innerHTML='';
-    createGoalForOwner(owner);
+    await createGoalForOwner(owner);
   });
 }
 function renderMobileSpaardoelen(){
@@ -3971,7 +4018,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       if(!await DataAdapter.backup(state, 'voor alles wissen')){alert('Noodback-up niet bevestigd; gegevens behouden.');return;}
       const stateBeforeReset = clone(state);
       state = normalizeBudgetState(defaultState()); window.state = state; committedStateSnapshot = stateBeforeReset;
-      if (!commitChange(()=>{}, {render:false})) return;
+      if (!await commitChange(()=>{}, {render:false})) return;
       renderActiveTab();
     }
   });
@@ -4080,7 +4127,7 @@ function bankRememberCategory(description, category){
   state.bankImportRules.unshift({match,category});
   state.bankImportRules = state.bankImportRules.slice(0,200);
 }
-function bankImportRows(indexes){
+async function bankImportRows(indexes){
   if (!bankImportDraft) return;
   const wanted = new Set(indexes);
   const rows = bankImportDraft.rows.filter(row=>wanted.has(row.index) && row.selected && !row.duplicate && row.valid);
@@ -4094,7 +4141,7 @@ function bankImportRows(indexes){
     row.imported = true; row.selected = false;
   });
   if (!rows.length) return;
-  persist();
+  if(!await persist()){rows.forEach(row=>{row.imported=false;row.selected=true;});return;}
   showQuickToast(`${rows.length} regel${rows.length === 1 ? '' : 's'} in de controlewachtrij gezet`);
   bankImportDraft = null;
   renderActiveTab();
@@ -4126,8 +4173,8 @@ function bindBankImport(root){
   root.querySelectorAll('[data-bank-map]').forEach(select=>select.addEventListener('change',()=>{ bankImportOpen = true; bankImportDraft.mapping[select.dataset.bankMap] = select.value; bankParseDraft(); renderActiveTab(); }));
   root.querySelectorAll('[data-bank-select]').forEach(input=>input.addEventListener('change',()=>{ const row=bankImportDraft?.rows.find(item=>item.index === Number(input.dataset.bankSelect)); if (row) { bankImportOpen = true; row.selected = input.checked; renderActiveTab(); } }));
   root.querySelectorAll('[data-bank-category]').forEach(select=>select.addEventListener('change',()=>{ const row=bankImportDraft?.rows.find(item=>item.index === Number(select.dataset.bankCategory)); if (row) row.category = select.value; }));
-  root.querySelector('[data-bank-import-all]')?.addEventListener('click',()=>bankImportRows(bankImportDraft.rows.filter(row=>row.selected).map(row=>row.index)));
-  root.querySelectorAll('[data-bank-import-row]').forEach(button=>button.addEventListener('click',()=>bankImportRows([Number(button.dataset.bankImportRow)])));
+  root.querySelector('[data-bank-import-all]')?.addEventListener('click',async ()=>await bankImportRows(bankImportDraft.rows.filter(row=>row.selected).map(row=>row.index)));
+  root.querySelectorAll('[data-bank-import-row]').forEach(button=>button.addEventListener('click',async ()=>await bankImportRows([Number(button.dataset.bankImportRow)])));
 }
 
 function routeImportedTransactionEdit(tx){
@@ -4187,7 +4234,7 @@ function openContextTransactionModal(owner,transactionId=''){
   modal.classList.add('open','joint-transaction-modal-open');bindFinancialProcessingFields(modal,prefix,destination,existing,account);
   const close=()=>modal.classList.remove('open','joint-transaction-modal-open');modal.querySelector('#btnClose'+suffix).onclick=close;modal.querySelector('#btnCancel'+suffix).onclick=close;bindModalBackdrop(modal,close);
   modal.querySelector('[data-p4-open-coverage]')?.addEventListener('click',()=>openSavingsCoverageModal(existing.id));
-  modal.querySelector('#btnSave'+suffix).onclick=()=>{
+  modal.querySelector('#btnSave'+suffix).onclick=async ()=>{
     const button=modal.querySelector('#btnSave'+suffix);if(button.disabled)return;
     try{
       const amount=bankAmount(document.getElementById(prefix+'Amount').value),fields=readFinancialProcessingFields(prefix),date=document.getElementById(prefix+'Date').value,type=fields.transactionType;
@@ -4201,7 +4248,7 @@ function openContextTransactionModal(owner,transactionId=''){
       const next={...(existing||{}),...fields,id:existing?.id||uid(),date,transactionDate:date,owner:financialDestination,financialFor:financialDestination,budgetOwner:financialDestination,category,amount,description:document.getElementById(prefix+'Description').value.trim(),note:document.getElementById(prefix+'Note').value.trim(),kind:income?'inkomen':'uitgave',createdAt:existing?.createdAt||new Date().toISOString(),fixedExpenseId:fixed?.itemId||'',fixedOccurrenceId:fixed?.id||'',fixedOccurrenceMonth:fixed?.month||'',incomeSourceId};
       if(existing?.processing)next.processing={...existing.processing,...fields,transactionType:type,category,budgetOwner:financialDestination,processedAmount:amount,fixedExpenseId:next.fixedExpenseId,fixedOccurrenceId:next.fixedOccurrenceId,fixedOccurrenceMonth:next.fixedOccurrenceMonth,incomeSourceId:next.incomeSourceId};
       const candidate=clone(state);upsertManualFinancialTransaction(candidate,next,account,{today:localTransactionToday()});button.disabled=true;
-      if(!commitChange(()=>upsertManualFinancialTransaction(state,next,account,{today:localTransactionToday()}),{render:false})){button.disabled=false;throw new Error('Opslaan is afgebroken.');}close();renderActiveTab();
+      if(!await commitChange(()=>upsertManualFinancialTransaction(state,next,account,{today:localTransactionToday()}),{render:false})){button.disabled=false;throw new Error('Opslaan is afgebroken.');}close();renderActiveTab();
     }catch(error){modal.querySelector('[data-p4-error]').textContent=error.message;}
   };
 }
@@ -4215,15 +4262,15 @@ function openSavingsCoverageModal(transactionId){
     const current=allocations.find(a=>a.id===editing);
     modal.innerHTML=`<div class="modal joint-transaction-fullscreen-editor"><div class="card-head"><h2>Spaardekking · ${monthLabel(month)}</h2><button class="ghost" data-p4-close>Sluiten</button></div><p class="hint">Echte uitgaven blijven behouden. Dekking vermindert alleen de reguliere maandbelasting.</p><div class="modal-grid"><label>Spaaropname<select data-p4-withdrawal><option value="">Kies opname</option>${withdrawals.map(p=>`<option value="${attrSafe(p.id)}" ${p.id===(current?.withdrawalTransactionId||anchor?.transactionType==='van-spaarrekening'&&anchor.id)?'selected':''}>${textSafe(label(p))} · ongebruikt ${eur(p.effects.unusedSavings)}</option>`).join('')}</select></label><label>Uitgave / split<select data-p4-expense><option value="">Kies uitgave</option>${expenses.map(p=>`<option value="${attrSafe(p.id)}" ${p.id===(current?.expenseTransactionId||anchor?.effects.realExpense>0&&anchor.id)?'selected':''}>${textSafe(label(p))}</option>`).join('')}</select></label><label>Dekkingsbedrag<input data-p4-amount type="number" step="0.01" min="0.01" value="${current?current.amountCents/100:''}"></label></div><p class="hint" role="alert" data-p4-error></p><div class="modal-actions"><button class="primary" data-p4-save>${editing?'Dekking wijzigen':'Dekking toevoegen'}</button></div><div class="summary-list">${allocations.map(a=>{const status=statuses.get(a.id);return `<div class="summary-line"><span>${eur(a.amountCents/100)} · ${status?.active?'Actief':textSafe(coverageMessage(status?.reason))}</span><button class="ghost small" data-p4-edit="${attrSafe(a.id)}">Wijzigen</button><button class="danger-ghost small" data-p4-remove="${attrSafe(a.id)}">Verwijderen</button></div>`;}).join('')||'<p class="hint">Nog geen dekking.</p>'}</div></div>`;
     modal.classList.add('open','joint-transaction-modal-open');modal.querySelector('[data-p4-close]').onclick=()=>modal.classList.remove('open','joint-transaction-modal-open');
-    modal.querySelector('[data-p4-save]').onclick=()=>{try{
+    modal.querySelector('[data-p4-save]').onclick=async ()=>{try{
       const withdrawal=rows.find(p=>p.id===modal.querySelector('[data-p4-withdrawal]').value),expense=rows.find(p=>p.id===modal.querySelector('[data-p4-expense]').value);if(!withdrawal||!expense)throw new Error('Kies een opname en een uitgave.');
       const amount=bankAmount(modal.querySelector('[data-p4-amount]').value),amountCents=Math.round(amount*100);if(!Number.isFinite(amount)||Math.abs(amount*100-amountCents)>1e-6)throw new Error('Vul gehele eurocenten in.');
       const w=projectionLineReference(withdrawal),e=projectionLineReference(expense),allocation={id:editing||uid(),withdrawalTransactionId:w.transactionId,withdrawalSourceKey:w.sourceKey,withdrawalSplitId:w.splitId,expenseTransactionId:e.transactionId,expenseSourceKey:e.sourceKey,expenseSplitId:e.splitId,amountCents},audit={createdAt:new Date().toISOString(),updatedBy:getDeviceId()};
       setSavingsCoverageAllocation(clone(state),allocation,audit);assertMonthMutationAllowed(month);
-      if(!commitChange(()=>setSavingsCoverageAllocation(state,allocation,audit),{render:false}))throw new Error('Dekking opslaan is afgebroken.');renderActiveTab();openSavingsCoverageModal(transactionId);
+      if(!await commitChange(()=>setSavingsCoverageAllocation(state,allocation,audit),{render:false}))throw new Error('Dekking opslaan is afgebroken.');renderActiveTab();openSavingsCoverageModal(transactionId);
     }catch(error){modal.querySelector('[data-p4-error]').textContent=error.message;}};
     modal.querySelectorAll('[data-p4-edit]').forEach(button=>button.onclick=()=>{editing=button.dataset.p4Edit;render();});
-    modal.querySelectorAll('[data-p4-remove]').forEach(button=>button.onclick=()=>{try{const audit={updatedAt:new Date().toISOString(),updatedBy:getDeviceId()};removeSavingsCoverageAllocation(clone(state),button.dataset.p4Remove,audit);assertMonthMutationAllowed(month);if(!commitChange(()=>removeSavingsCoverageAllocation(state,button.dataset.p4Remove,audit),{render:false}))throw new Error('Verwijderen is afgebroken.');renderActiveTab();openSavingsCoverageModal(transactionId);}catch(error){modal.querySelector('[data-p4-error]').textContent=error.message;}});
+    modal.querySelectorAll('[data-p4-remove]').forEach(button=>button.onclick=async ()=>{try{const audit={updatedAt:new Date().toISOString(),updatedBy:getDeviceId()};removeSavingsCoverageAllocation(clone(state),button.dataset.p4Remove,audit);assertMonthMutationAllowed(month);if(!await commitChange(()=>removeSavingsCoverageAllocation(state,button.dataset.p4Remove,audit),{render:false}))throw new Error('Verwijderen is afgebroken.');renderActiveTab();openSavingsCoverageModal(transactionId);}catch(error){modal.querySelector('[data-p4-error]').textContent=error.message;}});
   };render();
 }
 
@@ -4287,20 +4334,20 @@ function showUndoToast(message, undo){
   showQuickToast._t = setTimeout(()=>toast.classList.remove('show'), 6000);
 }
 
-function removeWithUndo(path, id, message, rerender=true){
+async function removeWithUndo(path, id, message, rerender=true){
   if(path==='transactions'&&routeImportedTransactionEdit((state.transactions||[]).find(tx=>tx.id===id)))return;
   if(path==='transactions'){try{const candidate=clone(state);candidate.transactions=candidate.transactions.filter(tx=>tx.id!==id);synchronizeChangedSavings(candidate,state);assertManualCandidateSafe(state,candidate,id);}catch(error){alert(error.message);return false;}}
   let removed = null;
-  const ok = commitChange(()=>{ removed = removeItemById(path, id); }, {render:false});
+  const ok = await commitChange(()=>{ removed = removeItemById(path, id); }, {render:false});
   if (!ok || !removed) return false;
   if (rerender) renderActiveTab();
-  showUndoToast(message, ()=>{
-    commitChange(()=>{
+  showUndoToast(message, async ()=>{
+    if(!await commitChange(()=>{
       const rows = getPath(state, removed.path);
       if (Array.isArray(rows) && !rows.some(item=>item?.id === removed.item.id)){
         rows.splice(Math.min(removed.index, rows.length), 0, removed.item);
       }
-    }, {render:false});
+    }, {render:false}))return;
     if (rerender) renderActiveTab();
   });
   return true;
@@ -4456,7 +4503,7 @@ function openJointVariableCostsModal(focusLast=false, owner='gezamenlijk'){
       draftRows.push({id:uid(), categorie:'Variabel', post:'', bedrag:0});
       draw(true);
     });
-    modal.querySelector('[data-variable-save]')?.addEventListener('click',()=>{
+    modal.querySelector('[data-variable-save]')?.addEventListener('click',async ()=>{
       syncDraftFromInputs();
       const cleaned = draftRows.map(row=>({
         ...row,
@@ -4465,7 +4512,7 @@ function openJointVariableCostsModal(focusLast=false, owner='gezamenlijk'){
         post:String(row.post||'').trim(),
         bedrag:round2(Number(row.bedrag)||0)
       }));
-      const saved = commitChange(()=>{
+      const saved = await commitChange(()=>{
         assertMonthMutationAllowed(month);
         ensureMonthData(month);
         setBudgetForMonth(state,owner,month,cleaned,{scope:saveScope});
@@ -4534,10 +4581,10 @@ function openSavingEditModal(){
   document.getElementById('btnCloseSavingEdit').addEventListener('click', close);
   document.getElementById('btnCancelSavingEdit').addEventListener('click', close);
   bindModalBackdrop(modal,close);
-  document.getElementById('btnSaveSavingEdit').addEventListener('click', ()=>{
+  document.getElementById('btnSaveSavingEdit').addEventListener('click', async ()=>{
     const parsed = parseFloat(String(input.value).replace(',', '.'));
     if(!Number.isFinite(parsed)){alert('Vul een geldig spaarbedrag in.');return;}
-    const saved=commitChange(()=>{
+    const saved=await commitChange(()=>{
       assertMonthMutationAllowed(month);
       setSavingsPlanForMonth(state,savingKey,month,parsed);
     },{render:false});
@@ -4576,8 +4623,8 @@ function openPersonalSavingEditModal(owner){
     </div>`;
   modal.classList.add('open');
   const close=()=>{modal.classList.remove('open');modal.innerHTML='';};
-  const removeOverride=()=>{
-    const saved=commitChange(()=>{
+  const removeOverride=async ()=>{
+    const saved=await commitChange(()=>{
       assertMonthMutationAllowed(month);
       if(isPlainObject(state.monthlySavingOverrides?.[month])){
         delete state.monthlySavingOverrides[month][owner];
@@ -4591,10 +4638,10 @@ function openPersonalSavingEditModal(owner){
   document.getElementById('btnCancelPersonalSaving').addEventListener('click',close);
   document.getElementById('btnUseAutomaticSaving').addEventListener('click',removeOverride);
   bindModalBackdrop(modal,close);
-  document.getElementById('btnSavePersonalSaving').addEventListener('click',()=>{
+  document.getElementById('btnSavePersonalSaving').addEventListener('click',async ()=>{
     const value=bankAmount(document.getElementById('personalSavingInput').value);
     if(!Number.isFinite(value)){alert('Vul een geldig spaarbedrag in.');return;}
-    const saved=commitChange(()=>{
+    const saved=await commitChange(()=>{
       assertMonthMutationAllowed(month);
       setSavingsPlanForMonth(state,owner,month,value);
     },{render:false});
@@ -4675,10 +4722,10 @@ function openIncomeEditModal(person, label){
   document.getElementById('btnCloseIncomeEdit').addEventListener('click', close);
   document.getElementById('btnCancelIncomeEdit').addEventListener('click', close);
   bindModalBackdrop(modal,close);
-  document.getElementById('btnSaveIncomeEdit').addEventListener('click', ()=>{
+  document.getElementById('btnSaveIncomeEdit').addEventListener('click', async ()=>{
     const parsed = parseFloat(String(input.value).replace(',', '.'));
     const refund=bankAmount(refundInput.value);
-    if(!commitChange(()=>setIncomeDefaultsFromMonth(person,month,Number.isFinite(parsed)?parsed:0,Number.isFinite(refund)?refund:0),{render:false}))return;
+    if(!await commitChange(()=>setIncomeDefaultsFromMonth(person,month,Number.isFinite(parsed)?parsed:0,Number.isFinite(refund)?refund:0),{render:false}))return;
     close();
     renderActiveTab();
     showQuickToast('Inkomen opgeslagen');
@@ -4716,11 +4763,11 @@ function openTotalIncomeEditModal(){
   document.getElementById('btnCloseTotalIncomeEdit').addEventListener('click',close);
   document.getElementById('btnCancelTotalIncomeEdit').addEventListener('click',close);
   bindModalBackdrop(modal,close);
-  document.getElementById('btnSaveTotalIncomeEdit').addEventListener('click',()=>{
+  document.getElementById('btnSaveTotalIncomeEdit').addEventListener('click',async ()=>{
     assertMonthMutationAllowed(month);ensureMonthData(month);
     const values={dion:{salary:amount(inputs[0]),refund:amount(inputs[1])},dara:{salary:amount(inputs[2]),refund:amount(inputs[3])}};
     const onlyMonth=document.getElementById('incomeOnlyThisMonth').checked;
-    const saved=commitChange(()=>{
+    const saved=await commitChange(()=>{
       assertMonthMutationAllowed(month);
     if(onlyMonth){
       state.monthlyIncomeOverrides[month]=isPlainObject(state.monthlyIncomeOverrides[month])?state.monthlyIncomeOverrides[month]:{};
@@ -5109,7 +5156,7 @@ function renderActiveTab(){
   });
   bindDirectGoalOrdering(root);
   root.querySelectorAll('[data-add-goal]').forEach(btn=>{
-    btn.addEventListener('click',()=>createGoalForOwner(btn.dataset.addGoal));
+    btn.addEventListener('click',async ()=>await createGoalForOwner(btn.dataset.addGoal));
   });
   root.querySelectorAll('.mobile-savings-overview .manage-section').forEach(section=>{
     section.querySelector('summary')?.addEventListener('click',event=>{
@@ -5249,23 +5296,23 @@ document.getElementById('monthPickerButton').addEventListener('click', (e)=>{
   if (control.classList.contains('open')) closeMonthPicker();
   else openMonthPicker();
 });
-document.getElementById('monthPickerPanel').addEventListener('click', (e)=>{
+document.getElementById('monthPickerPanel').addEventListener('click', async (e)=>{
   e.stopPropagation(); // Rendering replaces the clicked button; the outer handler must not close the new picker.
+  const panel=e.currentTarget;
+  if(panel.dataset.saving==='true')return;
   const yearBtn = e.target.closest('[data-month-year]');
-  if (yearBtn){
-    const currentMonth = getSelectedMonth().slice(5,7);
-    setSelectedMonth(yearBtn.dataset.monthYear + '-' + currentMonth);
-    persist();
-    renderActiveTab();
-    openMonthPicker();
-    return;
-  }
   const monthBtn = e.target.closest('[data-month-value]');
-  if (monthBtn){
-    setSelectedMonth(monthBtn.dataset.monthValue);
-    persist();
-    closeMonthPicker();
+  if(!yearBtn&&!monthBtn)return;
+  panel.dataset.saving='true';panel.querySelectorAll('button').forEach(button=>button.disabled=true);
+  try{
+    const selected=yearBtn?yearBtn.dataset.monthYear+'-'+getSelectedMonth().slice(5,7):monthBtn.dataset.monthValue;
+    setSelectedMonth(selected);
+    if(!await persist())return;
+    if(monthBtn)closeMonthPicker();
     renderActiveTab();
+    if(yearBtn)openMonthPicker();
+  }finally{
+    delete panel.dataset.saving;panel.querySelectorAll('button').forEach(button=>button.disabled=false);
   }
 });
 document.addEventListener('click', (e)=>{
@@ -5559,13 +5606,13 @@ function u2OpenProcessModal(owner){
     }));
     modal.querySelectorAll('[data-u2-close]').forEach(btn=>btn.addEventListener('click',()=>{modal.classList.remove('open','u2-process-open');modal.innerHTML='';}));
     modal.querySelector('[data-u2-fixed-ratio]')?.addEventListener('click',()=>{amounts=u2FixedFallback(items,pot);render();});
-    modal.querySelector('[data-u2-confirm]').addEventListener('click',()=>{
+    modal.querySelector('[data-u2-confirm]').addEventListener('click',async ()=>{
       const total=round2(amounts.reduce((sum,value)=>sum+(Number(value)||0),0));
       const invalid=amounts.some((value,index)=>value<0 || value>items[index].nogTeGaan+.005);
       if(invalid){modal.querySelector('[data-u2-error]').textContent='Een bedrag is ongeldig of hoger dan de resterende doelruimte.';return;}
       if(total>pot+.005){modal.querySelector('[data-u2-error]').textContent='De verdeling is hoger dan de beschikbare spaarpot.';return;}
       const proposed=items.map(item=>item.werkelijkeInleg);
-      const ok=commitChange(()=>{
+      const ok=await commitChange(()=>{
         if (state.spaardoelGeschiedenis[u2HistoryKey(owner,month)]) throw new Error('Deze maand is al verwerkt.');
         const transactions=goals.map((goal,index)=>{
           const amount=round2(amounts[index]||0);
@@ -5763,14 +5810,14 @@ openMobileGoalEditor=function(owner,id){
     section.querySelector('[data-u2-add-child]')?.addEventListener('click',()=>{sync();drafts.push({id:uid(),naam:'Nieuw subdoel',doelbedrag:0,gespaard:0,link:'',voltooid:false});renderChildren();});
     section.querySelectorAll('[data-u2-child-remove]').forEach(btn=>btn.addEventListener('click',()=>{sync();drafts.splice(Number(btn.dataset.u2ChildRemove),1);renderChildren();}));
     const move=(from,to)=>{sync();if(to<0||to>=drafts.length)return;const [child]=drafts.splice(from,1);drafts.splice(to,0,child);renderChildren();};
-    section.querySelectorAll('[data-u2-child-up]').forEach(btn=>btn.addEventListener('click',()=>move(Number(btn.dataset.u2ChildUp),Number(btn.dataset.u2ChildUp)-1)));
-    section.querySelectorAll('[data-u2-child-down]').forEach(btn=>btn.addEventListener('click',()=>move(Number(btn.dataset.u2ChildDown),Number(btn.dataset.u2ChildDown)+1)));
+    section.querySelectorAll('[data-u2-child-up]').forEach(btn=>btn.addEventListener('click',async ()=>await move(Number(btn.dataset.u2ChildUp),Number(btn.dataset.u2ChildUp)-1)));
+    section.querySelectorAll('[data-u2-child-down]').forEach(btn=>btn.addEventListener('click',async ()=>await move(Number(btn.dataset.u2ChildDown),Number(btn.dataset.u2ChildDown)+1)));
     let dragIndex=null;
     section.querySelectorAll('[data-u2-child]').forEach(row=>{
       row.addEventListener('dragstart',()=>{sync();dragIndex=Number(row.dataset.u2Child);row.classList.add('dragging');});
       row.addEventListener('dragend',()=>row.classList.remove('dragging'));
       row.addEventListener('dragover',event=>event.preventDefault());
-      row.addEventListener('drop',event=>{event.preventDefault();const target=Number(row.dataset.u2Child);if(dragIndex!==null&&dragIndex!==target)move(dragIndex,target);});
+      row.addEventListener('drop',async event=>{event.preventDefault();const target=Number(row.dataset.u2Child);if(dragIndex!==null&&dragIndex!==target)await move(dragIndex,target);});
     });
     section.querySelectorAll('input').forEach(input=>input.addEventListener('input',sync));
     section.querySelectorAll('[data-u2-child-link]').forEach(input=>input.addEventListener('change',()=>lookupProduct(input)));
@@ -5801,7 +5848,7 @@ openMobileGoalEditor=function(owner,id){
     u2CloseButton.onclick=u2CloseEditor;
     u2CloseButton.addEventListener('pointerup',u2CloseEditor,{once:true});
   }
-  modal.querySelector('#goalEditSave').addEventListener('click',()=>{
+  modal.finizeGoalEdit=()=>{
     section.querySelectorAll('input').forEach(input=>input.dispatchEvent(new Event('input')));
     const newOwner=modal.querySelector('#u2GoalOwner').value;
     if(!manageableGoalOwnerKeys().includes(newOwner))return;
@@ -5818,18 +5865,9 @@ openMobileGoalEditor=function(owner,id){
       vastBedrag:!modal.querySelector('#u2GoalRatio').checked,
       subdoelen:drafts.map((child,index)=>({...child,volgorde:index}))
     };
-    const savedAmount=round2(bankAmount(modal.querySelector('#goalEditSaved').value)||0);
     u2NormalizeChildren(extras);
-    commitChange(()=>{
-      const source=state.spaardoelen[owner];
-      const index=source.findIndex(item=>item.id===id);
-      if(index<0)return;
-      Object.assign(source[index],extras);
-      u2NormalizeChildren(source[index]);
-      u2SetGoalSavedAmount(source[index],savedAmount);
-      if(newOwner!==owner){const [moved]=source.splice(index,1);state.spaardoelen[newOwner].push(moved);}
-    },{render:false});
-  },true);
+    return extras;
+  };
   const calculation=grid.querySelector('.goal-calculation-card');
   const settingsDetails=document.createElement('details');
   settingsDetails.className='full u2-editor-details';
@@ -6206,7 +6244,7 @@ function renderU3AdminPanel(){
   return renderManageSection('Maandadministratie',body,false,'data-dashboard-accordion="month-admin"');
 }
 function bindU3Admin(root){
-  root.querySelectorAll('[data-u3-open]').forEach(button=>button.addEventListener('click',()=>{
+  root.querySelectorAll('[data-u3-open]').forEach(button=>button.addEventListener('click',async ()=>{
     const view=button.dataset.u3Open;
     if(view==='planning')u3OpenPlanning(button.dataset.u3PlanningOwner||'');
     else if(view==='review')u3OpenReview();
@@ -6216,7 +6254,7 @@ function bindU3Admin(root){
       const current=state.actualIncomeOverrides?.[month]?.total;
       const value=prompt(`Werkelijk inkomen voor ${month}. Laat leeg om de handmatige correctie te verwijderen.`,Number.isFinite(Number(current))?String(current):String(u3ActualIncome(month)));
       if(value===null)return;
-      const ok=commitChange(()=>{
+      const ok=await commitChange(()=>{
         state.actualIncomeOverrides=isPlainObject(state.actualIncomeOverrides)?state.actualIncomeOverrides:{};
         if(!String(value).trim())delete state.actualIncomeOverrides[month];
         else{
@@ -6309,26 +6347,26 @@ function u3OpenRecurringEditor(kind,id='',defaults={}){
   };
   modal.querySelector('#u3RecFor')?.addEventListener('change',updateDistributionField);
   updateDistributionField();
-  modal.querySelector('#u3RecStop')?.addEventListener('click',()=>{
-    try{u3AssertMonthOpen();commitChange(()=>income?endIncomeSourceFromMonth(state,record,nextPlanningMonth(current)):endRecurringFromMonth(record,nextPlanningMonth(current)),{render:false});u3OpenPlanning(planningOwner);}catch(error){alert(error.message);}
+  modal.querySelector('#u3RecStop')?.addEventListener('click',async ()=>{
+    try{u3AssertMonthOpen();if(!await commitChange(()=>income?endIncomeSourceFromMonth(state,record,nextPlanningMonth(current)):endRecurringFromMonth(record,nextPlanningMonth(current)),{render:false}))return;u3OpenPlanning(planningOwner);}catch(error){alert(error.message);}
   });
-  modal.querySelector('#u3RecDelete')?.addEventListener('click',()=>{
+  modal.querySelector('#u3RecDelete')?.addEventListener('click',async ()=>{
     const label=existing?.naam||`${income?'inkomstenbron':'vaste last'}`;
     if(!confirm(`“${label}” verwijderen vanaf ${monthLabel(current)}? Eerdere maanden en bestaande transacties blijven bewaard.`))return;
     try{
       u3AssertMonthOpen();
-      commitChange(()=>income?endIncomeSourceFromMonth(state,record,current):endRecurringFromMonth(record,current),{render:false});
+      if(!await commitChange(()=>income?endIncomeSourceFromMonth(state,record,current):endRecurringFromMonth(record,current),{render:false}))return;
       u3OpenPlanning(planningOwner);
       showQuickToast(`${income?'Inkomstenbron':'Vaste last'} verwijderd vanaf ${monthLabel(current)}`);
     }catch(error){alert(error.message);}
   });
-  modal.querySelector('#u3RecSave').addEventListener('click',()=>{
+  modal.querySelector('#u3RecSave').addEventListener('click',async ()=>{
     try{
       u3AssertMonthOpen();
       const name=modal.querySelector('#u3RecName').value.trim();
       const amount=round2(bankAmount(modal.querySelector('#u3RecAmount').value));
       if(!name||!Number.isFinite(amount)||amount<0)throw new Error('Vul een naam en een geldig bedrag in.');
-      commitChange(()=>{
+      if(!await commitChange(()=>{
         const item=record||{id:uid(),amountHistory:[],monthOverrides:{},recognition:{text:'',counterparty:'',amountTolerance:5}};
         const changes={naam:name,rekening:modal.querySelector('#u3RecAccount').value,financialFor:modal.querySelector('#u3RecFor').value,
           frequentieAantal:Math.max(1,Math.floor(Number(modal.querySelector('#u3RecFrequency').value)||1)),frequentieEenheid:modal.querySelector('#u3RecUnit').value,
@@ -6339,7 +6377,7 @@ function u3OpenRecurringEditor(kind,id='',defaults={}){
         const scope=modal.querySelector('#u3RecScope').value;
         if(income)setIncomeSourceForMonth(state,item,current,changes,{scope,isNew:!record});
         else{setRecurringFromMonth(item,current,changes,{scope,isNew:!record});if(!record)u3RecurringRows(kind).push(item);}
-      },{render:false});
+      },{render:false}))return;
       u3OpenPlanning(planningOwner);
     }catch(error){alert(error.message);}
   });
@@ -6368,10 +6406,10 @@ function u3OpenReview(){
     </article>`;
   }).join('');
   const {modal}=u3AdminModal(`<div class="u3-admin-head"><div><div class="section-kicker">${monthLabel(getSelectedMonth())}</div><h2>Transacties controleren</h2><p>Suggesties worden nooit automatisch bevestigd.</p></div><button class="ghost" data-u3-close>Sluiten</button></div><div class="u3-admin-list">${rowHtml||'<div class="u3-empty">Alles is gecontroleerd.</div>'}</div>`);
-  modal.querySelectorAll('[data-u3-ignore-review]').forEach(button=>button.addEventListener('click',()=>{
-    commitChange(()=>{const row=state.transactionReviewQueue.find(item=>item.id===button.dataset.u3IgnoreReview);if(row)row.reviewStatus='genegeerd';},{render:false});u3OpenReview();
+  modal.querySelectorAll('[data-u3-ignore-review]').forEach(button=>button.addEventListener('click',async ()=>{
+    if(!await commitChange(()=>{const row=state.transactionReviewQueue.find(item=>item.id===button.dataset.u3IgnoreReview);if(row)row.reviewStatus='genegeerd';},{render:false}))return;u3OpenReview();
   }));
-  modal.querySelectorAll('[data-u3-confirm-review]').forEach(button=>button.addEventListener('click',()=>{
+  modal.querySelectorAll('[data-u3-confirm-review]').forEach(button=>button.addEventListener('click',async ()=>{
     try{
       u3AssertMonthOpen();
       const source=state.transactionReviewQueue.find(item=>item.id===button.dataset.u3ConfirmReview);
@@ -6387,12 +6425,12 @@ function u3OpenReview(){
       tx.approvalSource='manual';tx.certainty='goedgekeurd';tx.processingStatus='goedgekeurd';tx.approvedAt=new Date().toISOString();
       tx.fixedExpenseId='';tx.fixedOccurrenceId='';tx.incomeSourceId='';tx.incomeOccurrenceId='';
       if(link){const separator=link.indexOf('|');const type=link.slice(0,separator);const occurrenceId=link.slice(separator+1);const occurrence=(type==='fixed'?u3FixedOccurrences(transactionMonth(tx)):u3IncomeOccurrences(transactionMonth(tx))).find(item=>item.id===occurrenceId);if(!occurrence)throw new Error('Het gekozen geplande betaalmoment bestaat niet meer.');if(type==='fixed'){tx.transactionType='vaste-last';tx.fixedOccurrenceId=occurrenceId;tx.fixedOccurrenceMonth=occurrence?.month;tx.fixedExpenseId=occurrence?.itemId||'';tx.kind='vaste-last';}else{tx.transactionType='inkomen';tx.incomeOccurrenceId=occurrenceId;tx.incomeSourceId=occurrence?.itemId||'';tx.kind='inkomen';}}
-      commitChange(()=>{
+      if(!await commitChange(()=>{
         state.transactions.push(tx);
         source.reviewStatus='bevestigd';source.confirmedTransactionId=tx.id;
         u3RememberRecognition(tx);
         if(editor.querySelector('[data-u3-review-advance]').checked)u3CreateAdvanceForTransaction(tx);
-      },{render:false});
+      },{render:false}))return;
       u3OpenReview();
     }catch(error){alert(error.message);}
   }));
@@ -6413,35 +6451,35 @@ function u3OpenClose(){
       <section class="u3-step"><div class="u3-step-head"><div><h3>3. Overboekingen</h3><p>Zakgeld, sparen en netto voorschotten worden als voorstellen klaargezet.</p></div></div>${u3NetAdvances(month).map(row=>`<div>${u3AccountLabel(row.debtor)} → ${u3AccountLabel(row.creditor)} <strong>${eur(row.amount)}</strong></div>`).join('')||'<small>Geen openstaande voorschotten.</small>'}</section>
       <section class="u3-step"><div class="u3-step-head"><div><h3>4. Bevestigen</h3><p>Open bankcontroles geven een waarschuwing maar blokkeren afsluiten niet.</p></div></div><div class="modal-actions">${record.status==='afgesloten'?'<button class="danger-ghost" id="u3ReopenMonth">Maand heropenen</button>':pending?'<button class="ghost" id="u3GoTransactions">Ga naar banktransacties</button><button class="primary" id="u3CloseMonthForce">Toch maand sluiten</button>':'<button class="primary" id="u3CloseMonth">Maand afsluiten</button>'}</div></section>
     </div>`);
-  modal.querySelectorAll('[data-u3-save-opening]').forEach(button=>button.addEventListener('click',()=>{
+  modal.querySelectorAll('[data-u3-save-opening]').forEach(button=>button.addEventListener('click',async ()=>{
     const account=button.dataset.u3SaveOpening;const value=bankAmount(modal.querySelector(`[data-u3-opening="${account}"]`).value);
     if(!Number.isFinite(value)){alert('Vul een geldig openingssaldo in.');return;}
-    commitChange(()=>{state.accountSettings[account]={openingBalance:round2(value),effectiveMonth:month,openingBalanceSet:true};},{render:false});u3OpenClose();
+    if(!await commitChange(()=>{state.accountSettings[account]={openingBalance:round2(value),effectiveMonth:month,openingBalanceSet:true};},{render:false}))return;u3OpenClose();
   }));
-  modal.querySelector('#u3ReopenMonth')?.addEventListener('click',()=>{commitChange(()=>u3ReopenMonth(month),{render:false});u3OpenClose();});
+  modal.querySelector('#u3ReopenMonth')?.addEventListener('click',async ()=>{if(!await commitChange(()=>u3ReopenMonth(month),{render:false}))return;u3OpenClose();});
   modal.querySelector('#u3GoTransactions')?.addEventListener('click',()=>{
     modal.closest('#incomeEditModal')?.classList.remove('open','u3-admin-open');
     if(typeof window.openBankImportForOwner==='function')window.openBankImportForOwner('gezamenlijk');
   });
-  const closeMonth=(force=false)=>{
+  const closeMonth=async (force=false)=>{
     try{
       const actual={};const corrections=[];
       U3_ACCOUNTS.forEach(account=>{const value=bankAmount(modal.querySelector(`[data-u3-actual="${account}"]`).value);if(Number.isFinite(value))actual[account]=value;if(modal.querySelector(`[data-u3-correct="${account}"]`).checked)corrections.push(account);});
-      commitChange(()=>u3CloseMonth(month,actual,corrections,{force}),{render:false});u3OpenClose();
+      if(!await commitChange(()=>u3CloseMonth(month,actual,corrections,{force}),{render:false}))return;u3OpenClose();
     }catch(error){alert(error.message);}
   };
-  modal.querySelector('#u3CloseMonth')?.addEventListener('click',()=>closeMonth(false));
-  modal.querySelector('#u3CloseMonthForce')?.addEventListener('click',()=>closeMonth(true));
+  modal.querySelector('#u3CloseMonth')?.addEventListener('click',async ()=>await closeMonth(false));
+  modal.querySelector('#u3CloseMonthForce')?.addEventListener('click',async ()=>await closeMonth(true));
 }
 function u3OpenTransfers(){
   const month=getSelectedMonth();
   const rows=(state.internalTransfers||[]).filter(row=>row.month===month);
   const html=rows.map(row=>`<article class="u3-admin-row"><div class="u3-transfer-row"><div><strong>${textSafe(row.destination||row.type)}</strong><br><small>${u3AccountLabel(row.sourceAccount)}${row.targetAccount?` → ${u3AccountLabel(row.targetAccount)}`:''} · ${textSafe(row.status)}</small></div><input data-u3-transfer-amount="${attrSafe(row.id)}" type="number" step="0.01" value="${Number(row.actualAmount??row.calculatedAmount)||0}" ${row.status==='uitgevoerd'?'disabled':''}><button class="${row.status==='uitgevoerd'?'ghost':'primary'} small" data-u3-confirm-transfer="${attrSafe(row.id)}" ${row.status==='uitgevoerd'?'disabled':''}>${row.status==='uitgevoerd'?'Uitgevoerd':'Bevestig'}</button></div></article>`).join('');
   const {modal}=u3AdminModal(`<div class="u3-admin-head"><div><div class="section-kicker">${monthLabel(month)}</div><h2>Interne overboekingen</h2><p>Uitvoering is handmatig; bevestigde aflossingen tellen niet als inkomen of uitgave.</p></div><button class="ghost" data-u3-close>Sluiten</button></div><div class="u3-admin-list">${html||'<div class="u3-empty">Nog geen voorstellen. Sluit de maand eerst af.</div>'}</div>`);
-  modal.querySelectorAll('[data-u3-confirm-transfer]').forEach(button=>button.addEventListener('click',()=>{
+  modal.querySelectorAll('[data-u3-confirm-transfer]').forEach(button=>button.addEventListener('click',async ()=>{
     const id=button.dataset.u3ConfirmTransfer;const amount=bankAmount(modal.querySelector(`[data-u3-transfer-amount="${id}"]`).value);
     if(!Number.isFinite(amount)||amount<0){alert('Vul een geldig bedrag in.');return;}
-    commitChange(()=>u3ConfirmTransfer(id,amount,u3IsoDate(new Date())),{render:false});u3OpenTransfers();
+    if(!await commitChange(()=>u3ConfirmTransfer(id,amount,u3IsoDate(new Date())),{render:false}))return;u3OpenTransfers();
   }));
 }
 
@@ -6462,8 +6500,8 @@ window.FinizePlanning=Object.freeze({
   budgets:(month,owner)=>resolveVariableBudgetsForMonth(state,month,owner),
   income:(month,owner)=>resolvePlannedIncomeForMonth(state,month,owner)
 });
-window.FinizeManual=Object.freeze({open:(owner,id='')=>openContextTransactionModal(owner,id),categories:(owner,month)=>expenseCategoriesForMonth(state,month,owner),save:(tx,account)=>{upsertManualFinancialTransaction(clone(state),tx,account);return commitChange(()=>upsertManualFinancialTransaction(state,tx,account),{render:false});}});
-window.FinizeTransactions=Object.freeze({bankSources:options=>currentBankTransactions(options),bankTotal:options=>round2(currentBankTransactions(options).reduce((sum,tx)=>sum+tx.bankAmount,0)),project:tx=>projectTransaction(tx,{state}),effects:options=>selectTransactionProjections(state,options),total:(dimension,options)=>sumTransactionEffects(state,dimension,options),fixedActual:occurrence=>fixedOccurrenceActuals(state,occurrence),income:(month,owner)=>actualIncomeForMonth(state,month,owner),forecast:month=>monthlyFinancialForecast(month),coverage:()=>coverageAllocationStatus(state),openCoverage:id=>openSavingsCoverageModal(id),confirmPair:id=>commitChange(()=>confirmInternalTransferPair(state,id))});
+window.FinizeManual=Object.freeze({open:(owner,id='')=>openContextTransactionModal(owner,id),categories:(owner,month)=>expenseCategoriesForMonth(state,month,owner),save:async (tx,account)=>{upsertManualFinancialTransaction(clone(state),tx,account);return await commitChange(()=>upsertManualFinancialTransaction(state,tx,account),{render:false});}});
+window.FinizeTransactions=Object.freeze({bankSources:options=>currentBankTransactions(options),bankTotal:options=>round2(currentBankTransactions(options).reduce((sum,tx)=>sum+tx.bankAmount,0)),project:tx=>projectTransaction(tx,{state}),effects:options=>selectTransactionProjections(state,options),total:(dimension,options)=>sumTransactionEffects(state,dimension,options),fixedActual:occurrence=>fixedOccurrenceActuals(state,occurrence),income:(month,owner)=>actualIncomeForMonth(state,month,owner),forecast:month=>monthlyFinancialForecast(month),coverage:()=>coverageAllocationStatus(state),openCoverage:id=>openSavingsCoverageModal(id),confirmPair:async id=>await commitChange(()=>confirmInternalTransferPair(state,id))});
 window.FinizeUpdate3=Object.freeze({
   schemaVersion:U3_SCHEMA_VERSION,
   occurrenceDates:(item,month)=>u3OccurrenceDates(clone(item),month),
@@ -6507,9 +6545,19 @@ window.__finizeBootstrap={
   rendered:false,
   initialRenderCount:0
 };
+let resolveDataReady;
+window.__finizeDataReady=new Promise(resolve=>{resolveDataReady=resolve;});
+window.addEventListener('finize:auth-session',event=>{
+  if(!window.__finizeBootstrap.authReady)return;
+  const previous=activeAuthSession,next=event.detail;
+  if(previous?.status===next?.status&&previous?.user?.uid===next?.user?.uid&&previous?.assignment?.householdId===next?.assignment?.householdId)return;
+  // A fresh runtime prevents editors, callbacks and in-memory queues crossing accounts.
+  document.body.classList.add('auth-pending');
+  location.reload();
+});
 window.__finizeMaybeFinishBootstrap=function(){
   const bootstrap=window.__finizeBootstrap;
-  if(bootstrap.rendered||!bootstrap.coreReady||!bootstrap.update4Ready||!bootstrap.update5Ready)return false;
+  if(bootstrap.rendered||!bootstrap.coreReady)return false;
   if(!bootstrap.authReady){
     if(!bootstrap.waitingForAuth){
       bootstrap.waitingForAuth=true;
@@ -6521,22 +6569,33 @@ window.__finizeMaybeFinishBootstrap=function(){
             state=scopedState;
             window.state=state;
             committedStateSnapshot=clone(state);
-            await GoalImageStore.initializeState(state);
+            const legacySource=JSON.parse(localStorage.getItem(DataAdapter.store().head.migration.sourceKey)||'null');
+            if(await GoalImageStore.initializeState(state,{legacySource}))await localSave(state);
+            committedStateSnapshot=clone(state);
+            if(await DataAdapter.store().pendingCloud())CloudAdapter.queueSave(state);
           }
         }
         window.FinizeImportSync?.setScope?.();
         configureUpdate6Navigation();
         bootstrap.authReady=true;
         bootstrap.authSession=session;
+        resolveDataReady();
         window.__finizeMaybeFinishBootstrap();
       }).catch(error=>{
         window.__finizeInitError={message:String(error?.message||error),stack:String(error?.stack||'')};
         state=null;delete window.state;
         console.error('Finize initialisatie mislukt; oorspronkelijke opslag behouden',error);
+        const panel=document.createElement('section');panel.className='card';panel.setAttribute('role','alert');panel.id='finizeStorageError';
+        const title=document.createElement('h2');title.textContent='Finize kan de opgeslagen administratie niet veilig openen.';
+        const message=document.createElement('p');message.textContent=String(error?.message||error)+' De bestaande gegevens blijven behouden. Wis de Finize-sitegegevens niet.';
+        const retry=document.createElement('button');retry.className='primary';retry.textContent='Opnieuw openen';retry.onclick=()=>location.reload();
+        panel.append(title,message,retry);document.querySelector('.v4-main')?.prepend(panel);
+        document.querySelectorAll('.v4-sidebar,.v4-bottom-nav,.v4-main-topbar').forEach(node=>{node.inert=true;});
       });
     }
     return false;
   }
+  if(!bootstrap.update4Ready||!bootstrap.update5Ready)return false;
   bootstrap.rendered=true;
   bootstrap.initialRenderCount+=1;
   renderActiveTab();
@@ -6546,7 +6605,7 @@ window.__finizeMaybeFinishBootstrap=function(){
 async function initializeApp(){
   try{
     const imagesMigrated = await GoalImageStore.initializeState(state);
-    if (imagesMigrated) localSave(state);
+    if (imagesMigrated) await localSave(state);
   }catch(error){
     console.warn('Lokale spaardoelfoto-opslag kon niet worden voorbereid.', error);
   }

@@ -7,7 +7,7 @@ export function inspectCommitOutcome(state, operation) {
     .find(row => row.id === operation.importId);
   if (receipt?.operationId === operation.intent.operationId
     && Number(receipt.version) === Number(operation.batch?.version)) return 'committed';
-  return JSON.stringify(state) === operation.baseSignature ? 'rejected' : 'uncertain';
+  return JSON.stringify(state) === (operation.durableBaseSignature ?? operation.baseSignature) ? 'rejected' : 'uncertain';
 }
 
 export async function readCommitOutcome(readState, operation) {

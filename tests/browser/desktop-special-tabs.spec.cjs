@@ -12,7 +12,7 @@ test('desktop spaardoelen en data back-up renderen volledig', async ({ page }) =
   });
 
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto('/');
+  await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   const dashboardDistributionCards = page.locator('#tab-dashboard .u5-planning-realisation > .card');
   await expect(dashboardDistributionCards).toHaveCount(2);
   await expect(dashboardDistributionCards.nth(0)).toContainText('Geplande verdeling');
@@ -108,7 +108,7 @@ test('desktop spaardoelen en data back-up renderen volledig', async ({ page }) =
 
 test('persoonlijke spaardoelen met subdoelen klappen op desktop open',async({page})=>{
   await page.setViewportSize({width:1280,height:900});
-  await page.goto('/');
+  await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   await page.evaluate(()=>{
     state.spaardoelen.dion=[{
       id:'desktop-subgoals',naam:'Koffie-uitrusting',doelbedrag:400,algespaard:150,doeldatum:'2027-12-31',
@@ -147,7 +147,7 @@ test('persoonlijke spaardoelen met subdoelen klappen op desktop open',async({pag
 
 test('subdoelen zijn rechtstreeks in de spaardoelentabel uitklapbaar en bewerkbaar',async({page})=>{
   await page.setViewportSize({width:1440,height:900});
-  await page.goto('/');
+  await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   await page.evaluate(()=>{
     state.spaardoelen.dion=[{
       id:'table-subgoals',naam:'Koffie-uitrusting',doelbedrag:400,algespaard:150,doeldatum:'2027-12-31',
@@ -184,7 +184,7 @@ test('subdoelen zijn rechtstreeks in de spaardoelentabel uitklapbaar en bewerkba
 
 test('mobiel en desktop beheren vaste lasten via dezelfde canonieke editor',async({page})=>{
   await page.setViewportSize({width:390,height:844});
-  await page.goto('/');
+  await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   const legacyBefore=await page.evaluate(()=>{
 
     state.recurringFixedExpenses.push({
@@ -252,7 +252,7 @@ test('mobiel en desktop beheren vaste lasten via dezelfde canonieke editor',asyn
 
 test('de gedeelde mobiele editor bewaart 50/50 in de normale tijdlijn',async({page})=>{
   await page.setViewportSize({width:390,height:844});
-  await page.goto('/');
+  await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   await page.evaluate(()=>{
 
     state.recurringFixedExpenses.push({
@@ -276,7 +276,7 @@ test('de gedeelde mobiele editor bewaart 50/50 in de normale tijdlijn',async({pa
 
 test('mobiel voegt een canonieke vaste last met maanduitzondering toe en kan die stoppen',async({page})=>{
   await page.setViewportSize({width:390,height:844});
-  await page.goto('/');
+  await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   await page.evaluate(()=>{renderActiveTab();});
   const month=await page.evaluate(()=>getSelectedMonth());
   const legacyBefore=await page.evaluate(()=>JSON.stringify(state.planning.gezamenlijk.vasteLasten));
@@ -316,7 +316,7 @@ test('mobiel voegt een canonieke vaste last met maanduitzondering toe en kan die
 
 test('een vaste last kan naast stoppen vanaf de gekozen maand worden verwijderd',async({page})=>{
   await page.setViewportSize({width:390,height:844});
-  await page.goto('/');
+  await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   await page.evaluate(()=>{
 
     state.recurringFixedExpenses.push({
@@ -350,7 +350,7 @@ test('een vaste last kan naast stoppen vanaf de gekozen maand worden verwijderd'
 
 test('vaste lasten laten hun verdeling aanpassen en bewaren een administratieve afschrijfdatum',async({page})=>{
   await page.setViewportSize({width:1280,height:900});
-  await page.goto('/');
+  await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   await page.evaluate(()=>{
 
     state.recurringFixedExpenses.push({
@@ -400,7 +400,7 @@ test('vaste lasten laten hun verdeling aanpassen en bewaren een administratieve 
 
 test('spaardoelkaarten wijzigen direct van volgorde zonder beheerpop-up',async({page})=>{
   await page.setViewportSize({width:390,height:844});
-  await page.goto('/');
+  await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   await page.evaluate(()=>{
     state.spaardoelen.dion=[
       {id:'direct-a',naam:'Eerste doel',doelbedrag:100,algespaard:0,doeldatum:'2027-12-31',vasteInleg:0,rendement:0,rendementPeriode:'jaarlijks',favoriet:false,eigenaar:'dion',ratoVerdeling:true,subdoelen:[]},
@@ -443,7 +443,7 @@ test('spaardoelkaarten wijzigen direct van volgorde zonder beheerpop-up',async({
 
 test('budgetten openen op desktop transacties en zijn op mobiel bewerkbaar', async ({ page }) => {
   await page.setViewportSize({ width:1280, height:900 });
-  await page.goto('/');
+  await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   await page.locator('.v4-sidebar [data-tab="dion"]').click();
   const desktopBudget=page.locator('#tab-dion .budget-usage-button').first();
   const category=await desktopBudget.locator('strong').innerText();
@@ -475,7 +475,7 @@ test('budgetten openen op desktop transacties en zijn op mobiel bewerkbaar', asy
 
 test('mobiele spaardoelbalken houden hun vaste breedte', async ({ page }) => {
   await page.setViewportSize({ width: 430, height: 900 });
-  await page.goto('/');
+  await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   const mobileIncomeValues = await page.locator('#tab-dashboard .mobile-kpi-card .mobile-kpi-value').allTextContents();
   expect(mobileIncomeValues).toHaveLength(4);
   expect(parseEuro(mobileIncomeValues[2])).toBeCloseTo(
