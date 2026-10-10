@@ -288,6 +288,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
 
   async function fetchImportFromCloud(root,id){
     const cloud=root?.CloudAdapter;
+    if(cloud?.recordSession)return cloud.recordSession.loadImport(id);
     if(!cloud?.isConnected?.()){
       if(cloud?.isConfigured?.()&&typeof cloud.connect==='function')await cloud.connect();
     }
@@ -2375,6 +2376,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
     ImportPerformance.syncRequested=true;if(ImportPerformance.syncPromise)return ImportPerformance.syncPromise;
     ImportPerformance.syncPromise=(async()=>{
       const cloud=root.CloudAdapter;
+      if(cloud?.recordSession){if(!cloud.recordAutomatic)return false;const result=await cloud.recordSession.sync();return ['committed','idle'].includes(result.outcome);}
       if(!cloud?.isConnected?.()||cloud.initialSyncComplete===false)return false;
       if(cloud.docRef){
         for(const item of await ImportStore.listSync()){if((await ImportStore.getJournal(`conflict-${item.importId}`))?.status==='conflict')continue;const legacy=await ImportStore.getImport(item.importId);if(legacy&&!legacy.operationId){await persistImportDraftImmediate(root,legacy,{syncCloud:false});await queueImportSync(legacy);}}

@@ -1,0 +1,15 @@
+{
+  "indexes": [],
+  "fieldOverrides": [
+    { "collectionGroup": "records", "fieldPath": "*", "indexes": [] },
+    { "collectionGroup": "records", "fieldPath": "periods", "indexes": [{ "arrayConfig": "CONTAINS", "queryScope": "COLLECTION" }] },
+    { "collectionGroup": "records", "fieldPath": "logicalId", "indexes": [{ "order": "ASCENDING", "queryScope": "COLLECTION" }] },
+    { "collectionGroup": "records", "fieldPath": "collection", "indexes": [{ "order": "ASCENDING", "queryScope": "COLLECTION" }] },
+    { "collectionGroup": "periods", "fieldPath": "*", "indexes": [] },
+    { "collectionGroup": "globals", "fieldPath": "*", "indexes": [] },
+    { "collectionGroup": "operations", "fieldPath": "*", "indexes": [] },
+    { "collectionGroup": "changes", "fieldPath": "*", "indexes": [] },
+    { "collectionGroup": "members", "fieldPath": "*", "indexes": [] },
+    { "collectionGroup": "receipts", "fieldPath": "*", "indexes": [] }
+  ]
+}

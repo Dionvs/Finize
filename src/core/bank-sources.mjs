@@ -46,6 +46,7 @@ export function ensureImportBankSources(state,batch){
   return state;
 }
 export function selectBankTransactions(state,{month=null,account=null,accountId=null,includeInactive=false,imports=[]}={}){
+  if(state?.__finizePartialHistory&&(!month||!state.verifiedPeriods?.includes(month)))throw Object.assign(new Error('De gevraagde bankperiode is niet volledig geladen.'),{code:'period-incomplete'});
   // Read-only compatibility for old pending rows that exist only in ImportStore.
   // Adapt on a clone; opening/reloading never migrates or approves stored data.
   const missing=imports.filter(batch=>(state.importSummaries||[]).some(summary=>summary.id===batch.id)&&!(state.importDeletionProofs||[]).some(proof=>proof.id===batch.id)&&(batch.rows||[]).some(row=>row.bankOriginal?.valid&&!row.importError&&!bankSourceForImport(state,batch.id,row.id)));

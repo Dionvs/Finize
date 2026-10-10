@@ -148,7 +148,8 @@ test('persoonlijke spaardoelen met subdoelen klappen op desktop open',async({pag
 test('subdoelen zijn rechtstreeks in de spaardoelentabel uitklapbaar en bewerkbaar',async({page})=>{
   await page.setViewportSize({width:1440,height:900});
   await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
-  await page.evaluate(()=>{
+  await page.evaluate(async()=>{
+    await commitChange(()=>{
     state.spaardoelen.dion=[{
       id:'table-subgoals',naam:'Koffie-uitrusting',doelbedrag:400,algespaard:150,doeldatum:'2027-12-31',
       vasteInleg:0,rendement:0,rendementPeriode:'jaarlijks',favoriet:true,eigenaar:'dion',ratoVerdeling:true,
@@ -157,6 +158,7 @@ test('subdoelen zijn rechtstreeks in de spaardoelentabel uitklapbaar en bewerkba
         {id:'table-molen',naam:'Koffiemolen',doelbedrag:100,gespaard:0,link:'',voltooid:false}
       ]
     }];
+    });
     document.querySelector('.v4-sidebar [data-tab="spaardoelen"]').click();
   });
   await page.getByRole('button',{name:'Tabelweergave'}).click();

@@ -4,5 +4,6 @@ node_modules/
 test-results/
 playwright-report/
 .cache/
+firestore-debug.log
 finize-mobile.html
 finize-v4.html

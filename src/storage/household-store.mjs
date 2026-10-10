@@ -68,7 +68,7 @@ export function decodeHouseholdState(head,records) {
 function requestResult(request){return new Promise((resolve,reject)=>{request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});}
 function completed(transaction){return new Promise((resolve,reject)=>{transaction.oncomplete=()=>resolve();transaction.onerror=transaction.onabort=()=>reject(transaction.error||fail('storage-aborted','De lokale opslagtransactie is afgebroken.'));});}
 
-export function createHouseholdStore(scope='legacy') {
+export function createHouseholdStore(scope='legacy',{verifySource=async()=>{}}={}) {
   let cachedHead=null,cachedRecords=new Map();
   async function retainedInventory(){
     const names=['imports','journal','syncQueue'],db=await openHouseholdDatabase(scope),tx=db.transaction(names,'readonly'),done=completed(tx);
@@ -85,7 +85,9 @@ export function createHouseholdStore(scope='legacy') {
     cachedHead=clone(head);cachedRecords=new Map(records.map(record=>[record.id,JSON.stringify(record)]));
     return state;
   }
-  async function commit(state,{expectedHash=cachedHead?.sha256??null,operationId=crypto.randomUUID(),importMutation=null,migration=null,queueCloud=true}={}){
+  async function commit(state,{expectedHash=cachedHead?.sha256??null,operationId=crypto.randomUUID(),importMutation=null,migration=null,queueCloud=true,cloudAcceptance=null}={}){
+    await verifySource(migration||cachedHead?.migration);
+    if(cloudAcceptance&&(importMutation||queueCloud))throw fail('storage-contract','Een cloudontvangst accepteert geen parallelle lokale importbewerking.');
     const encoded=encodeHouseholdState(state),sha256=await backupDigest(JSON.stringify(state));
     const next={id:'current',storageVersion:LOCAL_STORAGE_VERSION,schemaVersion:11,storageRevision:(cachedHead?.storageRevision||0)+1,revision:Number(state.meta?.revision)||0,layout:encoded.layout,sha256,verified:!migration,migration:migration||cachedHead?.migration||null,operationId};
     const desired=new Set(encoded.records.map(record=>record.id));
@@ -125,8 +127,22 @@ export function createHouseholdStore(scope='legacy') {
               tx.objectStore('syncQueue').put(clone(importMutation.queue));
               tx.objectStore('journal').put({...clone(importMutation.journal),status:'completed',candidate:undefined,previousBatch:undefined,baseSignature:undefined,durableBaseSignature:undefined});
             }
+            if(cloudAcceptance){
+              for(const batch of cloudAcceptance.imports)tx.objectStore('imports').put(clone(batch));
+              tx.objectStore('financialOutbox').put({...clone(cloudAcceptance.base),id:'cloud-base',localSha256:sha256});
+            }
           }catch(error){abort(error);}
         };
+        if(cloudAcceptance){
+          const imports=tx.objectStore('imports').getAll(),queue=tx.objectStore('syncQueue').getAll();
+          queue.onsuccess=()=>{
+            try{
+              if(JSON.stringify(imports.result)!==cloudAcceptance.expectedImportsSignature||queue.result.length)throw fail('import-conflict','Lokale importkeuzes wijzigden tijdens cloudontvangst.');
+              for(const old of imports.result){const incoming=cloudAcceptance.imports.find(row=>row.id===old.id);if(!incoming)throw fail('import-conflict','Een lokale import ontbreekt in de externe stand.');assertOriginalBankDataUnchanged(old.rows,incoming.rows);}
+              publish();
+            }catch(error){abort(error);}
+          };return;
+        }
         if(!importMutation){publish();return;}
         const imports=tx.objectStore('imports'),read=imports.get(importMutation.batch.id);
         read.onsuccess=()=>{
@@ -178,5 +194,32 @@ export function createHouseholdStore(scope='legacy') {
     cachedHead=head;cachedRecords=new Map(records.map(record=>[record.id,JSON.stringify(record)]));
     return {state,receipt:receipt||null};
   }
-  return {scope,load,commit,migrate,verifyAndActivate,acknowledgeCloud,pendingCloud,markCloudConflict,inspectOperation,get head(){return cachedHead&&clone(cachedHead);}};
+  async function readCloudSnapshot(){
+    const db=await openHouseholdDatabase(scope),tx=db.transaction(stores,'readonly'),done=completed(tx);
+    const [head,records,imports,outbox,receipts,journals,importQueue]=await Promise.all([requestResult(tx.objectStore('financialHead').get('current')),requestResult(tx.objectStore('financialRecords').getAll()),requestResult(tx.objectStore('imports').getAll()),requestResult(tx.objectStore('financialOutbox').getAll()),requestResult(tx.objectStore('operationReceipts').getAll()),requestResult(tx.objectStore('journal').getAll()),requestResult(tx.objectStore('syncQueue').getAll()),done]);
+    if(!head?.verified)throw fail('storage-migration','Synchronisatie vereist geverifieerde lokale opslag.');
+    const state=decodeHouseholdState(head,records);
+    if(await backupDigest(JSON.stringify(state))!==head.sha256)throw fail('storage-integrity','De lokale synchronisatiebasis heeft een afwijkende hash.');
+    const operations=outbox.filter(row=>['pending','conflict'].includes(row.status)&&row.id!=='current').sort((a,b)=>a.storageRevision-b.storageRevision);
+    const pointer=outbox.find(row=>row.id==='current');if(pointer&&!operations.some(row=>row.id===pointer.operationId))throw fail('storage-integrity','De synchronisatiewijzer mist een duurzaam operatiebewijs.');
+    for(const row of operations){row.receipt=receipts.find(receipt=>receipt.id===row.id);if(!row.receipt||row.receipt.sha256!==row.sha256)throw fail('storage-integrity','Een lokaal operatiebewijs ontbreekt.');}
+    return {state,imports,operations,head,importQueue,conflicts:journals.filter(row=>row.operation==='record-cloud-conflict'&&row.status==='conflict'),cloudBase:outbox.find(row=>row.id==='cloud-base')||null};
+  }
+  async function acknowledgeRecordCloud(ids,base,confirmedImports=[],resolution=null){
+    const db=await openHouseholdDatabase(scope),tx=db.transaction(['financialOutbox','syncQueue','journal'],'readwrite',{durability:'strict'}),store=tx.objectStore('financialOutbox'),done=completed(tx),all=store.getAll();
+    all.onsuccess=()=>{const selected=new Set(ids);for(const row of all.result)if(selected.has(row.id)&&row.id!=='current')store.delete(row.id);const pointer=all.result.find(row=>row.id==='current');if(pointer&&selected.has(pointer.operationId))store.delete('current');store.put({...clone(base),id:'cloud-base'});};
+    for(const batch of confirmedImports){const queue=tx.objectStore('syncQueue'),read=queue.get(batch.id);read.onsuccess=()=>{const row=read.result;if(row&&row.operationId===batch.operationId&&Number(row.version)===Number(batch.version))queue.delete(batch.id);};}
+    for(const resolved of resolution?(Array.isArray(resolution)?resolution:[resolution]):[]){const journal=tx.objectStore('journal'),read=journal.get(resolved.id);read.onsuccess=()=>{if(read.result)journal.put({...read.result,status:'resolved',resolution:clone(resolved)});};}
+    await done;
+  }
+  async function preserveRecordConflict(conflict){
+    const db=await openHouseholdDatabase(scope),tx=db.transaction(['journal','financialOutbox'],'readwrite',{durability:'strict'}),done=completed(tx),outbox=tx.objectStore('financialOutbox');
+    tx.objectStore('journal').put({...clone(conflict),id:conflict.id,operation:'record-cloud-conflict',status:'conflict',scope});
+    const all=outbox.getAll();all.onsuccess=()=>{for(const row of all.result)if(conflict.operationIds.includes(row.id))outbox.put({...row,status:'conflict',conflictId:conflict.id});};await done;
+  }
+  async function markRecordResolution(id,resolution){
+    const db=await openHouseholdDatabase(scope),tx=db.transaction('journal','readwrite',{durability:'strict'}),done=completed(tx),journal=tx.objectStore('journal'),read=journal.get(id);
+    read.onsuccess=()=>{if(!read.result||read.result.status!=='conflict'){tx.abort();return;}journal.put({...read.result,resolution:{...clone(resolution),outcome:'pending'}});};await done;
+  }
+  return {scope,load,commit,migrate,verifyAndActivate,acknowledgeCloud,pendingCloud,markCloudConflict,inspectOperation,readCloudSnapshot,acknowledgeRecordCloud,preserveRecordConflict,markRecordResolution,get head(){return cachedHead&&clone(cachedHead);}};
 }

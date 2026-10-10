@@ -58,6 +58,7 @@ function projectBaseTransaction(tx,{state={},materialized=false,sourceApproved=n
   return result;
 }
 export function selectTransactionProjections(state,{month=null,dimension='calendar',account=null,owner=null,includeInactive=false}={}) {
+  if(state?.__finizePartialHistory)throw Object.assign(new Error('De volledige historie is niet geladen. Gebruik de geverifieerde maandprojectie; ontbrekende transacties zijn geen nul.'),{code:'period-incomplete'});
   const groups=new Map();(state.transactions||[]).filter(tx=>!isBankSource(tx)).forEach(tx=>{const key=transactionSourceKey(tx);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(tx);});
   const projections=[];
   groups.forEach(group=>{

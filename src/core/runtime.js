@@ -1,6 +1,8 @@
 import { selectBankTransactions, isBankSource } from './bank-sources.mjs';
 import { createStateBackupStore, readLegacyStateBackup } from '../storage/state-backups.mjs';
 import { createHouseholdStore } from '../storage/household-store.mjs';
+import { installRecordSessions } from '../storage/record-session.mjs';
+import { readLegacyCloudImports } from '../storage/legacy-import-readback.mjs';
 import { backupDigest } from '../storage/migration-backups.mjs';
 import { createChunkedCloudStore, cloudStateManifest } from '../storage/cloud-chunks.mjs';
 import { createMigrationBackupStore, readLegacyMigrationBackup } from '../storage/migration-backups.mjs';
@@ -1853,7 +1855,7 @@ const GoalImageStore = {
     }
     return changed;
   },
-  async expandStateForTransfer(target){
+  async expandStateForTransfer(target,{strict=false}={}){
     for (const owner of ['gezamenlijk','dion','dara']){
       for (const goal of (target?.spaardoelen?.[owner] || [])){
         const key = this.keyFromRef(goal.afbeelding);
@@ -1862,10 +1864,12 @@ const GoalImageStore = {
           const image = await this.get(key);
           if (image) goal.afbeelding = image;
           else{
+            if(strict)throw new Error('Spaardoelfoto ontbreekt; de cloudstand blijft ongewijzigd: '+goal.id);
             console.warn('Spaardoelfoto ontbreekt; overdracht gaat verder zonder foto:', goal.id);
             goal.afbeelding = '';
           }
         }catch(error){
+          if(strict)throw error;
           console.warn('Spaardoelfoto kon niet worden geladen; overdracht gaat verder zonder foto:', goal.id, error);
           goal.afbeelding = '';
         }
@@ -2157,7 +2161,7 @@ const CloudAdapter = {
   importScope(){return activeAuthSession?.assignment?.householdId||'legacy';},
   statusText(){ return this.status; },
   isConfigured(){ return firebaseConfigIsComplete(this.config); },
-  isConnected(){ return !!(this.db && this.docRef); },
+  isConnected(){ return !!this.recordSession || !!(this.db && this.docRef); },
   async loadModules(){
     if (this.modules) return this.modules;
     const base = `https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}`;
@@ -2169,6 +2173,7 @@ const CloudAdapter = {
     return this.modules;
   },
   async connect(){
+    if(this.recordSession)return true;
     if (!cloudConnectionAllowed()){
       this.status = 'Offline — lokaal bewaard';
       renderCloudStatus();
@@ -2419,7 +2424,7 @@ const CloudAdapter = {
       ? 'Synchronisatieconflict'
       : (this.isConnected() ? 'Opslaan…' : 'Offline — lokaal bewaard');
     renderCloudStatus();
-    if (!this.isConnected() || !this.initialSyncComplete || this.conflict) return;
+    if (!this.isConnected() || !this.initialSyncComplete || this.conflict || this.recordSession && !this.recordAutomatic) return;
     clearTimeout(this.saveTimer);
     this.saveTimer = setTimeout(()=> this.flushQueue(), 350);
   },
@@ -2447,6 +2452,12 @@ const CloudAdapter = {
     this.retryTimer = setTimeout(()=>this.flushQueue(), delay);
   },
   async saveNow(snapshot){
+    if(this.recordSession){
+      try{
+        const result=await this.recordSession.sync();this.conflict=result.outcome==='conflict';
+        this.lastFailureRetryable=!this.conflict;return ['committed','idle'].includes(result.outcome);
+      }catch(error){this.status='Offline wijzigingen blijven in de duurzame wachtrij';renderCloudStatus();this.lastFailureRetryable=true;return false;}
+    }
     if (!this.isConnected() || !this.initialSyncComplete || this.cloudVersion === null || this.conflict) return false;
     this.lastFailureRetryable = true;
     const expectedVersion = this.cloudVersion;
@@ -2586,6 +2597,7 @@ const CloudAdapter = {
     }
   },
   async signOut(){
+    this.recordSession=null;this.recordAutomatic=false;clearTimeout(this.saveTimer);clearTimeout(this.retryTimer);
     if (this.unsubscribe){ this.unsubscribe(); this.unsubscribe = null; }
     this.app = null;
     this.db = null;
@@ -2623,7 +2635,7 @@ const DataAdapter = {
   store(){
     if(!activeStorageKeys())throw new Error('De oorspronkelijke opslagcontext is niet beschikbaar.');
     const scope=CloudAdapter.importScope();
-    if(!this.stores.has(scope))this.stores.set(scope,createHouseholdStore(scope));
+    if(!this.stores.has(scope))this.stores.set(scope,createHouseholdStore(scope,{verifySource:migration=>this.verifyLegacySource(migration)}));
     return this.stores.get(scope);
   },
   async readDurableState(){
@@ -2646,7 +2658,6 @@ const DataAdapter = {
       }
     };
     try{
-      await this.verifyLegacySource(store.head?.migration);
       const expectedHash=await backupDigest(JSON.stringify(base));
       await store.commit(snapshot,{expectedHash,operationId,importMutation:options.importMutation,queueCloud:options.queueCloud!==false});
       enqueue(snapshot);
@@ -2725,6 +2736,26 @@ const DataAdapter = {
     return this.backupRead.value;
   }
 };
+
+installRecordSessions(window,{
+  getLocalStore:()=>DataAdapter.store(),
+  validateIncoming(candidate){const validation=validateBudgetState(candidate);if(!validation.ok)throw new Error('De cloudadministratie is ongeldig: '+validation.errors.join(' '));},
+  onAdopt(candidate,{previousState}){
+    if(JSON.stringify(committedStateSnapshot)!==JSON.stringify(previousState))throw Object.assign(new Error('De cloudstand is lokaal bevestigd; herlaad om de inmiddels gewijzigde schermstand veilig te herstellen.'),{code:'storage-operation-committed',commitOutcome:'committed'});
+    DataAdapter.adoptDurableState(candidate);renderActiveTab();
+  },
+  async prepareState(candidate){
+    const scope=CloudAdapter.importScope();await GoalImageStore.expandStateForTransfer(candidate,{strict:true});
+    if(scope!==CloudAdapter.importScope())throw new Error('Het huishouden wijzigde tijdens het voorbereiden van de cloudstand.');
+    return candidate;
+  },
+  applicationProjection(candidate,month){
+    const previous=state;
+    try{state=clone(candidate);return {monthResult:getMonthFinancialResult(month),scenario:calcScenario(state,month)};}
+    finally{state=previous;}
+  },
+  readLegacyImports:(headers,transport)=>readLegacyCloudImports(headers,transport,{assembleCloudImport:window.FinizeUpdate4Runtime.assembleCloudImport})
+});
 
 // Local state adoption is deferred until the async backup gate has completed.
 // This placeholder is never persisted or rendered before that gate.

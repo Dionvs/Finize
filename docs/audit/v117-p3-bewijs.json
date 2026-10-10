@@ -1,0 +1,275 @@
+{
+  "package": "V117 P3",
+  "decision": "infrastructure-tested-p3-acceptance-blocked",
+  "createdAt": "2026-10-10T11:36:48.618Z",
+  "branch": "agent/v117-stabilisatie",
+  "baseP2": "33154fe38f52ce943e8ee7add5d18842c27643a1",
+  "main": "a56e8659d0c20f6c35b008c08e8bb27f23c5541a",
+  "buildSha256": "f86b649a8f79d919e112a1ecb2cc76c5fbfbe47ec54558cf16929c5e091c7574",
+  "tests": {
+    "node": {
+      "files": 55,
+      "registeredCases": 581,
+      "passed": 581,
+      "failed": 0,
+      "skipped": 0
+    },
+    "browser": {
+      "total": 270,
+      "passed": 270,
+      "failed": 0,
+      "skipped": 0,
+      "duration": "7.7m"
+    },
+    "realFirestoreRules": {
+      "total": 24,
+      "passed": 24,
+      "failed": 0,
+      "skipped": 0,
+      "standaloneRepeated": true
+    },
+    "intermediate": {
+      "nodeFixtureFailures": 1,
+      "browserPassed": 269,
+      "browserFailed": 1,
+      "browserCause": "Subgoal fixture was only in live memory; now durably committed before test; financial assertions unchanged.",
+      "interruptedBrowserRun": "Last full browser run was interrupted before completion and restarted in full."
+    }
+  },
+  "environment": {
+    "os": "Windows_NT 10.0.26200",
+    "cpu": "AMD Ryzen 5 5500U with Radeon Graphics         ",
+    "ramBytes": 7879585792,
+    "node": "v24.19.0",
+    "playwright": "1.55.0",
+    "chromium": "140.0.7339.16",
+    "workers": 1,
+    "appOrigin": "http://127.0.0.1:4173",
+    "emulator": "Firestore 1.21.0",
+    "firebaseCli": "15.24.0",
+    "java": "21.0.12.1+1",
+    "project": "demo-finize-v117",
+    "firestoreOrigin": "http://127.0.0.1:8181"
+  },
+  "financialEvidence": {
+    "tenSavings": {
+      "bankSources": 10,
+      "uniqueEffects": 10,
+      "approved": 10,
+      "savingsCents": 75000,
+      "originalAmountsDatesAndIdentitiesPreserved": true,
+      "offlineReloadRepeatSyncSecondClient": true
+    },
+    "migration": {
+      "interruptionCheckpoints": 9,
+      "browserCloseAtLock": true,
+      "legacyChunkAndCsvReadback": true,
+      "largePhotoBytes": 1100000,
+      "hashCountAndProjectionVerification": true
+    },
+    "partialPeriods": {
+      "verifiedProjectionComparison": true,
+      "missingOrCorruptRecordsRejected": true,
+      "completeRawHistoryStillRequiredByApp": true
+    },
+    "rollback": {
+      "postMigrationPostingsPreservedInExport": true,
+      "productionRollbackPerformed": false
+    },
+    "oldClients": {
+      "v116WritePositiveControlBeforeFence": true,
+      "writesDeniedAfterFence": true,
+      "realSecurityRules": true
+    },
+    "conflicts": {
+      "bothVersionsDurable": true,
+      "reviewRequiredForChangedRemoteApprovals": true
+    }
+  },
+  "measuredPeriodFixture": {
+    "months": 36,
+    "bankMovements": 108,
+    "allRecordDocuments": 297,
+    "queriedRecords": 6,
+    "periodDocumentReads": 11,
+    "migrationMs": 4469.287899999999,
+    "periodMs": 63.43530000000101,
+    "totalWrites": 677,
+    "note": "36 months and 108 movements; not the P4 fixture of 5400. Suites partly concurrent. Client read/write counters exclude server rule reads and production billing."
+  },
+  "blockers": [
+    "Existing application screens and commit preparation/full integrity readback still require complete local canonical history; P3 partial-history application criterion remains open."
+  ],
+  "deferredP4": [
+    "64 MiB cache policy",
+    "5400-source three-year browser benchmark",
+    "production-scale measurements and proof retention"
+  ],
+  "safety": {
+    "productionFirestoreWrites": false,
+    "productionRulesPublished": false,
+    "deployed": false,
+    "pushed": false,
+    "merged": false,
+    "p4Started": false,
+    "legacyDataDeleted": false,
+    "productionTransportAvailable": false
+  },
+  "backup": {
+    "path": "backups/v117-stabilisatie/before-p3-2026-10-10/",
+    "files": 246,
+    "sha256": "ffd0bea52be3a8ca6c5bfa638c06ebb716013e27308e6bb0d5e9037245d09d97",
+    "verifiedMismatchCount": 0,
+    "preservedLocalFiles": 14,
+    "originalFirebaseLogBackup": "backups/v117-stabilisatie/before-2026-10-09T19-12-24-546Z/firebase-debug.log"
+  },
+  "logs": [
+    {
+      "file": "backups/v117-stabilisatie/p3-node-geverifieerd.log",
+      "sha256": "d239dcf578933193947a1da05143e614dc427a723a1400a0e1ffe7c0152a8ca7"
+    },
+    {
+      "file": "backups/v117-stabilisatie/p3-browser-geverifieerd.log",
+      "sha256": "11afdd2470ef60cd45306255a003496ab31ed54d5412a6ab9ee3a81ee480a6b0"
+    },
+    {
+      "file": "backups/v117-stabilisatie/p3-emulator-acceptatie.log",
+      "sha256": "3fb8fdd90487018b9c7643fc5145ae3e923484b2fe14bd1372e0b843fb611fa7"
+    },
+    {
+      "file": "backups/v117-stabilisatie/p3-emulator-zelfstandig-definitief.log",
+      "sha256": "feadc88744920b6bb7524bd3b30c4e752d3545a0b0e48511029c4aeddf0f024e"
+    },
+    {
+      "file": "backups/v117-stabilisatie/p3-desktop-fixture.log",
+      "sha256": "e38096fc7610ce4f194ee27e1b1d558ee18f9da7d1b0374cb86a8f61c469d901"
+    }
+  ],
+  "files": [
+    {
+      "file": ".gitignore",
+      "bytes": 130,
+      "sha256": "b678615fdc1584da30ad3200cbf282370808776a48f769259bc425e54af870e5"
+    },
+    {
+      "file": "app.js",
+      "bytes": 1460947,
+      "sha256": "f86b649a8f79d919e112a1ecb2cc76c5fbfbe47ec54558cf16929c5e091c7574"
+    },
+    {
+      "file": "firestore.rules",
+      "bytes": 19478,
+      "sha256": "3d705af66652c3009caa21f94aada2da8fc1adf2f640e02c22da65b5944b3099"
+    },
+    {
+      "file": "src/core/bank-sources.mjs",
+      "bytes": 8931,
+      "sha256": "2d881e20f59528420aeaf76e19aeecdee0c3a9ba37902bc90dd1def1ed0804f3"
+    },
+    {
+      "file": "src/core/transaction-engine.mjs",
+      "bytes": 41819,
+      "sha256": "4d9293b07e606450df93ec7419e41046bc73717673ee5484e15a021c7e3e3807"
+    },
+    {
+      "file": "src/core/runtime.js",
+      "bytes": 817677,
+      "sha256": "9956e6c871f39243a690474b17b8044ff6a6a4f60f7c308530143a03824b4610"
+    },
+    {
+      "file": "src/import/runtime.js",
+      "bytes": 233273,
+      "sha256": "704d108ee8f79b4b07f21478126ee0340079ae7428e68a50460c8026ee8fe003"
+    },
+    {
+      "file": "src/storage/household-store.mjs",
+      "bytes": 19765,
+      "sha256": "e22e4db91e9d4045930a99d0852bda9ec14d2d34e47f39b0ceb5099207a2a616"
+    },
+    {
+      "file": "tests/browser/desktop-special-tabs.spec.cjs",
+      "bytes": 34798,
+      "sha256": "5f5fdd82e9cb0068b5a07b6406eb5845ddcd287f97d628b8e35600dd21706efb"
+    },
+    {
+      "file": "docs/audit/v117-stabilisatie.md",
+      "bytes": 11064,
+      "sha256": "130838211bd7ca4eb0899b6ad8a664dcf455d03ca9681dd062fc2af2b9728248"
+    },
+    {
+      "file": "firebase.emulator.json",
+      "bytes": 237,
+      "sha256": "343f0ac8efe4f8631d791482702a1d5a48b1cd5449075faecfc5b24bb006466e"
+    },
+    {
+      "file": "firestore.indexes.json",
+      "bytes": 944,
+      "sha256": "6ea08f0dbb54e3b96223a73d969431fb7bd8ee338988f88e13877203951a3fe3"
+    },
+    {
+      "file": "src/storage/period-projections.mjs",
+      "bytes": 5979,
+      "sha256": "68bc4d09ce6c78f61ea223f5b643c474954b9553f71f9d4bbb2ea9ea47703cd9"
+    },
+    {
+      "file": "src/storage/cloud-record-model.mjs",
+      "bytes": 6178,
+      "sha256": "b217cbb755fdef1bbe01cf38350e0714aefa697eb292bf6453249bd0b9f7e46c"
+    },
+    {
+      "file": "src/storage/firestore-record-transport.mjs",
+      "bytes": 4001,
+      "sha256": "0e66fe130bd0a4a20ca96912671a0224da392b9a7a26fd407af7348eb0a2bbf3"
+    },
+    {
+      "file": "src/storage/cloud-records.mjs",
+      "bytes": 18542,
+      "sha256": "6744b973995c23ed04e7037c60674bd898bc91a760876643591836ed6be084a2"
+    },
+    {
+      "file": "src/storage/record-sync.mjs",
+      "bytes": 12424,
+      "sha256": "3c07cefecace63567d60e1f2e37ef84fc8dc0327811ff7a6e1b812b996e5dae0"
+    },
+    {
+      "file": "src/storage/record-session.mjs",
+      "bytes": 1855,
+      "sha256": "8355f8371243244a5961207716dcb1b1e3d6e195f0698f981f9b6d0c1875c0a9"
+    },
+    {
+      "file": "src/storage/legacy-import-readback.mjs",
+      "bytes": 1829,
+      "sha256": "2aafa37cf2f34d46a84c11a49042bb905768d8d898734526afa2878fb5596075"
+    },
+    {
+      "file": "scripts/test-p3-emulator.mjs",
+      "bytes": 1506,
+      "sha256": "8beadfc368154eb7ba0200535cf992d74226303ad2b57728877713398ec76648"
+    },
+    {
+      "file": "tests/v117-p3.test.cjs",
+      "bytes": 6425,
+      "sha256": "dc0b44f98d64a197094fc907877469acadd2f790d72d6212055b6fbba4df781f"
+    },
+    {
+      "file": "tests/emulator/v117-p3.test.cjs",
+      "bytes": 17798,
+      "sha256": "028168d91ecc8de798faa8054a43fcbff13ba7cee852805a9c0154286d019eae"
+    },
+    {
+      "file": "tests/helpers/v117-p3-emulator.cjs",
+      "bytes": 1628,
+      "sha256": "f4fa901154d8062245c623f9c673071cef790a2005a4f07ddd91ce2d20bae09e"
+    },
+    {
+      "file": "tests/browser/v117-p3.spec.cjs",
+      "bytes": 17040,
+      "sha256": "e98f06dca807e92e38872947866f5db44d425553feb77a192e36588d6df5df4f"
+    },
+    {
+      "file": "docs/audit/v117-p3-verslag.md",
+      "bytes": 22149,
+      "sha256": "a32764a9a773df7a966ea65a984b180dc125de76c43f04fa754faf9aec3980c2"
+    }
+  ]
+}

@@ -23,6 +23,15 @@ service cloud.firestore {
       return hasAccountLink() && accountLink().householdId == householdId;
     }
 
+    // An existing migration contract fences every v116 writer, including import chunks.
+    function legacyWritable(householdId) {
+      return !exists(/databases/$(database)/documents/households/$(householdId)/financialStorage/current);
+    }
+
+    function legacyWriter(householdId) {
+      return linkedTo(householdId) && legacyWritable(householdId);
+    }
+
     // Een geverifieerd account kan uitsluitend zijn vooraf aangemaakte koppeling lezen.
     // Rollen en huishoudens worden nooit door de browser aangemaakt of gewijzigd.
     match /accountLinks/{email} {
@@ -84,11 +93,11 @@ service cloud.firestore {
             && data.revision == data.stateMeta.revision;
         }
         allow read: if linkedTo(householdId);
-        allow create: if linkedTo(householdId)
+        allow create: if legacyWriter(householdId)
           && request.resource.data.syncVersion == 1
           && request.resource.data.commitId is string
           && (!('stateFormat' in request.resource.data) || validStatePointer());
-        allow update: if linkedTo(householdId)
+        allow update: if legacyWriter(householdId)
           && request.resource.data.syncVersion is int
           && request.resource.data.commitId is string
           && ((!('stateFormat' in request.resource.data) && !('stateFormat' in resource.data)) || validStatePointer())
@@ -120,8 +129,8 @@ service cloud.firestore {
               && last.cumulativeBytes == resource.data.totalByteLength;
           }
           allow read: if linkedTo(householdId);
-          allow create: if linkedTo(householdId) && validDescriptor() && request.resource.data.complete == false;
-          allow update: if linkedTo(householdId)
+          allow create: if legacyWriter(householdId) && validDescriptor() && request.resource.data.complete == false;
+          allow update: if legacyWriter(householdId)
             && (request.resource.data == resource.data
               || (resource.data.complete == false && request.resource.data.complete == true
                 && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['complete']) && completeChain()));
@@ -144,8 +153,8 @@ service cloud.firestore {
                     + get(/databases/$(database)/documents/households/$(householdId)/budgetState/current/generations/$(generationId)/chunks/$(string(data.sequence - 1))).data.cumulativeBytes));
             }
             allow read: if linkedTo(householdId);
-            allow create: if linkedTo(householdId) && validChunk();
-            allow update: if linkedTo(householdId) && request.resource.data == resource.data;
+            allow create: if legacyWriter(householdId) && validChunk();
+            allow update: if legacyWriter(householdId) && request.resource.data == resource.data;
             allow delete: if false;
           }
         }
@@ -153,11 +162,11 @@ service cloud.firestore {
 
       match /imports/{importId} {
         allow read: if linkedTo(householdId);
-        allow create: if linkedTo(householdId)
+        allow create: if legacyWriter(householdId)
           && request.resource.data.version is int
           && request.resource.data.version > 0
           && request.resource.data.operationId is string;
-        allow update: if linkedTo(householdId)
+        allow update: if legacyWriter(householdId)
           && (!('lifecycle' in resource.data) || resource.data.lifecycle != 'deleted')
           && request.resource.data.version is int
           && request.resource.data.operationId is string
@@ -172,12 +181,145 @@ service cloud.firestore {
         allow delete: if false;
         match /chunks/{chunkId} {
           allow read: if linkedTo(householdId);
-          allow create: if linkedTo(householdId)
+          allow create: if legacyWriter(householdId)
             && (!exists(/databases/$(database)/documents/households/$(householdId)/imports/$(importId))
               || !('lifecycle' in get(/databases/$(database)/documents/households/$(householdId)/imports/$(importId)).data)
               || get(/databases/$(database)/documents/households/$(householdId)/imports/$(importId)).data.lifecycle != 'deleted');
-          allow update: if linkedTo(householdId) && request.resource.data == resource.data;
-          allow delete: if linkedTo(householdId);
+          allow update: if legacyWriter(householdId) && request.resource.data == resource.data;
+          allow delete: if legacyWriter(householdId);
+        }
+      }
+
+      match /financialStorage/current {
+        allow read: if linkedTo(householdId);
+        allow create: if linkedTo(householdId)
+          && request.resource.data.storageVersion == 2
+          && request.resource.data.minClientVersion == 117
+          && request.resource.data.epoch is string
+          && request.resource.data.phase == 'preparing'
+          && request.resource.data.sourceVersion == (exists(/databases/$(database)/documents/households/$(householdId)/budgetState/current)
+            ? get(/databases/$(database)/documents/households/$(householdId)/budgetState/current).data.syncVersion : 0);
+        allow update: if linkedTo(householdId)
+          && request.resource.data.storageVersion == resource.data.storageVersion
+          && request.resource.data.minClientVersion == resource.data.minClientVersion
+          && request.resource.data.epoch == resource.data.epoch
+          && request.resource.data.sourceVersion == resource.data.sourceVersion
+          && request.resource.data.sourcePointerHash == resource.data.sourcePointerHash
+          && request.resource.data.sourceImportHeadersHash == resource.data.sourceImportHeadersHash
+          && request.resource.data.sourceStateHash == resource.data.sourceStateHash
+          && request.resource.data.sourceImportsHash == resource.data.sourceImportsHash
+          && (request.resource.data == resource.data
+            || (resource.data.phase == 'preparing' && request.resource.data.phase == 'verified'
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['phase','verifiedStateHash','verifiedRecordCount','verifiedPeriodCount'])
+              && get(/databases/$(database)/documents/households/$(householdId)/financialEpochs/$(resource.data.epoch)/meta/head).data.stateHash == request.resource.data.verifiedStateHash)
+            || (resource.data.phase == 'verified' && request.resource.data.phase == 'active'
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['phase'])));
+        allow delete: if false;
+      }
+
+      match /financialEpochs/{epoch} {
+        function control() {
+          return get(/databases/$(database)/documents/households/$(householdId)/financialStorage/current).data;
+        }
+        function ownEpoch() {
+          return linkedTo(householdId) && control().storageVersion == 2 && control().epoch == epoch;
+        }
+        function head() {
+          return get(/databases/$(database)/documents/households/$(householdId)/financialEpochs/$(epoch)/meta/head).data;
+        }
+        function opAfter(id) {
+          return getAfter(/databases/$(database)/documents/households/$(householdId)/financialEpochs/$(epoch)/operations/$(id)).data;
+        }
+        match /meta/head {
+          allow read: if ownEpoch();
+          allow create: if linkedTo(householdId)
+            && getAfter(/databases/$(database)/documents/households/$(householdId)/financialStorage/current).data.epoch == epoch
+            && request.resource.data.storageVersion == 2 && request.resource.data.epoch == epoch
+            && request.resource.data.revision == 0 && request.resource.data.phase == 'ready';
+          allow update: if ownEpoch()
+            && request.resource.data.storageVersion == 2 && request.resource.data.epoch == epoch
+            && ((resource.data.phase == 'ready' && request.resource.data.phase == 'applying'
+                && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['phase','pendingOperation'])
+                && opAfter(request.resource.data.pendingOperation).phase == 'applying'
+                && opAfter(request.resource.data.pendingOperation).baseRevision == resource.data.revision)
+              || (resource.data.phase == 'applying' && request.resource.data.phase == 'ready'
+                && request.resource.data.revision == resource.data.revision + 1
+                && opAfter(resource.data.pendingOperation).phase == 'committed'
+                && request.resource.data == opAfter(resource.data.pendingOperation).targetHead));
+          allow delete: if false;
+        }
+        match /operations/{operationId} {
+          allow read: if ownEpoch();
+          allow create: if ownEpoch()
+            && request.resource.data.storageVersion == 2 && request.resource.data.epoch == epoch
+            && request.resource.data.id == operationId && request.resource.data.phase == 'prepared'
+            && request.resource.data.baseRevision == head().revision && head().phase == 'ready'
+            && request.resource.data.targetHead.revision == head().revision + 1
+            && request.resource.data.memberCount is int && request.resource.data.memberCount >= 0
+            && request.resource.data.memberHash is string;
+          allow update: if ownEpoch()
+            && (request.resource.data == resource.data
+              || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['phase'])
+                && ((resource.data.phase == 'prepared' && request.resource.data.phase == 'applying'
+                    && getAfter(/databases/$(database)/documents/households/$(householdId)/financialEpochs/$(epoch)/meta/head).data.pendingOperation == operationId)
+                  || (resource.data.phase == 'applying' && request.resource.data.phase == 'committed'
+                    && getAfter(/databases/$(database)/documents/households/$(householdId)/financialEpochs/$(epoch)/meta/head).data == resource.data.targetHead))));
+          allow delete: if false;
+          match /changes/{changeId} {
+            allow read: if ownEpoch();
+            allow create: if ownEpoch()
+              && get(/databases/$(database)/documents/households/$(householdId)/financialEpochs/$(epoch)/operations/$(operationId)).data.phase == 'prepared'
+              && request.resource.data.id == changeId;
+            allow update: if ownEpoch() && request.resource.data == resource.data;
+            allow delete: if false;
+          }
+          match /members/{id} {
+            allow read: if ownEpoch();
+            allow create: if ownEpoch()
+              && get(/databases/$(database)/documents/households/$(householdId)/financialEpochs/$(epoch)/operations/$(operationId)).data.phase == 'prepared'
+              && request.resource.data.id == id && request.resource.data.sha256 is string
+              && request.resource.data.storageRevision is int;
+            allow update: if ownEpoch() && request.resource.data == resource.data;
+            allow delete: if false;
+          }
+        }
+        function applyingChange(kind,id) {
+          let current = head();
+          let operation = get(/databases/$(database)/documents/households/$(householdId)/financialEpochs/$(epoch)/operations/$(current.pendingOperation)).data;
+          let change = get(/databases/$(database)/documents/households/$(householdId)/financialEpochs/$(epoch)/operations/$(current.pendingOperation)/changes/$(kind + '_' + id)).data;
+          return current.phase == 'applying' && operation.phase == 'applying'
+            && change.path == kind + '/' + id && request.resource.data == change.after;
+        }
+        match /records/{recordId} {
+          allow read: if ownEpoch();
+          allow create: if ownEpoch() && applyingChange('records',recordId);
+          allow update: if ownEpoch() && applyingChange('records',recordId)
+            && request.resource.data.sourceHash == resource.data.sourceHash;
+          allow delete: if false;
+        }
+        match /periods/{month} {
+          allow read: if ownEpoch();
+          allow create, update: if ownEpoch() && applyingChange('periods',month);
+          allow delete: if false;
+        }
+        match /globals/{id} {
+          allow read: if ownEpoch();
+          allow create, update: if ownEpoch() && applyingChange('globals',id);
+          allow delete: if false;
+        }
+        match /receipts/{id} {
+          allow read: if ownEpoch();
+          allow create: if ownEpoch() && request.resource.data.id == id
+            && request.resource.data.storageVersion == 2 && request.resource.data.epoch == epoch
+            && request.resource.data.outcome == 'prepared'
+            && opAfter(request.resource.data.cloudOperation).phase == 'applying'
+            && get(/databases/$(database)/documents/households/$(householdId)/financialEpochs/$(epoch)/operations/$(request.resource.data.cloudOperation)/members/$(id)).data == {
+              'id': id, 'sha256': request.resource.data.sha256,
+              'storageRevision': request.resource.data.storageRevision
+            }
+            && request.resource.data.cloudRevision == opAfter(request.resource.data.cloudOperation).targetHead.revision;
+          allow update: if ownEpoch() && request.resource.data == resource.data;
+          allow delete: if false;
         }
       }
     }

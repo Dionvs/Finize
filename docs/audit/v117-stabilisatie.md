@@ -63,11 +63,13 @@ P1 vervangt nog niet de omvangrijke localStorage-statewrites; dat is expliciet P
 
 Afgerond voor lokale ontwikkeling op 10 oktober 2026. Eén atomaire IndexedDB-commit bewaart financiële records, importdetails, revisies, operatiebewijs en outbox. De volledige administratie migreert verliesloos met verificatie en behoud van oude opslag; de app publiceert financiële wijzigingen pas na commitbevestiging. Huishoudens en fotocaches zijn gescheiden. De volledige suites op dezelfde definitieve build slagen: 54 Node-bestanden met 572 geregistreerde testgevallen en 266 Playwright-tests, geen mislukkingen of skips. Volle localStorage met tien CSV-groepsgoedkeuringen, zeven IndexedDB-commitgrenzen en vier migratieherstarts zijn aantoonbaar getest.
 
-Uitgebreid technisch verslag: [v117-p2-verslag.md](v117-p2-verslag.md). Bestanden, hashes en reproduceerbaar testbewijs: [v117-p2-bewijs.json](v117-p2-bewijs.json). De technische back-up is opnieuw geverifieerd; het controlemanifest heet nu `backup-manifest.json` om het oorspronkelijke PWA-bestand `manifest.json` te behouden. P3 blijft op uitdrukkelijk gebruikersverzoek gepauzeerd; geen productieaanpassing, deployment, push of merge naar main.
+Uitgebreid technisch verslag: [v117-p2-verslag.md](v117-p2-verslag.md). Bestanden, hashes en reproduceerbaar testbewijs: [v117-p2-bewijs.json](v117-p2-bewijs.json). De technische back-up is opnieuw geverifieerd; het controlemanifest heet nu `backup-manifest.json` om het oorspronkelijke PWA-bestand `manifest.json` te behouden. P2 is vervolgens expliciet geaccepteerd als basis voor P3; geen productieaanpassing, deployment, push of merge naar main.
 
 ## P3 — cloudinfrastructuur
 
-Nog niet gestart. Vereist recordgerichte periodequeries, herleidbare projecties uit de bestaande motor, revisieconflicten en een hervatbare, geverifieerde migratie uitsluitend in test/emulator. Productiemigratie vereist aparte toestemming.
+Lokaal geïmplementeerd: recordgerichte periodequeries, geverifieerde projecties uit de bestaande motor, een hervatbare migratie, bescherming tegen oude clients via echte Firestore-regels, idempotente outboxpublicatie en atomaire ontvangst op een tweede client. Beide conflictversies blijven bewaard. Tien CSV-spaartransacties blijven na één groepsbevestiging, offline herladen en echte emulatorsynchronisatie afzonderlijk goedgekeurd, samen €750.
+
+Verslag: [v117-p3-verslag.md](v117-p3-verslag.md). Bewijs: [v117-p3-bewijs.json](v117-p3-bewijs.json). De nieuwe transportlaag is uitsluitend voor de lokale demo-emulator beschikbaar. De bestaande schermen en volledige commitreadback gebruiken nog de complete lokale administratie. P3-acceptatie blijft daarom open; dit is geen vrijgave van een volledige app met gedeeltelijk geladen historie. Productieomschakeling vereist aparte toestemming. P4 blijft gestopt totdat het open P3-criterium is opgelost en het verslag is goedgekeurd.
 
 ## P4 — cache en releasecontrole
 
