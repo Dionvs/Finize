@@ -1,6 +1,37 @@
 const {test,expect}=require('@playwright/test');
 const fs=require('node:fs'),path=require('node:path');
 const fixture=JSON.parse(fs.readFileSync(path.join(__dirname,'../fixtures/v50-visual-state.json'),'utf8'));
+
+for(const width of [390,1440])test(`V117 vaste last buiten budgetdetail en interne inleg voor spaardoel op ${width}px`,async({page})=>{
+ await boot(page,width);
+ await page.evaluate(()=>commitChange(()=>{
+  state.budgetDefaultsHistory.gezamenlijk=[{effectiveFrom:'0000-01',rows:[{id:'capital-other',post:'Overig',bedrag:200}]}];state.monthlyBudgetOverrides={};state.monthlyBudgets={};
+  state.spaardoelen.gezamenlijk.push({id:'capital-garden',naam:'Tuin test',doelbedrag:10000,algespaard:0});
+  state.transactions.push({id:'gym',source:'manual',accountContext:'gezamenlijk',financialFor:'gezamenlijk',date:'2026-10-01',amount:62.83,kind:'vaste-last',transactionType:'vaste-last',category:'Overig',description:'Sportschool test',fixedExpenseId:'p3-hyp',fixedOccurrenceId:'p3-hyp:2026-10-01',fixedOccurrenceMonth:'2026-10'});
+ },{render:true}));
+ await page.evaluate(()=>document.querySelector('#tabs [data-tab="gezamenlijk"]').click());
+ await page.locator('#tab-gezamenlijk').getByRole('button',{name:'Open transacties voor Overig',exact:true}).click();
+ await expect(page.locator('#transactionModal')).not.toContainText('Sportschool test');
+ await page.locator('[data-close-budget-transactions]').click();
+ const baseline=await page.evaluate(()=>FinizeTransactions.forecast('2026-10'));
+ await draft(page,'capital','gezamenlijk',[
+  {date:'2026-10-11',amount:6100,label:'Inleg Dara',type:'interne-overboeking',processing:{sourceAccountProfileId:'dara',destinationAccountProfileId:'gezamenlijk'}},
+  {date:'2026-10-11',amount:-6100,label:'Tuin sparen',type:'sparen',processing:{savingsGoalId:'capital-garden'}}
+ ]);
+ const incoming=page.locator('[data-u4-row="capital-0"]');
+ await incoming.locator('[data-u4-field="contributionGoalId"]').selectOption('capital-garden');
+ await expect(incoming.locator('[data-u4-field="contributionAmount"]')).toHaveValue('6100');await approve(page,'capital-0');
+ const afterIncoming=await page.evaluate(()=>FinizeTransactions.forecast('2026-10'));
+ expect(afterIncoming.household.income).toBe(baseline.household.income);expect(afterIncoming.owners.dion.allowance).toBe(baseline.owners.dion.allowance);expect(afterIncoming.owners.dara.allowance).toBe(baseline.owners.dara.allowance);
+ const deposit=page.locator('[data-u4-row="capital-1"]');
+ await deposit.locator('[data-u4-field="savingsContributionId"]').selectOption('tx-capital-0');
+ await expect(deposit.locator('[data-u4-field="savingsContributionAmount"]')).toHaveValue('6100');await approve(page,'capital-1');
+ await process(page);
+ const verify=()=>page.evaluate(()=>({available:FinizeTransactions.forecast('2026-10').owners.gezamenlijk.available,goal:state.spaardoelen.gezamenlijk.find(g=>g.id==='capital-garden').algespaard,linked:FinizeTransactions.effects({month:'2026-10'}).find(p=>p.id==='tx-capital-1').effects.existingCapitalDeposit}));
+ expect(await verify()).toEqual({available:baseline.owners.gezamenlijk.available,goal:6100,linked:6100});
+ await page.reload();await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
+ expect(await verify()).toEqual({available:baseline.owners.gezamenlijk.available,goal:6100,linked:6100});
+});
 test.setTimeout(60_000);test.use({actionTimeout:5000});
 async function boot(page,width){
  await page.setViewportSize({width,height:900});

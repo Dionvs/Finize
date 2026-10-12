@@ -1,11 +1,11 @@
-const CACHE_NAME = "finize-v117-p4r4c";
+const CACHE_NAME = "finize-v117-p4r5";
 const CACHE_PREFIX = "finize-";
 
 const CRITICAL_SHELL = [
   "./",
   "./index.html",
-  "./app.js?v=117-p4r4c",
-  "./app.css?v=117-p4r4c",
+  "./app.js?v=117-p4r5",
+  "./app.css?v=117-p4r5",
   "./manifest.json"
 ];
 

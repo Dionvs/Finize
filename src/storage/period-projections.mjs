@@ -36,7 +36,7 @@ export function transactionPeriodDependencies(state,months){
   const contextKey=(owner,month,category)=>JSON.stringify([owner,month,String(category||'').trim().toLocaleLowerCase('nl-NL')]);
   for(const p of projections)if(p.effects.realExpense>0){const key=contextKey(p.financialFor,p.fixedMonth||p.calendarMonth,p.budgetCategory);if(!fixedContexts.has(key))fixedContexts.set(key,new Set());fixedContexts.get(key).add(p.sourceKey);}
   for(const p of projections)if(p.effects.refundCashflow&&p.refundMonth){if(!refundEdges.has(p.sourceKey))refundEdges.set(p.sourceKey,new Set());for(const key of fixedContexts.get(contextKey(p.financialFor,p.refundMonth,p.refundCategory))||[])refundEdges.get(p.sourceKey).add(key);}
-  const links=[...(state.internalTransferPairs||[]).map(row=>row.transactionIds||[]),...(state.savingsCoverageAllocations||[]).map(row=>[row.withdrawalTransactionId,row.expenseTransactionId]),...(state.manualTransactionReplacements||[]).map(row=>[row.manualTransactionId||row.manualTransaction?.id,row.importedTransactionId||row.importTransactionId])];
+  const links=[...(state.transactions||[]).filter(tx=>tx.processing?.savingsContributionId).map(tx=>[tx.id,tx.processing.savingsContributionId]),...(state.internalTransferPairs||[]).map(row=>row.transactionIds||[]),...(state.savingsCoverageAllocations||[]).map(row=>[row.withdrawalTransactionId,row.expenseTransactionId]),...(state.manualTransactionReplacements||[]).map(row=>[row.manualTransactionId||row.manualTransaction?.id,row.importedTransactionId||row.importTransactionId])];
   return new Map(months.map(month=>{
     const selected=new Set(records.filter(row=>row.periods.includes(month)).map(row=>row.recordId));let previous=-1;
     while(previous!==selected.size){previous=selected.size;

@@ -6,6 +6,7 @@ import { plannedOccurrences } from './recurring-occurrences.mjs';
 import { resolveBudgetAssignment, budgetAssignmentMatches } from './budget-assignment.mjs';
 import { profileCount } from '../storage/performance.mjs';
 import { salaryPerson, salaryLink } from './salary-assignment.mjs';
+import { applySavingsContributions } from './savings-contributions.mjs';
 const copy=value=>JSON.parse(JSON.stringify(value));
 const money=value=>Math.round((Number(value||0)+Number.EPSILON)*100)/100;
 const cents=value=>Math.round(Number(value)*100);
@@ -88,6 +89,7 @@ export function selectTransactionProjections(state,{month=null,dimension='calend
     });
   });
   applySavingsAndRefundEffects(projections,state);
+  applySavingsContributions(projections,state);
   return projections.filter(p=>(includeInactive||p.active)&&(!month||(dimension==='fixed'?p.fixedMonth:dimension==='budget'&&p.effects.refundCorrection?p.refundMonth:p.calendarMonth)===month)&&(!account||p.accountContext===account)&&(!owner||p.financialFor===owner));
 }
 export function selectActiveTransactions(state,options={}) {
@@ -346,11 +348,12 @@ export function categoryFinancialActuals(state,month,owner=null){
   });return [...map.values()];
 }
 // Detail rows are financial explanations linked to their existing source, never bank mutations.
-export function categoryProcessingDetails(state,month,owner=null){
+export function categoryProcessingDetails(state,month,owner=null,{budgetOnly=false}={}){
   state=periodDependencyState(state,month);
   const details=[];
   for(const p of selectTransactionProjections(state)){
-    if(!owner||p.financialFor===owner){
+    const fixed=p.transactionType==='vaste-last'||p.fixedExpenseId||p.fixedOccurrenceId;
+    if((!budgetOnly||!fixed)&&(!owner||p.financialFor===owner)){
       const effectiveMonth=p.effects.refundCorrection?p.refundMonth:p.fixedOccurrenceId?p.fixedMonth:p.calendarMonth;
       if(effectiveMonth===month&&(p.effects.realExpense>0||p.effects.refundCorrection>0))details.push({...p.transaction,id:p.transaction.sourceTransactionId||p.id,budgetItemId:p.effects.refundCorrection?'':p.budgetItemId,category:p.effects.refundCorrection?p.refundCategory:p.budgetCategory||p.category,displayImpact:p.effects.refundCorrection?-p.effects.refundCorrection:p.fixedOccurrenceId?p.effects.fixedRegularImpact:p.effects.budgetImpact,savingsFunded:p.effects.savingsFunded,refundCorrection:p.effects.refundCorrection,categoryOnlyRefundCorrection:p.effects.categoryOnlyRefundCorrection});
     }
@@ -376,6 +379,7 @@ export function financialForecastForMonth(state,month,{compatibilityIncome={},pl
     target.variableBurden=money(target.variableBurden+(p.effects.realExpense>0&&!p.fixedOccurrenceId?p.effects.budgetImpact:0));
     for(const a of p.directBudgetAllocations||[]){const budgetOwner=owners[a.budgetOwner||p.financialFor];if(budgetOwner)budgetOwner.variableBurden=money(budgetOwner.variableBurden-a.amount);}
     for(const field of ['savingsDeposit','savingsFunded','unusedSavings','refundCashflow'])target[field]=money(target[field]+p.effects[field]);
+    if(p.effects.existingCapitalDeposit)target.existingCapitalDeposit=money((target.existingCapitalDeposit||0)+p.effects.existingCapitalDeposit);
   });
   const occurrences=fixedOccurrences||plannedOccurrences(resolveFixedExpensesForMonth(state,month),month);
   const allowanceOwners=Object.fromEntries(ACCOUNT_CONTEXTS.map(owner=>[owner,{fixedReserve:0,budgetReserve:money(resolveVariableBudgetsForMonth(state,month,owner).reduce((sum,row)=>sum+Number(row.bedrag||0),0)),savingsReserve:0,totalReserve:0}]));
@@ -387,7 +391,7 @@ export function financialForecastForMonth(state,month,{compatibilityIncome={},pl
     if(occurrence.financialFor==='gezamenlijk'&&occurrence.source?.distributionMode==='equal')equalJointReserve=money(equalJointReserve+Number(occurrence.amount));
   });
   const dion=owners.dion,dara=owners.dara,joint=owners.gezamenlijk,incomeBasis=money(dion.income+dara.income),minimum=Number(state.planning?.verdeling?.minimumDion??.4),ratioDion=Math.max(minimum,incomeBasis>0?dion.income/incomeBasis:0),ratioDara=1-ratioDion;
-  const burden=owner=>money(owner.fixedBurden+owner.variableBurden+owner.savingsDeposit-owner.unusedSavings-owner.refundCashflow);
+  const burden=owner=>money(owner.fixedBurden+owner.variableBurden+owner.savingsDeposit-(owner.existingCapitalDeposit||0)-owner.unusedSavings-owner.refundCashflow);
   // Allowance is determined by month planning. Actual spending, refunds, coverage and
   // savings realizations only affect forecast/account buffers, never this reservation.
   const savingsOverrides=state.monthlySavingOverrides?.[month]||{};

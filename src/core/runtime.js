@@ -5118,7 +5118,7 @@ function parkMonthControlBeforeRender(){
 function openBudgetTransactionsModal(category,owner='gezamenlijk',budgetItemId=''){
   const modal=document.getElementById('transactionModal');
   const month=getSelectedMonth();
-  const rows=categoryProcessingDetails(state,month,owner).filter(tx=>budgetCategoryMatches(tx,category,owner,month,budgetItemId)).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+  const rows=categoryProcessingDetails(state,month,owner,{budgetOnly:true}).filter(tx=>budgetCategoryMatches(tx,category,owner,month,budgetItemId)).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
   const total=round2(rows.reduce((sum,tx)=>sum+tx.displayImpact,0));
   modal.innerHTML=`<div class="modal budget-transactions-modal"><div class="modal-head"><div><h2>${textSafe(category)}</h2><p>${monthLabel(month)} · ${rows.length} transactie${rows.length===1?'':'s'} · ${eur(total)}</p></div><button type="button" class="ghost" data-close-budget-transactions>Sluiten</button></div><div class="budget-transactions-list">${rows.length?rows.map(tx=>`<button type="button" class="budget-transaction-row" data-open-budget-transaction-id="${textSafe(tx.id)}"><span><strong>${textSafe(tx.description||tx.category||'Transactie')}</strong><small>${formatDateNL(tx.date)} · ${textSafe(tx.category||'Overig')}${tx.savingsFunded?' · gedekt '+eur(tx.savingsFunded):''}${tx.categoryOnlyRefundCorrection?' · aparte categoriecorrectie':tx.refundCorrection?' · refundcorrectie':''}</small></span><b class="${tx.displayImpact<0?'value pos':'value neg'}">${eur(tx.displayImpact)}</b></button>`).join(''):'<p class="muted-empty">Geen budgettransacties in deze categorie.</p>'}</div></div>`;
   modal.classList.add('open');

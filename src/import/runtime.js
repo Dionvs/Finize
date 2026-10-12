@@ -15,7 +15,7 @@ import { importVersion, sameImportOperation, assertImportBase, pendingQueueRecei
 import { planImportCommand, deriveBatchReviewStatus, batchLifecycle } from './import-lifecycle.mjs';
 import { classifyCsvDuplicate, importDateError, validCalendarDate, csvFileDigest, assertNoDuplicateSources } from './import-identity.mjs';
 import { plannedOccurrences } from '../core/recurring-occurrences.mjs';
-import { projectTransaction, validateTransactionProcessing, getTransactionFinancialMonth, confirmInternalTransferPair, confirmManualReplacement, refundCategoryIsRecognizable } from '../core/transaction-engine.mjs';
+import { selectTransactionProjections, projectTransaction, validateTransactionProcessing, getTransactionFinancialMonth, confirmInternalTransferPair, confirmManualReplacement, refundCategoryIsRecognizable } from '../core/transaction-engine.mjs';
 import { reopenTransactionSource, commitProcessedSourceGroup, replaceProcessedSourceRows, createTransactionSavingsEntry, synchronizeChangedSavings, assertFinancialMutationSafe, applyFinancialCandidate } from '../core/transaction-processing.mjs';
 import { resolveRecurringAmount, resolveRecurringConfig, resolveFixedExpensesForMonth, applyFixedPlanningAdjustment, undoFixedPlanningAdjustment } from '../core/planning-timeline.mjs';
 import { cloneState as clone } from "../core/state.js";
@@ -967,6 +967,17 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
     if(!row.bankOriginal?.valid)return {ok:false,errors:[{code:'original',message:'Originele bankregel is ongeldig.'}]};
     if(row.possibleDuplicate&&!row.identityDecision&&!row.duplicate)return {ok:false,errors:[{code:'identity-choice',field:'identityDecision',message:'Kies of deze bankregel dezelfde of een afzonderlijke betaling is.'}]};
     const p=row.processing||{},lines=p.splits?.length?p.splits:[p];
+    if(p.contributionGoalId){
+      const n=Number(p.contributionAmount),c=Math.round(n*100);
+      if(!['interne-overboeking','extra-bijdrage'].includes(p.transactionType)||row.bankOriginal.amount<=0||!goalExists(state,p.contributionGoalId)||!Number.isSafeInteger(c)||c<=0||Math.abs(n*100-c)>1e-6||n>Math.min(p.processedAmount,row.bankOriginal.amount)||p.splits?.length)return {ok:false,errors:[{code:'savings-contribution',message:'Kies een bestaand spaardoel en een inlegbedrag binnen deze ontvangen interne overboeking. Een gesplitste ontvangst kan nog niet als inleg worden gekoppeld.'}]};
+    }
+    if(p.savingsContributionId){
+      const prior=(state.transactions||[]).find(tx=>tx.importTransactionId===row.id),id=prior?.id||`tx-${row.id}`;
+      const candidate={id,source:'csv',approvalSource:'manual',processingStatus:'goedgekeurd',date:row.bankOriginal.bankDate,bankOriginal:row.bankOriginal,amount:p.processedAmount,transactionType:p.transactionType,accountContext:row.accountOwner,financialFor:p.budgetOwner,processing:clone(p),savingsGoalId:p.savingsGoalId};
+      const checkState={...state,transactions:[...(state.transactions||[]).filter(tx=>tx.importTransactionId!==row.id&&tx.id!==id),candidate]};
+      const result=projectTransaction(candidate,{state:checkState});
+      if(result.savingsContributionError||!result.effects.existingCapitalDeposit)return {ok:false,errors:[{code:'savings-contribution',message:result.savingsContributionError||'Deze interne inleg kan niet aan de spaarboeking worden gekoppeld.'}]};
+    }
     if(p.salaryLinkVersion===117&&lines.some(line=>(line.transactionType||p.transactionType)==='salaris')){
       try{salaryLink({...row,processing:p},{},{requireChoice:true});}catch(error){return {ok:false,errors:[{code:error.code,field:error.field,message:error.message}]};}
     }
@@ -1521,6 +1532,8 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
     else {delete line.salaryLinkVersion;delete line.salaryPersonId;delete line.salarySourceId;delete line.salaryMonth;}
     if(type!=='vaste-last'){line.fixedExpenseId='';line.fixedOccurrenceId='';line.fixedOccurrenceMonth='';line.fixedAmountMode='none';}
     if(next!=='sparen')line.savingsGoalId='';
+    if(!['sparen','naar-spaarrekening'].includes(type)){delete line.savingsContributionId;delete line.savingsContributionAmount;}
+    if(!['interne-overboeking','extra-bijdrage'].includes(type)){delete line.contributionGoalId;delete line.contributionAmount;}
     if(!['terugbetaling','refund'].includes(type)){line.refundCategory='';line.refundMonth='';}
     if(type!=='interne-overboeking'){line.sourceAccountProfileId='';line.destinationAccountProfileId='';line.internalPairId='';line.transferPairId='';}
     if(type!=='terugbetaling-voorschot')line.repaymentAllocations=[];
@@ -1578,6 +1591,8 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
   }
   function copiedProcessing(source,target,root){
     setProcessingType(target.processing,source.processing.transactionType);
+    // Capital links require a choice for this source; never copy them in bulk.
+    ['contributionGoalId','contributionAmount','savingsContributionId','savingsContributionAmount'].forEach(field=>delete target.processing[field]);
     ['budgetOwner','category','transactionType','budgetItemId','fixedExpenseId','fixedAmountMode','savingsGoalId','refundCategory','refundMonth','advanceMode','include','sourceAccountProfileId','destinationAccountProfileId','salaryPersonId'].forEach(field=>{
       const value=source.processing[field];
       if(value===undefined)delete target.processing[field];
@@ -1646,6 +1661,17 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
     for(const tx of root.state.transactions||[]){if(String(tx.date||tx.transactionDate||'').slice(0,7)===month&&tx.category&&refundCategoryIsRecognizable(root.state,tx.category,month,owner)&&!categories.includes(tx.category))categories.push(tx.category);}
     return `<div class="u4-context-grid"><label>Correctiemaand<input type="month" ${attr}="refundMonth" value="${esc(month)}"></label><label>Budgetcategorie<select ${attr}="refundCategory"><option value="">Kies categorie</option>${categories.map(category=>option(category,category,line.refundCategory||'')).join('')}</select></label></div>`;
   }
+  function incomingContributionFields(root,row){
+    const p=row.processing;
+    if(Number(row.bankOriginal.amount)<=0||!['interne-overboeking','extra-bijdrage'].includes(p.transactionType))return '';
+    return `<div class="u4-dependent-grid"><label>Inleg bestaand geld voor spaardoel (optioneel)<select data-u4-field="contributionGoalId">${goalOptions(root,p.contributionGoalId||'')}</select></label>${p.contributionGoalId?`<label>Inlegbedrag<input type="number" min="0.01" step="0.01" data-u4-field="contributionAmount" value="${Number(p.contributionAmount)||0}"></label><span class="u4-muted">Geen inkomen of extra zakgeld. Koppel na goedkeuring de daadwerkelijke spaarboeking aan deze inleg. Alleen die spaarboeking verhoogt het spaardoel.</span>`:''}</div>`;
+  }
+  function savingsContributionFields(root,row){
+    const p=row.processing,month=row.bankOriginal.bankDate.slice(0,7);
+    const sources=selectTransactionProjections(root.state).filter(t=>['interne-overboeking','extra-bijdrage'].includes(t.transactionType)&&t.effects.accountCashflow>0&&t.calendarMonth===month&&t.financialFor===p.budgetOwner&&t.transaction.processing?.contributionGoalId===p.savingsGoalId);
+    const missing=p.savingsContributionId&&!sources.some(t=>t.id===p.savingsContributionId);
+    return `<label>Betaald uit interne inleg<select data-u4-field="savingsContributionId"><option value="">Geen koppeling — uit maandruimte</option>${missing?option(p.savingsContributionId,'Gekoppelde inleg niet beschikbaar',p.savingsContributionId):''}${sources.map(t=>option(t.id,`${t.transaction.description||'Interne inleg'} · ${euro(t.transaction.processing.contributionAmount)}`,p.savingsContributionId||'')).join('')}</select></label>${p.savingsContributionId?`<label>Gekoppeld bedrag<input type="number" min="0.01" step="0.01" data-u4-field="savingsContributionAmount" value="${Number(p.savingsContributionAmount)||0}"></label><span class="u4-muted">Dit deel komt uit bestaand eigen geld en wordt niet van Over deze maand afgetrokken. De volledige spaarboeking blijft meetellen voor het spaardoel.</span>`:''}`;
+  }
   function dependentFieldsHtml(root,row){
     const p=row.processing;const family=transactionFamily(p);
     if(p.splits?.length&&['uitgave','terugbetaling'].includes(family))return '';
@@ -1654,10 +1680,10 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
       return `<div class="u4-dependent-grid"><label>Categorie<select data-u4-field="category">${categoryOptions(root,p.budgetOwner,category,String(p.processingDate||row.bankOriginal?.bankDate).slice(0,7))}</select></label>${category==='Vaste lasten'?`<label>Vaste last<select data-u4-field="fixedExpenseId">${fixedOptions(root,p.budgetOwner,p.fixedExpenseId,p.fixedOccurrenceMonth||String(row.bankOriginal?.bankDate).slice(0,7))}</select></label>${occurrenceFields(root,row,p)}`:''}</div>`;
     }
     if(family==='inkomen')return `<div class="u4-dependent-grid"><label>Soort inkomen<select data-u4-field="transactionType">${INCOME_TYPES.map(type=>option(type,TYPE_GROUPS[1].items.find(item=>item[0]===type)?.[1]||type,p.transactionType)).join('')}</select></label>${p.transactionType==='salaris'?`<label>Salaris van<select data-u4-field="salaryPersonId"><option value="">Kies Dion of Dara</option>${['dion','dara'].map(person=>option(person,ownerLabel(person),p.salaryPersonId||'')).join('')}</select></label><span class="u4-muted">Salarismaand ${esc(originalSalaryMonth(row))}. Een voorstel wordt pas definitief na Opslaan en verwerken.</span>`:''}</div>`;
-    if(family==='sparen')return `<div class="u4-dependent-grid"><label>Spaarbeweging<select data-u4-field="transactionType">${option('sparen','Naar spaardoel',p.transactionType)}${option('naar-spaarrekening','Naar spaarrekening',p.transactionType)}${option('van-spaarrekening','Van spaarrekening',p.transactionType)}</select></label><label>Spaardoel<select data-u4-field="savingsGoalId">${goalOptions(root,p.savingsGoalId)}</select></label>${p.transactionType==='van-spaarrekening'&&!p.splits?.length?`<label>Budgetcorrectie (optioneel)<select data-u4-field="withdrawalBudgetCategory"><option value="">Zonder budgetcorrectie</option>${categoryOptions(root,p.budgetOwner,p.withdrawalBudgetCategory,row.bankOriginal.bankDate.slice(0,7))}</select></label>`:''}</div>`;
-    if(family==='overboeking')return `<div class="u4-dependent-grid"><label>Soort overboeking<select data-u4-field="transactionType">${TYPE_GROUPS[2].items.filter(item=>TRANSFER_TYPES.includes(item[0])).map(([type,label])=>option(type,label,p.transactionType)).join('')}</select></label></div>${transferFieldsHtml(root,row)}`;
+    if(family==='sparen')return `<div class="u4-dependent-grid"><label>Spaarbeweging<select data-u4-field="transactionType">${option('sparen','Naar spaardoel',p.transactionType)}${option('naar-spaarrekening','Naar spaarrekening',p.transactionType)}${option('van-spaarrekening','Van spaarrekening',p.transactionType)}</select></label><label>Spaardoel<select data-u4-field="savingsGoalId">${goalOptions(root,p.savingsGoalId)}</select></label>${['sparen','naar-spaarrekening'].includes(p.transactionType)?savingsContributionFields(root,row):''}${p.transactionType==='van-spaarrekening'&&!p.splits?.length?`<label>Budgetcorrectie (optioneel)<select data-u4-field="withdrawalBudgetCategory"><option value="">Zonder budgetcorrectie</option>${categoryOptions(root,p.budgetOwner,p.withdrawalBudgetCategory,row.bankOriginal.bankDate.slice(0,7))}</select></label>`:''}</div>`;
+    if(family==='overboeking')return `${incomingContributionFields(root,row)}<div class="u4-dependent-grid"><label>Soort overboeking<select data-u4-field="transactionType">${TYPE_GROUPS[2].items.filter(item=>TRANSFER_TYPES.includes(item[0])).map(([type,label])=>option(type,label,p.transactionType)).join('')}</select></label></div>${transferFieldsHtml(root,row)}`;
     if(family==='zakgeld')return '<p class="u4-dependent-hint">Kies Dion of Dara bij Budgeteigenaar.</p>';
-    if(family==='extra-bijdrage')return '<p class="u4-dependent-hint">De budgeteigenaar ontvangt deze extra bijdrage.</p>';
+    if(family==='extra-bijdrage')return incomingContributionFields(root,row)+'<p class="u4-dependent-hint">De budgeteigenaar ontvangt deze extra bijdrage.</p>';
     if(family==='terugbetaling')return `<div class="u4-dependent-grid"><label>Soort terugbetaling<select data-u4-field="transactionType">${option('terugbetaling','Terugbetaling aankoop',p.transactionType)}${option('terugbetaling-voorschot','Terugbetaling voorschot',p.transactionType)}</select></label></div>${['terugbetaling','refund'].includes(p.transactionType)?refundFieldsHtml(root,row,p):repaymentHtml(root,row)}`;
     return '';
   }
@@ -1932,12 +1958,14 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
         rerender=true;
       }else if(event.target.dataset.u4Field){
         const field=event.target.dataset.u4Field;let value=event.target.value;
-        if(['processedAmount','singleLineAmount'].includes(field))value=Math.abs(Number(value));
+        if(['processedAmount','singleLineAmount','contributionAmount','savingsContributionAmount'].includes(field))value=Math.abs(Number(value));
         if(field==='include')value=value==='true';
         if(field==='transactionType'){setProcessingType(row.processing,value);for(const line of row.processing.splits||[])setProcessingType(line,value);}else row.processing[field]=value;
         row.processing.editorVersion=113;
         if(field==='budgetOwner')row.processing.budgetItemId='';
         if(field==='processedAmount'){redistributeProcessing(row.processing);rerender=true;}
+        if(field==='contributionGoalId'){row.processing.contributionAmount=value?row.processing.processedAmount:0;rerender=true;}
+        if(field==='savingsContributionId'){row.processing.savingsContributionAmount=value?row.processing.processedAmount:0;rerender=true;}
         if(field==='savingsGoalId')for(const line of row.processing.splits||[])line.savingsGoalId=value;
         if(field==='category'){
           row.processing.budgetItemId='';

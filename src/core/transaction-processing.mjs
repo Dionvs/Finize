@@ -72,6 +72,11 @@ function replaceSourceInPlace(state,importId,rowId,newRows) {
 
 
 export function assertFinancialMutationSafe(previous,next){
+  if((next.transactions||[]).some(tx=>tx.processing?.savingsContributionId)){
+    const existingContributionErrors=new Set(selectTransactionProjections(previous).filter(p=>p.savingsContributionError).map(p=>p.id));
+    const brokenContribution=selectTransactionProjections(next).find(p=>p.savingsContributionError&&!existingContributionErrors.has(p.id));
+    if(brokenContribution)throw new Error(`${brokenContribution.savingsContributionError} Pas eerst de koppeling bij de spaarboeking aan.`);
+  }
   const previousBalances=new Map(allGoals(previous).map(({goal})=>[goal.id,calculateGoalSavedAmount(previous,goal.id)]));
   allGoals(next).forEach(({goal})=>{const balance=calculateGoalSavedAmount(next,goal.id);if(balance<0&&balance!==previousBalances.get(goal.id))throw new Error(`Onvoldoende saldo in spaardoel ${goal.naam||goal.id}: ${money(previousBalances.get(goal.id)||0).toLocaleString('nl-NL',{style:'currency',currency:'EUR'})} beschikbaar. De wijziging maakt het saldo negatief: ${money(balance).toLocaleString('nl-NL',{style:'currency',currency:'EUR'})}. Corrigeer eerst de afhankelijke spaarbewegingen.`);});
   const codes=new Set(['coverage-exceeds-withdrawal','coverage-exceeds-expense','coverage-cents']);

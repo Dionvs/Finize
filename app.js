@@ -1190,8 +1190,8 @@
     return result2;
   }
   function redistributeProcessing(processing) {
-    const cents3 = processingCents(processing.processedAmount);
-    if (cents3 !== null) processing.splits = distributeProcessingCents(Math.abs(cents3), processing.splits || []);
+    const cents4 = processingCents(processing.processedAmount);
+    if (cents4 !== null) processing.splits = distributeProcessingCents(Math.abs(cents4), processing.splits || []);
     return processing;
   }
   function addProcessingSplit(processing, id, nextId) {
@@ -1320,10 +1320,48 @@
     })));
   }
 
+  // src/core/savings-contributions.mjs
+  var cents = (value) => Math.round(Number(value) * 100);
+  function applySavingsContributions(rows, state2) {
+    const goals = new Set(Object.values(state2.spaardoelen || {}).flat().map((goal) => goal.id));
+    const byId = new Map(rows.map((p) => [p.id, p])), claims = /* @__PURE__ */ new Map(), pending = [];
+    for (const deposit of rows) {
+      const choice = deposit.transaction.processing || {}, sourceId = choice.savingsContributionId;
+      if (!sourceId) continue;
+      const source = byId.get(sourceId), origin = (source == null ? void 0 : source.transaction.processing) || {};
+      const amount = Number(choice.savingsContributionAmount), amountCents = cents(amount);
+      let error2 = "";
+      if (!deposit.active) continue;
+      if (!(source == null ? void 0 : source.active)) error2 = "De gekoppelde inleg ontbreekt of is niet goedgekeurd.";
+      else if (!["interne-overboeking", "extra-bijdrage"].includes(source.transactionType) || source.effects.accountCashflow <= 0) error2 = "De bron moet een ontvangen interne inleg zijn.";
+      else if (!(deposit.effects.savingsDeposit > 0) || !goals.has(deposit.savingsGoalId) || origin.contributionGoalId !== deposit.savingsGoalId) error2 = "De inleg en spaarboeking moeten hetzelfde bestaande spaardoel hebben.";
+      else if (source.calendarMonth !== deposit.calendarMonth || source.financialFor !== deposit.financialFor) error2 = "De inleg en spaarboeking moeten dezelfde maand en budgeteigenaar hebben.";
+      else if (!Number.isSafeInteger(amountCents) || amountCents <= 0 || Math.abs(amount * 100 - amountCents) > 1e-6 || amountCents > cents(deposit.effects.savingsDeposit)) error2 = "De gekoppelde inleg moet binnen het spaarbedrag passen.";
+      if (error2) {
+        deposit.savingsContributionError = error2;
+        continue;
+      }
+      const cap = Math.min(cents(source.amount), cents(source.effects.accountCashflow), cents(origin.contributionAmount));
+      if (!Number.isSafeInteger(cap) || cap <= 0) {
+        deposit.savingsContributionError = "Vul een geldig inlegbedrag in bij de interne ontvangst.";
+        continue;
+      }
+      claims.set(sourceId, (claims.get(sourceId) || 0) + amountCents);
+      pending.push({ deposit, sourceId, cap, amountCents });
+    }
+    for (const { deposit, sourceId, cap, amountCents } of pending) {
+      if (claims.get(sourceId) > cap) {
+        deposit.savingsContributionError = "Deze inleg is vaker of voor een hoger bedrag gekoppeld dan beschikbaar.";
+        continue;
+      }
+      deposit.effects.existingCapitalDeposit = amountCents / 100;
+    }
+  }
+
   // src/core/transaction-engine.mjs
   var copy3 = (value) => JSON.parse(JSON.stringify(value));
   var money = (value) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
-  var cents = (value) => Math.round(Number(value) * 100);
+  var cents2 = (value) => Math.round(Number(value) * 100);
   var incomeTypes = /* @__PURE__ */ new Set(["inkomen", "salaris", "vakantiegeld", "nabetaling", "vergoeding", "belastingteruggave", "overige-inkomsten"]);
   var savingsTypes = /* @__PURE__ */ new Set(["sparen", "naar-spaarrekening", "van-spaarrekening"]);
   var transferTypes = /* @__PURE__ */ new Set(["interne-overboeking", "maandelijkse-bijdrage", "extra-bijdrage"]);
@@ -1430,6 +1468,7 @@
       });
     });
     applySavingsAndRefundEffects(projections, state2);
+    applySavingsContributions(projections, state2);
     return projections.filter((p) => (includeInactive || p.active) && (!month || (dimension === "fixed" ? p.fixedMonth : dimension === "budget" && p.effects.refundCorrection ? p.refundMonth : p.calendarMonth) === month) && (!account || p.accountContext === account) && (!owner || p.financialFor === owner));
   }
   function selectActiveTransactions(state2, options = {}) {
@@ -1519,14 +1558,14 @@
     var _a2, _b, _c, _d, _e;
     const p = source.processing || source, errors = [];
     const amount = (_c = (_a2 = p.processedAmount) != null ? _a2 : source.amount) != null ? _c : (_b = source.bankOriginal) == null ? void 0 : _b.amount;
-    const validMoney = (value) => value !== null && value !== void 0 && String(value).trim() !== "" && Number.isFinite(Number(value)) && Number.isSafeInteger(cents(value)) && Math.abs(Number(value) * 100 - cents(value)) < 1e-6;
+    const validMoney = (value) => value !== null && value !== void 0 && String(value).trim() !== "" && Number.isFinite(Number(value)) && Number.isSafeInteger(cents2(value)) && Math.abs(Number(value) * 100 - cents2(value)) < 1e-6;
     if (!validMoney(amount)) errors.push({ code: "amount", message: "Bedrag moet een geldig bedrag in eurocenten zijn." });
     const splits = (_d = p.splits) != null ? _d : source.splits;
     if (splits !== void 0 && !Array.isArray(splits)) errors.push({ code: "splits", message: "Ongeldige splitstructuur." });
     if (Array.isArray(splits) && splits.length) {
       const signed = splits.some((split) => Number(split.amount) < 0);
-      const total = splits.reduce((sum, split) => sum + (validMoney(split.amount) ? cents(split.amount) : 0), 0);
-      const expected = signed ? Number(amount) < 0 ? cents(amount) : -Math.abs(cents(amount)) : Math.abs(cents(amount));
+      const total = splits.reduce((sum, split) => sum + (validMoney(split.amount) ? cents2(split.amount) : 0), 0);
+      const expected = signed ? Number(amount) < 0 ? cents2(amount) : -Math.abs(cents2(amount)) : Math.abs(cents2(amount));
       if (total !== expected || splits.some((split) => !validMoney(split.amount))) {
         const diff = Math.abs(expected) - Math.abs(total), format = (c) => (c / 100).toLocaleString("nl-NL", { style: "currency", currency: "EUR" });
         errors.push({ code: "splits", field: "amount", expectedCents: Math.abs(expected), actualCents: Math.abs(total), differenceCents: diff, message: diff > 0 ? `Er is ${format(Math.abs(total))} verdeeld. Nog ${format(diff)} te verdelen.` : diff < 0 ? `De splitsingen zijn samen ${format(-diff)} hoger dan het transactiebedrag.` : "Vul alle splitbedragen in gehele eurocenten in." });
@@ -1576,7 +1615,7 @@
     const groups = (pair.transactionIds || []).map((id2) => (state2.transactions || []).find((tx) => tx.id === id2));
     if (groups.length !== 2 || groups.some((tx) => !tx || !isTransactionFinanciallyActive(tx))) throw new Error("Beide transfers moeten financieel actief zijn.");
     const [a, b] = groups, accountA = getTransactionAccountContext(a, { accountProfiles: state2.accountProfiles || [] }), accountB = getTransactionAccountContext(b, { accountProfiles: state2.accountProfiles || [] });
-    if (!accountA || !accountB || accountA === accountB || cents(sourceCash(a)) + cents(sourceCash(b)) !== 0) throw new Error("Rekeningen of bedragen vormen geen geldig intern paar.");
+    if (!accountA || !accountB || accountA === accountB || cents2(sourceCash(a)) + cents2(sourceCash(b)) !== 0) throw new Error("Rekeningen of bedragen vormen geen geldig intern paar.");
     if ((state2.internalTransferPairs || []).some((row) => row.id !== id && row.active !== false && ["bevestigd", "confirmed", "uitgevoerd"].includes(row.status) && (row.transactionIds || []).some((txid) => pair.transactionIds.includes(txid)))) throw new Error("Een transactie is al gekoppeld.");
     pair.status = "bevestigd";
     return pair;
@@ -1659,7 +1698,7 @@
       p.effects.savingsWithdrawal = p.active && p.transactionType === "van-spaarrekening" ? p.amount : 0;
       p.effects.goalDelta = p.savingsGoalId && goalExistsIn(state2, p.savingsGoalId) ? money(p.effects.savingsDeposit - p.effects.savingsWithdrawal) : 0;
       p.directBudgetAllocations = p.active && p.transactionType === "van-spaarrekening" ? (processing.directBudgetAllocations || []).filter((a) => a.category && Number(a.amount) > 0) : [];
-      const direct = p.directBudgetAllocations.reduce((sum, a) => sum + cents(a.amount), 0);
+      const direct = p.directBudgetAllocations.reduce((sum, a) => sum + cents2(a.amount), 0);
       p.effects.directSavingsCorrection = direct / 100;
       p.effects.budgetImpact = money(p.effects.budgetImpact - direct / 100);
       p.effects.savingsFunded = direct / 100;
@@ -1672,7 +1711,7 @@
       p.effects.fixedRegularImpact = p.fixedOccurrenceId ? p.effects.realExpense : 0;
       if (savingsTypes.has(p.transactionType) && !p.savingsGoalId) p.diagnostics.push({ code: "legacy-savings-goal-missing", id: p.id });
       if (refund && (!incoming || !p.refundCategory || !validMonth(p.refundMonth))) p.diagnostics.push({ code: !incoming ? "legacy-refund-direction" : "legacy-refund-context-missing", id: p.id });
-      if (direct > cents(p.effects.savingsWithdrawal)) p.diagnostics.push({ code: "coverage-exceeds-withdrawal", id: p.id });
+      if (direct > cents2(p.effects.savingsWithdrawal)) p.diagnostics.push({ code: "coverage-exceeds-withdrawal", id: p.id });
       p.coverageAllocations = [];
     });
     (state2.savingsCoverageAllocations || []).filter((a) => a.active !== false).forEach((allocation) => {
@@ -1687,7 +1726,7 @@
       expenseTotals.set(expense.id, (expenseTotals.get(expense.id) || 0) + amount);
     });
     eligible.forEach(({ allocation, withdrawal, expense, status }) => {
-      const reason = withdrawalTotals.get(withdrawal.id) + cents(withdrawal.effects.directSavingsCorrection) > cents(withdrawal.amount) ? "coverage-exceeds-withdrawal" : expenseTotals.get(expense.id) > cents(expense.regularExpenseBase) ? "coverage-exceeds-expense" : "";
+      const reason = withdrawalTotals.get(withdrawal.id) + cents2(withdrawal.effects.directSavingsCorrection) > cents2(withdrawal.amount) ? "coverage-exceeds-withdrawal" : expenseTotals.get(expense.id) > cents2(expense.regularExpenseBase) ? "coverage-exceeds-expense" : "";
       if (reason) {
         status.reason = reason;
         expense.diagnostics.push({ code: reason, allocationId: allocation.id });
@@ -1705,7 +1744,7 @@
         if (p.fixedOccurrenceId) p.effects.fixedRegularImpact = amount;
         else p.effects.budgetImpact = amount;
         const key = categoryContext(p.financialFor, p.fixedOccurrenceId ? p.fixedMonth : p.calendarMonth, p.budgetCategory);
-        categoryCapacity.set(key, (categoryCapacity.get(key) || 0) + cents(amount));
+        categoryCapacity.set(key, (categoryCapacity.get(key) || 0) + cents2(amount));
         if (p.fixedOccurrenceId) fixedCategories.add(key);
       }
       if (p.effects.refundCashflow && validMonth(p.refundMonth) && p.refundCategory) {
@@ -1715,7 +1754,7 @@
       }
     });
     refundGroups.forEach((refunds, key) => {
-      const total = refunds.reduce((sum, p) => sum + cents(p.amount), 0);
+      const total = refunds.reduce((sum, p) => sum + cents2(p.amount), 0);
       refunds.forEach((p) => {
         p.effects.refundCorrection = p.amount;
         p.effects.categoryOnlyRefundCorrection = fixedCategories.has(key) ? p.amount : 0;
@@ -1781,11 +1820,12 @@
     });
     return [...map.values()];
   }
-  function categoryProcessingDetails(state2, month, owner = null) {
+  function categoryProcessingDetails(state2, month, owner = null, { budgetOnly = false } = {}) {
     state2 = periodDependencyState(state2, month);
     const details = [];
     for (const p of selectTransactionProjections(state2)) {
-      if (!owner || p.financialFor === owner) {
+      const fixed = p.transactionType === "vaste-last" || p.fixedExpenseId || p.fixedOccurrenceId;
+      if ((!budgetOnly || !fixed) && (!owner || p.financialFor === owner)) {
         const effectiveMonth = p.effects.refundCorrection ? p.refundMonth : p.fixedOccurrenceId ? p.fixedMonth : p.calendarMonth;
         if (effectiveMonth === month && (p.effects.realExpense > 0 || p.effects.refundCorrection > 0)) details.push({ ...p.transaction, id: p.transaction.sourceTransactionId || p.id, budgetItemId: p.effects.refundCorrection ? "" : p.budgetItemId, category: p.effects.refundCorrection ? p.refundCategory : p.budgetCategory || p.category, displayImpact: p.effects.refundCorrection ? -p.effects.refundCorrection : p.fixedOccurrenceId ? p.effects.fixedRegularImpact : p.effects.budgetImpact, savingsFunded: p.effects.savingsFunded, refundCorrection: p.effects.refundCorrection, categoryOnlyRefundCorrection: p.effects.categoryOnlyRefundCorrection });
       }
@@ -1824,6 +1864,7 @@
         if (budgetOwner) budgetOwner.variableBurden = money(budgetOwner.variableBurden - a.amount);
       }
       for (const field of ["savingsDeposit", "savingsFunded", "unusedSavings", "refundCashflow"]) target[field] = money(target[field] + p.effects[field]);
+      if (p.effects.existingCapitalDeposit) target.existingCapitalDeposit = money((target.existingCapitalDeposit || 0) + p.effects.existingCapitalDeposit);
     });
     const occurrences = fixedOccurrences || u3PlannedOccurrences(resolveFixedExpensesForMonth(state2, month), month);
     const allowanceOwners = Object.fromEntries(ACCOUNT_CONTEXTS.map((owner) => [owner, { fixedReserve: 0, budgetReserve: money(resolveVariableBudgetsForMonth(state2, month, owner).reduce((sum, row) => sum + Number(row.bedrag || 0), 0)), savingsReserve: 0, totalReserve: 0 }]));
@@ -1838,7 +1879,7 @@
       if (occurrence.financialFor === "gezamenlijk" && ((_a3 = occurrence.source) == null ? void 0 : _a3.distributionMode) === "equal") equalJointReserve = money(equalJointReserve + Number(occurrence.amount));
     });
     const dion = owners2.dion, dara = owners2.dara, joint = owners2.gezamenlijk, incomeBasis = money(dion.income + dara.income), minimum = Number((_c = (_b = (_a2 = state2.planning) == null ? void 0 : _a2.verdeling) == null ? void 0 : _b.minimumDion) != null ? _c : 0.4), ratioDion = Math.max(minimum, incomeBasis > 0 ? dion.income / incomeBasis : 0), ratioDara = 1 - ratioDion;
-    const burden = (owner) => money(owner.fixedBurden + owner.variableBurden + owner.savingsDeposit - owner.unusedSavings - owner.refundCashflow);
+    const burden = (owner) => money(owner.fixedBurden + owner.variableBurden + owner.savingsDeposit - (owner.existingCapitalDeposit || 0) - owner.unusedSavings - owner.refundCashflow);
     const savingsOverrides = ((_d = state2.monthlySavingOverrides) == null ? void 0 : _d[month]) || {};
     const jointPlan = allowanceOwners.gezamenlijk;
     jointPlan.savingsReserve = money(Object.hasOwn(savingsOverrides, "gezamenlijk") ? savingsOverrides.gezamenlijk : (_e = state2.planning) == null ? void 0 : _e.spaarpotDezeMaand);
@@ -2033,11 +2074,11 @@
   var storageError = (code, message) => Object.assign(new Error(message), { code, storageFailure: true });
   var validMonth2 = (month) => /^\d{4}-(0[1-9]|1[0-2])$/.test(month);
   var dimensions = ["accountCashflow", "externalHouseholdCashflow", "incomeImpact", "realExpense", "budgetImpact", "fixedRealization", "savingsDeposit", "savingsWithdrawal", "goalDelta", "savingsFunded", "unusedSavings", "refundCashflow", "advanceRepaymentEffect"];
-  var cents2 = (value) => Math.round(Number(value) * 100);
+  var cents3 = (value) => Math.round(Number(value) * 100);
   function periodFinancials(state2, month, { applicationProjection } = {}) {
     var _a2;
     if (!validMonth2(month)) throw storageError("invalid-period", "Ongeldige financiële periode.");
-    const totalsCents = Object.fromEntries(dimensions.map((dimension) => [dimension, cents2(sumTransactionEffects(state2, dimension, { month }))]));
+    const totalsCents = Object.fromEntries(dimensions.map((dimension) => [dimension, cents3(sumTransactionEffects(state2, dimension, { month }))]));
     const categories = Object.fromEntries(["gezamenlijk", "dion", "dara"].map((owner) => [owner, categoryFinancialActuals(state2, month, owner)]));
     const forecast = financialForecastForMonth(state2, month);
     return {
@@ -2071,7 +2112,10 @@
       if (!refundEdges.has(p.sourceKey)) refundEdges.set(p.sourceKey, /* @__PURE__ */ new Set());
       for (const key of fixedContexts.get(contextKey(p.financialFor, p.refundMonth, p.refundCategory)) || []) refundEdges.get(p.sourceKey).add(key);
     }
-    const links = [...(state2.internalTransferPairs || []).map((row) => row.transactionIds || []), ...(state2.savingsCoverageAllocations || []).map((row) => [row.withdrawalTransactionId, row.expenseTransactionId]), ...(state2.manualTransactionReplacements || []).map((row) => {
+    const links = [...(state2.transactions || []).filter((tx) => {
+      var _a2;
+      return (_a2 = tx.processing) == null ? void 0 : _a2.savingsContributionId;
+    }).map((tx) => [tx.id, tx.processing.savingsContributionId]), ...(state2.internalTransferPairs || []).map((row) => row.transactionIds || []), ...(state2.savingsCoverageAllocations || []).map((row) => [row.withdrawalTransactionId, row.expenseTransactionId]), ...(state2.manualTransactionReplacements || []).map((row) => {
       var _a2;
       return [row.manualTransactionId || ((_a2 = row.manualTransaction) == null ? void 0 : _a2.id), row.importedTransactionId || row.importTransactionId];
     })];
@@ -2106,7 +2150,7 @@
     }
     return {
       version: PERIOD_PROJECTION_VERSION,
-      totalsCents: Object.fromEntries(dimensions.map((dimension) => [dimension, cents2(projections ? sumProjectionEffects(projections, dimension) : sumTransactionEffects(state2, dimension))])),
+      totalsCents: Object.fromEntries(dimensions.map((dimension) => [dimension, cents3(projections ? sumProjectionEffects(projections, dimension) : sumTransactionEffects(state2, dimension))])),
       goals,
       bankSourceCount: selectBankTransactions(state2).length,
       approvedEffectCount: (projections || selectTransactionProjections(state2)).length
@@ -4583,6 +4627,14 @@
     return next;
   }
   function assertFinancialMutationSafe(previous, next) {
+    if ((next.transactions || []).some((tx) => {
+      var _a2;
+      return (_a2 = tx.processing) == null ? void 0 : _a2.savingsContributionId;
+    })) {
+      const existingContributionErrors = new Set(selectDependencyProjections(previous).filter((p) => p.savingsContributionError).map((p) => p.id));
+      const brokenContribution = selectDependencyProjections(next).find((p) => p.savingsContributionError && !existingContributionErrors.has(p.id));
+      if (brokenContribution) throw new Error(`${brokenContribution.savingsContributionError} Pas eerst de koppeling bij de spaarboeking aan.`);
+    }
     const previousBalances = new Map(allGoals(previous).map(({ goal }) => [goal.id, calculateGoalSavedAmount(previous, goal.id)]));
     allGoals(next).forEach(({ goal }) => {
       const balance = calculateGoalSavedAmount(next, goal.id);
@@ -11270,7 +11322,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     var _a2;
     const modal = document.getElementById("transactionModal");
     const month = getSelectedMonth();
-    const rows = categoryProcessingDetails(state, month, owner).filter((tx) => budgetCategoryMatches(tx, category, owner, month, budgetItemId)).sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+    const rows = categoryProcessingDetails(state, month, owner, { budgetOnly: true }).filter((tx) => budgetCategoryMatches(tx, category, owner, month, budgetItemId)).sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
     const total = round22(rows.reduce((sum, tx) => sum + tx.displayImpact, 0));
     modal.innerHTML = `<div class="modal budget-transactions-modal"><div class="modal-head"><div><h2>${textSafe(category)}</h2><p>${monthLabel(month)} · ${rows.length} transactie${rows.length === 1 ? "" : "s"} · ${eur(total)}</p></div><button type="button" class="ghost" data-close-budget-transactions>Sluiten</button></div><div class="budget-transactions-list">${rows.length ? rows.map((tx) => `<button type="button" class="budget-transaction-row" data-open-budget-transaction-id="${textSafe(tx.id)}"><span><strong>${textSafe(tx.description || tx.category || "Transactie")}</strong><small>${formatDateNL(tx.date)} · ${textSafe(tx.category || "Overig")}${tx.savingsFunded ? " · gedekt " + eur(tx.savingsFunded) : ""}${tx.categoryOnlyRefundCorrection ? " · aparte categoriecorrectie" : tx.refundCorrection ? " · refundcorrectie" : ""}</small></span><b class="${tx.displayImpact < 0 ? "value pos" : "value neg"}">${eur(tx.displayImpact)}</b></button>`).join("") : '<p class="muted-empty">Geen budgettransacties in deze categorie.</p>'}</div></div>`;
     modal.classList.add("open");
@@ -11862,22 +11914,22 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
   function u2ApplyContribution(goal, amount) {
     var _a2;
     const fullBalance = round22(u2GoalSaved(goal) + amount);
-    let cents3 = Math.max(0, Math.round(amount * 100));
+    let cents4 = Math.max(0, Math.round(amount * 100));
     if ((_a2 = goal.subdoelen) == null ? void 0 : _a2.length) {
       goal.subdoelen.forEach((child) => {
-        if (cents3 <= 0) return;
+        if (cents4 <= 0) return;
         const room = Math.max(0, Math.round((Number(child.doelbedrag) || 0) * 100) - Math.round((Number(child.gespaard) || 0) * 100));
-        const applied = Math.min(room, cents3);
+        const applied = Math.min(room, cents4);
         child.gespaard = round22((Math.round((Number(child.gespaard) || 0) * 100) + applied) / 100);
         child.voltooid = Number(child.doelbedrag) > 0 && child.gespaard >= Number(child.doelbedrag);
-        cents3 -= applied;
+        cents4 -= applied;
       });
       goal.doelbedrag = u2GoalTarget(goal);
       goal.algespaard = fullBalance;
     } else {
       goal.algespaard = round22((Number(goal.algespaard) || 0) + amount);
     }
-    return round22(cents3 / 100);
+    return round22(cents4 / 100);
   }
   function u2ReconcileSavingsGoals(goalIds = null) {
     const runtime = window.FinizeUpdate4Runtime;
@@ -11906,10 +11958,10 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     return new Date(Number(match[1]), Number(match[2]) - 1 + (processed ? 1 : 0), 1, 12);
   }
   function u2FixedFallback(items, pot) {
-    const cents3 = Math.round(pot * 100);
+    const cents4 = Math.round(pot * 100);
     const candidates = items.map((item, index) => ({ index, weight: Math.max(0, Number(item.doel.vasteInleg) || 0) })).filter((item) => item.weight > 0);
     const capacities = items.map((item) => Math.max(0, Math.round(item.nogTeGaan * 100)));
-    const result2 = u2DistributeCents(cents3, candidates, capacities);
+    const result2 = u2DistributeCents(cents4, candidates, capacities);
     return items.map((item, index) => round22((result2.output.get(index) || 0) / 100));
   }
   function u2OpenProcessModal(owner) {
@@ -14881,11 +14933,22 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       return item ? { item } : null;
     }
     function rowProcessingValidation(row, state2) {
-      var _a2, _b;
+      var _a2, _b, _c;
       if (row.importError) return { ok: false, errors: [row.importError] };
       if (!((_a2 = row.bankOriginal) == null ? void 0 : _a2.valid)) return { ok: false, errors: [{ code: "original", message: "Originele bankregel is ongeldig." }] };
       if (row.possibleDuplicate && !row.identityDecision && !row.duplicate) return { ok: false, errors: [{ code: "identity-choice", field: "identityDecision", message: "Kies of deze bankregel dezelfde of een afzonderlijke betaling is." }] };
       const p = row.processing || {}, lines = ((_b = p.splits) == null ? void 0 : _b.length) ? p.splits : [p];
+      if (p.contributionGoalId) {
+        const n = Number(p.contributionAmount), c = Math.round(n * 100);
+        if (!["interne-overboeking", "extra-bijdrage"].includes(p.transactionType) || row.bankOriginal.amount <= 0 || !goalExists(state2, p.contributionGoalId) || !Number.isSafeInteger(c) || c <= 0 || Math.abs(n * 100 - c) > 1e-6 || n > Math.min(p.processedAmount, row.bankOriginal.amount) || ((_c = p.splits) == null ? void 0 : _c.length)) return { ok: false, errors: [{ code: "savings-contribution", message: "Kies een bestaand spaardoel en een inlegbedrag binnen deze ontvangen interne overboeking. Een gesplitste ontvangst kan nog niet als inleg worden gekoppeld." }] };
+      }
+      if (p.savingsContributionId) {
+        const prior = (state2.transactions || []).find((tx) => tx.importTransactionId === row.id), id = (prior == null ? void 0 : prior.id) || `tx-${row.id}`;
+        const candidate = { id, source: "csv", approvalSource: "manual", processingStatus: "goedgekeurd", date: row.bankOriginal.bankDate, bankOriginal: row.bankOriginal, amount: p.processedAmount, transactionType: p.transactionType, accountContext: row.accountOwner, financialFor: p.budgetOwner, processing: cloneState(p), savingsGoalId: p.savingsGoalId };
+        const checkState = { ...state2, transactions: [...(state2.transactions || []).filter((tx) => tx.importTransactionId !== row.id && tx.id !== id), candidate] };
+        const result2 = projectTransaction(candidate, { state: checkState });
+        if (result2.savingsContributionError || !result2.effects.existingCapitalDeposit) return { ok: false, errors: [{ code: "savings-contribution", message: result2.savingsContributionError || "Deze interne inleg kan niet aan de spaarboeking worden gekoppeld." }] };
+      }
       if (p.salaryLinkVersion === 117 && lines.some((line) => (line.transactionType || p.transactionType) === "salaris")) {
         try {
           salaryLink({ ...row, processing: p }, {}, { requireChoice: true });
@@ -15696,6 +15759,14 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
         line.fixedAmountMode = "none";
       }
       if (next !== "sparen") line.savingsGoalId = "";
+      if (!["sparen", "naar-spaarrekening"].includes(type)) {
+        delete line.savingsContributionId;
+        delete line.savingsContributionAmount;
+      }
+      if (!["interne-overboeking", "extra-bijdrage"].includes(type)) {
+        delete line.contributionGoalId;
+        delete line.contributionAmount;
+      }
       if (!["terugbetaling", "refund"].includes(type)) {
         line.refundCategory = "";
         line.refundMonth = "";
@@ -15791,6 +15862,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     }
     function copiedProcessing(source, target, root2) {
       setProcessingType(target.processing, source.processing.transactionType);
+      ["contributionGoalId", "contributionAmount", "savingsContributionId", "savingsContributionAmount"].forEach((field) => delete target.processing[field]);
       ["budgetOwner", "category", "transactionType", "budgetItemId", "fixedExpenseId", "fixedAmountMode", "savingsGoalId", "refundCategory", "refundMonth", "advanceMode", "include", "sourceAccountProfileId", "destinationAccountProfileId", "salaryPersonId"].forEach((field) => {
         const value = source.processing[field];
         if (value === void 0) delete target.processing[field];
@@ -15866,6 +15938,20 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       }
       return `<div class="u4-context-grid"><label>Correctiemaand<input type="month" ${attr}="refundMonth" value="${esc(month)}"></label><label>Budgetcategorie<select ${attr}="refundCategory"><option value="">Kies categorie</option>${categories.map((category) => option(category, category, line.refundCategory || "")).join("")}</select></label></div>`;
     }
+    function incomingContributionFields(root2, row) {
+      const p = row.processing;
+      if (Number(row.bankOriginal.amount) <= 0 || !["interne-overboeking", "extra-bijdrage"].includes(p.transactionType)) return "";
+      return `<div class="u4-dependent-grid"><label>Inleg bestaand geld voor spaardoel (optioneel)<select data-u4-field="contributionGoalId">${goalOptions(root2, p.contributionGoalId || "")}</select></label>${p.contributionGoalId ? `<label>Inlegbedrag<input type="number" min="0.01" step="0.01" data-u4-field="contributionAmount" value="${Number(p.contributionAmount) || 0}"></label><span class="u4-muted">Geen inkomen of extra zakgeld. Koppel na goedkeuring de daadwerkelijke spaarboeking aan deze inleg. Alleen die spaarboeking verhoogt het spaardoel.</span>` : ""}</div>`;
+    }
+    function savingsContributionFields(root2, row) {
+      const p = row.processing, month = row.bankOriginal.bankDate.slice(0, 7);
+      const sources = selectTransactionProjections(root2.state).filter((t) => {
+        var _a2;
+        return ["interne-overboeking", "extra-bijdrage"].includes(t.transactionType) && t.effects.accountCashflow > 0 && t.calendarMonth === month && t.financialFor === p.budgetOwner && ((_a2 = t.transaction.processing) == null ? void 0 : _a2.contributionGoalId) === p.savingsGoalId;
+      });
+      const missing = p.savingsContributionId && !sources.some((t) => t.id === p.savingsContributionId);
+      return `<label>Betaald uit interne inleg<select data-u4-field="savingsContributionId"><option value="">Geen koppeling — uit maandruimte</option>${missing ? option(p.savingsContributionId, "Gekoppelde inleg niet beschikbaar", p.savingsContributionId) : ""}${sources.map((t) => option(t.id, `${t.transaction.description || "Interne inleg"} · ${euro(t.transaction.processing.contributionAmount)}`, p.savingsContributionId || "")).join("")}</select></label>${p.savingsContributionId ? `<label>Gekoppeld bedrag<input type="number" min="0.01" step="0.01" data-u4-field="savingsContributionAmount" value="${Number(p.savingsContributionAmount) || 0}"></label><span class="u4-muted">Dit deel komt uit bestaand eigen geld en wordt niet van Over deze maand afgetrokken. De volledige spaarboeking blijft meetellen voor het spaardoel.</span>` : ""}`;
+    }
     function dependentFieldsHtml(root2, row) {
       var _a2, _b, _c, _d;
       const p = row.processing;
@@ -15879,10 +15965,10 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
         var _a3;
         return option(type, ((_a3 = TYPE_GROUPS[1].items.find((item) => item[0] === type)) == null ? void 0 : _a3[1]) || type, p.transactionType);
       }).join("")}</select></label>${p.transactionType === "salaris" ? `<label>Salaris van<select data-u4-field="salaryPersonId"><option value="">Kies Dion of Dara</option>${["dion", "dara"].map((person) => option(person, ownerLabel2(person), p.salaryPersonId || "")).join("")}</select></label><span class="u4-muted">Salarismaand ${esc(originalSalaryMonth(row))}. Een voorstel wordt pas definitief na Opslaan en verwerken.</span>` : ""}</div>`;
-      if (family === "sparen") return `<div class="u4-dependent-grid"><label>Spaarbeweging<select data-u4-field="transactionType">${option("sparen", "Naar spaardoel", p.transactionType)}${option("naar-spaarrekening", "Naar spaarrekening", p.transactionType)}${option("van-spaarrekening", "Van spaarrekening", p.transactionType)}</select></label><label>Spaardoel<select data-u4-field="savingsGoalId">${goalOptions(root2, p.savingsGoalId)}</select></label>${p.transactionType === "van-spaarrekening" && !((_d = p.splits) == null ? void 0 : _d.length) ? `<label>Budgetcorrectie (optioneel)<select data-u4-field="withdrawalBudgetCategory"><option value="">Zonder budgetcorrectie</option>${categoryOptions(root2, p.budgetOwner, p.withdrawalBudgetCategory, row.bankOriginal.bankDate.slice(0, 7))}</select></label>` : ""}</div>`;
-      if (family === "overboeking") return `<div class="u4-dependent-grid"><label>Soort overboeking<select data-u4-field="transactionType">${TYPE_GROUPS[2].items.filter((item) => TRANSFER_TYPES.includes(item[0])).map(([type, label]) => option(type, label, p.transactionType)).join("")}</select></label></div>${transferFieldsHtml(root2, row)}`;
+      if (family === "sparen") return `<div class="u4-dependent-grid"><label>Spaarbeweging<select data-u4-field="transactionType">${option("sparen", "Naar spaardoel", p.transactionType)}${option("naar-spaarrekening", "Naar spaarrekening", p.transactionType)}${option("van-spaarrekening", "Van spaarrekening", p.transactionType)}</select></label><label>Spaardoel<select data-u4-field="savingsGoalId">${goalOptions(root2, p.savingsGoalId)}</select></label>${["sparen", "naar-spaarrekening"].includes(p.transactionType) ? savingsContributionFields(root2, row) : ""}${p.transactionType === "van-spaarrekening" && !((_d = p.splits) == null ? void 0 : _d.length) ? `<label>Budgetcorrectie (optioneel)<select data-u4-field="withdrawalBudgetCategory"><option value="">Zonder budgetcorrectie</option>${categoryOptions(root2, p.budgetOwner, p.withdrawalBudgetCategory, row.bankOriginal.bankDate.slice(0, 7))}</select></label>` : ""}</div>`;
+      if (family === "overboeking") return `${incomingContributionFields(root2, row)}<div class="u4-dependent-grid"><label>Soort overboeking<select data-u4-field="transactionType">${TYPE_GROUPS[2].items.filter((item) => TRANSFER_TYPES.includes(item[0])).map(([type, label]) => option(type, label, p.transactionType)).join("")}</select></label></div>${transferFieldsHtml(root2, row)}`;
       if (family === "zakgeld") return '<p class="u4-dependent-hint">Kies Dion of Dara bij Budgeteigenaar.</p>';
-      if (family === "extra-bijdrage") return '<p class="u4-dependent-hint">De budgeteigenaar ontvangt deze extra bijdrage.</p>';
+      if (family === "extra-bijdrage") return incomingContributionFields(root2, row) + '<p class="u4-dependent-hint">De budgeteigenaar ontvangt deze extra bijdrage.</p>';
       if (family === "terugbetaling") return `<div class="u4-dependent-grid"><label>Soort terugbetaling<select data-u4-field="transactionType">${option("terugbetaling", "Terugbetaling aankoop", p.transactionType)}${option("terugbetaling-voorschot", "Terugbetaling voorschot", p.transactionType)}</select></label></div>${["terugbetaling", "refund"].includes(p.transactionType) ? refundFieldsHtml(root2, row, p) : repaymentHtml(root2, row)}`;
       return "";
     }
@@ -16281,7 +16367,7 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
         } else if (event.target.dataset.u4Field) {
           const field = event.target.dataset.u4Field;
           let value = event.target.value;
-          if (["processedAmount", "singleLineAmount"].includes(field)) value = Math.abs(Number(value));
+          if (["processedAmount", "singleLineAmount", "contributionAmount", "savingsContributionAmount"].includes(field)) value = Math.abs(Number(value));
           if (field === "include") value = value === "true";
           if (field === "transactionType") {
             setProcessingType(row.processing, value);
@@ -16291,6 +16377,14 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
           if (field === "budgetOwner") row.processing.budgetItemId = "";
           if (field === "processedAmount") {
             redistributeProcessing(row.processing);
+            rerender = true;
+          }
+          if (field === "contributionGoalId") {
+            row.processing.contributionAmount = value ? row.processing.processedAmount : 0;
+            rerender = true;
+          }
+          if (field === "savingsContributionId") {
+            row.processing.savingsContributionAmount = value ? row.processing.processedAmount : 0;
             rerender = true;
           }
           if (field === "savingsGoalId") for (const line of row.processing.splits || []) line.savingsGoalId = value;
