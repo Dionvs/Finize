@@ -82,6 +82,10 @@ export function isTransactionFinanciallyActive(tx) {
 }
 
 export function getTransactionFinancialDestination(tx) {
+  if(getTransactionClassification(tx)==='salaris'){
+    const person=tx?.salaryPersonId||tx?.processing?.salaryPersonId;
+    if(['dion','dara'].includes(person))return person;
+  }
   return [tx?.budgetOwner,tx?.processing?.budgetOwner,tx?.financialFor,tx?.owner].find(validAccount) || null;
 }
 export function getTransactionDate(tx) {

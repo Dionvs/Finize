@@ -13,6 +13,8 @@
     "check:syntax": "node scripts/check-syntax.mjs",
     "check:css": "node scripts/check-css.mjs",
     "test:browser": "playwright test",
+    "test:emulator": "node scripts/test-p3-emulator.mjs --p4",
+    "test:p4": "node scripts/test-p4.mjs",
     "test": "pnpm run test:unit && pnpm run check:syntax && pnpm run check:css && pnpm run check:generated && pnpm run test:browser"
   },
   "devDependencies": {

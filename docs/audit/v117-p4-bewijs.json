@@ -1,0 +1,798 @@
+{
+  "createdAt": "2026-10-10T22:42:24.055Z",
+  "status": "P4-blocked",
+  "acceptancePassed": false,
+  "productionActions": false,
+  "branch": "agent/v117-stabilisatie",
+  "baseCommit": "1db602a0986f09e5739169f9de40c1debe95abf9",
+  "releaseBlockers": [
+    "Reproduceerbare IndexedDB-quota bij 500 bankbewegingen, inclusief fout bij journalregistratie; herstel na deze daadwerkelijke fout en tien meetronden niet bewezen.",
+    "Ondersteunde veilige gebruikersroute voor conflicterende financiële goedkeuringen ontbreekt."
+  ],
+  "build": {
+    "manifest": "backups/v117-stabilisatie/p4-stop-build-manifest.json",
+    "manifestSha256": "ecb3f56b2a071d20bd3e57963631f66a9aad1471f4c5550419a0090d7e535be4",
+    "files": 209,
+    "appSha256": "278c265f00e96252cec12e231e316fccd0574813606474bf29a5dff3163ea5a5",
+    "unchangedAfterVerification": true
+  },
+  "backup": {
+    "directory": "backups/v117-stabilisatie/before-p4-2026-10-10",
+    "files": 268,
+    "manifestSha256": "534b77e378b7c2bbd9bfbc45c38b9f62040f9056b54add064e9d29a41c411862",
+    "allCopiesVerified": true
+  },
+  "preservedExistingChanges": [
+    {
+      "path": "app.css",
+      "sha256": "df32bfc4b70dddacfe41271c7247c18347bbcedd0b865169d2d7d6f413166962",
+      "unchanged": true
+    },
+    {
+      "path": "tests/browser/update6-auth-shell.spec.cjs",
+      "sha256": "4d37e00b7fe67f6eba15b593ba5529d63db89230b8124fea8514e23c4ca78fd5",
+      "unchanged": true
+    },
+    {
+      "path": "tests/update2-calculations.test.cjs",
+      "sha256": "95ad0f1768e7fad2aba1bbc5d5a6b2ec21e744130a27a6d6cb3d0a797d6dc787",
+      "unchanged": true
+    },
+    {
+      "path": "tests/update3-ui-structure.test.cjs",
+      "sha256": "c0c4f8261932972fedf1f3def88fa8203a5e946391f6ed63179f9c66c123c24a",
+      "unchanged": true
+    },
+    {
+      "path": "tests/update4-3-history.test.cjs",
+      "sha256": "6103017587c3f31068d84bddf06f323da02976cd41bae8eac49e8946f881d295",
+      "unchanged": true
+    },
+    {
+      "path": "tests/update4-5-selected-month.test.cjs",
+      "sha256": "afe1558b2a3aa3e8b4c3cd01635087d17375747852e2b05ad07ea39f07817d16",
+      "unchanged": true
+    },
+    {
+      "path": "tests/update4-6-closing.test.cjs",
+      "sha256": "b36571bc3a056c223a4d60032e18fcc83a553facc4e5f8c275cc58acca553dec",
+      "unchanged": true
+    },
+    {
+      "path": "tests/update4-7-closed-month.test.cjs",
+      "sha256": "c5d5d7edb6eadd104c73d1c1bd3ea7ede33e55158779704cb848a42bfd20f454",
+      "unchanged": true
+    },
+    {
+      "path": "tests/update6-account-scope.test.cjs",
+      "sha256": "291bb25a758568b311b31d45da677c480eb82b0b639840bfe97785a5d04bae34",
+      "unchanged": true
+    },
+    {
+      "path": "tests/update6-auth-contract.test.cjs",
+      "sha256": "476e1ef388591911effc6705e7ab13d5f9a42964502f24ce0cfcd854acb1c4cb",
+      "unchanged": true
+    },
+    {
+      "path": "tests/update6-firestore-rules-contract.test.cjs",
+      "sha256": "4ae34913aca394c4635c3af59ea4a02f9b158a31ab1d03c88b4fda131e189950",
+      "unchanged": true
+    },
+    {
+      "path": "docs/audit/v114-publicatiebewijs.json",
+      "sha256": "7c8e33b66db2933f4ea9eb4902a200b1dc9ce34727eced37c110f31d0d3a7b01",
+      "unchanged": true
+    },
+    {
+      "path": "docs/audit/v116-publicatiebewijs.json",
+      "sha256": "82804c62affc0f6cd5028cbf9b8c2e44fc216e075f021abb6e2f73550c137930",
+      "unchanged": true
+    },
+    {
+      "path": "firebase-debug.log",
+      "sha256": "f1f41d419f6535099ac91a3c7219aae2513dd77681e20819bedc7558e5f4ffec",
+      "unchanged": true
+    }
+  ],
+  "suites": {
+    "node": {
+      "files": 58,
+      "registeredTests": 606,
+      "additionalAssertionScripts": 34,
+      "skipped": 0,
+      "exitCode": 0
+    },
+    "firestore": {
+      "tests": 42,
+      "passed": 42,
+      "failed": 0,
+      "skipped": 0,
+      "actualRules": true,
+      "exitCode": 0
+    },
+    "browser": {
+      "uniqueTestsExecuted": 292,
+      "passed": 291,
+      "failed": 1,
+      "scaleTestExecutedSeparately": true,
+      "excludedFromRemainingRun": 1,
+      "remainingRunExitCode": 0,
+      "skipped": 0
+    },
+    "steps": [
+      {
+        "name": "Node",
+        "exitCode": 0,
+        "durationMs": 22243
+      },
+      {
+        "name": "Syntax",
+        "exitCode": 0,
+        "durationMs": 630
+      },
+      {
+        "name": "CSS",
+        "exitCode": 0,
+        "durationMs": 835
+      },
+      {
+        "name": "Generated",
+        "exitCode": 0,
+        "durationMs": 1600
+      },
+      {
+        "name": "Firestore Rules",
+        "exitCode": 0,
+        "durationMs": 100862
+      },
+      {
+        "name": "Playwright remaining",
+        "exitCode": 0,
+        "durationMs": 426601
+      }
+    ]
+  },
+  "scale": {
+    "initialBankSources": 500,
+    "bankMonths": 3,
+    "completedRounds": 7,
+    "requestedRounds": 10,
+    "acceptancePassed": false,
+    "partialTimings": {
+      "coldStartup": {
+        "runs": 8,
+        "medianMs": 3909.2077500000014,
+        "maximumMs": 4094.923199999961
+      },
+      "warmStartup": {
+        "runs": 8,
+        "medianMs": 5112.3104500000045,
+        "maximumMs": 5358.041900000069
+      },
+      "monthLoad": {
+        "runs": 8,
+        "medianMs": 2498.8591500000184,
+        "maximumMs": 2735.925200000056
+      },
+      "singleApproval": {
+        "runs": 7,
+        "medianMs": 2616.0087999999814,
+        "maximumMs": 2883.799699999974
+      },
+      "bulkTen": {
+        "runs": 7,
+        "medianMs": 17205.73469999997,
+        "maximumMs": 18597.28330000007
+      },
+      "sync": {
+        "runs": 7,
+        "medianMs": 12907.415899999964,
+        "maximumMs": 33741.99110000001
+      }
+    },
+    "storageTimeline": [
+      {
+        "stage": "initial",
+        "totalBytes": 15956630,
+        "categories": {
+          "activeFinancialRecords": 4967767,
+          "offlinePeriods": 0,
+          "openCsvImports": 0,
+          "historicalCsvImports": 0,
+          "syncOutbox": 3073167,
+          "operationReceipts": 526,
+          "conflictsAndRecovery": 0,
+          "protectedMigrationCopies": 81945,
+          "replaceablePeriodCache": 7786892,
+          "storageMetadata": 46333,
+          "planningAssets": 0
+        },
+        "browserEstimate": {
+          "quota": 473592648,
+          "usage": 3846253,
+          "usageDetails": {
+            "indexedDB": 3846253
+          }
+        }
+      },
+      {
+        "stage": "round-1",
+        "totalBytes": 17324918,
+        "categories": {
+          "activeFinancialRecords": 5245785,
+          "offlinePeriods": 0,
+          "openCsvImports": 0,
+          "historicalCsvImports": 22366,
+          "syncOutbox": 3230675,
+          "operationReceipts": 5286,
+          "conflictsAndRecovery": 357870,
+          "protectedMigrationCopies": 81945,
+          "replaceablePeriodCache": 8332963,
+          "storageMetadata": 48028,
+          "planningAssets": 0
+        },
+        "browserEstimate": {
+          "quota": 473592648,
+          "usage": 65355656,
+          "usageDetails": {
+            "indexedDB": 65355656
+          }
+        }
+      },
+      {
+        "stage": "round-2",
+        "totalBytes": 18116179,
+        "categories": {
+          "activeFinancialRecords": 5396451,
+          "offlinePeriods": 0,
+          "openCsvImports": 0,
+          "historicalCsvImports": 44732,
+          "syncOutbox": 3321305,
+          "operationReceipts": 10065,
+          "conflictsAndRecovery": 715740,
+          "protectedMigrationCopies": 81945,
+          "replaceablePeriodCache": 8496220,
+          "storageMetadata": 49721,
+          "planningAssets": 0
+        },
+        "browserEstimate": {
+          "quota": 473592648,
+          "usage": 127781532,
+          "usageDetails": {
+            "indexedDB": 127781532
+          }
+        }
+      },
+      {
+        "stage": "round-3",
+        "totalBytes": 18907844,
+        "categories": {
+          "activeFinancialRecords": 5547262,
+          "offlinePeriods": 0,
+          "openCsvImports": 0,
+          "historicalCsvImports": 67098,
+          "syncOutbox": 3412080,
+          "operationReceipts": 14844,
+          "conflictsAndRecovery": 1073610,
+          "protectedMigrationCopies": 81945,
+          "replaceablePeriodCache": 8659591,
+          "storageMetadata": 51414,
+          "planningAssets": 0
+        },
+        "browserEstimate": {
+          "quota": 473592648,
+          "usage": 191762905,
+          "usageDetails": {
+            "indexedDB": 191762905
+          }
+        }
+      },
+      {
+        "stage": "round-4",
+        "totalBytes": 19698777,
+        "categories": {
+          "activeFinancialRecords": 5697927,
+          "offlinePeriods": 0,
+          "openCsvImports": 0,
+          "historicalCsvImports": 89464,
+          "syncOutbox": 3502709,
+          "operationReceipts": 19623,
+          "conflictsAndRecovery": 1431480,
+          "protectedMigrationCopies": 81945,
+          "replaceablePeriodCache": 8822522,
+          "storageMetadata": 53107,
+          "planningAssets": 0
+        },
+        "browserEstimate": {
+          "quota": 473592648,
+          "usage": 257507151,
+          "usageDetails": {
+            "indexedDB": 257507151
+          }
+        }
+      },
+      {
+        "stage": "round-5",
+        "totalBytes": 20490448,
+        "categories": {
+          "activeFinancialRecords": 5848738,
+          "offlinePeriods": 0,
+          "openCsvImports": 0,
+          "historicalCsvImports": 111830,
+          "syncOutbox": 3593485,
+          "operationReceipts": 24402,
+          "conflictsAndRecovery": 1789350,
+          "protectedMigrationCopies": 81945,
+          "replaceablePeriodCache": 8985898,
+          "storageMetadata": 54800,
+          "planningAssets": 0
+        },
+        "browserEstimate": {
+          "quota": 473592648,
+          "usage": 324998655,
+          "usageDetails": {
+            "indexedDB": 324998655
+          }
+        }
+      },
+      {
+        "stage": "round-6",
+        "totalBytes": 21281833,
+        "categories": {
+          "activeFinancialRecords": 5999476,
+          "offlinePeriods": 0,
+          "openCsvImports": 0,
+          "historicalCsvImports": 134196,
+          "syncOutbox": 3684187,
+          "operationReceipts": 29192,
+          "conflictsAndRecovery": 2147220,
+          "protectedMigrationCopies": 81945,
+          "replaceablePeriodCache": 9149123,
+          "storageMetadata": 56494,
+          "planningAssets": 0
+        },
+        "browserEstimate": {
+          "quota": 473592648,
+          "usage": 394093693,
+          "usageDetails": {
+            "indexedDB": 394093693
+          }
+        }
+      },
+      {
+        "stage": "round-7",
+        "totalBytes": 22072711,
+        "categories": {
+          "activeFinancialRecords": 6150141,
+          "offlinePeriods": 0,
+          "openCsvImports": 0,
+          "historicalCsvImports": 156562,
+          "syncOutbox": 3774816,
+          "operationReceipts": 33989,
+          "conflictsAndRecovery": 2505090,
+          "protectedMigrationCopies": 81945,
+          "replaceablePeriodCache": 9311981,
+          "storageMetadata": 58187,
+          "planningAssets": 0
+        },
+        "browserEstimate": {
+          "quota": 473592648,
+          "usage": 464826087,
+          "usageDetails": {
+            "indexedDB": 464826087
+          }
+        }
+      }
+    ],
+    "failure": {
+      "error": "Error: expect(received).toBe(expected) // Object.is equality\n\nExpected: 5858\nReceived: 5857\n\nCall Log:\n- Timeout 20000ms exceeded while waiting on the predicate",
+      "storageErrors": [
+        {
+          "database": "finize-imports-v1-p4-57255d0c-4ae3-42eb-af6d-cbaadd7b8643",
+          "stores": [
+            "financialHead",
+            "financialOutbox",
+            "financialRecords",
+            "imports",
+            "journal",
+            "operationReceipts",
+            "periodCache",
+            "syncQueue"
+          ],
+          "name": "QuotaExceededError",
+          "message": ""
+        },
+        {
+          "database": "finize-imports-v1-p4-57255d0c-4ae3-42eb-af6d-cbaadd7b8643",
+          "stores": [
+            "journal"
+          ],
+          "name": "QuotaExceededError",
+          "message": ""
+        }
+      ],
+      "visibleSources": 578,
+      "usage": {
+        "scope": "p4-57255d0c-4ae3-42eb-af6d-cbaadd7b8643",
+        "measurement": "UTF-8 JSON payload; excludes IndexedDB index/page overhead",
+        "categories": {
+          "activeFinancialRecords": 6152815,
+          "offlinePeriods": 0,
+          "openCsvImports": 2391,
+          "historicalCsvImports": 156562,
+          "syncOutbox": 11385703,
+          "operationReceipts": 35057,
+          "conflictsAndRecovery": 22222430,
+          "protectedMigrationCopies": 81945,
+          "replaceablePeriodCache": 9316741,
+          "storageMetadata": 58263,
+          "planningAssets": 0
+        },
+        "totalBytes": 49411907,
+        "indexedDbPayloadBytes": 49411907,
+        "householdDatabaseBytes": 49411907,
+        "externalStorage": {
+          "migrationBackups": 0,
+          "emergencyBackups": 0,
+          "goalImages": 0,
+          "localStorage": {
+            "financialState": 0,
+            "migrationBackups": 0,
+            "emergencyBackups": 0
+          }
+        },
+        "legacyMigrationBytes": 0,
+        "categoryBytes": 49411907,
+        "overlapBytes": 0,
+        "periods": [
+          {
+            "id": "2026-06",
+            "pinned": false,
+            "lastUsed": 1791633600000,
+            "cloudRevision": 15,
+            "epoch": "scale"
+          },
+          {
+            "id": "2026-07",
+            "pinned": false,
+            "lastUsed": 1791633600000,
+            "cloudRevision": 15,
+            "epoch": "scale"
+          },
+          {
+            "id": "2026-08",
+            "pinned": false,
+            "lastUsed": 1791633600000,
+            "cloudRevision": 15,
+            "epoch": "scale"
+          },
+          {
+            "id": "2026-09",
+            "pinned": false,
+            "lastUsed": 1791633600000,
+            "cloudRevision": 15,
+            "epoch": "scale"
+          },
+          {
+            "id": "2026-10",
+            "pinned": false,
+            "lastUsed": 1791633600000,
+            "cloudRevision": 15,
+            "epoch": "scale"
+          }
+        ],
+        "browserEstimate": {
+          "quota": 473592648,
+          "usage": 473430100,
+          "usageDetails": {
+            "indexedDB": 473430100
+          }
+        }
+      }
+    },
+    "endToEndRecoveryAfterActualQuotaTested": false,
+    "finalCompleteCloudInvariantsTested": false
+  },
+  "evidence": [
+    {
+      "path": "backups/v117-stabilisatie/p4-stop-build-manifest.json",
+      "sha256": "ecb3f56b2a071d20bd3e57963631f66a9aad1471f4c5550419a0090d7e535be4"
+    },
+    {
+      "path": "backups/v117-stabilisatie/p4-stop-suite-status.json",
+      "sha256": "c9ca3f6b66ab1614cbbcbb5a8dc13ec731fdfb4b5d338645a5df0caf608e3e6a"
+    },
+    {
+      "path": "backups/v117-stabilisatie/p4-stop-all.log",
+      "sha256": "c30581e26c0c3c9587b659cc3c957b7fd7d4fa232261cef175a5167277676e9f"
+    },
+    {
+      "path": "backups/v117-stabilisatie/p4-scale-storage-diagnostic.log",
+      "sha256": "0bf8642597bd751140ae05618227a4c411e6e0f13bdc8416dbe613c9113955e4"
+    },
+    {
+      "path": "backups/v117-stabilisatie/p4-scale-failure-3.json",
+      "sha256": "bd90f7fc4632f13614287aad98feb1514e61a4188c0c4f1fc985253f106f576a"
+    },
+    {
+      "path": "backups/v117-stabilisatie/p4-scale-quota-error-context.md",
+      "sha256": "55ce616338ec7ef5ba5d4559a3adcd7449768e8c681b83257fc88c7a9d24f1be"
+    },
+    {
+      "path": "backups/v117-stabilisatie/p4-remote-local-overlap-before.json",
+      "sha256": "30c9a6664fd7367258797f2b091a5341ed7648e99d63a91c1014877fa76f5ea7"
+    },
+    {
+      "path": "backups/v117-stabilisatie/p4-remote-local-overlap-regression-2.log",
+      "sha256": "6c8ea4a76bb565ff7ccf67691ddb34a0c2070696263906d3b5ebd525a9787c92"
+    },
+    {
+      "path": "backups/v117-stabilisatie/p4-financial-reference.json",
+      "sha256": "e0defb7bc29af4998c6f0e9245b4f40a57def84171350bc25ceaa52ee0e7bb3f"
+    },
+    {
+      "path": "backups/v117-stabilisatie/run-p4-stop-verification.mjs",
+      "sha256": "c92af2a893b266180d429f0e88d5cd65de2d6c83f121f15be6a1ad2c0382acf7"
+    },
+    {
+      "path": "backups/v117-stabilisatie/create-p4-blocked-proof.mjs",
+      "sha256": "0c9f8550bfd0f0075e8a4cc1700343eae2b66251c7e5320dbe5bf88d0e6dccb2"
+    },
+    {
+      "path": "backups/v117-stabilisatie/create-p4-stop-snapshot.mjs",
+      "sha256": "ff524edf457ca324142deb43ad4856eb3b9893be085ffce81c1c2d7c2f53623d"
+    },
+    {
+      "path": "backups/v117-stabilisatie/sleep-after-p4.ps1",
+      "sha256": "b8a9a19626ab95e3cf1ed9eae4bb6b3f56746b9d20044bfca29a502b38eceb1a"
+    }
+  ],
+  "changedFiles": [
+    {
+      "path": "app.js",
+      "bytes": 1553324,
+      "sha256": "278c265f00e96252cec12e231e316fccd0574813606474bf29a5dff3163ea5a5"
+    },
+    {
+      "path": "docs/audit/v117-p4-eindrapport.md",
+      "bytes": 39649,
+      "sha256": "b93b15dc0b4533e213c9cf6d90bf5dbd3169fe419b693a7327f3b78dfa7453b9"
+    },
+    {
+      "path": "docs/audit/v117-productie-releaseplan.md",
+      "bytes": 12020,
+      "sha256": "2ab698645b23abed8536169581c47185bdf86c6feb8a5ec0352f16b747a482c3"
+    },
+    {
+      "path": "index.html",
+      "bytes": 5214,
+      "sha256": "0b241c64ab83fa8cdd182e6eec929d82bec59724519cc4f9d914f305cf13c6e4"
+    },
+    {
+      "path": "package.json",
+      "bytes": 807,
+      "sha256": "b5251c8eaf20d9eda7e9493a77049364000f5fa74b1806701e2f2f9adde5e015"
+    },
+    {
+      "path": "scripts/test-p3-emulator.mjs",
+      "bytes": 1622,
+      "sha256": "b74f4b9c2cb8144dbb81f3b1797a51950160ff0cc0c2430538fe4a11806501b8"
+    },
+    {
+      "path": "scripts/test-p4.mjs",
+      "bytes": 3592,
+      "sha256": "2583d834958ebac0d3ef2723e006fb0ba76ee517a483fe4207b0f3f56acd76d4"
+    },
+    {
+      "path": "service-worker.js",
+      "bytes": 2465,
+      "sha256": "c92b96fee2ac51d3c0e2f0c20569534e71982e5c361a6e29bd0581d796dd0512"
+    },
+    {
+      "path": "src/core/budget-assignment.mjs",
+      "bytes": 1543,
+      "sha256": "a8902832a3ce820aa134811fb24d081cbd02f994b6e82dc75ea7e5f97a1aaaf9"
+    },
+    {
+      "path": "src/core/runtime.js",
+      "bytes": 828488,
+      "sha256": "0f1b80393c014f7d25a5aac36ab524d0aca43ad3678ce7b98bdc2ca1db8893aa"
+    },
+    {
+      "path": "src/core/salary-assignment.mjs",
+      "bytes": 3077,
+      "sha256": "b2514d9dc89014acc3acb49b92b54512ce0eee34681228e5206af01020e89ab9"
+    },
+    {
+      "path": "src/core/transaction-engine.mjs",
+      "bytes": 44129,
+      "sha256": "7566f3dfc1456319677b91fdc84ea7cd13a38225ae1362063a4efb53ea7855a6"
+    },
+    {
+      "path": "src/core/transaction-model.mjs",
+      "bytes": 9362,
+      "sha256": "3917d620ec8920983b628fb5559a3ff202197338c547bb9203f1e87a1434b513"
+    },
+    {
+      "path": "src/core/transaction-processing.mjs",
+      "bytes": 26837,
+      "sha256": "c3b863d3c73e6f51aa274fd242535a0ee79a74db47c767ab5c2ed533e143d7cb"
+    },
+    {
+      "path": "src/import/runtime.js",
+      "bytes": 236257,
+      "sha256": "53c9b77c3fd22d59e71bcf4617a49ee7022d01b0a3a686973f10ae751400061e"
+    },
+    {
+      "path": "src/storage/cloud-records.mjs",
+      "bytes": 22251,
+      "sha256": "3e9cb0afed5f9ce8cb1939b9e5de671f273e397abbb0f56807590a0f6b8bb4fa"
+    },
+    {
+      "path": "src/storage/firestore-record-transport.mjs",
+      "bytes": 5417,
+      "sha256": "9d7937bc646218eeee0569ac4d914c4ca809bb159dbfb0204da6659205e2b5d5"
+    },
+    {
+      "path": "src/storage/household-store.mjs",
+      "bytes": 23636,
+      "sha256": "fcde2e7a19defc8f78fe0746f398aeee9cf02a93672abb9d2130fcc223ec28cc"
+    },
+    {
+      "path": "src/storage/period-cache.mjs",
+      "bytes": 9774,
+      "sha256": "bf9411a2d873b72c86c62d6988d235a7075113d57ca66e7f60983900b7c21f8e"
+    },
+    {
+      "path": "src/storage/period-projections.mjs",
+      "bytes": 6872,
+      "sha256": "b10e1bd0d5a0565a752cdc7c4e2a2f93c636b6c5a871f89cd54c726568726392"
+    },
+    {
+      "path": "src/storage/record-sync.mjs",
+      "bytes": 25490,
+      "sha256": "f6217c8044a59d78791dd202bd50e8006584bc9e3ba22f025c9a15caf97b9d9c"
+    },
+    {
+      "path": "src/storage/storage-inventory.mjs",
+      "bytes": 3023,
+      "sha256": "cee5d94d2b9041a208f409f430e881e68401f3be082ae729f94b490a23064eab"
+    },
+    {
+      "path": "tests/browser/desktop-special-tabs.spec.cjs",
+      "bytes": 34930,
+      "sha256": "39e7ab943193e4eda571e48a7552e7c8209a120a913bc734201d38f4e664d2aa"
+    },
+    {
+      "path": "tests/browser/hotfix-migration-backup.spec.cjs",
+      "bytes": 12837,
+      "sha256": "04580bd6a49d277eb9fb65ca090bb0d8a39f9126481d06ac2c58be23443945ca"
+    },
+    {
+      "path": "tests/browser/modal-and-commit-stability.spec.cjs",
+      "bytes": 17865,
+      "sha256": "0d45a075b17888c4319f2dcf72ee45e743bd208d07a014a7770268a25927a358"
+    },
+    {
+      "path": "tests/browser/package3-transaction-engine.spec.cjs",
+      "bytes": 16246,
+      "sha256": "340f72e4c3131b61dbe6b7f372016f6766de3aae0c759be4d4ddef406f30986a"
+    },
+    {
+      "path": "tests/browser/package7-release-audit.spec.cjs",
+      "bytes": 13432,
+      "sha256": "df50462a2ccebcf6f3147fcb5d38f569832f4666b2fc178f2a4853ebdaecee17"
+    },
+    {
+      "path": "tests/browser/v117-p3.spec.cjs",
+      "bytes": 30061,
+      "sha256": "9220da5885f72a2f9d4505cd4a559d49ae932c3176fb5e8100cd23af80513c7d"
+    },
+    {
+      "path": "tests/browser/v117-p4-budget-identity.spec.cjs",
+      "bytes": 6061,
+      "sha256": "42e26a596a6f4309e4da61de5e9860c02fd8c1d6491fe01cfd0b4a12b02b17a7"
+    },
+    {
+      "path": "tests/browser/v117-p4-salary.spec.cjs",
+      "bytes": 10136,
+      "sha256": "93cdb8c2ab62dea1376305e4b53787fd98fe5c118019afe80696855a97eabb0a"
+    },
+    {
+      "path": "tests/browser/v117-p4-scale.spec.cjs",
+      "bytes": 8406,
+      "sha256": "f8b210f70ffd8fa446d93ce36d4b759a23904989a7e68b43a32cebeb87ea216f"
+    },
+    {
+      "path": "tests/browser/v117-p4.spec.cjs",
+      "bytes": 20729,
+      "sha256": "9e9edb379bdafb61c4932548206b83ce12a1c2b39935cbb6ba53eb2dc3c6ef27"
+    },
+    {
+      "path": "tests/emulator/v117-p4.test.cjs",
+      "bytes": 2338,
+      "sha256": "538eb0ee292139da145a2b0919d94c7dd908a32fcfb142d570db888b668f9b0f"
+    },
+    {
+      "path": "tests/helpers/package5-fixture.cjs",
+      "bytes": 4552,
+      "sha256": "fbc9afaa4347567dc698735a4a2021e7ada055da6e66790ecd01bb570b332931"
+    },
+    {
+      "path": "tests/helpers/v117-p4-browser.cjs",
+      "bytes": 3760,
+      "sha256": "5c707cb2c4610b49c41160fb1564c79ba5e5039a1d7138c8d56f1e75ec3d493e"
+    },
+    {
+      "path": "tests/helpers/v117-p4-fixture.cjs",
+      "bytes": 4158,
+      "sha256": "e58c2268bb2e9a44b549da09ef3ac2470c81a63267888e6c1da9f9b5c07fe462"
+    },
+    {
+      "path": "tests/html-inline-syntax.test.cjs",
+      "bytes": 801,
+      "sha256": "caa8049afcc9a60065f3a341d11ce8b0d5fd565aab2e34141854cbd83bcf3c4a"
+    },
+    {
+      "path": "tests/package3-transaction-engine.test.cjs",
+      "bytes": 18092,
+      "sha256": "088ebff3f5fddffbe7ff70f407cae23e805f0ed994e8e6a8331af39b85cd3129"
+    },
+    {
+      "path": "tests/package4-savings-refunds-forecast.test.cjs",
+      "bytes": 26624,
+      "sha256": "d3340324a1a55f1d1b75ff05196f724b55684b3cf97a769eb6cef6a6d9d7cdf7"
+    },
+    {
+      "path": "tests/package7-release-audit.test.cjs",
+      "bytes": 26375,
+      "sha256": "4a7d346ca8ae37c79bbb51e081fdf6312bc356f1714a4134ca6866804cbea795"
+    },
+    {
+      "path": "tests/service-worker-cache.test.cjs",
+      "bytes": 1580,
+      "sha256": "7819d8e43e7647dd0bf934a46e52b957a15a6d0e6217e376746e61580e3a19a9"
+    },
+    {
+      "path": "tests/update4-1-expense-impact.test.cjs",
+      "bytes": 2968,
+      "sha256": "c7c2c0d2947670b4ae4fb0b57469c758c0e863ef1d0cdfe60520877a2cf7427a"
+    },
+    {
+      "path": "tests/update4-cloud-import.test.cjs",
+      "bytes": 6522,
+      "sha256": "c82d6791d3e929195b3716492eda432e2b3139059a900f8b3f938f3b58d57b07"
+    },
+    {
+      "path": "tests/update4-final-regression.test.cjs",
+      "bytes": 1056,
+      "sha256": "46f649bfdae71a1ba79c920c1c9f4b1865f4042e243757f4b2aca0842ae9cca9"
+    },
+    {
+      "path": "tests/update4-processing.test.cjs",
+      "bytes": 2557,
+      "sha256": "8905f8f613e2b85866354c89cfe60f2b68bbf36475bad90d31e94c293e42ce05"
+    },
+    {
+      "path": "tests/update5-responsive-structure.test.cjs",
+      "bytes": 5284,
+      "sha256": "64d6812323e85f9eaff10591027a44c8be4af1446f397bd22771b7a3acdb1e01"
+    },
+    {
+      "path": "tests/v117-p4-salary.test.cjs",
+      "bytes": 5928,
+      "sha256": "b2b39c8e8dcd7a1cd86646bb12a0387092eb763389a87d3fabc2d80ba30df518"
+    },
+    {
+      "path": "tests/v117-p4.test.cjs",
+      "bytes": 6904,
+      "sha256": "16bf4c46f48a181719b394c1dafc3ce03c5c2146b400bf59130c15a43265b14d"
+    }
+  ],
+  "limitations": [
+    "Alleen Chromium/Windows en mobiele viewports.",
+    "Productie-authenticatie en productiedata niet getest.",
+    "500-bronnenproef faalt; grotere prestatieproeven op gebruikersverzoek vervallen.",
+    "Beschermde opslag niet verwijderd; compacte bewijsopslag en retentie slechts voorgesteld."
+  ]
+}

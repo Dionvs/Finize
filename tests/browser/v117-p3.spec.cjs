@@ -3,6 +3,8 @@ const {fixture,admin,token}=require('../helpers/v117-p3-emulator.cjs');
 const visual=require('../fixtures/v50-visual-state.json');
 test.setTimeout(120000);
 async function boot(page,f,seed=visual){
+  await require('../helpers/isolated-emulator.cjs').isolateBrowser(page);
+  if(process.env.FINIZE_BROWSER_DIAGNOSTIC){page.on('console',m=>{if(['error','warning'].includes(m.type()))console.log('P43_BROWSER '+m.text());});page.on('requestfailed',r=>console.log('P43_REQUEST_FAILED '+r.url()+' '+JSON.stringify(r.failure())));page.on('pageerror',e=>console.log('P43_PAGE_ERROR '+String(e)));}
   page.on('dialog',d=>d.accept());await page.clock.setFixedTime(new Date('2026-10-09T12:00:00Z'));
   await page.route('https://www.gstatic.com/**',r=>r.abort());await page.route('https://firestore.googleapis.com/**',r=>r.abort());
   await page.addInitScript(({seed,householdId})=>{
@@ -54,14 +56,16 @@ test('V117 P3 partial history: real screens, ten CSV approvals, offline restart,
   await first.locator('[data-u4-approve]').click();await expect(page.locator('[data-u4-match-apply]')).toHaveText('Geselecteerde transacties goedkeuren (10)');await page.locator('[data-u4-match-apply]').click();
   await expect.poll(()=>inspect(page)).toMatchObject({approved:10,bankSources:10,savings:750});const approved=await inspect(page);
   expect(await page.evaluate(()=>state.transactions.some(row=>row.id.startsWith('history-')))).toBe(false);
-  await page.route('http://127.0.0.1:8181/**',r=>r.abort());
+  await page.route(require('../helpers/isolated-emulator.cjs').browserPattern,r=>r.abort());
   expect(await page.evaluate(async()=>{try{await p3.openMonth('2023-01');return false;}catch{return state.meta.selectedMonth==='2026-10'&&state.transactions.length===20;}})).toBe(true);
   expect(await page.evaluate(async()=>{try{await p3.sync();return false;}catch{return (await DataAdapter.store().readCloudSnapshot()).operations.length>0;}})).toBe(true);
   await page.reload();await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);expect(await inspect(page)).toEqual(approved);
-  await page.unroute('http://127.0.0.1:8181/**');await page.evaluate(async options=>{window.p3=await FinizeCloudRecords.createEmulatorSession(options);await p3.attach({automatic:false,periodLoading:false});},{householdId:f.householdId,token:token(f.email)});
+  await page.unroute(require('../helpers/isolated-emulator.cjs').browserPattern);await page.evaluate(async options=>{window.p3=await FinizeCloudRecords.createEmulatorSession(options);await p3.attach({automatic:false,periodLoading:false});},{householdId:f.householdId,token:token(f.email)});
   const committed=await page.evaluate(async()=>{const start={...p3.transport.metrics};const result=await p3.sync();return {...result,reads:p3.transport.metrics.reads-start.reads};});expect(committed.outcome).toBe('committed');expect((await page.evaluate(()=>p3.sync())).outcome).toBe('idle');
   await page.locator('#monthPickerButton').click();await page.locator('[data-month-year="2025"]').click();await page.locator('[data-month-value="2025-03"]').click();await expect.poll(()=>page.evaluate(()=>state.meta.selectedMonth)).toBe('2025-03');
-  expect(await page.evaluate(()=>state.transactions.filter(row=>row.id.startsWith('history-')).length)).toBeLessThan(4);
+  // A historical selection loads that period, not another four-month window.
+  expect(await page.evaluate(()=>state.transactions.filter(row=>row.id.startsWith('history-')).length)).toBe(1);
+  expect(await page.evaluate(()=>[...state.verifiedPeriods].sort())).toEqual(['2025-03']);
   expect(await page.evaluate(async()=>{const row=state.transactions.find(row=>row.id==='history-2025-03');return FinizeManual.save({...row,amount:25,expenseImpact:25},'gezamenlijk');})).toBe(true);
   expect((await page.evaluate(()=>p3.sync())).outcome).toBe('committed');expect(await page.evaluate(async()=>(await p3.loadPeriod('2025-03')).financials.totalsCents.budgetImpact)).toBe(2500);
   const context=await browser.newContext({baseURL:'http://127.0.0.1:4173',serviceWorkers:'block'});
@@ -71,7 +75,7 @@ test('V117 P3 partial history: real screens, ten CSV approvals, offline restart,
     expect((await second.evaluate(()=>p3.sync())).outcome).toBe('idle');
   }finally{await context.close();}
   const wholeFinancialReads=await page.evaluate(()=>Number(sessionStorage.getItem('wholeFinancialReads')||0));expect(wholeFinancialReads).toBe(0);
-  expect(await page.evaluate(()=>new Promise((resolve,reject)=>{const request=indexedDB.open('finize-imports-v1-'+DataAdapter.store().scope);request.onerror=()=>reject(request.error);request.onsuccess=()=>{const db=request.result,tx=db.transaction('financialRecords','readonly'),read=tx.objectStore('financialRecords').get(JSON.stringify(['transactions','history-2023-01']));read.onsuccess=()=>resolve(read.result?.value?.id==='history-2023-01');tx.oncomplete=()=>db.close();};}))).toBe(true);
+  expect(await page.evaluate(()=>(async()=>{const db=await FinizeUpdate4.importStore.open();return new Promise((resolve,reject)=>{const tx=db.transaction('financialRecords','readonly'),read=tx.objectStore('financialRecords').get(JSON.stringify(['transactions','history-2023-01']));read.onsuccess=()=>resolve(read.result?.value?.id==='history-2023-01');read.onerror=()=>reject(read.error);});})())).toBe(true);
   console.log('P3_BROWSER_TARGETED '+JSON.stringify({initialHistorySources:36,activeMonthTransactions:opened.loadedTransactions,monthReads:opened.reads,tenApprovalSyncReads:committed.reads,wholeFinancialReads}));
 });
 test('V117 P3 real Firestore: offline ten savings approvals, restart, repeated sync and second browser client',async({page,browser})=>{
@@ -85,10 +89,10 @@ test('V117 P3 real Firestore: offline ten savings approvals, restart, repeated s
   await first.locator('[data-u4-approve]').click();await expect(page.locator('[data-u4-match-apply]')).toHaveText('Geselecteerde transacties goedkeuren (10)');await page.locator('[data-u4-match-apply]').click();
   await expect.poll(()=>inspect(page)).toMatchObject({approved:10,bankSources:10,savings:750});const before=await inspect(page);
   expect(new Set(before.effects.map(r=>r.source)).size).toBe(10);
-  await page.route('http://127.0.0.1:8181/**',r=>r.abort());
+  await page.route(require('../helpers/isolated-emulator.cjs').browserPattern,r=>r.abort());
   expect(await page.evaluate(async()=>{try{await p3.sync();return false;}catch{return (await DataAdapter.store().readCloudSnapshot()).operations.length>0;}})).toBe(true);
   await page.reload();await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);expect(await inspect(page)).toEqual(before);
-  await page.unroute('http://127.0.0.1:8181/**');
+  await page.unroute(require('../helpers/isolated-emulator.cjs').browserPattern);
   // Resume from the durable cursor, never establish a different base over pending edits.
   await page.evaluate(async options=>{window.p3=await FinizeCloudRecords.createEmulatorSession(options);await p3.attach({automatic:false,periodLoading:false});},{householdId:f.householdId,token:token(f.email)});
   expect((await page.evaluate(()=>p3.sync())).outcome).toBe('committed');
@@ -153,7 +157,7 @@ test('V117 P3 real Firestore: divergent offline clients preserve both versions a
     expect(await second.evaluate(async()=>(await p3.cloudStore.context()).head.data.revision)).toBe(revision);
     expect(await second.evaluate(async()=>(await p3.cloudStore.verifyIntegrity()).state.deviceChoice)).toBe('B');
     expect((await page.evaluate(()=>p3.pull())).outcome).toBe('committed');expect(await page.evaluate(()=>state.deviceChoice)).toBe('B');
-    expect(await second.evaluate(async()=>{const db=await new Promise(resolve=>{const q=indexedDB.open('finize-imports-v1-'+DataAdapter.store().scope);q.onsuccess=()=>resolve(q.result);});return new Promise(resolve=>{const q=db.transaction('journal').objectStore('journal').getAll();q.onsuccess=()=>{db.close();resolve(q.result.some(r=>r.operation==='record-cloud-conflict'&&r.status==='resolved'&&r.local.deviceChoice==='B'&&r.remote.deviceChoice==='A'));};});})).toBe(true);
+    expect(await second.evaluate(async()=>(await FinizeUpdate4.importStore.listJournal()).some(r=>r.operation==='record-cloud-conflict'&&r.status==='resolved'&&r.local.deviceChoice==='B'&&r.remote.deviceChoice==='A'))).toBe(true);
   }finally{await context.close();}
 });
 
@@ -172,7 +176,7 @@ test('V117 P3 partial history: commit hydrates historical dependencies once and 
   expect((await page.evaluate(()=>p3.sync())).outcome).toBe('committed');
   expect(await page.evaluate(()=>commitChange(()=>state.planning.spaarpotDezeMaand=150,{throwOnError:true}))).toBe(true);
   expect(await page.evaluate(()=>state.__finizePeriodContext.explicitFullHistory)).toBe(true);expect((await page.evaluate(()=>p3.sync())).outcome).toBe('committed');
-  expect(await page.evaluate(()=>({loaded:state.transactions.length,months:state.verifiedPeriods,full:state.__finizePeriodContext.explicitFullHistory}))).toEqual({loaded:0,months:['2026-10'],full:false});
+  expect(await page.evaluate(()=>({loaded:state.transactions.length,months:[...state.verifiedPeriods].sort(),full:state.__finizePeriodContext.explicitFullHistory}))).toEqual({loaded:0,months:['2026-07','2026-08','2026-09','2026-10'],full:false});
   expect(await page.evaluate(()=>commitChange(()=>{state.monthlyBudgets['2026-10']={gezamenlijkVariabel:[{id:'once-current',categorie:'Boodschappen',post:'Boodschappen',bedrag:250}]};},{throwOnError:true}))).toBe(true);
   expect((await page.evaluate(()=>p3.sync())).outcome).toBe('committed');
   const touched=await page.evaluate(async()=>{const s=await p3.cloudStore.context(),ops=await p3.transport.query(s.root+'/operations');const latest=ops.map(row=>row.data).sort((a,b)=>b.targetHead.revision-a.targetHead.revision)[0];return (await p3.transport.query(s.root+'/operations/'+latest.id+'/changes')).filter(row=>row.data.path.startsWith('periods/')).map(row=>row.data.path);});

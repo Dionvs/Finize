@@ -319,26 +319,28 @@ test('mobiel voegt een canonieke vaste last met maanduitzondering toe en kan die
 test('een vaste last kan naast stoppen vanaf de gekozen maand worden verwijderd',async({page})=>{
   await page.setViewportSize({width:390,height:844});
   await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
-  await page.evaluate(()=>{
+  await page.evaluate(()=>commitChange(()=>{
 
     state.recurringFixedExpenses.push({
       id:'remove-fixed-test',naam:'Te verwijderen last',categorie:'Test',bedrag:12.34,rekening:'gezamenlijk',financialFor:'gezamenlijk',
       frequentieAantal:1,frequentieEenheid:'maanden',begindatum:'2026-01-01',einddatum:'',actief:true,
       amountHistory:[{id:'amount-remove-fixed',effectiveFrom:'2026-01-01',amount:12.34}],monthOverrides:{},recognition:{}
     });
-    renderActiveTab();
-  });
+  },{render:false}));
   await page.locator('.v4-bottom-nav [data-tab="gezamenlijk"]').click();
   await page.locator('#tab-gezamenlijk [data-u3-planning-owner="gezamenlijk"]').click();
   await page.getByRole('dialog').locator('.u3-admin-row').filter({hasText:'Te verwijderen last'}).getByRole('button',{name:'Bewerken'}).click();
   await expect(page.getByRole('dialog').getByRole('button',{name:'Stoppen na deze maand'})).toBeVisible();
   page.once('dialog',dialog=>dialog.accept());
   await page.getByRole('dialog').getByRole('button',{name:'Verwijderen'}).click();
-  const result=await page.evaluate(()=>{
-    const month=state.meta.selectedMonth;
+  await expect(page.getByRole('dialog').locator('.u3-admin-row').filter({hasText:'Te verwijderen last'})).toHaveCount(0);
+  await expect(page.getByRole('dialog').locator('[data-u3-add-recurring="fixed"]')).toBeVisible();
+  const result=await page.evaluate(async()=>{
+    const durable=await DataAdapter.readDurableState();
+    const month=durable.meta.selectedMonth;
     const [year,number]=month.split('-').map(Number);
     const previous=`${new Date(year,number-2,1).getFullYear()}-${String(new Date(year,number-2,1).getMonth()+1).padStart(2,'0')}`;
-    const item=state.recurringFixedExpenses.find(row=>row.id==='remove-fixed-test');
+    const item=durable.recurringFixedExpenses.find(row=>row.id==='remove-fixed-test');
     return {
       preserved:!!item,
       active:item?.actief,
@@ -457,10 +459,12 @@ test('budgetten openen op desktop transacties en zijn op mobiel bewerkbaar', asy
 
   await page.setViewportSize({ width:390, height:844 });
   await page.reload();
+  await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   await page.locator('.v4-bottom-nav [data-tab="gezamenlijk"]').click();
   const jointEdit=page.locator('#tab-gezamenlijk').getByRole('button',{name:'Gezamenlijke maandbudgetten wijzigen'});
   await expect(jointEdit).toContainText('Wijzig');
-  expect((await jointEdit.boundingBox()).height).toBeGreaterThanOrEqual(44);
+  await expect(jointEdit).toBeVisible();
+  await expect.poll(async()=> (await jointEdit.boundingBox())?.height??0).toBeGreaterThanOrEqual(44);
   await jointEdit.click();
   const jointDialog=page.getByRole('dialog',{name:'Variabele lasten aanpassen'});
   await expect(jointDialog.getByRole('heading',{name:'Variabele lasten',exact:true})).toBeVisible();

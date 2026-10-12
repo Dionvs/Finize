@@ -7,12 +7,15 @@ const same=(a,b)=>canonical(a)===canonical(b);
 const batches=values=>Array.from({length:Math.ceil(values.length/8)},(_,index)=>values.slice(index*8,index*8+8));
 
 export function createRecordCloudStore({transport,householdId,applicationProjection,readLegacyImports}={}){
-  if(!transport?.emulator||!/^demo-/.test(transport.emulator.projectId)||!/^127\.0\.0\.1:\d+$/.test(transport.emulator.host))throw storageError('emulator-only','Nieuwe cloudopslag is nog niet voor productie vrijgegeven.');
+  const testTransport=transport?.emulator&&/^demo-/.test(transport.emulator.projectId)&&/^127\.0\.0\.1:\d+$/.test(transport.emulator.host);
+  const gate=transport?.releaseGate;
+  if(!testTransport&&!(gate?.enabled===true&&gate.householdId===householdId&&gate.storageVersion===2&&gate.minClientVersion===117&&gate.phase==='active'&&gate.epoch))throw storageError('emulator-only','Nieuwe cloudopslag is nog niet voor productie vrijgegeven.');
   if(!/^[A-Za-z0-9_-]{1,120}$/.test(householdId||''))throw storageError('household-scope','Een geldig huishouden is verplicht.');
   const household=`households/${householdId}`,controlPath=household+'/financialStorage/current',legacyPath=household+'/budgetState/current';
   const epochPath=epoch=>household+'/financialEpochs/'+epoch;
   async function context({allowMigration=false,allowPending=false}={}){
     const control=await transport.get(controlPath),c=control?.data;
+    if(gate&&(c?.epoch!==gate.epoch||c?.minClientVersion!==gate.minClientVersion))throw storageError('storage-version','Het vrijgegeven productie-epoch wijkt af.');
     if(c?.storageVersion!==RECORD_STORAGE_VERSION||!['active',...(allowMigration?['preparing','verified']:[])].includes(c.phase))throw storageError('storage-version','Het recordmodel is nog niet geverifieerd en geactiveerd.');
     const root=epochPath(c.epoch),head=await transport.get(root+'/meta/head');
     if(!head||head.data.epoch!==c.epoch||head.data.storageVersion!==RECORD_STORAGE_VERSION)throw storageError('storage-version','Het cloudversiecontract is inconsistent.');
@@ -47,7 +50,8 @@ export function createRecordCloudStore({transport,householdId,applicationProject
     const headers=(await transport.query(household+'/imports')).map(row=>({path:row.path,data:row.data})).sort((a,b)=>a.path.localeCompare(b.path));
     if(await digest(headers)!==control.sourceImportHeadersHash)throw storageError('migration-source-conflict','De oude importheaders wijzigden tijdens de migratiecontrole.');
   }
-  async function migrate({state,imports=[],epoch,legacyPointer,checkpoint=()=>{}}){
+  async function migrate({state,imports=[],epoch,legacyPointer,checkpoint=()=>{},initialization=false}){
+    if(!testTransport)throw storageError('production-disabled','Migratie is uitsluitend beschikbaar in de testomgeving.');
     if(!/^[A-Za-z0-9_-]{1,120}$/.test(epoch||''))throw storageError('migration-epoch','Ongeldig migratie-epoch.');
     let existing=await transport.get(controlPath);
     if(!existing){
@@ -62,8 +66,9 @@ export function createRecordCloudStore({transport,householdId,applicationProject
       }
       if(sourceState&&!same(sourceState,state))throw storageError('migration-source-conflict','De migratiekandidaat wijkt af van de teruggelezen oude financiële bron.');
       const oldHeaders=await transport.query(household+'/imports');
+      if(initialization&&(legacy||oldHeaders.length))throw storageError('migration-source-conflict','Een nieuwe administratie mag geen bestaande cloudhistorie vervangen.');
       const sourceImports=readLegacyImports?await readLegacyImports(oldHeaders,transport):oldHeaders.map(row=>{if(!Array.isArray(row.data.rows))throw storageError('migration-incomplete','De bestaande importdelen vereisen een volledige legacy-readback.');return row.data;});
-      if(!same(sourceImports,imports))throw storageError('migration-source-conflict','Niet alle bestaande cloudimports en CSV-bronnen zijn verliesloos meegenomen.');
+      if(!initialization&&!same(sourceImports,imports))throw storageError('migration-source-conflict','Niet alle bestaande cloudimports en CSV-bronnen zijn verliesloos meegenomen.');
       const control={storageVersion:2,minClientVersion:117,epoch,phase:'preparing',sourceVersion:legacy?.data?.syncVersion||0,sourcePointerHash:await digest(legacy?.data||null),sourceImportHeadersHash:await digest(oldHeaders.map(row=>({path:row.path,data:row.data})).sort((a,b)=>a.path.localeCompare(b.path))),sourceStateHash:await digest(state),sourceImportsHash:await digest(imports)};
       const head={storageVersion:2,epoch,phase:'ready',revision:0,lastOperation:'',pendingOperation:'',stateHash:'',importsHash:'',layout:{},recordCount:0,importCount:0,periodHashes:{},globalHash:''};
       await transport.commit([{path:controlPath,data:control},{path:epochPath(epoch)+'/meta/head',data:head}],new Map([[controlPath,null],[epochPath(epoch)+'/meta/head',null]]));
@@ -80,6 +85,7 @@ export function createRecordCloudStore({transport,householdId,applicationProject
     return result;
   }
   async function activate({approveTestCutover=false}={}){
+    if(!testTransport)throw storageError('production-disabled','Productiemigratie en activering vereisen de afzonderlijke releaseprocedure.');
     if(approveTestCutover!==true)throw storageError('cutover-approval','Omschakeling vereist een afzonderlijke expliciete testgoedkeuring.');
     const c=await context({allowMigration:true});
     if(c.control.data.phase==='active')return c.head.data;
@@ -164,7 +170,7 @@ export function createRecordCloudStore({transport,householdId,applicationProject
     const c=await context(),logicalId=await digest(JSON.stringify(['@imports',id]));
     const [headers,rows]=await Promise.all([transport.query(c.root+'/records',{field:'logicalId',value:logicalId}),transport.query(c.root+'/records',{field:'collection',value:'@rows:'+id})]);
     const values=await decodeRecordValues([...headers,...rows].map(row=>row.data)),header=values.find(row=>row.collection==='@imports')?.value;
-    if(!header)throw storageError('import-incomplete','De cloudimport ontbreekt.');
+    if(!header)throw storageError('cloud-missing','De cloudimport ontbreekt.');
     const result={...header,rows:values.filter(row=>row.collection==='@rows:'+id).sort((a,b)=>a.ordinal-b.ordinal).map(row=>row.value)};
     if(!same(c.head.data,(await transport.get(c.root+'/meta/head'))?.data))throw storageError('cloud-conflict','De import wijzigde tijdens laden.');
     return result;
@@ -189,5 +195,10 @@ export function createRecordCloudStore({transport,householdId,applicationProject
     return commit({state:full.state,imports:full.imports,expectedRevision:full.head.revision,operationId:'period-manifests-'+full.head.epoch+'-'+full.head.revision});
   }
   const workspace=createPeriodWorkspace({transport,context,loadPeriod,loadImport,stageOperation,recover,applicationProjection});
-  return {householdId,migrate,activate,commit,recover,loadPeriod,loadImport,verifyIntegrity,operationReceipt,operationStatus,exportRollback,preparePeriodStorage,context,transport,...workspace};
+  async function initializeNew({state,imports=[],epoch,approveTestCutover=false}){
+    if(!testTransport||approveTestCutover!==true)throw storageError('production-disabled','Nieuwe recordadministratie wordt uitsluitend expliciet in de emulator gestart.');
+    if(await transport.get(legacyPath))throw storageError('migration-source-conflict','Dit huishouden heeft legacyhistorie; gebruik de gecontroleerde migratie.');
+    await migrate({state,imports,epoch,legacyPointer:null,initialization:true});await activate({approveTestCutover:true});return verifyIntegrity();
+  }
+  return {householdId,initializeNew,migrate,activate,commit,recover,loadPeriod,loadImport,verifyIntegrity,operationReceipt,operationStatus,exportRollback,preparePeriodStorage,context,transport,...workspace};
 }

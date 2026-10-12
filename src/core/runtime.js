@@ -1,3 +1,7 @@
+import { profileSync, profileStart } from '../storage/performance.mjs';
+import { salaryPerson } from './salary-assignment.mjs';
+import { budgetAssignmentMatches } from './budget-assignment.mjs';
+import { budgetActual } from './transaction-engine.mjs';
 import { selectBankTransactions, isBankSource } from './bank-sources.mjs';
 import { createStateBackupStore, readLegacyStateBackup } from '../storage/state-backups.mjs';
 import { createHouseholdStore } from '../storage/household-store.mjs';
@@ -675,7 +679,8 @@ function normalizedTransactionType(tx){return getTransactionClassification(tx);}
 function isBudgetExpenseTransaction(tx){const p=projectTransaction(tx,{state});return !p.fixedOccurrenceId&&(p.effects.realExpense>0||['sparen','naar-spaarrekening','van-spaarrekening','terugbetaling','refund'].includes(p.transactionType));}
 function getTransactionExpenseImpact(tx){return projectTransaction(tx,{state,materialized:!!tx.importBatchId}).effects.budgetImpact;}
 
-function sumTransactions(owner=null, category=null, month=getSelectedMonth()){
+function sumTransactions(owner=null, category=null, month=getSelectedMonth(), budgetItemId=''){
+  if(category&&owner)return budgetActual(state,month,owner,category,budgetItemId);
   const actuals=categoryActuals(state,month,owner);
   return round2(Object.entries(actuals).reduce((sum,[label,amount])=>category&&!budgetCategoryMatches({category:label},category)?sum:sum+amount,0));
 }
@@ -821,10 +826,8 @@ function openIncomeSourceTransactions(owner,label,month,trigger){
   modal.addEventListener('keydown',onKey);bindModalBackdrop(modal,close);modal.classList.add('open');
   modal.querySelector('[data-close-income-source]').focus();
 }
-function budgetCategoryMatches(tx, category){
-  const txCat=String(tx?.category||'').trim().toLocaleLowerCase('nl-NL');
-  const wanted=String(category||'').trim().toLocaleLowerCase('nl-NL');
-  return !!wanted && !!txCat && (txCat===wanted || txCat.includes(wanted) || wanted.includes(txCat));
+function budgetCategoryMatches(tx, category, owner='gezamenlijk', month=getSelectedMonth(), budgetItemId=''){
+  return budgetAssignmentMatches(state,month,owner,tx,category,budgetItemId);
 }
 function budgetStatus(used, budget){
   if (!budget) return {ratio:0, label:'Geen budget', cls:'muted'};
@@ -2219,6 +2222,15 @@ const CloudAdapter = {
   },
   async acceptRemote(documentData, normalizedRemote, backupReason='voor Firestore-sync'){
     const acceptanceScope=activeStorageKeys()?.state, acceptanceRef=this.docRef;
+    const acceptanceSnapshot=committedStateSnapshot;
+    const retainNewLocalCommit=()=>{
+      // Another accepted remote may advance the serialized base. A local commit
+      // during preparation must instead keep its state, receipts and outbox.
+      if(committedStateSnapshot===acceptanceSnapshot||committedStateSnapshot===this.lastRemoteAcceptanceSnapshot)return false;
+      this.remoteStateWaiting={documentData:clone(documentData),normalizedRemote:clone(normalizedRemote)};
+      this.status='Lokaal opgeslagen — cloudstand wordt opnieuw gecontroleerd';
+      renderCloudStatus();return true;
+    };
     if (this.initialSyncComplete && isStaleCloudSnapshot(
       {...documentData, state:normalizedRemote},
       this.cloudVersion,
@@ -2233,10 +2245,21 @@ const CloudAdapter = {
     // Backup I/O can yield to a newer listener; apply the existing revision guard again.
     if(this.initialSyncComplete && isStaleCloudSnapshot({...documentData,state:normalizedRemote},this.cloudVersion,this.lastCloudSignature))return false;
     if (backupReason && !await DataAdapter.backup(state, backupReason)) throw new Error('Noodback-up niet bevestigd; state is niet vervangen.');
+    // Only one remote acceptance may commit and publish at a time. Backups stay
+    // outside this section so a slow older backup cannot delay a newer snapshot.
+    const previousAcceptance=this.remoteAcceptanceCommit;
+    let releaseAcceptance;
+    this.remoteAcceptanceCommit=new Promise(resolve=>{releaseAcceptance=resolve;});
+    await previousAcceptance;
+    try{
     if(activeStorageKeys()?.state!==acceptanceScope || this.docRef!==acceptanceRef)return false;
     if(this.initialSyncComplete && isStaleCloudSnapshot({...documentData,state:normalizedRemote},this.cloudVersion,this.lastCloudSignature))return false;
+    if(retainNewLocalCommit())return false;
     const candidate=clone(normalizedRemote);
     await GoalImageStore.initializeState(candidate);
+    if(activeStorageKeys()?.state!==acceptanceScope || this.docRef!==acceptanceRef)return false;
+    if(this.initialSyncComplete && isStaleCloudSnapshot({...documentData,state:normalizedRemote},this.cloudVersion,this.lastCloudSignature))return false;
+    if(retainNewLocalCommit())return false;
     if(normalizedCloudData){candidate.meta.revision=Math.max(Number(candidate.meta.revision)||0,Number(normalizedRemote.meta?.revision)||0)+1;candidate.meta.updatedAt=new Date().toISOString();candidate.meta.updatedBy=getDeviceId();}
     await localSave(candidate,{preserveBackup:normalizedCloudData});
     if(activeStorageKeys()?.state!==acceptanceScope || this.docRef!==acceptanceRef)return false;
@@ -2256,6 +2279,7 @@ const CloudAdapter = {
     state = candidate;
     window.state = state;
     committedStateSnapshot = clone(state);
+    this.lastRemoteAcceptanceSnapshot=committedStateSnapshot;
     window.FinizeImportSync?.setScope?.();
     this.applyingRemote = false;
     DataAdapter.loadedFromStorage = true;
@@ -2271,6 +2295,7 @@ const CloudAdapter = {
     window.FinizeImportSync?.refresh?.();
     window.FinizeImportSync?.onCloudAccepted?.();
     return true;
+    }finally{releaseAcceptance();}
   },
   async rebasePendingOntoRemote(documentData, normalizedRemote, localSnapshot=this.pendingState, backupReason='lokale wijzigingen voor cloudherstel'){
     if (!localSnapshot) return false;
@@ -2663,7 +2688,7 @@ const DataAdapter = {
     };
     try{
       const expectedHash=await backupDigest(JSON.stringify(base));
-      await store.commit(snapshot,{expectedHash,operationId,importMutation:options.importMutation,queueCloud:options.queueCloud!==false});
+      await store.commit(snapshot,{expectedHash,operationId,importMutation:options.importMutation,queueCloud:options.queueCloud!==false,payloadPreparation:options.payloadPreparation});
       enqueue(snapshot);
       return true;
     }catch(e){
@@ -2793,6 +2818,7 @@ async function commitChange(change, options={}){
         return await commitChange(()=>{state=merged;window.state=state;},{...options,dependencyAttempts:Number(options.dependencyAttempts||0)+1});
       }
     }
+    const finishFinancial=profileStart('commit.financialValidation');
     synchronizeChangedSavings(state,before);
     refreshWorkspaceTotals(before,state);
     assertFinancialMutationSafe(before,state);
@@ -2821,7 +2847,11 @@ async function commitChange(change, options={}){
       }
     });
     ensurePersistentIds(state);
-    state.transactions=state.transactions.map(tx=>normalizeDataTransaction(tx,{accountProfiles:state.accountProfiles}));
+    const finishAccountNormalization=profileStart('commit.accountNormalization');
+    const previousTransactions=new Map(before.transactions.map(tx=>[tx.id,tx]));
+    const sameAccountProfiles=JSON.stringify(before.accountProfiles)===JSON.stringify(state.accountProfiles);
+    state.transactions=state.transactions.map(tx=>sameAccountProfiles&&JSON.stringify(previousTransactions.get(tx.id))===JSON.stringify(tx)?tx:normalizeDataTransaction(tx,{accountProfiles:state.accountProfiles}));
+    finishAccountNormalization();
     state.meta = isPlainObject(state.meta) ? state.meta : {};
     state.meta.schemaVersion = U3_SCHEMA_VERSION;
     state.meta.revision = Math.max(0, Number(state.meta.revision)||0) + 1;
@@ -2829,10 +2859,11 @@ async function commitChange(change, options={}){
     state.meta.updatedBy = getDeviceId();
     const validation = validateBudgetState(state);
     if (!validation.ok) throw new Error(validation.errors.join(' '));
+    finishFinancial();
     const candidate=clone(state);
     // Nothing may observe a financial candidate while IndexedDB is still committing.
     state=clone(before);window.state=state;
-    if (!await DataAdapter.save(candidate,{throwOnError:true,importMutation:options.importMutation,operationId:options.operationId})) throw new Error('Lokale opslag is mislukt. Probeer opnieuw; wis de Finize-sitegegevens niet.');
+    if (!await DataAdapter.save(candidate,{throwOnError:true,importMutation:options.importMutation,operationId:options.operationId,payloadPreparation:options.payloadPreparation})) throw new Error('Lokale opslag is mislukt. Probeer opnieuw; wis de Finize-sitegegevens niet.');
     if(activeStorageKeys()?.state!==scope)throw Object.assign(new Error('Het huishouden wijzigde tijdens opslag; de bevestigde wijziging blijft in het oorspronkelijke huishouden.'),{commitOutcome:'committed'});
     state=candidate;window.state=state;
     committedStateSnapshot = clone(state);
@@ -3299,10 +3330,10 @@ function renderDashboard(){
        </div></div>`;
   const budgetRows = (scenarioData.gezamenlijk.variabel||[]).filter(row=>row.post || row.bedrag).map(row=>{
     const budget = Number(row.bedrag)||0;
-    const used = sumTransactions('gezamenlijk', row.post);
+    const used = sumTransactions('gezamenlijk', row.post,getSelectedMonth(),row.id);
     const ratio = budget > 0 ? Math.max(0,Math.min(1, used / budget)) : 0;
     const label=row.post || row.categorie || 'Budget';
-    return `<button type="button" class="budget-preview-item budget-preview-button" data-open-budget-transactions="${textSafe(label)}" aria-label="Open transacties voor ${textSafe(label)}">
+    return `<button type="button" class="budget-preview-item budget-preview-button" data-open-budget-transactions="${textSafe(label)}" data-budget-id="${textSafe(row.id||'')}" aria-label="Open transacties voor ${textSafe(label)}">
       <div class="budget-preview-thumb tone-green">${iconSvg(categoryIconName(label))}</div>
       <div class="budget-preview-main">
         <div class="budget-preview-top"><strong>${textSafe(label)}</strong><span><span class="neutral-amount">${eur(used)}</span> / <span class="neutral-amount">${eur(budget)}</span></span></div>
@@ -3502,10 +3533,10 @@ function renderBudgetUsageList(owner='gezamenlijk'){
   const data = getMonthlyScenarioData();
   return `<div class="progress-list">${(data[owner]?.variabel||[]).filter(row=>row.post || row.bedrag).map(row=>{
     const budget = Number(row.bedrag)||0;
-    const used = sumTransactions(owner, row.post);
+    const used = sumTransactions(owner, row.post,getSelectedMonth(),row.id);
     const status = budgetStatus(used, budget);
     const label=row.post || row.categorie || 'Budget';
-    return `<button type="button" class="progress-item budget-usage-button" data-open-budget-transactions="${textSafe(label)}" data-budget-owner="${owner}" aria-label="Open transacties voor ${textSafe(label)}">
+    return `<button type="button" class="progress-item budget-usage-button" data-open-budget-transactions="${textSafe(label)}" data-budget-id="${textSafe(row.id||'')}" data-budget-owner="${owner}" aria-label="Open transacties voor ${textSafe(label)}">
       <div class="progress-top"><strong>${textSafe(row.post || row.categorie)}</strong><span><span class="neutral-amount">${eur(used)}</span> / <span class="neutral-amount">${eur(budget)}</span> <span class="status-badge ${status.cls}">${status.label}</span></span></div>
       <div class="progress-track"><div class="progress-fill" style="width:${Math.max(0,Math.min(100, Math.round(status.ratio*100)))}%"></div></div>
     </button>`;
@@ -3561,20 +3592,16 @@ function ownerVariableBudgetRows(owner, data){
   const budgets = new Map();
   (data?.variabel || []).forEach(row=>{
     const label=String(row.post || row.categorie || '').trim();
-    if(label) budgets.set(label.toLocaleLowerCase(),{label,budget:Number(row.bedrag)||0});
+    if(label) budgets.set(row.id||label.toLocaleLowerCase(),{id:row.id,label,budget:Number(row.bedrag)||0});
   });
   const used = {};
   let uncategorized = 0;
-  getMonthTransactions(owner).forEach(tx=>{
-    const key=String(tx.category||'').trim().toLocaleLowerCase();
-    const impact=getTransactionExpenseImpact(tx);
-    if (budgets.has(key)) used[key]=round2((used[key]||0)+impact);
-    else uncategorized=round2(uncategorized+impact);
-  });
+  for(const [key,row] of budgets)used[key]=budgetActual(state,getSelectedMonth(),owner,row.label,row.id);
+  uncategorized=round2(sumTransactions(owner)-Object.values(used).reduce((sum,n)=>sum+n,0));
   const rows = [...budgets.entries()].map(([key,row])=>{
     const amount=used[key]||0;
     const ratio=row.budget>0?Math.min(1,amount/row.budget):0;
-    return `<button type="button" class="budget-preview-item budget-preview-button" data-open-budget-transactions="${textSafe(row.label)}" data-budget-owner="${owner}" aria-label="Open transacties voor ${textSafe(row.label)}"><div class="budget-preview-thumb tone-green">${iconSvg(categoryIconName(row.label))}</div><div class="budget-preview-main"><div class="budget-preview-top"><strong>${textSafe(row.label)}</strong><span>${eur(amount)} / ${eur(row.budget)}</span></div><div class="progress-track budget-gradient"><div class="progress-fill budget-gradient" style="width:${Math.round(ratio*100)}%"></div></div></div></button>`;
+    return `<button type="button" class="budget-preview-item budget-preview-button" data-open-budget-transactions="${textSafe(row.label)}" data-budget-id="${textSafe(row.id||'')}" data-budget-owner="${owner}" aria-label="Open transacties voor ${textSafe(row.label)}"><div class="budget-preview-thumb tone-green">${iconSvg(categoryIconName(row.label))}</div><div class="budget-preview-main"><div class="budget-preview-top"><strong>${textSafe(row.label)}</strong><span>${eur(amount)} / ${eur(row.budget)}</span></div><div class="progress-track budget-gradient"><div class="progress-fill budget-gradient" style="width:${Math.round(ratio*100)}%"></div></div></div></button>`;
   });
   if (uncategorized>0){
     rows.push(`<button type="button" class="budget-preview-item budget-preview-button joint-variable-unassigned" data-open-budget-transactions="Ongecategoriseerd" data-budget-owner="${owner}"><div class="budget-preview-thumb">${iconSvg('more')}</div><div class="budget-preview-main"><div class="budget-preview-top"><strong>Ongecategoriseerd</strong><span>${eur(uncategorized)}</span></div><div class="progress-track"><div class="progress-fill" style="width:100%"></div></div></div></button>`);
@@ -3952,6 +3979,8 @@ function renderSpaardoelen(){
 /* ---------- data & back-up tab ---------- */
 function renderDataTab(){
   document.getElementById('tab-data')?.classList.remove('mobile-data-page');
+  const offlineInput=document.getElementById('offlinePeriodMonth'),storageScope=DataAdapter.store().scope;
+  const offlineMonth=offlineInput?.dataset.storageScope===storageScope?offlineInput.value:getSelectedMonth();
   const lastBackup = DataAdapter.backupForPresentation();
   const lastBackupDate = lastBackup?.savedAt ? new Date(lastBackup.savedAt) : null;
   const isToday = lastBackupDate && lastBackupDate.toDateString() === new Date().toDateString();
@@ -3978,6 +4007,13 @@ function renderDataTab(){
         <button class="ghost" id="btnReset" style="border-color:var(--red);color:var(--red)">🗑 Alles wissen</button>
       </div>
       <input type="file" id="fileImport" accept="application/json" style="display:none">
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>Offline opslag</h2></div>
+      <p class="hint">De actieve maand en drie voorafgaande maanden blijven beschikbaar. Bewaar extra maanden voor offline gebruik. Beschermde gegevens worden niet automatisch opgeruimd.</p>
+      <p id="periodCacheUsage" role="status">Opslag meten…</p>
+      <div class="toolbar"><label>Maand <input type="month" id="offlinePeriodMonth" data-storage-scope="${attrSafe(storageScope)}" value="${attrSafe(offlineMonth)}"></label><button class="ghost small" id="btnPinOfflinePeriod">Offline bewaren</button><button class="ghost small" id="btnUnpinOfflinePeriod">Offline bescherming opheffen</button><button class="ghost small" id="btnTrimPeriodCache">Vervangbare cache opruimen</button></div>
+      <p id="offlinePeriodList" class="hint"></p>
     </div>
     <div class="card">
       <div class="card-head"><h2>Firebase / Firestore</h2><span class="hint" id="cloudStatus">${textSafe(CloudAdapter.statusText())}</span></div>
@@ -4115,6 +4151,28 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
   document.getElementById('btnFirebaseSignOut').addEventListener('click', async ()=>{
     await CloudAdapter.signOut();
   });
+  const cacheStore=DataAdapter.store(),cache=cacheStore.cache;
+  const updateCacheUsage=async()=>{
+    const usage=await cache.usage();
+    if(DataAdapter.store().scope!==cacheStore.scope)return;
+    const target=document.getElementById('periodCacheUsage'),list=document.getElementById('offlinePeriodList');
+    if(target)target.textContent=`Vervangbare cache: ${(usage.categories.replaceablePeriodCache/1048576).toFixed(2)} MiB / richtwaarde 64 MiB. Beschermde opslag en metadata: ${((usage.totalBytes-usage.categories.replaceablePeriodCache)/1048576).toFixed(2)} MiB. Gemeten gegevensomvang; browseroverhead kan afwijken.`;
+    if(list)list.textContent='Offline bewaard: '+(usage.periods.filter(row=>row.pinned).map(row=>row.id).join(', ')||'geen extra maanden');
+  };
+  const cacheAction=async action=>{
+    try{if(DataAdapter.store().scope!==cacheStore.scope)throw new Error('Het huishouden is gewijzigd.');await action();await updateCacheUsage();}
+    catch(error){alert('Offline opslag: '+error.message);}
+  };
+  document.getElementById('btnPinOfflinePeriod').addEventListener('click',()=>cacheAction(async()=>{
+    const month=document.getElementById('offlinePeriodMonth').value;
+    if(CloudAdapter.recordSession){const result=await CloudAdapter.recordSession.openMonth(month);if(result.outcome!=='committed')throw new Error('Synchroniseer eerst open wijzigingen of los het conflict op.');}
+    await cache.pin(month,true);
+  }));
+  document.getElementById('btnUnpinOfflinePeriod').addEventListener('click',()=>cacheAction(()=>cache.pin(document.getElementById('offlinePeriodMonth').value,false)));
+  document.getElementById('btnTrimPeriodCache').addEventListener('click',()=>cacheAction(async()=>{
+    const result=await cache.evict({selectedMonth:getSelectedMonth()});if(result.blocked)throw new Error('Open synchronisatie- of herstelgegevens beschermen de cache.');
+  }));
+  updateCacheUsage().catch(error=>{const target=document.getElementById('periodCacheUsage');if(target)target.textContent='Opslagmeting niet beschikbaar: '+error.message;});
 }
 
 function renderMobileDataTab(){
@@ -4152,6 +4210,9 @@ function renderMonthSelect(){
         return `<button type="button" data-month-value="${key}" class="${classes}">${name}</button>`;
       }).join('')}
     </div>`;
+  // A period load can render the picker before its click handler finishes.
+  // Replacement buttons must retain the same busy state as the old buttons.
+  panel.querySelectorAll('button').forEach(item=>item.disabled=panel.dataset.saving==='true');
 }
 function closeMonthPicker(){
   const control = document.getElementById('monthControl');
@@ -4253,14 +4314,14 @@ function manualDefaultDate(month,today=localTransactionToday()){
 function financialProcessingFields(prefix,owner,tx={}){
   const type=(tx.fixedExpenseId||tx.fixedOccurrenceId||tx.processing?.fixedExpenseId)?'vaste-last':getTransactionClassification(tx),goals=U3_ACCOUNTS.flatMap(key=>(state.spaardoelen?.[key]||[]).map(goal=>({...goal,owner:key})));
   const typeOptions=MANUAL_PROCESSING_TYPES.some(([value])=>value===type)?MANUAL_PROCESSING_TYPES:[...MANUAL_PROCESSING_TYPES,[type,'Bestaand type · '+type]];
-  return `<label>Soort<select id="${prefix}Type">${typeOptions.map(([value,label])=>`<option value="${value}" ${value===type?'selected':''}>${textSafe(label)}</option>`).join('')}</select></label><label data-p4-goal>Spaardoel<select id="${prefix}Goal"><option value="">Kies spaardoel</option>${goals.map(goal=>`<option value="${attrSafe(goal.id)}" ${goal.id===(tx.savingsGoalId||tx.processing?.savingsGoalId)?'selected':''}>${textSafe(ownerLabel(goal.owner)+' · '+goal.naam)}</option>`).join('')}</select></label><label data-p4-refund>Refundcategorie<input id="${prefix}RefundCategory" value="${attrSafe(tx.refundCategory||tx.processing?.refundCategory||'')}" placeholder="Historische categorie"></label><label data-p4-refund>Refundmaand<input id="${prefix}RefundMonth" type="month" value="${attrSafe(tx.refundMonth||tx.processing?.refundMonth||'')}"></label><label data-manual-fixed>Maand vaste last<input id="${prefix}FixedMonth" type="month" value="${attrSafe(tx.fixedOccurrenceMonth||tx.processing?.fixedOccurrenceMonth||getTransactionDate(tx).slice(0,7))}"></label><label data-manual-fixed>Betaalmoment vaste last<select id="${prefix}Fixed"><option value="">Kies vast betaalmoment</option></select></label><label data-manual-income>Inkomstenbron<select id="${prefix}Income"><option value="">Geen koppeling</option></select></label>`;
+  return `<label>Soort<select id="${prefix}Type">${typeOptions.map(([value,label])=>`<option value="${value}" ${value===type?'selected':''}>${textSafe(label)}</option>`).join('')}</select></label><label data-p4-goal>Spaardoel<select id="${prefix}Goal"><option value="">Kies spaardoel</option>${goals.map(goal=>`<option value="${attrSafe(goal.id)}" ${goal.id===(tx.savingsGoalId||tx.processing?.savingsGoalId)?'selected':''}>${textSafe(ownerLabel(goal.owner)+' · '+goal.naam)}</option>`).join('')}</select></label><label data-p4-refund>Refundcategorie<input id="${prefix}RefundCategory" value="${attrSafe(tx.refundCategory||tx.processing?.refundCategory||'')}" placeholder="Historische categorie"></label><label data-p4-refund>Refundmaand<input id="${prefix}RefundMonth" type="month" value="${attrSafe(tx.refundMonth||tx.processing?.refundMonth||'')}"></label><label data-manual-fixed>Maand vaste last<input id="${prefix}FixedMonth" type="month" value="${attrSafe(tx.fixedOccurrenceMonth||tx.processing?.fixedOccurrenceMonth||getTransactionDate(tx).slice(0,7))}"></label><label data-manual-fixed>Betaalmoment vaste last<select id="${prefix}Fixed"><option value="">Kies vast betaalmoment</option></select></label><label data-manual-salary>Salaris van<select id="${prefix}SalaryPerson"><option value="">Kies Dion of Dara</option>${['dion','dara'].map(person=>`<option value="${person}" ${person===(salaryPerson(tx,state)||owner)?'selected':''}>${textSafe(ownerLabel(person))}</option>`).join('')}</select></label><label data-manual-income>Inkomstenbron<select id="${prefix}Income"><option value="">Geen koppeling</option></select></label>`;
 }
 function bindFinancialProcessingFields(modal,prefix,owner,existing,account=owner){
   const date=modal.querySelector(`#${prefix}Date`),type=modal.querySelector(`#${prefix}Type`),category=modal.querySelector(`#${prefix}Category`);
   const update=()=>{
     const month=String(date.value).slice(0,7),valid=/^\d{4}-(0[1-9]|1[0-2])$/.test(month),value=type.value;
     const income=value==='inkomen'||INCOME_TRANSACTION_TYPES.includes(value),savings=['sparen','naar-spaarrekening','van-spaarrekening'].includes(value),refund=['terugbetaling','refund'].includes(value);
-    for(const [selector,visible] of [['[data-p4-goal]',savings],['[data-p4-refund]',refund],['[data-manual-fixed]',value==='vaste-last'],['[data-manual-income]',income],['[data-manual-category]',value==='uitgave']])modal.querySelectorAll(selector).forEach(el=>{el.hidden=!visible;el.style.display=visible?'':'none';});
+    for(const [selector,visible] of [['[data-p4-goal]',savings],['[data-p4-refund]',refund],['[data-manual-fixed]',value==='vaste-last'],['[data-manual-income]',income],['[data-manual-salary]',value==='salaris'],['[data-manual-category]',value==='uitgave']])modal.querySelectorAll(selector).forEach(el=>{el.hidden=!visible;el.style.display=visible?'':'none';});
     const previous=category.value,keep=existing&&getTransactionDate(existing).slice(0,7)===month?existing.category:'';
     const categories=valid?jointVariableCategoryOptions(keep,owner,month):['Overig'];
     category.innerHTML=categories.map(label=>`<option value="${attrSafe(label)}">${textSafe(label)}</option>`).join('');if(categories.includes(previous))category.value=previous;else if(categories.includes(keep))category.value=keep;
@@ -4271,6 +4332,10 @@ function bindFinancialProcessingFields(modal,prefix,owner,existing,account=owner
     const source=modal.querySelector(`#${prefix}Income`),oldSource=source.value||existing?.incomeSourceId||existing?.processing?.incomeSourceId,rows=valid?resolveIncomeSourcesForMonth(state,month).filter(row=>row.rekening===account||(!row.rekening&&(row.eigenaar||row.financialFor)===owner)):[];
     source.innerHTML='<option value="">Geen koppeling</option>'+rows.map(row=>`<option value="${attrSafe(row.id)}">${textSafe(row.naam)}</option>`).join('');if(oldSource&&!rows.some(row=>row.id===oldSource))source.insertAdjacentHTML('beforeend','<option value="'+attrSafe(oldSource)+'" selected disabled>Bestaande historische inkomstenkoppeling</option>');if(oldSource)source.value=oldSource;
   };
+  modal.querySelector('#'+prefix+'Income').addEventListener('change',event=>{
+    const source=resolveIncomeSourcesForMonth(state,String(date.value).slice(0,7)).find(row=>row.id===event.target.value);
+    if(type.value==='salaris'&&source?.legacyKind==='salary')modal.querySelector('#'+prefix+'SalaryPerson').value=source.eigenaar;
+  });
   type.addEventListener('change',update);date.addEventListener('change',update);modal.querySelector('#'+prefix+'FixedMonth').addEventListener('change',update);update();
 }
 function readFinancialProcessingFields(prefix){
@@ -4302,8 +4367,11 @@ function openContextTransactionModal(owner,transactionId=''){
       const incomeSourceId=income?document.getElementById(prefix+'Income').value:'',incomeSource=incomeSourceId?resolveIncomeSourcesForMonth(state,date.slice(0,7)).find(row=>row.id===incomeSourceId):null;
       // An explicitly selected salary source identifies whose salary this is, independently of its bank account.
       const explicitNewLink=!existing||incomeSourceId!==(existing.incomeSourceId||existing.processing?.incomeSourceId||'');
-      const financialDestination=explicitNewLink&&incomeSource?.legacyKind==='salary'&&['dion','dara'].includes(incomeSource.eigenaar)?incomeSource.eigenaar:destination;
-      const next={...(existing||{}),...fields,id:existing?.id||uid(),date,transactionDate:date,owner:financialDestination,financialFor:financialDestination,budgetOwner:financialDestination,category,amount,description:document.getElementById(prefix+'Description').value.trim(),note:document.getElementById(prefix+'Note').value.trim(),kind:income?'inkomen':'uitgave',createdAt:existing?.createdAt||new Date().toISOString(),fixedExpenseId:fixed?.itemId||'',fixedOccurrenceId:fixed?.id||'',fixedOccurrenceMonth:fixed?.month||'',incomeSourceId};
+      const chosenSalaryPerson=document.getElementById(prefix+'SalaryPerson').value;
+      if(type==='salaris'&&!['dion','dara'].includes(chosenSalaryPerson)&&incomeSource?.legacyKind!=='salary')throw new Error('Kies Dion of Dara voor deze salarisbetaling.');
+      const leavingSalary=existing&&getTransactionClassification(existing)==='salaris'&&type!=='salaris';
+      const financialDestination=type==='salaris'&&['dion','dara'].includes(chosenSalaryPerson)?chosenSalaryPerson:explicitNewLink&&['salaris','inkomen'].includes(type)&&incomeSource?.legacyKind==='salary'&&['dion','dara'].includes(incomeSource.eigenaar)?incomeSource.eigenaar:leavingSalary?account:destination;
+      const next={...(existing||{}),...fields,salaryPersonId:type==='salaris'?financialDestination:'',id:existing?.id||uid(),date,transactionDate:date,owner:financialDestination,financialFor:financialDestination,budgetOwner:financialDestination,category,amount,description:document.getElementById(prefix+'Description').value.trim(),note:document.getElementById(prefix+'Note').value.trim(),kind:income?'inkomen':'uitgave',createdAt:existing?.createdAt||new Date().toISOString(),fixedExpenseId:fixed?.itemId||'',fixedOccurrenceId:fixed?.id||'',fixedOccurrenceMonth:fixed?.month||'',incomeSourceId};
       if(existing?.processing)next.processing={...existing.processing,...fields,transactionType:type,category,budgetOwner:financialDestination,processedAmount:amount,fixedExpenseId:next.fixedExpenseId,fixedOccurrenceId:next.fixedOccurrenceId,fixedOccurrenceMonth:next.fixedOccurrenceMonth,incomeSourceId:next.incomeSourceId};
       const candidate=clone(state);upsertManualFinancialTransaction(candidate,next,account,{today:localTransactionToday()});button.disabled=true;
       if(!await commitChange(()=>upsertManualFinancialTransaction(state,next,account,{today:localTransactionToday()}),{render:false})){button.disabled=false;throw new Error('Opslaan is afgebroken.');}close();renderActiveTab();
@@ -4899,23 +4967,19 @@ function renderJointFirstRow(){
   (scenarioData.gezamenlijk.variabel||[]).forEach(row=>{
     const label = String(row.post || row.categorie || '').trim();
     if (!label && !Number(row.bedrag)) return;
-    const key = label.toLocaleLowerCase();
-    const current = variableBudgetMap.get(key) || {label: label || 'Budget', budget:0};
+    const key = row.id||label.toLocaleLowerCase();
+    const current = variableBudgetMap.get(key) || {id:row.id,label: label || 'Budget', budget:0};
     current.budget = round2(current.budget + (Number(row.bedrag)||0));
     variableBudgetMap.set(key, current);
   });
   const usedByBudgetKey = {};
   let unassignedUsed = 0;
-  getMonthTransactions('gezamenlijk').forEach(tx=>{
-    const key = String(tx.category || '').trim().toLocaleLowerCase();
-    const amount = getTransactionExpenseImpact(tx);
-    if (key && variableBudgetMap.has(key)) usedByBudgetKey[key] = round2((usedByBudgetKey[key]||0) + amount);
-    else unassignedUsed = round2(unassignedUsed + amount);
-  });
+  for(const [key,row] of variableBudgetMap)usedByBudgetKey[key]=budgetActual(state,getSelectedMonth(),'gezamenlijk',row.label,row.id);
+  unassignedUsed=round2(sumTransactions('gezamenlijk')-Object.values(usedByBudgetKey).reduce((sum,n)=>sum+n,0));
   const variableRows = Array.from(variableBudgetMap.entries()).map(([key,row])=>{
     const used = usedByBudgetKey[key] || 0;
     const ratio = row.budget > 0 ? Math.min(1, used / row.budget) : 0;
-    return `<button type="button" class="budget-preview-item budget-preview-button" data-open-budget-transactions="${textSafe(row.label)}" data-budget-owner="gezamenlijk" aria-label="Open transacties voor ${textSafe(row.label)}">
+    return `<button type="button" class="budget-preview-item budget-preview-button" data-open-budget-transactions="${textSafe(row.label)}" data-budget-id="${textSafe(row.id||'')}" data-budget-owner="gezamenlijk" aria-label="Open transacties voor ${textSafe(row.label)}">
       <div class="budget-preview-thumb tone-green">${iconSvg(categoryIconName(row.label))}</div>
       <div class="budget-preview-main">
         <div class="budget-preview-top"><strong>${textSafe(row.label)}</strong><span><span class="neutral-amount">${eur(used)}</span> / <span class="neutral-amount">${eur(row.budget)}</span></span></div>
@@ -5051,10 +5115,10 @@ function parkMonthControlBeforeRender(){
   }
 }
 
-function openBudgetTransactionsModal(category,owner='gezamenlijk'){
+function openBudgetTransactionsModal(category,owner='gezamenlijk',budgetItemId=''){
   const modal=document.getElementById('transactionModal');
   const month=getSelectedMonth();
-  const rows=categoryProcessingDetails(state,month,owner).filter(tx=>budgetCategoryMatches(tx,category)).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+  const rows=categoryProcessingDetails(state,month,owner).filter(tx=>budgetCategoryMatches(tx,category,owner,month,budgetItemId)).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
   const total=round2(rows.reduce((sum,tx)=>sum+tx.displayImpact,0));
   modal.innerHTML=`<div class="modal budget-transactions-modal"><div class="modal-head"><div><h2>${textSafe(category)}</h2><p>${monthLabel(month)} · ${rows.length} transactie${rows.length===1?'':'s'} · ${eur(total)}</p></div><button type="button" class="ghost" data-close-budget-transactions>Sluiten</button></div><div class="budget-transactions-list">${rows.length?rows.map(tx=>`<button type="button" class="budget-transaction-row" data-open-budget-transaction-id="${textSafe(tx.id)}"><span><strong>${textSafe(tx.description||tx.category||'Transactie')}</strong><small>${formatDateNL(tx.date)} · ${textSafe(tx.category||'Overig')}${tx.savingsFunded?' · gedekt '+eur(tx.savingsFunded):''}${tx.categoryOnlyRefundCorrection?' · aparte categoriecorrectie':tx.refundCorrection?' · refundcorrectie':''}</small></span><b class="${tx.displayImpact<0?'value pos':'value neg'}">${eur(tx.displayImpact)}</b></button>`).join(''):'<p class="muted-empty">Geen budgettransacties in deze categorie.</p>'}</div></div>`;
   modal.classList.add('open');
@@ -5143,7 +5207,8 @@ function renderSettings(){
   root.querySelector('[data-u6-signout]')?.addEventListener('click',async()=>{await CloudAdapter.signOut();await globalThis.FinizeAuth.signOut();});
 }
 
-function renderActiveTab(){
+function renderActiveTab(){return profileSync('ui.activeTabRender',()=>renderActiveTabMeasured());}
+function renderActiveTabMeasured(){
   if (['dion','dara'].includes(activeTab) && !canViewPersonalTab(activeTab)) activeTab='settings';
   ensureMonthData(getSelectedMonth());
   renderMonthSelect();
@@ -5154,6 +5219,7 @@ function renderActiveTab(){
 
   parkMonthControlBeforeRender();
 
+  try {
   if (activeTab==='dashboard') renderDashboard();
   else if (activeTab==='gezamenlijk') window.innerWidth >= 768 ? renderPersonOrJoint('tab-gezamenlijk','gezamenlijk','Gezamenlijk') : renderEmptyVisualTab('tab-gezamenlijk', 'Gezamenlijk');
   else if (activeTab==='dion') window.innerWidth >= 768 || isReadOnlyPersonalTab('dion') ? renderPersonOrJoint('tab-dion','dion','Dion') : renderEmptyVisualTab('tab-dion', 'Dion');
@@ -5161,6 +5227,14 @@ function renderActiveTab(){
   else if (activeTab==='spaardoelen') window.innerWidth >= 768 && window.FinizeUpdate5?.renderGoals ? window.FinizeUpdate5.renderGoals() : renderMobileSpaardoelen();
   else if (activeTab==='data') window.innerWidth >= 768 && window.FinizeUpdate5?.renderData ? window.FinizeUpdate5.renderData() : renderMobileDataTab();
   else if (activeTab==='settings') renderSettings();
+  }catch(error){
+    if(error.code!=='salary-person-required')throw error;
+    const root=document.getElementById('tab-'+activeTab);
+    const rows=selectTransactionProjections(state,{month:error.salaryReviewMonth||getSelectedMonth()}).filter(p=>p.transactionType==='salaris'&&p.effects.incomeImpact>0&&!salaryPerson(p.transaction,state));
+    root.innerHTML=`<section class="card" role="alert"><h2>Salaris koppelen</h2><p>${textSafe(error.message)} Inkomsten, zakgeld en prognoses zijn tijdelijk niet beschikbaar. De oorspronkelijke betalingen blijven behouden.</p>${rows.map(p=>`<button type="button" class="primary" data-salary-review="${attrSafe(p.transaction.id)}">${textSafe(p.transaction.description||'Salarisbetaling')} · ${eur(p.amount)}</button>`).join('')}<button type="button" class="ghost" data-tab-shortcut="data">Open Data &amp; back-up</button></section>`;
+    root.querySelectorAll('[data-salary-review]').forEach(button=>button.onclick=()=>{const tx=rows.find(p=>p.transaction.id===button.dataset.salaryReview)?.transaction;if(tx)getTransactionSource(tx)==='csv'?routeImportedTransactionEdit(tx):openContextTransactionModal(getTransactionAccountContext(tx)||'gezamenlijk',tx.id);});
+  }
+
 
   if (['gezamenlijk','dion','dara','spaardoelen','data','settings'].includes(activeTab)){
     document.body.dataset.activeTab = 'dashboard';
@@ -5204,7 +5278,7 @@ function renderActiveTab(){
     btn.addEventListener('click', openTotalIncomeEditModal);
   });
   root.querySelectorAll('[data-open-budget-transactions]').forEach(btn=>{
-    btn.addEventListener('click',()=>openBudgetTransactionsModal(btn.dataset.openBudgetTransactions,btn.dataset.budgetOwner||'gezamenlijk'));
+    btn.addEventListener('click',()=>openBudgetTransactionsModal(btn.dataset.openBudgetTransactions,btn.dataset.budgetOwner||'gezamenlijk',btn.dataset.budgetId||''));
   });
   root.querySelectorAll('[data-open-goal-editor]').forEach(btn=>{
     btn.addEventListener('click',()=>{ const [owner,id]=btn.dataset.openGoalEditor.split(':'); openMobileGoalEditor(owner,id); });

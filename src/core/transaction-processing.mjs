@@ -1,5 +1,7 @@
 import { isBankSource, bankSourceForImport } from './bank-sources.mjs';
 import { expenseCategoriesForMonth } from './planning-timeline.mjs';
+import { bindBudgetAssignment } from './budget-assignment.mjs';
+import { salaryLink } from './salary-assignment.mjs';
 import { plannedOccurrences } from './recurring-occurrences.mjs';
 import { markManualTransaction, getTransactionClassification, getTransactionProcessingStatus, getTransactionSource, getTransactionAccountContext, getTransactionFinancialDestination, getTransactionDate, ACCOUNT_CONTEXTS } from './transaction-model.mjs';
 import { transactionSourceKey, projectTransaction, selectDependencyProjections as selectTransactionProjections, validateTransactionProcessing, refundCategoryIsRecognizable, validateSavingsCoverageAllocation, coverageAllocationStatus, coverageMessage, confirmInternalTransferPair } from './transaction-engine.mjs';
@@ -26,6 +28,11 @@ function reopenSourceInPlace(state,importId,rowId,{dryRun=false}={}) {
   if(advances.some(advance=>(advance.settlementTransferIds||[]).length))throw new Error('Dit voorschot heeft uitgevoerde verrekeningen. Heropening vereist eerst een expliciete correctie daarvan.');
   const goalIds=[...new Set((state.savingsGoalLedger||[]).filter(entry=>ids.has(entry.transactionId)&&entry.source!=='planned').map(entry=>entry.goalId))];
   if(dryRun)return {transactionIds:[...ids],goalIds};
+  if(header&&getTransactionProcessingStatus(header)!=='nakijken'){
+    header.approvalHistory=[...(header.approvalHistory||[]),{approvalSource:header.approvalSource||'',approvedAt:header.approvedAt||'',status:getTransactionProcessingStatus(header),processing:copy(header.approvedProcessing||{})}];
+    header.processingStatus='nakijken';header.reviewStatus='nakijken';header.certainty='nakijken';header.approvalSource='';header.approvedAt='';
+    header.processingRevision=(Number(header.processingRevision)||0)+1;
+  }
   rows.forEach(tx=>{
     if(tx.processingStatus==='nakijken')return;
     tx.approvalHistory=tx.approvalHistory||[];
@@ -219,7 +226,18 @@ export function upsertManualFinancialTransaction(state,tx,accountContext,options
     if(Object.hasOwn(tx,'date')||Object.hasOwn(tx,'transactionDate'))next.processing.processingDate=next.transactionDate;
   }
   next.budgetOwner=next.budgetOwner||next.financialFor||next.owner||accountContext;next.financialFor=next.budgetOwner;next.owner=next.budgetOwner;
+  if(getTransactionClassification(next)==='salaris'){
+    const link=salaryLink(next,state);Object.assign(next,link,{budgetOwner:link.salaryPersonId,financialFor:link.salaryPersonId,owner:link.salaryPersonId});
+    if(next.processing)Object.assign(next.processing,link,{budgetOwner:link.salaryPersonId});
+  }
   validateManualTransactionInput(state,next,accountContext,{...options,existing});
+  if(getTransactionClassification(next)==='uitgave'&&!next.fixedExpenseId&&!next.fixedOccurrenceId){
+    const changed=existing&&(existing.category!==next.category||getTransactionFinancialDestination(existing)!==next.budgetOwner);
+    const priorId=next.budgetItemId||next.processing?.budgetItemId||'';
+    const unchanged=existing&&!changed&&getTransactionDate(existing)===getTransactionDate(next);
+    const budgetItemId=unchanged?priorId:bindBudgetAssignment(state,getTransactionDate(next).slice(0,7),next.budgetOwner,{category:next.category,budgetItemId:changed?'':priorId});
+    next.budgetItemId=budgetItemId;if(next.processing)next.processing.budgetItemId=budgetItemId;
+  }
   // Legacy manual cash/impact fields may be redundant, but never silently reinterpret
   // a non-equivalent legacy value when editing the amount/classification.
   if(existing&&(Number(existing.amount)!==Number(next.amount)||getTransactionClassification(existing)!==getTransactionClassification(next))){

@@ -28,7 +28,7 @@ const context = {
   getSelectedMonth:()=> '2026-07',
   getMonthTransactions:(owner=null,month='2026-07')=>transactions.filter(tx=>String(tx.date).slice(0,7)===month&&(!owner||tx.owner===owner))
 };
-Object.assign(context,require('../src/core/transaction-model.mjs'),require('../src/core/transaction-engine.mjs'),require('../src/core/recurring-occurrences.mjs'));
+Object.assign(context,require('../src/core/transaction-model.mjs'),require('../src/core/transaction-engine.mjs'),require('../src/core/recurring-occurrences.mjs'),require('../src/core/budget-assignment.mjs'));
 vm.createContext(context);
 vm.runInContext(html.slice(start,end), context);
 

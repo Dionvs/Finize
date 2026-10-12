@@ -4,6 +4,7 @@ import { getTransactionProcessingStatus,assertOriginalBankDataUnchanged } from '
 import { workspaceState,refreshWorkspaceTotals,mergeWorkspaceIntent } from './period-workspace.mjs';
 import { synchronizeChangedSavings,assertFinancialMutationSafe } from '../core/transaction-processing.mjs';
 import { reconcileGoalSavedAmounts } from '../core/data-normalization.mjs';
+import { requestedPeriodWindow } from './period-cache.mjs';
 const same=(a,b)=>canonical(a)===canonical(b);
 
 export function conflictApprovalReview(value){
@@ -16,6 +17,14 @@ export function createRecordSync({localStore,cloudStore,onStatus=()=>{},prepareS
   if(localStore.scope!==cloudStore.householdId)throw storageError('household-scope','De lokale en cloudadministratie horen niet bij hetzelfde huishouden.');
   let running=null;
   async function readLocal(){const snapshot=await localStore.readCloudSnapshot();return {...snapshot,localState:snapshot.state,state:await prepareState(structuredClone(snapshot.state))};}
+  async function pendingImportBaseMatches(local){
+    // Record sync uses the household epoch/revision, not the legacy per-import
+    // baseVersion. Prove that this pending choice descends from that cloud base.
+    const snapshot=await localStore.readCloudSnapshot(),c=await cloudStore.context();
+    const queued=snapshot.importQueue.find(row=>(row.importId||row.id)===local.id);
+    const stored=snapshot.imports.find(row=>row.id===local.id),operations=snapshot.operations;
+    return Boolean(queued&&stored&&queued.operationId===local.operationId&&queued.version===local.version&&stored.operationId===local.operationId&&stored.version===local.version&&operations.length&&operations.every(row=>row.status==='pending')&&snapshot.cloudBase?.epoch===c.head.data.epoch&&snapshot.cloudBase?.revision===c.head.data.revision&&operations[0].previousHash===snapshot.cloudBase.localSha256&&operations.at(-1).sha256===snapshot.head.sha256);
+  }
   async function conflict(snapshot,remote,reason){
     const id='record-conflict-'+await digest({local:snapshot.head.sha256,remote:remote.head.stateHash,revision:remote.head.revision});
     const value={id,reason,epoch:remote.head.epoch,remoteRevision:remote.head.revision,local:snapshot.state,localImports:snapshot.imports,remote:remote.state,remoteImports:remote.imports,operationIds:snapshot.operations.map(row=>row.id),localHash:snapshot.head.sha256,remoteHash:remote.head.stateHash};
@@ -76,9 +85,17 @@ export function createRecordSync({localStore,cloudStore,onStatus=()=>{},prepareS
   }
   function sync(){if(running)return running;running=performSync().finally(()=>{running=null;});return running;}
   async function releaseFullWindow(snapshot){
-    if(!snapshot.state.__finizePeriodContext?.explicitFullHistory)return;
     const current=await readLocal();
-    if(!current.operations.length)await openMonth(current.state.meta.selectedMonth,{resetWindow:true});
+    if(!current.state.__finizePeriodContext?.explicitFullHistory&&current.state.__finizePeriodContext?.revision===current.cloudBase?.revision)return true;
+    if(!current.operations.length){
+      try{return (await openMonth(current.state.meta.selectedMonth,{resetWindow:true})).outcome==='committed';}
+      catch(error){
+        onStatus('Cloud opgeslagen; offline perioden moeten bij verbinding opnieuw worden gecontroleerd');
+        if(error.code&&!['cloud-offline','firestore-error','cloud-pending'].includes(error.code)){error.commitOutcome='committed';throw error;}
+        return false;
+      }
+    }
+    return false;
   }
   async function syncWorkspace(snapshot){
     if(!snapshot.operations.length){await releaseFullWindow(snapshot);return {outcome:'idle'};}
@@ -93,7 +110,7 @@ export function createRecordSync({localStore,cloudStore,onStatus=()=>{},prepareS
       if(confirmed.__finizePeriodContext.revision!==latest.cloudRevision)return conflict(snapshot,{state:confirmed,imports:[],head:confirmed.__finizePeriodContext.head},'newer-period-after-ack-loss');
       const ids=new Set(receipts.map(row=>row.id)),last=members.filter(row=>ids.has(row.id)).sort((a,b)=>a.storageRevision-b.storageRevision).at(-1);
       await localStore.acknowledgeRecordCloud([...ids],{epoch:latest.epoch,revision:latest.cloudRevision,localSha256:last.sha256,stateHash:confirmed.__finizePeriodContext.head.stateHash,importsHash:confirmed.__finizePeriodContext.head.importsHash,workspace:confirmed.__finizePeriodContext},snapshot.imports,receipts.length===members.length?resolutions:null);
-      if(receipts.length===members.length){await releaseFullWindow(snapshot);onStatus('Cloud opgeslagen');return {outcome:'committed',replayed:true,revision:latest.cloudRevision};}
+      if(receipts.length===members.length){const refreshed=await releaseFullWindow(snapshot);if(refreshed)onStatus('Cloud opgeslagen');return {outcome:'committed',replayed:true,revision:latest.cloudRevision,offlineRefreshPending:!refreshed};}
       return syncWorkspace(await readLocal());
     }
     const operationId='period-outbox-'+await digest(members.map(row=>row.id));let result;
@@ -109,7 +126,7 @@ export function createRecordSync({localStore,cloudStore,onStatus=()=>{},prepareS
     const confirmed=await cloudStore.openWorkspace(snapshot.state.verifiedPeriods);
     if(confirmed.__finizePeriodContext.revision!==result.revision)throw storageError('cloud-conflict','Een nieuwere cloudstand vereist aparte ontvangst. De lokale outbox blijft behouden.');
     await localStore.acknowledgeRecordCloud(members.map(row=>row.id),{epoch:proof.epoch,revision:result.revision,localSha256:snapshot.head.sha256,stateHash:confirmed.__finizePeriodContext.head.stateHash,importsHash:confirmed.__finizePeriodContext.head.importsHash,workspace:confirmed.__finizePeriodContext},snapshot.imports,resolutions);
-    await releaseFullWindow(snapshot);onStatus('Cloud opgeslagen');return result;
+    const refreshed=await releaseFullWindow(snapshot);if(refreshed)onStatus('Cloud opgeslagen');return {...result,offlineRefreshPending:!refreshed};
   }
   async function openMonth(month,{explicitFullHistory=false,additionalMonths=[],resetWindow=false}={}){
     const snapshot=await readLocal(),partial=snapshot.state.__finizePartialHistory;
@@ -120,13 +137,16 @@ export function createRecordSync({localStore,cloudStore,onStatus=()=>{},prepareS
     if(!partial&&!pristine&&(!snapshot.cloudBase||snapshot.cloudBase.localSha256!==snapshot.head.sha256))throw storageError('unconfirmed-local-base','Bevestig eerst de bestaande lokale administratie; de oude historie blijft beschermd.');
     let incoming,fromCache=false;
     try{
-      const c=await cloudStore.context(),months=explicitFullHistory?Object.keys(c.head.data.periodHashes):[month,...additionalMonths,...(partial&&!resetWindow?snapshot.state.verifiedPeriods:[])].filter((value,index,all)=>all.indexOf(value)===index);
+      const c=await cloudStore.context(),months=explicitFullHistory?Object.keys(c.head.data.periodHashes):[...requestedPeriodWindow(month),...additionalMonths,...(partial&&!resetWindow&&snapshot.operations.length?snapshot.state.verifiedPeriods:[])].filter((value,index,all)=>all.indexOf(value)===index);
       if(!months.includes(month))months.unshift(month);
       incoming=await cloudStore.openWorkspace(months,{explicitFullHistory});
     }
     catch(error){
-      if(explicitFullHistory||!partial||!snapshot.state.verifiedPeriods.includes(month)||error.code&&!['firestore-error','cloud-pending'].includes(error.code))throw error;
-      incoming=copyState(snapshot.localState);incoming.meta.selectedMonth=month;fromCache=true;onStatus('Offline — eerder geverifieerde financiële maand');
+      if(explicitFullHistory||!partial||error.code&&!['cloud-offline','firestore-error','cloud-pending'].includes(error.code))throw error;
+      if(snapshot.state.verifiedPeriods.includes(month)){incoming=copyState(snapshot.localState);incoming.meta.selectedMonth=month;}
+      else if(!snapshot.operations.length)incoming=await localStore.cache.read(month,{epoch:snapshot.cloudBase?.epoch,revision:snapshot.cloudBase?.revision});
+      if(!incoming)throw error;
+      fromCache=true;onStatus('Offline — eerder geverifieerde financiële maand');
     }
     if(partial&&snapshot.operations.length&&!fromCache){
       const base=await workspaceState(snapshot.cloudBase?.workspace||snapshot.state.__finizePeriodContext,snapshot.state.meta.selectedMonth);
@@ -140,7 +160,7 @@ export function createRecordSync({localStore,cloudStore,onStatus=()=>{},prepareS
     }
     if(partial&&!snapshot.operations.length&&!fromCache){
       const rows=new Map(incoming.transactions.map(row=>[row.id,row]));
-      const relevant=row=>!resetWindow||String(row.bankOriginal?.bankDate||row.transactionDate||row.date||'').startsWith(month)||snapshot.state.__finizePeriodContext.records.some(record=>record.collection==='transactions'&&record.recordId===row.id&&record.periods.includes(month));
+      const relevant=row=>snapshot.state.__finizePeriodContext.records.some(record=>record.collection==='transactions'&&record.recordId===row.id&&record.periods.some(value=>incoming.verifiedPeriods.includes(value)));
       const lost=snapshot.state.transactions.some(row=>relevant(row)&&getTransactionProcessingStatus(row)==='goedgekeurd'&&(!rows.has(row.id)||getTransactionProcessingStatus(rows.get(row.id))!=='goedgekeurd'));
       if(lost)return conflict(snapshot,{state:incoming,imports:[],head:incoming.__finizePeriodContext.head},'period-approval-missing');
     }
@@ -150,7 +170,24 @@ export function createRecordSync({localStore,cloudStore,onStatus=()=>{},prepareS
     const periodAcceptance=fromCache&&snapshot.cloudBase?snapshot.cloudBase:{epoch:workspace.epoch,revision:workspace.revision,stateHash:workspace.head.stateHash,importsHash:workspace.head.importsHash,workspace};
     try{await localStore.commit(incoming,{expectedHash:snapshot.head.sha256,operationId:id,queueCloud:false,periodAcceptance});}
     catch(error){const proof=await localStore.inspectOperation(id);if(proof.receipt?.sha256!==expected){error.commitOutcome=proof.state&&await backupDigest(JSON.stringify(proof.state))===snapshot.head.sha256?'rejected':'uncertain';throw error;}}
-    await onAdopt(incoming,{previousState:snapshot.localState});return {outcome:'committed',month,loadedTransactions:incoming.transactions.length,fullHistoryLoaded:false};
+    await onAdopt(incoming,{previousState:snapshot.localState});
+      if(!fromCache&&!snapshot.operations.length&&localStore.cache){
+        try{
+          await localStore.cache.remember(incoming,expected);
+          // Keep the calendar window and explicitly pinned offline copies at the
+          // confirmed revision, outside the selected financial workspace. A
+          // historical edit must not silently leave the active offline cache stale.
+          const offlinePeriods=new Set([...requestedPeriodWindow(),...await localStore.cache.pinnedPeriods()]);
+          for(const pin of offlinePeriods)if(!incoming.verifiedPeriods.includes(pin)&&!await localStore.cache.read(pin,{epoch:workspace.epoch,revision:workspace.revision})){
+            const offline=await cloudStore.openWorkspace([pin]);
+            if(offline.__finizePeriodContext.epoch!==workspace.epoch||offline.__finizePeriodContext.revision!==workspace.revision)throw storageError('cloud-conflict','De offline cache vereist een nieuwe gecontroleerde revisie.');
+            await localStore.cache.remember(offline,expected);
+          }
+          await localStore.cache.evict({selectedMonth:month});
+        }
+      catch(error){onStatus('Maand duurzaam geladen — cache niet bijgewerkt: '+error.message);}
+    }
+    return {outcome:'committed',month,loadedTransactions:incoming.transactions.length,fullHistoryLoaded:false};
   }
   async function pull(){
     const localState=await localStore.load();if(localState?.__finizePartialHistory)return openMonth(localState.meta.selectedMonth);
@@ -216,6 +253,6 @@ export function createRecordSync({localStore,cloudStore,onStatus=()=>{},prepareS
     await localStore.acknowledgeRecordCloud(members.map(row=>row.id),{epoch:c.head.data.epoch,revision:result.revision,localSha256:local.head.sha256,stateHash:await digest(local.state),importsHash:await digest(local.imports)},local.imports,{id:value.id,choice,operationId,reviewedRemoteChanges:reviewed});
     onStatus('Cloud opgeslagen — conflictkeuze en beide versies bewaard');return result;
   }
-  return {sync,pull,openMonth,openFullHistory:(month,reason)=>{if(!reason)throw storageError('history-reason','Geef de noodzakelijke historische afhankelijkheid op.');return openMonth(month,{explicitFullHistory:true});},establishBase,resolveConflict,conflictApprovalReview,readLocal,loadPeriod:month=>cloudStore.loadPeriod(month),loadImport:id=>cloudStore.loadImport(id),cloudStore,localStore};
+  return {sync,pull,openMonth,openFullHistory:(month,reason)=>{if(!reason)throw storageError('history-reason','Geef de noodzakelijke historische afhankelijkheid op.');return openMonth(month,{explicitFullHistory:true});},establishBase,resolveConflict,conflictApprovalReview,readLocal,pendingImportBaseMatches,loadPeriod:month=>cloudStore.loadPeriod(month),loadImport:id=>cloudStore.loadImport(id),cloudStore,localStore};
 }
 const copyState=value=>structuredClone(value);

@@ -3,6 +3,9 @@ import { processingFamily, processingCents, splitDifference } from './processing
 import { ACCOUNT_CONTEXTS, getTransactionAccountContext, getTransactionFinancialDestination, getTransactionSource, getTransactionProcessingStatus, getTransactionDate, getTransactionClassification, isTransactionFinanciallyActive } from './transaction-model.mjs';
 import { resolvePlannedIncomeForMonth, resolveFixedExpensesForMonth, resolveVariableBudgetsForMonth } from './planning-timeline.mjs';
 import { plannedOccurrences } from './recurring-occurrences.mjs';
+import { resolveBudgetAssignment, budgetAssignmentMatches } from './budget-assignment.mjs';
+import { profileCount } from '../storage/performance.mjs';
+import { salaryPerson, salaryLink } from './salary-assignment.mjs';
 const copy=value=>JSON.parse(JSON.stringify(value));
 const money=value=>Math.round((Number(value||0)+Number.EPSILON)*100)/100;
 const cents=value=>Math.round(Number(value)*100);
@@ -23,13 +26,14 @@ function sourceCash(tx){
 }
 function replacementSuppresses(tx,state){return(state.manualTransactionReplacements||[]).some(row=>row.active!==false&&(row.manualTransaction?.id===tx.id||row.manualTransactionId===tx.id));}
 function pairFor(tx,state){return(state.internalTransferPairs||[]).find(pair=>['bevestigd','confirmed','uitgevoerd'].includes(pair.status)&&pair.active!==false&&(pair.transactionIds||[]).some(id=>id===tx.id||id===tx.sourceTransactionId||((state.transactions||[]).find(row=>row.id===id)&&transactionSourceKey((state.transactions||[]).find(row=>row.id===id))===transactionSourceKey(tx))));}
-function projectBaseTransaction(tx,{state={},materialized=false,sourceApproved=null,sourceCashflow=null}={}) {
-  const sourceHeader=bankSourceForTransaction(state,tx);
+function projectBaseTransaction(tx,{state={},materialized=false,sourceApproved=null,sourceCashflow=null,preparation=null}={}) {
+  const sourceHeader=preparation?preparation.sources.get(tx.bankSourceId):bankSourceForTransaction(state,tx);
   const status=getTransactionProcessingStatus(tx),active=(sourceHeader?bankSourceActive(state,sourceHeader):!['withdrawn','deleted'].includes(tx.batchLifecycle))&&(sourceApproved??isTransactionFinanciallyActive(tx))&&status==='goedgekeurd'&&!replacementSuppresses(tx,state);
-  const accountContext=getTransactionAccountContext(tx,{accountProfiles:state.accountProfiles||[]}),financialFor=getTransactionFinancialDestination(tx);
+  const accountContext=getTransactionAccountContext(tx,{accountProfiles:state.accountProfiles||[]});let financialFor=getTransactionFinancialDestination(tx);
   let type=getTransactionClassification(tx);
   const linkedSource=(state.recurringIncomeSources||[]).find(source=>source.id===(tx.incomeSourceId||tx.processing?.incomeSourceId));
-  if(linkedSource?.legacyKind==='salary'&&incomeTypes.has(type))type='salaris';
+  if(linkedSource?.legacyKind==='salary'&&['salaris','inkomen'].includes(type))type='salaris';
+  if(type==='salaris')financialFor=salaryPerson(tx,state)||financialFor;
   const amount=amountOf(tx),calendarMonth=getTransactionFinancialMonth(tx),key=transactionSourceKey(tx);
   const diagnostics=[];if(!accountContext)diagnostics.push({code:'ambiguous-account-context',id:tx.id});if(!calendarMonth)diagnostics.push({code:'missing-transaction-date',id:tx.id});
   const rawSplits=tx.processing?.splits||tx.splits;
@@ -47,18 +51,30 @@ function projectBaseTransaction(tx,{state={},materialized=false,sourceApproved=n
   const pair=pairFor(tx,state),internal=transferTypes.has(type)||!!pair;
   const structural=savingsTypes.has(type)||type==='terugbetaling-voorschot';
   const effects={accountCashflow:cash,householdCashflow:cash,externalHouseholdCashflow:internal||structural?0:cash,unconfirmedTransferCashflow:internal&&!pair?cash:0,incomeImpact:active&&income&&!internal?amount:0,realExpense,budgetImpact:budget,fixedRealization:active&&fixedId?amount:0,savingsEffect:active&&savingsTypes.has(type)?amount:0,refundEffect:active&&refund?amount:0,advanceRepaymentEffect:active&&type==='terugbetaling-voorschot'?amount:0};
-  const result={id:tx.id,sourceKey:key,source:getTransactionSource(tx),accountContext,financialFor,status,active,transactionType:type,category:tx.category||processing.category||'Overig',amount,calendarMonth,financialMonth:fixedMonth||calendarMonth,fixedMonth,fixedOccurrenceId:fixedId,fixedExpenseId:tx.fixedExpenseId||processing.fixedExpenseId||'',incomeSourceId:tx.incomeSourceId||processing.incomeSourceId||'',incomeOccurrenceId:tx.incomeOccurrenceId||processing.incomeOccurrenceId||'',splitId:tx.splitId||'',effects,diagnostics,transaction:tx};
+  const budgetItemId=tx.budgetItemId||processing.budgetItemId||'';
+  let budgetRows=null;
+  if(preparation&&calendarMonth&&financialFor&&!fixed&&!special&&!income){
+    const key=calendarMonth+':'+financialFor;
+    if(!preparation.budgets.has(key)){preparation.budgets.set(key,resolveVariableBudgetsForMonth(state,calendarMonth,financialFor));profileCount('financial.budgetPlanningReads');}
+    budgetRows=preparation.budgets.get(key);
+  }
+  const budgetRow=calendarMonth&&financialFor&&!fixed&&!special&&!income?resolveBudgetAssignment(state,calendarMonth,financialFor,{category:tx.category||processing.category,budgetItemId},budgetRows):null;
+  const result={id:tx.id,sourceKey:key,source:getTransactionSource(tx),accountContext,financialFor,status,active,transactionType:type,category:budgetRow?.post||budgetRow?.categorie||tx.category||processing.category||'Overig',budgetItemId:budgetRow?.id||budgetItemId,amount,calendarMonth,financialMonth:fixedMonth||calendarMonth,fixedMonth,fixedOccurrenceId:fixedId,fixedExpenseId:tx.fixedExpenseId||processing.fixedExpenseId||'',incomeSourceId:tx.incomeSourceId||processing.incomeSourceId||'',incomeOccurrenceId:tx.incomeOccurrenceId||processing.incomeOccurrenceId||'',splitId:tx.splitId||'',effects,diagnostics,transaction:tx};
   // Existing stored rows are already materialized processing lines, even though the source's
   // full split list is repeated on every row. Only an unmaterialized source is expanded.
   if(!materialized&&!tx.splitId&&Array.isArray(rawSplits)&&rawSplits.length){
     const cashIndex=rawSplits.findIndex(split=>split.include!==false&&split.transactionType!=='niet-meetellen');
-    result.lines=rawSplits.map((split,index)=>projectBaseTransaction({...tx,...split,source:tx.source,bankOriginal:tx.bankOriginal,rawData:tx.rawData,accountContext:tx.accountContext,accountContextEvidence:tx.accountContextEvidence,account:tx.account,accountOwner:tx.accountOwner,accountProfileId:tx.accountProfileId,transactionDate:tx.transactionDate,date:tx.date,bookingDate:tx.bookingDate,importBatchId:tx.importBatchId,importTransactionId:tx.importTransactionId,processingStatus:tx.processingStatus,certainty:tx.certainty,reviewStatus:tx.reviewStatus,approvalSource:tx.approvalSource,approvedAt:tx.approvedAt,id:`${tx.id}:split:${split.id||index}`,splitId:split.id||String(index),sourceTransactionId:tx.id,expenseImpact:split.expenseImpact,amount:split.amount,transactionType:split.transactionType||(type==='vaste-last'?'uitgave':type),fixedExpenseId:split.fixedExpenseId||'',fixedOccurrenceId:split.fixedOccurrenceId||'',fixedOccurrenceMonth:split.fixedOccurrenceMonth||'',budgetOwner:split.budgetOwner||financialFor,financialFor:split.financialFor||split.budgetOwner||financialFor,category:split.category,processing:{...processing,...split,fixedExpenseId:split.fixedExpenseId||'',fixedOccurrenceId:split.fixedOccurrenceId||'',fixedOccurrenceMonth:split.fixedOccurrenceMonth||'',splits:[]}}, {state,materialized:true,sourceApproved:active,sourceCashflow:index===cashIndex?cash:0}));
+    result.lines=rawSplits.map((split,index)=>projectBaseTransaction({...tx,...split,source:tx.source,bankOriginal:tx.bankOriginal,rawData:tx.rawData,accountContext:tx.accountContext,accountContextEvidence:tx.accountContextEvidence,account:tx.account,accountOwner:tx.accountOwner,accountProfileId:tx.accountProfileId,transactionDate:tx.transactionDate,date:tx.date,bookingDate:tx.bookingDate,importBatchId:tx.importBatchId,importTransactionId:tx.importTransactionId,processingStatus:tx.processingStatus,certainty:tx.certainty,reviewStatus:tx.reviewStatus,approvalSource:tx.approvalSource,approvedAt:tx.approvedAt,id:`${tx.id}:split:${split.id||index}`,splitId:split.id||String(index),sourceTransactionId:tx.id,expenseImpact:split.expenseImpact,amount:split.amount,transactionType:split.transactionType||(type==='vaste-last'?'uitgave':type),fixedExpenseId:split.fixedExpenseId||'',fixedOccurrenceId:split.fixedOccurrenceId||'',fixedOccurrenceMonth:split.fixedOccurrenceMonth||'',budgetOwner:split.budgetOwner||financialFor,financialFor:split.financialFor||split.budgetOwner||financialFor,category:split.category,budgetItemId:split.budgetItemId||'',processing:{...processing,...split,fixedExpenseId:split.fixedExpenseId||'',fixedOccurrenceId:split.fixedOccurrenceId||'',fixedOccurrenceMonth:split.fixedOccurrenceMonth||'',splits:[]}}, {state,materialized:true,sourceApproved:active,sourceCashflow:index===cashIndex?cash:0,preparation}));
     for(const dimension of ['incomeImpact','realExpense','budgetImpact','fixedRealization','savingsEffect','refundEffect','advanceRepaymentEffect'])result.effects[dimension]=money(result.lines.reduce((sum,line)=>sum+line.effects[dimension],0));
   }
   return result;
 }
 export function selectTransactionProjections(state,{month=null,dimension='calendar',account=null,owner=null,includeInactive=false}={}) {
   if(state?.__finizePartialHistory)state=periodDependencyState(state,month);
+  // Invocation-local lookups. No financial result survives this synchronous call.
+  profileCount('financial.projectionCalls');
+  const preparation={sources:new Map(),budgets:new Map()};
+  for(const source of state.transactions||[])if(isBankSource(source)&&!preparation.sources.has(source.bankSourceId))preparation.sources.set(source.bankSourceId,source);
   const groups=new Map();(state.transactions||[]).filter(tx=>!isBankSource(tx)).forEach(tx=>{const key=transactionSourceKey(tx);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(tx);});
   const projections=[];
   groups.forEach(group=>{
@@ -67,7 +83,7 @@ export function selectTransactionProjections(state,{month=null,dimension='calend
     const cashTarget=group.find(isTransactionFinanciallyActive);
     const cashEvidence=group.find(tx=>tx.bankOriginal)||group.find(tx=>Number(tx.accountDelta)!==0)||group[0];
     group.forEach(tx=>{
-      const p=projectBaseTransaction(tx,{state,materialized:csvMaterialized,sourceApproved:approved,sourceCashflow:csvMaterialized?(tx===cashTarget?sourceCash(cashEvidence):0):null});
+      const p=projectBaseTransaction(tx,{state,materialized:csvMaterialized,sourceApproved:approved,sourceCashflow:csvMaterialized?(tx===cashTarget?sourceCash(cashEvidence):0):null,preparation});
       projections.push(...(p.lines||[p]));
     });
   });
@@ -86,6 +102,9 @@ export function selectDependencyProjections(state,options={}){
   if(state?.__finizePartialHistory&&!state.__finizePeriodContext?.periods?.length)throw Object.assign(new Error('De financiële afhankelijkheidsbasis ontbreekt.'),{code:'period-incomplete'});
   return selectTransactionProjections(state?.__finizePartialHistory?{...state,__finizePartialHistory:false}:state,options);
 }
+export function sumProjectionEffects(projections,dimension){
+  return money(projections.reduce((sum,p)=>sum+Number(p.effects[dimension]||0),0));
+}
 export function sumTransactionEffects(state,dimension,options={}) {
   if(state?.__finizePartialHistory&&!options.month){
     if(options.account||options.owner)throw Object.assign(new Error('Kies een geverifieerde maand voor een rekening- of eigenaartotaal.'),{code:'period-incomplete'});
@@ -93,10 +112,19 @@ export function sumTransactionEffects(state,dimension,options={}) {
     if(!Number.isSafeInteger(base?.totalsCents?.[dimension]))throw Object.assign(new Error('De vereiste cumulatieve projectie ontbreekt.'),{code:'period-incomplete'});
     return base.totalsCents[dimension]/100;
   }
-  return money(selectTransactionProjections(state,{...options,...(dimension==='budgetImpact'?{dimension:'budget'}:{})}).reduce((sum,p)=>sum+Number(p.effects[dimension]||0),0));
+  return sumProjectionEffects(selectTransactionProjections(state,{...options,...(dimension==='budgetImpact'?{dimension:'budget'}:{})}),dimension);
 }
 export function categoryActuals(state,month,owner) {
   const result={};selectTransactionProjections(state,{month,dimension:'budget'}).forEach(p=>{const category=p.effects.refundCorrection?p.refundCategory:p.category;if((!owner||p.financialFor===owner)&&p.effects.budgetImpact&&!p.directBudgetAllocations?.length)result[category]=money((result[category]||0)+p.effects.budgetImpact);(p.directBudgetAllocations||[]).filter(a=>!owner||(a.budgetOwner||p.financialFor)===owner).forEach(a=>{result[a.category]=money((result[a.category]||0)-a.amount);});});return result;
+}
+export function budgetActual(state,month,owner,category,budgetItemId=''){
+  return money(selectTransactionProjections(state,{month,dimension:'budget'}).reduce((sum,p)=>{
+    const label=p.effects.refundCorrection?p.refundCategory:p.category;
+    const id=p.effects.refundCorrection?'':p.budgetItemId;
+    let amount=p.financialFor===owner&&!p.directBudgetAllocations?.length&&budgetAssignmentMatches(state,month,owner,{category:label,budgetItemId:id},category,budgetItemId)?p.effects.budgetImpact:0;
+    for(const a of p.directBudgetAllocations||[])if((a.budgetOwner||p.financialFor)===owner&&budgetAssignmentMatches(state,month,owner,a,category,budgetItemId))amount-=a.amount;
+    return sum+amount;
+  },0));
 }
 export function fixedOccurrenceActuals(state,occurrence) {
   const rows=selectTransactionProjections(state,{month:occurrence.month,dimension:'fixed'}).filter(p=>p.fixedOccurrenceId===occurrence.id);
@@ -109,16 +137,13 @@ export function actualIncomeForMonth(state,month,owner=null) {
   const override=state.actualIncomeOverrides?.[month],manual=owner?override?.[owner]:override?.total;
   return {amount:Number.isFinite(Number(manual))?money(manual):0,source:manual!==undefined?'manual-correction':'none',rows:[]};
 }
-// Compatibility only for grandfathered salary rows that the old forecast assigned by
-// employer group/amount. It never changes canonical financialFor or physical account.
-export function legacySalaryForecastOwners(state,month,planned){
-  const groups=new Map(),result=new Map();
-  selectTransactionProjections(state,{month}).filter(p=>p.transactionType==='salaris'&&p.effects.incomeImpact>0&&!['dion','dara'].includes(p.financialFor)&&(p.transaction.approvalSource==='legacy-confirmed'||p.transaction.reviewStatus==='bevestigd'&&!p.transaction.approvalSource)).forEach(p=>{
-    const description=String(p.transaction.description||p.transaction.title||p.transaction.name||'');
-    const key=description.split(/[\u2014\u2013]/)[0].toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()||String(p.id);
-    if(!groups.has(key))groups.set(key,[]);groups.get(key).push(p);
-  });
-  groups.forEach(rows=>{const amount=money(rows.reduce((sum,p)=>sum+p.effects.incomeImpact,0));const owner=Math.abs(amount-planned.dion.salary)<=Math.abs(amount-planned.dara.salary)?'dion':'dara';rows.forEach(p=>result.set(p.id,owner));});
+// Legacy links require an existing person or salary source. Never guess by amount/name.
+export function legacySalaryForecastOwners(state,month){
+  const result=new Map();
+  for(const p of selectTransactionProjections(state,{month}))if(p.transactionType==='salaris'&&p.effects.incomeImpact>0){
+    try{const link=salaryLink(p.transaction,state);result.set(p.id,link.salaryPersonId);}
+    catch(error){if(error.code==='salary-person-required')Object.assign(error,{salaryReviewMonth:month,salaryReviewTransactionId:p.transaction.id});throw error;}
+  }
   return result;
 }
 export function incomeProjectionForMonth(state,month,owner,planned,{legacyOwners=new Map()}={}) {
@@ -327,12 +352,12 @@ export function categoryProcessingDetails(state,month,owner=null){
   for(const p of selectTransactionProjections(state)){
     if(!owner||p.financialFor===owner){
       const effectiveMonth=p.effects.refundCorrection?p.refundMonth:p.fixedOccurrenceId?p.fixedMonth:p.calendarMonth;
-      if(effectiveMonth===month&&(p.effects.realExpense>0||p.effects.refundCorrection>0))details.push({...p.transaction,id:p.transaction.sourceTransactionId||p.id,category:p.effects.refundCorrection?p.refundCategory:p.budgetCategory||p.category,displayImpact:p.effects.refundCorrection?-p.effects.refundCorrection:p.fixedOccurrenceId?p.effects.fixedRegularImpact:p.effects.budgetImpact,savingsFunded:p.effects.savingsFunded,refundCorrection:p.effects.refundCorrection,categoryOnlyRefundCorrection:p.effects.categoryOnlyRefundCorrection});
+      if(effectiveMonth===month&&(p.effects.realExpense>0||p.effects.refundCorrection>0))details.push({...p.transaction,id:p.transaction.sourceTransactionId||p.id,budgetItemId:p.effects.refundCorrection?'':p.budgetItemId,category:p.effects.refundCorrection?p.refundCategory:p.budgetCategory||p.category,displayImpact:p.effects.refundCorrection?-p.effects.refundCorrection:p.fixedOccurrenceId?p.effects.fixedRegularImpact:p.effects.budgetImpact,savingsFunded:p.effects.savingsFunded,refundCorrection:p.effects.refundCorrection,categoryOnlyRefundCorrection:p.effects.categoryOnlyRefundCorrection});
     }
     if(p.calendarMonth!==month)continue;
     const categories=new Map();
     for(const a of p.directBudgetAllocations||[])if(!owner||(a.budgetOwner||p.financialFor)===owner)categories.set(a.category,money((categories.get(a.category)||0)+a.amount));
-    for(const [category,amount] of categories)details.push({...p.transaction,id:p.transaction.sourceTransactionId||p.id,category,displayImpact:-amount,savingsFunded:amount,directSavingsCorrection:amount});
+    for(const [category,amount] of categories)details.push({...p.transaction,id:p.transaction.sourceTransactionId||p.id,budgetItemId:'',category,displayImpact:-amount,savingsFunded:amount,directSavingsCorrection:amount});
   }
   return details;
 }

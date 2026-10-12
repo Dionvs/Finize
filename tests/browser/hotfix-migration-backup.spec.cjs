@@ -50,3 +50,58 @@ test('async backup cannot allow an older cloud listener to replace a newer snaps
  const accepted=await old;return {accepted,version:cloud.cloudVersion,proof:state.unknownListenerProof};
  },large());expect(result).toEqual({accepted:false,version:800,proof:'newer'});
 });
+
+test('overlapping cloud acceptances serialize durable commits without weakening revision checks',async({page})=>{
+ await boot(page);
+ const result=await page.evaluate(async()=>{
+  const cloud=CloudAdapter;cloud.queueSave=()=>{};
+  const originalSave=DataAdapter.save.bind(DataAdapter);
+  let entered,release;
+  const started=new Promise(resolve=>{entered=resolve;});
+  const gate=new Promise(resolve=>{release=resolve;});
+  let active=0,maximum=0,calls=0;
+  DataAdapter.save=async(...args)=>{
+   active++;maximum=Math.max(maximum,active);
+   try{if(++calls===1){entered();await gate;}return await originalSave(...args);}
+   finally{active--;}
+  };
+  try{
+   const first=structuredClone(state);first.unknownListenerProof='first';first.meta.revision=4999;
+   const second=structuredClone(first);second.unknownListenerProof='second';second.meta.revision=5000;
+   const old=cloud.acceptRemote({state:first,syncVersion:799},first,null);
+   await started;
+   const newer=cloud.acceptRemote({state:second,syncVersion:800},second,null);
+   await new Promise(resolve=>setTimeout(resolve,50));
+   const writesBeforeRelease=calls;release();
+   const outcomes=await Promise.all([old,newer]);
+   const stale=await cloud.acceptRemote({state:first,syncVersion:799},first,null);
+   return {outcomes,stale,maximum,writesBeforeRelease,version:cloud.cloudVersion,visible:state.unknownListenerProof,durable:(await DataAdapter.load()).unknownListenerProof};
+  }finally{release();DataAdapter.save=originalSave;}
+ });
+ expect(result).toEqual({outcomes:[true,true],stale:false,maximum:1,writesBeforeRelease:1,version:800,visible:'second',durable:'second'});
+});
+
+for(const boundary of ['backup','images'])test(`a durable local approval during remote ${boundary} preparation retains its state and outbox`,async({page})=>{
+ if(boundary==='images')await page.route('**/app.js*',async route=>{
+  const source=require('node:fs').readFileSync(require('node:path').join(__dirname,'../../app.js'),'utf8'),marker='async initializeState(target, { legacySource = null } = {}) {';
+  expect(source).toContain(marker);
+  await route.fulfill({contentType:'text/javascript',body:source.replace(marker,marker+' if(window.__p4ImageGate)await window.__p4ImageGate();')});
+ });
+ await boot(page);
+ const result=await page.evaluate(async boundary=>{
+  const remote=structuredClone(state);remote.meta.selectedMonth='2026-10';remote.meta.revision+=10;
+  let entered,release;const started=new Promise(resolve=>{entered=resolve;}),gate=new Promise(resolve=>{release=resolve;});
+  const target=boundary==='backup'?DataAdapter:window,key=boundary==='backup'?'backup':'__p4ImageGate',original=target[key];
+  target[key]=async()=>{entered();await gate;return true;};
+  try{
+   const operation=CloudAdapter.acceptRemote({state:remote,syncVersion:900},remote);
+   await started;
+   const localCommitted=await commitChange(()=>state.transactions.push({id:'overlap-local',source:'manual',approvalSource:'manual',processingStatus:'goedgekeurd',accountContext:'gezamenlijk',owner:'gezamenlijk',financialFor:'gezamenlijk',budgetOwner:'gezamenlijk',date:'2026-10-03',transactionType:'uitgave',kind:'uitgave',amount:12.34,category:'Overig',description:'Concurrent local approval'}),{render:false});
+   const hash=DataAdapter.store().head.sha256;release();const remoteAccepted=await operation;
+   return {localCommitted,remoteAccepted,visibleLocal:state.transactions.some(t=>t.id==='overlap-local'),durableLocal:(await DataAdapter.readDurableState()).transactions.some(t=>t.id==='overlap-local'),unchangedHash:hash===DataAdapter.store().head.sha256,pending:CloudAdapter.pendingState.transactions.some(t=>t.id==='overlap-local'),outbox:Boolean(await DataAdapter.store().pendingCloud()),waiting:CloudAdapter.remoteStateWaiting.documentData.syncVersion};
+  }finally{release();target[key]=original;}
+ },boundary);
+ expect(result).toEqual({localCommitted:true,remoteAccepted:false,visibleLocal:true,durableLocal:true,unchangedHash:true,pending:true,outbox:true,waiting:900});
+ await page.reload();await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
+ expect(await page.evaluate(async()=>({local:state.transactions.some(t=>t.id==='overlap-local'),outbox:Boolean(await DataAdapter.store().pendingCloud())}))).toEqual({local:true,outbox:true});
+});

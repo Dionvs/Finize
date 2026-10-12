@@ -49,6 +49,22 @@ test('P3 transport rejects production and non-loopback addresses before any requ
   for(const options of [{host:'firestore.googleapis.com:443',projectId:'demo-test'},{host:'127.0.0.1:8181',projectId:'financien-7dd43'}])assert.throws(()=>createEmulatorRecordTransport({...options,token:'test'}),{code:'emulator-only'});
 });
 
+test('P4 record transport distinguishes offline fetch failure from permission and malformed responses',async()=>{
+  const offline=new TypeError('Failed to fetch');
+  await assert.rejects(()=>createEmulatorRecordTransport({token:'test',fetch:async()=>{throw offline;}}).get('households/test/head/current'),{code:'cloud-offline',cause:offline});
+  await assert.rejects(()=>createEmulatorRecordTransport({token:'test',fetch:async()=>({status:403,ok:false,json:async()=>({error:{message:'denied'}})})}).get('households/test/head/current'),{code:'permission-denied'});
+  await assert.rejects(()=>createEmulatorRecordTransport({token:'test',fetch:async()=>({status:200,ok:true,json:async()=>{throw new SyntaxError('damaged response');}})}).get('households/test/head/current'),SyntaxError);
+});
+
+test('P4 reopening a pending record import proves epoch, revision and the durable operation chain',async()=>{
+  const {createRecordSync}=require('../src/storage/record-sync.mjs');
+  const local={id:'batch',version:2,operationId:'edit',baseVersion:0};
+  const base={importQueue:[{importId:'batch',version:2,operationId:'edit'}],imports:[local],operations:[{status:'pending',previousHash:'base',sha256:'current'}],head:{sha256:'current'},cloudBase:{epoch:'epoch',revision:5,localSha256:'base'}};
+  const check=snapshot=>createRecordSync({localStore:{scope:'test',readCloudSnapshot:async()=>snapshot},cloudStore:{householdId:'test',context:async()=>({head:{data:{epoch:'epoch',revision:5}}})}}).pendingImportBaseMatches(local);
+  assert.equal(await check(base),true);
+  for(const mutate of [s=>s.cloudBase.revision++,s=>s.cloudBase.epoch='old',s=>s.operations[0].previousHash='wrong',s=>s.operations[0].status='conflict',s=>s.head.sha256='newer',s=>s.importQueue[0].operationId='other']){const changed=copy(base);mutate(changed);assert.equal(await check(changed),false);}
+});
+
 test('P3 conflict review identifies every differing existing approval before explicit resolution',()=>{
   const {conflictApprovalReview}=require('../src/storage/record-sync.mjs'),remote=state(),local=state();
   materialize(remote,[row('cloud-approved','naar-spaarrekening',-75,{savingsGoalId:'goal'})]);

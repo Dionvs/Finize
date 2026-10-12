@@ -12,6 +12,7 @@ const state=u4.normalizeCore({
   monthRecords:{'2026-07':{month:'2026-07',status:'afgesloten',closureHistory:[]}}
 });
 const draft=u4.createImportDraft({text,fileName:'dion.csv',profiles:[profile],rules:[],transactions:[],id:'process-one'});
+draft.rows.filter(row=>row.processing.transactionType==='salaris').forEach(row=>row.processing.salaryPersonId='dion');
 draft.rows[1].processing.category='Boodschappen';
 draft.rows[1].processing.budgetOwner='gezamenlijk';
 draft.rows[1].processing.splits=[

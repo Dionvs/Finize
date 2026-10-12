@@ -61,6 +61,7 @@ for(const width of [390,1440])test(`Pakket 3 transacties, splits, fixed actuals,
  expect(await page.evaluate(()=>__p3Draft.rows.map(row=>row.bankOriginal))).toEqual(originals);
  await page.locator('[data-u4-close]').first().click();await expect(page.locator('#u4ImportModalRoot')).not.toHaveClass(/open/);
  await draft(page,'p3-income','dion',[{amount:2645,label:'Werkgever expliciet',date:'2026-10-25',type:'salaris'},{amount:100,label:'Losse vergoeding',date:'2026-10-12',type:'vergoeding'}]);
+ await page.locator('[data-u4-row="p3-income-0"] [data-u4-field="salaryPersonId"]').selectOption('dion');
  for(const id of ['p3-income-0','p3-income-1'])await approve(page,id);await process(page);
  expect(await page.evaluate(()=>FinizeUpdate3.actualIncome('2026-10','dion'))).toBe(2745);
  await page.evaluate(()=>document.querySelector('#tabs [data-tab="gezamenlijk"]').click());

@@ -20,7 +20,7 @@ export async function runApprovalGroup(requests, approve) {
       const invalid = error?.code === 'approval-validation';
       const uncertain = error?.commitOutcome === 'uncertain';
       results.push({ rowId: request.rowId, operationId: error?.operationId || request.operationId,
-        status: uncertain ? 'onzeker' : conflict ? 'conflicterend' : 'ongeldig',
+        status: uncertain ? 'onzeker' : conflict ? 'conflicterend' : error?.storageFailure ? 'opslagfout' : 'ongeldig',
         outcome: error?.commitOutcome || 'rejected', message: error?.message || String(error) });
       // Validation/conflict concerns this source. Storage/scope/unknown failures stop the group.
       stopped = uncertain || (!invalid && !conflict);
@@ -30,7 +30,7 @@ export async function runApprovalGroup(requests, approve) {
 }
 
 export function approvalGroupSummary(group) {
-  const labels = { ongeldig: 'ongeldig', conflicterend: 'conflict', 'niet-geprobeerd': 'niet geprobeerd', onzeker: 'uitkomst onzeker' };
+  const labels = { ongeldig: 'ongeldig', conflicterend: 'conflict', 'niet-geprobeerd': 'niet geprobeerd', onzeker: 'uitkomst onzeker', opslagfout: 'niet opgeslagen door een opslagfout' };
   const parts = [`${group.committed} van ${group.total} transacties goedgekeurd.`];
   for (const [status, label] of Object.entries(labels)) {
     const count = group.results.filter(row => row.status === status).length;

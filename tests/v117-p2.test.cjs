@@ -3,6 +3,20 @@ const {encodeHouseholdState,decodeHouseholdState,LOCAL_STORAGE_VERSION}=require(
 const {state,row,materialize,copy}=require('./helpers/package5-fixture.cjs');
 const engine=require('../src/core/transaction-engine.mjs');
 
+test('P4.3 incremental records match full encoding and update historical period dependencies',()=>{
+  const initial=state();materialize(initial,Array.from({length:100},(_,i)=>row('inc-'+i,'uitgave',-10)));
+  const first=encodeHouseholdState(initial,{basis:new Map()}),next=copy(initial);
+  const target=next.transactions.find(r=>r.recordRole!=='bank-source');target.fixedOccurrenceMonth='2025-09';
+  const incremental=encodeHouseholdState(next,{basis:first.entries}),full=encodeHouseholdState(next);
+  assert.deepEqual(incremental.records,full.records);assert.deepEqual(incremental.layout,full.layout);
+  assert.equal(incremental.reused.has(JSON.stringify(['transactions',target.id])),false);
+  assert(incremental.reused.size>=199);
+  assert(incremental.records.find(r=>r.recordId===target.id).periods.includes('2025-09'));
+  next.nonJson={missing:undefined};const withUndefined=encodeHouseholdState(next,{basis:incremental.entries});
+  assert.equal(withUndefined.reused.has(JSON.stringify(['nonJson',''])),false);
+  assert.deepEqual(withUndefined.records,encodeHouseholdState(next).records);
+});
+
 test('V117 P2 lossless record roundtrip preserves financial invariants and unknown legacy data',()=>{
   const s=state();materialize(s,[row('a','uitgave',-300),row('b','naar-spaarrekening',-75,{savingsGoalId:'goal'})]);
   s.futureCompatible={nested:['keep',{value:17}]};s.legacyArrayWithoutIds=[{name:'preserve'},42,null];

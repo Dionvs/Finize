@@ -128,8 +128,8 @@ test('gezamenlijk inkomen vervangt standaardsalaris en negeert oude dubbele teru
     };
     state.meta.selectedMonth=month;
     state.transactions=[
-      {id:'salary-a',date:`${month}-05`,owner:'gezamenlijk',kind:'inkomen',reviewStatus:'bevestigd',processing:{transactionType:'salaris',include:true},amount:800,description:'Werkgever Dion — Deel 1'},
-      {id:'salary-b',date:`${month}-24`,owner:'gezamenlijk',kind:'inkomen',reviewStatus:'bevestigd',transactionType:'salaris',amount:1200,description:'Werkgever Dion — Deel 2'},
+      {id:'salary-a',salaryPersonId:'dion',date:`${month}-05`,owner:'gezamenlijk',kind:'inkomen',reviewStatus:'bevestigd',processing:{transactionType:'salaris',include:true},amount:800,description:'Werkgever Dion — Deel 1'},
+      {id:'salary-b',salaryPersonId:'dion',date:`${month}-24`,owner:'gezamenlijk',kind:'inkomen',reviewStatus:'bevestigd',transactionType:'salaris',amount:1200,description:'Werkgever Dion — Deel 2'},
       {id:'extra',date:`${month}-08`,owner:'gezamenlijk',kind:'inkomen',reviewStatus:'bevestigd',transactionType:'overige-inkomsten',amount:50,description:'Naam: Cadeau'},
       {id:'refund',date:`${month}-09`,owner:'dion',kind:'uitgave',reviewStatus:'bevestigd',transactionType:'terugbetaling',amount:20,description:'Naam: Terugbetaling'},
       {id:'duo',date:`${month}-20`,owner:'dion',kind:'inkomen',reviewStatus:'bevestigd',transactionType:'overige-inkomsten',amount:300.5,description:'DUO Hoofdrekening'},
@@ -169,7 +169,7 @@ test('gezamenlijk inkomen vervangt standaardsalaris en negeert oude dubbele teru
   });
 });
 
-test('twee herkende werkgevers vervangen in juli beide persoonlijke standaardsalarissen', async ({ page }) => {
+test('twee expliciet gekoppelde salarissen vervangen in juli beide persoonlijke standaardsalarissen', async ({ page }) => {
   await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   await page.locator('.v4-sidebar .tab-btn[data-tab="gezamenlijk"]').click();
   await page.evaluate(() => {
@@ -184,8 +184,8 @@ test('twee herkende werkgevers vervangen in juli beide persoonlijke standaardsal
     };
     state.meta.selectedMonth='2026-07';
     state.transactions=[
-      {id:'salary-dion',date:'2026-07-06',owner:'gezamenlijk',kind:'inkomen',reviewStatus:'bevestigd',transactionType:'salaris',amount:1294.74,description:'St-iek Fysiotherapie B.V. — Salaris juni'},
-      {id:'salary-dara',date:'2026-07-24',owner:'gezamenlijk',kind:'inkomen',reviewStatus:'bevestigd',transactionType:'salaris',amount:3610.09,description:'Stichting SBOH — Maand 7 2026'}
+      {id:'salary-dion',salaryPersonId:'dion',date:'2026-07-06',owner:'gezamenlijk',kind:'inkomen',reviewStatus:'bevestigd',transactionType:'salaris',amount:1294.74,description:'St-iek Fysiotherapie B.V. — Salaris juni'},
+      {id:'salary-dara',salaryPersonId:'dara',date:'2026-07-24',owner:'gezamenlijk',kind:'inkomen',reviewStatus:'bevestigd',transactionType:'salaris',amount:3610.09,description:'Stichting SBOH — Maand 7 2026'}
     ];
     state.incomeDefaultsHistory={
       dion:[{id:'dion-default',effectiveFrom:'0000-01',salary:2650,refund:0}],

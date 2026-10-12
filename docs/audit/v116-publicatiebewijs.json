@@ -1,0 +1,104 @@
+{
+  "verifiedAtUtc": "2026-10-09T06:19:03.663474+00:00",
+  "releaseCommit": "a56e8659d0c20f6c35b008c08e8bb27f23c5541a",
+  "mainCommitVerified": "a56e8659d0c20f6c35b008c08e8bb27f23c5541a",
+  "pagesRun": {
+    "id": 37892686438,
+    "url": "https://github.com/Dionvs/Finize/actions/runs/37892686438",
+    "conclusion": "success"
+  },
+  "tests": {
+    "nodeFiles": 52,
+    "registeredNodeCases": 554,
+    "browserCases": 235,
+    "pnpmTestExitCode": 0,
+    "build": true,
+    "syntax": true,
+    "css": true,
+    "generatedRuntime": true,
+    "gitDiffCheck": true
+  },
+  "live": {
+    "release": "a56e8659d0c20f6c35b008c08e8bb27f23c5541a",
+    "base": "https://dionvs.github.io/Finize/",
+    "cacheVersion": "finize-v116-cache-isolatie",
+    "assets": {
+      "index.html": {
+        "status": 200,
+        "sha256": "482a8cd18949a80cf8b1de98544daaf949d4a3a41f0407f911a4e91c1774c758"
+      },
+      "service-worker.js": {
+        "status": 200,
+        "sha256": "7c5258a69804c277d8286ec3d0cba77930eeaf98fa2bf5f941470fe60b0de42f"
+      },
+      "app.js": {
+        "status": 200,
+        "sha256": "d68ece44a8e981d9433c5a148949e1ddec7d639af5047cbaa33d6573e4df6ca3"
+      },
+      "app.css": {
+        "status": 200,
+        "sha256": "df32bfc4b70dddacfe41271c7247c18347bbcedd0b865169d2d7d6f413166962"
+      }
+    },
+    "browser": [
+      {
+        "width": 360,
+        "pageErrors": [],
+        "horizontalOverflow": false,
+        "cacheNames": [
+          "finize-v116-cache-isolatie"
+        ],
+        "offlineReload": true
+      },
+      {
+        "width": 1440,
+        "pageErrors": [],
+        "horizontalOverflow": false,
+        "cacheNames": [
+          "finize-v116-cache-isolatie"
+        ],
+        "offlineReload": true
+      }
+    ]
+  },
+  "upgradeChecks": [
+    {
+      "environment": "Isolated HTTP server, exact Git release bytes also verified on live endpoints",
+      "oldCache": "finize-v114-csv-verwerking",
+      "newCache": "finize-v116-cache-isolatie",
+      "oldCacheRemovedAtActivation": true,
+      "lateOldCacheVisible": true,
+      "cacheReadsScopedToCurrentVersion": true,
+      "transactionsUnchanged": true,
+      "planningUnchanged": true,
+      "closedSnapshotsUnchanged": true,
+      "expense": 300,
+      "localStoragePreserved": true,
+      "indexedDBPreserved": true,
+      "offlineReload": true,
+      "pageErrors": []
+    },
+    {
+      "environment": "Isolated HTTP server, exact Git release bytes also verified on live endpoints",
+      "oldCache": "finize-v115-opslagmeldingen",
+      "newCache": "finize-v116-cache-isolatie",
+      "oldCacheRemovedAtActivation": true,
+      "lateOldCacheVisible": true,
+      "cacheReadsScopedToCurrentVersion": true,
+      "transactionsUnchanged": true,
+      "planningUnchanged": true,
+      "closedSnapshotsUnchanged": true,
+      "expense": 300,
+      "localStoragePreserved": true,
+      "indexedDBPreserved": true,
+      "offlineReload": true,
+      "pageErrors": []
+    }
+  ],
+  "hardBlocks": [],
+  "limitations": [
+    "De specifieke oorzaak van de oorspronkelijke gebruikersmelding is niet vastgesteld zonder de nieuwe concrete foutmelding.",
+    "Een late ongebruikte oude cache kan blijven bestaan tot de volgende activatie; de nieuwe worker leest uitsluitend zijn eigen cache.",
+    "Live browsercontroles gebruiken een geisoleerde testsessie zonder toegang tot productiegegevens."
+  ]
+}

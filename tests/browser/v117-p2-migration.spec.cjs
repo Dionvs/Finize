@@ -6,7 +6,17 @@ const legacyKey='finize-budget-planner-v1';
 test.setTimeout(90000);
 async function offline(page){await page.route('https://www.gstatic.com/**',r=>r.abort());await page.route('https://firestore.googleapis.com/**',r=>r.abort());}
 async function rawStores(page,name='finize-imports-v1'){
-  return page.evaluate(name=>new Promise((resolve,reject)=>{const r=indexedDB.open(name);r.onerror=()=>reject(r.error);r.onsuccess=()=>{const db=r.result,names=[...db.objectStoreNames],tx=db.transaction(names,'readonly'),out={};for(const name of names){const q=tx.objectStore(name).getAll();q.onsuccess=()=>out[name]=q.result;}tx.oncomplete=()=>{db.close();resolve(out);};tx.onabort=()=>reject(tx.error);};}),name);
+  const bundle=require('esbuild').buildSync({entryPoints:[require.resolve('../../src/storage/payload-parts.mjs')],bundle:true,format:'esm',platform:'browser',write:false}).outputFiles[0].text;
+  await page.route('**/p2-payload-readback.mjs',route=>route.fulfill({contentType:'text/javascript',body:bundle}));
+  return page.evaluate(async name=>{
+    // Read native stores without opening the application's migration gate.
+    // Losslessly decode the physical representation before the original P2
+    // assertions compare all retained data, including pending recovery rows.
+    const out=await new Promise((resolve,reject)=>{const r=indexedDB.open(name);r.onerror=()=>reject(r.error);r.onsuccess=()=>{const db=r.result,names=[...db.objectStoreNames],tx=db.transaction(names,'readonly'),out={};for(const name of names){const q=tx.objectStore(name).getAll();q.onsuccess=()=>out[name]=q.result;}tx.oncomplete=()=>{db.close();resolve(out);};tx.onabort=()=>reject(tx.error);};});
+    const {decodePayloadRow}=await import('/p2-payload-readback.mjs'),parts=new Map((out.payloadParts||[]).map(row=>[row.id,row]));
+    for(const name of ['imports','journal','syncQueue','financialRecords','financialHead','operationReceipts','financialOutbox','periodCache'])if(out[name])out[name]=await Promise.all(out[name].map(row=>decodePayloadRow(row,hash=>parts.get(hash))));
+    return out;
+  },name);
 }
 const retained={
   imports:[{id:'retained-draft',version:4,operationId:'old-op',originalCsv:'Datum;Bedrag\n2026-01-01;-42',sourceFile:{digest:'retained-sha',name:'old.csv'},rows:[{id:'old-row',bankOriginal:{bankDate:'2026-01-01',amount:-42,description:'kept'},processing:{splits:[{id:'split-a',amount:12},{id:'split-b',amount:30}]}}]}],

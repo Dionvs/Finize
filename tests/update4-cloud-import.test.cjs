@@ -44,6 +44,12 @@ function snapshot(value){
   assert.equal(cloudReads,0,'een lokale import mag geen cloudread starten');
   assert.equal(localWrites,0);
 
+  const missingOptions={localRead:async()=>record,cloudRead:async()=>{throw Object.assign(new Error('not synchronized'),{code:'cloud-missing'});},localWrite:async()=>{throw new Error('must preserve local import');},refresh:true,pendingRead:async()=>true};
+  const pendingResult=await u4.resolveImportDetails(record.id,missingOptions);
+  assert.equal(pendingResult.source,'local-pending');assert.equal(pendingResult.record,record);
+  await assert.rejects(()=>u4.resolveImportDetails(record.id,{...missingOptions,pendingRead:async()=>false}),{code:'cloud-missing'});
+  await assert.rejects(()=>u4.resolveImportDetails(record.id,{...missingOptions,cloudRead:async()=>{throw Object.assign(new Error('corrupt proof'),{code:'import-incomplete'});}}),{code:'import-incomplete'});
+
   const cached=[];
   const cloudResult=await u4.resolveImportDetails('cloud-1',{
     localRead:async()=>undefined,

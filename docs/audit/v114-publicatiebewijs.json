@@ -1,0 +1,76 @@
+{
+  "verifiedAtUtc": "2026-10-09T05:46:25.720575+00:00",
+  "releaseCommit": "6818b881c60a938b52e166e6a46cf8eedde4ea55",
+  "mainCommitVerified": "6818b881c60a938b52e166e6a46cf8eedde4ea55",
+  "pagesRun": {
+    "id": 37889622567,
+    "url": "https://github.com/Dionvs/Finize/actions/runs/37889622567",
+    "conclusion": "success"
+  },
+  "live": {
+    "release": "6818b881c60a938b52e166e6a46cf8eedde4ea55",
+    "base": "https://dionvs.github.io/Finize/",
+    "cacheVersion": "finize-v114-csv-verwerking",
+    "assets": {
+      "index.html": {
+        "status": 200,
+        "sha256": "5f19e64912b6bf0111dab2f25800676389e288c051e8e3f00382212d1b78d9c3"
+      },
+      "service-worker.js": {
+        "status": 200,
+        "sha256": "e9ead92ebd2648d74d078f68e09ef42ac4f59f0e769c9ec201cb56cdfd65b65e"
+      },
+      "app.js": {
+        "status": 200,
+        "sha256": "a188f7050bc9ee2e37457cdea1ff99777db32e0db3e501cfde32412ac8ac4b11"
+      },
+      "app.css": {
+        "status": 200,
+        "sha256": "df32bfc4b70dddacfe41271c7247c18347bbcedd0b865169d2d7d6f413166962"
+      }
+    },
+    "browser": [
+      {
+        "width": 430,
+        "pageErrors": [],
+        "horizontalOverflow": false,
+        "cacheNames": [
+          "finize-v114-csv-verwerking"
+        ],
+        "offlineReload": true
+      },
+      {
+        "width": 1440,
+        "pageErrors": [],
+        "horizontalOverflow": false,
+        "cacheNames": [
+          "finize-v114-csv-verwerking"
+        ],
+        "offlineReload": true
+      }
+    ]
+  },
+  "upgrade": {
+    "oldCache": "finize-v113-mobile-account-margins",
+    "newCache": "finize-v114-csv-verwerking",
+    "oldCacheRemoved": true,
+    "transactionsUnchanged": true,
+    "planningUnchanged": true,
+    "closedSnapshotsUnchanged": true,
+    "expense": 300,
+    "localStoragePreserved": true,
+    "indexedDBPreserved": true,
+    "offlineReload": true,
+    "pageErrors": []
+  },
+  "upgradeFixture": "Isolated browser with restored v113 shell from pre-release backup; subsequent requests use the public v114 site.",
+  "browserAuthentication": "Isolated test driver; Firebase/Firestore blocked. No real user account accessed.",
+  "assetHashBasis": "Exact committed Git bytes compared with public HTTP bodies; Git normalizes Windows line endings.",
+  "productionFirestoreModified": false,
+  "productionDataMigrated": false,
+  "localTestResults": {
+    "registeredNodePassed": 551,
+    "browserPassed": 229,
+    "failed": 0
+  }
+}
