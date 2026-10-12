@@ -1,6 +1,10 @@
 # V117 — CSV-reset en publicatie met bestaande cloudsynchronisatie
 
-Status 12 oktober 2026: **CSV-reset in productie afgerond en exact teruggelezen**. Publicatie van de geteste client met bestaande cloudsynchronisatie wordt afzonderlijk gecontroleerd. De nieuwe productie-recordopslag blijft uitgeschakeld.
+Status 12 oktober 2026: **CSV-reset afgerond; V117-client en cache gepubliceerd en live gecontroleerd**. De nieuwe productie-recordopslag blijft uitgeschakeld.
+
+Code-releasecommit: `745c8148f8e416d3119e3445e167cf98e86dcba8`. De [Pages-publicatie](https://github.com/Dionvs/Finize/actions/runs/38252202704) is geslaagd; alle zeven gecontroleerde live assets zijn bytegelijk aan die commit. De apphash blijft exact de geteste hash en de cacheversie is `finize-v117-p4r4c`. Zie het [machineleesbare publicatiebewijs](v117-publicatiebewijs.json).
+
+De aangemelde Edge-app is opnieuw geopend en volledig herladen met de V117-script-/stijlverwijzingen. Een achtergebleven lokale snapshot werd aanvankelijk als conflict beschermd; de actuele cloudstand bleef leidend. De lokale JSON-export vóór en na opnieuw laden bevat exact de vijftien behouden handmatige boekingen, nul imports en twintig verwijderbewijzen, met ongewijzigde instellingen. Na herladen meldt de app **Cloud opgeslagen**. De oorspronkelijke volledige back-up en beide actuele app-exports blijven beschikbaar; geen oude snapshot is teruggezet.
 
 ## Besluit van de gebruiker
 

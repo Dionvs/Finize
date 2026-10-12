@@ -1,0 +1,105 @@
+{
+  "verifiedAtUtc": "2026-10-12T13:07:20.700Z",
+  "releaseCommit": "745c8148f8e416d3119e3445e167cf98e86dcba8",
+  "mainCommitVerified": "745c8148f8e416d3119e3445e167cf98e86dcba8",
+  "pagesRun": {
+    "id": 38252202704,
+    "url": "https://github.com/Dionvs/Finize/actions/runs/38252202704",
+    "conclusion": "success"
+  },
+  "build": "117-p4r4c",
+  "live": {
+    "base": "https://dionvs.github.io/Finize/",
+    "cacheVersion": "finize-v117-p4r4c",
+    "assets": {
+      "index.html": {
+        "status": 200,
+        "bytes": 5126,
+        "sha256": "952c5c412a099a22bfe86cfc4f6685a5204dc4f21b9dba5a05434d030454b696"
+      },
+      "service-worker.js": {
+        "status": 200,
+        "bytes": 2393,
+        "sha256": "cb56dc6d147c7c3525e10fdea548fedd598a8fb4c872ce1d30bf359bd71eb5f7"
+      },
+      "app.js": {
+        "status": 200,
+        "bytes": 1597885,
+        "sha256": "0840650614444b727d603f273838085b8e91cb5d2912db1dcdfbe8d593885713"
+      },
+      "app.css": {
+        "status": 200,
+        "bytes": 265456,
+        "sha256": "df32bfc4b70dddacfe41271c7247c18347bbcedd0b865169d2d7d6f413166962"
+      },
+      "manifest.json": {
+        "status": 200,
+        "bytes": 586,
+        "sha256": "00cbaa9a122b7a02219bdf7bedd7b1824e6e744a4b430201e7a8e6585726e239"
+      },
+      "icons/icon-192.png": {
+        "status": 200,
+        "bytes": 19806,
+        "sha256": "7a804e24cd03a592ac480b107567783388ae1de7b8eef2820299d6addbc85af5"
+      },
+      "icons/icon-512.png": {
+        "status": 200,
+        "bytes": 138171,
+        "sha256": "c97d054b788942d1cfc7a52a2f4f57b7ddcc91120d19b00c7994d0eaa0c2ac97"
+      }
+    },
+    "allAssetsMatchCommit": true,
+    "authenticatedBrowserReload": {
+      "completed": true,
+      "authenticatedBrowser": true,
+      "fullPageReloadPassed": true,
+      "cloudStatus": "Cloud opgeslagen",
+      "transactions": 15,
+      "activeImports": 0,
+      "deletionProofs": 20,
+      "manualBookingsUnchanged": true,
+      "settingsUnchanged": true,
+      "script": "./app.js?v=117-p4r4c",
+      "style": "./app.css?v=117-p4r4c"
+    }
+  },
+  "tests": {
+    "nodeCasesPassed": 624,
+    "nodeFilesPassed": 60,
+    "rulesCasesPassed": 42,
+    "browserDistinctPassed": 306,
+    "browserMissing": 2,
+    "browserFullRunPassed": 300,
+    "browserFullRunReferencePathFailures": 6,
+    "originalVisualReferencesRecheckedPassed": 6,
+    "closingWritePerformanceCasesPassed": 3,
+    "correctedNetworkMeterCasesPassed": 1,
+    "allOriginalPerformanceAssertionsUnchanged": true
+  },
+  "csvReset": {
+    "completed": true,
+    "importsDeleted": 10,
+    "visibleImportsDeletedByUser": 8,
+    "orphanImportsCleanedUp": 2,
+    "manualBookingsPreserved": 15,
+    "settingsPreserved": true,
+    "remainingActiveImports": 0
+  },
+  "backup": {
+    "productionDocuments": 1418,
+    "productionCollections": 228,
+    "documentsRestoredExactly": 1418,
+    "standardAuthAccountsRestored": 2,
+    "twoVerifiedCopiesRetained": true,
+    "readTime": "2026-10-12T10:11:18.769918Z",
+    "authLoginTested": false
+  },
+  "productionRecordStorageActivated": false,
+  "firestoreRulesChanged": false,
+  "publicationScope": "Tested V117 client and cache with existing cloud generation synchronization",
+  "deferredByUser": [
+    "Production record migration and old-client fence activation",
+    "Two original large-fixture calendar/offline checks",
+    "Separately approved same-source conflict interface"
+  ]
+}
