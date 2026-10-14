@@ -3363,6 +3363,7 @@
       root2.querySelector("[data-p3-day]").value = day;
       const detail = root2.querySelector("[data-p3-point-detail]");
       detail.hidden = false;
+      detail.removeAttribute("data-hover-detail");
       detail.removeAttribute("data-hover-tooltip");
       detail.removeAttribute("style");
       const signed = (value) => (value > 0 ? "+ " : "") + money2(value);
@@ -3458,13 +3459,26 @@
       renderLower(root2);
       observeChart(root2);
       load(root2);
+      const hideHover = () => {
+        const detail = root2.querySelector("[data-p3-point-detail][data-hover-detail]");
+        if (!detail) return;
+        detail.hidden = true;
+        detail.removeAttribute("data-hover-detail");
+        detail.removeAttribute("data-hover-tooltip");
+        detail.removeAttribute("style");
+        root2.querySelectorAll("[data-p3-point]").forEach((point) => point.setAttribute("aria-pressed", "false"));
+      };
       root2.addEventListener("pointermove", (e) => {
-        var _a2;
+        var _a2, _b;
         if (e.pointerType !== "mouse" || e.buttons) return;
-        const day = chartDay(root2, e);
-        if (!day) return;
-        if (day !== selectedDay || ((_a2 = root2.querySelector("[data-p3-point-detail]")) == null ? void 0 : _a2.hidden)) showDay(root2, day);
+        const day = (_a2 = e.target.closest("[data-p3-point]")) == null ? void 0 : _a2.dataset.p3Point;
+        if (!day) {
+          hideHover();
+          return;
+        }
+        if (day !== selectedDay || ((_b = root2.querySelector("[data-p3-point-detail]")) == null ? void 0 : _b.hidden)) showDay(root2, day);
         const detail = root2.querySelector("[data-p3-point-detail]");
+        detail == null ? void 0 : detail.setAttribute("data-hover-detail", "");
         if (innerWidth >= 768 && detail) {
           detail.setAttribute("data-hover-tooltip", "");
           const chart = detail.closest(".p3-chart").getBoundingClientRect();
@@ -3474,6 +3488,10 @@
           detail.style.left = Math.max(8, chart.left + 8, Math.min(innerWidth - box.width - 8, chart.right - box.width - 8, e.clientX + 16)) + "px";
           detail.style.top = Math.max(8, chart.top + 8, Math.min(innerHeight - box.height - 8, chart.bottom - box.height - 8, e.clientY + 16)) + "px";
         }
+      }, { signal });
+      root2.addEventListener("pointerout", (e) => {
+        var _a2, _b;
+        if (e.pointerType === "mouse" && e.target.closest("[data-p3-point]") !== ((_b = (_a2 = e.relatedTarget) == null ? void 0 : _a2.closest) == null ? void 0 : _b.call(_a2, "[data-p3-point]"))) hideHover();
       }, { signal });
       root2.addEventListener("keydown", (e) => {
         if (e.key === "Escape") {
