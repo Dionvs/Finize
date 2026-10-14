@@ -1,7 +1,7 @@
 {
   "package": "V118 definitieve release",
   "version": "118-r1",
-  "status": "validated-before-publication",
+  "status": "published-and-live-verified",
   "date": "2026-10-14",
   "branch": "agent/v117-stabilisatie",
   "baseCommit": "fbf8b34b8000570e05b9ec0b1ec3f00ddd33e7e5",
@@ -212,7 +212,7 @@
     "service-worker.js": "a680f9aa644dc442c5bd962835fc3715a644d5747e2353883e40613fa4cfc77e",
     "manifest.json": "d346dffbb70d22017e713af462ed84ae835ac36dee3839ce25712a84761be78f",
     "docs/toekomstige-bankkoppelingen.md": "3ccaf72e9c228823669cf08594650c71da4f4809433915a4580d01f2886232ef",
-    "docs/v118-definitieve-release.md": "ea68a4bb733671d635419972dbd56169b0e8c02f1e321a5d4c9ff9e3b204308d",
+    "docs/v118-definitieve-release.md": "4a875d83709b742ca1fe38da07b1540065b24ae1f5835234a5022d6cdaf127d7",
     "tests/v118-release-safety.test.cjs": "19521bdc367298cc154bdd64c1ba756153691cfec20d3a77adb13fe09e0f2c61",
     "tests/browser/v118-release-safety.spec.cjs": "d4a688c58af7ce6f1b2d9e85d5725fcedc6cb6d7e46baaf58ebee5331ce3ffda",
     "docs/audit/v118-p5a-bewijs.json": "006cee3ff4be35af7bb56ddcc3575f9cbb51eabddb0567c8f2cb35431af314a2",
@@ -231,7 +231,18 @@
     ".cache/v118-release/browser-safety.log": "a3d58976786cf37f3647df16d7ed75506bac38c40786579f58a47eb5ff9a2439",
     ".cache/v118-release/browser-pwa-upgrade.log": "f64ff00c22d2b7b2ccd4a39164369c5bc5c1abbc4e90c3cf783afc5107060139",
     ".cache/v118-release/secret-scan.json": "066793af45fdc2b8a3c7860b2db0eea65c2ece176999ca5f73d84206f6c9c5a9",
-    ".cache/v118-release/staged-diff-check.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    ".cache/v118-release/staged-diff-check.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    ".cache/v118-release/live-assets.json": "baa5d082cfaf0972188ca3e781b51e54e65a8d846f013f0237334430faffdaf4",
+    ".cache/v118-release/live-smoke.json": "e8c355a3e8a13c5ae5c0f55bfdf1bedc3a21aaff2d6a6c1dce1d2dfedebc3ca1",
+    ".cache/v118-release/live-smoke.log": "17c44464952b22be748ade4307129ae1356a5ae0c39efc282ad570f8adae39bd",
+    ".cache/v118-release/deployment-result.json": "5c27a12aba08700c7802ebbdb4d73906a2984dc333bcc7ad3102b25141032ee9",
+    ".cache/v118-release/production-after-publication.json": "646c5557693eb23f807a1cd53c110b11bb786c748ab3e2850d940f420c065b0b",
+    ".cache/v118-release/live-login.png": "c07c387027f2002120f6ee74d11ba09c25a87eceee89c62130bd0767420f3793",
+    ".cache/v118-release/live-dashboard-1440.png": "2cc4df480ee7181d76bfedfe20de8ad95d15b62cf4e0f57311377cc8b13a5b3a",
+    ".cache/v118-release/live-dashboard-390.png": "53e9f95eff059511716e9347eb5d22e854a722a0d945f546a4b1e1ee832f4fc3",
+    ".cache/v118-release/live-dashboard-320.png": "437b8150ed78790718bd0bc6d8ed02b92137de9c77f74be9aae07abe03af7025",
+    ".cache/v118-release/live-accounts-390.png": "845a7c7ae23e160a6c19e3f066f88922df1c6f680443f95cf428365153a94dfe",
+    ".cache/v118-release/live-import-320.png": "d970027f105db25b2acfe7ad92bc7dab8fba0176db84532d2c898ad94b4f369d"
   },
   "financialEngineGitProof": [
     {
@@ -294,5 +305,257 @@
       "blob": "1b7aa41ed26a195c3e68a24eb7d015f766197f36",
       "unchanged": true
     }
-  ]
+  ],
+  "releaseCommit": "36ca3d61f7bad5ee71dce698efbad87a40b7754b",
+  "deployment": {
+    "conclusion": "success",
+    "headSha": "36ca3d61f7bad5ee71dce698efbad87a40b7754b",
+    "jobs": [
+      {
+        "completedAt": "2026-10-14T15:19:00Z",
+        "conclusion": "success",
+        "databaseId": 115935696466,
+        "name": "build",
+        "startedAt": "2026-10-14T15:18:39Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-14T15:18:41Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-14T15:18:40Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-14T15:18:52Z",
+            "conclusion": "success",
+            "name": "Pull ghcr.io/actions/jekyll-build-pages:v1.0.13",
+            "number": 2,
+            "startedAt": "2026-10-14T15:18:41Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-14T15:18:53Z",
+            "conclusion": "success",
+            "name": "Checkout",
+            "number": 3,
+            "startedAt": "2026-10-14T15:18:52Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-14T15:18:57Z",
+            "conclusion": "success",
+            "name": "Build with Jekyll",
+            "number": 4,
+            "startedAt": "2026-10-14T15:18:53Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-14T15:18:59Z",
+            "conclusion": "success",
+            "name": "Upload artifact",
+            "number": 5,
+            "startedAt": "2026-10-14T15:18:57Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-14T15:18:59Z",
+            "conclusion": "success",
+            "name": "Post Checkout",
+            "number": 10,
+            "startedAt": "2026-10-14T15:18:59Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-14T15:18:59Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 11,
+            "startedAt": "2026-10-14T15:18:59Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/Dionvs/Finize/actions/runs/38588183532/job/115935696466"
+      },
+      {
+        "completedAt": "2026-10-14T15:20:05Z",
+        "conclusion": "success",
+        "databaseId": 115935941801,
+        "name": "deploy",
+        "startedAt": "2026-10-14T15:19:22Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-14T15:19:24Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-14T15:19:22Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-14T15:20:04Z",
+            "conclusion": "success",
+            "name": "Deploy to GitHub Pages",
+            "number": 2,
+            "startedAt": "2026-10-14T15:19:24Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-14T15:20:04Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 3,
+            "startedAt": "2026-10-14T15:20:04Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/Dionvs/Finize/actions/runs/38588183532/job/115935941801"
+      },
+      {
+        "completedAt": "2026-10-14T15:19:22Z",
+        "conclusion": "success",
+        "databaseId": 115935965143,
+        "name": "report-build-status",
+        "startedAt": "2026-10-14T15:19:15Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-14T15:19:16Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-14T15:19:16Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-14T15:19:21Z",
+            "conclusion": "success",
+            "name": "Report Build Status",
+            "number": 2,
+            "startedAt": "2026-10-14T15:19:17Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-14T15:19:21Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 3,
+            "startedAt": "2026-10-14T15:19:21Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/Dionvs/Finize/actions/runs/38588183532/job/115935965143"
+      }
+    ],
+    "status": "completed",
+    "updatedAt": "2026-10-14T15:20:06Z",
+    "url": "https://github.com/Dionvs/Finize/actions/runs/38588183532"
+  },
+  "liveAssets": {
+    "checkedAt": "2026-10-14T15:20:26.725Z",
+    "releaseCommit": "36ca3d61f7bad5ee71dce698efbad87a40b7754b",
+    "assets": [
+      {
+        "path": "index.html",
+        "status": 200,
+        "sha256": "3673ce2e8cb03179b50d986454958399ed7d5cf434c4ede97f74a18fa75f02ab",
+        "matchesReleaseCommit": true
+      },
+      {
+        "path": "app.js",
+        "status": 200,
+        "sha256": "0c240acff14f50c31986ff3d9a2b75708e018a5ea6c8d4202b76be4c02fdef41",
+        "matchesReleaseCommit": true
+      },
+      {
+        "path": "app.css",
+        "status": 200,
+        "sha256": "4f22fab16fdfa43e6f8753549a9ad217cdf2d2420aeede06f7323b192b15c9da",
+        "matchesReleaseCommit": true
+      },
+      {
+        "path": "service-worker.js",
+        "status": 200,
+        "sha256": "23db27e0ee001535b7f993235a3d62684c9a7865b36fd8cff32fa3863360f6fb",
+        "matchesReleaseCommit": true
+      },
+      {
+        "path": "manifest.json",
+        "status": 200,
+        "sha256": "00cbaa9a122b7a02219bdf7bedd7b1824e6e744a4b430201e7a8e6585726e239",
+        "matchesReleaseCommit": true
+      },
+      {
+        "path": "icons/icon-192.png",
+        "status": 200,
+        "sha256": "7a804e24cd03a592ac480b107567783388ae1de7b8eef2820299d6addbc85af5",
+        "matchesReleaseCommit": true
+      },
+      {
+        "path": "icons/icon-512.png",
+        "status": 200,
+        "sha256": "c97d054b788942d1cfc7a52a2f4f57b7ddcc91120d19b00c7994d0eaa0c2ac97",
+        "matchesReleaseCommit": true
+      }
+    ]
+  },
+  "liveSmoke": {
+    "checkedAt": "2026-10-14T15:22:34.822Z",
+    "url": "https://dionvs.github.io/Finize/",
+    "defaultLoginVerified": true,
+    "isolatedSyntheticAuthDriver": true,
+    "realProductionSessionTested": false,
+    "backendNetworkDisabled": true,
+    "results": [
+      {
+        "width": 1440,
+        "httpStatus": 200,
+        "assetVersion": "118-r1",
+        "cache": "finize-v118-r1",
+        "dashboard": true,
+        "bankAccounts": true,
+        "importInterface": true,
+        "pageErrors": [],
+        "overflow": false,
+        "productionWriteRequestsSent": 0,
+        "blockedBackendRequests": 4,
+        "blockedNonGetRequests": 2
+      },
+      {
+        "width": 390,
+        "httpStatus": 200,
+        "assetVersion": "118-r1",
+        "cache": "finize-v118-r1",
+        "dashboard": true,
+        "bankAccounts": true,
+        "importInterface": true,
+        "pageErrors": [],
+        "overflow": false,
+        "productionWriteRequestsSent": 0,
+        "blockedBackendRequests": 4,
+        "blockedNonGetRequests": 2
+      },
+      {
+        "width": 320,
+        "httpStatus": 200,
+        "assetVersion": "118-r1",
+        "cache": "finize-v118-r1",
+        "dashboard": true,
+        "bankAccounts": true,
+        "importInterface": true,
+        "pageErrors": [],
+        "overflow": false,
+        "productionWriteRequestsSent": 0,
+        "blockedBackendRequests": 2,
+        "blockedNonGetRequests": 2
+      }
+    ]
+  },
+  "afterPublication": {
+    "checkedAt": "2026-10-14T15:24:12.877Z",
+    "productionWrites": 0,
+    "cloudHeadUnchanged": true
+  }
 }
