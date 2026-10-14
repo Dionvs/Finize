@@ -1,3 +1,4 @@
+import { fixedPaymentDay } from './liquidity-settings.mjs';
 import { createDashboard } from '../ui/dashboard.mjs';
 import { profileSync, profileStart } from '../storage/performance.mjs';
 import { salaryPerson } from './salary-assignment.mjs';
@@ -456,7 +457,7 @@ function u3MigrateFixedExpenses(target){
           id:`fixed-${scenario}-${account}-${row.id}`,legacyKey,naam:String(row.post||row.omschrijving||row.categorie||'Vaste last'),
           categorie:String(row.categorie||'Overig'),bedrag:round2(Number(row.bedrag)||0),rekening:account,
           frequentieAantal:row.jaarlijks?1:1,frequentieEenheid:row.jaarlijks?'jaren':'maanden',
-          begindatum:start,einddatum:'',afschrijfdatum:String(row.afschrijfdatum||''),actief:true,amountHistory:[{id:`amount-${row.id}`,effectiveFrom:start,amount:round2(Number(row.bedrag)||0)}],
+          begindatum:start,einddatum:'',afschrijfdatum:String(row.afschrijfdatum||''),...(Object.hasOwn(row,'afschrijfdag')?{afschrijfdag:row.afschrijfdag}:{}),actief:true,amountHistory:[{id:`amount-${row.id}`,effectiveFrom:start,amount:round2(Number(row.bedrag)||0)}],
           monthOverrides:{},recognition:{text:bankText(row.post||row.omschrijving||''),counterparty:'',amountTolerance:5},legacyKind:group.kind
         });
         ids.add(legacyKey);
@@ -3375,6 +3376,7 @@ function renderDashboard(){
       return {budget,used,allowances,allowanceDistribution:[r.dion.zakgeld,r.dara.zakgeld],goals};
     },
     eventLabel:event=>{
+      if(event.type==='allowance')return 'Zakgeld '+ownerLabel(event.person)+(event.amountCents>0?' ontvangen':' overboeken');
       if(event.type==='salary')return 'Salaris '+ownerLabel(event.person);
       if(event.type==='bank'){
         const mutation=state.transactions.find(tx=>sourceRecordKey(tx)===event.sourceId);
@@ -4369,6 +4371,8 @@ async function removeWithUndo(path, id, message, rerender=true){
 }
 
 
+function paymentDayOptions(day){return '<option value="">Onbekend</option>'+[...Array.from({length:31},(_,i)=>i+1),'last'].map(value=>`<option value="${value}" ${String(value)===String(day)?'selected':''}>${value==='last'?'Laatste dag van de maand':'Dag '+value}</option>`).join('');}
+function paymentDayLabel(item){const day=fixedPaymentDay(item);return day==='last'?'laatste dag van de maand':day?'dag '+day:'onbekend';}
 function renderJointFixedCostsEditorRows(rows, options={}){
   const kind = options.kind || 'fixed';
   const idAttr = kind === 'mortgage' ? 'data-mortgage-id' : 'data-fixed-id';
@@ -4417,7 +4421,7 @@ function renderJointFixedCostsEditorRows(rows, options={}){
       ${kind === 'fixed' ? `<select class="joint-fixed-editor-move" data-fixed-move-id="${textSafe(row.id)}" data-fixed-source-path="${sourcePath}" aria-label="Verplaatsen naar">${moveOptions}</select>` : '<span class="joint-fixed-editor-mortgage-note">50/50</span>'}
       <button type="button" class="joint-fixed-row-delete-compact" ${removeAttr}="${textSafe(row.id)}" aria-label="Post verwijderen">×</button>
       <div class="joint-fixed-editor-admin">
-        <label>Afschrijfdatum<input class="joint-fixed-editor-input joint-fixed-editor-date" type="date" ${fieldAttr}="afschrijfdatum" ${idAttr}="${textSafe(row.id)}" value="${attrSafe(row.afschrijfdatum||'')}" aria-label="Afschrijfdatum"></label>
+        <label>Afschrijfdag<select class="joint-fixed-editor-input joint-fixed-editor-date" ${fieldAttr}="afschrijfdag" ${idAttr}="${textSafe(row.id)}" aria-label="Afschrijfdag">${paymentDayOptions(fixedPaymentDay(row))}</select></label>
         <span class="joint-fixed-distribution">Verdeling: <strong>${textSafe(distributionLabel)}</strong></span>
         <span>Gerekend als ${eur(monthly)} per maand${note ? ` · ${note}` : ''}</span>
       </div>
@@ -6354,7 +6358,7 @@ function u3OpenPlanning(owner=''){
   const fixed=resolveFixedExpensesForMonth(state,getSelectedMonth()).filter(item=>(!planningOwner||(item.financialFor||item.rekening||'gezamenlijk')===planningOwner));
   const incomes=resolveIncomeSourcesForMonth(state,getSelectedMonth(),null,{planningOnly:true}).filter(item=>!planningOwner||(planningOwner==='gezamenlijk'?(item.financialFor||item.rekening)===planningOwner:item.eigenaar===planningOwner));
   const ownerName=planningOwner?u3AccountLabel(planningOwner):'';
-  const rows=(items,kind)=>items.map(item=>`<article class="u3-admin-row"><div class="u3-row-head"><div><strong>${textSafe(item.naam||'Zonder naam')}</strong><br><small>${u3AccountLabel(item.rekening)} → ${u3AccountLabel(item.financialFor||item.rekening)} · elke ${textSafe(item.frequentieAantal)} ${textSafe(item.frequentieEenheid)}${kind==='fixed'?` · ${textSafe(u3FixedDistributionLabel(item))}`:''}</small></div><div><span class="u3-status ${item.actief!==false?'ok':''}">${item.actief!==false?'Actief':'Gestopt'}</span> <button class="ghost small" data-u3-edit-recurring="${attrSafe(kind+':'+item.id)}">Bewerken</button></div></div><div>${eur(u3AmountAt(item,getSelectedMonth()))} <small>· gemiddeld ${eur(u3MonthlyAverage(item))} p/m${kind==='fixed'&&item.afschrijfdatum?` · afschrijving ${formatDateNL(item.afschrijfdatum)}`:''}${kind==='fixed'?fixedRealizationLabel(item):''}</small></div></article>`).join('');
+  const rows=(items,kind)=>items.map(item=>`<article class="u3-admin-row"><div class="u3-row-head"><div><strong>${textSafe(item.naam||'Zonder naam')}</strong><br><small>${u3AccountLabel(item.rekening)} → ${u3AccountLabel(item.financialFor||item.rekening)} · elke ${textSafe(item.frequentieAantal)} ${textSafe(item.frequentieEenheid)}${kind==='fixed'?` · ${textSafe(u3FixedDistributionLabel(item))}`:''}</small></div><div><span class="u3-status ${item.actief!==false?'ok':''}">${item.actief!==false?'Actief':'Gestopt'}</span> <button class="ghost small" data-u3-edit-recurring="${attrSafe(kind+':'+item.id)}">Bewerken</button></div></div><div>${eur(u3AmountAt(item,getSelectedMonth()))} <small>· gemiddeld ${eur(u3MonthlyAverage(item))} p/m${kind==='fixed'?` · afschrijving ${paymentDayLabel(item)}`:''}${kind==='fixed'?fixedRealizationLabel(item):''}</small></div></article>`).join('');
   const {modal}=u3AdminModal(`<div class="u3-admin-head"><div><div class="section-kicker">${monthLabel(getSelectedMonth())} · Planning</div><h2>${planningOwner?`${textSafe(ownerName)} vaste lasten`:'Planning beheren'}</h2><p>${planningOwner?`Alleen de vaste lasten die financieel voor ${textSafe(ownerName)} zijn.`:'Bedragen kunnen voor één maand of vanaf deze maand wijzigen.'}</p></div><button class="ghost" data-u3-close>Sluiten</button></div>
     <div class="u3-steps">
       <section class="u3-step"><div class="u3-step-head"><div><h3>Vaste lasten</h3><p>${fixed.length} terugkerende posten${planningOwner?` voor ${textSafe(ownerName)}`:' in deze maand'}</p></div><button class="primary small" data-u3-add-recurring="fixed">+ Vaste last</button></div><div class="u3-admin-list">${rows(fixed,'fixed')||'<div class="u3-empty">Nog geen vaste lasten.</div>'}</div></section>
@@ -6381,14 +6385,16 @@ function u3OpenRecurringEditor(kind,id='',defaults={}){
       ${income?`<label>Eigenaar<select id="u3RecOwner">${U3_ACCOUNTS.map(value=>`<option value="${value}" ${(existing?.eigenaar||defaultOwner)===value?'selected':''}>${u3AccountLabel(value)}</option>`).join('')}</select></label><label class="u2-checkbox"><input id="u3RecDistribution" type="checkbox" ${existing?.meetellenVoorVerdeling!==false?'checked':''}> Meetellen voor verdeling</label>`:''}
       <label>Elke<input id="u3RecFrequency" type="number" min="1" step="1" value="${attrSafe(existing?.frequentieAantal||1)}"></label>
       <label>Frequentie<select id="u3RecUnit">${U3_FREQUENCY_UNITS.map(value=>`<option value="${value}" ${existing?.frequentieEenheid===value?'selected':''}>${value}</option>`).join('')}</select></label>
-      <label>Begindatum<input id="u3RecStart" type="date" value="${textSafe(existing?.begindatum||`${current}-01`)}"></label>
+      <label>Ingangsdatum<input id="u3RecStart" type="date" value="${textSafe(existing?.begindatum||`${current}-01`)}"></label>
       <label>Einddatum<input id="u3RecEnd" type="date" value="${textSafe(existing?.einddatum||'')}"></label>
-      ${income?'':`<label>Afschrijfdatum<input id="u3RecDebitDate" type="date" value="${textSafe(existing?.afschrijfdatum||'')}"></label><label id="u3RecDistributionField">Verdeling<select id="u3RecDistribution"><option value="income-ratio" ${u3FixedDistributionMode(existing||{},existing?.financialFor||defaultOwner)==='income-ratio'?'selected':''}>Naar rato · Dion minimaal 40%</option><option value="equal" ${u3FixedDistributionMode(existing||{},existing?.financialFor||defaultOwner)==='equal'?'selected':''}>50/50</option></select><small id="u3RecDistributionHint">Kies hoe Dion en Dara deze gezamenlijke vaste last verdelen.</small></label>`}
+      ${income?'':`<label>Afschrijfdag<select id="u3RecDebitDay">${paymentDayOptions(fixedPaymentDay(existing||{}))}</select><small id="u3RecDebitHint">Elke actieve maand; een te hoge dag wordt de laatste kalenderdag.</small></label><label id="u3RecDistributionField">Verdeling<select id="u3RecDistribution"><option value="income-ratio" ${u3FixedDistributionMode(existing||{},existing?.financialFor||defaultOwner)==='income-ratio'?'selected':''}>Naar rato · Dion minimaal 40%</option><option value="equal" ${u3FixedDistributionMode(existing||{},existing?.financialFor||defaultOwner)==='equal'?'selected':''}>50/50</option></select><small id="u3RecDistributionHint">Kies hoe Dion en Dara deze gezamenlijke vaste last verdelen.</small></label>`}
       <label>Geldigheid<select id="u3RecScope"><option value="from">Vanaf ${monthLabel(current)}</option><option value="once">Alleen ${monthLabel(current)}</option></select></label>
       <label class="u2-checkbox"><input id="u3RecActive" type="checkbox" ${existing?.actief!==false?'checked':''}> Actief</label>
     </div>
     <div class="modal-actions">${existing?`${existing.actief!==false?'<button class="ghost" id="u3RecStop">Stoppen na deze maand</button>':''}<button class="danger-ghost" id="u3RecDelete">Verwijderen</button>`:''}<button class="ghost" data-u3-back-planning>Terug</button><button class="primary" id="u3RecSave">Opslaan</button></div>`);
   modal.querySelector('[data-u3-back-planning]')?.addEventListener('click',()=>u3OpenPlanning(planningOwner));
+  const updateDebitDay=()=>{const day=modal.querySelector('#u3RecDebitDay');if(!day)return;const weekly=modal.querySelector('#u3RecUnit').value==='weken';day.disabled=weekly;modal.querySelector('#u3RecDebitHint').textContent=weekly?'Bij een weekfrequentie volgen betaalmomenten de bestaande ingangsdatum en weekplanning.':'Elke actieve maand; een te hoge dag wordt de laatste kalenderdag.';};
+  modal.querySelector('#u3RecUnit').addEventListener('change',updateDebitDay);updateDebitDay();
   const updateDistributionField=()=>{
     const financialFor=modal.querySelector('#u3RecFor')?.value||defaultOwner;
     const field=modal.querySelector('#u3RecDistributionField');
@@ -6428,7 +6434,8 @@ function u3OpenRecurringEditor(kind,id='',defaults={}){
           begindatum:modal.querySelector('#u3RecStart').value,einddatum:modal.querySelector('#u3RecEnd').value,actief:modal.querySelector('#u3RecActive').checked};
         if(!u3ParseDate(changes.begindatum))throw new Error('Vul een geldige begindatum in.');
         if(income)Object.assign(changes,{type:modal.querySelector('#u3RecCategory').value,eigenaar:modal.querySelector('#u3RecOwner').value,meetellenVoorVerdeling:modal.querySelector('#u3RecDistribution').checked,verwachtBedrag:amount});
-        else Object.assign(changes,{categorie:modal.querySelector('#u3RecCategory').value.trim()||'Overig',bedrag:amount,afschrijfdatum:modal.querySelector('#u3RecDebitDate').value,distributionMode:changes.financialFor==='gezamenlijk'?modal.querySelector('#u3RecDistribution').value:''});
+        else Object.assign(changes,{categorie:modal.querySelector('#u3RecCategory').value.trim()||'Overig',bedrag:amount,afschrijfdag:modal.querySelector('#u3RecDebitDay').value==='last'?'last':Number(modal.querySelector('#u3RecDebitDay').value)||'',distributionMode:changes.financialFor==='gezamenlijk'?modal.querySelector('#u3RecDistribution').value:''});
+        if(!income&&changes.frequentieEenheid==='weken')delete changes.afschrijfdag;
         const scope=modal.querySelector('#u3RecScope').value;
         if(income)setIncomeSourceForMonth(state,item,current,changes,{scope,isNew:!record});
         else{setRecurringFromMonth(item,current,changes,{scope,isNew:!record});if(!record)u3RecurringRows(kind).push(item);}

@@ -89,7 +89,7 @@ export function applyAccountProfileCommand(state, command, {imports=[]}={}) {
     if (old?.iban && profile.identifier !== old.identifier) profile.iban = profile.identifier;
   } else if (command.type === 'liquidity-settings') {
     const values=command.values || {};
-    profile={...old,liquidity:{version:1,primaryForOwner:values.primaryForOwner,bufferCents:values.bufferCents,salaryDays:structuredClone(values.salaryDays)},updatedAt:command.createdAt};
+    profile={...old,liquidity:{version:1,primaryForOwner:values.primaryForOwner,bufferCents:values.bufferCents,salaryDays:structuredClone(values.salaryDays),allowanceDays:structuredClone(values.allowanceDays ?? old?.liquidity?.allowanceDays ?? {})},updatedAt:command.createdAt};
   } else if (['archive','reactivate'].includes(command.type)) profile = {...old,status:command.type==='archive'?'archived':'active',updatedAt:command.createdAt};
   else throw fail('invalid-account-command','Deze rekeningactie wordt niet ondersteund.');
   profile.lastAccountOperationId = command.operationId;

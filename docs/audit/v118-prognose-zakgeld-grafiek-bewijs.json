@@ -1,0 +1,196 @@
+{
+  "version": 1,
+  "date": "2026-10-14",
+  "status": "local-verified-awaiting-review",
+  "repository": "G:\\Mijn Drive\\Codex\\financien\\outputs\\dion_dara_budget\\webapp\\github\\Finize-live-repo",
+  "branch": "agent/v117-stabilisatie",
+  "head": "e473dbb35e2e43d9e33e5eefe404f4f170cb8509",
+  "initialGitStatus": "clean",
+  "recovery": {
+    "path": "../Finize-herstel-v118-prognose-20261014-174948",
+    "files": 363,
+    "method": "Each copied file verified against source SHA-256",
+    "manifestSha256": "ce06452480f244e13868b8ef9f92157b815756b8f06c2aa4c85e470c74c703f4"
+  },
+  "publication": {
+    "commit": false,
+    "push": false,
+    "merge": false,
+    "deploy": false,
+    "productionDataModified": false
+  },
+  "verification": {
+    "node": {
+      "passed": 299,
+      "failed": 0,
+      "newCorrectionCases": 36,
+      "multiMonthCases": 9,
+      "command": "node --test tests/v118-prognose-correctie.test.cjs tests/v118-p2-liquidity.test.cjs tests/v118-p1b-accounts.test.cjs tests/v118-p3-dashboard.test.cjs tests/v118-p4-suggestions.test.cjs tests/package2-planning-timeline.test.cjs tests/package4-allowance-planning-correction.test.cjs tests/package4-savings-refunds-forecast.test.cjs tests/v117-p4-salary.test.cjs"
+    },
+    "browser": {
+      "passed": 20,
+      "failed": 0,
+      "newCases": 6,
+      "widths": [
+        1440,
+        390,
+        320
+      ],
+      "command": "node node_modules/@playwright/test/cli.js test tests/browser/v118-prognose-correctie.spec.cjs tests/browser/v118-p2-liquidity.spec.cjs tests/browser/v118-p3-dashboard.spec.cjs --grep 'correctie|instellingen|IndexedDB abort|verloren ontvangst|1440px|390px|320px|filters|negatieve prognose'",
+      "data": "synthetic isolated local fixtures",
+      "backend": "Firebase SDK/auth/Firestore blocked; no production writes"
+    },
+    "syntax": "passed",
+    "css": {
+      "status": "passed",
+      "existingNotice": "--line"
+    },
+    "generated": "byte-reproducible",
+    "gitDiffCheck": "passed",
+    "fullV118Regression": false
+  },
+  "multiMonth": {
+    "horizonsMonths": [
+      3,
+      6,
+      12
+    ],
+    "jointExampleFreeCents": [
+      449697,
+      419394,
+      358788
+    ],
+    "checks": [
+      "monthly reservations once",
+      "one safety buffer",
+      "salary and calculated allowance timing",
+      "early shortfall despite positive final balance",
+      "December/January/February and quarterly recurrence",
+      "historical payment-day changes",
+      "CSV replaces one month only",
+      "missing future history stays incomplete"
+    ]
+  },
+  "changedFiles": [
+    {
+      "path": "app.css",
+      "sha256": "af12c2e87656c7cac2d0dc1f224934044f2568e22b1596ec283ec3d618a247f6"
+    },
+    {
+      "path": "app.js",
+      "sha256": "d3f71a35926c1fd314036320eeb393f294c1d5fed759feb5759260d01a1be891"
+    },
+    {
+      "path": "src/core/account-profiles.mjs",
+      "sha256": "8e36843232d455047839084f58b1c644b27b8924f8f3ed0fd003bc0ba5f83dcc"
+    },
+    {
+      "path": "src/core/daily-liquidity.mjs",
+      "sha256": "4cf330fc6c4de470172df87f8a142663454ed77711707049e1bc1181a2a2fae9"
+    },
+    {
+      "path": "src/core/liquidity-settings.mjs",
+      "sha256": "eea9cf5cdfebfbbe610a950d1d416e2b5cc8cc5db04ac8170d1a4fef68532b21"
+    },
+    {
+      "path": "src/core/planning-timeline.mjs",
+      "sha256": "52b9c64abec5c96c64d493d11c68c3acc02d356f2f89ba3a3d6788373ab04dc3"
+    },
+    {
+      "path": "src/core/runtime.js",
+      "sha256": "a5e02b4fdabdfa2262b4eedd1297002802691899fbfdcdc6d5348f3caf0bd325"
+    },
+    {
+      "path": "src/import/runtime.js",
+      "sha256": "4ddd26a51bdaa79c3192d784e502a4951966997a143be183443314e48aa4f953"
+    },
+    {
+      "path": "src/styles/dashboard-p3.css",
+      "sha256": "e326a4cbeb9d96ad9f1d2bc0ccefcdb102f7ce852fa40b6ca55b52dc82095178"
+    },
+    {
+      "path": "src/ui/dashboard.mjs",
+      "sha256": "a856028830b76c8006608a7048b0843f8ad7e67769056a6462f4e58de692e2e2"
+    },
+    {
+      "path": "src/ui/liquidity-settings.mjs",
+      "sha256": "416c2037d8dd2a4d489e324e12f948530a531080469a739b2c255ead52c8b01f"
+    },
+    {
+      "path": "tests/browser/v118-p2-liquidity.spec.cjs",
+      "sha256": "c14eff6db33620653a07d93e730ee0543ff7d520989c85e6c7231b0bf1c2a3c8"
+    },
+    {
+      "path": "tests/v118-prognose-correctie.test.cjs",
+      "sha256": "8242852861cf3e5bea9886b35acdf7b7ccaabfee3539378987e0708fc70d1e8b"
+    },
+    {
+      "path": "tests/browser/v118-prognose-correctie.spec.cjs",
+      "sha256": "11e4936b9361f92d96f2ccb6f971f4d4b32f14c5a18acd00c6e5388c4c2ba5c3"
+    },
+    {
+      "path": "docs/v118-prognose-zakgeld-grafiek.md",
+      "sha256": "356a3d91791cf353ac7b625eb485cbedebd1e62b1e81d7139d4fd871f9f72ca3"
+    }
+  ],
+  "localEvidence": [
+    {
+      "path": ".cache/v118-prognose/node-final.log",
+      "sha256": "082da859fc9825fed49fbb81f604f87aa42dea6e6522360b4507296b389ee2c6"
+    },
+    {
+      "path": ".cache/v118-prognose/browser-complete.log",
+      "sha256": "e39f403abae1962c8404d066f75d84762209f683c4cbb471f73eed73d8cd1775"
+    },
+    {
+      "path": ".cache/v118-prognose/syntax-final.log",
+      "sha256": "890228085be011d60149e5d5912f8c255c8263eedb062ed174487716b64c4605"
+    },
+    {
+      "path": ".cache/v118-prognose/css-final.log",
+      "sha256": "e7486cb602cec02ba239ed20de08733387558ef6b0418be4ea70962b3e85b401"
+    },
+    {
+      "path": ".cache/v118-prognose/generated-final.log",
+      "sha256": "a6a130c8944ab36df75487007636f238ac9f95bc42ca06cce0e25aaa0ebcc719"
+    },
+    {
+      "path": ".cache/v118-prognose/diff-final.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": ".cache/v118-prognose/design-detector.json",
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+    },
+    {
+      "path": ".cache/v118-prognose/correctie-1440.png",
+      "sha256": "42a9c7d0a3ffbe2be13d84b318500d0b5d30e4c68258541e64975cec3b77ce9a"
+    },
+    {
+      "path": ".cache/v118-prognose/instellingen-1440.png",
+      "sha256": "46f7d065d1ebec42dfb03b7780423bf1645ed7cc27df4824da7cca3aaf18c6bb"
+    },
+    {
+      "path": ".cache/v118-prognose/correctie-390.png",
+      "sha256": "c1a0647ce609ad8e3b8d0d8018c774cd2437b5774f2d68353ea4ff1839d17c43"
+    },
+    {
+      "path": ".cache/v118-prognose/instellingen-390.png",
+      "sha256": "4d59c97a405ba764e91a354bfc261a152baf909969a60c6d6c7340951c4069ac"
+    },
+    {
+      "path": ".cache/v118-prognose/correctie-320.png",
+      "sha256": "623a024c6dc24235de1f9fec210d248de25ae2f9ef4fb1e72cd8f870d1f74dec"
+    },
+    {
+      "path": ".cache/v118-prognose/instellingen-320.png",
+      "sha256": "7e808a0e57a5c0bef6b35e4d74b34bd164c54dd786bc6b4bd08aa285062ebb42"
+    }
+  ],
+  "limits": [
+    "No production cloud write test",
+    "Balance checkpoint, bank coverage and physical account links remain required",
+    "Ambiguous matches stay uncertain",
+    "Full V118 regression and scale benchmarks intentionally not repeated"
+  ]
+}

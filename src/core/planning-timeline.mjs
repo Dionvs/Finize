@@ -1,4 +1,5 @@
 // Planning only. Transactions, approvals, ledger balances and saved closures are never resolved here.
+import { fixedPaymentDay, validPaymentDay } from './liquidity-settings.mjs';
 const clone = value => JSON.parse(JSON.stringify(value));
 const plain = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const owners = ['gezamenlijk','dion','dara'];
@@ -38,6 +39,8 @@ export function resolveRecurringConfig(item,month,{includeInactive=false}={}) {
   const override=item.monthOverrides?.[month];
   if(plain(override)) result={...result,...clone(override.config||{})};
   result={...result,id:item.id,bedrag:round(amount),verwachtBedrag:round(amount)};
+  // Read migration after resolving historical properties. No stored dates or IDs change.
+  if (!Object.hasOwn(result,'afschrijfdag') && result.afschrijfdatum && result.frequentieEenheid!=='weken') result.afschrijfdag=fixedPaymentDay(result);
   const start=result.validFrom || String(result.begindatum||'').slice(0,7);
   if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(start)) throw new Error(`Regel ${item.id}: betrouwbare beginmaand ontbreekt.`);
   const beginMonth=String(result.begindatum||'').slice(0,7),endMonth=String(result.einddatum||'').slice(0,7);
@@ -109,6 +112,7 @@ export function setRecurringFromMonth(item,month,changes,{scope='from',isNew=fal
   assertPlanningMonth(month);
   if(!['from','once'].includes(scope))throw new Error('Onbekende geldigheid voor planning.');
   if(!item?.id)throw new Error('Planning mist een stabiel ID.');
+  if(Object.hasOwn(changes,'afschrijfdag')&&changes.afschrijfdag!==''&&!validPaymentDay(changes.afschrijfdag))throw new Error('Kies een afschrijfdag van 1 tot en met 31 of de laatste dag van de maand.');
   const resolved=isNew?snapshot(item):resolveRecurringConfig(item,month,{includeInactive:true});
   const amount=Number(changes.bedrag ?? changes.verwachtBedrag ?? resolved.bedrag ?? item.bedrag ?? item.verwachtBedrag);
   if(!Number.isFinite(amount)||amount<0)throw new Error('Ongeldig planningsbedrag.');

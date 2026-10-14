@@ -1,3 +1,4 @@
+import { fixedCashDate } from '../core/liquidity-settings.mjs';
 import { profileSync, profileStart } from '../storage/performance.mjs';
 import { availableAccountProfiles, accountIsArchived } from '../core/account-profiles.mjs';
 import { createPayloadPreparation, advancePayloadPreparation } from '../storage/payload-parts.mjs';
@@ -621,15 +622,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
       const occurrences=plannedOccurrences(fixedExpenses.filter(item=>item.begindatum),month).filter(item=>item.itemId===p.fixedExpenseId&&item.financialFor===p.budgetOwner&&(!item.source.accountProfileId||item.source.accountProfileId===profile?.id));
       const used=new Set(transactions.filter(tx=>isTransactionFinanciallyActive(tx)).map(tx=>tx.processing?.fixedOccurrenceId||tx.fixedOccurrenceId).filter(Boolean));
       const available=occurrences.filter(item=>!used.has(item.id));
-      const cashDate=item=>{
-        const explicit=item.source.cashDates?.[item.id];
-        if(explicit)return validCalendarDate(explicit)?explicit:'';
-        const debit=item.source.afschrijfdatum;
-        if(!validCalendarDate(debit))return item.date;
-        if(item.source.frequentieEenheid==='weken')return debit===item.date?item.date:'';
-        const lastDay=new Date(Number(month.slice(0,4)),Number(month.slice(5,7)),0).getDate();
-        return month+'-'+String(Math.min(Number(debit.slice(8)),lastDay)).padStart(2,'0');
-      };
+      const cashDate=item=>fixedCashDate(item)||(!item.source.afschrijfdatum&&!Object.hasOwn(item.source,'afschrijfdag')?item.date:'');
       evidence.occurrences=available.map(item=>({id:item.id,date:cashDate(item)||item.date,month:item.month,name:item.naam}));
       // A tolerance or a sole monthly occurrence alone is never identity proof.
       const exact=available.filter(item=>cashDate(item)===original.bankDate);

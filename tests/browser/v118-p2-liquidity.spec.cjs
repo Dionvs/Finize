@@ -8,7 +8,7 @@ async function boot(page,width=390){
  await page.addInitScript(seed=>{if(!localStorage.getItem('finize-budget-planner-v1'))localStorage.setItem('finize-budget-planner-v1',JSON.stringify({...seed,accountProfiles:[{id:'p2-joint',name:'Gezamenlijk betalen',accountOwner:'gezamenlijk',accountType:'payment',identifier:'NL91ABNA0417164300',status:'active'}]}));},fixture);
  await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);await page.evaluate(()=>openBankAccountDetails('p2-joint'));await expect(page.locator('[data-liquidity-form]')).toBeVisible();
 }
-async function fill(page){await page.locator('[name="primaryForOwner"]').check();await expect(page.locator('[name="buffer"]')).toHaveValue('200');await page.locator('[name="buffer"]').fill('275.50');await page.locator('[name="salary-dion"]').fill('25');await page.locator('[name="salary-dara"]').fill('27');}
+async function fill(page){await page.locator('[name="primaryForOwner"]').check();await expect(page.locator('[name="buffer"]')).toHaveValue('200');await page.locator('[name="buffer"]').fill('275.50');await page.locator('[data-income-person]').selectOption('dion');await page.locator('[data-income-day]').selectOption('25');await page.locator('[data-income-add]').click();await page.locator('[data-income-person]').last().selectOption('dara');await page.locator('[data-income-day]').last().selectOption('27');}
 const submit=page=>page.locator('[data-liquidity-form] button[type="submit"]').click();
 const saved=page=>expect.poll(()=>page.evaluate(()=>state.accountProfiles[0].liquidity?.bufferCents)).toBe(27550);
 for(const width of [1440,390,320])test(`P2 ${width}px instellingen opslaan herladen en gedeelde pure uitkomst`,async({page})=>{
@@ -31,7 +31,7 @@ test('P2 IndexedDB abort bewaart eerdere instellingen en opnieuw proberen is ato
 });
 test('P2 verloren ontvangstbevestiging herstelt instellingen zonder voortijdig zichtbaar maken',async({page})=>{
  await boot(page);await fill(page);await page.evaluate(()=>{const store=DataAdapter.store(),original=store.commit;store.commit=async function(...args){await new Promise(resolve=>window.__release=resolve);await original.apply(this,args);store.commit=original;throw new Error('Verloren bevestiging P2');};});
- await submit(page);await page.waitForFunction(()=>window.__release);expect(await page.evaluate(()=>state.accountProfiles[0].liquidity)).toBeUndefined();await expect(page.locator('[data-liquidity-form] button')).toBeDisabled();await page.evaluate(()=>__release());await saved(page);
+ await submit(page);await page.waitForFunction(()=>window.__release);expect(await page.evaluate(()=>state.accountProfiles[0].liquidity)).toBeUndefined();await expect(page.locator('[data-liquidity-form] button[type="submit"]')).toBeDisabled();await page.evaluate(()=>__release());await saved(page);
 });
 test('P2 cloudconflict bewaart instellingen en keuze overleeft herladen',async({page})=>{
  await boot(page);await fill(page);await submit(page);await saved(page);

@@ -532,6 +532,62 @@
     }
   }
 
+  // src/core/liquidity-settings.mjs
+  var validPaymentDay = (day) => day === "last" || Number.isInteger(day) && day >= 1 && day <= 31;
+  function monthlyPaymentDate(month, day) {
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month) || !validPaymentDay(day)) return null;
+    const last = new Date(Number(month.slice(0, 4)), Number(month.slice(5)), 0, 12).getDate();
+    return month + "-" + String(day === "last" ? last : Math.min(day, last)).padStart(2, "0");
+  }
+  function fixedPaymentDay(source) {
+    if (Object.hasOwn(source, "afschrijfdag")) return source.afschrijfdag;
+    return validCalendarDate(source.afschrijfdatum) ? Number(source.afschrijfdatum.slice(8)) : "";
+  }
+  function fixedCashDate(occurrence) {
+    var _a2;
+    const source = occurrence.source;
+    if ((_a2 = source.cashDates) == null ? void 0 : _a2[occurrence.id]) return source.cashDates[occurrence.id];
+    if (source.frequentieEenheid === "weken") return Object.hasOwn(source, "afschrijfdag") ? occurrence.date : source.afschrijfdatum === occurrence.date ? occurrence.date : null;
+    return monthlyPaymentDate(occurrence.month, fixedPaymentDay(source));
+  }
+  function liquidityBuffer(profile) {
+    var _a2, _b, _c;
+    return (_c = (_a2 = profile == null ? void 0 : profile.liquidity) == null ? void 0 : _a2.bufferCents) != null ? _c : (profile == null ? void 0 : profile.accountOwner) === "gezamenlijk" && ((_b = profile == null ? void 0 : profile.liquidity) == null ? void 0 : _b.primaryForOwner) ? 2e4 : 0;
+  }
+  function validateLiquiditySettings(profile, profiles) {
+    const value = profile.liquidity;
+    if (value === void 0) return;
+    const fail6 = (message) => {
+      throw Object.assign(new Error(message), { code: "invalid-liquidity-settings" });
+    };
+    if (!value || value.version !== 1 || typeof value.primaryForOwner !== "boolean" || !Number.isSafeInteger(value.bufferCents) || value.bufferCents < 0)
+      fail6("Vul een niet-negatieve veiligheidsbuffer in hele eurocenten in.");
+    if (value.primaryForOwner && profile.accountType !== "payment") fail6("Kies een betaalrekening voor de maandplanning.");
+    if (value.primaryForOwner && profiles.some((p) => {
+      var _a2;
+      return p.id !== profile.id && p.accountOwner === profile.accountOwner && ((_a2 = p.liquidity) == null ? void 0 : _a2.primaryForOwner);
+    }))
+      fail6("Er is al een rekening voor deze maandplanning. Schakel die keuze daar eerst uit.");
+    if (profile.accountOwner === "gezamenlijk" && !value.primaryForOwner && value.bufferCents !== 0)
+      fail6("De gezamenlijke buffer hoort alleen bij de primaire gezamenlijke betaalrekening.");
+    if (!value.salaryDays || typeof value.salaryDays !== "object" || Array.isArray(value.salaryDays)) fail6("Controleer de salarisbetaaldagen.");
+    for (const [person, day] of Object.entries(value.salaryDays)) {
+      if (!["dion", "dara"].includes(person) || !validPaymentDay(day)) fail6("Kies voor salaris een dag van 1 tot en met 31, de laatste dag, of laat het veld leeg.");
+      if (profiles.some((p) => {
+        var _a2, _b;
+        return p.id !== profile.id && ((_b = (_a2 = p.liquidity) == null ? void 0 : _a2.salaryDays) == null ? void 0 : _b[person]);
+      })) fail6("Dit salaris is al aan een andere rekening gekoppeld. Verwijder die betaaldag daar eerst.");
+    }
+    if (value.allowanceDays !== void 0 && (!value.allowanceDays || typeof value.allowanceDays !== "object" || Array.isArray(value.allowanceDays))) fail6("Controleer de zakgeldbetaaldagen.");
+    for (const [person, day] of Object.entries(value.allowanceDays || {})) {
+      if (!["dion", "dara"].includes(person) || profile.accountOwner !== person || profile.accountType !== "payment" || !validPaymentDay(day)) fail6("Koppel zakgeld aan de persoonlijke betaalrekening van de juiste eigenaar en kies een afschrijfdag.");
+      if (profiles.some((p) => {
+        var _a2, _b;
+        return p.id !== profile.id && ((_b = (_a2 = p.liquidity) == null ? void 0 : _a2.allowanceDays) == null ? void 0 : _b[person]);
+      })) fail6("Dit zakgeld is al aan een andere rekening gekoppeld. Verwijder die betaaldag daar eerst.");
+    }
+  }
+
   // src/import/bank-input-contract.mjs
   var BANK_INPUT_VERSION = 1;
   var TYPES = ["bank-transaction", "balance-observation", "coverage"];
@@ -1461,6 +1517,7 @@
     const override = (_a2 = item.monthOverrides) == null ? void 0 : _a2[month];
     if (plain(override)) result2 = { ...result2, ...clone(override.config || {}) };
     result2 = { ...result2, id: item.id, bedrag: round(amount), verwachtBedrag: round(amount) };
+    if (!Object.hasOwn(result2, "afschrijfdag") && result2.afschrijfdatum && result2.frequentieEenheid !== "weken") result2.afschrijfdag = fixedPaymentDay(result2);
     const start = result2.validFrom || String(result2.begindatum || "").slice(0, 7);
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(start)) throw new Error(`Regel ${item.id}: betrouwbare beginmaand ontbreekt.`);
     const beginMonth = String(result2.begindatum || "").slice(0, 7), endMonth = String(result2.einddatum || "").slice(0, 7);
@@ -1540,6 +1597,7 @@
     assertPlanningMonth(month);
     if (!["from", "once"].includes(scope)) throw new Error("Onbekende geldigheid voor planning.");
     if (!(item == null ? void 0 : item.id)) throw new Error("Planning mist een stabiel ID.");
+    if (Object.hasOwn(changes, "afschrijfdag") && changes.afschrijfdag !== "" && !validPaymentDay(changes.afschrijfdag)) throw new Error("Kies een afschrijfdag van 1 tot en met 31 of de laatste dag van de maand.");
     const resolved = isNew ? snapshot(item) : resolveRecurringConfig(item, month, { includeInactive: true });
     const amount = Number((_d = (_c = (_b = (_a2 = changes.bedrag) != null ? _a2 : changes.verwachtBedrag) != null ? _b : resolved.bedrag) != null ? _c : item.bedrag) != null ? _d : item.verwachtBedrag);
     if (!Number.isFinite(amount) || amount < 0) throw new Error("Ongeldig planningsbedrag.");
@@ -2538,37 +2596,6 @@
     return { month, owners: owners3, household, ratioDion, ratioDara, distributable, allowanceBasis: { owners: allowanceOwners, distributable, income: money(incomeBasis + joint.income) }, coverage: coverageAllocationStatus(state2) };
   }
 
-  // src/core/liquidity-settings.mjs
-  function liquidityBuffer(profile) {
-    var _a2, _b, _c;
-    return (_c = (_a2 = profile == null ? void 0 : profile.liquidity) == null ? void 0 : _a2.bufferCents) != null ? _c : (profile == null ? void 0 : profile.accountOwner) === "gezamenlijk" && ((_b = profile == null ? void 0 : profile.liquidity) == null ? void 0 : _b.primaryForOwner) ? 2e4 : 0;
-  }
-  function validateLiquiditySettings(profile, profiles) {
-    const value = profile.liquidity;
-    if (value === void 0) return;
-    const fail6 = (message) => {
-      throw Object.assign(new Error(message), { code: "invalid-liquidity-settings" });
-    };
-    if (!value || value.version !== 1 || typeof value.primaryForOwner !== "boolean" || !Number.isSafeInteger(value.bufferCents) || value.bufferCents < 0)
-      fail6("Vul een niet-negatieve veiligheidsbuffer in hele eurocenten in.");
-    if (value.primaryForOwner && profile.accountType !== "payment") fail6("Kies een betaalrekening voor de maandplanning.");
-    if (value.primaryForOwner && profiles.some((p) => {
-      var _a2;
-      return p.id !== profile.id && p.accountOwner === profile.accountOwner && ((_a2 = p.liquidity) == null ? void 0 : _a2.primaryForOwner);
-    }))
-      fail6("Er is al een rekening voor deze maandplanning. Schakel die keuze daar eerst uit.");
-    if (profile.accountOwner === "gezamenlijk" && !value.primaryForOwner && value.bufferCents !== 0)
-      fail6("De gezamenlijke buffer hoort alleen bij de primaire gezamenlijke betaalrekening.");
-    if (!value.salaryDays || typeof value.salaryDays !== "object" || Array.isArray(value.salaryDays)) fail6("Controleer de salarisbetaaldagen.");
-    for (const [person, day] of Object.entries(value.salaryDays)) {
-      if (!["dion", "dara"].includes(person) || !Number.isInteger(day) || day < 1 || day > 31) fail6("Kies voor salaris een dag van 1 tot en met 31, of laat het veld leeg.");
-      if (profiles.some((p) => {
-        var _a2, _b;
-        return p.id !== profile.id && ((_b = (_a2 = p.liquidity) == null ? void 0 : _a2.salaryDays) == null ? void 0 : _b[person]);
-      })) fail6("Dit salaris is al aan een andere rekening gekoppeld. Verwijder die betaaldag daar eerst.");
-    }
-  }
-
   // src/core/daily-liquidity.mjs
   var owners2 = ["gezamenlijk", "dion", "dara"];
   var cents3 = (value) => decimalAmountToCents(value);
@@ -2583,12 +2610,15 @@
     return parsed.toISOString().slice(0, 10);
   };
   var monthEnd = (month) => shiftLiquidityDay(nextPlanningMonth(month) + "-01", -1);
-  var salaryDate = (month, day) => month + "-" + String(Math.min(day, Number(monthEnd(month).slice(8)))).padStart(2, "0");
+  var salaryDate = monthlyPaymentDate;
   var event = (values) => ({ id: "", accountProfileId: null, date: null, amountCents: 0, type: "other", status: "planned", dateQuality: "unknown", sourceId: null, occurrenceId: null, replacedBy: [], warnings: [], ...values });
   var issue = (code, eventId = "", severity = "incomplete") => ({ code, eventId, severity });
   function liquidityReasonMessage(reason) {
     return {
       "missing-checkpoint": "Er is nog geen bruikbaar saldo-ijkpunt voor deze rekening.",
+      "missing-period-opening": "Een beginsaldo vóór deze periode ontbreekt. De saldolijn begint bij het eerste bruikbare saldo-ijkpunt; eerdere saldi worden niet verzonnen.",
+      "planning-basis": "Deze saldolijn is berekend uit de planning en beschikbare bankboekingen; dit is geen door de bank bevestigd historisch saldo.",
+      "possible-planning-overlap": "Een geboekte mutatie kan bij een geplande post horen. Bevestig de koppeling; de mogelijke tweede kasmutatie staat niet op de saldolijn.",
       "missing-period": "Een benodigde opslagmaand ontbreekt.",
       "missing-reliable-horizon": "Een betrouwbare volgende ontvangst ontbreekt. Kies een einddatum.",
       "unknown-bank-coverage": "Niet bevestigd dat alle bankmutaties sinds het ijkpunt aanwezig zijn.",
@@ -2602,6 +2632,7 @@
       "replacement-bank-source-unusable": "Een expliciet gekoppelde betaling mist een bruikbare bankbron in deze periode.",
       "ambiguous-income-occurrence": "Een ontvangst is aan een bron gekoppeld, maar niet aan een bewezen betaalmoment. Extra geplande ontvangst blijft buiten de kaslijn.",
       "ambiguous-fixed-occurrence": "Een betaling heeft een vaste-lastlink zonder bewezen occurrence; de resterende verplichting is onzeker.",
+      "ambiguous-allowance-occurrence": "Een geboekte overboeking kan bij het geplande zakgeld horen. Bevestig eerst de verwerking; de extra ontvangst blijft buiten de kaslijn.",
       "planning-dependencies-unavailable": "De financiële afhankelijkheidsgegevens zijn niet volledig beschikbaar.",
       "financial-planning-unavailable": "Een deel van de bestaande financiële planning kan niet betrouwbaar worden berekend.",
       "conflicting-event": "Dezelfde gebeurtenis bevat tegenstrijdige gegevens.",
@@ -2676,6 +2707,8 @@
       if (amount <= 0) continue;
       const resolved = source && target && source !== target;
       const date2 = validCalendarDate(row.plannedDate || row.date) ? row.plannedDate || row.date : null;
+      const sourceProfile = (state2.accountProfiles || []).find((p) => p.id === source), targetProfile = (state2.accountProfiles || []).find((p) => p.id === target);
+      const isSavingsPlan = ["gezamenlijk-sparen", "dion-sparen", "dara-sparen", "sparen", "naar-spaarrekening"].includes(row.type) || !!(sourceProfile && (targetProfile == null ? void 0 : targetProfile.accountType) === "savings" && sourceProfile.accountOwner === targetProfile.accountOwner);
       for (const [accountProfileId, sign] of [[source, -1], [target, 1]]) result2.push(event({
         id: "transfer:" + row.id + ":" + (sign < 0 ? "out" : "in"),
         accountProfileId: resolved ? accountProfileId : null,
@@ -2683,6 +2716,7 @@
         amountCents: sign * amount,
         type: "internal-transfer",
         transferId: row.id,
+        isSavingsPlan,
         dateQuality: date2 ? "explicitly-planned" : "unknown",
         month: row.month || (date2 == null ? void 0 : date2.slice(0, 7)),
         horizonReceipt: sign > 0,
@@ -2692,16 +2726,53 @@
     }
     return result2;
   }
-  function liquidityRequiredMonths(state2, { accountProfileId, asOfDate, endDate, scope } = {}) {
-    if (!validCalendarDate(asOfDate)) return [];
-    const checkpoint = checkpointHistory(state2, accountProfileId, scope).active.find((row) => row.asOfDate <= asOfDate);
-    const end = validCalendarDate(endDate) ? endDate : monthEnd(nextPlanningMonth(asOfDate.slice(0, 7)));
-    return balanceRequiredMonths(checkpoint && checkpoint.asOfDate < asOfDate ? checkpoint.asOfDate : asOfDate, end);
+  function allowancePlans(state2, month, forecast, projections) {
+    const result2 = [];
+    for (const person of ["dion", "dara"]) {
+      const profiles = (state2.accountProfiles || []).filter((p) => {
+        var _a2, _b;
+        return p.status !== "archived" && p.accountType === "payment" && p.accountOwner === person && ((_b = (_a2 = p.liquidity) == null ? void 0 : _a2.allowanceDays) == null ? void 0 : _b[person]);
+      });
+      if (!profiles.length) continue;
+      const target = profiles.length === 1 ? profiles[0] : null, joint = physicalAccount(state2, null, "gezamenlijk");
+      const amount = cents3(forecast.owners[person].allowance);
+      const date2 = target ? monthlyPaymentDate(month, target.liquidity.allowanceDays[person]) : null;
+      const transferRows = (state2.internalTransfers || []).filter((r) => r.month === month && ["zakgeld-" + person, "zakgeld-" + person + "-terug"].includes(r.type) && !["vervallen", "cancelled"].includes(r.status));
+      for (const [side, accountProfileId, amountCents] of [["out", joint, -amount], ["in", target == null ? void 0 : target.id, amount]]) {
+        const actualIds = transferRows.flatMap((r) => [r.actualTransactionId, ...r.transactionIds || []]).filter(Boolean);
+        const replacedBy = projections.filter((p) => {
+          const tx = p.transaction, source = bankSourceForTransaction(state2, tx);
+          const linked = p.active || tx.approvalSource === "manual" && p.status === "goedgekeurd" && source && bankSourceActive(state2, source);
+          return linked && tx.bankOriginal && tx.accountProfileId === accountProfileId && (actualIds.includes(tx.id) || actualIds.includes(tx.sourceTransactionId) || p.transactionType === "maandelijkse-bijdrage" && p.financialFor === person && p.calendarMonth === month) && Math.sign(Number(tx.bankOriginal.amount)) === Math.sign(amountCents);
+        }).map((p) => sourceRecordKey(p.transaction));
+        const ambiguous = !replacedBy.length && projections.some((p) => p.transaction.bankOriginal && p.transaction.accountProfileId === accountProfileId && p.transactionType === "maandelijkse-bijdrage" && p.financialFor === person && p.calendarMonth === month && Math.sign(Number(p.transaction.bankOriginal.amount)) === Math.sign(amountCents));
+        if (amountCents) result2.push(event({
+          id: `allowance:${person}:${month}:${side}`,
+          transferId: `allowance:${person}:${month}`,
+          accountProfileId: joint && target ? accountProfileId : null,
+          date: ambiguous ? null : date2,
+          amountCents,
+          type: "allowance",
+          person,
+          month,
+          dateQuality: !ambiguous && date2 ? "explicitly-planned" : "unknown",
+          replacedBy,
+          warnings: ambiguous ? ["ambiguous-allowance-occurrence"] : []
+        }));
+      }
+    }
+    return result2;
   }
-  function buildLiquidityInput(state2, { accountProfileId, asOfDate, endDate, scope, imports = [], importsAvailable = true, coverage = [], monthlyForecast = financialForecastForMonth } = {}) {
-    var _a2, _b, _c, _d, _e;
+  function liquidityRequiredMonths(state2, { accountProfileId, asOfDate, endDate, startDate, scope } = {}) {
+    if (!validCalendarDate(asOfDate)) return [];
+    const checkpoint = startDate ? planningAnchor(state2, { accountProfileId, asOfDate, startDate, scope }) : checkpointHistory(state2, accountProfileId, scope).active.find((row) => row.asOfDate <= asOfDate);
+    const end = validCalendarDate(endDate) ? endDate : monthEnd(nextPlanningMonth(asOfDate.slice(0, 7)));
+    return balanceRequiredMonths(startDate && checkpoint ? shiftLiquidityDay(checkpoint.asOfDate, 1) : (checkpoint == null ? void 0 : checkpoint.asOfDate) || startDate || asOfDate, end);
+  }
+  function buildLiquidityInput(state2, { accountProfileId, asOfDate, endDate, scope, imports = [], importsAvailable = true, coverage = [], monthlyForecast = financialForecastForMonth, salaryOnly = false, planningBasis = false } = {}) {
+    var _a2, _b, _c, _d, _e, _f;
     if (!validCalendarDate(asOfDate) || endDate !== void 0 && (!validCalendarDate(endDate) || endDate < asOfDate)) throw new Error("Kies geldige prognosedatums; de einddatum mag niet vóór de berekendatum liggen.");
-    if (endDate && balanceRequiredMonths(asOfDate, endDate).length > 24) throw new Error("Kies een prognose van maximaal 24 kalendermaanden.");
+    if (!planningBasis && endDate && balanceRequiredMonths(asOfDate, endDate).length > 24) throw new Error("Kies een prognose van maximaal 24 kalendermaanden.");
     const reasons2 = [], events = [], reservations = [], savingsPlans = [];
     const profile = (state2.accountProfiles || []).find((p) => p.id === accountProfileId);
     const opening = selectAccountBalance(state2, { accountProfileId, toDate: asOfDate, scope, imports, importsAvailable, coverage });
@@ -2729,17 +2800,22 @@
         });
         receipt = [...salaries, ...transfers.filter((row) => {
           var _a3;
-          return (profile == null ? void 0 : profile.accountOwner) !== "gezamenlijk" && row.amountCents > 0 && ((_a3 = row.date) == null ? void 0 : _a3.slice(0, 7)) === month;
+          return !salaryOnly && (profile == null ? void 0 : profile.accountOwner) !== "gezamenlijk" && row.amountCents > 0 && ((_a3 = row.date) == null ? void 0 : _a3.slice(0, 7)) === month && !(state2.internalTransfers || []).some((t) => {
+            var _a4, _b2, _c2;
+            return t.id === row.transferId && ((_a4 = t.type) == null ? void 0 : _a4.startsWith("zakgeld-")) && ((_c2 = (_b2 = profile == null ? void 0 : profile.liquidity) == null ? void 0 : _b2.allowanceDays) == null ? void 0 : _c2[profile.accountOwner]);
+          });
         })].filter((row) => row.accountProfileId === accountProfileId && row.date > asOfDate && !row.replacedBy.length).sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id))[0] || null;
       }
     }
-    const horizonEnd2 = endDate || (receipt ? shiftLiquidityDay(receipt.date, -1) : null);
-    const horizon = { kind: endDate ? "manual" : "next-receipt", endDate: horizonEnd2, receiptDate: (receipt == null ? void 0 : receipt.date) || null, receiptId: (receipt == null ? void 0 : receipt.id) || null, boundary: "end-of-previous-day" };
+    const allowanceDay = !salaryOnly && (profile == null ? void 0 : profile.accountOwner) !== "gezamenlijk" && ((_b = (_a2 = profile == null ? void 0 : profile.liquidity) == null ? void 0 : _a2.allowanceDays) == null ? void 0 : _b[profile.accountOwner]);
+    const allowanceWindow = allowanceDay ? monthEnd(monthlyPaymentDate(asOfDate.slice(0, 7), allowanceDay) > asOfDate ? asOfDate.slice(0, 7) : nextPlanningMonth(asOfDate.slice(0, 7))) : null;
+    const horizonEnd2 = endDate || (receipt ? shiftLiquidityDay(receipt.date, -1) : allowanceWindow);
+    const horizon = { kind: endDate ? "manual" : receipt ? "next-receipt" : allowanceWindow ? "allowance-window" : "next-receipt", endDate: horizonEnd2, receiptDate: (receipt == null ? void 0 : receipt.date) || null, receiptId: (receipt == null ? void 0 : receipt.id) || null, boundary: !receipt ? "end-of-day" : "end-of-previous-day" };
     if (!horizonEnd2) reasons2.push(issue("missing-reliable-horizon"));
-    const requiredMonths = liquidityRequiredMonths(state2, { accountProfileId, asOfDate, endDate: horizonEnd2 || asOfDate, scope });
-    for (const month of requiredMonths) if (state2.__finizePartialHistory && !((_a2 = state2.verifiedPeriods) == null ? void 0 : _a2.includes(month))) reasons2.push(issue("missing-period", month));
+    const requiredMonths = liquidityRequiredMonths(state2, { accountProfileId, asOfDate, endDate: horizonEnd2 || asOfDate, scope }).filter((month) => !planningBasis || month >= shiftLiquidityDay(asOfDate, 1).slice(0, 7));
+    for (const month of requiredMonths) if (state2.__finizePartialHistory && !((_c = state2.verifiedPeriods) == null ? void 0 : _c.includes(month))) reasons2.push(issue("missing-period", month));
     const last = horizonEnd2 || asOfDate;
-    const future = selectAccountBalance(state2, { accountProfileId, toDate: last, scope, imports, importsAvailable, coverage, checkpointId: (_b = opening.checkpoint) == null ? void 0 : _b.id });
+    const future = selectAccountBalance(state2, { accountProfileId, toDate: last, scope, imports, importsAvailable, coverage, checkpointId: (_d = opening.checkpoint) == null ? void 0 : _d.id });
     future.reasons.filter((row) => !["unknown-bank-coverage", "partial-bank-coverage"].includes(row.code)).forEach((row) => reasons2.push(issue(row.code, row.sourceId, row.code === "awaiting-review" ? "provisional" : "incomplete")));
     for (const row of future.mutations.filter((row2) => row2.date > asOfDate)) {
       const linked = projections.filter((p) => sourceRecordKey(p.transaction) === row.sourceId);
@@ -2760,7 +2836,12 @@
     const addPlan = (row) => {
       var _a3, _b2;
       row.replacedBy = [.../* @__PURE__ */ new Set([...row.replacedBy, ...replaced.get(row.id) || []])];
+      row.replacedBy = row.replacedBy.filter((key) => projections.some((p) => {
+        var _a4;
+        return sourceRecordKey(p.transaction) === key && p.transaction.accountProfileId === row.accountProfileId && Math.sign(Number((_a4 = p.transaction.bankOriginal) == null ? void 0 : _a4.amount)) === Math.sign(row.amountCents);
+      }));
       if (!relevant(row)) return;
+      if (row.warnings.includes("ambiguous-allowance-occurrence")) reasons2.push(issue("ambiguous-allowance-occurrence", row.id));
       if (row.type === "fixed" && projections.some((p) => p.active && p.fixedExpenseId === row.planningSourceId && !p.fixedOccurrenceId)) reasons2.push(issue("ambiguous-fixed-occurrence", row.id));
       if (row.type === "income" && projections.some((p) => p.active && p.incomeSourceId === row.planningSourceId && !p.incomeOccurrenceId && p.effects.incomeImpact > 0 && p.calendarMonth === row.month)) {
         row.date = null;
@@ -2779,7 +2860,21 @@
         }
         return;
       }
+      const overlap = projections.some((p) => {
+        var _a4;
+        const tx = p.transaction, b = tx.bankOriginal;
+        if (!(b == null ? void 0 : b.valid) || b.currency !== "EUR" || ((_a4 = b.bankStatus) != null ? _a4 : "booked") !== "booked" || tx.accountProfileId !== row.accountProfileId || !validCalendarDate(b.bankDate) || Math.sign(Number(b.amount)) !== Math.sign(row.amountCents)) return false;
+        return replacementKeys(p, state2).includes(row.id) || row.type === "fixed" && p.fixedExpenseId === row.planningSourceId && p.calendarMonth === row.month;
+      });
+      if (overlap) {
+        row.plannedDate = row.date;
+        row.date = null;
+        row.dateQuality = "unknown";
+        row.warnings.push("possible-planning-overlap");
+        reasons2.push(issue("possible-planning-overlap", row.id));
+      }
       if (row.date && row.date > last) return;
+      if (planningBasis && row.date && row.date <= asOfDate) return;
       if (row.type === "internal-transfer" && (!row.accountProfileId || !row.date)) {
         row.status = "unresolved";
         row.warnings.push("unconfirmed-transfer-plan");
@@ -2806,18 +2901,14 @@
       }
       events.push(row);
     };
-    for (const month of balanceRequiredMonths(asOfDate, last)) {
-      if (state2.__finizePartialHistory && !((_c = state2.verifiedPeriods) == null ? void 0 : _c.includes(month))) continue;
+    for (const month of balanceRequiredMonths(planningBasis ? shiftLiquidityDay(asOfDate, 1) : asOfDate, last)) {
+      if (state2.__finizePartialHistory && !((_e = state2.verifiedPeriods) == null ? void 0 : _e.includes(month))) continue;
       for (const row of salaryPlans(state2, month)) addPlan(row);
       try {
         for (const occurrence of u3PlannedOccurrences(resolveFixedExpensesForMonth(state2, month), month)) {
           const source = occurrence.source;
-          const explicit = (_d = source.cashDates) == null ? void 0 : _d[occurrence.id];
-          let date2 = validCalendarDate(explicit) ? explicit : null;
-          if (!date2 && validCalendarDate(source.afschrijfdatum)) {
-            if (source.frequentieEenheid === "weken") date2 = source.afschrijfdatum === occurrence.date ? occurrence.date : null;
-            else date2 = salaryDate(month, Number(source.afschrijfdatum.slice(8)));
-          }
+          const cashDate = fixedCashDate(occurrence);
+          const date2 = validCalendarDate(cashDate) ? cashDate : null;
           addPlan(event({
             id: "fixed:" + occurrence.id,
             occurrenceId: occurrence.id,
@@ -2831,7 +2922,7 @@
           }));
         }
         for (const occurrence of u3PlannedOccurrences(resolveIncomeSourcesForMonth(state2, month).filter((row) => row.legacyKind !== "salary"), month)) {
-          const source = occurrence.source, explicit = ((_e = source.cashDates) == null ? void 0 : _e[occurrence.id]) || source.paymentDate;
+          const source = occurrence.source, explicit = ((_f = source.cashDates) == null ? void 0 : _f[occurrence.id]) || source.paymentDate;
           const date2 = validCalendarDate(explicit) ? explicit : source.planningProvenance === "versioned-properties" ? occurrence.date : null;
           addPlan(event({
             id: "income:" + occurrence.id,
@@ -2874,17 +2965,28 @@
           });
         }
         const forecast = monthlyForecast(state2.__finizePartialHistory ? { ...state2, __finizePartialHistory: false } : state2, month);
-        for (const owner of owners2) if (physicalAccount(state2, null, owner) === accountProfileId) savingsPlans.push({ month, owner, amountCents: cents3(forecast.allowanceBasis.owners[owner].savingsReserve) });
+        for (const row of allowancePlans(state2, month, forecast, projections)) addPlan(row);
+        for (const owner of owners2) if (physicalAccount(state2, null, owner) === accountProfileId) {
+          const realizedCents = sum(projections.filter((p) => {
+            var _a3;
+            return p.active && p.financialFor === owner && p.calendarMonth === month && String(((_a3 = p.transaction.bankOriginal) == null ? void 0 : _a3.bankDate) || p.transaction.transactionDate || p.transaction.date || "") <= last;
+          }).map((p) => safe(cents3(p.effects.savingsDeposit || 0) - cents3(p.effects.savingsWithdrawal || 0))));
+          savingsPlans.push({ month, owner, amountCents: cents3(forecast.allowanceBasis.owners[owner].savingsReserve), realizedCents, monthlyRoomCents: cents3(forecast.owners[owner].available) });
+        }
       } catch (error2) {
         reasons2.push({ ...issue("financial-planning-unavailable", month), message: error2.message });
       }
     }
-    for (const row of transfers.filter((row2) => !row2.month || row2.month >= asOfDate.slice(0, 7) && row2.month <= last.slice(0, 7))) addPlan(row);
+    for (const row of transfers.filter((row2) => !row2.month || row2.month >= asOfDate.slice(0, 7) && row2.month <= last.slice(0, 7))) {
+      const source = (state2.internalTransfers || []).find((r) => r.id === row.transferId);
+      if (events.some((e) => e.type === "allowance" && e.month === (source == null ? void 0 : source.month) && ["zakgeld-" + e.person, "zakgeld-" + e.person + "-terug"].includes(source == null ? void 0 : source.type))) continue;
+      addPlan(row);
+    }
     if ((profile == null ? void 0 : profile.accountOwner) === "gezamenlijk" && !physicalAccount(state2, null, "gezamenlijk")) reasons2.push(issue("joint-primary-account-not-selected"));
     return { accountProfileId, asOfDate, opening, horizon, events, reservations, savingsPlans, bufferCents: liquidityBuffer(profile), requiredMonths, reasons: reasons2 };
   }
   function projectDailyLiquidity(input) {
-    var _a2, _b, _c, _d, _e, _f, _g, _h, _i, _j;
+    var _a2, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
     const { opening, horizon, asOfDate, bufferCents } = input;
     const reasons2 = [...input.reasons], events = [], seen = /* @__PURE__ */ new Map();
     for (const row of input.events) {
@@ -2907,33 +3009,66 @@
       const covered = sum(events.filter((e) => e.status === "planned" && e.date > asOfDate && e.date <= horizon.endDate && e.amountCents < 0 && e.reservationId === row.id).map((e) => -e.amountCents));
       reservations.push({ ...row, coveredByConcreteCents: Math.min(row.amountCents, covered), amountCents: Math.max(0, row.amountCents - covered) });
     }
-    const reserveCents = sum(reservations.map((row) => row.amountCents));
+    const reserveCents = sum(reservations.filter((row) => row.reserveForDisplay !== false).map((row) => row.amountCents));
     const dated = events.filter((row) => ["actual", "provisional", "planned"].includes(row.status) && row.accountProfileId === input.accountProfileId && row.date > asOfDate && row.date <= horizon.endDate);
-    const estimated = /* @__PURE__ */ new Map();
-    for (const row of reservations.filter((row2) => row2.type === "budget")) {
+    const estimated = /* @__PURE__ */ new Map(), allocations = /* @__PURE__ */ new Map();
+    const distribute = (row, fromDate = row.fromDate) => {
+      const previous = allocations.get(row.id) || /* @__PURE__ */ new Map();
+      for (const [date2, amount] of previous) if (date2 >= fromDate) {
+        estimated.set(date2, safe((estimated.get(date2) || 0) - amount));
+        previous.delete(date2);
+      }
       const dates = [];
-      for (let date2 = row.fromDate; date2 <= row.toDate; date2 = shiftLiquidityDay(date2, 1)) dates.push(date2);
-      dates.forEach((date2, index) => estimated.set(date2, safe((estimated.get(date2) || 0) + Math.floor(row.amountCents / dates.length) + (index < row.amountCents % dates.length ? 1 : 0))));
-    }
+      for (let date2 = fromDate; date2 <= row.toDate; date2 = shiftLiquidityDay(date2, 1)) dates.push(date2);
+      dates.forEach((date2, index) => {
+        const amount = Math.floor(row.amountCents / dates.length) + (index < row.amountCents % dates.length ? 1 : 0);
+        previous.set(date2, amount);
+        estimated.set(date2, safe((estimated.get(date2) || 0) + amount));
+      });
+      allocations.set(row.id, previous);
+    };
+    for (const row of reservations.filter((row2) => row2.type === "budget")) distribute(row);
+    const observations = new Map((input.observations || []).map((row) => [row.asOfDate, row]));
     const days = [];
     if (opening.balanceCents !== null && horizon.endDate) {
-      let bank = opening.balanceCents, spent = 0;
+      let bank = opening.balanceCents, spent = 0, earlierEstimated = 0, lastObservationMonth = null;
       for (let date2 = asOfDate; date2 <= horizon.endDate; date2 = shiftLiquidityDay(date2, 1)) {
         const rows = dated.filter((row) => row.date === date2);
+        const openingBalanceCents = safe(bank - spent);
+        let mutationCents = safe(sum(rows.map((row) => row.amountCents)) - (estimated.get(date2) || 0));
         bank = safe(bank + sum(rows.map((row) => row.amountCents)));
         spent = safe(spent + (estimated.get(date2) || 0));
+        if (input.displayStartDate && date2 < input.displayStartDate.slice(0, 7) + "-01") earlierEstimated = safe(earlierEstimated + (estimated.get(date2) || 0));
+        const observation2 = observations.get(date2);
+        if (observation2) {
+          const modeledCents = safe(bank - spent), amountCents = safe(observation2.amountCents - modeledCents);
+          const adjustment = event({ id: "checkpoint:" + observation2.id, accountProfileId: input.accountProfileId, date: date2, amountCents, type: "checkpoint", status: "observed", dateQuality: "confirmed", observedBalanceCents: observation2.amountCents, modeledBalanceCents: modeledCents });
+          events.push(adjustment);
+          rows.push(adjustment);
+          mutationCents = safe(mutationCents + amountCents);
+          bank = observation2.amountCents;
+          spent = 0;
+          earlierEstimated = 0;
+          lastObservationMonth = date2.slice(0, 7);
+          for (const row of reservations.filter((row2) => row2.type === "budget" && row2.fromDate <= date2 && row2.toDate > date2)) distribute(row, shiftLiquidityDay(date2, 1));
+        }
+        if (input.displayStartDate && date2 < input.displayStartDate) continue;
         days.push({
           date: date2,
+          openingBalanceCents,
+          mutationCents,
           cashBalanceCents: bank,
           estimatedBudgetCents: estimated.get(date2) || 0,
           expectedBalanceCents: safe(bank - spent),
-          afterReservationsCents: safe(bank - reserveCents),
+          afterReservationsCents: safe(bank - earlierEstimated - sum(reservations.filter((row) => row.reserveForDisplay !== false && (!lastObservationMonth || row.type !== "budget" || row.month >= lastObservationMonth)).map((row) => row.amountCents))),
           eventIds: rows.map((row) => row.id)
         });
       }
     }
-    const min = (field) => days.reduce((best, row) => !best || row[field] < best[field] ? row : best, null);
-    const expected = min("expectedBalanceCents"), conservative = min("afterReservationsCents");
+    const availabilityFromDate = input.availabilityFromDate || asOfDate;
+    const availabilityDays = days.filter((row) => row.date >= availabilityFromDate);
+    const min = (field, rows = days) => rows.reduce((best, row) => !best || row[field] < best[field] ? row : best, null);
+    const expected = min("expectedBalanceCents"), conservative = min("afterReservationsCents", availabilityDays);
     const distinct = [...new Map(reasons2.map((row) => [row.code + ":" + row.eventId, { ...row, message: row.message || liquidityReasonMessage(row) }])).values()];
     const status2 = opening.balanceCents === null || !horizon.endDate ? "unknown" : distinct.some((row) => row.severity === "incomplete") ? "incomplete" : distinct.length ? "provisional" : "projected";
     const indicative = conservative ? Math.max(0, safe(conservative.afterReservationsCents - bufferCents)) : null;
@@ -2945,14 +3080,15 @@
       status: status2,
       days,
       reservedCents: reserveCents,
+      availability: { fromDate: availabilityFromDate, toDate: horizon.endDate, minimumCents: (_a2 = conservative == null ? void 0 : conservative.afterReservationsCents) != null ? _a2 : null, minimumDate: (_b = conservative == null ? void 0 : conservative.date) != null ? _b : null, status: status2 },
       savingsGoalCents: sum(input.savingsPlans.map((row) => row.amountCents)),
-      minimumBalanceCents: (_a2 = expected == null ? void 0 : expected.expectedBalanceCents) != null ? _a2 : null,
-      minimumDate: (_b = expected == null ? void 0 : expected.date) != null ? _b : null,
-      minimumAfterReservationsCents: (_c = conservative == null ? void 0 : conservative.afterReservationsCents) != null ? _c : null,
-      minimumAfterReservationsDate: (_d = conservative == null ? void 0 : conservative.date) != null ? _d : null,
-      firstShortfallDate: (_f = (_e = days.find((row) => row.expectedBalanceCents < 0)) == null ? void 0 : _e.date) != null ? _f : null,
-      firstBufferBreachDate: (_h = (_g = days.find((row) => row.expectedBalanceCents < bufferCents)) == null ? void 0 : _g.date) != null ? _h : null,
-      firstReservedBufferBreachDate: (_j = (_i = days.find((row) => row.afterReservationsCents < bufferCents)) == null ? void 0 : _i.date) != null ? _j : null,
+      minimumBalanceCents: (_c = expected == null ? void 0 : expected.expectedBalanceCents) != null ? _c : null,
+      minimumDate: (_d = expected == null ? void 0 : expected.date) != null ? _d : null,
+      minimumAfterReservationsCents: (_e = conservative == null ? void 0 : conservative.afterReservationsCents) != null ? _e : null,
+      minimumAfterReservationsDate: (_f = conservative == null ? void 0 : conservative.date) != null ? _f : null,
+      firstShortfallDate: (_h = (_g = days.find((row) => row.expectedBalanceCents < 0)) == null ? void 0 : _g.date) != null ? _h : null,
+      firstBufferBreachDate: (_j = (_i = days.find((row) => row.expectedBalanceCents < bufferCents)) == null ? void 0 : _i.date) != null ? _j : null,
+      firstReservedBufferBreachDate: (_l = (_k = availabilityDays.find((row) => row.afterReservationsCents < bufferCents)) == null ? void 0 : _k.date) != null ? _l : null,
       shortfallCents: expected ? Math.max(0, -expected.expectedBalanceCents) : null,
       reservedShortfallCents: conservative ? Math.max(0, -conservative.afterReservationsCents) : null,
       freeAfterObligationsCents: status2 === "projected" ? indicative : null,
@@ -2960,8 +3096,102 @@
       quality: { ...opening.quality, forecast: status2, budgetTiming: reservations.some((row) => row.type === "budget") ? "estimated" : "not-applicable" }
     };
   }
+  function savingsGuidance(projection, spendingLimitCents = projection.indicativeFreeAfterObligationsCents) {
+    const from = projection.availability.fromDate, end = projection.horizon.endDate;
+    const plans = projection.savingsPlans.filter((row) => row.month >= from.slice(0, 7));
+    const goalCents = sum(plans.map((row) => row.amountCents));
+    const remainingGoalCents = sum(plans.map((row) => Math.max(0, safe(row.amountCents - (row.realizedCents || 0)))));
+    const base = { goalCents, remainingGoalCents, status: goalCents > 0 ? "unknown" : "none", headroomCents: null, expectedSavingsCapacityCents: null, warning: false, shortfallCents: null, assessmentEndDate: end };
+    if (!goalCents) return base;
+    if (projection.availability.status !== "projected" || !end || end !== monthEnd(end.slice(0, 7)) || !plans.length) return base;
+    let cumulative = 0, headroom = null, capacity = null;
+    for (const plan of plans) {
+      const day = projection.days.find((row) => row.date === monthEnd(plan.month));
+      if (!day) return base;
+      cumulative = safe(cumulative + Math.max(0, safe(plan.amountCents - (plan.realizedCents || 0))));
+      const room = safe(day.afterReservationsCents - projection.bufferCents), surplus = safe(room - cumulative);
+      if (headroom === null || surplus < headroom) {
+        headroom = surplus;
+        capacity = Math.max(0, room);
+      }
+    }
+    const hard = spendingLimitCents;
+    return {
+      ...base,
+      status: "known",
+      headroomCents: Math.max(0, Math.min(hard, headroom)),
+      expectedSavingsCapacityCents: capacity,
+      warning: remainingGoalCents > 0 && (headroom < 0 || headroom < hard),
+      shortfallCents: Math.max(0, -headroom)
+    };
+  }
+  function hardAvailability(projection, input, fromDate) {
+    var _a2;
+    const softIds = new Set(input.events.filter((row) => row.isSavingsPlan && row.status !== "replaced").map((row) => row.id));
+    const currentAnchor = ((_a2 = projection.currentBalance) == null ? void 0 : _a2.checkpoint) || projection.opening.checkpoint;
+    const hardReasons = input.reasons.filter((row) => row.code !== "missing-period-opening" && !(row.code === "missing-period" && row.eventId < fromDate.slice(0, 7) && (currentAnchor == null ? void 0 : currentAnchor.asOfDate) >= fromDate.slice(0, 7) + "-01") && (!softIds.has(row.eventId) || !["unknown-cash-date", "unconfirmed-transfer-plan", "unresolved-account-profile"].includes(row.code)));
+    const hard = softIds.size || hardReasons.length !== input.reasons.length ? projectDailyLiquidity({
+      ...input,
+      availabilityFromDate: fromDate,
+      events: input.events.filter((row) => !softIds.has(row.id)),
+      reservations: input.reservations.filter((row) => !softIds.has(row.id.replace(/^undated:/, ""))),
+      reasons: hardReasons
+    }) : projection;
+    return { hard, softIds };
+  }
+  function withAvailability(projection, input, fromDate, goalInputFor) {
+    const { hard, softIds } = hardAvailability(projection, input, fromDate);
+    let goalProjection = hard;
+    const end = hard.horizon.endDate;
+    if (end && end !== monthEnd(end.slice(0, 7)) && hard.savingsPlans.some((row) => row.amountCents > 0) && goalInputFor) {
+      const goalInput = goalInputFor(monthEnd(end.slice(0, 7)));
+      goalProjection = hardAvailability({ ...projectDailyLiquidity(goalInput), currentBalance: projection.currentBalance }, goalInput, fromDate).hard;
+    }
+    const guidance = savingsGuidance(goalProjection, hard.indicativeFreeAfterObligationsCents);
+    return {
+      ...projection,
+      freeAfterObligationsCents: hard.freeAfterObligationsCents,
+      indicativeFreeAfterObligationsCents: hard.indicativeFreeAfterObligationsCents,
+      availability: { ...hard.availability, excludedSavingsPlanIds: [...softIds] },
+      softSavings: guidance
+    };
+  }
+  function planningAnchor(state2, { accountProfileId, asOfDate, startDate, scope }) {
+    const history = checkpointHistory(state2, accountProfileId, scope).active;
+    return history.find((row) => row.asOfDate < startDate) || history.filter((row) => row.asOfDate >= startDate && row.asOfDate <= asOfDate).at(-1) || null;
+  }
   function selectDailyLiquidity(state2, options) {
-    return projectDailyLiquidity(buildLiquidityInput(state2, options));
+    var _a2;
+    if (!options.startDate) {
+      const input2 = buildLiquidityInput(state2, options);
+      return withAvailability(projectDailyLiquidity(input2), input2, options.asOfDate, (endDate) => buildLiquidityInput(state2, { ...options, endDate, salaryOnly: false }));
+    }
+    const { startDate, asOfDate } = options;
+    if (!validCalendarDate(startDate) || startDate > asOfDate) throw new Error("Kies een geldige beginperiode tot en met vandaag.");
+    if (balanceRequiredMonths(startDate, options.endDate || asOfDate).length > 24) throw new Error("Kies een prognose van maximaal 24 kalendermaanden.");
+    const current = buildLiquidityInput(state2, options), anchor = planningAnchor(state2, options);
+    const origin = (anchor == null ? void 0 : anchor.asOfDate) || shiftLiquidityDay(startDate, -1);
+    const inputFor = (endDate) => {
+      const input2 = buildLiquidityInput(state2, { ...options, asOfDate: origin, endDate, salaryOnly: false, planningBasis: true });
+      input2.displayStartDate = startDate;
+      input2.availabilityFromDate = asOfDate;
+      input2.observations = checkpointHistory(state2, options.accountProfileId, options.scope).active.filter((row) => row.asOfDate > origin && row.asOfDate <= asOfDate);
+      for (const row of current.opening.reasons) input2.reasons.push(issue(row.code, row.sourceId, current.opening.status === "incomplete" || current.opening.status === "unknown" ? "incomplete" : "provisional"));
+      if (!anchor || origin >= startDate) input2.reasons.push(issue("missing-period-opening"));
+      input2.reservations = input2.reservations.map((row) => ({ ...row, reserveForDisplay: row.type !== "budget" || row.month >= startDate.slice(0, 7) }));
+      input2.savingsPlans = input2.savingsPlans.filter((row) => row.month >= startDate.slice(0, 7));
+      return input2;
+    };
+    const input = inputFor(current.horizon.endDate || asOfDate);
+    input.horizon = current.horizon;
+    if (!current.horizon.endDate) input.reasons.push(issue("missing-reliable-horizon"));
+    const result2 = projectDailyLiquidity(input);
+    for (const row of result2.events.filter((row2) => row2.type === "bank")) row.replacedPlans = result2.events.filter((plan) => plan.status === "replaced" && plan.replacedBy.includes(row.sourceId)).map((plan) => ({ id: plan.id, type: plan.type, amountCents: plan.amountCents, date: plan.date, planningSourceId: plan.planningSourceId, person: plan.person }));
+    if (origin >= startDate && ((_a2 = result2.days[0]) == null ? void 0 : _a2.date) === origin) result2.days[0] = { ...result2.days[0], openingBalanceCents: null, checkpointId: anchor.id };
+    const reconciliations = result2.events.filter((row) => row.type === "checkpoint").map((row) => {
+      return { checkpointId: row.id.slice("checkpoint:".length), date: row.date, observedCents: row.observedBalanceCents, modeledCents: row.modeledBalanceCents, differenceCents: row.amountCents };
+    });
+    return withAvailability({ ...result2, asOfDate, calculationStartDate: origin, currentBalance: current.opening, displayStartDate: startDate, historyComplete: !!anchor && origin < startDate, reconciliations }, input, asOfDate, inputFor);
   }
 
   // src/ui/dashboard.mjs
@@ -2977,8 +3207,9 @@
     var _a2;
     if (!((_a2 = p == null ? void 0 : p.horizon) == null ? void 0 : _a2.endDate)) return `Prognoseperiode onbekend${p ? ` · ${status(p.status)}` : ""}`;
     const dated = (value) => new Intl.DateTimeFormat("nl-NL", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(/* @__PURE__ */ new Date(value + "T12:00:00Z"));
-    const from = p.asOfDate.slice(0, 4) === p.horizon.endDate.slice(0, 4) ? date(p.asOfDate) : dated(p.asOfDate);
-    return `${from} – ${dated(p.horizon.endDate)} · ${p.horizon.kind === "manual" ? "Einddatum inbegrepen" : "Tot vóór volgend salaris"}`;
+    const start = p.displayStartDate || p.asOfDate;
+    const from = start.slice(0, 4) === p.horizon.endDate.slice(0, 4) ? date(start) : dated(start);
+    return `${from} – ${dated(p.horizon.endDate)} · ${p.horizon.kind === "allowance-window" ? "Zakgeldprognose tot einde maand" : p.horizon.kind === "manual" ? "Einddatum inbegrepen" : "Tot vóór volgend salaris"}`;
   }
   function pointMeaning(events, isMinimum) {
     const income = events.some((e) => e.amountCents > 0), expense = events.some((e) => e.amountCents < 0);
@@ -2986,13 +3217,18 @@
   }
   function horizonEnd(filter, today, custom) {
     if (filter === "salary") return void 0;
-    if (filter === "7" || filter === "14") return shiftLiquidityDay(today, Number(filter));
+    if (filter === "7" || filter === "14") return shiftLiquidityDay(today, Number(filter) - 1);
     if (filter === "month") {
       const d = /* @__PURE__ */ new Date(today + "T12:00:00Z");
       d.setUTCMonth(d.getUTCMonth() + 1, 0);
       return d.toISOString().slice(0, 10);
     }
     return custom || void 0;
+  }
+  var horizonStart = (filter, today) => filter === "month" ? today.slice(0, 7) + "-01" : today;
+  function chartSegments(days, today) {
+    const index = days.findIndex((d) => d.date >= today);
+    return { past: days.filter((d) => d.date < today), future: index < 0 ? [] : days.slice(index) };
   }
   function primaryAccount(profiles, owner) {
     const matches = profiles.filter((p) => {
@@ -3002,11 +3238,22 @@
     return matches.length === 1 ? matches[0] : null;
   }
   function paymentEvents(p) {
-    return ((p == null ? void 0 : p.events) || []).filter((e) => e.accountProfileId === p.accountProfileId && ["actual", "provisional", "planned"].includes(e.status) && e.date > p.asOfDate && e.date <= p.horizon.endDate).sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+    return ((p == null ? void 0 : p.events) || []).filter((e) => e.accountProfileId === p.accountProfileId && ["actual", "provisional", "planned"].includes(e.status) && (p.displayStartDate ? e.date >= p.displayStartDate : e.date > p.asOfDate) && e.date <= p.horizon.endDate).sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
   }
   function liquidityView(p) {
     var _a2;
-    return { free: (_a2 = p.freeAfterObligationsCents) != null ? _a2 : p.indicativeFreeAfterObligationsCents, indicative: p.freeAfterObligationsCents == null, savings: p.savingsGoalCents, balance: p.opening.balanceCents, minimum: p.minimumBalanceCents, minimumDate: p.minimumDate, buffer: p.bufferCents };
+    return { free: (_a2 = p.freeAfterObligationsCents) != null ? _a2 : p.indicativeFreeAfterObligationsCents, indicative: p.freeAfterObligationsCents == null, savings: p.savingsGoalCents, balance: (p.currentBalance || p.opening).balanceCents, minimum: p.minimumBalanceCents, minimumDate: p.minimumDate, buffer: p.bufferCents };
+  }
+  function savingsNote(p) {
+    var _a2;
+    const s = p.softSavings;
+    const planned = `<span data-p3-savings-plan>Gepland sparen: ${money2((_a2 = s == null ? void 0 : s.goalCents) != null ? _a2 : p.savingsGoalCents)}</span>`;
+    if (!s || s.status === "none") return planned;
+    if (s.status === "unknown") return planned + "<span data-p3-savings-unknown>Spaarruimte nog niet betrouwbaar vast te stellen.</span>";
+    if (!s.remainingGoalCents) return planned + "<span>Spaardoel al gerealiseerd.</span>";
+    const room = `<span data-p3-savings-room>Ruimte boven spaardoel: ${money2(s.headroomCents)}</span>`;
+    const warning = !s.warning ? "" : s.shortfallCents > 0 ? "<span data-p3-savings-warning>Het spaardoel lijkt al niet volledig haalbaar. Extra uitgaven kunnen dit verder verlagen.</span>" : `<span data-p3-savings-warning>Boven ${money2(s.headroomCents)} extra uitgaven kan je geplande spaardoel in gevaar komen.</span>`;
+    return planned + room + warning;
   }
   function yearView(year, getMonth) {
     const months = Array.from({ length: 12 }, (_, i) => {
@@ -3034,11 +3281,19 @@
   function chartHtml(p, width = 720) {
     width = Math.max(210, width);
     const plotStart = 76, plotEnd = width - 24;
-    if (!(p == null ? void 0 : p.days.length)) return '<p class="p3-empty">Nog geen saldo-ontwikkeling beschikbaar. Stel je saldo en salarisdatum in.</p>';
+    if (p && !p.horizon.endDate) return '<p class="p3-empty">Een betrouwbare volgende salarisdatum ontbreekt. Kies een andere periode of stel salaris in bij Bankrekeningen.</p>';
+    if (!(p == null ? void 0 : p.days.length)) return '<p class="p3-empty">Een bruikbaar beginsaldo ontbreekt. Stel een saldo-ijkpunt in. Bekende geplande kasbewegingen blijven in de betalingslijst zichtbaar.</p>';
     const days = p.days, values = days.map((d) => d.expectedBalanceCents), lo = Math.min(0, p.bufferCents, ...values), hi = Math.max(p.bufferCents, ...values, 100), range = hi - lo || 1;
     const chartHeight = width >= 440 ? 205 : 245, baseline = chartHeight - 40;
     const x = (i) => plotStart + i * (plotEnd - plotStart) / Math.max(1, days.length - 1), y = (v) => baseline - (v - lo) / range * (baseline - 32);
-    const line = days.map((d, i) => `${i ? "L" : "M"}${x(i).toFixed(2)},${y(d.expectedBalanceCents).toFixed(2)}`).join(" ");
+    const segments = chartSegments(days, p.asOfDate), pathFor = (rows) => rows.map((d, i) => `${i ? "L" : "M"}${x(days.indexOf(d)).toFixed(2)},${y(d.expectedBalanceCents).toFixed(2)}`).join(" ");
+    const segment = (rows, kind) => {
+      if (!rows.length) return "";
+      const lineRows = kind === "history" && segments.future.length ? [...rows, segments.future[0]] : rows;
+      const path = pathFor(lineRows), from = x(days.indexOf(lineRows[0])), to = x(days.indexOf(lineRows.at(-1)));
+      return `<path d="${path} L${to},${baseline} L${from},${baseline} Z" class="p3-area p3-${kind}"/><path d="${path}" class="p3-line p3-${kind}" data-from="${rows[0].date}" data-to="${rows.at(-1).date}"/>`;
+    };
+    const todayIndex = days.findIndex((d) => d.date === p.asOfDate), today = segments.past.length && todayIndex >= 0 ? `<line class="p3-today" x1="${x(todayIndex)}" x2="${x(todayIndex)}" y1="28" y2="${baseline}"/><text class="p3-today-label" x="${Math.max(plotStart, Math.min(plotEnd - 48, x(todayIndex) + 5))}" y="20">Vandaag</text>` : "";
     const ticks = [0, 1, 2, 3].map((i) => {
       const v = lo + range * i / 3, yy = y(v);
       return `<line x1="${plotStart}" x2="${plotEnd}" y1="${yy}" y2="${yy}" class="p3-gridline"/><text x="${plotStart - 5}" y="${yy + 4}" text-anchor="end">${money2(Math.round(v)).replace(",00", "")}</text>`;
@@ -3050,17 +3305,18 @@
       const dot = meaning.income ? "p3-income" : meaning.expense ? "p3-expense" : "p3-neutral";
       return `<g role="button" tabindex="0" data-p3-point="${d.date}" aria-label="${date(d.date)}: ${money2(d.expectedBalanceCents)} · ${meaning.label}" aria-pressed="false"><circle class="p3-hit" cx="${cx}" cy="${cy}" r="22" fill="transparent"/>${meaning.isMinimum ? `<rect class="p3-min" x="${cx - 7}" y="${cy - 7}" width="14" height="14" rx="2" transform="rotate(45 ${cx} ${cy})"/>` : ""}<circle cx="${cx}" cy="${cy}" r="${meaning.isMinimum ? 3 : 4}" class="${dot}"/>${meaning.income && meaning.expense ? `<circle cx="${cx}" cy="${cy}" r="8" class="p3-mixed"/>` : ""}${meaning.isMinimum ? `<text class="p3-min-label" x="${Math.max(plotStart, Math.min(plotEnd - 6, cx))}" y="${Math.max(15, cy - 16)}" text-anchor="${cx > (plotStart + plotEnd) / 2 ? "end" : "start"}">Minimum · ${date(d.date)}</text>` : ""}</g>`;
     }).join("");
-    return `<div class="p3-chart"><svg viewBox="0 0 ${width} ${chartHeight}" role="group" aria-label="Verwachte saldo-ontwikkeling; selecteer een dag voor bedragen en gebeurtenissen">${ticks}<path d="${line} L${plotEnd},${baseline} L${plotStart},${baseline} Z" class="p3-area"/><line x1="${plotStart}" x2="${plotEnd}" y1="${y(p.bufferCents)}" y2="${y(p.bufferCents)}" class="p3-buffer-line"/><path d="${line}" class="p3-line"/>${markers}${labels2}</svg><div class="p3-chart-legend"><span>● Verwacht saldo / neutraal</span><span class="p3-income-key">● Inkomsten</span><span class="p3-expense-key">● Uitgaven</span><span>◇ Minimum</span><span>┄ Buffer ${money2(p.bufferCents)}</span></div><div class="p3-chart-controls"><label class="p3-day-select">Bekijk een dag <select data-p3-day aria-label="Dag in saldo-ontwikkeling">${days.map((d) => `<option value="${d.date}">${date(d.date)}</option>`).join("")}</select></label><div class="p3-point-detail" data-p3-point-detail aria-live="polite"></div></div></div>`;
+    return `<div class="p3-chart"><svg viewBox="0 0 ${width} ${chartHeight}" role="group" aria-label="Verwachte saldo-ontwikkeling; selecteer een dag voor bedragen en gebeurtenissen">${ticks}${segment(segments.past, "history")}${segment(segments.future, "future")}<line x1="${plotStart}" x2="${plotEnd}" y1="${y(p.bufferCents)}" y2="${y(p.bufferCents)}" class="p3-buffer-line"/>${today}${markers}${labels2}</svg><div class="p3-chart-legend">${segments.past.length ? '<span class="p3-history-key"><i aria-hidden="true">━</i> Verstreken dagen</span>' : ""}<span>━ Vandaag en toekomst</span><span class="p3-income-key">● Inkomsten</span><span class="p3-expense-key">● Uitgaven</span><span>◇ Minimum</span><span>┄ Buffer ${money2(p.bufferCents)}</span></div><div class="p3-chart-controls"><label class="p3-day-select">Bekijk een dag <select data-p3-day aria-label="Dag in saldo-ontwikkeling">${days.map((d) => `<option value="${d.date}">${date(d.date)}</option>`).join("")}</select></label><div class="p3-point-detail" data-p3-point-detail aria-live="polite"></div></div></div>`;
   }
   function outlookHtml(p, profile, label, iconSvg2) {
-    var _a2;
+    var _a2, _b;
     if (!profile) return `<p class="p3-empty">Kies de primaire betaalrekening voor deze context. Er wordt geen willekeurige rekening gebruikt.</p>${action("accounts", "Rekening instellen")}`;
     if (!p) return '<p class="p3-empty" role="status">Vooruitblik laden…</p>';
     const v = liquidityView(p), kpi = (title, value, sub, icon, act = "") => `<${act ? 'button type="button"' : "article"} class="p3-kpi" ${act ? `data-p3-action="${act}"` : ""}><span class="p3-kpi-icon" aria-hidden="true">${iconSvg2(icon)}</span><span class="p3-kpi-copy"><span>${title}</span><strong>${value}</strong><small>${sub}</small></span></${act ? "button" : "article"}>`;
     const warning = v.minimum !== null && v.minimum < v.buffer ? `<div class="p3-warning" role="status">${p.status !== "projected" ? `${status(p.status)} · ` : ""}Op ${date(v.minimumDate)} wordt ${money2(v.minimum)} verwacht. ${v.minimum < 0 ? "Dit is onder € 0. " : ""}Dat is ${money2(v.buffer - v.minimum)} onder je buffer van ${money2(v.buffer)}.</div>` : "";
-    const help = `<details class="p3-explanation"><summary>Hoe wordt Vrij na verplichtingen bepaald?</summary><p>P2 houdt rekening met bekende verplichtingen, budgetreserveringen en de ingestelde veiligheidsbuffer. Het spaardoel is een ingecalculeerd streven in de zakgeldplanning en wordt hier niet nogmaals afgetrokken. Periode: ${date(p.asOfDate)} tot en met ${date(p.horizon.endDate)}.</p></details>`;
-    const quality = p.reasons.length ? `<div class="p3-quality"><details><summary>${status(p.status)} · ${escape((_a2 = p.reasons[0]) == null ? void 0 : _a2.message)}</summary><ul>${[...new Set(p.reasons.map((r) => r.message))].map((message) => `<li>${escape(message)}</li>`).join("")}</ul></details><div class="p3-quality-actions">${action("settings", p.reasons.some((r) => r.code === "missing-reliable-horizon") ? "Salarisdatum instellen" : "Prognose instellen")}${v.balance === null ? action("balance", "Saldo instellen") : ""}</div></div>` : "";
-    return `<div class="p3-kpis">${kpi("Vrij na verplichtingen", money2(v.free), `${v.indicative && v.free !== null ? "Indicatie · " : ""}Spaardoel: ${money2(v.savings)}`, "income")}${kpi("Huidig saldo", v.balance === null ? "Saldo onbekend" : money2(v.balance), `${status(p.opening.status)} · ${date(p.opening.toDate || p.asOfDate)} · Saldo bijwerken`, "wallet", "balance")}${kpi("Laagste prognose", money2(v.minimum), `${date(v.minimumDate)} · ${status(p.status)}`, "chart")}${kpi("Buffer", money2(v.buffer), "Veiligheidsmarge · Instellen", "shield", "settings")}</div>${warning}<div class="p3-outlook-footer">${help}${quality}</div>`;
+    const help = `<details class="p3-explanation"><summary>Hoe wordt Vrij na verplichtingen bepaald?</summary><p>Dit is de maximale extra uitgave vandaag zonder vanaf vandaag onder je veiligheidsbuffer te komen, na resterende verplichtingen en budgetten. Beoordeling: ${date(((_a2 = p.availability) == null ? void 0 : _a2.fromDate) || p.asOfDate)} tot en met ${date(p.horizon.endDate)}. De grafiek kan ook verstreken dagen tonen. Gepland sparen is een streefdoel, geen extra harde aftrek. De spaardoelruimte volgt de verwachte kasruimte aan het maandeinde en de bestaande spaarplanning.</p></details>`;
+    const reconciliations = (p.reconciliations || []).filter((r) => r.differenceCents !== null && r.differenceCents !== 0).map((r) => `<p class="p3-caption">Saldo-ijkpunt ${date(r.date)}: ${money2(r.observedCents)} · berekend ${money2(r.modeledCents)} · verschil ${money2(r.differenceCents)}. Vanaf deze dag loopt de berekening verder met het handmatig ingestelde saldo.</p>`).join("");
+    const quality = p.reasons.length ? `<div class="p3-quality"><details><summary>${status(p.status)} · ${escape((_b = p.reasons[0]) == null ? void 0 : _b.message)}</summary><ul>${[...new Set(p.reasons.map((r) => r.message))].map((message) => `<li>${escape(message)}</li>`).join("")}</ul></details><div class="p3-quality-actions">${action("settings", p.reasons.some((r) => r.code === "missing-reliable-horizon") ? "Salarisdatum instellen" : "Prognose instellen")}${v.balance === null ? action("balance", "Saldo instellen") : ""}</div></div>` : "";
+    return `<div class="p3-kpis">${kpi("Vrij na verplichtingen", money2(v.free), `${v.indicative && v.free !== null ? "Indicatie · " : ""}${savingsNote(p)}`, "income")}${kpi("Huidig saldo", v.balance === null ? "Saldo onbekend" : money2(v.balance), `${status((p.currentBalance || p.opening).status)} · ${date((p.currentBalance || p.opening).toDate || p.asOfDate)} · Saldo bijwerken`, "wallet", "balance")}${kpi("Laagste prognose", money2(v.minimum), `${date(v.minimumDate)} · ${status(p.status)}`, "chart")}${kpi("Buffer", money2(v.buffer), "Veiligheidsmarge · Instellen", "shield", "settings")}</div>${warning}<div class="p3-outlook-footer">${help}${quality}${reconciliations}</div>`;
   }
   function yearHtml(year, getMonth) {
     const v = yearView(year, getMonth), max = Math.max(1, ...v.months.filter((m) => !m.missing).flatMap((m) => [m.income, m.spent]));
@@ -3068,11 +3324,14 @@
   }
   function createDashboard(deps) {
     let controller = null, chartObserver = null, chartFrame = 0, selectedDay = null, lastChartWidth = 0;
-    let generation = 0, projection = null, filter = "salary", custom = "", context = "gezamenlijk", year = null, localPerson = "dion";
+    let generation = 0, projection = null, filter = "month", custom = "", context = "gezamenlijk", year = null, localPerson = "dion";
     try {
       const pref = JSON.parse(localStorage.getItem("finize-dashboard-context") || "null");
       if ((pref == null ? void 0 : pref.context) === "persoonlijk") context = pref.context;
       if (["dion", "dara"].includes(pref == null ? void 0 : pref.person)) localPerson = pref.person;
+      if (["month", "7", "14", "custom", "salary"].includes(pref == null ? void 0 : pref.filter)) filter = pref.filter;
+      if (/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test((pref == null ? void 0 : pref.custom) || "") && pref.custom >= deps.today()) custom = pref.custom;
+      else if (filter === "custom") filter = "month";
     } catch (e) {
     }
     function owner() {
@@ -3080,7 +3339,7 @@
     }
     function savePreference() {
       try {
-        localStorage.setItem("finize-dashboard-context", JSON.stringify({ context, person: localPerson }));
+        localStorage.setItem("finize-dashboard-context", JSON.stringify({ context, person: localPerson, filter, custom }));
       } catch (e) {
       }
     }
@@ -3102,7 +3361,24 @@
       selectedDay = day;
       root2.querySelectorAll("g[data-p3-point]").forEach((point) => point.setAttribute("aria-pressed", String(point.dataset.p3Point === day)));
       root2.querySelector("[data-p3-day]").value = day;
-      root2.querySelector("[data-p3-point-detail]").innerHTML = `<strong>${date(day)} · ${money2(d.expectedBalanceCents)}</strong><span>${paymentEvents(projection).filter((e) => e.date === day).map((e) => `${escape(deps.eventLabel(e))}: ${money2(e.amountCents)} (${status(e.status)})`).join(" · ") || "Geen concrete betaling"}${d.estimatedBudgetCents ? ` · Budgetschatting ${money2(d.estimatedBudgetCents)}` : ""}</span>`;
+      const detail = root2.querySelector("[data-p3-point-detail]");
+      detail.hidden = false;
+      detail.removeAttribute("data-hover-tooltip");
+      detail.removeAttribute("style");
+      const signed = (value) => (value > 0 ? "+ " : "") + money2(value);
+      const rows = projection.events.filter((e) => d.eventIds.includes(e.id));
+      const replaced = (e) => (e.replacedPlans || []).map((plan) => ` (planning ${money2(Math.abs(plan.amountCents))} vervangen)`).join("");
+      detail.innerHTML = `<div class="p3-detail-heading"><strong>${date(day)} ${day.slice(0, 4)}</strong><button type="button" class="ghost small" data-p3-close-detail aria-label="Datumdetails sluiten">Sluiten</button></div><span>Berekend beginsaldo: ${money2(d.openingBalanceCents)}</span><ul>${rows.map((e) => `<li>${escape(e.type === "checkpoint" ? "Handmatig saldo-ijkpunt" : deps.eventLabel(e))}: <strong>${signed(e.amountCents)}</strong>${escape(replaced(e))} <span>(${e.type === "checkpoint" ? "Saldo ingesteld op " + money2(e.observedBalanceCents) : e.type === "bank" ? e.status === "provisional" ? "Voorlopig verwerkt · geboekt, nog nakijken" : "Werkelijk" : e.type === "fixed" ? "Geplande vaste last" : e.type === "allowance" || e.type === "internal-transfer" ? "Geplande interne overboeking" : "Geplande inkomsten"})</span></li>`).join("") || (d.estimatedBudgetCents ? "" : "<li>Geen mutaties</li>")}${d.estimatedBudgetCents ? `<li>Geschatte resterende budgetuitgaven: <strong>${signed(-d.estimatedBudgetCents)}</strong></li>` : ""}</ul><span>Totaal mutaties: ${signed(d.mutationCents)}</span><strong>Berekend eindsaldo: ${money2(d.expectedBalanceCents)}</strong><span>${d.checkpointId ? "Saldo-ijkpunt aan het einde van deze dag · beginsaldo onbekend" : "Berekend uit planning en beschikbare bankboekingen"} · ${status(projection.status)}</span>`;
+    }
+    function chartDay(root2, e) {
+      if (!(projection == null ? void 0 : projection.days.length)) return;
+      const svg = e.target.closest("[data-p3-chart] svg");
+      if (!svg) return;
+      const point = e.target.closest("[data-p3-point]");
+      if (point) return point.dataset.p3Point;
+      const rect = svg.getBoundingClientRect(), x = (e.clientX - rect.left) * svg.viewBox.baseVal.width / rect.width;
+      const index = Math.round(Math.max(0, Math.min(1, (x - 76) / (svg.viewBox.baseVal.width - 100))) * (projection.days.length - 1));
+      return projection.days[index].date;
     }
     function unmount() {
       ++generation;
@@ -3157,7 +3433,7 @@
         return;
       }
       try {
-        const p = await deps.project({ accountProfileId: profile.id, asOfDate: deps.today(), endDate: horizonEnd(filter, deps.today(), custom) });
+        const p = await deps.project({ accountProfileId: profile.id, asOfDate: deps.today(), startDate: horizonStart(filter, deps.today()), endDate: horizonEnd(filter, deps.today(), custom), salaryOnly: filter === "salary" });
         if (token !== generation || !root2.isConnected) return;
         projection = p;
         root2.querySelector("[data-p3-outlook]").innerHTML = outlookHtml(p, profile, deps.eventLabel, deps.iconSvg);
@@ -3178,11 +3454,32 @@
       const signal = controller.signal;
       year != null ? year : year = Number(deps.month().slice(0, 4));
       root2.classList.add("p3-dashboard");
-      root2.insertAdjacentHTML("beforeend", `<div class="p3-surface"><section class="p3-panel p3-outlook"><div class="p3-toolbar"><div><h2>Vooruitblik</h2><p class="p3-caption">Je verwachte saldo en aankomende betalingen.</p></div><div class="p3-context" role="group" aria-label="Dashboardcontext">${["gezamenlijk", "persoonlijk"].map((c) => `<button type="button" data-p3-context="${c}" aria-pressed="${context === c}">${c === "gezamenlijk" ? "Gezamenlijk" : "Persoonlijk"}</button>`).join("")}</div>${!deps.personalRole() ? `<label class="p3-person" ${context === "gezamenlijk" ? "hidden" : ""}>Persoon <select data-p3-person><option value="dion" ${localPerson === "dion" ? "selected" : ""}>Dion</option><option value="dara" ${localPerson === "dara" ? "selected" : ""}>Dara</option></select></label>` : ""}<div class="p3-filters" role="group" aria-label="Prognoseperiode">${[["salary", "Volgende salaris"], ["7", "7 dagen"], ["14", "14 dagen"], ["month", "Einde maand"], ["custom", "Eigen datum"]].map(([value, title]) => `<button type="button" data-p3-filter="${value}" aria-pressed="${filter === value}">${title}</button>`).join("")}</div></div><label class="p3-custom" ${filter === "custom" ? "" : "hidden"}>Tot en met <input type="date" data-p3-custom min="${deps.today()}" value="${custom}" required></label><div data-p3-outlook></div></section><div class="p3-main"><section class="p3-panel">${head("Saldo-ontwikkeling")}<p class="p3-period" data-p3-period aria-live="polite"></p><p class="p3-caption">Verwacht saldo · ongedateerde budgetuitgaven zijn gelijkmatig geschat.</p><div data-p3-chart></div></section><section class="p3-panel">${head("Komende betalingen", action("payments"))}<ul class="p3-payments" data-p3-payments></ul></section></div><div class="p3-summary" data-p3-summary></div><section class="p3-panel p3-year" data-p3-year-panel></section></div>`);
+      root2.insertAdjacentHTML("beforeend", `<div class="p3-surface"><section class="p3-panel p3-outlook"><div class="p3-toolbar"><div><h2>Vooruitblik</h2><p class="p3-caption">Je verwachte saldo en aankomende betalingen.</p></div><div class="p3-context" role="group" aria-label="Dashboardcontext">${["gezamenlijk", "persoonlijk"].map((c) => `<button type="button" data-p3-context="${c}" aria-pressed="${context === c}">${c === "gezamenlijk" ? "Gezamenlijk" : "Persoonlijk"}</button>`).join("")}</div>${!deps.personalRole() ? `<label class="p3-person" ${context === "gezamenlijk" ? "hidden" : ""}>Persoon <select data-p3-person><option value="dion" ${localPerson === "dion" ? "selected" : ""}>Dion</option><option value="dara" ${localPerson === "dara" ? "selected" : ""}>Dara</option></select></label>` : ""}<div class="p3-filters" role="group" aria-label="Prognoseperiode">${[["month", "Deze maand"], ["7", "7 dagen"], ["14", "14 dagen"], ["custom", "Eigen datum"], ["salary", "Volgend salaris"]].map(([value, title]) => `<button type="button" data-p3-filter="${value}" aria-pressed="${filter === value}">${title}</button>`).join("")}</div></div><label class="p3-custom" ${filter === "custom" ? "" : "hidden"}>Tot en met <input type="date" data-p3-custom min="${deps.today()}" value="${custom}" required></label><div data-p3-outlook></div></section><div class="p3-main"><section class="p3-panel">${head("Saldo-ontwikkeling")}<p class="p3-period" data-p3-period aria-live="polite"></p><p class="p3-caption">Berekend saldo uit planning en bankboekingen · oranje is verleden, groen is vandaag en toekomst. Budgetuitgaven zonder datum zijn geschat.</p><div data-p3-chart></div></section><section class="p3-panel">${head("Betalingen in deze periode", action("payments"))}<ul class="p3-payments" data-p3-payments></ul></section></div><div class="p3-summary" data-p3-summary></div><section class="p3-panel p3-year" data-p3-year-panel></section></div>`);
       renderLower(root2);
       observeChart(root2);
       load(root2);
+      root2.addEventListener("pointermove", (e) => {
+        var _a2;
+        if (e.pointerType !== "mouse" || e.buttons) return;
+        const day = chartDay(root2, e);
+        if (!day) return;
+        if (day !== selectedDay || ((_a2 = root2.querySelector("[data-p3-point-detail]")) == null ? void 0 : _a2.hidden)) showDay(root2, day);
+        const detail = root2.querySelector("[data-p3-point-detail]");
+        if (innerWidth >= 768 && detail) {
+          detail.setAttribute("data-hover-tooltip", "");
+          const chart = detail.closest(".p3-chart").getBoundingClientRect();
+          detail.style.maxWidth = Math.max(44, Math.min(innerWidth - 16, chart.width - 16)) + "px";
+          detail.style.maxHeight = Math.max(44, Math.min(innerHeight - 16, chart.height - 16)) + "px";
+          const box = detail.getBoundingClientRect();
+          detail.style.left = Math.max(8, chart.left + 8, Math.min(innerWidth - box.width - 8, chart.right - box.width - 8, e.clientX + 16)) + "px";
+          detail.style.top = Math.max(8, chart.top + 8, Math.min(innerHeight - box.height - 8, chart.bottom - box.height - 8, e.clientY + 16)) + "px";
+        }
+      }, { signal });
       root2.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+          const detail = root2.querySelector("[data-p3-point-detail]");
+          if (detail) detail.hidden = true;
+        }
         const point = e.target.closest("g[data-p3-point]");
         if (point && ["Enter", " "].includes(e.key)) {
           e.preventDefault();
@@ -3191,8 +3488,13 @@
       }, { signal });
       root2.addEventListener("click", (e) => {
         var _a2;
-        const point = e.target.closest("g[data-p3-point]");
-        if (point) showDay(root2, point.dataset.p3Point);
+        const day = chartDay(root2, e);
+        if (day) showDay(root2, day);
+        if (e.target.closest("[data-p3-close-detail]")) {
+          root2.querySelector("[data-p3-point-detail]").hidden = true;
+          selectedDay = null;
+          root2.querySelectorAll("[data-p3-point]").forEach((p) => p.setAttribute("aria-pressed", "false"));
+        }
         const button = e.target.closest("button");
         if (!button) return;
         if (button.dataset.p3Context) {
@@ -3206,6 +3508,7 @@
         }
         if (button.dataset.p3Filter) {
           filter = button.dataset.p3Filter;
+          savePreference();
           root2.querySelectorAll("[data-p3-filter]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.p3Filter === filter)));
           root2.querySelector(".p3-custom").hidden = filter !== "custom";
           if (filter === "custom" && !custom) {
@@ -3252,6 +3555,7 @@
       root2.addEventListener("change", (e) => {
         if (e.target.matches("[data-p3-custom]") && e.target.reportValidity()) {
           custom = e.target.value;
+          savePreference();
           load(root2);
         }
         if (e.target.matches("[data-p3-person]")) {
@@ -3338,6 +3642,7 @@
     }
   }
   function applyAccountProfileCommand(state2, command, { imports = [] } = {}) {
+    var _a2, _b, _c;
     if (typeof (command == null ? void 0 : command.operationId) !== "string" || !command.operationId || typeof command.id !== "string" || !command.id || !Number.isFinite(Date.parse(command.createdAt))) throw fail2("invalid-account-command", "De opslagactie mist een geldige identiteit of vastlegtijd. Open het formulier opnieuw.");
     const profiles = state2.accountProfiles || [], old = profiles.find((profile2) => profile2.id === command.id);
     const signature2 = JSON.stringify([command.type, command.id, command.values || {}]);
@@ -3366,7 +3671,7 @@
       if ((old == null ? void 0 : old.iban) && profile.identifier !== old.identifier) profile.iban = profile.identifier;
     } else if (command.type === "liquidity-settings") {
       const values = command.values || {};
-      profile = { ...old, liquidity: { version: 1, primaryForOwner: values.primaryForOwner, bufferCents: values.bufferCents, salaryDays: structuredClone(values.salaryDays) }, updatedAt: command.createdAt };
+      profile = { ...old, liquidity: { version: 1, primaryForOwner: values.primaryForOwner, bufferCents: values.bufferCents, salaryDays: structuredClone(values.salaryDays), allowanceDays: structuredClone((_c = (_b = values.allowanceDays) != null ? _b : (_a2 = old == null ? void 0 : old.liquidity) == null ? void 0 : _a2.allowanceDays) != null ? _c : {}) }, updatedAt: command.createdAt };
     } else if (["archive", "reactivate"].includes(command.type)) profile = { ...old, status: command.type === "archive" ? "archived" : "active", updatedAt: command.createdAt };
     else throw fail2("invalid-account-command", "Deze rekeningactie wordt niet ondersteund.");
     profile.lastAccountOperationId = command.operationId;
@@ -3554,19 +3859,21 @@
 
   // src/ui/liquidity-settings.mjs
   var escape3 = (value) => String(value != null ? value : "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  var dayOptions = (day) => '<option value="">Niet ingesteld</option>' + [...Array.from({ length: 31 }, (_, i) => i + 1), "last"].map((value) => `<option value="${value}" ${value === day ? "selected" : ""}>${value === "last" ? "Laatste dag van de maand" : "Dag " + value}</option>`).join("");
+  function receiptHtml({ kind = "salary", person = "dion", day = "" } = {}) {
+    return `<fieldset data-income-receipt class="bank-account-fields"><legend>Geplande ontvangst</legend><label>Soort inkomsten<select data-income-kind><option value="salary" ${kind === "salary" ? "selected" : ""}>Salaris</option><option value="allowance" ${kind === "allowance" ? "selected" : ""}>Zakgeld</option></select></label><label>Van wie<select data-income-person>${["dion", "dara"].map((p) => `<option value="${p}" ${p === person ? "selected" : ""}>${p === "dion" ? "Dion" : "Dara"}</option>`).join("")}</select></label><label>Dag van de maand<select data-income-day ${kind === "salary" ? `name="salary-${person}"` : ""}>${dayOptions(day)}</select></label><button type="button" class="ghost" data-income-remove>Ontvangst verwijderen</button></fieldset>`;
+  }
   function renderLiquiditySettings(profile) {
     const config = profile.liquidity || {}, joint = profile.accountOwner === "gezamenlijk";
-    return `<section class="card liquidity-settings"><h3>Dagelijkse prognose</h3>
-    <form data-liquidity-form class="bank-account-form">
-    <label class="bank-account-archive-filter"><input type="checkbox" name="primaryForOwner" ${config.primaryForOwner ? "checked" : ""} ${profile.accountType !== "payment" ? "disabled" : ""}> Gebruik deze betaalrekening voor de maandplanning van ${joint ? "Gezamenlijk" : escape3(profile.accountOwner === "dion" ? "Dion" : "Dara")}</label>
-    <p class="hint">Deze keuze koppelt vaste lasten en budgetten zonder eigen rekeningkeuze aan deze fysieke rekening.</p>
-    <div class="bank-account-fields"><label>Veiligheidsbuffer (€)<input name="buffer" type="number" min="0" step="0.01" required inputmode="decimal" value="${liquidityBuffer(profile) / 100}"></label>
-    ${["dion", "dara"].map((person) => {
-      var _a2, _b;
-      return `<label>Salaris ${person === "dion" ? "Dion" : "Dara"}: betaaldag op deze rekening<input name="salary-${person}" type="number" min="1" max="31" step="1" inputmode="numeric" value="${escape3((_b = (_a2 = config.salaryDays) == null ? void 0 : _a2[person]) != null ? _b : "")}"></label>`;
-    }).join("")}</div>
-    <p class="hint">Vul alleen een bevestigde maandelijkse betaaldag in (1–31). Leeg betekent onbekend of niet op deze rekening. In een kortere maand gebruiken we de laatste dag. Dit wijzigt geen salarisbedragen. ${joint ? "De standaardbuffer voor de primaire gezamenlijke betaalrekening is € 200." : ""}</p>
-    <p role="alert" data-liquidity-error></p><div class="bank-account-actions"><button class="primary" type="submit">Prognose-instellingen opslaan</button></div></form></section>`;
+    const receipts = ["salary", "allowance"].flatMap((kind) => Object.entries(config[kind === "salary" ? "salaryDays" : "allowanceDays"] || {}).map(([person, day]) => ({ kind, person, day })));
+    if (!receipts.length) receipts.push({ person: joint ? "dion" : profile.accountOwner });
+    return `<section class="card liquidity-settings"><h3>Dagelijkse prognose</h3><form data-liquidity-form class="bank-account-form">
+ <label class="bank-account-archive-filter"><input type="checkbox" name="primaryForOwner" ${config.primaryForOwner ? "checked" : ""} ${profile.accountType !== "payment" ? "disabled" : ""}> Gebruik deze betaalrekening voor de maandplanning van ${joint ? "Gezamenlijk" : escape3(profile.accountOwner === "dion" ? "Dion" : "Dara")}</label>
+ <p class="hint">Deze keuze koppelt vaste lasten en budgetten zonder eigen rekeningkeuze aan deze fysieke rekening.</p>
+ <label>Veiligheidsbuffer (€)<input name="buffer" type="number" min="0" step="0.01" required inputmode="decimal" value="${liquidityBuffer(profile) / 100}"></label>
+ <div data-income-receipts>${receipts.map(receiptHtml).join("")}</div><button type="button" class="ghost" data-income-add>Ontvangst toevoegen</button>
+ <p class="hint">Kies per ontvangst salaris óf zakgeld, van wie en wanneer. Zakgeld hoort op de persoonlijke betaalrekening van die persoon. Het bedrag volgt automatisch de bestaande maandberekening. In een kortere maand gebruiken we de laatste kalenderdag. Niet ingesteld betekent dat geen betaaldag bekend is. ${joint ? "De standaardbuffer voor de primaire gezamenlijke betaalrekening is € 200." : ""}</p>
+ <p role="alert" data-liquidity-error></p><div class="bank-account-actions"><button class="primary" type="submit">Prognose-instellingen opslaan</button></div></form></section>`;
   }
   function bindLiquiditySettings(panel, profile, { save, ensureScope, onOpen }) {
     const form = panel.querySelector("[data-liquidity-form]");
@@ -3576,16 +3883,38 @@
     form.elements.primaryForOwner.onchange = () => {
       if (profile.accountOwner === "gezamenlijk") form.elements.buffer.value = form.elements.primaryForOwner.checked ? "200" : "0";
     };
+    form.querySelector("[data-income-add]").onclick = () => {
+      form.querySelector("[data-income-receipts]").insertAdjacentHTML("beforeend", receiptHtml({ person: profile.accountOwner === "gezamenlijk" ? "dion" : profile.accountOwner }));
+      form.querySelector("[data-income-receipt]:last-child [data-income-kind]").focus();
+    };
+    form.addEventListener("click", (e) => {
+      if (e.target.closest("[data-income-remove]")) e.target.closest("[data-income-receipt]").remove();
+    });
+    form.addEventListener("change", (e) => {
+      const row = e.target.closest("[data-income-receipt]");
+      if (!row) return;
+      const kind = row.querySelector("[data-income-kind]").value, person = row.querySelector("[data-income-person]").value;
+      const day = row.querySelector("[data-income-day]");
+      day.removeAttribute("name");
+      if (kind === "salary") day.name = "salary-" + person;
+    });
     form.onsubmit = async (event2) => {
       event2.preventDefault();
       if (busy2 || !form.reportValidity()) return;
       const error2 = form.querySelector("[data-liquidity-error]");
       error2.textContent = "";
       try {
-        const values = { primaryForOwner: form.elements.primaryForOwner.checked, bufferCents: decimalAmountToCents(Number(form.elements.buffer.value)), salaryDays: {} };
-        for (const person of ["dion", "dara"]) if (form.elements["salary-" + person].value !== "") values.salaryDays[person] = Number(form.elements["salary-" + person].value);
+        const values = { primaryForOwner: form.elements.primaryForOwner.checked, bufferCents: decimalAmountToCents(Number(form.elements.buffer.value)), salaryDays: {}, allowanceDays: {} };
+        for (const row of form.querySelectorAll("[data-income-receipt]")) {
+          const kind = row.querySelector("[data-income-kind]").value, person = row.querySelector("[data-income-person]").value, day = row.querySelector("[data-income-day]").value;
+          if (!day) continue;
+          if (kind === "allowance" && (profile.accountOwner !== person || profile.accountType !== "payment")) throw new Error("Kies voor zakgeld de persoonlijke betaalrekening van " + (person === "dion" ? "Dion" : "Dara") + ".");
+          const target = values[kind === "allowance" ? "allowanceDays" : "salaryDays"];
+          if (Object.hasOwn(target, person)) throw new Error("Deze ontvangst staat tweemaal op dezelfde rekening. Verwijder de dubbele instelling.");
+          target[person] = day === "last" ? "last" : Number(day);
+        }
         busy2 = true;
-        form.querySelectorAll("input,button").forEach((el) => el.disabled = true);
+        form.querySelectorAll("input,select,button").forEach((el) => el.disabled = true);
         ensureScope();
         await save({ type: "liquidity-settings", id: profile.id, expectedProfile, values, operationId, createdAt });
         ensureScope();
@@ -3594,7 +3923,7 @@
         error2.textContent = failure2.commitOutcome === "uncertain" ? "Opslaguitkomst onzeker. Herlaad de app voordat je opnieuw probeert." : failure2.message;
         if (failure2.commitOutcome !== "uncertain") {
           busy2 = false;
-          form.querySelectorAll("input,button").forEach((el) => el.disabled = false);
+          form.querySelectorAll("input,select,button").forEach((el) => el.disabled = false);
           form.elements.primaryForOwner.disabled = profile.accountType !== "payment";
         }
       }
@@ -8049,6 +8378,7 @@
             begindatum: start,
             einddatum: "",
             afschrijfdatum: String(row.afschrijfdatum || ""),
+            ...Object.hasOwn(row, "afschrijfdag") ? { afschrijfdag: row.afschrijfdag } : {},
             actief: true,
             amountHistory: [{ id: `amount-${row.id}`, effectiveFrom: start, amount: round22(Number(row.bedrag) || 0) }],
             monthOverrides: {},
@@ -11266,6 +11596,7 @@
       },
       eventLabel: (event2) => {
         var _a2;
+        if (event2.type === "allowance") return "Zakgeld " + ownerLabel(event2.person) + (event2.amountCents > 0 ? " ontvangen" : " overboeken");
         if (event2.type === "salary") return "Salaris " + ownerLabel(event2.person);
         if (event2.type === "bank") {
           const mutation = state.transactions.find((tx) => sourceRecordKey(tx) === event2.sourceId);
@@ -12462,6 +12793,13 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     });
     return true;
   }
+  function paymentDayOptions(day) {
+    return '<option value="">Onbekend</option>' + [...Array.from({ length: 31 }, (_, i) => i + 1), "last"].map((value) => `<option value="${value}" ${String(value) === String(day) ? "selected" : ""}>${value === "last" ? "Laatste dag van de maand" : "Dag " + value}</option>`).join("");
+  }
+  function paymentDayLabel(item) {
+    const day = fixedPaymentDay(item);
+    return day === "last" ? "laatste dag van de maand" : day ? "dag " + day : "onbekend";
+  }
   function renderJointFixedCostsEditorRows(rows, options = {}) {
     const kind = options.kind || "fixed";
     const idAttr = kind === "mortgage" ? "data-mortgage-id" : "data-fixed-id";
@@ -12506,7 +12844,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       ${kind === "fixed" ? `<select class="joint-fixed-editor-move" data-fixed-move-id="${textSafe(row.id)}" data-fixed-source-path="${sourcePath}" aria-label="Verplaatsen naar">${moveOptions}</select>` : '<span class="joint-fixed-editor-mortgage-note">50/50</span>'}
       <button type="button" class="joint-fixed-row-delete-compact" ${removeAttr}="${textSafe(row.id)}" aria-label="Post verwijderen">×</button>
       <div class="joint-fixed-editor-admin">
-        <label>Afschrijfdatum<input class="joint-fixed-editor-input joint-fixed-editor-date" type="date" ${fieldAttr}="afschrijfdatum" ${idAttr}="${textSafe(row.id)}" value="${attrSafe(row.afschrijfdatum || "")}" aria-label="Afschrijfdatum"></label>
+        <label>Afschrijfdag<select class="joint-fixed-editor-input joint-fixed-editor-date" ${fieldAttr}="afschrijfdag" ${idAttr}="${textSafe(row.id)}" aria-label="Afschrijfdag">${paymentDayOptions(fixedPaymentDay(row))}</select></label>
         <span class="joint-fixed-distribution">Verdeling: <strong>${textSafe(distributionLabel)}</strong></span>
         <span>Gerekend als ${eur(monthly)} per maand${note ? ` · ${note}` : ""}</span>
       </div>
@@ -14652,7 +14990,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     const fixed = resolveFixedExpensesForMonth(state, getSelectedMonth()).filter((item) => !planningOwner || (item.financialFor || item.rekening || "gezamenlijk") === planningOwner);
     const incomes = resolveIncomeSourcesForMonth(state, getSelectedMonth(), null, { planningOnly: true }).filter((item) => !planningOwner || (planningOwner === "gezamenlijk" ? (item.financialFor || item.rekening) === planningOwner : item.eigenaar === planningOwner));
     const ownerName = planningOwner ? u3AccountLabel(planningOwner) : "";
-    const rows = (items, kind) => items.map((item) => `<article class="u3-admin-row"><div class="u3-row-head"><div><strong>${textSafe(item.naam || "Zonder naam")}</strong><br><small>${u3AccountLabel(item.rekening)} → ${u3AccountLabel(item.financialFor || item.rekening)} · elke ${textSafe(item.frequentieAantal)} ${textSafe(item.frequentieEenheid)}${kind === "fixed" ? ` · ${textSafe(u3FixedDistributionLabel(item))}` : ""}</small></div><div><span class="u3-status ${item.actief !== false ? "ok" : ""}">${item.actief !== false ? "Actief" : "Gestopt"}</span> <button class="ghost small" data-u3-edit-recurring="${attrSafe(kind + ":" + item.id)}">Bewerken</button></div></div><div>${eur(u3AmountAt2(item, getSelectedMonth()))} <small>· gemiddeld ${eur(u3MonthlyAverage(item))} p/m${kind === "fixed" && item.afschrijfdatum ? ` · afschrijving ${formatDateNL(item.afschrijfdatum)}` : ""}${kind === "fixed" ? fixedRealizationLabel(item) : ""}</small></div></article>`).join("");
+    const rows = (items, kind) => items.map((item) => `<article class="u3-admin-row"><div class="u3-row-head"><div><strong>${textSafe(item.naam || "Zonder naam")}</strong><br><small>${u3AccountLabel(item.rekening)} → ${u3AccountLabel(item.financialFor || item.rekening)} · elke ${textSafe(item.frequentieAantal)} ${textSafe(item.frequentieEenheid)}${kind === "fixed" ? ` · ${textSafe(u3FixedDistributionLabel(item))}` : ""}</small></div><div><span class="u3-status ${item.actief !== false ? "ok" : ""}">${item.actief !== false ? "Actief" : "Gestopt"}</span> <button class="ghost small" data-u3-edit-recurring="${attrSafe(kind + ":" + item.id)}">Bewerken</button></div></div><div>${eur(u3AmountAt2(item, getSelectedMonth()))} <small>· gemiddeld ${eur(u3MonthlyAverage(item))} p/m${kind === "fixed" ? ` · afschrijving ${paymentDayLabel(item)}` : ""}${kind === "fixed" ? fixedRealizationLabel(item) : ""}</small></div></article>`).join("");
     const { modal } = u3AdminModal(`<div class="u3-admin-head"><div><div class="section-kicker">${monthLabel(getSelectedMonth())} · Planning</div><h2>${planningOwner ? `${textSafe(ownerName)} vaste lasten` : "Planning beheren"}</h2><p>${planningOwner ? `Alleen de vaste lasten die financieel voor ${textSafe(ownerName)} zijn.` : "Bedragen kunnen voor één maand of vanaf deze maand wijzigen."}</p></div><button class="ghost" data-u3-close>Sluiten</button></div>
     <div class="u3-steps">
       <section class="u3-step"><div class="u3-step-head"><div><h3>Vaste lasten</h3><p>${fixed.length} terugkerende posten${planningOwner ? ` voor ${textSafe(ownerName)}` : " in deze maand"}</p></div><button class="primary small" data-u3-add-recurring="fixed">+ Vaste last</button></div><div class="u3-admin-list">${rows(fixed, "fixed") || '<div class="u3-empty">Nog geen vaste lasten.</div>'}</div></section>
@@ -14683,14 +15021,23 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       ${income ? `<label>Eigenaar<select id="u3RecOwner">${U3_ACCOUNTS.map((value2) => `<option value="${value2}" ${((existing == null ? void 0 : existing.eigenaar) || defaultOwner) === value2 ? "selected" : ""}>${u3AccountLabel(value2)}</option>`).join("")}</select></label><label class="u2-checkbox"><input id="u3RecDistribution" type="checkbox" ${(existing == null ? void 0 : existing.meetellenVoorVerdeling) !== false ? "checked" : ""}> Meetellen voor verdeling</label>` : ""}
       <label>Elke<input id="u3RecFrequency" type="number" min="1" step="1" value="${attrSafe((existing == null ? void 0 : existing.frequentieAantal) || 1)}"></label>
       <label>Frequentie<select id="u3RecUnit">${U3_FREQUENCY_UNITS2.map((value2) => `<option value="${value2}" ${(existing == null ? void 0 : existing.frequentieEenheid) === value2 ? "selected" : ""}>${value2}</option>`).join("")}</select></label>
-      <label>Begindatum<input id="u3RecStart" type="date" value="${textSafe((existing == null ? void 0 : existing.begindatum) || `${current}-01`)}"></label>
+      <label>Ingangsdatum<input id="u3RecStart" type="date" value="${textSafe((existing == null ? void 0 : existing.begindatum) || `${current}-01`)}"></label>
       <label>Einddatum<input id="u3RecEnd" type="date" value="${textSafe((existing == null ? void 0 : existing.einddatum) || "")}"></label>
-      ${income ? "" : `<label>Afschrijfdatum<input id="u3RecDebitDate" type="date" value="${textSafe((existing == null ? void 0 : existing.afschrijfdatum) || "")}"></label><label id="u3RecDistributionField">Verdeling<select id="u3RecDistribution"><option value="income-ratio" ${u3FixedDistributionMode(existing || {}, (existing == null ? void 0 : existing.financialFor) || defaultOwner) === "income-ratio" ? "selected" : ""}>Naar rato · Dion minimaal 40%</option><option value="equal" ${u3FixedDistributionMode(existing || {}, (existing == null ? void 0 : existing.financialFor) || defaultOwner) === "equal" ? "selected" : ""}>50/50</option></select><small id="u3RecDistributionHint">Kies hoe Dion en Dara deze gezamenlijke vaste last verdelen.</small></label>`}
+      ${income ? "" : `<label>Afschrijfdag<select id="u3RecDebitDay">${paymentDayOptions(fixedPaymentDay(existing || {}))}</select><small id="u3RecDebitHint">Elke actieve maand; een te hoge dag wordt de laatste kalenderdag.</small></label><label id="u3RecDistributionField">Verdeling<select id="u3RecDistribution"><option value="income-ratio" ${u3FixedDistributionMode(existing || {}, (existing == null ? void 0 : existing.financialFor) || defaultOwner) === "income-ratio" ? "selected" : ""}>Naar rato · Dion minimaal 40%</option><option value="equal" ${u3FixedDistributionMode(existing || {}, (existing == null ? void 0 : existing.financialFor) || defaultOwner) === "equal" ? "selected" : ""}>50/50</option></select><small id="u3RecDistributionHint">Kies hoe Dion en Dara deze gezamenlijke vaste last verdelen.</small></label>`}
       <label>Geldigheid<select id="u3RecScope"><option value="from">Vanaf ${monthLabel(current)}</option><option value="once">Alleen ${monthLabel(current)}</option></select></label>
       <label class="u2-checkbox"><input id="u3RecActive" type="checkbox" ${(existing == null ? void 0 : existing.actief) !== false ? "checked" : ""}> Actief</label>
     </div>
     <div class="modal-actions">${existing ? `${existing.actief !== false ? '<button class="ghost" id="u3RecStop">Stoppen na deze maand</button>' : ""}<button class="danger-ghost" id="u3RecDelete">Verwijderen</button>` : ""}<button class="ghost" data-u3-back-planning>Terug</button><button class="primary" id="u3RecSave">Opslaan</button></div>`);
     (_a2 = modal.querySelector("[data-u3-back-planning]")) == null ? void 0 : _a2.addEventListener("click", () => u3OpenPlanning(planningOwner));
+    const updateDebitDay = () => {
+      const day = modal.querySelector("#u3RecDebitDay");
+      if (!day) return;
+      const weekly = modal.querySelector("#u3RecUnit").value === "weken";
+      day.disabled = weekly;
+      modal.querySelector("#u3RecDebitHint").textContent = weekly ? "Bij een weekfrequentie volgen betaalmomenten de bestaande ingangsdatum en weekplanning." : "Elke actieve maand; een te hoge dag wordt de laatste kalenderdag.";
+    };
+    modal.querySelector("#u3RecUnit").addEventListener("change", updateDebitDay);
+    updateDebitDay();
     const updateDistributionField = () => {
       var _a3;
       const financialFor = ((_a3 = modal.querySelector("#u3RecFor")) == null ? void 0 : _a3.value) || defaultOwner;
@@ -14746,7 +15093,8 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
           };
           if (!u3ParseDate2(changes.begindatum)) throw new Error("Vul een geldige begindatum in.");
           if (income) Object.assign(changes, { type: modal.querySelector("#u3RecCategory").value, eigenaar: modal.querySelector("#u3RecOwner").value, meetellenVoorVerdeling: modal.querySelector("#u3RecDistribution").checked, verwachtBedrag: amount });
-          else Object.assign(changes, { categorie: modal.querySelector("#u3RecCategory").value.trim() || "Overig", bedrag: amount, afschrijfdatum: modal.querySelector("#u3RecDebitDate").value, distributionMode: changes.financialFor === "gezamenlijk" ? modal.querySelector("#u3RecDistribution").value : "" });
+          else Object.assign(changes, { categorie: modal.querySelector("#u3RecCategory").value.trim() || "Overig", bedrag: amount, afschrijfdag: modal.querySelector("#u3RecDebitDay").value === "last" ? "last" : Number(modal.querySelector("#u3RecDebitDay").value) || "", distributionMode: changes.financialFor === "gezamenlijk" ? modal.querySelector("#u3RecDistribution").value : "" });
+          if (!income && changes.frequentieEenheid === "weken") delete changes.afschrijfdag;
           const scope = modal.querySelector("#u3RecScope").value;
           if (income) setIncomeSourceForMonth(state, item, current, changes, { scope, isNew: !record });
           else {
@@ -16329,16 +16677,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
           return ((_a3 = tx.processing) == null ? void 0 : _a3.fixedOccurrenceId) || tx.fixedOccurrenceId;
         }).filter(Boolean));
         const available = occurrences.filter((item) => !used.has(item.id));
-        const cashDate = (item) => {
-          var _a3;
-          const explicit = (_a3 = item.source.cashDates) == null ? void 0 : _a3[item.id];
-          if (explicit) return validCalendarDate(explicit) ? explicit : "";
-          const debit = item.source.afschrijfdatum;
-          if (!validCalendarDate(debit)) return item.date;
-          if (item.source.frequentieEenheid === "weken") return debit === item.date ? item.date : "";
-          const lastDay = new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate();
-          return month + "-" + String(Math.min(Number(debit.slice(8)), lastDay)).padStart(2, "0");
-        };
+        const cashDate = (item) => fixedCashDate(item) || (!item.source.afschrijfdatum && !Object.hasOwn(item.source, "afschrijfdag") ? item.date : "");
         evidence.occurrences = available.map((item) => ({ id: item.id, date: cashDate(item) || item.date, month: item.month, name: item.naam }));
         const exact = available.filter((item) => cashDate(item) === original2.bankDate);
         if (fixedMatch.safe && (proposal == null ? void 0 : proposal.level) === "counterparty" && exact.length === 1) {

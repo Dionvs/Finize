@@ -1,0 +1,175 @@
+{
+  "version": 1,
+  "date": "2026-10-14",
+  "status": "local-verified-awaiting-review",
+  "repository": "G:\\Mijn Drive\\Codex\\financien\\outputs\\dion_dara_budget\\webapp\\github\\Finize-live-repo",
+  "branch": "agent/v117-stabilisatie",
+  "head": "e473dbb35e2e43d9e33e5eefe404f4f170cb8509",
+  "recovery": {
+    "path": "../Finize-herstel-v118-vrij-spaardoel-20261014-201331",
+    "files": 371,
+    "manifestSha256": "d66141729dfe167bac471798848495a1b8fb1bbe92f34786df903ba38535d0fc",
+    "copyMethod": "Every recovery copy checked against source SHA-256 before implementation",
+    "unchangedFiles": 365,
+    "modifiedFiles": 6,
+    "missingFiles": []
+  },
+  "publication": {
+    "commit": false,
+    "push": false,
+    "merge": false,
+    "deploy": false,
+    "productionDataModified": false
+  },
+  "contract": {
+    "availabilityStart": "today",
+    "availabilityEnd": "selected horizon inclusive; salary horizon ends day before receipt",
+    "history": "Original graph days, cash and checkpoint reconciliation retained",
+    "formula": "max(0, minimum future afterReservationsCents - bufferCents)",
+    "savings": "Soft plan; actual bank savings remain cash; original allowance formula unchanged",
+    "goalAssessment": "Same P2 engine at each relevant month end, extending only soft assessment for short horizons",
+    "goalHeadroom": "max(0, min(selected hard free, minimum month-end cash after buffer minus cumulative remaining goals))",
+    "unknown": "No numeric soft threshold or warning if essential monthly cash inputs uncertain"
+  },
+  "tests": {
+    "node": {
+      "passed": 349,
+      "failed": 0,
+      "newScenarios": 21
+    },
+    "browser": {
+      "passed": 30,
+      "failed": 0,
+      "newScenarios": 3,
+      "widths": [
+        1440,
+        390,
+        320
+      ],
+      "data": "Synthetic local fixtures; Firebase/backend routes blocked"
+    },
+    "checks": [
+      {
+        "name": "syntax",
+        "command": "node scripts/check-syntax.mjs",
+        "exitCode": 0
+      },
+      {
+        "name": "css",
+        "command": "node scripts/check-css.mjs",
+        "exitCode": 0
+      },
+      {
+        "name": "generated",
+        "command": "node scripts/build.mjs --check",
+        "exitCode": 0
+      },
+      {
+        "name": "design",
+        "command": "node C:/Users/dionv/.codex/plugins/cache/personal/impeccable/4.0.2/skills/impeccable/scripts/detect.mjs --json src/ui/dashboard.mjs src/styles/dashboard-p3.css",
+        "exitCode": 0
+      },
+      {
+        "name": "diff",
+        "command": "git diff --check",
+        "exitCode": 0
+      }
+    ]
+  },
+  "changedSinceRecovery": [
+    {
+      "path": "app.css",
+      "beforeSha256": "530fd5edb5f15f79fcb96ead37e261863d5cabe7fc8a7294babd5108e29542fb",
+      "sha256": "d377ab6cd9bc9b36d512d6f347939b587e3b03f1b60755f779294fb022780952"
+    },
+    {
+      "path": "app.js",
+      "beforeSha256": "e60f917757cdb0a2d001a7968df8969bbf47e058443d90d47dbeabc33ec782cd",
+      "sha256": "09a57b99a631c59f6973ef508dbd7303d0dfa6c62b1c4a247e2a06acbc85f7a3"
+    },
+    {
+      "path": "src/core/daily-liquidity.mjs",
+      "beforeSha256": "a9348e04705e63e5b182551e02cd76d175de17f2dd5036edb25a83e36158de2b",
+      "sha256": "0f7e56d3b819c9e20c0ca587a89d050ed0026f2fbb31bc43ca9658af3be37c4f"
+    },
+    {
+      "path": "src/styles/dashboard-p3.css",
+      "beforeSha256": "cd9b68159ce3d66a34cfd11f2eb1b975abe9bda13226f4c29dc5080763e9124c",
+      "sha256": "7b5d9fdcfbab4cc93d88041cadaa6bafcac19529aded2ed444cec16b2af4d646"
+    },
+    {
+      "path": "src/ui/dashboard.mjs",
+      "beforeSha256": "5a90371e20df29a35b2e318213156c0faeb656d3c52953fb956102db0cfb4703",
+      "sha256": "43cd43fcb5119bed3dbe9a24b3db1f4efa43f4fb343fcad09c3d2f1e921ebe95"
+    },
+    {
+      "path": "tests/browser/v118-p3-dashboard.spec.cjs",
+      "beforeSha256": "5bfdcb46541ae87b8cf3fe6e9e1e0300a4e4bf8c626066a8aabbb374f9c5e8a0",
+      "sha256": "a7d119c24f6505a6d9218ee8b1447c3fc386d9169bbebbe341dff77708ce174d"
+    }
+  ],
+  "addedFiles": [
+    {
+      "path": "tests/v118-vrij-spaardoel.test.cjs",
+      "sha256": "67926e8f1891aac2a5b978ab63f869df51a999ce8f76c52da5d4a1aed85b7d90"
+    },
+    {
+      "path": "tests/browser/v118-vrij-spaardoel.spec.cjs",
+      "sha256": "801a35fcdd9e004d4f26f4b9f6cae22e4c612d1ad9489481fea072a2edd5860c"
+    },
+    {
+      "path": "docs/v118-vrij-na-verplichtingen-spaardoel.md",
+      "sha256": "bc5b694ba58f5b64edf872a01feb05ec71216e3f785380ea9d31858ff030dd57"
+    }
+  ],
+  "auditFile": "docs/audit/v118-vrij-na-verplichtingen-spaardoel-bewijs.json",
+  "evidence": [
+    {
+      "path": ".cache/v118-vrij-spaardoel/node-final.log",
+      "sha256": "55665685b9ccd42e024c02e4e5c9acba72dd275c0aacdef77f7c1a1ea8e270ed"
+    },
+    {
+      "path": ".cache/v118-vrij-spaardoel/browser-final.log",
+      "sha256": "8ac8004c62d4f562816b0415252b930eba1bbdc5af866b559ed406e8117a63e0"
+    },
+    {
+      "path": ".cache/v118-vrij-spaardoel/syntax-final.log",
+      "sha256": "890228085be011d60149e5d5912f8c255c8263eedb062ed174487716b64c4605"
+    },
+    {
+      "path": ".cache/v118-vrij-spaardoel/css-final.log",
+      "sha256": "476280affdda757fb7d01da213befeb120b6618d1685f9542f9fdd377fd7d67d"
+    },
+    {
+      "path": ".cache/v118-vrij-spaardoel/generated-final.log",
+      "sha256": "a6a130c8944ab36df75487007636f238ac9f95bc42ca06cce0e25aaa0ebcc719"
+    },
+    {
+      "path": ".cache/v118-vrij-spaardoel/design-final.log",
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+    },
+    {
+      "path": ".cache/v118-vrij-spaardoel/diff-final.log",
+      "sha256": "eb4ba6864a52d7ec19a5f07c7d592acb59e46250334217804b3ab9defa9cfcec"
+    },
+    {
+      "path": ".cache/v118-vrij-spaardoel/dashboard-1440.png",
+      "sha256": "313f2d69d4c838ea8dbbfa415945b5b6c435e380ddd3b7ba7e9fc882c026eb87"
+    },
+    {
+      "path": ".cache/v118-vrij-spaardoel/dashboard-390.png",
+      "sha256": "f252732d11b7f2d199815c9455f234d61c36172cc96f138c3b49aa9e10d89bc1"
+    },
+    {
+      "path": ".cache/v118-vrij-spaardoel/dashboard-320.png",
+      "sha256": "6fff989b97b680be49766939095515b002f0cfc5240d36376eb7eb61d17b2c60"
+    }
+  ],
+  "limitations": [
+    "Estimated budget timing",
+    "No production cloud writes or full regression",
+    "Monthly goal deadline remains month end",
+    "Missing essential cash or storage data stays uncertain",
+    "Earlier historical reports retained; this correction supersedes their historic-minimum availability rule"
+  ]
+}

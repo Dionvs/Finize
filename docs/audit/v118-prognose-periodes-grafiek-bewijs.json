@@ -1,0 +1,167 @@
+{
+  "version": 1,
+  "date": "2026-10-14",
+  "status": "local-verified-awaiting-review",
+  "repository": "G:\\Mijn Drive\\Codex\\financien\\outputs\\dion_dara_budget\\webapp\\github\\Finize-live-repo",
+  "branch": "agent/v117-stabilisatie",
+  "head": "e473dbb35e2e43d9e33e5eefe404f4f170cb8509",
+  "initialGitStatus": "Prior local allowance/payment-day/chart correction present; retained",
+  "recovery": {
+    "path": "../Finize-herstel-v118-periodes-20261014-183039",
+    "files": 367,
+    "manifestSha256": "b43a6aee309d402fc08c486223514e221dd6ab1adea5cbf2cbc4389950bc94a5",
+    "method": "Every copied file SHA-256 checked against its source"
+  },
+  "publication": {
+    "commit": false,
+    "push": false,
+    "merge": false,
+    "deploy": false,
+    "productionDataModified": false
+  },
+  "contract": {
+    "defaultPeriod": "month",
+    "periods": [
+      "month",
+      "7",
+      "14",
+      "custom",
+      "salary"
+    ],
+    "dayLengths": {
+      "7": 7,
+      "14": 14
+    },
+    "history": "Same P1/P2 planning and monthly selectors, no separate historical engine",
+    "checkpointBoundary": "end-of-bank-day",
+    "manualBalanceOverride": "Observed end balance replaces modeled balance from its own date; earlier days unchanged; same-day movements not replayed afterwards",
+    "sourceReplacement": "Existing source/occurrence/approval contracts only; unmatched bookings additional; uncertain explicit overlap excluded from cash line with conservative reservation",
+    "availability": "Minimum selected-period cash after existing reservations and one safety buffer; savings goal remains informational"
+  },
+  "verification": {
+    "node": {
+      "passed": 328,
+      "failed": 0,
+      "newCases": 29,
+      "command": "node --test tests/v118-prognose-periodes.test.cjs tests/v118-prognose-correctie.test.cjs tests/v118-p1b-accounts.test.cjs tests/v118-p2-liquidity.test.cjs tests/v118-p3-dashboard.test.cjs tests/v118-p4-suggestions.test.cjs tests/package2-planning-timeline.test.cjs tests/package4-allowance-planning-correction.test.cjs tests/package4-savings-refunds-forecast.test.cjs tests/v117-p4-salary.test.cjs"
+    },
+    "browser": {
+      "passed": 27,
+      "failed": 0,
+      "newCases": 7,
+      "widths": [
+        1440,
+        390,
+        320
+      ],
+      "command": "node node_modules/@playwright/test/cli.js test tests/browser/v118-prognose-periodes.spec.cjs tests/browser/v118-prognose-correctie.spec.cjs tests/browser/v118-p2-liquidity.spec.cjs tests/browser/v118-p3-dashboard.spec.cjs --grep 'periodes|correctie|instellingen|IndexedDB abort|verloren ontvangst|1440px|390px|320px|filters|negatieve prognose'",
+      "data": "Synthetic isolated local fixtures; Firebase/auth/Firestore blocked",
+      "csv": "Synthetic bank sources materialized through existing import contracts; no full parser/approval UI regression"
+    },
+    "syntax": "passed",
+    "css": {
+      "status": "passed",
+      "existingNotice": "--line"
+    },
+    "generated": "byte-reproducible",
+    "gitDiffCheck": "passed",
+    "designDetector": [],
+    "fullRegression": false,
+    "scaleBenchmarks": false
+  },
+  "filesChangedSinceRecovery": [
+    {
+      "path": "docs/v118-prognose-periodes-grafiek.md",
+      "sha256": "f42058f6b50f70599fe79a6eeadb9d79dbd83bc817cee1debf340fb6c4bc240c"
+    },
+    {
+      "path": "tests/browser/v118-prognose-correctie.spec.cjs",
+      "sha256": "8cd70bc93e5f604d56570b3640e323bd5fbe43dc644c1d0448f911b86e91241e"
+    },
+    {
+      "path": "tests/browser/v118-prognose-periodes.spec.cjs",
+      "sha256": "4912e94f8a9946a7d18e69cc17bcd09ea334aa845370c1499dbe8ef4410d191c"
+    },
+    {
+      "path": "tests/v118-prognose-periodes.test.cjs",
+      "sha256": "aacc3ea4ebbad8862bb91e73ceaa3fe0872945cc8c8f6b5384472d88bb2a6f7c"
+    },
+    {
+      "path": "app.css",
+      "sha256": "530fd5edb5f15f79fcb96ead37e261863d5cabe7fc8a7294babd5108e29542fb"
+    },
+    {
+      "path": "app.js",
+      "sha256": "e60f917757cdb0a2d001a7968df8969bbf47e058443d90d47dbeabc33ec782cd"
+    },
+    {
+      "path": "src/core/daily-liquidity.mjs",
+      "sha256": "a9348e04705e63e5b182551e02cd76d175de17f2dd5036edb25a83e36158de2b"
+    },
+    {
+      "path": "src/styles/dashboard-p3.css",
+      "sha256": "cd9b68159ce3d66a34cfd11f2eb1b975abe9bda13226f4c29dc5080763e9124c"
+    },
+    {
+      "path": "src/ui/dashboard.mjs",
+      "sha256": "5a90371e20df29a35b2e318213156c0faeb656d3c52953fb956102db0cfb4703"
+    },
+    {
+      "path": "tests/browser/v118-p3-dashboard.spec.cjs",
+      "sha256": "5bfdcb46541ae87b8cf3fe6e9e1e0300a4e4bf8c626066a8aabbb374f9c5e8a0"
+    },
+    {
+      "path": "tests/v118-p3-dashboard.test.cjs",
+      "sha256": "c53558ec639f5b471139dcb06e92f673f8e9d11e7a376fb16b3f211fdbcfe68b"
+    }
+  ],
+  "localEvidence": [
+    {
+      "path": ".cache/v118-periodes/node-final.log",
+      "sha256": "2ca632788b9f53eae5be9c668fc54f2dbfc2831a7f7e66eaae4df6bdcd4a7c00"
+    },
+    {
+      "path": ".cache/v118-periodes/browser-verified.log",
+      "sha256": "31ee5d3e5bfd3d4fadb5a72f0e5c0af4c399d006d334d274e91ef09e889c3011"
+    },
+    {
+      "path": ".cache/v118-periodes/syntax-final.log",
+      "sha256": "890228085be011d60149e5d5912f8c255c8263eedb062ed174487716b64c4605"
+    },
+    {
+      "path": ".cache/v118-periodes/css-final.log",
+      "sha256": "13ac06a9182c53da86b816bac390c16f8c681312633267c008642b54c7869eb1"
+    },
+    {
+      "path": ".cache/v118-periodes/generated-final.log",
+      "sha256": "a6a130c8944ab36df75487007636f238ac9f95bc42ca06cce0e25aaa0ebcc719"
+    },
+    {
+      "path": ".cache/v118-periodes/diff-final.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": ".cache/v118-periodes/design-detector.json",
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+    },
+    {
+      "path": ".cache/v118-periodes/maand-1440.png",
+      "sha256": "43600e975f7a617d323586f570a3fdd501b9390d2b89d27568db1750baf1b4d0"
+    },
+    {
+      "path": ".cache/v118-periodes/maand-390.png",
+      "sha256": "6cb6f15fc5b52dd0e3eedcd06b74293b2bdbb5e86817b57f9e91f0c6d75a947f"
+    },
+    {
+      "path": ".cache/v118-periodes/maand-320.png",
+      "sha256": "bde90b2af3cebfbad9861fbeac28e3f56c7ef588fdffd1b35875e9e1e0e62c3e"
+    }
+  ],
+  "limitations": [
+    "Calculated history is not bank confirmation",
+    "Missing initial balance is never fabricated; line can start at first valid in-period observation",
+    "Missing intermediate storage remains incomplete",
+    "Manual cash observations do not prove budget spending; existing unspent budget rules continue",
+    "No production cloud write test; no publish"
+  ]
+}
