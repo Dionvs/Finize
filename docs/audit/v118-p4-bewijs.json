@@ -1,0 +1,279 @@
+{
+  "package": "V118 P4 Slimme transactiesuggesties",
+  "date": "2026-10-14",
+  "branch": "agent/v117-stabilisatie",
+  "baseCommit": "fbf8b34b8000570e05b9ec0b1ec3f00ddd33e7e5",
+  "assetVersion": "118-p4r1",
+  "restorePoint": "C:/Users/dionv/AppData/Local/Finize-herstelpunten/v118-p4-20261014-162725",
+  "restoreFiles": 54,
+  "restoreManifestSha256": "1721f96207e9430334c486ce83fcaa7fea71ac7445b0c1b23fd6a0f355b84896",
+  "preservedSinceRestore": [
+    "docs/audit/v118-p1-bewijs.json",
+    "docs/audit/v118-p1b-bewijs.json",
+    "docs/audit/v118-p2-bewijs.json",
+    "docs/audit/v118-p3-bewijs.json",
+    "docs/audit/v118-p3-herstel-bewijs.json",
+    "docs/audit/v118-p5a-bewijs.json",
+    "docs/v118-inventarisatie-en-implementatieplan.md",
+    "docs/v118-p1-saldo-ijkpunten.md",
+    "docs/v118-p1b-bankrekeningbeheer.md",
+    "docs/v118-p2-dagelijkse-prognose.md",
+    "docs/v118-p3-dashboard-design.md",
+    "docs/v118-p3-impeccable-hercontrole.md",
+    "docs/v118-p5a-bank-invoercontract.md",
+    "src/core/account-profiles.mjs",
+    "src/core/balance-checkpoints.mjs",
+    "src/core/daily-liquidity.mjs",
+    "src/core/liquidity-settings.mjs",
+    "src/import/bank-input-contract.mjs",
+    "src/styles/dashboard-p3.css",
+    "src/ui/account-balances.mjs",
+    "src/ui/bank-accounts.mjs",
+    "src/ui/dashboard.mjs",
+    "src/ui/liquidity-settings.mjs",
+    "tests/browser/v118-p1-balances.spec.cjs",
+    "tests/browser/v118-p1b-accounts.spec.cjs",
+    "tests/browser/v118-p2-liquidity.spec.cjs",
+    "tests/browser/v118-p3-dashboard.spec.cjs",
+    "tests/v118-p1-balance.test.cjs",
+    "tests/v118-p1b-accounts.test.cjs",
+    "tests/v118-p2-liquidity.test.cjs",
+    "tests/v118-p3-dashboard.test.cjs",
+    "tests/v118-p5a-bank-input.test.cjs",
+    "v118-p3-dashboard-vooruitblik.md",
+    "v118-p3-impeccable-herstel.md",
+    "scripts/build.mjs",
+    "src/core/data-normalization.mjs",
+    "src/core/runtime.js",
+    "src/storage/period-workspace.mjs",
+    "src/storage/sync-protocol.mjs",
+    "src/styles/settings.css",
+    "src/ui/presentation.js",
+    "tests/browser/package3-transaction-engine.spec.cjs"
+  ],
+  "changedSinceRestore": {
+    "app.css": "4f22fab16fdfa43e6f8753549a9ad217cdf2d2420aeede06f7323b192b15c9da",
+    "app.js": "0c240acff14f50c31986ff3d9a2b75708e018a5ea6c8d4202b76be4c02fdef41",
+    "index.html": "b3e1d5b8d15e3d49baa6ae00d6e7d11520377fa5028a7ea860338d0113e5c409",
+    "service-worker.js": "07ef018344ea1f2d2c1952db3c439f4ec5b2cceb74dabb981be01d720ed700ba",
+    "src/import/runtime.js": "ba2d7852fcbef6ba0e19889bce958b779a5b659ff85180165ba83ca2417698da",
+    "src/styles/import.css": "fca608ea35e4767281ec3b8f1579ca7dae29fdd5e2d3dae7c42cdafde4a440c5",
+    "tests/browser/package7-release-audit.spec.cjs": "f83ab4a3ee4f615e61adf188a5810916ffa1cfbecbdfcd6a307eb51d44ee5d0e",
+    "tests/html-inline-syntax.test.cjs": "b9dc36952792be31137ff6e40c69c4f97aed3a56cb5d9f0faa3f7948a06636d2",
+    "tests/package7-release-audit.test.cjs": "1b651760707f47c18a2eef95d66820e3d7ea974c52f3ecb619842e883b9f0e7e",
+    "tests/service-worker-cache.test.cjs": "a1963c9209474db7a51b027bd7b663883754c41aecc10ffda7ec6d7eda6ec079",
+    "tests/update4-final-regression.test.cjs": "44ab57217e556f3c8e4b7ba851df434a677eec6398e2234200166101706703b0",
+    "tests/update5-responsive-structure.test.cjs": "c69fc34269634e1a14b069625643610910376ad4b53d569f41f394e4e64e0654"
+  },
+  "protectedFiles": [
+    {
+      "path": "src/core/runtime.js",
+      "sha256": "ec3fa16461d4aea65feb4e07d625dfaa36c4f1cd0fbf52c61f1c4792569599b6",
+      "unchanged": true
+    },
+    {
+      "path": "src/core/data-normalization.mjs",
+      "sha256": "698845febc30d6d8c771c72151428943f9564c76116f1ffd29dbdf9da2d287ee",
+      "unchanged": true
+    },
+    {
+      "path": "src/core/account-profiles.mjs",
+      "sha256": "3d3a50b081cb11496d8b490a33e266cb3c70246ae326a132de014516979ce8ae",
+      "unchanged": true
+    },
+    {
+      "path": "src/core/balance-checkpoints.mjs",
+      "sha256": "545af29d751a28a4e6f3f5ed27481d1d11bdd33fe2c164aa7dec2f88a91f6bab",
+      "unchanged": true
+    },
+    {
+      "path": "src/core/daily-liquidity.mjs",
+      "sha256": "8fa2f6b538b0aa4a7be3821bc2b9d06a259248592503a4a5c6d0be91f79732a3",
+      "unchanged": true
+    },
+    {
+      "path": "src/core/liquidity-settings.mjs",
+      "sha256": "23f30b9fb99c7533a9848376a84aef8c5086488abc69e1c522ca5dbc3ed9c3bf",
+      "unchanged": true
+    },
+    {
+      "path": "src/import/bank-input-contract.mjs",
+      "sha256": "c47844641012ea5ac371c7b7923be65a6638afbfac267d8b6cb34db03ab482fb",
+      "unchanged": true
+    },
+    {
+      "path": "src/storage/period-workspace.mjs",
+      "sha256": "da940553447b88731d714f5076d6218894ac78a2c6f1e42d4b4db635050a5fa2",
+      "unchanged": true
+    },
+    {
+      "path": "src/storage/sync-protocol.mjs",
+      "sha256": "1c907c018d35e9724a719d3630b912fae5f99f9e0e1b69bb38d37bd23d44b658",
+      "unchanged": true
+    },
+    {
+      "path": "src/ui/dashboard.mjs",
+      "sha256": "a8a3585e848c2e03ef27cb91e7bb600bbfeb8b8ffe322a4bf5e9f9762359498a",
+      "unchanged": true
+    },
+    {
+      "path": "src/ui/presentation.js",
+      "sha256": "8df2fd24b8c05055ef85f607b428903494f869c06c8373608080dd84ce61ae38",
+      "unchanged": true
+    },
+    {
+      "path": "src/styles/dashboard-p3.css",
+      "sha256": "932fb31ea8cd8eba3fce7158836c631c41cae6d3069e2bedd0bcf179de8b7077",
+      "unchanged": true
+    }
+  ],
+  "headProof": [
+    {
+      "path": "src/core/transaction-engine.mjs",
+      "sha256": "b966da1c2e2c06db07ae642adc994dbb57f2ef6971fcfc12ba7e0234faa39bee",
+      "headBlob": "603f8c3846e00bbc0f716650d3b3597df6ffcc25",
+      "unchanged": true
+    },
+    {
+      "path": "src/core/transaction-model.mjs",
+      "sha256": "3917d620ec8920983b628fb5559a3ff202197338c547bb9203f1e87a1434b513",
+      "headBlob": "187900e7e0b47c4b1b7909fa00826d4dbbf45c3e",
+      "unchanged": true
+    },
+    {
+      "path": "src/core/transaction-processing.mjs",
+      "sha256": "8d834f15666edfe7694db70ce58245cc1ff1076c6300b4f1b2817ba4531a05bb",
+      "headBlob": "7aff66c7ced49e3b986da0892c7ef77f3f22db9a",
+      "unchanged": true
+    },
+    {
+      "path": "src/core/planning-timeline.mjs",
+      "sha256": "21ad0ad5293e48634bdbe66eb73b11f5650b9ea78c595d446aa677b7557025ac",
+      "headBlob": "e20e2f3d207c8c72f9d0e17c4db06913315d1d13",
+      "unchanged": true
+    },
+    {
+      "path": "src/core/recurring-occurrences.mjs",
+      "sha256": "4d10ed6b121a2944e3cc97c1db9007efc90b4aadff593e78e04c91a673025ef2",
+      "headBlob": "f467e0af3017536427934a0dba0e2d96ae6ead4b",
+      "unchanged": true
+    },
+    {
+      "path": "src/core/salary-assignment.mjs",
+      "sha256": "b2514d9dc89014acc3acb49b92b54512ce0eee34681228e5206af01020e89ab9",
+      "headBlob": "db47b37957fcc8d5fed7964581d1d789b4b2c8df",
+      "unchanged": true
+    },
+    {
+      "path": "src/import/import-lifecycle.mjs",
+      "sha256": "ea310edaeaac45a9a0d55e77e666dd170641229d9936d317bedbdb01f61fbdd4",
+      "headBlob": "13c72f8353b464c45ce2fe9cb72c026401984f06",
+      "unchanged": true
+    },
+    {
+      "path": "src/import/import-identity.mjs",
+      "sha256": "15366e180be2de8c3e07f6cfc7f2a2109daa8901073fd412b05f4f7365afe3d0",
+      "headBlob": "32cbcf3e8c0f293d15922554d6dc0857a7225f70",
+      "unchanged": true
+    },
+    {
+      "path": "src/storage/household-store.mjs",
+      "sha256": "cd0d426af754104f30436a2a8914cb56674d1ca251919f44affd3ac096c03b9c",
+      "headBlob": "112e16920537fa668418253997f63df481148751",
+      "unchanged": true
+    },
+    {
+      "path": "src/import/import-sync-protocol.mjs",
+      "sha256": "027d896f62c211cbe1989b489783f7889a9772a430eb25c46421dffba1d7fbd8",
+      "headBlob": "143a4abbe5a85fa45c8777b0c71b04abf9c4d27b",
+      "unchanged": true
+    }
+  ],
+  "node": {
+    "command": "node --test tests/v118-p4-suggestions.test.cjs tests/update4-import-engine.test.cjs tests/update4-import-review-simplification.test.cjs tests/v117-p4-salary.test.cjs tests/v117-p1.test.cjs tests/v117-p44.test.cjs tests/v113-csv-processing.test.cjs tests/package4-savings-refunds-forecast.test.cjs tests/v117-budget-detail-capital.test.cjs tests/package5-sync.test.cjs tests/cloud-sync-protocol.test.cjs tests/html-inline-syntax.test.cjs tests/service-worker-cache.test.cjs tests/package7-release-audit.test.cjs",
+    "passed": 273,
+    "failed": 0,
+    "newP4Cases": 25
+  },
+  "browser": {
+    "command": "node node_modules/@playwright/test/cli.js test tests/browser/v118-p4-suggestions.spec.cjs --workers=1 --max-failures=1",
+    "passed": 4,
+    "failed": 0,
+    "fullReviewCases": 3,
+    "additionalRefundCase": 1,
+    "additionalCommand": "node node_modules/@playwright/test/cli.js test tests/browser/v118-p4-suggestions.spec.cjs --grep 'refund en refundsplits' --workers=1 --max-failures=1",
+    "widths": [
+      1440,
+      390,
+      320
+    ],
+    "syntheticLocalData": true,
+    "checks": [
+      "conflict visible before approval",
+      "alternative selection without booking",
+      "five out of ten bulk categories",
+      "durable editor journal after reload",
+      "one explicit approval",
+      "one effect after restart",
+      "learned provenance after restart",
+      "no modal overflow",
+      "hint font at least 12px",
+      "no page errors"
+    ],
+    "screenshotsVisuallyOpened": true
+  },
+  "checks": {
+    "build": "passed",
+    "generated": "passed",
+    "syntax": "passed",
+    "css": "passed; existing --line",
+    "diffCheck": "passed; Git line-ending notices only"
+  },
+  "impeccable": {
+    "version": "4.0.2",
+    "scope": "small consistency check of Nakijken",
+    "detectorFindings": 0,
+    "manualVisualCheck": true
+  },
+  "storage": {
+    "schemaChanged": false,
+    "firestoreChanged": false,
+    "metadataRoundtrip": "existing cloud envelope and normalization contract tested",
+    "deviceSwitch": "existing mocked device A/B sync contracts tested; no real cloud clients used",
+    "conflicts": "existing package5-sync/cloud-sync-protocol/v117-p1 contracts tested"
+  },
+  "boundaries": {
+    "committed": false,
+    "pushed": false,
+    "merged": false,
+    "deployed": false,
+    "productionModified": false,
+    "P5bStarted": false,
+    "scaleTests": false,
+    "fullV118Regression": false,
+    "emulatorSuite": false,
+    "financialEngineModified": false,
+    "P1P2P3Modified": false,
+    "awaitingUserReview": true
+  },
+  "localArtifacts": {
+    ".cache/v118-p4/browser-tests.log": "91138c0dd79d1ad029696df382fe0faa519ccedd09a801fb57d38e1f916e84ab",
+    ".cache/v118-p4/node-tests.log": "30377916ca4e517a988674c11162c571e5f9689f798bcc47a5d05499a2cd0766",
+    ".cache/v118-p4/review-1440.png": "f9af83a6628eeac3d2b41a72e3b7715ab0ec1d7e3ea9f8d38415b9f1891d1cd9",
+    ".cache/v118-p4/review-390.png": "1e50ff818804f7e4c5de4e15c8625303636dbeaa04022320d305928b952c1229",
+    ".cache/v118-p4/review-320.png": "7662db85fa6e20bd22b53344ba318db088f395dad69e17d7d795d73297d054ce",
+    ".cache/v118-p4/syntax.log": "295e628357dad66fa63abf1006dcd90fd6a4ab5dbb75a5aa24ccdc0f79cf67f4",
+    ".cache/v118-p4/css.log": "19e2da74b9537624e71fd4f6f3cadbea2eb774fd999455b013a8f98cd3b39bd7",
+    ".cache/v118-p4/generated.log": "01251087df2610e69d5e74772f224739901b47c1fd5c444dd9be991cb63e4004",
+    ".cache/v118-p4/diff-check.log": "1dd14adb60f666f1cd0dd1c616c88d8b9505a4d6ab8510108fc511cbfc079ed8",
+    ".cache/v118-p4/impeccable-detector.json": "a5338d955b09046ec0b16f3a9625b7955c763aae07dc722e474e6078745f932f",
+    ".cache/v118-p4/build.log": "dfce3386f9a7cdb19219d25f8ed5315810c7c9ffe8a28b9a82cce222c2dad7ab",
+    ".cache/v118-p4/audit.cjs": "dabf23f499e389c0d10d256569bb4bddd1c53e8cbcc8481c71b3b5d6028e2f5f",
+    ".cache/v118-p4/browser-refund.log": "dbed05fe08b439249c25bd9e4c09557b7a9a03a5441b34fadaa4facb730460b7"
+  },
+  "deliveredFiles": {
+    "v118-p4-slimme-transactiesuggesties.md": "a74b76fe809069e6f7db0a4adbc53f208121f277becf204e7bfde1a62f483da1",
+    "tests/v118-p4-suggestions.test.cjs": "831b224d3a054a2be69c5a54b4558d414d7ef2852e4ec3708fb93e376f156dc1",
+    "tests/browser/v118-p4-suggestions.spec.cjs": "9b1ca7cc851c2b9d05fffa96533f73e4f8d88f7b5e13323b7715dc5f5e06afd2"
+  }
+}

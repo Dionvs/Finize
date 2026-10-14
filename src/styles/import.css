@@ -1,4 +1,27 @@
 .u4-import-panel{display:grid;gap:12px}
+.balance-panel{min-width:0;display:grid;gap:12px}
+.balance-panel h3,.balance-panel h4,.balance-panel p{margin:0}
+.balance-account{min-width:0;padding:14px;border:1px solid var(--border);border-radius:14px;background:var(--surface);display:grid;gap:12px}
+.balance-account .hint,.balance-explanation{font-size:13px;line-height:1.5}
+.balance-identifier,.balance-history-row{overflow-wrap:anywhere}
+.balance-amount{display:block;font-size:22px;font-variant-numeric:tabular-nums}
+.balance-status{display:block;font-size:13px;color:var(--text-dim)}
+.balance-actions{display:flex;flex-wrap:wrap;gap:8px}
+.balance-actions button,.balance-history-row button{min-height:44px}
+.balance-explanation summary,.balance-history summary{cursor:pointer;min-height:36px;align-content:center}
+.balance-history-row{padding:12px 0;border-top:1px solid var(--border-soft);display:flex;gap:12px;justify-content:space-between;align-items:start}
+.balance-history-row>div{min-width:0}
+.balance-form{display:grid;gap:12px;border-top:1px solid var(--border);padding-top:16px}
+.balance-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.balance-form label{display:grid;gap:6px;min-width:0}
+.balance-form input,.balance-form textarea{box-sizing:border-box;width:100%;min-width:0;max-width:100%;font-size:16px}
+.balance-form [role=alert]{color:var(--red);overflow-wrap:anywhere}
+.balance-comparison{padding:12px;background:var(--surface-2);border:1px solid var(--border);border-radius:12px;line-height:1.5}
+.balance-comparison,.balance-form input{scroll-margin-top:100px}
+.balance-comparison dl>div{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.balance-comparison dd{margin:0;font-weight:700;font-variant-numeric:tabular-nums}
+.balance-account ul{padding-left:20px;line-height:1.5}
+@media(max-width:600px){.balance-fields{grid-template-columns:minmax(0,1fr)}.balance-history-row{flex-wrap:wrap}.balance-account{padding:12px}.balance-actions button{flex:1 1 auto}}
 .u4-profile-owner-static{display:flex;align-items:center;min-height:42px;padding:9px 11px;border:1px solid var(--border);border-radius:12px;background:var(--bg-soft);color:var(--text);font-weight:750}
 .u4-import-actions,.u4-import-summary,.u4-import-row-main,.u4-receipt-head,.u4-modal-head,.u4-modal-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .u4-import-actions input[type=file]{position:absolute;inline-size:1px;block-size:1px;opacity:0;pointer-events:none}
@@ -243,3 +266,10 @@
 .u4-split-row>label{min-width:0}.u4-split-row input,.u4-split-row select{width:100%;min-width:0}
 .u4-split-row button{min-height:44px}.u4-split-line .u4-context-grid{margin-top:8px}
 @media(max-width:600px){.u4-split-row{grid-template-columns:85px minmax(0,1fr) 36px;gap:5px}.u4-split-row select{font-size:14px}.u4-split-line .u4-context-grid{grid-template-columns:1fr 1fr}}
+.u4-suggestion{display:grid;gap:6px;min-width:0;padding:10px 0;color:var(--text);font-size:13px;line-height:1.5;overflow-wrap:anywhere}
+.u4-suggestion p{margin:0}
+.u4-suggestion summary{cursor:pointer;min-height:44px;align-content:center;color:var(--text-dim)}
+.u4-suggestion ul{margin:0;padding-inline-start:20px}
+.u4-suggestion label{display:grid;gap:6px;min-width:0}
+.u4-suggestion select{width:100%;min-width:0;max-width:100%;font-size:16px;min-height:44px}
+.u4-suggestion[data-suggestion-status=conflict]>strong{color:var(--red)}

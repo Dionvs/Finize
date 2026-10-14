@@ -1,0 +1,298 @@
+{
+  "package": "V118 definitieve release",
+  "version": "118-r1",
+  "status": "validated-before-publication",
+  "date": "2026-10-14",
+  "branch": "agent/v117-stabilisatie",
+  "baseCommit": "fbf8b34b8000570e05b9ec0b1ec3f00ddd33e7e5",
+  "production": {
+    "url": "https://dionvs.github.io/Finize/",
+    "hosting": "GitHub Pages legacy",
+    "sourceBranch": "main",
+    "sourcePath": "/",
+    "branchProtected": false,
+    "previousCommit": "fbf8b34b8000570e05b9ec0b1ec3f00ddd33e7e5",
+    "previousVersion": "117-p4r5",
+    "previousRun": 38293280017,
+    "backendChanges": false
+  },
+  "recovery": {
+    "path": "C:/Users/dionv/AppData/Local/Finize-herstelpunten/v118-release-20261014-170442",
+    "manifestSha256": "b5be37f622841fed0ecdb156acfe7fdda96bd93f57cd95b197aec30d4f133195",
+    "files": 58,
+    "allCopiesHashVerified": true,
+    "stableGitRef": "rollback/finize-v117-p4r5-20261014",
+    "liveAssetCopies": [
+      {
+        "file": "index.html",
+        "status": 200,
+        "sha256": "4048b46b8d1031a50c6eff1606dba6e4903471c39b6afc4ee2d0acc9e0d5b5af",
+        "bytes": 5124,
+        "equalsStableCommit": true
+      },
+      {
+        "file": "app.js",
+        "status": 200,
+        "sha256": "5b2e7e9fa3625f6928fb1099931753ce64c6cf33c42a4150c468c0101f461ba4",
+        "bytes": 1606909,
+        "equalsStableCommit": true
+      },
+      {
+        "file": "app.css",
+        "status": 200,
+        "sha256": "df32bfc4b70dddacfe41271c7247c18347bbcedd0b865169d2d7d6f413166962",
+        "bytes": 265456,
+        "equalsStableCommit": true
+      },
+      {
+        "file": "service-worker.js",
+        "status": 200,
+        "sha256": "7e36f5ce686be9914ac8518fb91da78288a489c002d31220f8ba59c6c4731f2b",
+        "bytes": 2390,
+        "equalsStableCommit": true
+      },
+      {
+        "file": "manifest.json",
+        "status": 200,
+        "sha256": "00cbaa9a122b7a02219bdf7bedd7b1824e6e744a4b430201e7a8e6585726e239",
+        "bytes": 586,
+        "equalsStableCommit": true
+      },
+      {
+        "file": "icons/icon-192.png",
+        "status": 200,
+        "sha256": "7a804e24cd03a592ac480b107567783388ae1de7b8eef2820299d6addbc85af5",
+        "bytes": 19806,
+        "equalsStableCommit": true
+      },
+      {
+        "file": "icons/icon-512.png",
+        "status": 200,
+        "sha256": "c97d054b788942d1cfc7a52a2f4f57b7ddcc91120d19b00c7994d0eaa0c2ac97",
+        "bytes": 138171,
+        "equalsStableCommit": true
+      }
+    ]
+  },
+  "unchangedSinceRecovery": [
+    "docs/audit/v118-p1-bewijs.json",
+    "docs/audit/v118-p1b-bewijs.json",
+    "docs/audit/v118-p2-bewijs.json",
+    "docs/audit/v118-p3-bewijs.json",
+    "docs/audit/v118-p3-herstel-bewijs.json",
+    "docs/audit/v118-p4-bewijs.json",
+    "docs/audit/v118-p5a-bewijs.json",
+    "docs/v118-inventarisatie-en-implementatieplan.md",
+    "docs/v118-p1-saldo-ijkpunten.md",
+    "docs/v118-p1b-bankrekeningbeheer.md",
+    "docs/v118-p2-dagelijkse-prognose.md",
+    "docs/v118-p3-dashboard-design.md",
+    "docs/v118-p3-impeccable-hercontrole.md",
+    "docs/v118-p5a-bank-invoercontract.md",
+    "src/core/account-profiles.mjs",
+    "src/core/balance-checkpoints.mjs",
+    "src/core/daily-liquidity.mjs",
+    "src/core/liquidity-settings.mjs",
+    "src/import/bank-input-contract.mjs",
+    "src/styles/dashboard-p3.css",
+    "src/ui/account-balances.mjs",
+    "src/ui/bank-accounts.mjs",
+    "src/ui/dashboard.mjs",
+    "src/ui/liquidity-settings.mjs",
+    "tests/browser/v118-p1-balances.spec.cjs",
+    "tests/browser/v118-p1b-accounts.spec.cjs",
+    "tests/browser/v118-p2-liquidity.spec.cjs",
+    "tests/browser/v118-p3-dashboard.spec.cjs",
+    "tests/browser/v118-p4-suggestions.spec.cjs",
+    "tests/v118-p1-balance.test.cjs",
+    "tests/v118-p1b-accounts.test.cjs",
+    "tests/v118-p2-liquidity.test.cjs",
+    "tests/v118-p3-dashboard.test.cjs",
+    "tests/v118-p4-suggestions.test.cjs",
+    "tests/v118-p5a-bank-input.test.cjs",
+    "v118-p3-dashboard-vooruitblik.md",
+    "v118-p3-impeccable-herstel.md",
+    "v118-p4-slimme-transactiesuggesties.md",
+    "app.css",
+    "app.js",
+    "scripts/build.mjs",
+    "src/core/data-normalization.mjs",
+    "src/core/runtime.js",
+    "src/import/runtime.js",
+    "src/storage/period-workspace.mjs",
+    "src/storage/sync-protocol.mjs",
+    "src/styles/import.css",
+    "src/styles/settings.css",
+    "src/ui/presentation.js",
+    "tests/browser/package3-transaction-engine.spec.cjs"
+  ],
+  "changedSinceRecovery": {
+    "index.html": "d5d32daf566b4621a03289803783b4b7aa9bf38e2daef78ac301d6a806ac847e",
+    "service-worker.js": "a680f9aa644dc442c5bd962835fc3715a644d5747e2353883e40613fa4cfc77e",
+    "tests/browser/package7-release-audit.spec.cjs": "4fa8c0f8998cd50991385511ad077e77658f74d53970a6fd52d621133d554b86",
+    "tests/html-inline-syntax.test.cjs": "72f1f1554f68fdcecede08c79e6b97462d45098d90459a4262bacb1464ad1823",
+    "tests/package7-release-audit.test.cjs": "7c298e610ffb75d0693a5209e6eb1474691718c7067f64731e1e9635cb8e080a",
+    "tests/service-worker-cache.test.cjs": "4b86a93f2ad5458ecdce19a1b549c0dd488a2c7680dee0b5444744e46350e695",
+    "tests/update4-final-regression.test.cjs": "430ee93a76fad6734c411334a519eeed50d46b83c35501fc9e137b1bca603650",
+    "tests/update5-responsive-structure.test.cjs": "a206ad03043d5c9b87b8b9c26e93293e143148473a0e54e8753fa8e646a9befa"
+  },
+  "node": {
+    "passed": 471,
+    "failed": 0,
+    "newReleaseCases": 3,
+    "command": "node --test tests/v118-p5a-bank-input.test.cjs tests/v118-p1-balance.test.cjs tests/v118-p1b-accounts.test.cjs tests/v118-p2-liquidity.test.cjs tests/v118-p3-dashboard.test.cjs tests/v118-p4-suggestions.test.cjs tests/v118-release-safety.test.cjs tests/update4-import-engine.test.cjs tests/update4-import-review-simplification.test.cjs tests/v117-p4-salary.test.cjs tests/v117-p1.test.cjs tests/v117-p44.test.cjs tests/v113-csv-processing.test.cjs tests/package4-savings-refunds-forecast.test.cjs tests/v117-budget-detail-capital.test.cjs tests/package5-sync.test.cjs tests/cloud-sync-protocol.test.cjs tests/update5-budget-history-saving-overrides.test.cjs tests/update5-allowance-budget-regression.test.cjs tests/html-inline-syntax.test.cjs tests/service-worker-cache.test.cjs tests/package7-release-audit.test.cjs tests/update5-responsive-structure.test.cjs tests/update4-final-regression.test.cjs"
+  },
+  "browser": {
+    "integrationPassed": 61,
+    "safetyPassed": 2,
+    "pwaUpgradePassed": 1,
+    "totalPassed": 64,
+    "failed": 0,
+    "widths": [
+      1440,
+      390,
+      320
+    ],
+    "commands": [
+      "node node_modules/@playwright/test/cli.js test tests/browser/v118-p1-balances.spec.cjs tests/browser/v118-p1b-accounts.spec.cjs tests/browser/v118-p2-liquidity.spec.cjs tests/browser/v118-p3-dashboard.spec.cjs tests/browser/v118-p4-suggestions.spec.cjs tests/browser/package7-release-audit.spec.cjs --workers=1 --max-failures=1",
+      "FINIZE_RELEASE_PRIVATE_SNAPSHOT=<private read-only snapshot> FINIZE_RELEASE_RESTORE=<verified V117 backup> node node_modules/@playwright/test/cli.js test tests/browser/v118-release-safety.spec.cjs --workers=1 --max-failures=1 (first two cases)",
+      "FINIZE_RELEASE_RESTORE=<verified V117 backup> node node_modules/@playwright/test/cli.js test tests/browser/v118-release-safety.spec.cjs --grep \"service worker upgrades\" --workers=1 --max-failures=1"
+    ]
+  },
+  "compatibility": {
+    "productionWrites": 0,
+    "consistentCloudHead": true,
+    "normalizationIdempotent": true,
+    "normalizationLossless": true,
+    "sourceIdsPreserved": true,
+    "productionSnapshotReadAt": "2026-10-14T15:07:29.070Z",
+    "isolatedRealDataUpgradeAndRollback": true,
+    "newOptionalCheckpointPreservedOnRollback": true,
+    "schemaVersion": 11,
+    "nativeIndexedDbVersion": 4,
+    "localStorageVersion": 1,
+    "cloudContractUnchanged": true,
+    "productionRecordCutover": false
+  },
+  "financialSafety": {
+    "failedApprovalCannotPersistLearnedRule": true,
+    "realIndexedDbAbortTested": true,
+    "cloudSourceConflictBlocksLearning": true,
+    "oneProvisionalOrApprovedBankMutation": true,
+    "existingFinancialEngineUnmodified": true,
+    "historicalPlanningTested": true
+  },
+  "checks": {
+    "build": "passed",
+    "syntax": "passed",
+    "css": "passed; existing --line",
+    "generated": "passed",
+    "diff": "passed",
+    "secretScan": {
+      "candidateFiles": 63,
+      "forbiddenPaths": 0,
+      "privateKeyOrTokenFindings": 0,
+      "privateFinancialSnapshotExcluded": true,
+      "backendChanges": []
+    }
+  },
+  "evidenceReused": [
+    "docs/audit/v118-p5a-bewijs.json",
+    "docs/audit/v118-p1-bewijs.json",
+    "docs/audit/v118-p1b-bewijs.json",
+    "docs/audit/v118-p2-bewijs.json",
+    "docs/audit/v118-p3-bewijs.json",
+    "docs/audit/v118-p3-herstel-bewijs.json",
+    "docs/audit/v118-p4-bewijs.json"
+  ],
+  "artifacts": {
+    "app.js": "0c240acff14f50c31986ff3d9a2b75708e018a5ea6c8d4202b76be4c02fdef41",
+    "app.css": "4f22fab16fdfa43e6f8753549a9ad217cdf2d2420aeede06f7323b192b15c9da",
+    "index.html": "d5d32daf566b4621a03289803783b4b7aa9bf38e2daef78ac301d6a806ac847e",
+    "service-worker.js": "a680f9aa644dc442c5bd962835fc3715a644d5747e2353883e40613fa4cfc77e",
+    "manifest.json": "d346dffbb70d22017e713af462ed84ae835ac36dee3839ce25712a84761be78f",
+    "docs/toekomstige-bankkoppelingen.md": "3ccaf72e9c228823669cf08594650c71da4f4809433915a4580d01f2886232ef",
+    "docs/v118-definitieve-release.md": "ea68a4bb733671d635419972dbd56169b0e8c02f1e321a5d4c9ff9e3b204308d",
+    "tests/v118-release-safety.test.cjs": "19521bdc367298cc154bdd64c1ba756153691cfec20d3a77adb13fe09e0f2c61",
+    "tests/browser/v118-release-safety.spec.cjs": "d4a688c58af7ce6f1b2d9e85d5725fcedc6cb6d7e46baaf58ebee5331ce3ffda",
+    "docs/audit/v118-p5a-bewijs.json": "006cee3ff4be35af7bb56ddcc3575f9cbb51eabddb0567c8f2cb35431af314a2",
+    "docs/audit/v118-p1-bewijs.json": "0cf56e24800ef9b8d1fdb7e832efcde9e49d75c271ae0006b8efaf514fa55d6f",
+    "docs/audit/v118-p1b-bewijs.json": "55421daaa28fe9c1275c947c2308b0a2e7267310e7dcf8a2c46aea97b005bae2",
+    "docs/audit/v118-p2-bewijs.json": "aa62b21c6147da0bbf208a1fa0f2a7392143b7b55c0ee60fb518205a587c4564",
+    "docs/audit/v118-p3-bewijs.json": "fd2efccc6f881b2827b6ac899163e14af3b53fee98fa6ade03911d92cc6e5f58",
+    "docs/audit/v118-p3-herstel-bewijs.json": "4ecf91501c7aec9878306a3cbfb7a2d40b112dd34491f9cbc62729a30bcabc7a",
+    "docs/audit/v118-p4-bewijs.json": "8242563afe61587e8840ba78789707ca171ce8893c09afb2444759818dd90eee",
+    ".cache/v118-release/build.log": "dfce3386f9a7cdb19219d25f8ed5315810c7c9ffe8a28b9a82cce222c2dad7ab",
+    ".cache/v118-release/syntax.log": "295e628357dad66fa63abf1006dcd90fd6a4ab5dbb75a5aa24ccdc0f79cf67f4",
+    ".cache/v118-release/css.log": "3e99f9ac4cbdd442f079b31ecba2f5a6e021a298c1a7366f64152d85d653d564",
+    ".cache/v118-release/generated.log": "01251087df2610e69d5e74772f224739901b47c1fd5c444dd9be991cb63e4004",
+    ".cache/v118-release/node-tests.log": "d254534008e509ccc84ae7e6f9834314ade240cfa7a6ed5dae71789d0a53fb76",
+    ".cache/v118-release/browser-integration.log": "cac30ac0616ad45332ab5c7152e5b05251ff795d04ff58555ff9c65c40d0167e",
+    ".cache/v118-release/browser-safety.log": "a3d58976786cf37f3647df16d7ed75506bac38c40786579f58a47eb5ff9a2439",
+    ".cache/v118-release/browser-pwa-upgrade.log": "f64ff00c22d2b7b2ccd4a39164369c5bc5c1abbc4e90c3cf783afc5107060139",
+    ".cache/v118-release/secret-scan.json": "066793af45fdc2b8a3c7860b2db0eea65c2ece176999ca5f73d84206f6c9c5a9",
+    ".cache/v118-release/staged-diff-check.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "financialEngineGitProof": [
+    {
+      "path": "src/core/transaction-engine.mjs",
+      "blob": "603f8c3846e00bbc0f716650d3b3597df6ffcc25",
+      "unchanged": true
+    },
+    {
+      "path": "src/core/transaction-model.mjs",
+      "blob": "187900e7e0b47c4b1b7909fa00826d4dbbf45c3e",
+      "unchanged": true
+    },
+    {
+      "path": "src/core/transaction-processing.mjs",
+      "blob": "7aff66c7ced49e3b986da0892c7ef77f3f22db9a",
+      "unchanged": true
+    },
+    {
+      "path": "src/core/planning-timeline.mjs",
+      "blob": "e20e2f3d207c8c72f9d0e17c4db06913315d1d13",
+      "unchanged": true
+    },
+    {
+      "path": "src/core/recurring-occurrences.mjs",
+      "blob": "f467e0af3017536427934a0dba0e2d96ae6ead4b",
+      "unchanged": true
+    },
+    {
+      "path": "src/core/salary-assignment.mjs",
+      "blob": "db47b37957fcc8d5fed7964581d1d789b4b2c8df",
+      "unchanged": true
+    },
+    {
+      "path": "src/storage/household-store.mjs",
+      "blob": "112e16920537fa668418253997f63df481148751",
+      "unchanged": true
+    },
+    {
+      "path": "src/storage/cloud-chunks.mjs",
+      "blob": "264d6a8ae5c8122a488a3f9622b7aca94f46e41c",
+      "unchanged": true
+    },
+    {
+      "path": "src/import/import-identity.mjs",
+      "blob": "32cbcf3e8c0f293d15922554d6dc0857a7225f70",
+      "unchanged": true
+    },
+    {
+      "path": "src/import/import-lifecycle.mjs",
+      "blob": "13c72f8353b464c45ce2fe9cb72c026401984f06",
+      "unchanged": true
+    },
+    {
+      "path": "src/import/import-sync-protocol.mjs",
+      "blob": "143a4abbe5a85fa45c8777b0c71b04abf9c4d27b",
+      "unchanged": true
+    },
+    {
+      "path": "src/storage/firestore-record-transport.mjs",
+      "blob": "1b7aa41ed26a195c3e68a24eb7d015f766197f36",
+      "unchanged": true
+    }
+  ]
+}

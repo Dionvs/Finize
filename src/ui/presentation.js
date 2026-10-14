@@ -278,6 +278,9 @@ import {
     const next = window.innerWidth >= 768;
     if (next === largeLayoutActive) return;
     largeLayoutActive = next;
+    // P3 already reflows with CSS and observes its chart container. Keep its
+    // loaded projection across breakpoints instead of requesting P2 again.
+    if(document.getElementById('tab-dashboard')?.classList.contains('active'))return;
     renderActiveTab();
   });
 

@@ -1,0 +1,77 @@
+{
+  "package": "V118 P1",
+  "date": "2026-10-13",
+  "baseCommit": "fbf8b34b8000570e05b9ec0b1ec3f00ddd33e7e5",
+  "branch": "agent/v117-stabilisatie",
+  "workingTreeImplementation": true,
+  "assetVersion": "118-p1",
+  "runtimeIntegrated": true,
+  "files": {
+    "src/core/balance-checkpoints.mjs": "a0eabd59609859be76516f30226d2bf7a9415f051d27047e15c714e83d929929",
+    "src/ui/account-balances.mjs": "f152e42ae827f068fa233cf006801b33dfc18506fd5a76debe5a07e5f7ebc198",
+    "src/core/runtime.js": "e806f55ee3f564ed71f8ac7ddeabee968a9a8402d93b933e5738b75a1fc33e76",
+    "src/import/runtime.js": "a2f96a502c63bdbf02510301ab7d95cbe3b643c23020c8a538dee0ae3adcf0ba",
+    "src/storage/period-workspace.mjs": "4cf9d55bf2706059e165535649c71d121c9b5bec5d12570a747f83bff9cb99bd",
+    "src/storage/sync-protocol.mjs": "53ec557319a1cc88f124826234f5bc711354462b4133a1f6ccc0a41c21a9ef67",
+    "src/styles/import.css": "78e840164f894537f4c6244dcaae50f7a1a3d2bf80c0a5f24e6d76169d2e1561",
+    "app.js": "8c68cf990437f41e1a00150788a38d87e56bf48839786f628dfbfacb65768ee1",
+    "app.css": "9fbcd1feb84202458e1fafa776f7244d9814aa15391bd8087ab0c71c88951f10",
+    "index.html": "729e5f97ef914001db69dd7667fb311f2e91be21b98e98d9fe9ea184dde65a7b",
+    "service-worker.js": "ed4c2aa63084411d3107d50f79c53878efa5960825c4c33323396b37bc889255",
+    "tests/v118-p1-balance.test.cjs": "bd723318fb2380b851df307f5b52b252538a0efffa878c25a3f6a077c1371290",
+    "tests/browser/v118-p1-balances.spec.cjs": "10e674518c29c5c44d4203caca8fa68f5ddf638e757addd7d1ae1aced3938a02",
+    "docs/v118-p1-saldo-ijkpunten.md": "e594564541ceefd2f8d6ce63265ad03b9cbc17f6b78e84f570f9e5a8e3eb97b3"
+  },
+  "localArtifacts": {
+    ".cache/v118-p1/browser-tests.log": "dcda621b53a92eb9745d87baa65a8c5cad47295bfc8f816065f97c62ea9520f4",
+    ".cache/v118-p1/comparison-1440.png": "8db30f136cee06a447e221f3919a497778503b0222ec6b0c4616981a7f6ef9a6",
+    ".cache/v118-p1/comparison-320.png": "9486947422529e3b4b10d767d411fca0a31f745cfaec109016ba90d332a96178",
+    ".cache/v118-p1/comparison-390.png": "255d3f11cae6f59d4186d85c6915deab5d3e6bc3e0bf92fc0ed31a51ca0760f3",
+    ".cache/v118-p1/history-1440.png": "83685155538778d63bb42b64f9aa3b8573aad88bacef37c328bf04d68c8798ba",
+    ".cache/v118-p1/history-320.png": "e23ff339c422085ece3123cbcb45f447a3425b970876a964c46fdcc8c83ccc68",
+    ".cache/v118-p1/history-390.png": "fdb7aae677a8ed121b21ec73dffe39243fa45767037659aa2157e9a48ec53b8a",
+    ".cache/v118-p1/node-tests.log": "45c5f692e9853ec05d42c79814d3d57d00fe79064c7d5ac60ae612fe74b83e05"
+  },
+  "node": {
+    "passed": 286,
+    "failed": 0,
+    "skipped": 0,
+    "newP1Cases": 36,
+    "command": "node --test tests/v118-p1-balance.test.cjs tests/v118-p5a-bank-input.test.cjs tests/v113-csv-processing.test.cjs tests/v117-p1.test.cjs tests/v117-p3-periods.test.cjs tests/cloud-sync-protocol.test.cjs tests/update4-import-engine.test.cjs tests/package3-transaction-engine.test.cjs tests/update3-administration.test.cjs tests/update4-7-closed-month.test.cjs tests/service-worker-cache.test.cjs tests/package7-release-audit.test.cjs tests/html-inline-syntax.test.cjs tests/update5-responsive-structure.test.cjs tests/update4-final-regression.test.cjs"
+  },
+  "browser": {
+    "passed": 12,
+    "failed": 0,
+    "newP1Cases": 9,
+    "widths": [
+      1440,
+      390,
+      320
+    ],
+    "command": "node node_modules/@playwright/test/cli.js test tests/browser/v118-p1-balances.spec.cjs tests/browser/package3-transaction-engine.spec.cjs tests/browser/package7-release-audit.spec.cjs --grep \"P1 |V117 vaste last buiten|P7 W1/W2\" --workers=1",
+    "cloudRoute": "Lokale browser met aangeleverde snapshots; geen productieserver",
+    "screenshotsOpened": true
+  },
+  "checks": [
+    "node scripts/build.mjs --check",
+    "node scripts/check-syntax.mjs",
+    "node scripts/check-css.mjs",
+    "git diff --check"
+  ],
+  "checksPassed": true,
+  "knownCssNotice": "Bestaande v50-token --line zonder definitie",
+  "p5aHashesUnchanged": true,
+  "productionDataChanged": false,
+  "committed": false,
+  "pushed": false,
+  "merged": false,
+  "deployed": false,
+  "p2Started": false,
+  "limits": [
+    "Gerichte selectie, geen volledige V118-regressie",
+    "Geen bankdekking afgeleid uit CSV of sluitend saldo",
+    "Geen interface voor gelijktijdige tegenstrijdige ijkpunten",
+    "Geen Firestore-emulator of schaalbenchmark",
+    "Logs en screenshots zijn lokaal gitignored"
+  ]
+}

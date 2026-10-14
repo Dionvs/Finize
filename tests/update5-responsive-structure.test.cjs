@@ -6,14 +6,15 @@ const root = path.join(__dirname, '..');
 const markup = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const css = fs.readFileSync(path.join(root, 'app.css'), 'utf8');
 const js = require('./helpers/runtime-source.cjs');
+const dashboard = fs.readFileSync(path.join(root,'src/ui/dashboard.mjs'),'utf8');
 const html = markup + js;
 const presentationJs = fs.readFileSync(path.join(root, 'src', 'ui', 'presentation.js'), 'utf8');
 const sw = fs.readFileSync(path.join(root, 'service-worker.js'), 'utf8');
 
 assert.match(markup, /app\.css/);
 assert.match(markup, /app\.js/);
-assert.match(sw, /finize-v117-p4r5/);
-assert.match(js, /const dashboardTotalIncome = incomeBreakdown\.total;/);
+assert.match(sw, /finize-v118-r1/);
+assert.match(js, /createDashboard/);
 assert.match(sw, /\.\/app\.css/);
 assert.match(sw, /\.\/app\.js/);
 assert.doesNotMatch(html, /data-month-copy-previous|Kopieer vorige maand/);
@@ -27,8 +28,8 @@ assert.match(html, /dashboardIncomeBreakdown\(getSelectedMonth\(\)\)\.total/);
 assert.doesNotMatch(html, /renderManageSection\('Sparen'/);
 assert.match(html, /function openPersonalSavingEditModal\(owner\)/);
 assert.match(html, /Automatisch gebruiken/);
-assert.match(html, /data-income-edit="dion" data-income-label="Dion" aria-label="Inkomen van Dion aanpassen"/);
-assert.match(html, /data-income-edit="dara" data-income-label="Dara" aria-label="Inkomen van Dara aanpassen"/);
+assert.match(dashboard, /Vrij na verplichtingen/);
+assert.match(dashboard, /Geplande verdeling/);
 assert.match(html, /data-u3-open="planning" data-u3-planning-owner="\$\{(?:owner|opts\.openFixedOwner)\}" aria-label="Vaste lasten van/);
 assert.match(html, /function u3OpenPlanning\(owner=''\)/);
 assert.doesNotMatch(js, /data-open-owner-fixed/);
@@ -57,26 +58,12 @@ for (const marker of [
 }
 assert.match(css, /\.v4-bottom-nav\{display:none !important\}/);
 
-const presentationClasses = [
-  'dashboard-summary-row',
-  'dashboard-preview-row',
-  'budget-preview-card',
-  'savings-preview-card',
-  'mobile-kpi-card--editable',
-  'mobile-kpi-card--joint-total',
-  'mobile-kpi-card--budget'
-];
-for (const className of presentationClasses) {
-  assert.match(html, new RegExp(`class="[^"]*${className}`), `Presentatieklasse ontbreekt: ${className}`);
-}
-
-for (const marker of ['Inkomen Dion','Inkomen Dara','Totaal gezamenlijke rekening','Variabel gebruikt','Geplande verdeling','Verdeling Dion / Dara']) {
-  assert.match(html, new RegExp(marker), `Dashboardmarker ontbreekt: ${marker}`);
-}
-assert.match(html, /getMonthFinancialResult\(key\)/);
+// P3 replaces the historical dashboard composition; incumbent non-dashboard contracts stay below.
+for(const marker of ['p3-kpis','p3-main','p3-summary','p3-year-kpis','p3-year-chart'])assert.ok(dashboard.includes(marker),marker);
+assert.match(js, /getMonth:getMonthFinancialResult/);
 assert.doesNotMatch(html, /Werkelijk maandresultaat|Deze realisatie verandert het vooraf berekende zakgeld niet/);
-assert.match(html, /class="card span-6 u5-planned-flow"/);
-assert.match(html, /class="card span-6 u5-allowance-split"/);
+assert.match(dashboard, /freeAfterObligationsCents/);
+assert.match(dashboard, /data-p3-context/);
 assert.match(html, /function renderRecurringFixedManage\(owner\)/);
 assert.match(html, /resolveFixedExpensesForMonth\(state,getSelectedMonth\(\)\)/);
 

@@ -1,0 +1,274 @@
+{
+  "desktopHeight": {
+    "reductionPixels": 222,
+    "before": 1558,
+    "after": 1336,
+    "reductionPercent": 14.2
+  },
+  "preservedSinceRestore": [
+    "docs/audit/v118-p1-bewijs.json",
+    "docs/audit/v118-p1b-bewijs.json",
+    "docs/audit/v118-p2-bewijs.json",
+    "docs/audit/v118-p3-bewijs.json",
+    "docs/audit/v118-p5a-bewijs.json",
+    "docs/v118-inventarisatie-en-implementatieplan.md",
+    "docs/v118-p1-saldo-ijkpunten.md",
+    "docs/v118-p1b-bankrekeningbeheer.md",
+    "docs/v118-p2-dagelijkse-prognose.md",
+    "docs/v118-p3-dashboard-design.md",
+    "docs/v118-p3-impeccable-hercontrole.md",
+    "docs/v118-p5a-bank-invoercontract.md",
+    "scripts/build.mjs",
+    "src/core/account-profiles.mjs",
+    "src/core/balance-checkpoints.mjs",
+    "src/core/daily-liquidity.mjs",
+    "src/core/data-normalization.mjs",
+    "src/core/liquidity-settings.mjs",
+    "src/import/bank-input-contract.mjs",
+    "src/import/runtime.js",
+    "src/storage/period-workspace.mjs",
+    "src/storage/sync-protocol.mjs",
+    "src/styles/import.css",
+    "src/styles/settings.css",
+    "src/ui/account-balances.mjs",
+    "src/ui/bank-accounts.mjs",
+    "src/ui/liquidity-settings.mjs",
+    "tests/browser/package3-transaction-engine.spec.cjs",
+    "tests/browser/v118-p1-balances.spec.cjs",
+    "tests/browser/v118-p1b-accounts.spec.cjs",
+    "tests/browser/v118-p2-liquidity.spec.cjs",
+    "tests/v118-p1-balance.test.cjs",
+    "tests/v118-p1b-accounts.test.cjs",
+    "tests/v118-p2-liquidity.test.cjs",
+    "tests/v118-p5a-bank-input.test.cjs",
+    "v118-p3-dashboard-vooruitblik.md"
+  ],
+  "restoreFiles": 52,
+  "domMetrics": [
+    {
+      "viewport": 1440,
+      "chart": 686.734375,
+      "viewBox": 686.734375,
+      "font": 12,
+      "hitWidth": 44,
+      "hitHeight": 44,
+      "pageHeight": 1336,
+      "overflow": false
+    },
+    {
+      "viewport": 1200,
+      "chart": 535.625,
+      "viewBox": 535.625,
+      "font": 12,
+      "hitWidth": 44,
+      "hitHeight": 44,
+      "pageHeight": 1405,
+      "overflow": false
+    },
+    {
+      "viewport": 1440,
+      "chart": 686.734375,
+      "viewBox": 686.734375,
+      "font": 12,
+      "hitWidth": 44,
+      "hitHeight": 44,
+      "pageHeight": 1336,
+      "overflow": false
+    },
+    {
+      "viewport": 390,
+      "chart": 344,
+      "viewBox": 344,
+      "font": 12,
+      "hitWidth": 44,
+      "hitHeight": 44,
+      "pageHeight": 2598,
+      "overflow": false
+    },
+    {
+      "viewport": 320,
+      "chart": 274,
+      "viewBox": 274,
+      "font": 12,
+      "hitWidth": 44,
+      "hitHeight": 44,
+      "pageHeight": 2817,
+      "overflow": false
+    },
+    {
+      "viewport": 1440,
+      "chart": 686.734375,
+      "viewBox": 686.734375,
+      "font": 12,
+      "hitWidth": 44,
+      "hitHeight": 44,
+      "pageHeight": 1336,
+      "overflow": false
+    }
+  ],
+  "checks": {
+    "generated": "passed",
+    "diffCheck": "passed",
+    "css": "passed; existing --line",
+    "syntax": "passed",
+    "build": "passed"
+  },
+  "transactionEngine": {
+    "headBlob": "603f8c3846e00bbc0f716650d3b3597df6ffcc25",
+    "unchanged": true,
+    "gitBlob": "603f8c3846e00bbc0f716650d3b3597df6ffcc25"
+  },
+  "node": {
+    "passed": 129,
+    "p3Cases": 18,
+    "command": "node --test tests/v118-p3-dashboard.test.cjs tests/v118-p2-liquidity.test.cjs tests/package4-allowance-planning-correction.test.cjs tests/v117-budget-detail-capital.test.cjs tests/update5-responsive-structure.test.cjs tests/html-inline-syntax.test.cjs tests/service-worker-cache.test.cjs tests/package7-release-audit.test.cjs tests/update4-final-regression.test.cjs",
+    "failed": 0,
+    "newRepairCases": 4
+  },
+  "resolvedFindings": [
+    "personal-allowance-share",
+    "chart-container-resize",
+    "distinct-minimum",
+    "neutral-balance-points",
+    "mobile-12px-text",
+    "visible-projection-period",
+    "compact-desktop"
+  ],
+  "baseCommit": "fbf8b34b8000570e05b9ec0b1ec3f00ddd33e7e5",
+  "browser": {
+    "command": "node node_modules/@playwright/test/cli.js test tests/browser/v118-p3-dashboard.spec.cjs --workers=1 --max-failures=1",
+    "newRepairCases": 4,
+    "extraFirestoreRequestsOnResize": 0,
+    "financialStateUnchanged": true,
+    "extraP2RequestsOnResize": 0,
+    "mouseTouchKeyboard": true,
+    "dynamicResize": [
+      1440,
+      1200,
+      1440,
+      390,
+      320,
+      1440
+    ],
+    "widths": [
+      1440,
+      1200,
+      390,
+      320
+    ],
+    "screenshotsVisuallyOpened": true,
+    "passed": 14,
+    "failed": 0
+  },
+  "financialFunctions": [
+    {
+      "name": "calcScenario",
+      "unchanged": true,
+      "sha256": "e81f97628e47d6c7cbb2afb0ce129b683f3c57ac3bec4eafd3d5804edcdd7b24"
+    },
+    {
+      "name": "monthlyFinancialForecast",
+      "unchanged": true,
+      "sha256": "1f4c1cc0b59597470e87bbc99240a8b5b3a15588224094a1548529931651164e"
+    },
+    {
+      "name": "sumTransactions",
+      "unchanged": true,
+      "sha256": "f1da49e8aaa4bea26a24ca41d7657a373a06d37f2cbc368a03b83a99fd1e9145"
+    },
+    {
+      "name": "getMonthFinancialResult",
+      "unchanged": true,
+      "sha256": "69f1dcb4ad8c669c7929d2000af3b404021ea5d3bf7a3c7f0c61e32580c665a1"
+    },
+    {
+      "name": "calcGroep",
+      "unchanged": true,
+      "sha256": "fe574ba0b16f2cd3e4606121ac995f8b4cdd5365bc838a701aa5c7896575aa56"
+    },
+    {
+      "name": "calcDoel",
+      "unchanged": true,
+      "sha256": "627d220a4bf03723e2abcbd8d28c3bbc41b7746d41f82316b47c87e01bef628b"
+    },
+    {
+      "name": "resolveMonthlyIncome",
+      "unchanged": true,
+      "sha256": "2afb9815363b1905b7dfb253c38510726956de71f0430372169c5ec04d834fbc"
+    }
+  ],
+  "impeccable": {
+    "version": "4.0.2",
+    "repairRounds": 1,
+    "priorIndependentReviewUsed": true,
+    "steps": [
+      "harden",
+      "adapt",
+      "clarify",
+      "typeset",
+      "layout",
+      "polish"
+    ],
+    "independentReviewerThisRound": false,
+    "detectorFindings": 0,
+    "manualVisualCheck": true
+  },
+  "localArtifacts": {
+    ".cache/v118-p3-herstel/mobile-metrics-320.json": "77590875bb93b4c9e119f71c09dbcef8e316bf8a7f21af9eb464081c1e58db47",
+    ".cache/v118-p3-herstel/node-tests.log": "2478472a17f698fb900f12d5cde078a10a5acad1ef0f62e45924234190ade9e0",
+    ".cache/v118-p3-herstel/syntax.log": "890228085be011d60149e5d5912f8c255c8263eedb062ed174487716b64c4605",
+    ".cache/v118-p3-herstel/dashboard-390.png": "5caed802bb44d55b2bc5b67e3adcec79a18f8839fe94b9fcf3682980799ebcc5",
+    ".cache/v118-p3-herstel/browser-tests.log": "4c39bc71525c636c77d1caddcbbdddde2c503d0eb0a9ede70008cedcc9218a28",
+    ".cache/v118-p3-herstel/dashboard-320.png": "c10aca53ee1135042c288c11e6ac1a966edd61aeec3ebd708bbad7e39d81e7ac",
+    ".cache/v118-p3-herstel/css.log": "23caadb9aea779e7f8836937ed68bdab85fc45062dce71fdff73730556d8c4a7",
+    ".cache/v118-p3-herstel/mobile-metrics-390.json": "74db462557a8d325293471a5cd390089a2616f7c1e115913bdf33c0c953e99e2",
+    ".cache/v118-p3-herstel/dashboard-1200.png": "75ef06beae9ac0f37d0ef46adb24d30fa93d293c6d4edefe8adfb40c1a84af0d",
+    ".cache/v118-p3-herstel/resize-metrics.json": "4a9c97615b1c341d6ea24913d59ddd8bf17963b3fcece54e7c778aea12b18e61",
+    ".cache/v118-p3-herstel/diff-check.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    ".cache/v118-p3-herstel/dashboard-1440.png": "9fda029600006210d2d366918da7841b5678eee3a6b520037965eb9404dedb4f",
+    ".cache/v118-p3-herstel/generated.log": "a6a130c8944ab36df75487007636f238ac9f95bc42ca06cce0e25aaa0ebcc719",
+    ".cache/v118-p3-herstel/file-comparison.json": "d1287b05cdabf3875b65242d1d19aac2a45395d7f9eb53e1634f5811d5e167c8",
+    ".cache/v118-p3-herstel/impeccable-detector.json": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+    ".cache/v118-p3-herstel/financial-functions.json": "af85e5e72bf9781c0aac0fae128ddd2d78ac71e42273edf2c5add216145888c0",
+    ".cache/v118-p3-herstel/build.log": "115862f46538749e7218ba687619bc0dccb70b0583aa6a20b12d946dd200880f"
+  },
+  "branch": "agent/v117-stabilisatie",
+  "changedSinceRestore": {
+    "app.css": "4212be33b0b88588279876e216afcaa1893ef4be45b691a0bae8a4c57415a376",
+    "tests/package7-release-audit.test.cjs": "0bf21fe1d0de94a3f168a330977970c4a6ac06d28365594639c16e8481e3d2ee",
+    "service-worker.js": "f92fe8669d3faaed9d8de292872a7ca8d3548f7866c2dd94d623cf964c3d9072",
+    "index.html": "96f1abff589c39546da8d160e7eb7c02fbd741dfd7814a50c9de71a241a24a31",
+    "tests/browser/package7-release-audit.spec.cjs": "8834f63df950246925990c7905e6f9b091484ae589ad1ffe32b21f99e37b1a31",
+    "app.js": "9f6e52ec5539de513a11d7986830d460b8c6a055fc990d366a21ad749107372d",
+    "tests/browser/v118-p3-dashboard.spec.cjs": "357b717b59ed368fe0cd8fb3374e292ced71dcc24ce682fff715aec0d1e56517",
+    "src/ui/dashboard.mjs": "a8a3585e848c2e03ef27cb91e7bb600bbfeb8b8ffe322a4bf5e9f9762359498a",
+    "src/ui/presentation.js": "8df2fd24b8c05055ef85f607b428903494f869c06c8373608080dd84ce61ae38",
+    "src/core/runtime.js": "ec3fa16461d4aea65feb4e07d625dfaa36c4f1cd0fbf52c61f1c4792569599b6",
+    "tests/update5-responsive-structure.test.cjs": "33554fcfd9c9948c22acc4819d76c0c69b66c072580d2596f764ef97a2d3974a",
+    "tests/service-worker-cache.test.cjs": "d43fe288a74d1c6be5c66622403c7d2b914ef6b0d1c57339481ce958cdc031e1",
+    "tests/update4-final-regression.test.cjs": "5710657321c5905bef0f21225afc06a82cf31b47a75310a32c4218ad4264e045",
+    "tests/v118-p3-dashboard.test.cjs": "34ea74e200e24c94e6fbf386585024736d0901bd91840f36580a5292c5adea13",
+    "src/styles/dashboard-p3.css": "932fb31ea8cd8eba3fce7158836c631c41cae6d3069e2bedd0bcf179de8b7077",
+    "v118-p3-impeccable-herstel.md": "382dfc115cbe4e1c85ab0a2c3b0401ae643defec6b1c9bb81faa6281215aef25",
+    "tests/html-inline-syntax.test.cjs": "4bc266b803e9c82d32743eaf16b80b8686e757227cf9eaa877fc718d5024a9c1"
+  },
+  "date": "2026-10-14",
+  "restorePoint": "C:\\Users\\dionv\\AppData\\Local\\Finize-herstelpunten\\v118-p3-herstel-20261014-155821",
+  "boundaries": {
+    "deployed": false,
+    "P4Started": false,
+    "P5bStarted": false,
+    "awaitingUserReview": true,
+    "scaleTests": false,
+    "financialEngineModified": false,
+    "fullV118Regression": false,
+    "committed": false,
+    "benchmarks": false,
+    "productionModified": false,
+    "emulatorSuite": false,
+    "pushed": false,
+    "merged": false
+  },
+  "package": "V118 P3 Impeccable herstel",
+  "assetVersion": "118-p3r1"
+}

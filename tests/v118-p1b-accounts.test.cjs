@@ -1,0 +1,61 @@
+const {test}=require('node:test'),assert=require('node:assert/strict');
+const {applyAccountProfileCommand:apply,assertAccountProfileMutation:guard,validDutchIban,accountHasReferences,availableAccountProfiles}=require('../src/core/account-profiles.mjs');
+const {mergeAccountProfiles,rebaseLocalChanges,assertAccountProfilesPreserved}=require('../src/storage/sync-protocol.mjs');
+const {prepareBalanceCheckpoint,applyBalanceCheckpoint,selectAccountBalance}=require('../src/core/balance-checkpoints.mjs');
+const {encodeHouseholdState,decodeHouseholdState}=require('../src/storage/household-store.mjs');
+const {encodeCloudState,decodeCloudState,cloudStateManifest}=require('../src/storage/cloud-chunks.mjs');
+const {workspaceNeedsFullHistory}=require('../src/storage/period-workspace.mjs');
+const {state:fixture,row,materialize,copy}=require('./helpers/package5-fixture.cjs');
+const runtime=require('../src/import/update4-runtime.cjs');
+const IBAN='NL91ABNA0417164300',OTHER='NL20INGB0001234567';
+let seq=0;
+const values=(overrides={})=>({name:'Huishoudrekening',bank:'',identifier:IBAN,accountOwner:'gezamenlijk',accountType:'payment',...overrides});
+const create=(overrides={})=>({type:'create',id:'account-'+(++seq),operationId:'op-'+seq,createdAt:'2026-10-13T12:00:00Z',values:values(),...overrides});
+const empty=()=>({accountProfiles:[],transactions:[],balanceCheckpoints:[],importSummaries:[]});
+function setup(){const state=empty(),command=create();apply(state,command);return {state,command,profile:state.accountProfiles[0]};}
+const update=(profile,changes={},type='update')=>({type,id:profile.id,operationId:'op-'+(++seq),createdAt:'2026-10-13T13:00:00Z',expectedProfile:copy(profile),values:values({...profile,...changes})});
+const fails=(fn,code)=>assert.throws(fn,error=>error.code===code);
+test('P1b Nederlandse structuur, checksum en normalisatie',()=>{
+  assert(validDutchIban('nl91 abna 0417 1643 00'));assert(validDutchIban(OTHER));
+  for(const iban of ['NL92ABNA0417164300','NL01JOINT','DE89370400440532013000','NL91-ABNA0417164300',''])assert(!validDutchIban(iban));
+});
+for(const owner of ['gezamenlijk','dion','dara'])test('P1b lokaal toevoegen voor '+owner+' zonder financiële mutaties',()=>{
+  const state=empty(),before=copy(state);apply(state,create({values:values({accountOwner:owner,identifier:'nl91 abna 0417 1643 00'})}));
+  assert.equal(state.accountProfiles[0].accountOwner,owner);assert.equal(state.accountProfiles[0].identifier,IBAN);
+  assert.equal(state.accountProfiles[0].bank,'');delete state.accountProfiles;delete before.accountProfiles;assert.deepEqual(state,before);
+});
+for(const [changes,code] of [[{name:' '},'invalid-account-name'],[{identifier:'NL00ABNA0417164300'},'invalid-iban'],[{accountOwner:'ander'},'invalid-account-owner'],[{accountType:''},'invalid-account-type']])test('P1b validatie '+code,()=>{const state=empty(),before=copy(state);fails(()=>apply(state,create({values:values(changes)})),code);assert.deepEqual(state,before);});
+test('P1b dubbel IBAN en dubbel profiel-ID worden geblokkeerd',()=>{const {state,profile}=setup();fails(()=>apply(state,create()),'duplicate-iban');fails(()=>guard(state,{...state,accountProfiles:[profile,profile]}),'duplicate-account-id');});
+test('P1b dezelfde operatie is idempotent; andere inhoud is conflict',()=>{const {state,command}=setup();apply(state,command);assert.equal(state.accountProfiles.length,1);fails(()=>apply(state,{...command,values:values({name:'Anders'})}),'account-operation-conflict');});
+test('P1b veilig IBAN corrigeren behoudt ID; nieuwe fysieke rekening krijgt ander ID',()=>{const {state,profile}=setup();apply(state,update(profile,{identifier:OTHER}));assert.equal(state.accountProfiles[0].id,profile.id);apply(state,create());assert.equal(state.accountProfiles.length,2);});
+test('P1b eigenaar zonder historie expliciet wijzigen',()=>{const {state,profile}=setup();apply(state,update(profile,{accountOwner:'dara'}));assert.equal(state.accountProfiles[0].accountOwner,'dara');});
+for(const key of ['transactions','balanceCheckpoints','importSummaries','internalTransferPairs','recognitionRules'])test('P1b historieblok voor '+key,()=>{
+  const {state,profile}=setup();state[key]=[{id:'ref',accountProfileId:profile.id}];const before=copy(state);
+  assert(accountHasReferences(state,profile));fails(()=>apply(state,update(profile,{identifier:OTHER})),'account-identity-in-use');fails(()=>apply(state,update(profile,{accountOwner:'dara'})),'account-identity-in-use');assert.deepEqual(state,before);
+});
+test('P1b losse importdetails en IBAN-herkenningsregels worden meegenomen',()=>{const {state,profile}=setup();fails(()=>apply(state,update(profile,{identifier:OTHER}),{imports:[{rows:[{bankOriginal:{accountIdentifier:IBAN}}]}]}),'account-identity-in-use');state.recognitionRules=[{id:'rule',value:IBAN}];assert(accountHasReferences(state,profile));});
+test('P1b onvolledige historie blokkeert identiteit, veilige metadata blijft bewerkbaar',()=>{const {state,profile}=setup();state.__finizePartialHistory=true;fails(()=>apply(state,update(profile,{identifier:OTHER})),'account-history-incomplete');apply(state,update(profile,{name:'Nieuwe naam'}));assert.equal(state.accountProfiles[0].name,'Nieuwe naam');});
+test('P1b verouderd formulier wordt geweigerd',()=>{const {state,profile}=setup(),old=update(profile,{bank:'ABN AMRO'});apply(state,update(profile,{name:'Actuele naam'}));fails(()=>apply(state,old),'account-profile-conflict');});
+test('P1b archiveren en heractiveren behouden historie, ID en projectie',()=>{
+  const state=fixture();state.accountProfiles[0].name='Historisch';const profile=copy(state.accountProfiles[0]);materialize(state,[row('source')]);
+  const context={scope:{householdId:'legacy',accountProfiles:state.accountProfiles},today:'2026-10-13'};
+  const command={operationId:'checkpoint',createdAt:'2026-10-13T12:00:00Z',accountProfileId:'joint',amountCents:100000,asOfDate:'2026-10-01',note:''};
+  const prepared=prepareBalanceCheckpoint(state,command,context);applyBalanceCheckpoint(state,{...command,confirmed:true,previewSignature:prepared.previewSignature},context);
+  const before=copy(state),projection=selectAccountBalance(state,{...context,accountProfileId:'joint',toDate:'2026-10-13'});
+  apply(state,update(profile,{},'archive'));assert.equal(availableAccountProfiles(state.accountProfiles).length,0);assert.equal(availableAccountProfiles(state.accountProfiles,'joint').length,1);
+  assert.deepEqual(selectAccountBalance(state,{...context,accountProfileId:'joint',toDate:'2026-10-13'}),projection);
+  fails(()=>prepareBalanceCheckpoint(state,{...command,operationId:'new',asOfDate:'2026-10-12'},context),'account-archived');
+  const corrected={...command,operationId:'correction',supersedesId:'balance-checkpoint',amountCents:100100};assert(prepareBalanceCheckpoint(state,corrected,context).record);
+  apply(state,update(state.accountProfiles[0],{},'reactivate'));assert.equal(state.accountProfiles[0].id,'joint');assert.deepEqual(state.transactions,before.transactions);assert.deepEqual(state.balanceCheckpoints,before.balanceCheckpoints);
+});
+test('P1b gearchiveerd IBAN kan niet als nieuw profiel terugkomen; fysiek verwijderen geblokkeerd',()=>{const {state,profile}=setup();apply(state,update(profile,{},'archive'));fails(()=>apply(state,create()),'duplicate-iban');fails(()=>guard(state,{...state,accountProfiles:[]}),'account-delete-blocked');});
+test('P1b metadata voor onvolledig legacyprofiel behoudt kenmerk',()=>{const state={accountProfiles:[{id:'old',name:'Oud',identifier:'SPAREN-123',accountOwner:'dara',bank:'ING'}]};const old=copy(state.accountProfiles[0]);apply(state,update(old,{accountType:'savings',identifier:old.identifier,name:'Spaarrekening'}));assert.equal(state.accountProfiles[0].identifier,'SPAREN-123');});
+test('P1b CSV herkent handmatig toegevoegde rekening zonder eerdere import',()=>{const {state,profile}=setup();const draft=runtime.createImportDraft({id:'manual-first-csv',text:`Datum;Omschrijving;Rekening;Bedrag\n2026-10-11;Boodschappen;${IBAN};-10.00`,profiles:state.accountProfiles,entryOwner:'gezamenlijk',today:'2026-10-13'});assert.equal(draft.accountProfileId,profile.id);assert.equal(draft.accountOwner,'gezamenlijk');});
+test('P1b nieuwe CSV voor archiefrekening wordt geblokkeerd',()=>{const {state,profile}=setup();apply(state,update(profile,{},'archive'));assert.throws(()=>runtime.createImportDraft({text:`Datum;Omschrijving;Rekening;Bedrag\n2026-10-11;Boodschappen;${IBAN};-10.00`,profiles:state.accountProfiles}),/gearchiveerd/);});
+test('P1b onafhankelijke profielwijzigingen worden samengevoegd',()=>{const {state}=setup(),base=copy(state),local=copy(state),remote=copy(state);local.accountProfiles[0].name='Lokaal';remote.accountProfiles[0].bank='Cloudbank';const merged=rebaseLocalChanges(base,local,remote);assert.equal(merged.accountProfiles[0].name,'Lokaal');assert.equal(merged.accountProfiles[0].bank,'Cloudbank');});
+for(const field of ['identifier','accountOwner','status','name','bank','accountType'])test('P1b tegenstrijdig veld '+field+' geeft conflict',()=>{const {state}=setup(),base=copy(state),local=copy(state),remote=copy(state);local.accountProfiles[0][field]='lokaal';remote.accountProfiles[0][field]='cloud';fails(()=>rebaseLocalChanges(base,local,remote),'finize/cloud-conflict');});
+test('P1b gelijktijdige eerste toevoegingen blijven beide bestaan; dubbel IBAN blokkeert',()=>{const left=empty(),right=empty();apply(left,create());apply(right,create({values:values({identifier:OTHER,accountOwner:'dara'})}));assert.equal(rebaseLocalChanges({},left,right).accountProfiles.length,2);right.accountProfiles[0].identifier=IBAN;fails(()=>rebaseLocalChanges({},left,right),'finize/cloud-conflict');});
+test('P1b cloudacceptatie blokkeert verlies en onbevestigde lokale wijziging',()=>{const {state}=setup();fails(()=>assertAccountProfilesPreserved(state,{accountProfiles:[]}),'finize/cloud-conflict');const remote=copy(state);remote.accountProfiles[0].name='Overschreven';fails(()=>assertAccountProfilesPreserved(state,remote),'finize/cloud-conflict');});
+test('P1b archiefstatus en rekeningtype overleven lokale en cloudcodec',async()=>{const {state,profile}=setup();apply(state,update(profile,{},'archive'));const encoded=encodeHouseholdState(state);assert.deepEqual(decodeHouseholdState(encoded.head||{storageVersion:1,schemaVersion:11,layout:encoded.layout},encoded.records),state);const cloud=await encodeCloudState({...state,meta:{schemaVersion:11,revision:1}},'p1b');const manifest=cloudStateManifest({...cloud.descriptor,complete:true},{syncVersion:1,commitId:'p1b'});const decoded=await decodeCloudState(manifest,{...cloud.descriptor,complete:true},cloud.chunks);assert.equal(decoded.accountProfiles[0].status,'archived');});
+test('P1b metadata en archiveren vereisen geen globale historie; identiteit houdt de laadgrens',()=>{const {state,profile}=setup(),next=copy(state);next.accountProfiles[0].name='Naam';next.accountProfiles[0].status='archived';assert.equal(workspaceNeedsFullHistory(state,next),false);next.accountProfiles[0].identifier=OTHER;assert.equal(workspaceNeedsFullHistory(state,next),true);});
+test('P1b daadwerkelijke mutatiegrens blokkeert nieuw bankbewijs en eerste goedkeuring op archiefrekening',()=>{const {state,profile}=setup();apply(state,update(profile,{},'archive'));const candidate=copy(state);candidate.transactions.push({id:'source',recordRole:'bank-source',source:'csv',accountProfileId:profile.id,processingStatus:'nakijken'});fails(()=>guard(state,candidate),'account-archived');state.transactions=candidate.transactions;const approved=copy(state);Object.assign(approved.transactions[0],{processingStatus:'goedgekeurd',approvalSource:'manual'});fails(()=>guard(state,approved),'account-archived');});

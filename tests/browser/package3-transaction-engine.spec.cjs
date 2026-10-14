@@ -37,11 +37,10 @@ async function boot(page,width){
  await page.setViewportSize({width,height:900});
  await page.route('https://www.gstatic.com/firebasejs/**',route=>route.abort());
  await page.route('https://firestore.googleapis.com/**',route=>route.abort());
- await page.addInitScript(input=>{if(!localStorage.getItem('finize-budget-planner-v1'))localStorage.setItem('finize-budget-planner-v1',JSON.stringify(input));},fixture);
+ await page.addInitScript(input=>{if(!localStorage.getItem('finize-budget-planner-v1'))localStorage.setItem('finize-budget-planner-v1',JSON.stringify({...input,accountProfiles:['gezamenlijk','dion','dara'].map(owner=>({id:owner,name:owner,accountOwner:owner,identifier:'NL01'+owner.toUpperCase()}))}));},fixture);
  await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
  await page.evaluate(()=>commitChange(()=>{
   state.meta.selectedMonth='2026-10';state.transactions=[];
-  state.accountProfiles=['gezamenlijk','dion','dara'].map(owner=>({id:owner,name:owner,accountOwner:owner,identifier:'NL01'+owner.toUpperCase()}));
   state.recurringFixedExpenses=[{id:'p3-hyp',naam:'Hypotheek test',bedrag:100,categorie:'Wonen',financialFor:'gezamenlijk',rekening:'gezamenlijk',actief:true,begindatum:'2026-01-01',frequentieAantal:1,frequentieEenheid:'maanden',amountHistory:[{effectiveFrom:'2026-01-01',amount:100}],monthOverrides:{}}];
   state.importSummaries=[];state.activeImportId='';
  },{render:true}));

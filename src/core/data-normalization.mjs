@@ -114,7 +114,7 @@ export function normalizeImportCore(candidate, { diagnostics = [], seedLegacyOpe
     next.name=next.name || next.rekeningnaam || 'Rekening';
     next.identifier=next.identifier || normalizeIban(next.iban);
     if(!next.accountOwner && OWNERS.includes(next.owner))next.accountOwner=next.owner;
-    next.bank=next.bank || 'ING'; next.csvFormat=next.csvFormat || 'ing';
+    next.bank=next.bank ?? 'ING'; next.csvFormat=next.csvFormat || 'ing';
     next.createdAt=next.createdAt || epoch; next.updatedAt=next.updatedAt || epoch;
     return next;
   });

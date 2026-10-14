@@ -5,15 +5,20 @@ import { manifestBucket,manifestRoots } from './record-manifest.mjs';
 import { contributionAmount } from '../core/data-normalization.mjs';
 const same=(a,b)=>canonical(a)===canonical(b);
 const copy=value=>structuredClone(value);
-const transactionGlobals=new Set(['transactions','meta','spaardoelen','savingsGoalLedger','importSummaries','activeImportId','transactionReviewQueue','recognitionRules','advanceLedger','advanceRepayments','internalTransferPairs','savingsCoverageAllocations','manualTransactionReplacements','monthRecords','__finizePartialHistory','verifiedPeriods','__finizePeriodContext']);
+const transactionGlobals=new Set(['transactions','meta','spaardoelen','savingsGoalLedger','importSummaries','activeImportId','transactionReviewQueue','recognitionRules','advanceLedger','advanceRepayments','internalTransferPairs','savingsCoverageAllocations','manualTransactionReplacements','monthRecords','balanceCheckpoints','__finizePartialHistory','verifiedPeriods','__finizePeriodContext']);
 export function workspaceNeedsFullHistory(before,after){
   const ids=value=>Object.values(value.spaardoelen||{}).flatMap(rows=>rows.map(row=>row.id)).sort();
   if(!same(ids(before),ids(after)))return true;
   const life=row=>row?.lifecycle||(row?.status==='teruggedraaid'?'withdrawn':'active');
   if((before.importSummaries||[]).some(row=>{const next=(after.importSummaries||[]).find(value=>value.id===row.id);return !next||life(row)!==life(next);}))return true;
+  // Only metadata/status changes to already loaded profiles are independent of
+  // historical transactions. Identity changes and additions keep the old fence.
+  const identity=profiles=>(profiles||[]).map(profile=>({id:profile.id,identifier:profile.identifier,iban:profile.iban,accountOwner:profile.accountOwner}));
+  const sameAccountIdentity=same(identity(before.accountProfiles),identity(after.accountProfiles));
   const loaded=new Set(before.verifiedPeriods||[]);
   return [...new Set([...Object.keys(before),...Object.keys(after)])].some(key=>{
     if(same(before[key],after[key])||transactionGlobals.has(key))return false;
+    if(key==='accountProfiles'&&sameAccountIdentity)return false;
     return !key.startsWith('monthly')||!Object.keys({...before[key],...after[key]}).filter(month=>!same(before[key]?.[month],after[key]?.[month])).every(month=>loaded.has(month));
   });
 }

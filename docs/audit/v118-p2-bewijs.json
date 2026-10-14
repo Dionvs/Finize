@@ -1,0 +1,100 @@
+{
+  "package": "V118 P2",
+  "date": "2026-10-14",
+  "baseCommit": "fbf8b34b8000570e05b9ec0b1ec3f00ddd33e7e5",
+  "branch": "agent/v117-stabilisatie",
+  "assetVersion": "118-p2",
+  "restorePoint": "C:\\Users\\dionv\\AppData\\Local\\Finize-herstelpunten\\v118-p2-20261014-072609",
+  "workingTreeImplementation": true,
+  "changedSinceRestore": {
+    "app.css": "7537bae55b0040ac6a58f2027de08412eaed6495fb5ae397fa5724810bd2a418",
+    "app.js": "a056fb457c7206961cb2766ec276c64b9b74b0ac4ced3d522577b15fb8892c46",
+    "docs/v118-p2-dagelijkse-prognose.md": "137325b5a932a1faa27d5a172b762014d705ddc544274a51e91167185e7fcd07",
+    "index.html": "8bdf66b88290693d2e429a0e832829c6a320e54705ed53ac682e63b84e0aa44f",
+    "service-worker.js": "7601111d99631e80c65c5353076e6db35543351135eeb702470baec8e6cd3d44",
+    "src/core/account-profiles.mjs": "3d3a50b081cb11496d8b490a33e266cb3c70246ae326a132de014516979ce8ae",
+    "src/core/balance-checkpoints.mjs": "545af29d751a28a4e6f3f5ed27481d1d11bdd33fe2c164aa7dec2f88a91f6bab",
+    "src/core/daily-liquidity.mjs": "8fa2f6b538b0aa4a7be3821bc2b9d06a259248592503a4a5c6d0be91f79732a3",
+    "src/core/liquidity-settings.mjs": "23f30b9fb99c7533a9848376a84aef8c5086488abc69e1c522ca5dbc3ed9c3bf",
+    "src/core/runtime.js": "e93a50c2c1e95a4e3a72efb4fc416ab8ab93efd0c949178b39a0ecfae9120ddc",
+    "src/storage/sync-protocol.mjs": "1c907c018d35e9724a719d3630b912fae5f99f9e0e1b69bb38d37bd23d44b658",
+    "src/styles/settings.css": "090208c50f60a20bc78757f9f17af255cae296dabbe42b0026aaac7d3ec4548d",
+    "src/ui/bank-accounts.mjs": "e7b0e3e16a495393f13e1d0a870accb87a92d5a93918e35ffa74e098cae626e4",
+    "src/ui/liquidity-settings.mjs": "bee6d180e0d9db1fc1c9b7ffa903e568293af8656f41899939e057f3f4c7a482",
+    "tests/browser/package7-release-audit.spec.cjs": "933dab1e90e90c716a5ab5b46bd446c68601a9feb1212fc415b150b99e4405ba",
+    "tests/browser/v118-p2-liquidity.spec.cjs": "e3e152dd8873ea20155bc1292d4bd74f34b6010613f60ecd4bae4d22c0d233b7",
+    "tests/html-inline-syntax.test.cjs": "5e6bf6719d838c84516871086ffa806d7b7e5b9b15a657cf245d235cb5a7e64b",
+    "tests/package7-release-audit.test.cjs": "29bc8433e29e70423825e1c459b990812b8a6a24b7985f1609bf715a716abcc4",
+    "tests/service-worker-cache.test.cjs": "d9304358e11471d684cba2c58461bc7e6b75a50b8d5ad4321db8727403dff712",
+    "tests/update4-final-regression.test.cjs": "e4b77a6b01bb172c384a151d271faa738cbc4f83820eab45a0da1f896a48a9ba",
+    "tests/update5-responsive-structure.test.cjs": "1b37bb90424a144294821eb9d095aa370609fb10052fa40abd26f73b9e941dfb",
+    "tests/v118-p2-liquidity.test.cjs": "70a093e232e215c7a20d8d72ffa118db66ef7180ebeb149a0b5fc7f1f1a3018e"
+  },
+  "preservedSinceRestore": [
+    "docs/audit/v118-p1-bewijs.json",
+    "docs/audit/v118-p1b-bewijs.json",
+    "docs/audit/v118-p5a-bewijs.json",
+    "docs/v118-inventarisatie-en-implementatieplan.md",
+    "docs/v118-p1-saldo-ijkpunten.md",
+    "docs/v118-p1b-bankrekeningbeheer.md",
+    "docs/v118-p5a-bank-invoercontract.md",
+    "src/core/data-normalization.mjs",
+    "src/import/bank-input-contract.mjs",
+    "src/import/runtime.js",
+    "src/storage/period-workspace.mjs",
+    "src/styles/import.css",
+    "src/ui/account-balances.mjs",
+    "tests/browser/package3-transaction-engine.spec.cjs",
+    "tests/browser/v118-p1-balances.spec.cjs",
+    "tests/browser/v118-p1b-accounts.spec.cjs",
+    "tests/v118-p1-balance.test.cjs",
+    "tests/v118-p1b-accounts.test.cjs",
+    "tests/v118-p5a-bank-input.test.cjs"
+  ],
+  "localArtifacts": {
+    ".cache/v118-p2/browser-tests.log": "45c86de5b7ae3b6d3b270c17826aa2ef239765234f492c63699133d29b088709",
+    ".cache/v118-p2/build.log": "01251087df2610e69d5e74772f224739901b47c1fd5c444dd9be991cb63e4004",
+    ".cache/v118-p2/css.log": "6cb2cc7b269ed02b087c5e75e15a0737c234752eea5e22afaa87ded3f256ee7c",
+    ".cache/v118-p2/diff-check.log": "db11ef2332ed95a9347a33711d21d778f99607ed7b99e5c415c76b34ee8d3051",
+    ".cache/v118-p2/node-tests.log": "699993e936fff3c6fa138b6aeaa8116099adc151afb7fff11bca550452f06b85",
+    ".cache/v118-p2/settings-1440.png": "4dfee2ad53925e238afd6f91f414423e90668f4f7ce06585c7817abf91a3223d",
+    ".cache/v118-p2/settings-320.png": "be79394a8f42420185e759e7d813e46df8ac8dc4117342fea94ebf71ef564d02",
+    ".cache/v118-p2/settings-390.png": "b21ac1e53bb184f4805fab7d5aa955f0dba463c246a91d42966c5c00cd002126",
+    ".cache/v118-p2/syntax.log": "295e628357dad66fa63abf1006dcd90fd6a4ab5dbb75a5aa24ccdc0f79cf67f4"
+  },
+  "node": {
+    "command": "node --test tests/v118-p2-liquidity.test.cjs tests/v118-p1-balance.test.cjs tests/v118-p1b-accounts.test.cjs tests/v118-p5a-bank-input.test.cjs tests/package2-planning-timeline.test.cjs tests/package3-transaction-engine.test.cjs tests/package4-allowance-planning-correction.test.cjs tests/v117-p4-salary.test.cjs tests/v117-budget-detail-capital.test.cjs tests/v117-p3-periods.test.cjs tests/cloud-sync-protocol.test.cjs tests/v113-csv-processing.test.cjs tests/html-inline-syntax.test.cjs tests/service-worker-cache.test.cjs tests/package7-release-audit.test.cjs tests/update4-final-regression.test.cjs tests/update5-responsive-structure.test.cjs",
+    "failed": 0,
+    "passed": 429,
+    "newP2Cases": 53
+  },
+  "browser": {
+    "failed": 0,
+    "newP2Cases": 7,
+    "passed": 21,
+    "screenshotsVisuallyOpened": true,
+    "command": "node node_modules/@playwright/test/cli.js test tests/browser/v118-p2-liquidity.spec.cjs tests/browser/v118-p1b-accounts.spec.cjs tests/browser/package7-release-audit.spec.cjs --grep \"P2 |P1b |P7 W1/W2\" --workers=1 --max-failures=2",
+    "widths": [
+      1440,
+      390,
+      320
+    ]
+  },
+  "checks": {
+    "generated": "passed",
+    "syntax": "passed",
+    "diffCheck": "passed",
+    "css": "passed; known --line token"
+  },
+  "boundaries": {
+    "pushed": false,
+    "fullV118Regression": false,
+    "deployed": false,
+    "P3Started": false,
+    "scaleTests": false,
+    "committed": false,
+    "emulatorSuite": false,
+    "productionModified": false,
+    "merged": false
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "package": "V118 P5a",
+  "date": "2026-10-13",
+  "baseCommit": "fbf8b34b8000570e05b9ec0b1ec3f00ddd33e7e5",
+  "workingTreeImplementation": true,
+  "scope": "Pure lokaal bankinvoercontract, CSV-leesadapter en bronvergelijking",
+  "files": {
+    "src/import/bank-input-contract.mjs": "c47844641012ea5ac371c7b7923be65a6638afbfac267d8b6cb34db03ab482fb",
+    "tests/v118-p5a-bank-input.test.cjs": "13175507ec4972894de56363e0fa45f37e2caef018025fd0e9fa0a31505e62fc",
+    "docs/v118-p5a-bank-invoercontract.md": "cf19c63a62dbb294e108b2a258e096ccb649ee90254d1e89c1e06806606f7704"
+  },
+  "testCommand": "node --test --test-reporter=tap tests/v118-p5a-bank-input.test.cjs tests/v113-csv-processing.test.cjs tests/v117-p1.test.cjs tests/update4-import-engine.test.cjs tests/package3-transaction-engine.test.cjs",
+  "tests": {
+    "failed": 0,
+    "passed": 206,
+    "newContractCases": 47,
+    "existingReportedCases": 159,
+    "total": 206,
+    "skipped": 0
+  },
+  "testLog": "test-results/v118-p5a/node-tests.tap",
+  "testLogSha256": "5dd575879853367917b29bc963312ade425d4db15a0fd9a215a8b7ce85de6ef1",
+  "checks": [
+    {
+      "exitCode": 0,
+      "result": "Gegenereerde runtime is byte-reproduceerbaar.",
+      "command": "node scripts/build.mjs --check"
+    },
+    {
+      "exitCode": 0,
+      "command": "node --check src/import/bank-input-contract.mjs"
+    },
+    {
+      "exitCode": 0,
+      "command": "node --check tests/v118-p5a-bank-input.test.cjs"
+    },
+    {
+      "exitCode": 0,
+      "command": "git diff --check"
+    }
+  ],
+  "firstRunCorrection": "Een test verwachtte undefined voor een ontbrekende bron-ID, terwijl het contract null gebruikt. De fixture bevat nu expliciet een bestaande bron-ID om behoud daarvan te bewijzen.",
+  "runtimeIntegrated": false,
+  "uiChanged": false,
+  "productionDataChanged": false,
+  "productionRecordStorageActivated": false,
+  "published": false,
+  "limits": [
+    "Geen volledige V118-eindregressie",
+    "Geen browser- of emulatortests: geen UI-, opslag- of cloudwijzigingen",
+    "Lokale TAP-log is gitignored",
+    "Ready is geen financiele goedkeuring of bewezen bankdekking",
+    "P1-P4 en P5b zijn niet geimplementeerd"
+  ]
+}

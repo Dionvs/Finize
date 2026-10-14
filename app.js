@@ -1,15 +1,15 @@
 (() => {
   // src/core/early-errors.js
   window.__finizeEarlyErrors = [];
-  window.addEventListener("error", (event) => {
+  window.addEventListener("error", (event2) => {
     var _a2;
-    window.__finizeEarlyErrors.push({ type: "error", message: String(event.message || ""), filename: String(event.filename || ""), line: Number(event.lineno || 0), column: Number(event.colno || 0), stack: String(((_a2 = event.error) == null ? void 0 : _a2.stack) || "") });
-    console.error("Finize kon niet volledig starten:", event.message, event.filename ? `${event.filename}:${event.lineno || 0}` : "");
+    window.__finizeEarlyErrors.push({ type: "error", message: String(event2.message || ""), filename: String(event2.filename || ""), line: Number(event2.lineno || 0), column: Number(event2.colno || 0), stack: String(((_a2 = event2.error) == null ? void 0 : _a2.stack) || "") });
+    console.error("Finize kon niet volledig starten:", event2.message, event2.filename ? `${event2.filename}:${event2.lineno || 0}` : "");
   });
-  window.addEventListener("unhandledrejection", (event) => {
+  window.addEventListener("unhandledrejection", (event2) => {
     var _a2, _b, _c;
-    window.__finizeEarlyErrors.push({ type: "rejection", message: String(((_a2 = event.reason) == null ? void 0 : _a2.message) || event.reason || ""), stack: String(((_b = event.reason) == null ? void 0 : _b.stack) || "") });
-    console.error("Finize kon een achtergrondtaak niet afronden:", ((_c = event.reason) == null ? void 0 : _c.message) || String(event.reason || "Onbekende fout"));
+    window.__finizeEarlyErrors.push({ type: "rejection", message: String(((_a2 = event2.reason) == null ? void 0 : _a2.message) || event2.reason || ""), stack: String(((_b = event2.reason) == null ? void 0 : _b.stack) || "") });
+    console.error("Finize kon een achtergrondtaak niet afronden:", ((_c = event2.reason) == null ? void 0 : _c.message) || String(event2.reason || "Onbekende fout"));
   });
 
   // src/ui/platform.js
@@ -246,9 +246,9 @@
         setFeedback("Als dit adres bekend is, ontvang je een herstelmail.", "success");
       });
     });
-    (_d = root.querySelector("[data-auth-form]")) == null ? void 0 : _d.addEventListener("submit", (event) => {
-      event.preventDefault();
-      const form = event.currentTarget;
+    (_d = root.querySelector("[data-auth-form]")) == null ? void 0 : _d.addEventListener("submit", (event2) => {
+      event2.preventDefault();
+      const form = event2.currentTarget;
       if (!form.reportValidity()) return;
       runAction(async () => {
         const email = form.elements.email.value.trim();
@@ -283,12 +283,12 @@
     bindCommonActions();
     if (access === "signed-out") bindSignInActions();
   }
-  async function runAction(action) {
+  async function runAction(action2) {
     if (busy) return;
     setBusy(true);
     setFeedback("Even bezig…");
     try {
-      await action();
+      await action2();
     } catch (error2) {
       setFeedback(authErrorMessage(error2), "error");
     } finally {
@@ -451,38 +451,321 @@
   };
   initialize();
 
-  // src/storage/performance.mjs
-  function profileSync(name, action) {
-    const observe = globalThis.__finizePerformance;
-    if (typeof observe !== "function") return action();
-    const start = performance.now();
-    try {
-      return action();
-    } finally {
-      try {
-        observe(name, performance.now() - start);
-      } catch (e) {
+  // src/import/import-identity.mjs
+  var original = (row) => row.bankOriginal || row;
+  var accountKey = (row, batch) => String(row.accountContext || row.accountOwner || (batch == null ? void 0 : batch.accountOwner) || "") + "|" + String(original(row).accountIdentifier || (batch == null ? void 0 : batch.accountProfileId) || "");
+  function immutableBankFields(row) {
+    const bank = original(row);
+    return JSON.stringify([bank.bankDate, bank.transactionTime || "", bank.bookingDate || "", bank.amount, bank.rawDescription || bank.description, bank.description, bank.counterpartyAccount || "", bank.currency || "", bank.reference || "", bank.code || "", bank.notes || "", bank.rawCells || []]);
+  }
+  function classifyCsvDuplicate(row, batch, existingBatches = []) {
+    let possible = null;
+    for (const oldBatch of existingBatches) {
+      if (oldBatch.lifecycle === "deleted") continue;
+      for (const oldRow of oldBatch.rows || []) {
+        if (accountKey(row, batch) !== accountKey(oldRow, oldBatch)) continue;
+        const sameFields = immutableBankFields(row) === immutableBankFields(oldRow);
+        const proof = row.sourceIdentityProof, oldProof = oldRow.sourceIdentityProof;
+        const sameFile = (proof == null ? void 0 : proof.kind) === "file-row" && (oldProof == null ? void 0 : oldProof.kind) === "file-row" && Number.isSafeInteger(proof.rowOrdinal) && proof.rowOrdinal > 0 && proof.rowOrdinal === oldProof.rowOrdinal && (typeof batch.originalCsv === "string" && batch.originalCsv === oldBatch.originalCsv || /^[a-f0-9]{64}$/.test(proof.fileDigest || "") && proof.fileDigest === oldProof.fileDigest);
+        const bankIdentity = (proof == null ? void 0 : proof.kind) === "bank-id" && (oldProof == null ? void 0 : oldProof.kind) === "bank-id" && typeof proof.authority === "string" && proof.authority.trim() !== "" && typeof proof.id === "string" && proof.id.trim() !== "" && proof.authority === oldProof.authority && proof.id === oldProof.id;
+        if (sameFields && (sameFile || bankIdentity)) return { duplicate: true, duplicateSource: { batchId: oldBatch.id, rowId: oldRow.id }, reason: "proven-source-identity" };
+        if (sameFields) possible = { duplicate: false, possibleDuplicate: { batchId: oldBatch.id, rowId: oldRow.id }, reason: "equal-bank-fields" };
       }
     }
+    return possible || { duplicate: false };
   }
-  function profileStart(name) {
-    const observe = globalThis.__finizePerformance;
-    if (typeof observe !== "function") return () => {
-    };
-    const start = performance.now();
-    return () => {
-      try {
-        observe(name, performance.now() - start);
-      } catch (e) {
+  function validCalendarDate(date2) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date2))) return false;
+    const parsed = /* @__PURE__ */ new Date(date2 + "T12:00:00Z");
+    return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === date2;
+  }
+  function importDateError(original2, today) {
+    if (!validCalendarDate(original2.bankDate)) return { code: "invalid-transaction-date", row: original2.lineNumber, date: original2.bankDate, message: "Ongeldige transactiedatum." };
+    if (original2.bankDate > today) return { code: "future-transaction-date", row: original2.lineNumber, date: original2.bankDate, message: `Bankregel ${original2.lineNumber}: transactiedatum ${original2.bankDate} ligt in de toekomst.` };
+    return null;
+  }
+  function csvFileDigest(text2) {
+    const bytes3 = new TextEncoder().encode(String(text2)), length = bytes3.length, padded = new Uint8Array((Math.floor((length + 8) / 64) + 1) * 64);
+    padded.set(bytes3);
+    padded[length] = 128;
+    const view = new DataView(padded.buffer);
+    view.setUint32(padded.length - 8, Math.floor(length / 536870912));
+    view.setUint32(padded.length - 4, length * 8);
+    const k = [1116352408, 1899447441, 3049323471, 3921009573, 961987163, 1508970993, 2453635748, 2870763221, 3624381080, 310598401, 607225278, 1426881987, 1925078388, 2162078206, 2614888103, 3248222580, 3835390401, 4022224774, 264347078, 604807628, 770255983, 1249150122, 1555081692, 1996064986, 2554220882, 2821834349, 2952996808, 3210313671, 3336571891, 3584528711, 113926993, 338241895, 666307205, 773529912, 1294757372, 1396182291, 1695183700, 1986661051, 2177026350, 2456956037, 2730485921, 2820302411, 3259730800, 3345764771, 3516065817, 3600352804, 4094571909, 275423344, 430227734, 506948616, 659060556, 883997877, 958139571, 1322822218, 1537002063, 1747873779, 1955562222, 2024104815, 2227730452, 2361852424, 2428436474, 2756734187, 3204031479, 3329325298];
+    const h = [1779033703, 3144134277, 1013904242, 2773480762, 1359893119, 2600822924, 528734635, 1541459225], w = new Uint32Array(64), rot = (n, b) => n >>> b | n << 32 - b;
+    for (let offset = 0; offset < padded.length; offset += 64) {
+      for (let n = 0; n < 16; n++) w[n] = view.getUint32(offset + n * 4);
+      for (let n = 16; n < 64; n++) {
+        const a2 = w[n - 15], b2 = w[n - 2];
+        w[n] = w[n - 16] + (rot(a2, 7) ^ rot(a2, 18) ^ a2 >>> 3) + w[n - 7] + (rot(b2, 17) ^ rot(b2, 19) ^ b2 >>> 10) >>> 0;
       }
-    };
+      let [a, b, c, d, e, f, g, z] = h;
+      for (let n = 0; n < 64; n++) {
+        const first = z + (rot(e, 6) ^ rot(e, 11) ^ rot(e, 25)) + (e & f ^ ~e & g) + k[n] + w[n] >>> 0, second = (rot(a, 2) ^ rot(a, 13) ^ rot(a, 22)) + (a & b ^ a & c ^ b & c) >>> 0;
+        z = g;
+        g = f;
+        f = e;
+        e = d + first >>> 0;
+        d = c;
+        c = b;
+        b = a;
+        a = first + second >>> 0;
+      }
+      [a, b, c, d, e, f, g, z].forEach((v, n) => h[n] = h[n] + v >>> 0);
+    }
+    return h.map((n) => n.toString(16).padStart(8, "0")).join("");
   }
-  function profileCount(name, count = 1) {
+  function assertNoDuplicateSources(previous, next) {
     var _a2;
-    try {
-      (_a2 = globalThis.__finizePerformance) == null ? void 0 : _a2.call(globalThis, name, 0, { count });
-    } catch (e) {
+    const groups = /* @__PURE__ */ new Map();
+    for (const tx of next.transactions || []) {
+      if (!tx.importBatchId || !tx.importTransactionId || tx.batchLifecycle === "withdrawn" || tx.processingStatus !== "goedgekeurd") continue;
+      const proof = tx.sourceIdentityProof;
+      if ((proof == null ? void 0 : proof.kind) !== "file-row" || !proof.fileDigest) continue;
+      const key = JSON.stringify([tx.accountContext, ((_a2 = tx.bankOriginal) == null ? void 0 : _a2.accountIdentifier) || tx.accountProfileId, proof.fileDigest, proof.rowOrdinal]);
+      const source = tx.importBatchId + ":" + tx.importTransactionId;
+      const old = groups.get(key);
+      if (old && old.source !== source) {
+        const unchanged = (previous.transactions || []).some((row) => row.id === tx.id && JSON.stringify(row) === JSON.stringify(tx)) && (previous.transactions || []).some((row) => row.id === old.tx.id && JSON.stringify(row) === JSON.stringify(old.tx));
+        if (!unchanged) throw Object.assign(new Error("Dezelfde bewezen CSV-bron heeft twee actieve imports. Herstel/goedkeuring is geblokkeerd."), { code: "duplicate-source-conflict" });
+      } else groups.set(key, { source, tx });
     }
+  }
+
+  // src/import/bank-input-contract.mjs
+  var BANK_INPUT_VERSION = 1;
+  var TYPES = ["bank-transaction", "balance-observation", "coverage"];
+  var CHANNELS = ["csv", "bank-api", "manual"];
+  var text = (value) => typeof value === "string" && value.trim().length > 0;
+  var optional = (value) => value === void 0 || value === null || value === "" ? null : value;
+  var accountNumber = (value) => String(value || "").replace(/\s/g, "").toUpperCase();
+  var freeze = (value) => {
+    if (value && typeof value === "object") {
+      Object.values(value).forEach(freeze);
+      Object.freeze(value);
+    }
+    return value;
+  };
+  function jsonCopy(value) {
+    const ancestors = /* @__PURE__ */ new Set();
+    function check(item) {
+      if (item === null || typeof item === "string" || typeof item === "boolean") return;
+      if (typeof item === "number" && Number.isFinite(item)) return;
+      if (!item || typeof item !== "object" || ancestors.has(item)) throw new Error("invalid-json");
+      if (!Array.isArray(item) && Object.getPrototypeOf(item) !== Object.prototype) throw new Error("invalid-json");
+      ancestors.add(item);
+      for (const child of Array.isArray(item) ? item : Object.values(item)) check(child);
+      ancestors.delete(item);
+    }
+    check(value);
+    return JSON.parse(JSON.stringify(value));
+  }
+  function blocked(code, field) {
+    return freeze({ ok: false, disposition: "blocked", record: null, errors: [{ code, field }], warnings: [] });
+  }
+  function decimalAmountToCents(amount) {
+    if (typeof amount !== "number" || !Number.isFinite(amount)) throw new Error("invalid-amount");
+    const match = /^(-?)(\d+)(?:\.(\d{1,2}))?$/.exec(String(amount));
+    if (!match) throw new Error("invalid-amount-precision");
+    const cents5 = Number(match[1] + match[2] + (match[3] || "").padEnd(2, "0"));
+    if (!Number.isSafeInteger(cents5)) throw new Error("unsafe-amount");
+    return cents5 === 0 ? 0 : cents5;
+  }
+  function normalizeBankInput(input, scope) {
+    var _a2;
+    let source;
+    try {
+      source = jsonCopy(input);
+    } catch (e) {
+      return blocked("invalid-json", "input");
+    }
+    if (!source || Array.isArray(source) || typeof source !== "object") return blocked("invalid-record", "input");
+    const errors = [], warnings = [];
+    const error2 = (code, field) => errors.push({ code, field });
+    const warn = (code, field) => warnings.push({ code, field });
+    if (source.version !== BANK_INPUT_VERSION) error2("unsupported-version", "version");
+    if (!TYPES.includes(source.recordType)) error2("unsupported-record-type", "recordType");
+    if (!CHANNELS.includes(source.channel)) error2("unsupported-channel", "channel");
+    if (!text(scope == null ? void 0 : scope.householdId) || source.householdId !== scope.householdId) error2("household-scope-mismatch", "householdId");
+    const profiles = Array.isArray(scope == null ? void 0 : scope.accountProfiles) ? scope.accountProfiles.filter((profile) => (profile == null ? void 0 : profile.id) === source.accountProfileId) : [];
+    if (!text(source.accountProfileId) || profiles.length !== 1) error2("unresolved-account-profile", "accountProfileId");
+    if (!text(source.authority)) error2("missing-authority", "authority");
+    const provenance = source.provenance;
+    if (!provenance || typeof provenance !== "object" || Array.isArray(provenance) || !(provenance.payload != null || text(provenance.payloadRef))) error2("missing-original-evidence", "provenance");
+    let identity = (_a2 = source.identity) != null ? _a2 : null;
+    if (identity === null) warn("unproven-identity", "identity");
+    else if (identity.kind === "bank-id") {
+      if (!text(identity.id) || !text(identity.authority) || identity.authority !== source.authority)
+        error2("invalid-bank-identity", "identity");
+    } else if (identity.kind === "file-row") {
+      if (source.channel !== "csv" || source.recordType !== "bank-transaction" || !/^[a-f0-9]{64}$/.test(identity.fileDigest || "") || !Number.isSafeInteger(identity.rowOrdinal) || identity.rowOrdinal < 1)
+        error2("invalid-file-identity", "identity");
+    } else if (identity.kind === "observation-id") {
+      if (source.recordType === "bank-transaction" || !text(identity.id)) error2("invalid-observation-identity", "identity");
+    } else error2("unsupported-identity", "identity");
+    const facts = source.facts || {};
+    const date2 = (field) => {
+      if (!validCalendarDate(facts[field])) error2("invalid-date", "facts." + field);
+    };
+    const money4 = () => {
+      if (!Number.isSafeInteger(facts.amountCents)) error2("invalid-cent-amount", "facts.amountCents");
+      if (facts.currency !== "EUR") error2("unsupported-currency", "facts.currency");
+    };
+    let normalizedFacts = null, deferred = false;
+    if (source.recordType === "bank-transaction") {
+      if (source.channel === "manual") error2("unsupported-transaction-channel", "channel");
+      money4();
+      date2("transactionDate");
+      for (const field of ["bookingDate", "valueDate"]) if (optional(facts[field]) !== null) date2(field);
+      if (!["booked", "pending"].includes(facts.bankStatus)) error2("unsupported-bank-status", "facts.bankStatus");
+      if (facts.bankStatus === "pending") {
+        deferred = true;
+        warn("pending-not-booked", "facts.bankStatus");
+      }
+      if (!text(facts.description)) error2("missing-description", "facts.description");
+      for (const field of ["counterpartyAccount", "reference", "transactionTime"])
+        if (optional(facts[field]) !== null && typeof facts[field] !== "string") error2("invalid-text", "facts." + field);
+      normalizedFacts = {
+        amountCents: facts.amountCents,
+        currency: facts.currency,
+        bankStatus: facts.bankStatus,
+        transactionDate: facts.transactionDate,
+        bookingDate: optional(facts.bookingDate),
+        valueDate: optional(facts.valueDate),
+        transactionTime: optional(facts.transactionTime),
+        description: facts.description,
+        counterpartyAccount: optional(facts.counterpartyAccount) === null ? null : accountNumber(facts.counterpartyAccount),
+        reference: optional(facts.reference)
+      };
+    } else if (source.recordType === "balance-observation") {
+      money4();
+      date2("asOfDate");
+      if (!["booked", "available"].includes(facts.balanceType)) error2("unsupported-balance-type", "facts.balanceType");
+      if (!["end-of-bank-day", "timestamp"].includes(facts.boundary)) error2("unsupported-balance-boundary", "facts.boundary");
+      const observedAt = optional(facts.observedAt);
+      if (observedAt !== null && (typeof observedAt !== "string" || !/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|[+-](?:0\d|1[0-4]):[0-5]\d)$/.test(observedAt) || !validCalendarDate(observedAt.slice(0, 10)) || !Number.isFinite(Date.parse(observedAt)))) error2("invalid-observation-time", "facts.observedAt");
+      if (facts.boundary === "timestamp" && observedAt === null) error2("missing-observation-time", "facts.observedAt");
+      if (facts.boundary === "timestamp" || facts.balanceType === "available") {
+        deferred = true;
+        warn("balance-inclusion-unresolved", "facts.boundary");
+      }
+      normalizedFacts = {
+        amountCents: facts.amountCents,
+        currency: facts.currency,
+        asOfDate: facts.asOfDate,
+        balanceType: facts.balanceType,
+        boundary: facts.boundary,
+        observedAt
+      };
+    } else if (source.recordType === "coverage") {
+      date2("fromDate");
+      date2("toDate");
+      if (facts.fromDate > facts.toDate) error2("reversed-coverage-range", "facts.toDate");
+      if (!["unknown", "partial", "complete"].includes(facts.completeness)) error2("invalid-completeness", "facts.completeness");
+      if (!["unknown", "file-range", "bank-statement", "provider-assertion"].includes(facts.basis)) error2("invalid-coverage-basis", "facts.basis");
+      if (facts.completeness === "complete" && !["bank-statement", "provider-assertion"].includes(facts.basis))
+        error2("unproven-complete-coverage", "facts.basis");
+      if (facts.completeness !== "complete") warn("incomplete-bank-coverage", "facts.completeness");
+      normalizedFacts = { fromDate: facts.fromDate, toDate: facts.toDate, completeness: facts.completeness, basis: facts.basis };
+    }
+    if (errors.length) return freeze({ ok: false, disposition: "blocked", record: null, errors, warnings });
+    return freeze({
+      ok: true,
+      disposition: deferred ? "deferred" : "ready",
+      errors,
+      warnings,
+      record: {
+        version: BANK_INPUT_VERSION,
+        recordType: source.recordType,
+        householdId: source.householdId,
+        accountProfileId: source.accountProfileId,
+        channel: source.channel,
+        authority: source.authority,
+        identity,
+        facts: normalizedFacts,
+        provenance
+      }
+    });
+  }
+  function normalizeCsvBankInput(row, batch, scope) {
+    var _a2, _b, _c;
+    if ((row == null ? void 0 : row.source) && row.source !== "csv") return blocked("unsupported-transaction-channel", "source");
+    if (!((_a2 = row == null ? void 0 : row.bankOriginal) == null ? void 0 : _a2.valid) || row.importError) return blocked("invalid-csv-row", "bankOriginal");
+    const original2 = row.bankOriginal;
+    const accountProfileId = row.accountProfileId || (batch == null ? void 0 : batch.accountProfileId);
+    if (row.accountProfileId && (batch == null ? void 0 : batch.accountProfileId) && row.accountProfileId !== batch.accountProfileId)
+      return blocked("account-profile-conflict", "accountProfileId");
+    if ((batch == null ? void 0 : batch.householdId) && batch.householdId !== (scope == null ? void 0 : scope.householdId)) return blocked("household-scope-mismatch", "householdId");
+    const profile = Array.isArray(scope == null ? void 0 : scope.accountProfiles) ? scope.accountProfiles.find((item) => (item == null ? void 0 : item.id) === accountProfileId) : null;
+    if (original2.accountIdentifier && (!profile || accountNumber(original2.accountIdentifier) !== accountNumber(profile.identifier || profile.iban)))
+      return blocked("account-identifier-conflict", "bankOriginal.accountIdentifier");
+    if ([row.accountOwner, batch == null ? void 0 : batch.accountOwner].some((owner) => owner && (profile == null ? void 0 : profile.accountOwner) && owner !== profile.accountOwner))
+      return blocked("account-owner-conflict", "accountOwner");
+    let amountCents;
+    try {
+      amountCents = decimalAmountToCents(original2.amount);
+    } catch (error2) {
+      return blocked(error2.message, "bankOriginal.amount");
+    }
+    const originalProof = (_b = row.sourceIdentityProof) != null ? _b : null;
+    const proof = (originalProof == null ? void 0 : originalProof.kind) === "file-row" && !originalProof.fileDigest && typeof (batch == null ? void 0 : batch.originalCsv) === "string" ? { ...originalProof, fileDigest: csvFileDigest(batch.originalCsv) } : originalProof;
+    if ((proof == null ? void 0 : proof.kind) === "file-row" && typeof (batch == null ? void 0 : batch.originalCsv) === "string" && csvFileDigest(batch.originalCsv) !== proof.fileDigest)
+      return blocked("file-evidence-conflict", "sourceIdentityProof");
+    if (!text(batch == null ? void 0 : batch.id) || !text(row.id)) return blocked("missing-import-reference", "importReference");
+    return normalizeBankInput({
+      version: BANK_INPUT_VERSION,
+      recordType: "bank-transaction",
+      householdId: scope == null ? void 0 : scope.householdId,
+      accountProfileId,
+      channel: "csv",
+      authority: (proof == null ? void 0 : proof.kind) === "bank-id" ? proof.authority : "finize:csv",
+      identity: proof,
+      facts: {
+        amountCents,
+        currency: original2.currency,
+        bankStatus: (_c = original2.bankStatus) != null ? _c : "booked",
+        transactionDate: original2.bankDate,
+        bookingDate: optional(original2.bookingDate),
+        valueDate: optional(original2.valueDate),
+        transactionTime: optional(original2.transactionTime),
+        description: original2.rawDescription || original2.description,
+        counterpartyAccount: optional(original2.counterpartyAccount),
+        reference: optional(original2.reference)
+      },
+      provenance: {
+        payload: { bankOriginal: original2, sourceIdentityProof: originalProof },
+        importReference: { batchId: batch.id, rowId: row.id, bankSourceId: row.bankSourceId || null }
+      }
+    }, scope);
+  }
+  var identityKey = (record) => {
+    const id = record.identity;
+    if ((id == null ? void 0 : id.kind) === "bank-id") return JSON.stringify([id.kind, id.authority, id.id]);
+    if ((id == null ? void 0 : id.kind) === "file-row") return JSON.stringify([id.kind, id.fileDigest, id.rowOrdinal]);
+    return null;
+  };
+  function compareBankInputs(left, right, scope) {
+    const a = normalizeBankInput(left, scope), b = normalizeBankInput(right, scope);
+    if (!a.ok || !b.ok || left.recordType !== "bank-transaction" || right.recordType !== "bank-transaction")
+      return freeze({ status: "incomparable", reason: "invalid-input-or-type" });
+    const result2 = (status2, reason) => freeze({ status: status2, reason, evidence: [a.record.provenance, b.record.provenance] });
+    if (left.accountProfileId !== right.accountProfileId) return result2("distinct", "different-account-profile");
+    if (a.disposition !== "ready" || b.disposition !== "ready") return result2("incomparable", "not-booked");
+    const x = a.record.facts, y = b.record.facts, keyA = identityKey(a.record), keyB = identityKey(b.record);
+    const sameIdentity = keyA !== null && keyA === keyB;
+    const fields = Object.keys(x);
+    const conflict = fields.some((field) => x[field] !== null && y[field] !== null && x[field] !== y[field]);
+    const incomplete = fields.some((field) => x[field] === null !== (y[field] === null));
+    if (sameIdentity && conflict) return result2("identity-conflict", "different-canonical-facts");
+    if (sameIdentity && incomplete) return result2("incomparable", "incomplete-canonical-facts");
+    if (sameIdentity && left.channel === "csv" && right.channel === "csv")
+      return result2("incomparable", "use-existing-csv-duplicate-contract");
+    if (sameIdentity) return result2("same-source", "proven-identity-and-equal-facts");
+    if (keyA && keyB && left.identity.kind === "bank-id" && right.identity.kind === "bank-id" && left.identity.authority === right.identity.authority)
+      return result2("distinct", "different-bank-ids");
+    if (keyA && keyB && left.identity.kind === "file-row" && right.identity.kind === "file-row" && left.identity.fileDigest === right.identity.fileDigest)
+      return result2("distinct", "different-file-rows");
+    return !conflict && x.amountCents === y.amountCents && x.transactionDate === y.transactionDate ? result2("possible-duplicate", "matching-facts-without-shared-identity") : result2("distinct", "different-facts");
   }
 
   // src/core/transaction-model.mjs
@@ -569,8 +852,8 @@
     var _a2;
     const normalize = (value) => String(value || "").trim().toLowerCase().replace(/[ _]+/g, "-");
     const explicit = normalize((tx == null ? void 0 : tx.transactionType) || ((_a2 = tx == null ? void 0 : tx.processing) == null ? void 0 : _a2.transactionType) || (tx == null ? void 0 : tx.type));
-    const text = explicit || [tx == null ? void 0 : tx.kind, tx == null ? void 0 : tx.category].map(normalize).join("|");
-    for (const [pattern, type] of [[/naar-?spaar-?rekening|storten-?naar-?spaar/, "naar-spaarrekening"], [/van-?spaar-?rekening|opnemen-?van-?spaar/, "van-spaarrekening"], [/sparen|spaardoel/, "sparen"], [/interne-?overboeking|eigen-?rekening/, "interne-overboeking"], [/maandelijkse-?bijdrage/, "maandelijkse-bijdrage"], [/extra-?bijdrage/, "extra-bijdrage"], [/vaste-?last|fixed-?expense/, "vaste-last"]]) if (pattern.test(text)) return type;
+    const text2 = explicit || [tx == null ? void 0 : tx.kind, tx == null ? void 0 : tx.category].map(normalize).join("|");
+    for (const [pattern, type] of [[/naar-?spaar-?rekening|storten-?naar-?spaar/, "naar-spaarrekening"], [/van-?spaar-?rekening|opnemen-?van-?spaar/, "van-spaarrekening"], [/sparen|spaardoel/, "sparen"], [/interne-?overboeking|eigen-?rekening/, "interne-overboeking"], [/maandelijkse-?bijdrage/, "maandelijkse-bijdrage"], [/extra-?bijdrage/, "extra-bijdrage"], [/vaste-?last|fixed-?expense/, "vaste-last"]]) if (pattern.test(text2)) return type;
     return explicit || normalize(tx == null ? void 0 : tx.kind) || "uitgave";
   }
   function freezeTree(value) {
@@ -629,44 +912,511 @@
     });
   }
 
-  // src/core/salary-assignment.mjs
-  var SALARY_PERSON_IDS = Object.freeze(["dion", "dara"]);
-  var salarySourceId = (person) => SALARY_PERSON_IDS.includes(person) ? `income-defaults-salary-${person}` : "";
-  function salaryPerson(tx, state2 = {}) {
-    var _a2;
-    const explicit = tx.salaryPersonId || ((_a2 = tx.processing) == null ? void 0 : _a2.salaryPersonId);
-    if (explicit) return SALARY_PERSON_IDS.includes(explicit) ? explicit : null;
-    const destination = getTransactionFinancialDestination(tx);
-    const source = (state2.recurringIncomeSources || []).find((row) => {
-      var _a3;
-      return row.id === (tx.incomeSourceId || ((_a3 = tx.processing) == null ? void 0 : _a3.incomeSourceId)) && row.legacyKind === "salary";
+  // src/core/bank-sources.mjs
+  var copy2 = (value) => JSON.parse(JSON.stringify(value));
+  var isBankSource = (tx) => (tx == null ? void 0 : tx.recordRole) === "bank-source";
+  var sourceRecordKey = (tx) => tx.bankSourceId || (tx.importBatchId && tx.importTransactionId ? `${tx.importBatchId}:${tx.importTransactionId}` : tx.id);
+  function bankSourceForImport(state2, batchId, rowId) {
+    return (state2.transactions || []).find((tx) => isBankSource(tx) && (tx.importReferences || []).some((ref) => ref.batchId === batchId && ref.rowId === rowId));
+  }
+  function bankSourceForTransaction(state2, tx) {
+    return (state2.transactions || []).find((source) => isBankSource(source) && source.bankSourceId === tx.bankSourceId);
+  }
+  function bankSourceActive(state2, source, override = null) {
+    return (source.importReferences || []).some((ref) => {
+      const batch = (override == null ? void 0 : override.id) === ref.batchId ? override : (state2.importSummaries || []).find((batch2) => batch2.id === ref.batchId);
+      if ((state2.importDeletionProofs || []).some((proof) => proof.id === ref.batchId)) return false;
+      return batch ? !["withdrawn", "deleted"].includes(batch.lifecycle) && batch.status !== "teruggedraaid" : source.batchLifecycle !== "withdrawn";
     });
-    if (source && SALARY_PERSON_IDS.includes(source.eigenaar)) return SALARY_PERSON_IDS.includes(destination) && destination !== source.eigenaar ? null : source.eigenaar;
-    return SALARY_PERSON_IDS.includes(destination) ? destination : null;
   }
-  function salaryLink(tx, state2 = {}, { requireChoice = false } = {}) {
-    var _a2;
-    if (tx.bankOriginal && Number(tx.bankOriginal.amount) <= 0) throw Object.assign(new Error("Een salarisontvangst moet een bijschrijving zijn. Classificeer een terugboeking expliciet volgens haar financiële betekenis."), { code: "salary-direction", field: "transactionType" });
-    const person = requireChoice ? tx.salaryPersonId || ((_a2 = tx.processing) == null ? void 0 : _a2.salaryPersonId) : salaryPerson(tx, state2);
-    if (!SALARY_PERSON_IDS.includes(person)) throw Object.assign(new Error("Kies Dion of Dara voor deze salarisbetaling. De salarisplanning kan pas daarna betrouwbaar worden vergeleken."), { code: "salary-person-required", field: "salaryPersonId" });
-    const month = getTransactionDate(tx).slice(0, 7), sourceId = salarySourceId(person);
-    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new Error("Een geldige bankmaand is vereist voor salaris.");
-    const sources = (state2.recurringIncomeSources || []).filter((row) => row.legacyKind === "salary" && row.eigenaar === person);
-    const selected = sources.find((row) => {
+  function ensureImportBankSources(state2, batch) {
+    var _a2, _b;
+    state2.transactions = state2.transactions || [];
+    for (const row of batch.rows || []) {
+      if (!((_a2 = row.bankOriginal) == null ? void 0 : _a2.valid) || row.importError) continue;
+      let source = bankSourceForImport(state2, batch.id, row.id) || state2.transactions.find((tx) => isBankSource(tx) && row.bankSourceId && tx.bankSourceId === row.bankSourceId);
+      const ref = row.duplicateSource;
+      let legacy = state2.transactions.filter((tx) => !isBankSource(tx) && tx.importBatchId === ((ref == null ? void 0 : ref.batchId) || batch.id) && tx.importTransactionId === ((ref == null ? void 0 : ref.rowId) || row.id));
+      if (!source && ref) source = bankSourceForImport(state2, ref.batchId, ref.rowId);
+      if (!source && row.duplicate && !legacy.length) throw new Error("De eerdere bankbron ontbreekt. Open de oorspronkelijke import of herstel de bronkoppeling.");
+      if (row.possibleDuplicate && !row.identityDecision && !row.duplicate) continue;
+      if (!source) {
+        const first = legacy[0], bankSourceId = (first == null ? void 0 : first.bankSourceId) || row.bankSourceId || `bank-${(ref == null ? void 0 : ref.batchId) || batch.id}:${(ref == null ? void 0 : ref.rowId) || row.id}`;
+        const original3 = copy2(((_b = first == null ? void 0 : first.bankOriginal) == null ? void 0 : _b.bankDate) && first.bankOriginal.amount !== void 0 ? first.bankOriginal : row.bankOriginal), accountProfileId = (first == null ? void 0 : first.accountProfileId) || row.accountProfileId || batch.accountProfileId;
+        const accountContext = getTransactionAccountContext(first || { ...row, accountProfileId, accountOwner: row.accountOwner || batch.accountOwner }, { accountProfiles: state2.accountProfiles || [] });
+        if (!accountContext) continue;
+        source = { id: `source-${bankSourceId}`, recordRole: "bank-source", bankSourceId, source: "csv", bankOriginal: original3, transactionDate: original3.bankDate, date: original3.bankDate, amount: Math.abs(original3.amount), description: original3.description, accountContext, accountOwner: accountContext, account: accountContext, accountProfileId, importBatchId: (ref == null ? void 0 : ref.batchId) || batch.id, importTransactionId: (ref == null ? void 0 : ref.rowId) || row.id, processingRowId: (first == null ? void 0 : first.importTransactionId) || (ref == null ? void 0 : ref.rowId) || row.id, importReferences: [], processingRevision: 0, processingStatus: "nakijken", batchLifecycle: "active" };
+        if (first) {
+          source.importReferences.push({ batchId: first.importBatchId, rowId: first.importTransactionId });
+          source.approvedProcessing = copy2(first.processing || {});
+          source.approvedProcessing.processedAmount = Math.round(legacy.reduce((sum2, tx) => sum2 + Math.abs(Number(tx.amount) || 0), 0) * 100) / 100;
+          source.processingStatus = getTransactionProcessingStatus(first);
+          source.approvalSource = first.approvalSource || "";
+          source.approvedAt = first.approvedAt || "";
+        }
+        state2.transactions.push(source);
+        legacy.forEach((tx) => {
+          tx.bankSourceId = bankSourceId;
+        });
+      }
+      if (!(source.importReferences || []).some((ref2) => ref2.batchId === batch.id && ref2.rowId === row.id)) source.importReferences.push({ batchId: batch.id, rowId: row.id });
+      const bank = row.bankOriginal, original2 = source.bankOriginal;
+      if (bank.bankDate !== original2.bankDate || Math.round(Number(bank.amount) * 100) !== Math.round(Number(original2.amount) * 100) || bank.accountIdentifier && original2.accountIdentifier && bank.accountIdentifier.replace(/\s/g, "").toUpperCase() !== original2.accountIdentifier.replace(/\s/g, "").toUpperCase()) throw new Error("De bronverwijzing hoort bij een andere rekening, bankdatum of ander bankbedrag.");
+      row.bankSourceId = source.bankSourceId;
+      for (const relation of state2.manualTransactionReplacements || []) if (source.importReferences.some((ref2) => ref2.batchId === relation.importBatchId && ref2.rowId === relation.importTransactionId)) relation.bankSourceId = source.bankSourceId;
+      state2.transactions.filter((tx) => !isBankSource(tx) && tx.bankSourceId === source.bankSourceId).forEach((tx) => {
+        tx.batchLifecycle = bankSourceActive(state2, source, batch) ? "active" : "withdrawn";
+      });
+    }
+    return state2;
+  }
+  function selectBankTransactions(state2, { month = null, account = null, accountId = null, includeInactive = false, imports = [] } = {}) {
+    var _a2, _b, _c, _d, _e, _f, _g, _h;
+    if ((state2 == null ? void 0 : state2.__finizePartialHistory) && (!month || !((_a2 = state2.verifiedPeriods) == null ? void 0 : _a2.includes(month)))) throw Object.assign(new Error("De gevraagde bankperiode is niet volledig geladen."), { code: "period-incomplete" });
+    const missing = imports.filter((batch) => (state2.importSummaries || []).some((summary) => summary.id === batch.id) && !(state2.importDeletionProofs || []).some((proof) => proof.id === batch.id) && (batch.rows || []).some((row) => {
       var _a3;
-      return row.id === (tx.incomeSourceId || ((_a3 = tx.processing) == null ? void 0 : _a3.incomeSourceId));
-    }) || (sources.length === 1 ? sources[0] : null);
-    return { salaryPersonId: person, salarySourceId: sourceId, salaryMonth: month, incomeSourceId: (selected == null ? void 0 : selected.id) || "", incomeOccurrenceId: `${sourceId}:${month}` };
+      return ((_a3 = row.bankOriginal) == null ? void 0 : _a3.valid) && !row.importError && !bankSourceForImport(state2, batch.id, row.id);
+    }));
+    if (missing.length) {
+      const projected = { ...state2, transactions: copy2(state2.transactions || []), manualTransactionReplacements: copy2(state2.manualTransactionReplacements || []) };
+      for (const duplicates of [false, true]) for (const batch of missing) {
+        const rows = (batch.rows || []).filter((row) => Boolean(row.duplicate) === duplicates && !bankSourceForImport(projected, batch.id, row.id));
+        if (!rows.length) continue;
+        const previous = copy2(projected.transactions), relations = copy2(projected.manualTransactionReplacements);
+        try {
+          ensureImportBankSources(projected, { ...batch, rows: copy2(rows) });
+        } catch (e) {
+          projected.transactions = previous;
+          projected.manualTransactionReplacements = relations;
+        }
+      }
+      return selectBankTransactions(projected, { month, account, accountId, includeInactive });
+    }
+    const headers = (state2.transactions || []).filter(isBankSource), seen = /* @__PURE__ */ new Set(), result2 = [];
+    for (const tx of [...headers, ...(state2.transactions || []).filter((tx2) => !isBankSource(tx2))]) {
+      const source = bankSourceForTransaction(state2, tx) || tx, key = sourceRecordKey(source);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const csv = getTransactionSource(source) === "csv", active = isBankSource(source) ? bankSourceActive(state2, source) : !["withdrawn", "deleted"].includes(source.batchLifecycle);
+      if (!includeInactive && !active) continue;
+      if (!csv && (state2.manualTransactionReplacements || []).some((ref) => {
+        var _a3;
+        return ref.active !== false && (ref.manualTransactionId || ((_a3 = ref.manualTransaction) == null ? void 0 : _a3.id)) === source.id;
+      })) continue;
+      const date2 = ((_b = source.bankOriginal) == null ? void 0 : _b.bankDate) || source.transactionDate || source.date || "", context = getTransactionAccountContext(source, { accountProfiles: state2.accountProfiles || [] });
+      if (month && date2.slice(0, 7) !== month || account && context !== account || accountId && source.accountProfileId !== accountId) continue;
+      const incoming = ["inkomen", "salaris", "vakantiegeld", "nabetaling", "vergoeding", "belastingteruggave", "overige-inkomsten", "van-spaarrekening", "terugbetaling", "refund"].includes(source.transactionType || ((_c = source.approvedProcessing) == null ? void 0 : _c.transactionType)) || source.kind === "inkomen";
+      const amount = (_f = (_e = (_d = source.bankOriginal) == null ? void 0 : _d.amount) != null ? _e : source.accountDelta) != null ? _f : Math.abs(Number(source.amount) || 0) * (incoming ? 1 : -1);
+      const liveRef = (_g = source.importReferences) == null ? void 0 : _g.find((ref) => bankSourceActive(state2, { ...source, importReferences: [ref] }));
+      result2.push({ ...source, ...liveRef ? { importBatchId: liveRef.batchId, importTransactionId: liveRef.rowId } : {}, date: date2, transactionDate: date2, amount: Math.abs(amount), bankAmount: amount, accountContext: context, active, category: ((_h = source.approvedProcessing) == null ? void 0 : _h.category) || source.category || "Nog te beoordelen", processing: copy2(source.approvedProcessing || source.processing || {}) });
+    }
+    return result2;
   }
-  var accountKey = (value) => String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
-  function proposeSalaryPerson(original2, transactions = []) {
-    const employer = accountKey(original2.counterpartyAccount), account = accountKey(original2.accountIdentifier);
-    if (!employer || !account) return "";
-    const people = new Set(transactions.filter((tx) => {
-      var _a2, _b;
-      return tx.recordRole !== "bank-source" && tx.approvalSource === "manual" && isTransactionFinanciallyActive(tx) && getTransactionClassification(tx) === "salaris" && accountKey((_a2 = tx.bankOriginal) == null ? void 0 : _a2.counterpartyAccount) === employer && accountKey((_b = tx.bankOriginal) == null ? void 0 : _b.accountIdentifier) === account;
-    }).map((tx) => salaryPerson(tx)).filter(Boolean));
-    return people.size === 1 ? [...people][0] : "";
+  function updateSourceApproval(state2, batch, row) {
+    const source = bankSourceForImport(state2, batch.id, row.id);
+    if (!source) return;
+    if (JSON.stringify(source.approvedProcessing) !== JSON.stringify(row.processing)) source.processingRevision = (source.processingRevision || 0) + 1;
+    source.approvedProcessing = copy2(row.processing);
+    source.processingStatus = getTransactionProcessingStatus({ ...row, source: "csv" });
+    source.approvalSource = row.approvalSource || "";
+    source.approvedAt = row.approvedAt || "";
+  }
+
+  // src/core/balance-checkpoints.mjs
+  var copy3 = (value) => structuredClone(value);
+  var fail = (code, message) => Object.assign(new Error(message), { code });
+  var canonical = (value) => JSON.stringify(value, (_, item) => item && typeof item === "object" && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).sort().map((key) => [key, item[key]])) : item);
+  var same = (a, b) => canonical(a) === canonical(b);
+  var nextDay = (date2) => new Date(Date.UTC(Number(date2.slice(0, 4)), Number(date2.slice(5, 7)) - 1, Number(date2.slice(8, 10)) + 1)).toISOString().slice(0, 10);
+  function balanceRequiredMonths(fromDate, toDate) {
+    if (!validCalendarDate(fromDate) || !validCalendarDate(toDate) || fromDate > toDate) return [];
+    const result2 = [];
+    let month = fromDate.slice(0, 7);
+    while (month <= toDate.slice(0, 7)) {
+      result2.push(month);
+      if (month === toDate.slice(0, 7)) break;
+      const [year, value] = month.split("-").map(Number);
+      month = value === 12 ? String(year + 1).padStart(4, "0") + "-01" : String(year).padStart(4, "0") + "-" + String(value + 1).padStart(2, "0");
+    }
+    return result2;
+  }
+  function observation(record) {
+    return {
+      version: 1,
+      recordType: "balance-observation",
+      householdId: record.householdId,
+      accountProfileId: record.accountProfileId,
+      channel: "manual",
+      authority: "finize:manual",
+      identity: { kind: "observation-id", id: record.id },
+      facts: {
+        amountCents: record.amountCents,
+        currency: record.currency,
+        asOfDate: record.asOfDate,
+        balanceType: "booked",
+        boundary: record.boundary
+      },
+      provenance: { payload: { createdAt: record.createdAt, actor: record.actor, note: record.note } }
+    };
+  }
+  function validCheckpoint(record, scope) {
+    return (record == null ? void 0 : record.version) === 1 && typeof record.id === "string" && !!record.id && typeof record.operationId === "string" && !!record.operationId && record.source === "manual-observation" && Number.isSafeInteger(record.revision) && record.revision > 0 && typeof record.createdAt === "string" && Number.isFinite(Date.parse(record.createdAt)) && typeof record.note === "string" && (record.actor === null || typeof record.actor === "string") && normalizeBankInput(observation(record), scope).ok;
+  }
+  function checkpointHistory(state2, accountProfileId, scope) {
+    var _a2;
+    const all = (_a2 = state2.balanceCheckpoints) != null ? _a2 : [];
+    if (!Array.isArray(all)) return { rows: [], active: [], issues: ["invalid-checkpoint-history"] };
+    const rows = all.filter((row) => (row == null ? void 0 : row.accountProfileId) === accountProfileId), issues = [];
+    if (all.some((row) => !row || typeof row.id !== "string")) issues.push("invalid-checkpoint-history");
+    if (rows.some((row) => !validCheckpoint(row, scope))) issues.push("invalid-checkpoint-history");
+    if (new Set(all.map((row) => row == null ? void 0 : row.id)).size !== all.length) issues.push("duplicate-checkpoint-id");
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    for (const row of rows) {
+      const previous = byId.get(row.supersedesId);
+      if (row.supersedesId ? !previous || previous.revision + 1 !== row.revision : row.revision !== 1)
+        issues.push("invalid-checkpoint-revision");
+    }
+    const replaced = new Set(rows.map((row) => row.supersedesId).filter(Boolean));
+    const active = rows.filter((row) => !replaced.has(row.id) && validCheckpoint(row, scope));
+    if (new Set(active.map((row) => row.asOfDate)).size !== active.length) issues.push("conflicting-checkpoint-revisions");
+    const order = (a, b) => String(b.asOfDate).localeCompare(String(a.asOfDate)) || b.revision - a.revision || String(b.createdAt).localeCompare(String(a.createdAt)) || b.id.localeCompare(a.id);
+    return { rows: copy3(rows.sort(order)), active: copy3(active.sort(order)), issues: [...new Set(issues)] };
+  }
+  function coverageFor(coverage, checkpoint, toDate, scope) {
+    if (checkpoint.asOfDate === toDate) return { status: "complete", basis: "checkpoint-only" };
+    const from = nextDay(checkpoint.asOfDate);
+    const valid = coverage.map((row) => normalizeBankInput(row, scope)).filter((result2) => result2.ok && result2.record.recordType === "coverage" && result2.record.accountProfileId === checkpoint.accountProfileId).map((result2) => result2.record.facts);
+    let cursor = from;
+    for (const range of valid.filter((row) => row.completeness === "complete").sort((a, b) => a.fromDate.localeCompare(b.fromDate))) {
+      if (range.fromDate > cursor) break;
+      if (range.toDate >= cursor) cursor = nextDay(range.toDate);
+    }
+    return { status: cursor > toDate ? "complete" : valid.some((row) => row.toDate >= from && row.fromDate <= toDate) ? "partial" : "unknown", basis: "bank-evidence" };
+  }
+  function selectAccountBalance(state2, { accountProfileId, toDate, scope, imports = [], importsAvailable = true, coverage = [], checkpointId = null } = {}) {
+    var _a2, _b, _c;
+    const reasons2 = [], add = (code, sourceId = "") => {
+      if (!reasons2.some((row) => row.code === code && row.sourceId === sourceId)) reasons2.push({ code, sourceId });
+    };
+    const history = checkpointHistory(state2, accountProfileId, scope);
+    history.issues.forEach((code) => add(code));
+    const checkpoint = history.active.find((row) => row.asOfDate <= toDate && (!checkpointId || row.id === checkpointId)) || null;
+    const result2 = {
+      accountProfileId,
+      toDate,
+      boundary: "end-of-bank-day",
+      checkpoint,
+      openingCents: (_a2 = checkpoint == null ? void 0 : checkpoint.amountCents) != null ? _a2 : null,
+      mutations: [],
+      confirmedCents: 0,
+      provisionalCents: 0,
+      balanceCents: null,
+      status: "unknown",
+      quality: { bankSources: "confirmed", coverage: "unknown", storage: "verified" },
+      reasons: reasons2
+    };
+    if (!validCalendarDate(toDate)) {
+      add("invalid-balance-date");
+      return result2;
+    }
+    const profiles = (state2.accountProfiles || []).filter((row) => row.id === accountProfileId);
+    if (profiles.length !== 1 || !Array.isArray(scope == null ? void 0 : scope.accountProfiles) || scope.accountProfiles.filter((row) => (row == null ? void 0 : row.id) === accountProfileId).length !== 1) {
+      add("unresolved-account-profile");
+      return result2;
+    }
+    if (!checkpoint) {
+      add("missing-checkpoint");
+      if (history.issues.length) {
+        result2.quality.storage = "incomplete";
+        result2.status = "incomplete";
+      }
+      return result2;
+    }
+    const months = checkpoint.asOfDate === toDate ? [] : balanceRequiredMonths(nextDay(checkpoint.asOfDate), toDate);
+    const missing = state2.__finizePartialHistory ? months.filter((month) => {
+      var _a3;
+      return !((_a3 = state2.verifiedPeriods) == null ? void 0 : _a3.includes(month));
+    }) : [];
+    if (missing.length) {
+      result2.quality.storage = "incomplete";
+      missing.forEach((month) => add("missing-period", month));
+    }
+    if (!importsAvailable) {
+      result2.quality.storage = "incomplete";
+      add("imports-unavailable");
+    }
+    if (history.issues.length) result2.quality.storage = "incomplete";
+    const cov = coverageFor(coverage, checkpoint, toDate, scope);
+    result2.quality.coverage = cov.status;
+    if (cov.status !== "complete") add(cov.status === "partial" ? "partial-bank-coverage" : "unknown-bank-coverage");
+    const profile = profiles[0];
+    const relevant = (row) => row.accountProfileId ? row.accountProfileId === accountProfileId : !getTransactionAccountContext(row, { accountProfiles: state2.accountProfiles }) || getTransactionAccountContext(row, { accountProfiles: state2.accountProfiles }) === profile.accountOwner;
+    const within = (row) => {
+      var _a3;
+      const date2 = ((_a3 = row.bankOriginal) == null ? void 0 : _a3.bankDate) || row.date || "";
+      return !validCalendarDate(date2) || date2 > checkpoint.asOfDate && date2 <= toDate;
+    };
+    const activeImports = imports.filter((batch) => !["withdrawn", "deleted"].includes(batch.lifecycle) && batch.status !== "teruggedraaid" && !(state2.importDeletionProofs || []).some((proof) => proof.id === batch.id) && (state2.importSummaries || []).some((summary) => summary.id === batch.id));
+    const unusable = /* @__PURE__ */ new Set(), references = /* @__PURE__ */ new Map();
+    for (const batch of activeImports) for (const row of batch.rows || []) {
+      const candidate = { ...row, accountProfileId: row.accountProfileId || batch.accountProfileId, accountOwner: row.accountOwner || batch.accountOwner };
+      references.set(batch.id + ":" + row.id, candidate);
+      if (!relevant(candidate) || !within(candidate) || row.duplicate) continue;
+      if (row.possibleDuplicate && !row.identityDecision) {
+        unusable.add(batch.id + ":" + row.id);
+        if (row.bankSourceId) unusable.add(row.bankSourceId);
+        add("possible-duplicate", batch.id + ":" + row.id);
+      }
+      if (!candidate.accountProfileId || row.importError || !((_b = row.bankOriginal) == null ? void 0 : _b.valid))
+        add(!candidate.accountProfileId ? "unresolved-account-profile" : "invalid-bank-source", batch.id + ":" + row.id);
+    }
+    const selected = /* @__PURE__ */ new Map();
+    try {
+      if (state2.__finizePartialHistory) {
+        for (const month of months.filter((month2) => !missing.includes(month2)))
+          for (const row of selectBankTransactions(state2, { month, imports })) selected.set(sourceRecordKey(row), row);
+      } else for (const row of selectBankTransactions(state2, { imports })) selected.set(sourceRecordKey(row), row);
+    } catch (e) {
+      result2.quality.storage = "incomplete";
+      add("bank-sources-unavailable");
+    }
+    const signatures = /* @__PURE__ */ new Map(), conflicts = /* @__PURE__ */ new Set(), proofSources = /* @__PURE__ */ new Map();
+    const registerProof = (row, key) => {
+      const proof = row.sourceIdentityProof;
+      const identity = (proof == null ? void 0 : proof.kind) === "bank-id" && proof.authority && proof.id ? ["bank-id", proof.authority, proof.id] : (proof == null ? void 0 : proof.kind) === "file-row" && /^[a-f0-9]{64}$/.test(proof.fileDigest || "") && Number.isSafeInteger(proof.rowOrdinal) && proof.rowOrdinal > 0 ? ["file-row", proof.fileDigest, proof.rowOrdinal] : null;
+      if (!identity || !row.accountProfileId) return;
+      const signature2 = JSON.stringify([row.accountProfileId, ...identity]), previous = proofSources.get(signature2);
+      if (previous && previous !== key) {
+        conflicts.add(previous);
+        conflicts.add(key);
+      } else proofSources.set(signature2, key);
+    };
+    for (const row of state2.transactions || []) {
+      if (!row.bankOriginal || !within(row) || !selected.has(sourceRecordKey(row))) continue;
+      const key = sourceRecordKey(row), b = row.bankOriginal;
+      const signature2 = JSON.stringify([row.accountProfileId || null, b.bankDate, b.amount, b.currency || null, b.accountIdentifier || null]);
+      if (signatures.has(key) && signatures.get(key) !== signature2) conflicts.add(key);
+      signatures.set(key, signature2);
+      registerProof(row, key);
+    }
+    for (const [key, row] of selected) for (const ref of row.importReferences || [{ batchId: row.importBatchId, rowId: row.importTransactionId }]) {
+      const original2 = references.get(ref.batchId + ":" + ref.rowId);
+      if (original2) registerProof(original2, key);
+    }
+    for (const row of state2.transactions || []) if (relevant(row) && within(row) && conflicts.has(sourceRecordKey(row))) add("conflicting-bank-source", sourceRecordKey(row));
+    for (const [key, row] of selected) {
+      if (!relevant(row) || !within(row)) continue;
+      const ref = row.importBatchId && row.importTransactionId ? row.importBatchId + ":" + row.importTransactionId : "";
+      if (!row.bankOriginal) {
+        add("manual-without-bank-evidence", key);
+        continue;
+      }
+      if (!row.accountProfileId || getTransactionAccountContext(row, { accountProfiles: state2.accountProfiles }) !== profile.accountOwner) {
+        add("unresolved-account-profile", key);
+        continue;
+      }
+      if (conflicts.has(key)) {
+        add("conflicting-bank-source", key);
+        continue;
+      }
+      if (unusable.has(key) || unusable.has(ref)) {
+        add("possible-duplicate", key);
+        continue;
+      }
+      const original2 = row.bankOriginal, status2 = (_c = original2.bankStatus) != null ? _c : "booked";
+      if (!validCalendarDate(original2.bankDate) || !original2.valid || original2.currency !== "EUR" || !ref) {
+        add("invalid-bank-source", key);
+        continue;
+      }
+      if (status2 !== "booked") {
+        add(status2 === "pending" ? "pending-bank-source" : "unknown-bank-status", key);
+        continue;
+      }
+      if (row.possibleDuplicate && !row.identityDecision) {
+        add("possible-duplicate", key);
+        continue;
+      }
+      const evidenceRows = (row.importReferences || [{ batchId: row.importBatchId, rowId: row.importTransactionId }]).map((item) => references.get(item.batchId + ":" + item.rowId)).filter(Boolean);
+      if (evidenceRows.some((item) => {
+        var _a3, _b2;
+        return item.accountProfileId !== row.accountProfileId || ((_a3 = item.bankOriginal) == null ? void 0 : _a3.bankDate) !== original2.bankDate || ((_b2 = item.bankOriginal) == null ? void 0 : _b2.amount) !== original2.amount;
+      })) {
+        add("conflicting-bank-source", key);
+        continue;
+      }
+      let amountCents;
+      try {
+        amountCents = decimalAmountToCents(original2.amount);
+      } catch (e) {
+        add("invalid-bank-amount", key);
+        continue;
+      }
+      const confirmed = row.approvalSource === "manual" && ["goedgekeurd", "niet-meetellen"].includes(getTransactionProcessingStatus(row));
+      const field = confirmed ? "confirmedCents" : "provisionalCents";
+      if (!Number.isSafeInteger(result2[field] + amountCents)) {
+        result2.quality.storage = "incomplete";
+        add("unsafe-balance-amount");
+        continue;
+      }
+      result2[field] += amountCents;
+      result2.mutations.push({ sourceId: key, date: original2.bankDate, amountCents, status: confirmed ? "confirmed" : "provisional", description: original2.description || "" });
+    }
+    result2.mutations.sort((a, b) => a.date.localeCompare(b.date) || a.sourceId.localeCompare(b.sourceId));
+    const bankKeys = new Set([...selected.values()].filter((row) => row.bankOriginal).map(sourceRecordKey));
+    const bankIds = new Set((state2.transactions || []).filter((row) => bankKeys.has(sourceRecordKey(row))).map((row) => row.id));
+    for (const transfer of state2.internalTransfers || []) {
+      if (transfer.status !== "uitgevoerd" || !within(transfer)) continue;
+      if (![transfer.sourceAccount, transfer.targetAccount].some((account) => account === accountProfileId || account === profile.accountOwner)) continue;
+      if ([transfer.actualTransactionId, ...transfer.transactionIds || []].some((id) => bankIds.has(id))) continue;
+      add("manual-transfer-unresolved", transfer.id || "");
+    }
+    if (result2.mutations.some((row) => row.status === "provisional")) add("awaiting-review");
+    const sourceIssues = reasons2.some((row) => !["unknown-bank-coverage", "partial-bank-coverage", "awaiting-review", "missing-period", "imports-unavailable"].includes(row.code));
+    result2.quality.bankSources = sourceIssues ? "uncertain" : result2.mutations.some((row) => row.status === "provisional") ? "provisional" : "confirmed";
+    const amount = checkpoint.amountCents + result2.confirmedCents + result2.provisionalCents;
+    if (!Number.isSafeInteger(amount)) {
+      result2.quality.storage = "incomplete";
+      add("unsafe-balance-amount");
+    }
+    if (result2.quality.storage === "verified") result2.balanceCents = amount;
+    result2.status = result2.quality.storage === "incomplete" || sourceIssues ? "incomplete" : result2.quality.bankSources === "provisional" || cov.status !== "complete" ? "provisional" : "confirmed";
+    return result2;
+  }
+  function prepareBalanceCheckpoint(state2, command, options) {
+    var _a2, _b;
+    const { scope, today } = options;
+    if ((state2.accountProfiles || []).filter((row) => row.id === command.accountProfileId).length !== 1) throw fail("unresolved-account-profile", "Kies een bestaande fysieke rekening.");
+    if (state2.accountProfiles.find((row) => row.id === command.accountProfileId).status === "archived" && !command.supersedesId && !(state2.balanceCheckpoints || []).some((row) => row.operationId === command.operationId)) throw fail("account-archived", "Heractiveer de rekening voordat je een nieuw banksaldo invoert.");
+    if (!validCalendarDate(today) || !validCalendarDate(command.asOfDate) || command.asOfDate > today)
+      throw fail("invalid-checkpoint-date", "Kies een geldige peildatum tot en met vandaag.");
+    if (!command.operationId || typeof command.operationId !== "string") throw fail("missing-operation-id", "De opslagactie mist een vaste identiteit.");
+    const history = checkpointHistory(state2, command.accountProfileId, scope);
+    if (history.issues.length) throw fail("checkpoint-history-conflict", "De ijkpunthistorie bevat een conflict. Bewaar de bestaande waarnemingen en controleer de synchronisatie.");
+    const previous = command.supersedesId ? history.rows.find((row) => row.id === command.supersedesId) : null;
+    const record = {
+      version: 1,
+      id: "balance-" + command.operationId,
+      operationId: command.operationId,
+      householdId: scope.householdId,
+      accountProfileId: command.accountProfileId,
+      amountCents: command.amountCents,
+      currency: "EUR",
+      asOfDate: command.asOfDate,
+      boundary: "end-of-bank-day",
+      source: "manual-observation",
+      createdAt: command.createdAt,
+      actor: (_a2 = command.actor) != null ? _a2 : null,
+      note: String(command.note || "").trim(),
+      revision: previous ? previous.revision + 1 : 1,
+      supersedesId: (previous == null ? void 0 : previous.id) || null
+    };
+    if (!validCheckpoint(record, scope)) throw fail("invalid-checkpoint", "Vul een geldig banksaldo in hele eurocenten in en kies een bestaande rekening.");
+    const existing = (state2.balanceCheckpoints || []).find((row) => row.operationId === command.operationId);
+    if (existing) {
+      if (!same(existing, record)) throw fail("operation-conflict", "Deze opslagactie is al gebruikt voor een andere waarneming.");
+      return { record: copy3(existing), noop: true };
+    }
+    const sameDate = history.active.find((row) => row.asOfDate === command.asOfDate);
+    if (command.supersedesId && (!previous || !history.active.some((row) => row.id === previous.id)))
+      throw fail("stale-checkpoint-revision", "Dit ijkpunt is intussen gewijzigd. Open de actuele waarneming opnieuw.");
+    if (sameDate && sameDate.id !== (previous == null ? void 0 : previous.id)) throw fail("checkpoint-date-exists", "Voor deze dag bestaat al een ander ijkpunt. Gebruik Corrigeren bij de juiste waarneming.");
+    const projected = selectAccountBalance(state2, { ...options, accountProfileId: command.accountProfileId, toDate: command.asOfDate });
+    const reconciliation = {
+      expectedCents: projected.balanceCents,
+      observedCents: record.amountCents,
+      differenceCents: projected.balanceCents === null ? null : record.amountCents - projected.balanceCents,
+      quality: projected.quality,
+      reasons: projected.reasons,
+      previousCheckpointId: ((_b = projected.checkpoint) == null ? void 0 : _b.id) || null
+    };
+    if (reconciliation.differenceCents !== null && !Number.isSafeInteger(reconciliation.differenceCents)) throw fail("unsafe-difference", "Het controleverschil is te groot om exact te bewaren.");
+    return { record, reconciliation, previewSignature: JSON.stringify([history.rows, projected, record]), noop: false };
+  }
+  function applyBalanceCheckpoint(state2, command, options) {
+    const prepared = prepareBalanceCheckpoint(state2, command, options);
+    if (prepared.noop) return prepared;
+    if (!command.confirmed || command.previewSignature !== prepared.previewSignature)
+      throw fail("balance-confirmation-required", "Controleer de actuele vergelijking en bevestig de waarneming opnieuw.");
+    state2.balanceCheckpoints = [...state2.balanceCheckpoints || [], prepared.record];
+    return prepared;
+  }
+
+  // src/core/processing-lines.mjs
+  var processingCents = (value) => {
+    if (value === null || value === void 0 || String(value).trim() === "") return null;
+    const n = Number(value), c = Math.round(n * 100);
+    return Number.isFinite(n) && Number.isSafeInteger(c) && Math.abs(n * 100 - c) < 1e-6 ? c : null;
+  };
+  function processingFamily(type) {
+    if (["uitgave", "vaste-last", "niet-meetellen"].includes(type)) return "uitgave";
+    if (["sparen", "naar-spaarrekening", "van-spaarrekening"].includes(type)) return "sparen";
+    if (["terugbetaling", "refund"].includes(type)) return "terugbetaling";
+    if (["inkomen", "salaris", "vakantiegeld", "nabetaling", "vergoeding", "belastingteruggave", "overige-inkomsten"].includes(type)) return "inkomen";
+    return type;
+  }
+  function distributeProcessingCents(totalCents, lines) {
+    if (!Number.isSafeInteger(totalCents) || totalCents < 0) throw new Error("Vul een geldig totaal in eurocenten in.");
+    const result2 = lines.map((line) => ({ ...line }));
+    const automatic = result2.filter((line) => line.amountMode === "auto");
+    const fixed = result2.filter((line) => line.amountMode !== "auto").reduce((sum2, line) => {
+      var _a2;
+      return sum2 + ((_a2 = processingCents(line.amount)) != null ? _a2 : 0);
+    }, 0);
+    const remainder = Math.max(0, totalCents - fixed), share = automatic.length ? Math.floor(remainder / automatic.length) : 0;
+    automatic.forEach((line, index) => {
+      line.amount = (share + (index < remainder % automatic.length ? 1 : 0)) / 100;
+    });
+    return result2;
+  }
+  function redistributeProcessing(processing) {
+    const cents5 = processingCents(processing.processedAmount);
+    if (cents5 !== null) processing.splits = distributeProcessingCents(Math.abs(cents5), processing.splits || []);
+    return processing;
+  }
+  function addProcessingSplit(processing, id, nextId) {
+    if (!(processing.splits || []).length) {
+      const first = { ...processing, id, amount: processing.processedAmount, amountMode: "auto" };
+      delete first.splits;
+      delete first.singleLineAmount;
+      delete first.singleLineId;
+      const second = { ...first, id: nextId, amount: 0, fixedExpenseId: "", fixedOccurrenceId: "", fixedOccurrenceMonth: "", fixedAmountMode: "none" };
+      if (first.transactionType === "vaste-last") {
+        second.transactionType = "uitgave";
+        second.category = "Ongecategoriseerd";
+      }
+      processing.splits = [first, second];
+    } else {
+      const template = processing.splits[0], allManual = processing.splits.every((line) => line.amountMode !== "auto");
+      processing.splits.push({ id, amount: 0, amountMode: "auto", transactionType: processing.transactionType === "vaste-last" ? "uitgave" : processing.transactionType, category: processing.transactionType === "vaste-last" ? "Ongecategoriseerd" : template.category, budgetOwner: template.budgetOwner || processing.budgetOwner, include: true, savingsGoalId: processing.savingsGoalId || "", refundCategory: template.refundCategory || "", refundMonth: template.refundMonth || "", advanceMode: processing.advanceMode || "none" });
+      if (allManual) {
+        delete processing.singleLineAmount;
+        delete processing.singleLineId;
+        return processing;
+      }
+    }
+    delete processing.singleLineAmount;
+    delete processing.singleLineId;
+    return redistributeProcessing(processing);
+  }
+  function removeProcessingSplit(processing, index) {
+    processing.splits.splice(index, 1);
+    if (processing.splits.length === 1) {
+      const remaining = processing.splits[0], total = processing.processedAmount;
+      Object.assign(processing, remaining, { processedAmount: total, singleLineAmount: remaining.amount, singleLineId: remaining.id, splits: [] });
+      delete processing.id;
+      delete processing.amount;
+    } else redistributeProcessing(processing);
+    return processing;
+  }
+  function splitDifference(processing) {
+    var _a2, _b;
+    const total = processingCents(processing.processedAmount);
+    const lines = ((_a2 = processing.splits) == null ? void 0 : _a2.length) ? processing.splits : [{ amount: (_b = processing.singleLineAmount) != null ? _b : processing.processedAmount }];
+    const actual = lines.reduce((sum2, line) => {
+      var _a3;
+      return sum2 + ((_a3 = processingCents(line.amount)) != null ? _a3 : 0);
+    }, 0);
+    return { expectedCents: total === null ? 0 : Math.abs(total), actualCents: actual, differenceCents: (total === null ? 0 : Math.abs(total)) - actual };
   }
 
   // src/core/planning-timeline.mjs
@@ -772,7 +1522,7 @@
       if (!config.timelineActive) salary = 0;
       else if ((_g = (_f = source.monthOverrides) == null ? void 0 : _f[month]) == null ? void 0 : _g.incomePlanningOverride) salary = resolveRecurringAmount(source, month);
     }
-    return { salary, refund: round((_j = entry == null ? void 0 : entry.refund) != null ? _j : (((_i = (_h = state2.personen) == null ? void 0 : _h[owner]) == null ? void 0 : _i.vasteTeruggaven) || []).reduce((sum, row) => sum + Number(row.bedrag || 0), 0)), effectiveFrom: (entry == null ? void 0 : entry.effectiveFrom) || "0000-01" };
+    return { salary, refund: round((_j = entry == null ? void 0 : entry.refund) != null ? _j : (((_i = (_h = state2.personen) == null ? void 0 : _h[owner]) == null ? void 0 : _i.vasteTeruggaven) || []).reduce((sum2, row) => sum2 + Number(row.bedrag || 0), 0)), effectiveFrom: (entry == null ? void 0 : entry.effectiveFrom) || "0000-01" };
   }
   function upsert(history, month, changes, id) {
     let index = -1;
@@ -1032,225 +1782,17 @@
     return target;
   }
 
-  // src/core/budget-assignment.mjs
-  var budgetNameKey = (value) => String(value || "").trim().toLocaleLowerCase("nl-NL");
-  function resolveBudgetAssignment(state2, month, owner, { category = "", budgetItemId = "" } = {}, resolvedRows = null) {
-    const rows = resolvedRows || resolveVariableBudgetsForMonth(state2, month, owner);
-    const matches = budgetItemId ? rows.filter((row) => row.id === budgetItemId) : rows.filter((row) => budgetNameKey(row.post || row.categorie) === budgetNameKey(category));
-    return matches.length === 1 ? matches[0] : null;
-  }
-  function budgetAssignmentMatches(state2, month, owner, assignment, category, budgetItemId = "") {
-    const assigned = resolveBudgetAssignment(state2, month, owner, assignment);
-    if (budgetItemId) return (assigned == null ? void 0 : assigned.id) === budgetItemId;
-    const wanted = resolveBudgetAssignment(state2, month, owner, { category });
-    if (wanted) return (assigned == null ? void 0 : assigned.id) === wanted.id;
-    return !assignment.budgetItemId && !assigned && !!budgetNameKey(category) && budgetNameKey(assignment.category) === budgetNameKey(category);
-  }
-  function bindBudgetAssignment(state2, month, owner, line) {
-    const row = resolveBudgetAssignment(state2, month, owner, line);
-    if (line.budgetItemId && !row) throw new Error("De gekozen budgetpost bestaat niet in deze maand voor deze eigenaar. Kies de budgetpost opnieuw.");
-    return (row == null ? void 0 : row.id) || "";
-  }
-
-  // src/core/bank-sources.mjs
-  var copy2 = (value) => JSON.parse(JSON.stringify(value));
-  var isBankSource = (tx) => (tx == null ? void 0 : tx.recordRole) === "bank-source";
-  var sourceRecordKey = (tx) => tx.bankSourceId || (tx.importBatchId && tx.importTransactionId ? `${tx.importBatchId}:${tx.importTransactionId}` : tx.id);
-  function bankSourceForImport(state2, batchId, rowId) {
-    return (state2.transactions || []).find((tx) => isBankSource(tx) && (tx.importReferences || []).some((ref) => ref.batchId === batchId && ref.rowId === rowId));
-  }
-  function bankSourceForTransaction(state2, tx) {
-    return (state2.transactions || []).find((source) => isBankSource(source) && source.bankSourceId === tx.bankSourceId);
-  }
-  function bankSourceActive(state2, source, override = null) {
-    return (source.importReferences || []).some((ref) => {
-      const batch = (override == null ? void 0 : override.id) === ref.batchId ? override : (state2.importSummaries || []).find((batch2) => batch2.id === ref.batchId);
-      if ((state2.importDeletionProofs || []).some((proof) => proof.id === ref.batchId)) return false;
-      return batch ? !["withdrawn", "deleted"].includes(batch.lifecycle) && batch.status !== "teruggedraaid" : source.batchLifecycle !== "withdrawn";
-    });
-  }
-  function ensureImportBankSources(state2, batch) {
-    var _a2, _b;
-    state2.transactions = state2.transactions || [];
-    for (const row of batch.rows || []) {
-      if (!((_a2 = row.bankOriginal) == null ? void 0 : _a2.valid) || row.importError) continue;
-      let source = bankSourceForImport(state2, batch.id, row.id) || state2.transactions.find((tx) => isBankSource(tx) && row.bankSourceId && tx.bankSourceId === row.bankSourceId);
-      const ref = row.duplicateSource;
-      let legacy = state2.transactions.filter((tx) => !isBankSource(tx) && tx.importBatchId === ((ref == null ? void 0 : ref.batchId) || batch.id) && tx.importTransactionId === ((ref == null ? void 0 : ref.rowId) || row.id));
-      if (!source && ref) source = bankSourceForImport(state2, ref.batchId, ref.rowId);
-      if (!source && row.duplicate && !legacy.length) throw new Error("De eerdere bankbron ontbreekt. Open de oorspronkelijke import of herstel de bronkoppeling.");
-      if (row.possibleDuplicate && !row.identityDecision && !row.duplicate) continue;
-      if (!source) {
-        const first = legacy[0], bankSourceId = (first == null ? void 0 : first.bankSourceId) || row.bankSourceId || `bank-${(ref == null ? void 0 : ref.batchId) || batch.id}:${(ref == null ? void 0 : ref.rowId) || row.id}`;
-        const original3 = copy2(((_b = first == null ? void 0 : first.bankOriginal) == null ? void 0 : _b.bankDate) && first.bankOriginal.amount !== void 0 ? first.bankOriginal : row.bankOriginal), accountProfileId = (first == null ? void 0 : first.accountProfileId) || row.accountProfileId || batch.accountProfileId;
-        const accountContext = getTransactionAccountContext(first || { ...row, accountProfileId, accountOwner: row.accountOwner || batch.accountOwner }, { accountProfiles: state2.accountProfiles || [] });
-        if (!accountContext) continue;
-        source = { id: `source-${bankSourceId}`, recordRole: "bank-source", bankSourceId, source: "csv", bankOriginal: original3, transactionDate: original3.bankDate, date: original3.bankDate, amount: Math.abs(original3.amount), description: original3.description, accountContext, accountOwner: accountContext, account: accountContext, accountProfileId, importBatchId: (ref == null ? void 0 : ref.batchId) || batch.id, importTransactionId: (ref == null ? void 0 : ref.rowId) || row.id, processingRowId: (first == null ? void 0 : first.importTransactionId) || (ref == null ? void 0 : ref.rowId) || row.id, importReferences: [], processingRevision: 0, processingStatus: "nakijken", batchLifecycle: "active" };
-        if (first) {
-          source.importReferences.push({ batchId: first.importBatchId, rowId: first.importTransactionId });
-          source.approvedProcessing = copy2(first.processing || {});
-          source.approvedProcessing.processedAmount = Math.round(legacy.reduce((sum, tx) => sum + Math.abs(Number(tx.amount) || 0), 0) * 100) / 100;
-          source.processingStatus = getTransactionProcessingStatus(first);
-          source.approvalSource = first.approvalSource || "";
-          source.approvedAt = first.approvedAt || "";
-        }
-        state2.transactions.push(source);
-        legacy.forEach((tx) => {
-          tx.bankSourceId = bankSourceId;
-        });
-      }
-      if (!(source.importReferences || []).some((ref2) => ref2.batchId === batch.id && ref2.rowId === row.id)) source.importReferences.push({ batchId: batch.id, rowId: row.id });
-      const bank = row.bankOriginal, original2 = source.bankOriginal;
-      if (bank.bankDate !== original2.bankDate || Math.round(Number(bank.amount) * 100) !== Math.round(Number(original2.amount) * 100) || bank.accountIdentifier && original2.accountIdentifier && bank.accountIdentifier.replace(/\s/g, "").toUpperCase() !== original2.accountIdentifier.replace(/\s/g, "").toUpperCase()) throw new Error("De bronverwijzing hoort bij een andere rekening, bankdatum of ander bankbedrag.");
-      row.bankSourceId = source.bankSourceId;
-      for (const relation of state2.manualTransactionReplacements || []) if (source.importReferences.some((ref2) => ref2.batchId === relation.importBatchId && ref2.rowId === relation.importTransactionId)) relation.bankSourceId = source.bankSourceId;
-      state2.transactions.filter((tx) => !isBankSource(tx) && tx.bankSourceId === source.bankSourceId).forEach((tx) => {
-        tx.batchLifecycle = bankSourceActive(state2, source, batch) ? "active" : "withdrawn";
-      });
-    }
-    return state2;
-  }
-  function selectBankTransactions(state2, { month = null, account = null, accountId = null, includeInactive = false, imports = [] } = {}) {
-    var _a2, _b, _c, _d, _e, _f, _g, _h;
-    if ((state2 == null ? void 0 : state2.__finizePartialHistory) && (!month || !((_a2 = state2.verifiedPeriods) == null ? void 0 : _a2.includes(month)))) throw Object.assign(new Error("De gevraagde bankperiode is niet volledig geladen."), { code: "period-incomplete" });
-    const missing = imports.filter((batch) => (state2.importSummaries || []).some((summary) => summary.id === batch.id) && !(state2.importDeletionProofs || []).some((proof) => proof.id === batch.id) && (batch.rows || []).some((row) => {
-      var _a3;
-      return ((_a3 = row.bankOriginal) == null ? void 0 : _a3.valid) && !row.importError && !bankSourceForImport(state2, batch.id, row.id);
-    }));
-    if (missing.length) {
-      const projected = { ...state2, transactions: copy2(state2.transactions || []), manualTransactionReplacements: copy2(state2.manualTransactionReplacements || []) };
-      for (const duplicates of [false, true]) for (const batch of missing) {
-        const rows = (batch.rows || []).filter((row) => Boolean(row.duplicate) === duplicates && !bankSourceForImport(projected, batch.id, row.id));
-        if (!rows.length) continue;
-        const previous = copy2(projected.transactions), relations = copy2(projected.manualTransactionReplacements);
-        try {
-          ensureImportBankSources(projected, { ...batch, rows: copy2(rows) });
-        } catch (e) {
-          projected.transactions = previous;
-          projected.manualTransactionReplacements = relations;
-        }
-      }
-      return selectBankTransactions(projected, { month, account, accountId, includeInactive });
-    }
-    const headers = (state2.transactions || []).filter(isBankSource), seen = /* @__PURE__ */ new Set(), result2 = [];
-    for (const tx of [...headers, ...(state2.transactions || []).filter((tx2) => !isBankSource(tx2))]) {
-      const source = bankSourceForTransaction(state2, tx) || tx, key = sourceRecordKey(source);
-      if (seen.has(key)) continue;
-      seen.add(key);
-      const csv = getTransactionSource(source) === "csv", active = isBankSource(source) ? bankSourceActive(state2, source) : !["withdrawn", "deleted"].includes(source.batchLifecycle);
-      if (!includeInactive && !active) continue;
-      if (!csv && (state2.manualTransactionReplacements || []).some((ref) => {
-        var _a3;
-        return ref.active !== false && (ref.manualTransactionId || ((_a3 = ref.manualTransaction) == null ? void 0 : _a3.id)) === source.id;
-      })) continue;
-      const date = ((_b = source.bankOriginal) == null ? void 0 : _b.bankDate) || source.transactionDate || source.date || "", context = getTransactionAccountContext(source, { accountProfiles: state2.accountProfiles || [] });
-      if (month && date.slice(0, 7) !== month || account && context !== account || accountId && source.accountProfileId !== accountId) continue;
-      const incoming = ["inkomen", "salaris", "vakantiegeld", "nabetaling", "vergoeding", "belastingteruggave", "overige-inkomsten", "van-spaarrekening", "terugbetaling", "refund"].includes(source.transactionType || ((_c = source.approvedProcessing) == null ? void 0 : _c.transactionType)) || source.kind === "inkomen";
-      const amount = (_f = (_e = (_d = source.bankOriginal) == null ? void 0 : _d.amount) != null ? _e : source.accountDelta) != null ? _f : Math.abs(Number(source.amount) || 0) * (incoming ? 1 : -1);
-      const liveRef = (_g = source.importReferences) == null ? void 0 : _g.find((ref) => bankSourceActive(state2, { ...source, importReferences: [ref] }));
-      result2.push({ ...source, ...liveRef ? { importBatchId: liveRef.batchId, importTransactionId: liveRef.rowId } : {}, date, transactionDate: date, amount: Math.abs(amount), bankAmount: amount, accountContext: context, active, category: ((_h = source.approvedProcessing) == null ? void 0 : _h.category) || source.category || "Nog te beoordelen", processing: copy2(source.approvedProcessing || source.processing || {}) });
-    }
-    return result2;
-  }
-  function updateSourceApproval(state2, batch, row) {
-    const source = bankSourceForImport(state2, batch.id, row.id);
-    if (!source) return;
-    if (JSON.stringify(source.approvedProcessing) !== JSON.stringify(row.processing)) source.processingRevision = (source.processingRevision || 0) + 1;
-    source.approvedProcessing = copy2(row.processing);
-    source.processingStatus = getTransactionProcessingStatus({ ...row, source: "csv" });
-    source.approvalSource = row.approvalSource || "";
-    source.approvedAt = row.approvedAt || "";
-  }
-
-  // src/core/processing-lines.mjs
-  var processingCents = (value) => {
-    if (value === null || value === void 0 || String(value).trim() === "") return null;
-    const n = Number(value), c = Math.round(n * 100);
-    return Number.isFinite(n) && Number.isSafeInteger(c) && Math.abs(n * 100 - c) < 1e-6 ? c : null;
-  };
-  function processingFamily(type) {
-    if (["uitgave", "vaste-last", "niet-meetellen"].includes(type)) return "uitgave";
-    if (["sparen", "naar-spaarrekening", "van-spaarrekening"].includes(type)) return "sparen";
-    if (["terugbetaling", "refund"].includes(type)) return "terugbetaling";
-    if (["inkomen", "salaris", "vakantiegeld", "nabetaling", "vergoeding", "belastingteruggave", "overige-inkomsten"].includes(type)) return "inkomen";
-    return type;
-  }
-  function distributeProcessingCents(totalCents, lines) {
-    if (!Number.isSafeInteger(totalCents) || totalCents < 0) throw new Error("Vul een geldig totaal in eurocenten in.");
-    const result2 = lines.map((line) => ({ ...line }));
-    const automatic = result2.filter((line) => line.amountMode === "auto");
-    const fixed = result2.filter((line) => line.amountMode !== "auto").reduce((sum, line) => {
-      var _a2;
-      return sum + ((_a2 = processingCents(line.amount)) != null ? _a2 : 0);
-    }, 0);
-    const remainder = Math.max(0, totalCents - fixed), share = automatic.length ? Math.floor(remainder / automatic.length) : 0;
-    automatic.forEach((line, index) => {
-      line.amount = (share + (index < remainder % automatic.length ? 1 : 0)) / 100;
-    });
-    return result2;
-  }
-  function redistributeProcessing(processing) {
-    const cents4 = processingCents(processing.processedAmount);
-    if (cents4 !== null) processing.splits = distributeProcessingCents(Math.abs(cents4), processing.splits || []);
-    return processing;
-  }
-  function addProcessingSplit(processing, id, nextId) {
-    if (!(processing.splits || []).length) {
-      const first = { ...processing, id, amount: processing.processedAmount, amountMode: "auto" };
-      delete first.splits;
-      delete first.singleLineAmount;
-      delete first.singleLineId;
-      const second = { ...first, id: nextId, amount: 0, fixedExpenseId: "", fixedOccurrenceId: "", fixedOccurrenceMonth: "", fixedAmountMode: "none" };
-      if (first.transactionType === "vaste-last") {
-        second.transactionType = "uitgave";
-        second.category = "Ongecategoriseerd";
-      }
-      processing.splits = [first, second];
-    } else {
-      const template = processing.splits[0], allManual = processing.splits.every((line) => line.amountMode !== "auto");
-      processing.splits.push({ id, amount: 0, amountMode: "auto", transactionType: processing.transactionType === "vaste-last" ? "uitgave" : processing.transactionType, category: processing.transactionType === "vaste-last" ? "Ongecategoriseerd" : template.category, budgetOwner: template.budgetOwner || processing.budgetOwner, include: true, savingsGoalId: processing.savingsGoalId || "", refundCategory: template.refundCategory || "", refundMonth: template.refundMonth || "", advanceMode: processing.advanceMode || "none" });
-      if (allManual) {
-        delete processing.singleLineAmount;
-        delete processing.singleLineId;
-        return processing;
-      }
-    }
-    delete processing.singleLineAmount;
-    delete processing.singleLineId;
-    return redistributeProcessing(processing);
-  }
-  function removeProcessingSplit(processing, index) {
-    processing.splits.splice(index, 1);
-    if (processing.splits.length === 1) {
-      const remaining = processing.splits[0], total = processing.processedAmount;
-      Object.assign(processing, remaining, { processedAmount: total, singleLineAmount: remaining.amount, singleLineId: remaining.id, splits: [] });
-      delete processing.id;
-      delete processing.amount;
-    } else redistributeProcessing(processing);
-    return processing;
-  }
-  function splitDifference(processing) {
-    var _a2, _b;
-    const total = processingCents(processing.processedAmount);
-    const lines = ((_a2 = processing.splits) == null ? void 0 : _a2.length) ? processing.splits : [{ amount: (_b = processing.singleLineAmount) != null ? _b : processing.processedAmount }];
-    const actual = lines.reduce((sum, line) => {
-      var _a3;
-      return sum + ((_a3 = processingCents(line.amount)) != null ? _a3 : 0);
-    }, 0);
-    return { expectedCents: total === null ? 0 : Math.abs(total), actualCents: actual, differenceCents: (total === null ? 0 : Math.abs(total)) - actual };
-  }
-
   // src/core/recurring-occurrences.mjs
   var U3_FREQUENCY_UNITS = ["weken", "maanden", "jaren"];
-  function u3IsoDate(date) {
-    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "";
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  function u3IsoDate(date2) {
+    if (!(date2 instanceof Date) || Number.isNaN(date2.getTime())) return "";
+    return `${date2.getFullYear()}-${String(date2.getMonth() + 1).padStart(2, "0")}-${String(date2.getDate()).padStart(2, "0")}`;
   }
   function u3ParseDate(value) {
     const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
     if (!match) return null;
-    const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12);
-    return date.getFullYear() === Number(match[1]) && date.getMonth() === Number(match[2]) - 1 && date.getDate() === Number(match[3]) ? date : null;
+    const date2 = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12);
+    return date2.getFullYear() === Number(match[1]) && date2.getMonth() === Number(match[2]) - 1 && date2.getDate() === Number(match[3]) ? date2 : null;
   }
   function u3MonthBounds(month) {
     const match = String(month || "").match(/^(\d{4})-(\d{2})$/);
@@ -1286,38 +1828,132 @@
       const stepMs = amount * 7 * 864e5;
       let index = Math.max(0, Math.floor((bounds.start - start) / stepMs) - 1);
       for (let guard = 0; guard < 64; guard++, index++) {
-        const date = new Date(start.getTime() + index * stepMs);
-        if (date > bounds.end) break;
-        if (date >= bounds.start && date >= start && (!end || date <= end)) dates.push(u3IsoDate(date));
+        const date2 = new Date(start.getTime() + index * stepMs);
+        if (date2 > bounds.end) break;
+        if (date2 >= bounds.start && date2 >= start && (!end || date2 <= end)) dates.push(u3IsoDate(date2));
       }
     } else {
       const multiplier = unit === "jaren" ? 12 * amount : amount;
       const monthDistance = (bounds.start.getFullYear() - start.getFullYear()) * 12 + bounds.start.getMonth() - start.getMonth();
       let index = Math.max(0, Math.floor(monthDistance / multiplier) - 1);
       for (let guard = 0; guard < 8; guard++, index++) {
-        const date = unit === "jaren" ? u3AddAnchoredYears(start, index * amount) : u3AddAnchoredMonths(start, index * amount);
-        if (date > bounds.end) break;
-        if (date >= bounds.start && date >= start && (!end || date <= end)) dates.push(u3IsoDate(date));
+        const date2 = unit === "jaren" ? u3AddAnchoredYears(start, index * amount) : u3AddAnchoredMonths(start, index * amount);
+        if (date2 > bounds.end) break;
+        if (date2 >= bounds.start && date2 >= start && (!end || date2 <= end)) dates.push(u3IsoDate(date2));
       }
     }
     return dates;
   }
-  function u3OccurrenceId(itemId, date) {
-    return `${itemId}:${date}`;
+  function u3OccurrenceId(itemId, date2) {
+    return `${itemId}:${date2}`;
   }
   function u3PlannedOccurrences(items, month) {
-    return (items || []).map((item) => resolveRecurringConfig(item, month)).filter(Boolean).flatMap((item) => u3OccurrenceDates(item, month).map((date) => ({
-      id: u3OccurrenceId(item.id, date),
+    return (items || []).map((item) => resolveRecurringConfig(item, month)).filter(Boolean).flatMap((item) => u3OccurrenceDates(item, month).map((date2) => ({
+      id: u3OccurrenceId(item.id, date2),
       itemId: item.id,
-      date,
-      month: String(date).slice(0, 7),
+      date: date2,
+      month: String(date2).slice(0, 7),
       naam: item.naam,
       categorie: item.categorie || "",
       account: item.rekening || item.account || "gezamenlijk",
       financialFor: item.financialFor || item.eigenaar || item.rekening || "gezamenlijk",
-      amount: u3AmountAt(item, date),
+      amount: u3AmountAt(item, date2),
       source: item
     })));
+  }
+
+  // src/core/budget-assignment.mjs
+  var budgetNameKey = (value) => String(value || "").trim().toLocaleLowerCase("nl-NL");
+  function resolveBudgetAssignment(state2, month, owner, { category = "", budgetItemId = "" } = {}, resolvedRows = null) {
+    const rows = resolvedRows || resolveVariableBudgetsForMonth(state2, month, owner);
+    const matches = budgetItemId ? rows.filter((row) => row.id === budgetItemId) : rows.filter((row) => budgetNameKey(row.post || row.categorie) === budgetNameKey(category));
+    return matches.length === 1 ? matches[0] : null;
+  }
+  function budgetAssignmentMatches(state2, month, owner, assignment, category, budgetItemId = "") {
+    const assigned = resolveBudgetAssignment(state2, month, owner, assignment);
+    if (budgetItemId) return (assigned == null ? void 0 : assigned.id) === budgetItemId;
+    const wanted = resolveBudgetAssignment(state2, month, owner, { category });
+    if (wanted) return (assigned == null ? void 0 : assigned.id) === wanted.id;
+    return !assignment.budgetItemId && !assigned && !!budgetNameKey(category) && budgetNameKey(assignment.category) === budgetNameKey(category);
+  }
+  function bindBudgetAssignment(state2, month, owner, line) {
+    const row = resolveBudgetAssignment(state2, month, owner, line);
+    if (line.budgetItemId && !row) throw new Error("De gekozen budgetpost bestaat niet in deze maand voor deze eigenaar. Kies de budgetpost opnieuw.");
+    return (row == null ? void 0 : row.id) || "";
+  }
+
+  // src/storage/performance.mjs
+  function profileSync(name, action2) {
+    const observe = globalThis.__finizePerformance;
+    if (typeof observe !== "function") return action2();
+    const start = performance.now();
+    try {
+      return action2();
+    } finally {
+      try {
+        observe(name, performance.now() - start);
+      } catch (e) {
+      }
+    }
+  }
+  function profileStart(name) {
+    const observe = globalThis.__finizePerformance;
+    if (typeof observe !== "function") return () => {
+    };
+    const start = performance.now();
+    return () => {
+      try {
+        observe(name, performance.now() - start);
+      } catch (e) {
+      }
+    };
+  }
+  function profileCount(name, count = 1) {
+    var _a2;
+    try {
+      (_a2 = globalThis.__finizePerformance) == null ? void 0 : _a2.call(globalThis, name, 0, { count });
+    } catch (e) {
+    }
+  }
+
+  // src/core/salary-assignment.mjs
+  var SALARY_PERSON_IDS = Object.freeze(["dion", "dara"]);
+  var salarySourceId = (person) => SALARY_PERSON_IDS.includes(person) ? `income-defaults-salary-${person}` : "";
+  function salaryPerson(tx, state2 = {}) {
+    var _a2;
+    const explicit = tx.salaryPersonId || ((_a2 = tx.processing) == null ? void 0 : _a2.salaryPersonId);
+    if (explicit) return SALARY_PERSON_IDS.includes(explicit) ? explicit : null;
+    const destination = getTransactionFinancialDestination(tx);
+    const source = (state2.recurringIncomeSources || []).find((row) => {
+      var _a3;
+      return row.id === (tx.incomeSourceId || ((_a3 = tx.processing) == null ? void 0 : _a3.incomeSourceId)) && row.legacyKind === "salary";
+    });
+    if (source && SALARY_PERSON_IDS.includes(source.eigenaar)) return SALARY_PERSON_IDS.includes(destination) && destination !== source.eigenaar ? null : source.eigenaar;
+    return SALARY_PERSON_IDS.includes(destination) ? destination : null;
+  }
+  function salaryLink(tx, state2 = {}, { requireChoice = false } = {}) {
+    var _a2;
+    if (tx.bankOriginal && Number(tx.bankOriginal.amount) <= 0) throw Object.assign(new Error("Een salarisontvangst moet een bijschrijving zijn. Classificeer een terugboeking expliciet volgens haar financiële betekenis."), { code: "salary-direction", field: "transactionType" });
+    const person = requireChoice ? tx.salaryPersonId || ((_a2 = tx.processing) == null ? void 0 : _a2.salaryPersonId) : salaryPerson(tx, state2);
+    if (!SALARY_PERSON_IDS.includes(person)) throw Object.assign(new Error("Kies Dion of Dara voor deze salarisbetaling. De salarisplanning kan pas daarna betrouwbaar worden vergeleken."), { code: "salary-person-required", field: "salaryPersonId" });
+    const month = getTransactionDate(tx).slice(0, 7), sourceId = salarySourceId(person);
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new Error("Een geldige bankmaand is vereist voor salaris.");
+    const sources = (state2.recurringIncomeSources || []).filter((row) => row.legacyKind === "salary" && row.eigenaar === person);
+    const selected = sources.find((row) => {
+      var _a3;
+      return row.id === (tx.incomeSourceId || ((_a3 = tx.processing) == null ? void 0 : _a3.incomeSourceId));
+    }) || (sources.length === 1 ? sources[0] : null);
+    return { salaryPersonId: person, salarySourceId: sourceId, salaryMonth: month, incomeSourceId: (selected == null ? void 0 : selected.id) || "", incomeOccurrenceId: `${sourceId}:${month}` };
+  }
+  var accountKey2 = (value) => String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  function proposeSalaryPerson(original2, transactions = []) {
+    const employer = accountKey2(original2.counterpartyAccount), account = accountKey2(original2.accountIdentifier);
+    if (!employer || !account) return "";
+    const people = new Set(transactions.filter((tx) => {
+      var _a2, _b;
+      return tx.recordRole !== "bank-source" && tx.approvalSource === "manual" && isTransactionFinanciallyActive(tx) && getTransactionClassification(tx) === "salaris" && accountKey2((_a2 = tx.bankOriginal) == null ? void 0 : _a2.counterpartyAccount) === employer && accountKey2((_b = tx.bankOriginal) == null ? void 0 : _b.accountIdentifier) === account;
+    }).map((tx) => salaryPerson(tx)).filter(Boolean));
+    return people.size === 1 ? [...people][0] : "";
   }
 
   // src/core/savings-contributions.mjs
@@ -1359,7 +1995,7 @@
   }
 
   // src/core/transaction-engine.mjs
-  var copy3 = (value) => JSON.parse(JSON.stringify(value));
+  var copy4 = (value) => JSON.parse(JSON.stringify(value));
   var money = (value) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
   var cents2 = (value) => Math.round(Number(value) * 100);
   var incomeTypes = /* @__PURE__ */ new Set(["inkomen", "salaris", "vakantiegeld", "nabetaling", "vergoeding", "belastingteruggave", "overige-inkomsten"]);
@@ -1397,7 +2033,7 @@
   function projectBaseTransaction(tx, { state: state2 = {}, materialized = false, sourceApproved = null, sourceCashflow = null, preparation = null } = {}) {
     var _a2;
     const sourceHeader = preparation ? preparation.sources.get(tx.bankSourceId) : bankSourceForTransaction(state2, tx);
-    const status = getTransactionProcessingStatus(tx), active = (sourceHeader ? bankSourceActive(state2, sourceHeader) : !["withdrawn", "deleted"].includes(tx.batchLifecycle)) && (sourceApproved != null ? sourceApproved : isTransactionFinanciallyActive(tx)) && status === "goedgekeurd" && !replacementSuppresses(tx, state2);
+    const status2 = getTransactionProcessingStatus(tx), active = (sourceHeader ? bankSourceActive(state2, sourceHeader) : !["withdrawn", "deleted"].includes(tx.batchLifecycle)) && (sourceApproved != null ? sourceApproved : isTransactionFinanciallyActive(tx)) && status2 === "goedgekeurd" && !replacementSuppresses(tx, state2);
     const accountContext = getTransactionAccountContext(tx, { accountProfiles: state2.accountProfiles || [] });
     let financialFor = getTransactionFinancialDestination(tx);
     let type = getTransactionClassification(tx);
@@ -1437,11 +2073,11 @@
       budgetRows = preparation.budgets.get(key2);
     }
     const budgetRow = calendarMonth2 && financialFor && !fixed && !special && !income ? resolveBudgetAssignment(state2, calendarMonth2, financialFor, { category: tx.category || processing.category, budgetItemId }, budgetRows) : null;
-    const result2 = { id: tx.id, sourceKey: key, source: getTransactionSource(tx), accountContext, financialFor, status, active, transactionType: type, category: (budgetRow == null ? void 0 : budgetRow.post) || (budgetRow == null ? void 0 : budgetRow.categorie) || tx.category || processing.category || "Overig", budgetItemId: (budgetRow == null ? void 0 : budgetRow.id) || budgetItemId, amount, calendarMonth: calendarMonth2, financialMonth: fixedMonth || calendarMonth2, fixedMonth, fixedOccurrenceId: fixedId, fixedExpenseId: tx.fixedExpenseId || processing.fixedExpenseId || "", incomeSourceId: tx.incomeSourceId || processing.incomeSourceId || "", incomeOccurrenceId: tx.incomeOccurrenceId || processing.incomeOccurrenceId || "", splitId: tx.splitId || "", effects, diagnostics, transaction: tx };
+    const result2 = { id: tx.id, sourceKey: key, source: getTransactionSource(tx), accountContext, financialFor, status: status2, active, transactionType: type, category: (budgetRow == null ? void 0 : budgetRow.post) || (budgetRow == null ? void 0 : budgetRow.categorie) || tx.category || processing.category || "Overig", budgetItemId: (budgetRow == null ? void 0 : budgetRow.id) || budgetItemId, amount, calendarMonth: calendarMonth2, financialMonth: fixedMonth || calendarMonth2, fixedMonth, fixedOccurrenceId: fixedId, fixedExpenseId: tx.fixedExpenseId || processing.fixedExpenseId || "", incomeSourceId: tx.incomeSourceId || processing.incomeSourceId || "", incomeOccurrenceId: tx.incomeOccurrenceId || processing.incomeOccurrenceId || "", splitId: tx.splitId || "", effects, diagnostics, transaction: tx };
     if (!materialized && !tx.splitId && Array.isArray(rawSplits) && rawSplits.length) {
       const cashIndex = rawSplits.findIndex((split) => split.include !== false && split.transactionType !== "niet-meetellen");
       result2.lines = rawSplits.map((split, index) => projectBaseTransaction({ ...tx, ...split, source: tx.source, bankOriginal: tx.bankOriginal, rawData: tx.rawData, accountContext: tx.accountContext, accountContextEvidence: tx.accountContextEvidence, account: tx.account, accountOwner: tx.accountOwner, accountProfileId: tx.accountProfileId, transactionDate: tx.transactionDate, date: tx.date, bookingDate: tx.bookingDate, importBatchId: tx.importBatchId, importTransactionId: tx.importTransactionId, processingStatus: tx.processingStatus, certainty: tx.certainty, reviewStatus: tx.reviewStatus, approvalSource: tx.approvalSource, approvedAt: tx.approvedAt, id: `${tx.id}:split:${split.id || index}`, splitId: split.id || String(index), sourceTransactionId: tx.id, expenseImpact: split.expenseImpact, amount: split.amount, transactionType: split.transactionType || (type === "vaste-last" ? "uitgave" : type), fixedExpenseId: split.fixedExpenseId || "", fixedOccurrenceId: split.fixedOccurrenceId || "", fixedOccurrenceMonth: split.fixedOccurrenceMonth || "", budgetOwner: split.budgetOwner || financialFor, financialFor: split.financialFor || split.budgetOwner || financialFor, category: split.category, budgetItemId: split.budgetItemId || "", processing: { ...processing, ...split, fixedExpenseId: split.fixedExpenseId || "", fixedOccurrenceId: split.fixedOccurrenceId || "", fixedOccurrenceMonth: split.fixedOccurrenceMonth || "", splits: [] } }, { state: state2, materialized: true, sourceApproved: active, sourceCashflow: index === cashIndex ? cash : 0, preparation }));
-      for (const dimension of ["incomeImpact", "realExpense", "budgetImpact", "fixedRealization", "savingsEffect", "refundEffect", "advanceRepaymentEffect"]) result2.effects[dimension] = money(result2.lines.reduce((sum, line) => sum + line.effects[dimension], 0));
+      for (const dimension of ["incomeImpact", "realExpense", "budgetImpact", "fixedRealization", "savingsEffect", "refundEffect", "advanceRepaymentEffect"]) result2.effects[dimension] = money(result2.lines.reduce((sum2, line) => sum2 + line.effects[dimension], 0));
     }
     return result2;
   }
@@ -1491,7 +2127,7 @@
     return selectTransactionProjections((state2 == null ? void 0 : state2.__finizePartialHistory) ? { ...state2, __finizePartialHistory: false } : state2, options);
   }
   function sumProjectionEffects(projections, dimension) {
-    return money(projections.reduce((sum, p) => sum + Number(p.effects[dimension] || 0), 0));
+    return money(projections.reduce((sum2, p) => sum2 + Number(p.effects[dimension] || 0), 0));
   }
   function sumTransactionEffects(state2, dimension, options = {}) {
     var _a2, _b;
@@ -1516,24 +2152,24 @@
     return result2;
   }
   function budgetActual(state2, month, owner, category, budgetItemId = "") {
-    return money(selectTransactionProjections(state2, { month, dimension: "budget" }).reduce((sum, p) => {
+    return money(selectTransactionProjections(state2, { month, dimension: "budget" }).reduce((sum2, p) => {
       var _a2;
       const label = p.effects.refundCorrection ? p.refundCategory : p.category;
       const id = p.effects.refundCorrection ? "" : p.budgetItemId;
       let amount = p.financialFor === owner && !((_a2 = p.directBudgetAllocations) == null ? void 0 : _a2.length) && budgetAssignmentMatches(state2, month, owner, { category: label, budgetItemId: id }, category, budgetItemId) ? p.effects.budgetImpact : 0;
       for (const a of p.directBudgetAllocations || []) if ((a.budgetOwner || p.financialFor) === owner && budgetAssignmentMatches(state2, month, owner, a, category, budgetItemId)) amount -= a.amount;
-      return sum + amount;
+      return sum2 + amount;
     }, 0));
   }
   function fixedOccurrenceActuals(state2, occurrence) {
     const rows = selectTransactionProjections(state2, { month: occurrence.month, dimension: "fixed" }).filter((p) => p.fixedOccurrenceId === occurrence.id);
-    const actual = money(rows.reduce((sum, p) => sum + p.effects.fixedRealization, 0)), planned = money(occurrence.amount);
+    const actual = money(rows.reduce((sum2, p) => sum2 + p.effects.fixedRealization, 0)), planned = money(occurrence.amount);
     return { planned, actual, deviation: money(actual - planned), paid: rows.length > 0, status: rows.length ? "Betaald" : "Niet betaald", rows };
   }
   function actualIncomeForMonth(state2, month, owner = null) {
     var _a2;
     const rows = selectTransactionProjections(state2, { month }).filter((p) => p.effects.incomeImpact > 0);
-    if (rows.length) return { amount: money(rows.filter((p) => !owner || p.financialFor === owner).reduce((sum, p) => sum + p.effects.incomeImpact, 0)), source: "transactions", rows };
+    if (rows.length) return { amount: money(rows.filter((p) => !owner || p.financialFor === owner).reduce((sum2, p) => sum2 + p.effects.incomeImpact, 0)), source: "transactions", rows };
     const override = (_a2 = state2.actualIncomeOverrides) == null ? void 0 : _a2[month], manual = owner ? override == null ? void 0 : override[owner] : override == null ? void 0 : override.total;
     return { amount: Number.isFinite(Number(manual)) ? money(manual) : 0, source: manual !== void 0 ? "manual-correction" : "none", rows: [] };
   }
@@ -1552,7 +2188,7 @@
   }
   function incomeProjectionForMonth(state2, month, owner, planned, { legacyOwners = /* @__PURE__ */ new Map() } = {}) {
     const rows = selectTransactionProjections(state2, { month }).filter((p) => p.effects.incomeImpact > 0 && (legacyOwners.get(p.id) || p.financialFor) === owner), salary = rows.filter((p) => p.transactionType === "salaris");
-    return { salary: salary.length ? money(salary.reduce((sum, p) => sum + p.effects.incomeImpact, 0)) : money(planned.salary), salaryActual: salary.length > 0, extra: money(rows.filter((p) => p.transactionType !== "salaris").reduce((sum, p) => sum + p.effects.incomeImpact, 0)), rows };
+    return { salary: salary.length ? money(salary.reduce((sum2, p) => sum2 + p.effects.incomeImpact, 0)) : money(planned.salary), salaryActual: salary.length > 0, extra: money(rows.filter((p) => p.transactionType !== "salaris").reduce((sum2, p) => sum2 + p.effects.incomeImpact, 0)), rows };
   }
   function validateTransactionProcessing(source, { fixedOccurrences = null, validFixedId = null, goalExists = null, refundCategoryExists = null } = {}) {
     var _a2, _b, _c, _d, _e;
@@ -1564,7 +2200,7 @@
     if (splits !== void 0 && !Array.isArray(splits)) errors.push({ code: "splits", message: "Ongeldige splitstructuur." });
     if (Array.isArray(splits) && splits.length) {
       const signed = splits.some((split) => Number(split.amount) < 0);
-      const total = splits.reduce((sum, split) => sum + (validMoney(split.amount) ? cents2(split.amount) : 0), 0);
+      const total = splits.reduce((sum2, split) => sum2 + (validMoney(split.amount) ? cents2(split.amount) : 0), 0);
       const expected = signed ? Number(amount) < 0 ? cents2(amount) : -Math.abs(cents2(amount)) : Math.abs(cents2(amount));
       if (total !== expected || splits.some((split) => !validMoney(split.amount))) {
         const diff = Math.abs(expected) - Math.abs(total), format = (c) => (c / 100).toLocaleString("nl-NL", { style: "currency", currency: "EUR" });
@@ -1630,12 +2266,12 @@
       return item.active !== false && (item.manualTransactionId === manualId || ((_a3 = item.manualTransaction) == null ? void 0 : _a3.id) === manualId) && (item.importBatchId !== importId || item.importTransactionId !== row.id);
     })) throw new Error("Handmatige transactie is al vervangen.");
     state2.manualTransactionReplacements = state2.manualTransactionReplacements || [];
-    if (!existing) state2.manualTransactionReplacements.push({ id, manualTransactionId: manualId, manualTransaction: copy3(manual), importBatchId: importId, importTransactionId: row.id, active: true });
+    if (!existing) state2.manualTransactionReplacements.push({ id, manualTransactionId: manualId, manualTransaction: copy4(manual), importBatchId: importId, importTransactionId: row.id, active: true });
     if (existing) existing.active = true;
     const p = row.processing;
     for (const field of ["category", "budgetOwner", "transactionType", "fixedExpenseId", "fixedOccurrenceId", "fixedOccurrenceMonth", "savingsGoalId", "refundCategory", "refundMonth", "splits"]) {
       const value = (_c = (_b = (_a2 = manual.processing) == null ? void 0 : _a2[field]) != null ? _b : manual[field]) != null ? _c : field === "budgetOwner" ? getTransactionFinancialDestination(manual) : void 0;
-      if (value !== void 0) p[field] = copy3(value);
+      if (value !== void 0) p[field] = copy4(value);
     }
     p.manualMatchId = manualId;
     p.processedAmount = Math.abs(Number(row.bankOriginal.amount));
@@ -1698,7 +2334,7 @@
       p.effects.savingsWithdrawal = p.active && p.transactionType === "van-spaarrekening" ? p.amount : 0;
       p.effects.goalDelta = p.savingsGoalId && goalExistsIn(state2, p.savingsGoalId) ? money(p.effects.savingsDeposit - p.effects.savingsWithdrawal) : 0;
       p.directBudgetAllocations = p.active && p.transactionType === "van-spaarrekening" ? (processing.directBudgetAllocations || []).filter((a) => a.category && Number(a.amount) > 0) : [];
-      const direct = p.directBudgetAllocations.reduce((sum, a) => sum + cents2(a.amount), 0);
+      const direct = p.directBudgetAllocations.reduce((sum2, a) => sum2 + cents2(a.amount), 0);
       p.effects.directSavingsCorrection = direct / 100;
       p.effects.budgetImpact = money(p.effects.budgetImpact - direct / 100);
       p.effects.savingsFunded = direct / 100;
@@ -1717,22 +2353,22 @@
     (state2.savingsCoverageAllocations || []).filter((a) => a.active !== false).forEach((allocation) => {
       const withdrawal = allocationEndpoint(rows, allocation, "withdrawal"), expense = allocationEndpoint(rows, allocation, "expense");
       const amount = Number(allocation.amountCents), reason = coverageEligibility(withdrawal, expense, state2) || (!Number.isSafeInteger(amount) || amount <= 0 ? "coverage-cents" : "");
-      const status = { id: allocation.id, active: false, reason, amountCents: amount, withdrawalTransactionId: (withdrawal == null ? void 0 : withdrawal.id) || allocation.withdrawalTransactionId, expenseTransactionId: (expense == null ? void 0 : expense.id) || allocation.expenseTransactionId };
-      if (withdrawal) withdrawal.coverageAllocations.push(status);
-      if (expense) expense.coverageAllocations.push(status);
+      const status2 = { id: allocation.id, active: false, reason, amountCents: amount, withdrawalTransactionId: (withdrawal == null ? void 0 : withdrawal.id) || allocation.withdrawalTransactionId, expenseTransactionId: (expense == null ? void 0 : expense.id) || allocation.expenseTransactionId };
+      if (withdrawal) withdrawal.coverageAllocations.push(status2);
+      if (expense) expense.coverageAllocations.push(status2);
       if (reason) return;
-      eligible.push({ allocation, withdrawal, expense, status });
+      eligible.push({ allocation, withdrawal, expense, status: status2 });
       withdrawalTotals.set(withdrawal.id, (withdrawalTotals.get(withdrawal.id) || 0) + amount);
       expenseTotals.set(expense.id, (expenseTotals.get(expense.id) || 0) + amount);
     });
-    eligible.forEach(({ allocation, withdrawal, expense, status }) => {
+    eligible.forEach(({ allocation, withdrawal, expense, status: status2 }) => {
       const reason = withdrawalTotals.get(withdrawal.id) + cents2(withdrawal.effects.directSavingsCorrection) > cents2(withdrawal.amount) ? "coverage-exceeds-withdrawal" : expenseTotals.get(expense.id) > cents2(expense.regularExpenseBase) ? "coverage-exceeds-expense" : "";
       if (reason) {
-        status.reason = reason;
+        status2.reason = reason;
         expense.diagnostics.push({ code: reason, allocationId: allocation.id });
         return;
       }
-      status.active = true;
+      status2.active = true;
       expense.effects.savingsFunded = money(expense.effects.savingsFunded + allocation.amountCents / 100);
       withdrawal.effects.unusedSavings = money(withdrawal.effects.unusedSavings - allocation.amountCents / 100);
     });
@@ -1754,7 +2390,7 @@
       }
     });
     refundGroups.forEach((refunds, key) => {
-      const total = refunds.reduce((sum, p) => sum + cents2(p.amount), 0);
+      const total = refunds.reduce((sum2, p) => sum2 + cents2(p.amount), 0);
       refunds.forEach((p) => {
         p.effects.refundCorrection = p.amount;
         p.effects.categoryOnlyRefundCorrection = fixedCategories.has(key) ? p.amount : 0;
@@ -1772,12 +2408,12 @@
     const projected = refs.map((line) => rows.find((p) => p.id === line.id) || line);
     if (!base.lines) return projected[0];
     base.lines = projected;
-    for (const dimension of Object.keys(((_a2 = projected[0]) == null ? void 0 : _a2.effects) || {})) base.effects[dimension] = money(projected.reduce((sum, line) => sum + Number(line.effects[dimension] || 0), 0));
+    for (const dimension of Object.keys(((_a2 = projected[0]) == null ? void 0 : _a2.effects) || {})) base.effects[dimension] = money(projected.reduce((sum2, line) => sum2 + Number(line.effects[dimension] || 0), 0));
     return base;
   }
   function coverageAllocationStatus(state2) {
-    const rows = selectDependencyProjections(state2, { includeInactive: true }), statuses = new Map(rows.flatMap((p) => p.coverageAllocations || []).map((a) => [a.id, a]));
-    return (state2.savingsCoverageAllocations || []).map((a) => a.active === false ? { id: a.id, active: false, reason: "removed", amountCents: a.amountCents } : statuses.get(a.id) || { id: a.id, active: false, reason: "coverage-missing-reference", amountCents: a.amountCents });
+    const rows = selectDependencyProjections(state2, { includeInactive: true }), statuses2 = new Map(rows.flatMap((p) => p.coverageAllocations || []).map((a) => [a.id, a]));
+    return (state2.savingsCoverageAllocations || []).map((a) => a.active === false ? { id: a.id, active: false, reason: "removed", amountCents: a.amountCents } : statuses2.get(a.id) || { id: a.id, active: false, reason: "coverage-missing-reference", amountCents: a.amountCents });
   }
   function validateSavingsCoverageAllocation(state2, allocation) {
     const rows = selectDependencyProjections(state2, { includeInactive: true }), withdrawal = allocationEndpoint(rows, allocation, "withdrawal"), expense = allocationEndpoint(rows, allocation, "expense");
@@ -1845,40 +2481,40 @@
       const config = (plannedIncome == null ? void 0 : plannedIncome[owner]) || resolvePlannedIncomeForMonth(state2, month, owner), manual = (_b2 = (_a3 = state2.monthlyIncomeOverrides) == null ? void 0 : _a3[month]) == null ? void 0 : _b2[owner];
       return [owner, { ...config, salary: manual !== void 0 ? money(manual) : money(config.salary) }];
     }));
-    const legacyOwners = legacySalaryForecastOwners(state2, month, planned), rows = selectTransactionProjections(state2), owners2 = Object.fromEntries(ACCOUNT_CONTEXTS.map((owner) => [owner, { owner, income: money(compatibilityIncome[owner]), salary: 0, salarySource: "none", extraIncome: 0, fixedBurden: 0, variableBurden: 0, savingsDeposit: 0, savingsFunded: 0, unusedSavings: 0, refundCashflow: 0, available: 0 }]));
+    const legacyOwners = legacySalaryForecastOwners(state2, month, planned), rows = selectTransactionProjections(state2), owners3 = Object.fromEntries(ACCOUNT_CONTEXTS.map((owner) => [owner, { owner, income: money(compatibilityIncome[owner]), salary: 0, salarySource: "none", extraIncome: 0, fixedBurden: 0, variableBurden: 0, savingsDeposit: 0, savingsFunded: 0, unusedSavings: 0, refundCashflow: 0, available: 0 }]));
     ["dion", "dara"].forEach((owner) => {
       var _a3, _b2;
       const income = incomeProjectionForMonth(state2, month, owner, planned[owner], { legacyOwners });
-      owners2[owner].salary = income.salary;
-      owners2[owner].salarySource = income.salaryActual ? "transactions" : ((_b2 = (_a3 = state2.monthlyIncomeOverrides) == null ? void 0 : _a3[month]) == null ? void 0 : _b2[owner]) !== void 0 ? "manual" : "planned";
-      owners2[owner].extraIncome = income.extra;
-      owners2[owner].income = money(owners2[owner].income + income.salary + income.extra);
+      owners3[owner].salary = income.salary;
+      owners3[owner].salarySource = income.salaryActual ? "transactions" : ((_b2 = (_a3 = state2.monthlyIncomeOverrides) == null ? void 0 : _a3[month]) == null ? void 0 : _b2[owner]) !== void 0 ? "manual" : "planned";
+      owners3[owner].extraIncome = income.extra;
+      owners3[owner].income = money(owners3[owner].income + income.salary + income.extra);
     });
     rows.filter((p) => p.calendarMonth === month).forEach((p) => {
-      const target = owners2[p.financialFor];
+      const target = owners3[p.financialFor];
       if (!target) return;
       if (p.financialFor === "gezamenlijk" && !legacyOwners.has(p.id)) target.income = money(target.income + p.effects.incomeImpact);
       target.variableBurden = money(target.variableBurden + (p.effects.realExpense > 0 && !p.fixedOccurrenceId ? p.effects.budgetImpact : 0));
       for (const a of p.directBudgetAllocations || []) {
-        const budgetOwner = owners2[a.budgetOwner || p.financialFor];
+        const budgetOwner = owners3[a.budgetOwner || p.financialFor];
         if (budgetOwner) budgetOwner.variableBurden = money(budgetOwner.variableBurden - a.amount);
       }
       for (const field of ["savingsDeposit", "savingsFunded", "unusedSavings", "refundCashflow"]) target[field] = money(target[field] + p.effects[field]);
       if (p.effects.existingCapitalDeposit) target.existingCapitalDeposit = money((target.existingCapitalDeposit || 0) + p.effects.existingCapitalDeposit);
     });
     const occurrences = fixedOccurrences || u3PlannedOccurrences(resolveFixedExpensesForMonth(state2, month), month);
-    const allowanceOwners = Object.fromEntries(ACCOUNT_CONTEXTS.map((owner) => [owner, { fixedReserve: 0, budgetReserve: money(resolveVariableBudgetsForMonth(state2, month, owner).reduce((sum, row) => sum + Number(row.bedrag || 0), 0)), savingsReserve: 0, totalReserve: 0 }]));
+    const allowanceOwners = Object.fromEntries(ACCOUNT_CONTEXTS.map((owner) => [owner, { fixedReserve: 0, budgetReserve: money(resolveVariableBudgetsForMonth(state2, month, owner).reduce((sum2, row) => sum2 + Number(row.bedrag || 0), 0)), savingsReserve: 0, totalReserve: 0 }]));
     let equalJointReserve = 0;
     occurrences.forEach((occurrence) => {
       var _a3;
-      const actualRows = rows.filter((p) => p.active && p.fixedOccurrenceId === occurrence.id), amount = actualRows.length ? money(actualRows.reduce((sum, p) => sum + p.effects.fixedRegularImpact, 0)) : money(occurrence.amount);
-      const owner = owners2[occurrence.financialFor];
+      const actualRows = rows.filter((p) => p.active && p.fixedOccurrenceId === occurrence.id), amount = actualRows.length ? money(actualRows.reduce((sum2, p) => sum2 + p.effects.fixedRegularImpact, 0)) : money(occurrence.amount);
+      const owner = owners3[occurrence.financialFor];
       if (!owner) return;
       owner.fixedBurden = money(owner.fixedBurden + amount);
       allowanceOwners[occurrence.financialFor].fixedReserve = money(allowanceOwners[occurrence.financialFor].fixedReserve + Number(occurrence.amount));
       if (occurrence.financialFor === "gezamenlijk" && ((_a3 = occurrence.source) == null ? void 0 : _a3.distributionMode) === "equal") equalJointReserve = money(equalJointReserve + Number(occurrence.amount));
     });
-    const dion = owners2.dion, dara = owners2.dara, joint = owners2.gezamenlijk, incomeBasis = money(dion.income + dara.income), minimum = Number((_c = (_b = (_a2 = state2.planning) == null ? void 0 : _a2.verdeling) == null ? void 0 : _b.minimumDion) != null ? _c : 0.4), ratioDion = Math.max(minimum, incomeBasis > 0 ? dion.income / incomeBasis : 0), ratioDara = 1 - ratioDion;
+    const dion = owners3.dion, dara = owners3.dara, joint = owners3.gezamenlijk, incomeBasis = money(dion.income + dara.income), minimum = Number((_c = (_b = (_a2 = state2.planning) == null ? void 0 : _a2.verdeling) == null ? void 0 : _b.minimumDion) != null ? _c : 0.4), ratioDion = Math.max(minimum, incomeBasis > 0 ? dion.income / incomeBasis : 0), ratioDara = 1 - ratioDion;
     const burden = (owner) => money(owner.fixedBurden + owner.variableBurden + owner.savingsDeposit - (owner.existingCapitalDeposit || 0) - owner.unusedSavings - owner.refundCashflow);
     const savingsOverrides = ((_d = state2.monthlySavingOverrides) == null ? void 0 : _d[month]) || {};
     const jointPlan = allowanceOwners.gezamenlijk;
@@ -1890,7 +2526,7 @@
     dara.allowance = money(dara.income - equalJointReserve * 0.5 - ratioCosts * ratioDara);
     ["dion", "dara"].forEach((owner) => {
       const plan = allowanceOwners[owner];
-      plan.automaticallyAvailableForSavings = money(owners2[owner].allowance - plan.fixedReserve - plan.budgetReserve);
+      plan.automaticallyAvailableForSavings = money(owners3[owner].allowance - plan.fixedReserve - plan.budgetReserve);
       plan.savingsReserve = Object.hasOwn(savingsOverrides, owner) ? money(savingsOverrides[owner]) : Math.max(0, plan.automaticallyAvailableForSavings);
       plan.totalReserve = money(plan.fixedReserve + plan.budgetReserve + plan.savingsReserve);
     });
@@ -1898,16 +2534,1237 @@
     dara.available = money(dara.allowance - burden(dara));
     joint.availableBeforeAllowance = money(incomeBasis + joint.income - burden(joint));
     joint.available = money(joint.availableBeforeAllowance - dion.allowance - dara.allowance);
-    const household = { income: money(ACCOUNT_CONTEXTS.reduce((sum, owner) => sum + owners2[owner].income, 0)), available: money(ACCOUNT_CONTEXTS.reduce((sum, owner) => sum + owners2[owner].income - burden(owners2[owner]), 0)), actualIncome: actualIncomeForMonth(state2, month).amount, realExpense: sumTransactionEffects(state2, "realExpense", { month }), savingsFunded: sumTransactionEffects(state2, "savingsFunded", { month }), unusedSavings: sumTransactionEffects(state2, "unusedSavings", { month }), refundCashflow: sumTransactionEffects(state2, "refundCashflow", { month }) };
-    return { month, owners: owners2, household, ratioDion, ratioDara, distributable, allowanceBasis: { owners: allowanceOwners, distributable, income: money(incomeBasis + joint.income) }, coverage: coverageAllocationStatus(state2) };
+    const household = { income: money(ACCOUNT_CONTEXTS.reduce((sum2, owner) => sum2 + owners3[owner].income, 0)), available: money(ACCOUNT_CONTEXTS.reduce((sum2, owner) => sum2 + owners3[owner].income - burden(owners3[owner]), 0)), actualIncome: actualIncomeForMonth(state2, month).amount, realExpense: sumTransactionEffects(state2, "realExpense", { month }), savingsFunded: sumTransactionEffects(state2, "savingsFunded", { month }), unusedSavings: sumTransactionEffects(state2, "unusedSavings", { month }), refundCashflow: sumTransactionEffects(state2, "refundCashflow", { month }) };
+    return { month, owners: owners3, household, ratioDion, ratioDara, distributable, allowanceBasis: { owners: allowanceOwners, distributable, income: money(incomeBasis + joint.income) }, coverage: coverageAllocationStatus(state2) };
+  }
+
+  // src/core/liquidity-settings.mjs
+  function liquidityBuffer(profile) {
+    var _a2, _b, _c;
+    return (_c = (_a2 = profile == null ? void 0 : profile.liquidity) == null ? void 0 : _a2.bufferCents) != null ? _c : (profile == null ? void 0 : profile.accountOwner) === "gezamenlijk" && ((_b = profile == null ? void 0 : profile.liquidity) == null ? void 0 : _b.primaryForOwner) ? 2e4 : 0;
+  }
+  function validateLiquiditySettings(profile, profiles) {
+    const value = profile.liquidity;
+    if (value === void 0) return;
+    const fail6 = (message) => {
+      throw Object.assign(new Error(message), { code: "invalid-liquidity-settings" });
+    };
+    if (!value || value.version !== 1 || typeof value.primaryForOwner !== "boolean" || !Number.isSafeInteger(value.bufferCents) || value.bufferCents < 0)
+      fail6("Vul een niet-negatieve veiligheidsbuffer in hele eurocenten in.");
+    if (value.primaryForOwner && profile.accountType !== "payment") fail6("Kies een betaalrekening voor de maandplanning.");
+    if (value.primaryForOwner && profiles.some((p) => {
+      var _a2;
+      return p.id !== profile.id && p.accountOwner === profile.accountOwner && ((_a2 = p.liquidity) == null ? void 0 : _a2.primaryForOwner);
+    }))
+      fail6("Er is al een rekening voor deze maandplanning. Schakel die keuze daar eerst uit.");
+    if (profile.accountOwner === "gezamenlijk" && !value.primaryForOwner && value.bufferCents !== 0)
+      fail6("De gezamenlijke buffer hoort alleen bij de primaire gezamenlijke betaalrekening.");
+    if (!value.salaryDays || typeof value.salaryDays !== "object" || Array.isArray(value.salaryDays)) fail6("Controleer de salarisbetaaldagen.");
+    for (const [person, day] of Object.entries(value.salaryDays)) {
+      if (!["dion", "dara"].includes(person) || !Number.isInteger(day) || day < 1 || day > 31) fail6("Kies voor salaris een dag van 1 tot en met 31, of laat het veld leeg.");
+      if (profiles.some((p) => {
+        var _a2, _b;
+        return p.id !== profile.id && ((_b = (_a2 = p.liquidity) == null ? void 0 : _a2.salaryDays) == null ? void 0 : _b[person]);
+      })) fail6("Dit salaris is al aan een andere rekening gekoppeld. Verwijder die betaaldag daar eerst.");
+    }
+  }
+
+  // src/core/daily-liquidity.mjs
+  var owners2 = ["gezamenlijk", "dion", "dara"];
+  var cents3 = (value) => decimalAmountToCents(value);
+  var sum = (values) => values.reduce((a, b) => safe(a + b), 0);
+  var safe = (value) => {
+    if (!Number.isSafeInteger(value)) throw new Error("Prognosebedrag valt buiten het exacte centbereik.");
+    return value;
+  };
+  var shiftLiquidityDay = (date2, offset) => {
+    const parsed = /* @__PURE__ */ new Date(date2 + "T12:00:00Z");
+    parsed.setUTCDate(parsed.getUTCDate() + offset);
+    return parsed.toISOString().slice(0, 10);
+  };
+  var monthEnd = (month) => shiftLiquidityDay(nextPlanningMonth(month) + "-01", -1);
+  var salaryDate = (month, day) => month + "-" + String(Math.min(day, Number(monthEnd(month).slice(8)))).padStart(2, "0");
+  var event = (values) => ({ id: "", accountProfileId: null, date: null, amountCents: 0, type: "other", status: "planned", dateQuality: "unknown", sourceId: null, occurrenceId: null, replacedBy: [], warnings: [], ...values });
+  var issue = (code, eventId = "", severity = "incomplete") => ({ code, eventId, severity });
+  function liquidityReasonMessage(reason) {
+    return {
+      "missing-checkpoint": "Er is nog geen bruikbaar saldo-ijkpunt voor deze rekening.",
+      "missing-period": "Een benodigde opslagmaand ontbreekt.",
+      "missing-reliable-horizon": "Een betrouwbare volgende ontvangst ontbreekt. Kies een einddatum.",
+      "unknown-bank-coverage": "Niet bevestigd dat alle bankmutaties sinds het ijkpunt aanwezig zijn.",
+      "partial-bank-coverage": "De bankgegevens dekken slechts een deel van de periode.",
+      "awaiting-review": "Geboekte bankmutaties bij Nakijken tellen voorlopig mee.",
+      "unknown-cash-date": "Een kasdatum is onbekend of een gepland bedrag staat nog open na de betaaldag.",
+      "unresolved-account-profile": "Een gebeurtenis heeft nog geen betrouwbare fysieke rekening.",
+      "unresolved-budget-account": "Een budget heeft nog geen aangewezen fysieke betaalrekening.",
+      "unconfirmed-transfer-plan": "Een overboeking mist een bevestigde datum of twee fysieke rekeningen en telt niet als kasbeweging.",
+      "joint-primary-account-not-selected": "Kies de primaire gezamenlijke betaalrekening voor de planning en veiligheidsbuffer.",
+      "replacement-bank-source-unusable": "Een expliciet gekoppelde betaling mist een bruikbare bankbron in deze periode.",
+      "ambiguous-income-occurrence": "Een ontvangst is aan een bron gekoppeld, maar niet aan een bewezen betaalmoment. Extra geplande ontvangst blijft buiten de kaslijn.",
+      "ambiguous-fixed-occurrence": "Een betaling heeft een vaste-lastlink zonder bewezen occurrence; de resterende verplichting is onzeker.",
+      "planning-dependencies-unavailable": "De financiële afhankelijkheidsgegevens zijn niet volledig beschikbaar.",
+      "financial-planning-unavailable": "Een deel van de bestaande financiële planning kan niet betrouwbaar worden berekend.",
+      "conflicting-event": "Dezelfde gebeurtenis bevat tegenstrijdige gegevens.",
+      "duplicate-reservation": "Een reservering kwam meer dan eenmaal voor en is slechts eenmaal opgenomen.",
+      "imports-unavailable": "Importdetails zijn niet beschikbaar voor broncontrole."
+    }[reason.code] || "De bankbron of saldo-uitgangspositie is niet volledig controleerbaar (" + reason.code + ").";
+  }
+  function physicalAccount(state2, explicit, owner) {
+    const profiles = state2.accountProfiles || [];
+    if (explicit && profiles.some((p) => p.id === explicit)) return explicit;
+    if (explicit && !owners2.includes(explicit)) return null;
+    const matches = profiles.filter((p) => {
+      var _a2;
+      return p.accountOwner === owner && p.status !== "archived" && ((_a2 = p.liquidity) == null ? void 0 : _a2.primaryForOwner);
+    });
+    return matches.length === 1 ? matches[0].id : null;
+  }
+  function replacementKeys(p, state2) {
+    const keys = [];
+    if (p.fixedOccurrenceId) keys.push("fixed:" + p.fixedOccurrenceId);
+    if (p.incomeOccurrenceId) keys.push("income:" + p.incomeOccurrenceId);
+    if (p.transactionType === "salaris") {
+      const person = salaryPerson(p.transaction, state2);
+      if (person) keys.push("salary:" + salarySourceId(person) + ":" + p.calendarMonth);
+    }
+    return keys;
+  }
+  function salaryPlans(state2, month) {
+    return ["dion", "dara"].map((person) => {
+      var _a2, _b, _c;
+      const amount = (_c = (_b = (_a2 = state2.monthlyIncomeOverrides) == null ? void 0 : _a2[month]) == null ? void 0 : _b[person]) != null ? _c : resolvePlannedIncomeForMonth(state2, month, person).salary;
+      const profiles = (state2.accountProfiles || []).filter((p) => {
+        var _a3, _b2;
+        return p.status !== "archived" && ((_b2 = (_a3 = p.liquidity) == null ? void 0 : _a3.salaryDays) == null ? void 0 : _b2[person]);
+      });
+      const profile = profiles.length === 1 ? profiles[0] : null;
+      return event({
+        id: "salary:" + salarySourceId(person) + ":" + month,
+        occurrenceId: salarySourceId(person) + ":" + month,
+        accountProfileId: (profile == null ? void 0 : profile.id) || null,
+        date: profile ? salaryDate(month, profile.liquidity.salaryDays[person]) : null,
+        amountCents: cents3(amount),
+        type: "salary",
+        person,
+        month,
+        dateQuality: profile ? "explicitly-planned" : "unknown",
+        horizonReceipt: true
+      });
+    }).filter((row) => row.amountCents > 0);
+  }
+  function replacementIndex(projections, state2) {
+    const map = /* @__PURE__ */ new Map();
+    for (const p of projections) {
+      const source = bankSourceForTransaction(state2, p.transaction);
+      const retainedLink = p.transaction.approvalSource === "manual" && p.status === "goedgekeurd" && source && bankSourceActive(state2, source);
+      if (!p.active && !retainedLink || !p.transaction.bankOriginal) continue;
+      for (const key of replacementKeys(p, state2)) {
+        if (!map.has(key)) map.set(key, /* @__PURE__ */ new Set());
+        map.get(key).add(sourceRecordKey(p.transaction));
+      }
+    }
+    return map;
+  }
+  function transferPlans(state2) {
+    var _a2, _b, _c;
+    const result2 = [];
+    for (const row of state2.internalTransfers || []) {
+      if (!["gepland", "planned", "concept", "nog-te-verwerken"].includes(row.status)) continue;
+      const source = physicalAccount(state2, row.sourceAccountProfileId || row.sourceAccount, null);
+      const target = physicalAccount(state2, row.targetAccountProfileId || row.targetAccount, null);
+      const amount = cents3((_c = (_b = (_a2 = row.plannedAmount) != null ? _a2 : row.calculatedAmount) != null ? _b : row.amount) != null ? _c : 0);
+      if (amount <= 0) continue;
+      const resolved = source && target && source !== target;
+      const date2 = validCalendarDate(row.plannedDate || row.date) ? row.plannedDate || row.date : null;
+      for (const [accountProfileId, sign] of [[source, -1], [target, 1]]) result2.push(event({
+        id: "transfer:" + row.id + ":" + (sign < 0 ? "out" : "in"),
+        accountProfileId: resolved ? accountProfileId : null,
+        date: date2,
+        amountCents: sign * amount,
+        type: "internal-transfer",
+        transferId: row.id,
+        dateQuality: date2 ? "explicitly-planned" : "unknown",
+        month: row.month || (date2 == null ? void 0 : date2.slice(0, 7)),
+        horizonReceipt: sign > 0,
+        actualTransactionIds: [row.actualTransactionId, ...row.transactionIds || []].filter(Boolean),
+        warnings: resolved ? [] : ["unresolved-transfer-accounts"]
+      }));
+    }
+    return result2;
+  }
+  function liquidityRequiredMonths(state2, { accountProfileId, asOfDate, endDate, scope } = {}) {
+    if (!validCalendarDate(asOfDate)) return [];
+    const checkpoint = checkpointHistory(state2, accountProfileId, scope).active.find((row) => row.asOfDate <= asOfDate);
+    const end = validCalendarDate(endDate) ? endDate : monthEnd(nextPlanningMonth(asOfDate.slice(0, 7)));
+    return balanceRequiredMonths(checkpoint && checkpoint.asOfDate < asOfDate ? checkpoint.asOfDate : asOfDate, end);
+  }
+  function buildLiquidityInput(state2, { accountProfileId, asOfDate, endDate, scope, imports = [], importsAvailable = true, coverage = [], monthlyForecast = financialForecastForMonth } = {}) {
+    var _a2, _b, _c, _d, _e;
+    if (!validCalendarDate(asOfDate) || endDate !== void 0 && (!validCalendarDate(endDate) || endDate < asOfDate)) throw new Error("Kies geldige prognosedatums; de einddatum mag niet vóór de berekendatum liggen.");
+    if (endDate && balanceRequiredMonths(asOfDate, endDate).length > 24) throw new Error("Kies een prognose van maximaal 24 kalendermaanden.");
+    const reasons2 = [], events = [], reservations = [], savingsPlans = [];
+    const profile = (state2.accountProfiles || []).find((p) => p.id === accountProfileId);
+    const opening = selectAccountBalance(state2, { accountProfileId, toDate: asOfDate, scope, imports, importsAvailable, coverage });
+    opening.reasons.forEach((row) => reasons2.push(issue(row.code, row.sourceId, opening.status === "incomplete" || opening.status === "unknown" ? "incomplete" : "provisional")));
+    let projections = [];
+    try {
+      projections = selectDependencyProjections(state2, { includeInactive: true });
+    } catch (e) {
+      reasons2.push(issue("planning-dependencies-unavailable"));
+    }
+    const replaced = replacementIndex(projections, state2);
+    const transfers = transferPlans(state2);
+    const txById = new Map((state2.transactions || []).map((tx) => [tx.id, tx]));
+    for (const transfer of transfers) transfer.replacedBy = [...new Set(transfer.actualTransactionIds.map((id) => txById.get(id)).filter((tx) => tx == null ? void 0 : tx.bankOriginal).map(sourceRecordKey))];
+    let receipt = null;
+    if (!endDate) {
+      let month = asOfDate.slice(0, 7);
+      for (let i = 0; i < 13 && !receipt; i++, month = nextPlanningMonth(month)) {
+        const salaries = salaryPlans(state2, month).flatMap((row) => {
+          if (!replaced.has(row.id)) return [row];
+          return projections.filter((p) => replaced.get(row.id).has(sourceRecordKey(p.transaction)) && p.transaction.accountProfileId === accountProfileId).filter((p) => {
+            var _a3, _b2;
+            return ((_a3 = p.transaction.bankOriginal) == null ? void 0 : _a3.valid) && p.transaction.bankOriginal.currency === "EUR" && ((_b2 = p.transaction.bankOriginal.bankStatus) != null ? _b2 : "booked") === "booked" && validCalendarDate(p.transaction.bankOriginal.bankDate);
+          }).map((p) => ({ ...row, accountProfileId, date: p.transaction.bankOriginal.bankDate, dateQuality: "confirmed" }));
+        });
+        receipt = [...salaries, ...transfers.filter((row) => {
+          var _a3;
+          return (profile == null ? void 0 : profile.accountOwner) !== "gezamenlijk" && row.amountCents > 0 && ((_a3 = row.date) == null ? void 0 : _a3.slice(0, 7)) === month;
+        })].filter((row) => row.accountProfileId === accountProfileId && row.date > asOfDate && !row.replacedBy.length).sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id))[0] || null;
+      }
+    }
+    const horizonEnd2 = endDate || (receipt ? shiftLiquidityDay(receipt.date, -1) : null);
+    const horizon = { kind: endDate ? "manual" : "next-receipt", endDate: horizonEnd2, receiptDate: (receipt == null ? void 0 : receipt.date) || null, receiptId: (receipt == null ? void 0 : receipt.id) || null, boundary: "end-of-previous-day" };
+    if (!horizonEnd2) reasons2.push(issue("missing-reliable-horizon"));
+    const requiredMonths = liquidityRequiredMonths(state2, { accountProfileId, asOfDate, endDate: horizonEnd2 || asOfDate, scope });
+    for (const month of requiredMonths) if (state2.__finizePartialHistory && !((_a2 = state2.verifiedPeriods) == null ? void 0 : _a2.includes(month))) reasons2.push(issue("missing-period", month));
+    const last = horizonEnd2 || asOfDate;
+    const future = selectAccountBalance(state2, { accountProfileId, toDate: last, scope, imports, importsAvailable, coverage, checkpointId: (_b = opening.checkpoint) == null ? void 0 : _b.id });
+    future.reasons.filter((row) => !["unknown-bank-coverage", "partial-bank-coverage"].includes(row.code)).forEach((row) => reasons2.push(issue(row.code, row.sourceId, row.code === "awaiting-review" ? "provisional" : "incomplete")));
+    for (const row of future.mutations.filter((row2) => row2.date > asOfDate)) {
+      const linked = projections.filter((p) => sourceRecordKey(p.transaction) === row.sourceId);
+      events.push(event({
+        id: "bank:" + row.sourceId,
+        accountProfileId,
+        date: row.date,
+        amountCents: row.amountCents,
+        type: "bank",
+        status: row.status === "confirmed" ? "actual" : "provisional",
+        dateQuality: "confirmed",
+        sourceId: row.sourceId,
+        financialTypes: [...new Set(linked.map((p) => p.transactionType))],
+        replaces: [...new Set(linked.filter((p) => p.active).flatMap((p) => replacementKeys(p, state2)))]
+      }));
+    }
+    const relevant = (row) => row.accountProfileId === accountProfileId || !row.accountProfileId;
+    const addPlan = (row) => {
+      var _a3, _b2;
+      row.replacedBy = [.../* @__PURE__ */ new Set([...row.replacedBy, ...replaced.get(row.id) || []])];
+      if (!relevant(row)) return;
+      if (row.type === "fixed" && projections.some((p) => p.active && p.fixedExpenseId === row.planningSourceId && !p.fixedOccurrenceId)) reasons2.push(issue("ambiguous-fixed-occurrence", row.id));
+      if (row.type === "income" && projections.some((p) => p.active && p.incomeSourceId === row.planningSourceId && !p.incomeOccurrenceId && p.effects.incomeImpact > 0 && p.calendarMonth === row.month)) {
+        row.date = null;
+        row.dateQuality = "unknown";
+        row.warnings.push("ambiguous-income-occurrence");
+        reasons2.push(issue("ambiguous-income-occurrence", row.id));
+      }
+      if (row.replacedBy.length) {
+        row.status = "replaced";
+        events.push(row);
+        for (const sourceId of row.replacedBy) {
+          const p = projections.find((p2) => sourceRecordKey(p2.transaction) === sourceId);
+          const bankDate2 = (_a3 = p == null ? void 0 : p.transaction.bankOriginal) == null ? void 0 : _a3.bankDate;
+          const bank = p == null ? void 0 : p.transaction.bankOriginal;
+          if (!(bank == null ? void 0 : bank.valid) || bank.currency !== "EUR" || ((_b2 = bank.bankStatus) != null ? _b2 : "booked") !== "booked" || !validCalendarDate(bankDate2) || bankDate2 > asOfDate && bankDate2 <= last && !future.mutations.some((m) => m.sourceId === sourceId)) reasons2.push(issue("replacement-bank-source-unusable", row.id));
+        }
+        return;
+      }
+      if (row.date && row.date > last) return;
+      if (row.type === "internal-transfer" && (!row.accountProfileId || !row.date)) {
+        row.status = "unresolved";
+        row.warnings.push("unconfirmed-transfer-plan");
+        events.push(row);
+        reasons2.push(issue("unconfirmed-transfer-plan", row.id));
+        return;
+      }
+      if (!row.accountProfileId) {
+        row.warnings.push("unresolved-account-profile");
+        reasons2.push(issue("unresolved-account-profile", row.id));
+      }
+      if (row.date && row.date <= asOfDate) {
+        row.warnings.push("overdue-unmatched-plan");
+        row.plannedDate = row.date;
+        row.date = null;
+      }
+      if (!row.date) {
+        row.warnings.push("unknown-cash-date");
+        reasons2.push(issue("unknown-cash-date", row.id, row.amountCents > 0 ? "provisional" : "incomplete"));
+        if (row.amountCents < 0) {
+          row.status = "reservation";
+          reservations.push({ ...row, id: "undated:" + row.id, amountCents: -row.amountCents, type: "undated-obligation" });
+        }
+      }
+      events.push(row);
+    };
+    for (const month of balanceRequiredMonths(asOfDate, last)) {
+      if (state2.__finizePartialHistory && !((_c = state2.verifiedPeriods) == null ? void 0 : _c.includes(month))) continue;
+      for (const row of salaryPlans(state2, month)) addPlan(row);
+      try {
+        for (const occurrence of u3PlannedOccurrences(resolveFixedExpensesForMonth(state2, month), month)) {
+          const source = occurrence.source;
+          const explicit = (_d = source.cashDates) == null ? void 0 : _d[occurrence.id];
+          let date2 = validCalendarDate(explicit) ? explicit : null;
+          if (!date2 && validCalendarDate(source.afschrijfdatum)) {
+            if (source.frequentieEenheid === "weken") date2 = source.afschrijfdatum === occurrence.date ? occurrence.date : null;
+            else date2 = salaryDate(month, Number(source.afschrijfdatum.slice(8)));
+          }
+          addPlan(event({
+            id: "fixed:" + occurrence.id,
+            occurrenceId: occurrence.id,
+            planningSourceId: source.id,
+            month,
+            accountProfileId: physicalAccount(state2, source.accountProfileId || occurrence.account, occurrence.account),
+            amountCents: -cents3(occurrence.amount),
+            date: date2,
+            type: "fixed",
+            dateQuality: date2 ? "explicitly-planned" : "unknown"
+          }));
+        }
+        for (const occurrence of u3PlannedOccurrences(resolveIncomeSourcesForMonth(state2, month).filter((row) => row.legacyKind !== "salary"), month)) {
+          const source = occurrence.source, explicit = ((_e = source.cashDates) == null ? void 0 : _e[occurrence.id]) || source.paymentDate;
+          const date2 = validCalendarDate(explicit) ? explicit : source.planningProvenance === "versioned-properties" ? occurrence.date : null;
+          addPlan(event({
+            id: "income:" + occurrence.id,
+            occurrenceId: occurrence.id,
+            planningSourceId: source.id,
+            month,
+            date: date2,
+            type: "income",
+            dateQuality: date2 ? "explicitly-planned" : "unknown",
+            amountCents: cents3(occurrence.amount),
+            accountProfileId: physicalAccount(state2, source.accountProfileId || occurrence.account, occurrence.account)
+          }));
+        }
+        const budgetState = { ...state2, __finizePartialHistory: false, transactions: (state2.transactions || []).filter((tx) => {
+          var _a3;
+          return String(((_a3 = tx.bankOriginal) == null ? void 0 : _a3.bankDate) || tx.date || "") <= last;
+        }) };
+        for (const owner of owners2) for (const budget of resolveVariableBudgetsForMonth(state2, month, owner)) {
+          const account = physicalAccount(state2, budget.accountProfileId, owner);
+          if (account && account !== accountProfileId) continue;
+          const plannedCents = cents3(Number(budget.bedrag || 0));
+          const usedCents = cents3(budgetActual(budgetState, month, owner, budget.post || budget.categorie, budget.id));
+          const amountCents = Math.max(0, safe(plannedCents - usedCents));
+          if (!amountCents) continue;
+          const id = "budget:" + owner + ":" + month + ":" + budget.id;
+          if (!account) reasons2.push(issue("unresolved-budget-account", id));
+          reservations.push({
+            id,
+            accountProfileId: account,
+            type: "budget",
+            month,
+            budgetItemId: budget.id,
+            owner,
+            plannedCents,
+            usedCents,
+            amountCents,
+            fromDate: month === asOfDate.slice(0, 7) ? shiftLiquidityDay(asOfDate, 1) : month + "-01",
+            toDate: last < monthEnd(month) ? last : monthEnd(month),
+            dateQuality: "estimated"
+          });
+        }
+        const forecast = monthlyForecast(state2.__finizePartialHistory ? { ...state2, __finizePartialHistory: false } : state2, month);
+        for (const owner of owners2) if (physicalAccount(state2, null, owner) === accountProfileId) savingsPlans.push({ month, owner, amountCents: cents3(forecast.allowanceBasis.owners[owner].savingsReserve) });
+      } catch (error2) {
+        reasons2.push({ ...issue("financial-planning-unavailable", month), message: error2.message });
+      }
+    }
+    for (const row of transfers.filter((row2) => !row2.month || row2.month >= asOfDate.slice(0, 7) && row2.month <= last.slice(0, 7))) addPlan(row);
+    if ((profile == null ? void 0 : profile.accountOwner) === "gezamenlijk" && !physicalAccount(state2, null, "gezamenlijk")) reasons2.push(issue("joint-primary-account-not-selected"));
+    return { accountProfileId, asOfDate, opening, horizon, events, reservations, savingsPlans, bufferCents: liquidityBuffer(profile), requiredMonths, reasons: reasons2 };
+  }
+  function projectDailyLiquidity(input) {
+    var _a2, _b, _c, _d, _e, _f, _g, _h, _i, _j;
+    const { opening, horizon, asOfDate, bufferCents } = input;
+    const reasons2 = [...input.reasons], events = [], seen = /* @__PURE__ */ new Map();
+    for (const row of input.events) {
+      if (!row.id || !Number.isSafeInteger(row.amountCents) || row.date && !validCalendarDate(row.date)) throw new Error("Een prognosegebeurtenis mist een geldig ID, kasdatum of exact centbedrag.");
+      if (seen.has(row.id)) {
+        if (JSON.stringify(seen.get(row.id)) !== JSON.stringify(row)) reasons2.push(issue("conflicting-event", row.id));
+        continue;
+      }
+      seen.set(row.id, row);
+      events.push(row);
+    }
+    const reservations = [], reservationIds = /* @__PURE__ */ new Set();
+    for (const row of input.reservations) {
+      if (!row.id || !Number.isSafeInteger(row.amountCents) || row.amountCents < 0) throw new Error("Een prognosereservering mist een geldig ID of niet-negatief centbedrag.");
+      if (reservationIds.has(row.id)) {
+        reasons2.push(issue("duplicate-reservation", row.id));
+        continue;
+      }
+      reservationIds.add(row.id);
+      const covered = sum(events.filter((e) => e.status === "planned" && e.date > asOfDate && e.date <= horizon.endDate && e.amountCents < 0 && e.reservationId === row.id).map((e) => -e.amountCents));
+      reservations.push({ ...row, coveredByConcreteCents: Math.min(row.amountCents, covered), amountCents: Math.max(0, row.amountCents - covered) });
+    }
+    const reserveCents = sum(reservations.map((row) => row.amountCents));
+    const dated = events.filter((row) => ["actual", "provisional", "planned"].includes(row.status) && row.accountProfileId === input.accountProfileId && row.date > asOfDate && row.date <= horizon.endDate);
+    const estimated = /* @__PURE__ */ new Map();
+    for (const row of reservations.filter((row2) => row2.type === "budget")) {
+      const dates = [];
+      for (let date2 = row.fromDate; date2 <= row.toDate; date2 = shiftLiquidityDay(date2, 1)) dates.push(date2);
+      dates.forEach((date2, index) => estimated.set(date2, safe((estimated.get(date2) || 0) + Math.floor(row.amountCents / dates.length) + (index < row.amountCents % dates.length ? 1 : 0))));
+    }
+    const days = [];
+    if (opening.balanceCents !== null && horizon.endDate) {
+      let bank = opening.balanceCents, spent = 0;
+      for (let date2 = asOfDate; date2 <= horizon.endDate; date2 = shiftLiquidityDay(date2, 1)) {
+        const rows = dated.filter((row) => row.date === date2);
+        bank = safe(bank + sum(rows.map((row) => row.amountCents)));
+        spent = safe(spent + (estimated.get(date2) || 0));
+        days.push({
+          date: date2,
+          cashBalanceCents: bank,
+          estimatedBudgetCents: estimated.get(date2) || 0,
+          expectedBalanceCents: safe(bank - spent),
+          afterReservationsCents: safe(bank - reserveCents),
+          eventIds: rows.map((row) => row.id)
+        });
+      }
+    }
+    const min = (field) => days.reduce((best, row) => !best || row[field] < best[field] ? row : best, null);
+    const expected = min("expectedBalanceCents"), conservative = min("afterReservationsCents");
+    const distinct = [...new Map(reasons2.map((row) => [row.code + ":" + row.eventId, { ...row, message: row.message || liquidityReasonMessage(row) }])).values()];
+    const status2 = opening.balanceCents === null || !horizon.endDate ? "unknown" : distinct.some((row) => row.severity === "incomplete") ? "incomplete" : distinct.length ? "provisional" : "projected";
+    const indicative = conservative ? Math.max(0, safe(conservative.afterReservationsCents - bufferCents)) : null;
+    return {
+      ...input,
+      events,
+      reservations,
+      reasons: distinct,
+      status: status2,
+      days,
+      reservedCents: reserveCents,
+      savingsGoalCents: sum(input.savingsPlans.map((row) => row.amountCents)),
+      minimumBalanceCents: (_a2 = expected == null ? void 0 : expected.expectedBalanceCents) != null ? _a2 : null,
+      minimumDate: (_b = expected == null ? void 0 : expected.date) != null ? _b : null,
+      minimumAfterReservationsCents: (_c = conservative == null ? void 0 : conservative.afterReservationsCents) != null ? _c : null,
+      minimumAfterReservationsDate: (_d = conservative == null ? void 0 : conservative.date) != null ? _d : null,
+      firstShortfallDate: (_f = (_e = days.find((row) => row.expectedBalanceCents < 0)) == null ? void 0 : _e.date) != null ? _f : null,
+      firstBufferBreachDate: (_h = (_g = days.find((row) => row.expectedBalanceCents < bufferCents)) == null ? void 0 : _g.date) != null ? _h : null,
+      firstReservedBufferBreachDate: (_j = (_i = days.find((row) => row.afterReservationsCents < bufferCents)) == null ? void 0 : _i.date) != null ? _j : null,
+      shortfallCents: expected ? Math.max(0, -expected.expectedBalanceCents) : null,
+      reservedShortfallCents: conservative ? Math.max(0, -conservative.afterReservationsCents) : null,
+      freeAfterObligationsCents: status2 === "projected" ? indicative : null,
+      indicativeFreeAfterObligationsCents: indicative,
+      quality: { ...opening.quality, forecast: status2, budgetTiming: reservations.some((row) => row.type === "budget") ? "estimated" : "not-applicable" }
+    };
+  }
+  function selectDailyLiquidity(state2, options) {
+    return projectDailyLiquidity(buildLiquidityInput(state2, options));
+  }
+
+  // src/ui/dashboard.mjs
+  var escape = (value) => String(value != null ? value : "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  var money2 = (cents5) => Number.isSafeInteger(cents5) ? new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR" }).format(cents5 / 100) : "—";
+  var date = (value) => value ? new Intl.DateTimeFormat("nl-NL", { day: "numeric", month: "short", timeZone: "UTC" }).format(/* @__PURE__ */ new Date(value + "T12:00:00Z")) : "Datum onbekend";
+  var status = (value) => ({ projected: "Prognose", confirmed: "Bevestigd", provisional: "Voorlopig", incomplete: "Onvolledig", unknown: "Onbekend", actual: "Werkelijk", planned: "Gepland" })[value] || "Onbekend";
+  function allowanceShare(amount, distribution) {
+    const total = distribution.reduce((sum2, value) => sum2 + value, 0);
+    return total > 0 && distribution.every((value) => value >= 0) ? amount / total * 100 : null;
+  }
+  function forecastPeriod(p) {
+    var _a2;
+    if (!((_a2 = p == null ? void 0 : p.horizon) == null ? void 0 : _a2.endDate)) return `Prognoseperiode onbekend${p ? ` · ${status(p.status)}` : ""}`;
+    const dated = (value) => new Intl.DateTimeFormat("nl-NL", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(/* @__PURE__ */ new Date(value + "T12:00:00Z"));
+    const from = p.asOfDate.slice(0, 4) === p.horizon.endDate.slice(0, 4) ? date(p.asOfDate) : dated(p.asOfDate);
+    return `${from} – ${dated(p.horizon.endDate)} · ${p.horizon.kind === "manual" ? "Einddatum inbegrepen" : "Tot vóór volgend salaris"}`;
+  }
+  function pointMeaning(events, isMinimum) {
+    const income = events.some((e) => e.amountCents > 0), expense = events.some((e) => e.amountCents < 0);
+    return { income, expense, isMinimum, label: [isMinimum ? "Laagste prognose" : "", income ? "Inkomst" : "", expense ? "Uitgave" : "", !income && !expense ? "Saldopunt zonder concrete betaling" : ""].filter(Boolean).join(" · ") };
+  }
+  function horizonEnd(filter, today, custom) {
+    if (filter === "salary") return void 0;
+    if (filter === "7" || filter === "14") return shiftLiquidityDay(today, Number(filter));
+    if (filter === "month") {
+      const d = /* @__PURE__ */ new Date(today + "T12:00:00Z");
+      d.setUTCMonth(d.getUTCMonth() + 1, 0);
+      return d.toISOString().slice(0, 10);
+    }
+    return custom || void 0;
+  }
+  function primaryAccount(profiles, owner) {
+    const matches = profiles.filter((p) => {
+      var _a2;
+      return p.status !== "archived" && p.accountOwner === owner && p.accountType === "payment" && ((_a2 = p.liquidity) == null ? void 0 : _a2.primaryForOwner);
+    });
+    return matches.length === 1 ? matches[0] : null;
+  }
+  function paymentEvents(p) {
+    return ((p == null ? void 0 : p.events) || []).filter((e) => e.accountProfileId === p.accountProfileId && ["actual", "provisional", "planned"].includes(e.status) && e.date > p.asOfDate && e.date <= p.horizon.endDate).sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+  }
+  function liquidityView(p) {
+    var _a2;
+    return { free: (_a2 = p.freeAfterObligationsCents) != null ? _a2 : p.indicativeFreeAfterObligationsCents, indicative: p.freeAfterObligationsCents == null, savings: p.savingsGoalCents, balance: p.opening.balanceCents, minimum: p.minimumBalanceCents, minimumDate: p.minimumDate, buffer: p.bufferCents };
+  }
+  function yearView(year, getMonth) {
+    const months = Array.from({ length: 12 }, (_, i) => {
+      var _a2, _b;
+      const key = `${year}-${String(i + 1).padStart(2, "0")}`;
+      try {
+        const m = getMonth(key);
+        const values = [(_a2 = m.income) == null ? void 0 : _a2.total, m.fixedExpenses, (_b = m.variableExpenses) == null ? void 0 : _b.total, m.savings];
+        if (!values.every(Number.isFinite)) return { key, missing: true };
+        return { key, income: Math.round(values[0] * 100), spent: Math.round((values[1] + values[2]) * 100), saving: Math.round(values[3] * 100) };
+      } catch (e) {
+        return { key, missing: true };
+      }
+    });
+    const known = months.filter((m) => !m.missing), total = (field) => known.length ? known.reduce((sum2, m) => sum2 + m[field], 0) : null;
+    return { months, count: known.length, income: total("income"), spent: total("spent"), saving: total("saving"), average: known.length ? Math.round(total("spent") / known.length) : null };
+  }
+  var head = (title, action2 = "") => `<div class="p3-head"><h2>${title}</h2>${action2}</div>`;
+  var action = (name, label = "Bekijk alles") => `<button type="button" class="p3-link" data-p3-action="${name}">${label}<span aria-hidden="true"> ›</span></button>`;
+  var meter = (value, label) => `<progress max="100" value="${Math.max(0, Math.min(100, value))}" aria-label="${escape(label)}"></progress>`;
+  function paymentsHtml(p, label, all = false, canOpen = () => false) {
+    const rows = paymentEvents(p);
+    return rows.slice(0, all ? rows.length : 6).map((e) => `<li${canOpen(e) ? "" : ' class="p3-payment"'}>${canOpen(e) ? `<button type="button" class="p3-payment p3-payment-button" data-p3-event="${escape(e.id)}">` : ""}<time datetime="${e.date}">${date(e.date)}</time><span class="p3-event-icon ${e.amountCents < 0 ? "out" : "in"}" aria-hidden="true">${e.amountCents < 0 ? "↗" : "↙"}</span><span class="p3-payment-copy"><strong>${escape(label(e))}</strong><small>${status(e.status)}${e.dateQuality === "estimated" ? " · Geschat" : ""}</small></span><strong class="${e.amountCents < 0 ? "" : "p3-positive"}">${e.amountCents > 0 ? "+ " : ""}${money2(e.amountCents)}</strong>${canOpen(e) ? "</button>" : ""}</li>`).join("") || '<li class="p3-empty">Geen gedateerde betalingen binnen deze periode.</li>';
+  }
+  function chartHtml(p, width = 720) {
+    width = Math.max(210, width);
+    const plotStart = 76, plotEnd = width - 24;
+    if (!(p == null ? void 0 : p.days.length)) return '<p class="p3-empty">Nog geen saldo-ontwikkeling beschikbaar. Stel je saldo en salarisdatum in.</p>';
+    const days = p.days, values = days.map((d) => d.expectedBalanceCents), lo = Math.min(0, p.bufferCents, ...values), hi = Math.max(p.bufferCents, ...values, 100), range = hi - lo || 1;
+    const chartHeight = width >= 440 ? 205 : 245, baseline = chartHeight - 40;
+    const x = (i) => plotStart + i * (plotEnd - plotStart) / Math.max(1, days.length - 1), y = (v) => baseline - (v - lo) / range * (baseline - 32);
+    const line = days.map((d, i) => `${i ? "L" : "M"}${x(i).toFixed(2)},${y(d.expectedBalanceCents).toFixed(2)}`).join(" ");
+    const ticks = [0, 1, 2, 3].map((i) => {
+      const v = lo + range * i / 3, yy = y(v);
+      return `<line x1="${plotStart}" x2="${plotEnd}" y1="${yy}" y2="${yy}" class="p3-gridline"/><text x="${plotStart - 5}" y="${yy + 4}" text-anchor="end">${money2(Math.round(v)).replace(",00", "")}</text>`;
+    }).join("");
+    const labels2 = [.../* @__PURE__ */ new Set([0, Math.floor((days.length - 1) / 2), days.length - 1])].map((i) => `<text x="${x(i)}" y="${chartHeight - 11}" text-anchor="${i === 0 ? "start" : i === days.length - 1 ? "end" : "middle"}">${date(days[i].date)}</text>`).join("");
+    const events = paymentEvents(p), points = days.map((d, i) => ({ d, i, events: events.filter((e) => e.date === d.date) })).filter(({ d, i, events: events2 }) => events2.length || d.date === p.minimumDate || i === 0 || i === days.length - 1);
+    const markers = points.map(({ d, i, events: events2 }) => {
+      const meaning = pointMeaning(events2, d.date === p.minimumDate), cx = x(i), cy = y(d.expectedBalanceCents);
+      const dot = meaning.income ? "p3-income" : meaning.expense ? "p3-expense" : "p3-neutral";
+      return `<g role="button" tabindex="0" data-p3-point="${d.date}" aria-label="${date(d.date)}: ${money2(d.expectedBalanceCents)} · ${meaning.label}" aria-pressed="false"><circle class="p3-hit" cx="${cx}" cy="${cy}" r="22" fill="transparent"/>${meaning.isMinimum ? `<rect class="p3-min" x="${cx - 7}" y="${cy - 7}" width="14" height="14" rx="2" transform="rotate(45 ${cx} ${cy})"/>` : ""}<circle cx="${cx}" cy="${cy}" r="${meaning.isMinimum ? 3 : 4}" class="${dot}"/>${meaning.income && meaning.expense ? `<circle cx="${cx}" cy="${cy}" r="8" class="p3-mixed"/>` : ""}${meaning.isMinimum ? `<text class="p3-min-label" x="${Math.max(plotStart, Math.min(plotEnd - 6, cx))}" y="${Math.max(15, cy - 16)}" text-anchor="${cx > (plotStart + plotEnd) / 2 ? "end" : "start"}">Minimum · ${date(d.date)}</text>` : ""}</g>`;
+    }).join("");
+    return `<div class="p3-chart"><svg viewBox="0 0 ${width} ${chartHeight}" role="group" aria-label="Verwachte saldo-ontwikkeling; selecteer een dag voor bedragen en gebeurtenissen">${ticks}<path d="${line} L${plotEnd},${baseline} L${plotStart},${baseline} Z" class="p3-area"/><line x1="${plotStart}" x2="${plotEnd}" y1="${y(p.bufferCents)}" y2="${y(p.bufferCents)}" class="p3-buffer-line"/><path d="${line}" class="p3-line"/>${markers}${labels2}</svg><div class="p3-chart-legend"><span>● Verwacht saldo / neutraal</span><span class="p3-income-key">● Inkomsten</span><span class="p3-expense-key">● Uitgaven</span><span>◇ Minimum</span><span>┄ Buffer ${money2(p.bufferCents)}</span></div><div class="p3-chart-controls"><label class="p3-day-select">Bekijk een dag <select data-p3-day aria-label="Dag in saldo-ontwikkeling">${days.map((d) => `<option value="${d.date}">${date(d.date)}</option>`).join("")}</select></label><div class="p3-point-detail" data-p3-point-detail aria-live="polite"></div></div></div>`;
+  }
+  function outlookHtml(p, profile, label, iconSvg2) {
+    var _a2;
+    if (!profile) return `<p class="p3-empty">Kies de primaire betaalrekening voor deze context. Er wordt geen willekeurige rekening gebruikt.</p>${action("accounts", "Rekening instellen")}`;
+    if (!p) return '<p class="p3-empty" role="status">Vooruitblik laden…</p>';
+    const v = liquidityView(p), kpi = (title, value, sub, icon, act = "") => `<${act ? 'button type="button"' : "article"} class="p3-kpi" ${act ? `data-p3-action="${act}"` : ""}><span class="p3-kpi-icon" aria-hidden="true">${iconSvg2(icon)}</span><span class="p3-kpi-copy"><span>${title}</span><strong>${value}</strong><small>${sub}</small></span></${act ? "button" : "article"}>`;
+    const warning = v.minimum !== null && v.minimum < v.buffer ? `<div class="p3-warning" role="status">${p.status !== "projected" ? `${status(p.status)} · ` : ""}Op ${date(v.minimumDate)} wordt ${money2(v.minimum)} verwacht. ${v.minimum < 0 ? "Dit is onder € 0. " : ""}Dat is ${money2(v.buffer - v.minimum)} onder je buffer van ${money2(v.buffer)}.</div>` : "";
+    const help = `<details class="p3-explanation"><summary>Hoe wordt Vrij na verplichtingen bepaald?</summary><p>P2 houdt rekening met bekende verplichtingen, budgetreserveringen en de ingestelde veiligheidsbuffer. Het spaardoel is een ingecalculeerd streven in de zakgeldplanning en wordt hier niet nogmaals afgetrokken. Periode: ${date(p.asOfDate)} tot en met ${date(p.horizon.endDate)}.</p></details>`;
+    const quality = p.reasons.length ? `<div class="p3-quality"><details><summary>${status(p.status)} · ${escape((_a2 = p.reasons[0]) == null ? void 0 : _a2.message)}</summary><ul>${[...new Set(p.reasons.map((r) => r.message))].map((message) => `<li>${escape(message)}</li>`).join("")}</ul></details><div class="p3-quality-actions">${action("settings", p.reasons.some((r) => r.code === "missing-reliable-horizon") ? "Salarisdatum instellen" : "Prognose instellen")}${v.balance === null ? action("balance", "Saldo instellen") : ""}</div></div>` : "";
+    return `<div class="p3-kpis">${kpi("Vrij na verplichtingen", money2(v.free), `${v.indicative && v.free !== null ? "Indicatie · " : ""}Spaardoel: ${money2(v.savings)}`, "income")}${kpi("Huidig saldo", v.balance === null ? "Saldo onbekend" : money2(v.balance), `${status(p.opening.status)} · ${date(p.opening.toDate || p.asOfDate)} · Saldo bijwerken`, "wallet", "balance")}${kpi("Laagste prognose", money2(v.minimum), `${date(v.minimumDate)} · ${status(p.status)}`, "chart")}${kpi("Buffer", money2(v.buffer), "Veiligheidsmarge · Instellen", "shield", "settings")}</div>${warning}<div class="p3-outlook-footer">${help}${quality}</div>`;
+  }
+  function yearHtml(year, getMonth) {
+    const v = yearView(year, getMonth), max = Math.max(1, ...v.months.filter((m) => !m.missing).flatMap((m) => [m.income, m.spent]));
+    return `${head(`Jaaroverzicht ${year}`, `<label class="p3-year-select">Jaar <select data-p3-year>${Array.from({ length: 11 }, (_, i) => year - 5 + i).map((y) => `<option ${y === year ? "selected" : ""}>${y}</option>`).join("")}</select></label>`)}<p class="p3-caption">Huishouden · bestaande maandprojecties${v.count < 12 ? ` · Onvolledig: ${v.count} van 12 maanden beschikbaar` : ""}. Open en toekomstige maanden zijn prognoses.</p><div class="p3-year-body"><div class="p3-year-kpis">${[["Totaal besteed", v.spent], ["Totaal inkomen", v.income], ["Totaal gespaard", v.saving], ["Gemiddeld per maand", v.average]].map(([title, value]) => `<div><span>${title}</span><strong>${money2(value)}</strong></div>`).join("")}</div><div class="p3-year-chart"><div class="p3-chart-legend"><span>■ Inkomsten</span><span class="p3-muted-key">■ Uitgaven</span></div><div class="p3-year-bars">${v.months.map((m) => `<div title="${m.key}: ${m.missing ? "Niet beschikbaar" : `inkomen ${money2(m.income)}, uitgaven ${money2(m.spent)}`}"><div class="p3-bar-pair">${m.missing ? "<span>—</span>" : `<i style="height:${Math.max(0, m.income / max * 100)}%"></i><i style="height:${Math.max(0, m.spent / max * 100)}%"></i>`}</div><span>${new Intl.DateTimeFormat("nl-NL", { month: "short", timeZone: "UTC" }).format(/* @__PURE__ */ new Date(m.key + "-01T12:00:00Z"))}</span></div>`).join("")}</div></div></div>`;
+  }
+  function createDashboard(deps) {
+    let controller = null, chartObserver = null, chartFrame = 0, selectedDay = null, lastChartWidth = 0;
+    let generation = 0, projection = null, filter = "salary", custom = "", context = "gezamenlijk", year = null, localPerson = "dion";
+    try {
+      const pref = JSON.parse(localStorage.getItem("finize-dashboard-context") || "null");
+      if ((pref == null ? void 0 : pref.context) === "persoonlijk") context = pref.context;
+      if (["dion", "dara"].includes(pref == null ? void 0 : pref.person)) localPerson = pref.person;
+    } catch (e) {
+    }
+    function owner() {
+      return context === "gezamenlijk" ? "gezamenlijk" : deps.personalRole() || localPerson;
+    }
+    function savePreference() {
+      try {
+        localStorage.setItem("finize-dashboard-context", JSON.stringify({ context, person: localPerson }));
+      } catch (e) {
+      }
+    }
+    function renderLower(root2) {
+      const data = deps.summary(owner());
+      root2.querySelector("[data-p3-summary]").innerHTML = `<section class="p3-panel p3-budget">${head("Budgetten", action("budgets"))}<p class="p3-caption">${escape(deps.monthLabel())} · ${escape(deps.ownerLabel(owner()))}</p><div class="p3-budget-body"><div class="p3-ring" style="--progress:${Math.max(0, Math.min(100, data.budget ? data.used / data.budget * 100 : 0))}%"><strong>${deps.eur(data.used)}</strong><span>van ${deps.eur(data.budget)}</span></div><dl><dt>Besteed</dt><dd>${deps.eur(data.used)}</dd><dt>Resterend</dt><dd>${deps.eur(data.budget - data.used)}</dd></dl></div></section><section class="p3-panel p3-allowance">${head("Zakgeld", action("allowance"))}<p class="p3-caption">Geplande verdeling</p>${data.allowances.map((p) => {
+        const share = allowanceShare(p.amount, data.allowanceDistribution);
+        return `<div class="p3-allowance-row"><strong>${escape(p.name)}</strong><span>${deps.eur(p.amount)} · ${share === null ? "Verdeling niet beschikbaar" : new Intl.NumberFormat("nl-NL", { maximumFractionDigits: 1 }).format(share) + "%"}</span>${share === null ? "" : meter(share, "Aandeel " + p.name)}</div>`;
+      }).join("")}</section><section class="p3-panel p3-goals">${head("Spaardoelen", action("goals"))}<div class="p3-goal-list">${data.goals.slice(0, 2).map((g) => {
+        const target = Number(g.doel.doelbedrag) || 0, saved = Number(g.doel.algespaard) || 0, progress = target > 0 ? saved / target * 100 : 0;
+        return `<div class="p3-goal">${deps.goalIcon(g.doel)}<div><strong>${escape(g.doel.naam)}</strong><span>${deps.eur(saved)} / ${deps.eur(target)} · ${Math.round(progress)}%</span>${meter(progress, g.doel.naam)}</div></div>`;
+      }).join("") || '<p class="p3-empty">Nog geen spaardoelen in deze context.</p>'}</div></section>`;
+      root2.querySelector("[data-p3-year-panel]").innerHTML = yearHtml(year, deps.getMonth);
+    }
+    function showDay(root2, day) {
+      if (!projection) return;
+      const d = projection.days.find((d2) => d2.date === day);
+      if (!d) return;
+      selectedDay = day;
+      root2.querySelectorAll("g[data-p3-point]").forEach((point) => point.setAttribute("aria-pressed", String(point.dataset.p3Point === day)));
+      root2.querySelector("[data-p3-day]").value = day;
+      root2.querySelector("[data-p3-point-detail]").innerHTML = `<strong>${date(day)} · ${money2(d.expectedBalanceCents)}</strong><span>${paymentEvents(projection).filter((e) => e.date === day).map((e) => `${escape(deps.eventLabel(e))}: ${money2(e.amountCents)} (${status(e.status)})`).join(" · ") || "Geen concrete betaling"}${d.estimatedBudgetCents ? ` · Budgetschatting ${money2(d.estimatedBudgetCents)}` : ""}</span>`;
+    }
+    function unmount() {
+      ++generation;
+      controller == null ? void 0 : controller.abort();
+      chartObserver == null ? void 0 : chartObserver.disconnect();
+      chartObserver = null;
+      if (chartFrame) cancelAnimationFrame(chartFrame);
+      chartFrame = 0;
+      lastChartWidth = 0;
+      projection = null;
+    }
+    function drawChart(root2, force = false) {
+      var _a2, _b, _c;
+      const host = root2.querySelector("[data-p3-chart]");
+      if (!host || !root2.isConnected || !projection) return;
+      const width = host.getBoundingClientRect().width;
+      if (width <= 0 || !force && Math.abs(width - lastChartWidth) < 0.5) return;
+      const focused = document.activeElement, focusDay = host.contains(focused) ? (_a2 = focused.dataset) == null ? void 0 : _a2.p3Point : null;
+      const focusSelect = host.contains(focused) && focused.matches("[data-p3-day]");
+      lastChartWidth = width;
+      host.innerHTML = chartHtml(projection, width);
+      if (projection.days.length) showDay(root2, projection.days.some((day) => day.date === selectedDay) ? selectedDay : projection.days[0].date);
+      if (focusDay) (_b = [...host.querySelectorAll("[data-p3-point]")].find((point) => point.dataset.p3Point === focusDay)) == null ? void 0 : _b.focus({ preventScroll: true });
+      else if (focusSelect) (_c = host.querySelector("[data-p3-day]")) == null ? void 0 : _c.focus({ preventScroll: true });
+    }
+    function observeChart(root2) {
+      const schedule = () => {
+        if (chartFrame) return;
+        chartFrame = requestAnimationFrame(() => {
+          chartFrame = 0;
+          drawChart(root2);
+        });
+      };
+      if (typeof ResizeObserver === "function") {
+        chartObserver = new ResizeObserver(schedule);
+        chartObserver.observe(root2.querySelector("[data-p3-chart]"));
+      } else window.addEventListener("resize", schedule, { signal: controller.signal });
+    }
+    async function load(root2) {
+      const token = ++generation;
+      projection = null;
+      const profile = primaryAccount(deps.profiles(), owner());
+      root2.querySelector("[data-p3-outlook]").innerHTML = outlookHtml(null, profile, deps.eventLabel, deps.iconSvg);
+      root2.querySelector("[data-p3-chart]").innerHTML = '<p class="p3-empty">Saldo-ontwikkeling laden…</p>';
+      root2.querySelector("[data-p3-payments]").innerHTML = "";
+      root2.querySelector("[data-p3-period]").textContent = "Prognoseperiode laden…";
+      lastChartWidth = 0;
+      if (!profile) {
+        root2.querySelector("[data-p3-period]").textContent = forecastPeriod(null);
+        root2.querySelector("[data-p3-chart]").innerHTML = chartHtml(null);
+        root2.querySelector("[data-p3-payments]").innerHTML = '<li class="p3-empty">Stel eerst je rekening in.</li>';
+        return;
+      }
+      try {
+        const p = await deps.project({ accountProfileId: profile.id, asOfDate: deps.today(), endDate: horizonEnd(filter, deps.today(), custom) });
+        if (token !== generation || !root2.isConnected) return;
+        projection = p;
+        root2.querySelector("[data-p3-outlook]").innerHTML = outlookHtml(p, profile, deps.eventLabel, deps.iconSvg);
+        root2.querySelector("[data-p3-period]").textContent = forecastPeriod(p);
+        drawChart(root2, true);
+        root2.querySelector("[data-p3-payments]").innerHTML = paymentsHtml(p, deps.eventLabel, false, deps.canOpenEvent);
+      } catch (e) {
+        if (token !== generation || !root2.isConnected) return;
+        root2.querySelector("[data-p3-outlook]").innerHTML = `<p class="p3-empty" role="status">${escape(e.message)}</p>${action("settings", "Prognose instellen")}`;
+        root2.querySelector("[data-p3-period]").textContent = forecastPeriod(null);
+        root2.querySelector("[data-p3-chart]").innerHTML = chartHtml(null);
+        root2.querySelector("[data-p3-payments]").innerHTML = '<li class="p3-empty">Betalingen konden niet worden geladen.</li>';
+      }
+    }
+    return { unmount, mount(root2) {
+      unmount();
+      controller = new AbortController();
+      const signal = controller.signal;
+      year != null ? year : year = Number(deps.month().slice(0, 4));
+      root2.classList.add("p3-dashboard");
+      root2.insertAdjacentHTML("beforeend", `<div class="p3-surface"><section class="p3-panel p3-outlook"><div class="p3-toolbar"><div><h2>Vooruitblik</h2><p class="p3-caption">Je verwachte saldo en aankomende betalingen.</p></div><div class="p3-context" role="group" aria-label="Dashboardcontext">${["gezamenlijk", "persoonlijk"].map((c) => `<button type="button" data-p3-context="${c}" aria-pressed="${context === c}">${c === "gezamenlijk" ? "Gezamenlijk" : "Persoonlijk"}</button>`).join("")}</div>${!deps.personalRole() ? `<label class="p3-person" ${context === "gezamenlijk" ? "hidden" : ""}>Persoon <select data-p3-person><option value="dion" ${localPerson === "dion" ? "selected" : ""}>Dion</option><option value="dara" ${localPerson === "dara" ? "selected" : ""}>Dara</option></select></label>` : ""}<div class="p3-filters" role="group" aria-label="Prognoseperiode">${[["salary", "Volgende salaris"], ["7", "7 dagen"], ["14", "14 dagen"], ["month", "Einde maand"], ["custom", "Eigen datum"]].map(([value, title]) => `<button type="button" data-p3-filter="${value}" aria-pressed="${filter === value}">${title}</button>`).join("")}</div></div><label class="p3-custom" ${filter === "custom" ? "" : "hidden"}>Tot en met <input type="date" data-p3-custom min="${deps.today()}" value="${custom}" required></label><div data-p3-outlook></div></section><div class="p3-main"><section class="p3-panel">${head("Saldo-ontwikkeling")}<p class="p3-period" data-p3-period aria-live="polite"></p><p class="p3-caption">Verwacht saldo · ongedateerde budgetuitgaven zijn gelijkmatig geschat.</p><div data-p3-chart></div></section><section class="p3-panel">${head("Komende betalingen", action("payments"))}<ul class="p3-payments" data-p3-payments></ul></section></div><div class="p3-summary" data-p3-summary></div><section class="p3-panel p3-year" data-p3-year-panel></section></div>`);
+      renderLower(root2);
+      observeChart(root2);
+      load(root2);
+      root2.addEventListener("keydown", (e) => {
+        const point = e.target.closest("g[data-p3-point]");
+        if (point && ["Enter", " "].includes(e.key)) {
+          e.preventDefault();
+          showDay(root2, point.dataset.p3Point);
+        }
+      }, { signal });
+      root2.addEventListener("click", (e) => {
+        var _a2;
+        const point = e.target.closest("g[data-p3-point]");
+        if (point) showDay(root2, point.dataset.p3Point);
+        const button = e.target.closest("button");
+        if (!button) return;
+        if (button.dataset.p3Context) {
+          context = button.dataset.p3Context;
+          savePreference();
+          root2.querySelectorAll("[data-p3-context]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.p3Context === context)));
+          const person = root2.querySelector(".p3-person");
+          if (person) person.hidden = context === "gezamenlijk";
+          renderLower(root2);
+          load(root2);
+        }
+        if (button.dataset.p3Filter) {
+          filter = button.dataset.p3Filter;
+          root2.querySelectorAll("[data-p3-filter]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.p3Filter === filter)));
+          root2.querySelector(".p3-custom").hidden = filter !== "custom";
+          if (filter === "custom" && !custom) {
+            ++generation;
+            projection = null;
+            root2.querySelector("[data-p3-period]").textContent = "Kies een einddatum";
+            root2.querySelector("[data-p3-outlook]").innerHTML = '<p class="p3-empty" role="status">Kies een einddatum voor je prognose.</p>';
+            root2.querySelector("[data-p3-chart]").innerHTML = chartHtml(null);
+            root2.querySelector("[data-p3-payments]").innerHTML = '<li class="p3-empty">Kies eerst een einddatum.</li>';
+            root2.querySelector("[data-p3-custom]").focus();
+          } else load(root2);
+        }
+        if (button.dataset.p3Event) {
+          const event2 = paymentEvents(projection).find((e2) => e2.id === button.dataset.p3Event);
+          if (event2) deps.openEvent(event2);
+        }
+        if (button.dataset.p3Point) showDay(root2, button.dataset.p3Point);
+        if (button.dataset.p3Action) {
+          const profile = primaryAccount(deps.profiles(), owner());
+          switch (button.dataset.p3Action) {
+            case "balance":
+              deps.balance(profile == null ? void 0 : profile.id);
+              break;
+            case "settings":
+              profile ? deps.settings(profile.id) : deps.balance();
+              break;
+            case "accounts":
+              deps.balance();
+              break;
+            case "payments":
+              deps.modal(`<h2>Betalingen binnen je prognoseperiode</h2><p>${date(projection == null ? void 0 : projection.asOfDate)} tot en met ${date((_a2 = projection == null ? void 0 : projection.horizon) == null ? void 0 : _a2.endDate)}</p><ul class="p3-payments">${projection ? paymentsHtml(projection, deps.eventLabel, true, deps.canOpenEvent) : "<li>Stel eerst je prognose in.</li>"}</ul>`, (id) => {
+                const event2 = paymentEvents(projection).find((e2) => e2.id === id);
+                if (event2) deps.openEvent(event2);
+              });
+              break;
+            case "goals":
+              deps.navigate("spaardoelen");
+              break;
+            default:
+              deps.navigate(owner());
+          }
+        }
+      }, { signal });
+      root2.addEventListener("change", (e) => {
+        if (e.target.matches("[data-p3-custom]") && e.target.reportValidity()) {
+          custom = e.target.value;
+          load(root2);
+        }
+        if (e.target.matches("[data-p3-person]")) {
+          localPerson = e.target.value;
+          savePreference();
+          renderLower(root2);
+          load(root2);
+        }
+        if (e.target.matches("[data-p3-day]")) showDay(root2, e.target.value);
+        if (e.target.matches("[data-p3-year]")) {
+          year = Number(e.target.value);
+          root2.querySelector("[data-p3-year-panel]").innerHTML = yearHtml(year, deps.getMonth);
+        }
+      }, { signal });
+    } };
+  }
+
+  // src/core/account-profiles.mjs
+  var ACCOUNT_OWNERS = Object.freeze(["gezamenlijk", "dion", "dara"]);
+  var ACCOUNT_TYPES = Object.freeze(["payment", "savings"]);
+  var normalizeAccountIban = (value) => String(value != null ? value : "").toUpperCase().replace(/\s/g, "");
+  var accountIsArchived = (profile) => (profile == null ? void 0 : profile.status) === "archived";
+  var availableAccountProfiles = (profiles, current = "") => (profiles || []).filter((profile) => !accountIsArchived(profile) || profile.id === current);
+  var same2 = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  var fail2 = (code, message) => Object.assign(new Error(message), { code });
+  function validDutchIban(value) {
+    const iban3 = normalizeAccountIban(value);
+    if (!/^NL\d{2}[A-Z]{4}\d{10}$/.test(iban3)) return false;
+    let remainder = 0;
+    for (const char of iban3.slice(4) + iban3.slice(0, 4)) {
+      const digits = /[A-Z]/.test(char) ? String(char.charCodeAt(0) - 55) : char;
+      for (const digit of digits) remainder = (remainder * 10 + Number(digit)) % 97;
+    }
+    return remainder === 1;
+  }
+  function accountHasReferences(state2, profile, imports = []) {
+    const identifier = normalizeAccountIban(profile.identifier || profile.iban);
+    const seen = /* @__PURE__ */ new Set();
+    function referenced(value) {
+      if (typeof value === "string") return value === profile.id || Boolean(identifier && normalizeAccountIban(value) === identifier);
+      if (!value || typeof value !== "object" || seen.has(value)) return false;
+      seen.add(value);
+      return Object.values(value).some(referenced);
+    }
+    return Object.entries(state2).some(([key, value]) => !["accountProfiles", "meta", "__finizePeriodContext"].includes(key) && referenced(value)) || referenced(imports);
+  }
+  function validateProfile(profile, previous, profiles) {
+    validateLiquiditySettings(profile, profiles);
+    if (typeof profile.id !== "string" || !profile.id || !String(profile.name || "").trim() || String(profile.name).length > 100) throw fail2("invalid-account-name", "Vul een herkenbare rekeningnaam van maximaal 100 tekens in.");
+    if (String(profile.bank || "").length > 100) throw fail2("invalid-account-bank", "Gebruik maximaal 100 tekens voor de banknaam.");
+    if (!ACCOUNT_OWNERS.includes(profile.accountOwner)) throw fail2("invalid-account-owner", "Kies Gezamenlijk, Dion of Dara als eigenaar.");
+    if ((!previous || profile.accountType !== previous.accountType) && !ACCOUNT_TYPES.includes(profile.accountType)) throw fail2("invalid-account-type", "Kies betaalrekening of spaarrekening.");
+    if ((!previous || profile.status !== previous.status) && !["active", "archived"].includes(profile.status)) throw fail2("invalid-account-status", "Kies een geldige rekeningstatus.");
+    if (!previous || profile.identifier !== previous.identifier) {
+      if (!validDutchIban(profile.identifier)) throw fail2("invalid-iban", "Vul een geldig Nederlands IBAN in, inclusief de juiste controlecijfers.");
+      if (profiles.some((other) => other.id !== profile.id && normalizeAccountIban(other.identifier || other.iban) === normalizeAccountIban(profile.identifier)))
+        throw fail2("duplicate-iban", "Dit IBAN hoort al bij een rekening. Open die rekening of activeer haar opnieuw.");
+    }
+  }
+  function assertAccountProfileMutation(before, after, { imports = [] } = {}) {
+    var _a2;
+    const previous = new Map((before.accountProfiles || []).map((profile) => [profile.id, profile]));
+    const next = after.accountProfiles || [];
+    if (new Set(next.map((profile) => profile.id)).size !== next.length) throw fail2("duplicate-account-id", "Een rekening-ID komt dubbel voor.");
+    for (const [id] of previous) if (!next.some((profile) => profile.id === id)) throw fail2("account-delete-blocked", "Archiveer de rekening; bestaande rekeningprofielen mogen niet worden verwijderd.");
+    for (const profile of next) {
+      const old = previous.get(profile.id);
+      if (same2(old, profile)) continue;
+      validateProfile(profile, old, next);
+      if (old && (old.identifier !== profile.identifier || old.accountOwner !== profile.accountOwner || old.iban !== profile.iban)) {
+        if (before.__finizePartialHistory && !((_a2 = before.__finizePeriodContext) == null ? void 0 : _a2.explicitFullHistory))
+          throw fail2("account-history-incomplete", "Laad eerst de volledige historie voordat je IBAN of eigenaar wijzigt.");
+        if (accountHasReferences(before, old, imports)) throw fail2("account-identity-in-use", "Deze rekening heeft historie of verwijzingen. IBAN en eigenaar blijven behouden. Voeg voor een andere bankrekening een nieuw profiel toe.");
+      }
+    }
+    const archived = new Set(next.filter(accountIsArchived).map((profile) => profile.id));
+    const oldTransactions = new Map((before.transactions || []).map((row) => [row.id, row]));
+    const approved = (row) => ["goedgekeurd", "niet-meetellen"].includes(getTransactionProcessingStatus(row || {}));
+    for (const row of after.transactions || []) {
+      if (!archived.has(row.accountProfileId)) continue;
+      const old = oldTransactions.get(row.id);
+      if (row.recordRole === "bank-source" ? !old || !approved(old) && approved(row) : !old && !(before.transactions || []).some((source) => source.recordRole === "bank-source" && source.bankSourceId === row.bankSourceId && approved(source)))
+        throw fail2("account-archived", "Heractiveer de rekening voordat je nieuwe transacties of bankmutaties toevoegt.");
+    }
+  }
+  function applyAccountProfileCommand(state2, command, { imports = [] } = {}) {
+    if (typeof (command == null ? void 0 : command.operationId) !== "string" || !command.operationId || typeof command.id !== "string" || !command.id || !Number.isFinite(Date.parse(command.createdAt))) throw fail2("invalid-account-command", "De opslagactie mist een geldige identiteit of vastlegtijd. Open het formulier opnieuw.");
+    const profiles = state2.accountProfiles || [], old = profiles.find((profile2) => profile2.id === command.id);
+    const signature2 = JSON.stringify([command.type, command.id, command.values || {}]);
+    if ((old == null ? void 0 : old.lastAccountOperationId) === command.operationId) {
+      if (old.lastAccountOperationSignature !== signature2) throw fail2("account-operation-conflict", "Deze opslagactie is al voor andere rekeninggegevens gebruikt.");
+      return old;
+    }
+    if (command.type === "create" ? Boolean(old) : !old || !same2(old, command.expectedProfile))
+      throw fail2("account-profile-conflict", "De rekening is intussen gewijzigd. Open de actuele rekening opnieuw; je invoer blijft in dit formulier staan.");
+    let profile;
+    if (["create", "update"].includes(command.type)) {
+      const values = command.values || {};
+      profile = {
+        ...old,
+        id: command.id,
+        name: String(values.name || "").trim(),
+        bank: String(values.bank || "").trim(),
+        identifier: command.type === "update" && values.identifier === old.identifier ? old.identifier : normalizeAccountIban(values.identifier),
+        accountOwner: values.accountOwner,
+        accountType: values.accountType,
+        status: (old == null ? void 0 : old.status) || "active",
+        csvFormat: (old == null ? void 0 : old.csvFormat) || "ing",
+        createdAt: (old == null ? void 0 : old.createdAt) || command.createdAt,
+        updatedAt: command.createdAt
+      };
+      if ((old == null ? void 0 : old.iban) && profile.identifier !== old.identifier) profile.iban = profile.identifier;
+    } else if (command.type === "liquidity-settings") {
+      const values = command.values || {};
+      profile = { ...old, liquidity: { version: 1, primaryForOwner: values.primaryForOwner, bufferCents: values.bufferCents, salaryDays: structuredClone(values.salaryDays) }, updatedAt: command.createdAt };
+    } else if (["archive", "reactivate"].includes(command.type)) profile = { ...old, status: command.type === "archive" ? "archived" : "active", updatedAt: command.createdAt };
+    else throw fail2("invalid-account-command", "Deze rekeningactie wordt niet ondersteund.");
+    profile.lastAccountOperationId = command.operationId;
+    profile.lastAccountOperationSignature = signature2;
+    const candidate = { ...state2, accountProfiles: old ? profiles.map((item) => item.id === old.id ? profile : item) : [...profiles, profile] };
+    assertAccountProfileMutation(state2, candidate, { imports });
+    state2.accountProfiles = candidate.accountProfiles;
+    return profile;
+  }
+
+  // src/ui/account-balances.mjs
+  var escape2 = (value) => String(value != null ? value : "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
+  var euro = (value) => value === null ? "Onbekend" : new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR" }).format(value / 100);
+  var dateNL = (value) => /^\d{4}-\d{2}-\d{2}$/.test(value || "") ? value.split("-").reverse().join("-") : "Onbekend";
+  var recordedAt = (value) => Number.isFinite(Date.parse(value)) ? new Intl.DateTimeFormat("nl-NL", { dateStyle: "short", timeStyle: "short" }).format(new Date(value)) : "Onbekend";
+  var statusLabels = { confirmed: "Bevestigd", provisional: "Voorlopig", incomplete: "Onvolledig", unknown: "Onbekend" };
+  var reasons = {
+    "missing-checkpoint": "Voer eerst een werkelijk banksaldo met peildatum in.",
+    "awaiting-review": "Er staan bankmutaties bij Nakijken. Deze tellen voorlopig mee.",
+    "unknown-bank-coverage": "Niet bevestigd dat alle bankmutaties sinds het ijkpunt zijn aangeleverd.",
+    "partial-bank-coverage": "De bankgegevens dekken slechts een deel van deze periode.",
+    "possible-duplicate": "Een mogelijke dubbele bankbron wacht op een identiteitskeuze en telt niet mee.",
+    "unresolved-account-profile": "Een bankbron kan niet eenduidig aan deze fysieke rekening worden gekoppeld.",
+    "invalid-bank-source": "Een bron mist geldige bankgegevens en telt niet mee.",
+    "invalid-bank-amount": "Een bron heeft geen geldig bedrag in eurocenten en telt niet mee.",
+    "conflicting-bank-source": "Gegevens van dezelfde bankbron spreken elkaar tegen. De bron telt niet mee.",
+    "pending-bank-source": "Een reservering is nog niet geboekt en telt niet mee.",
+    "unknown-bank-status": "Een bron heeft een onbekende boekingsstatus en telt niet mee.",
+    "manual-without-bank-evidence": "Een handmatige registratie is geen aangetoonde bankmutatie en telt niet mee.",
+    "manual-transfer-unresolved": "Een handmatige overboeking heeft geen aangetoonde bankbron op deze fysieke rekening en telt niet mee.",
+    "missing-period": "Niet alle historische maanden vanaf het ijkpunt zijn beschikbaar.",
+    "imports-unavailable": "Importdetails konden niet worden geladen. Probeer opnieuw.",
+    "bank-sources-unavailable": "Bankbronnen konden niet volledig worden gelezen.",
+    "invalid-checkpoint-history": "De ijkpunthistorie bevat ongeldige gegevens.",
+    "duplicate-checkpoint-id": "Een ijkpunt-ID komt meer dan eenmaal voor.",
+    "invalid-checkpoint-revision": "Een correctie mist een geldige eerdere waarneming.",
+    "conflicting-checkpoint-revisions": "Er zijn tegenstrijdige waarnemingen voor dezelfde dag. Controleer de synchronisatie.",
+    "unsafe-balance-amount": "Dit bedrag is te groot om exact te berekenen.",
+    "invalid-balance-date": "De gevraagde datum is ongeldig."
+  };
+  function reasonMarkup(rows) {
+    return [...new Set(rows.map((row) => reasons[row.code] || "De rekeningstand is nog niet volledig controleerbaar."))].map((message) => `<li>${escape2(message)}</li>`).join("");
+  }
+  function createAccountBalanceUI({ getState, getScope, getImports, commit, today, actor }) {
+    const bound = /* @__PURE__ */ new WeakSet();
+    const render2 = () => '<section class="balance-panel" data-balance-panel aria-label="Rekeningstanden"><h3>Rekeningstanden</h3><p role="status">Rekeningstanden laden…</p></section>';
+    async function bind(rootElement, owner, selectedProfileId = "") {
+      const panel = rootElement.querySelector("[data-balance-panel]");
+      if (!panel || bound.has(panel)) return;
+      bound.add(panel);
+      const householdId = getScope().householdId;
+      let imports = [], importsAvailable = true;
+      try {
+        imports = await getImports();
+      } catch (e) {
+        importsAvailable = false;
+      }
+      if (!panel.isConnected || householdId !== getScope().householdId) return;
+      const options = () => ({ scope: getScope(), imports, importsAvailable, today: today() });
+      const ensureScope = () => {
+        if (householdId !== getScope().householdId) throw new Error("Het huishouden is gewijzigd. Open de rekening opnieuw.");
+      };
+      const refresh = () => {
+        ensureScope();
+        const state2 = getState(), profiles = (state2.accountProfiles || []).filter((profile) => selectedProfileId ? profile.id === selectedProfileId : !owner || profile.accountOwner === owner);
+        panel.innerHTML = `<h3>Rekeningstanden</h3><p class="hint">Gebruik het geboekte banksaldo aan het einde van een bankdag. Stand tot en met ${dateNL(today())}.</p>${profiles.length ? profiles.map((profile) => {
+          const projection = selectAccountBalance(state2, { ...options(), accountProfileId: profile.id, toDate: today() });
+          const history = checkpointHistory(state2, profile.id, getScope());
+          const active = new Set(history.active.map((row) => row.id));
+          return `<article class="balance-account" data-balance-account="${escape2(profile.id)}"><div class="u4-receipt-head"><div><h4>${escape2(profile.name || profile.bank || "Bankrekening")}</h4><p class="hint balance-identifier">${escape2(profile.identifier || "")}</p></div><div><strong class="balance-amount" data-balance-value>${euro(projection.balanceCents)}</strong><span class="balance-status" data-balance-status>${statusLabels[projection.status]}</span></div></div>
+          <p class="hint">${projection.checkpoint ? `Vanaf ijkpunt ${dateNL(projection.checkpoint.asOfDate)} · ${euro(projection.openingCents)}` : "Nog geen saldo-ijkpunt."}</p>
+          <details class="balance-explanation"><summary>Controle en herkomst</summary><p>Bankbronnen: ${statusLabels[projection.quality.bankSources] || "Onzeker"}. Dekking: ${{ complete: "bekend compleet", partial: "gedeeltelijk", unknown: "onbekend" }[projection.quality.coverage]}. Opslag: ${projection.quality.storage === "verified" ? "gegevens beschikbaar" : "afhankelijkheden ontbreken"}.</p><ul>${reasonMarkup(projection.reasons)}</ul><p>Bevestigde mutaties: ${euro(projection.confirmedCents)} · Voorlopige mutaties: ${euro(projection.provisionalCents)}.</p></details>
+          <div class="balance-actions"><button type="button" class="primary small" data-balance-add ${accountIsArchived(profile) ? "disabled" : ""}>${projection.checkpoint ? "Banksaldo bijwerken" : "Banksaldo invoeren"}</button>${accountIsArchived(profile) ? '<p class="hint">Heractiveer de rekening voor een nieuw banksaldo. Eerdere ijkpunten blijven raadpleegbaar en corrigeerbaar.</p>' : ""}</div>
+          <details class="balance-history"><summary>Eerdere ijkpunten (${history.rows.length})</summary>${history.rows.map((row) => {
+            var _a2, _b;
+            return `<div class="balance-history-row"><div><strong>${dateNL(row.asOfDate)} · ${euro(row.amountCents)}</strong><p class="hint">Revisie ${row.revision} · ${row.id === ((_a2 = projection.checkpoint) == null ? void 0 : _a2.id) ? "Huidig ijkpunt" : active.has(row.id) ? "Eerder ijkpunt" : "Vervangen"}<br>Vastgelegd ${escape2(recordedAt(row.createdAt))}${row.actor && row.actor === actor() ? " · Door jou" : ""}${row.supersedesId ? `<br>Correctie van revisie ${((_b = history.rows.find((previous) => previous.id === row.supersedesId)) == null ? void 0 : _b.revision) || "?"}` : ""}${row.note ? `<br>${escape2(row.note)}` : ""}</p></div>${active.has(row.id) ? `<button type="button" class="ghost small" data-balance-correct="${escape2(row.id)}">Corrigeren</button>` : ""}</div>`;
+          }).join("") || '<p class="hint">Nog geen waarnemingen.</p>'}</details><div data-balance-editor></div></article>`;
+        }).join("") : '<p class="hint">Nog geen rekeningprofiel. Gebruik de bestaande CSV-import om een rekeningprofiel te koppelen.</p>'}`;
+      };
+      refresh();
+      panel.addEventListener("click", (event2) => {
+        var _a2;
+        const button = event2.target.closest("[data-balance-add],[data-balance-correct]");
+        if (!button) return;
+        try {
+          ensureScope();
+          const account = button.closest("[data-balance-account]"), accountProfileId = account.dataset.balanceAccount;
+          const old = button.dataset.balanceCorrect ? (getState().balanceCheckpoints || []).find((row) => row.id === button.dataset.balanceCorrect) : null;
+          panel.querySelectorAll("[data-balance-editor]").forEach((editor2) => editor2.replaceChildren());
+          const editor = account.querySelector("[data-balance-editor]"), operationId = crypto.randomUUID(), createdAt = (/* @__PURE__ */ new Date()).toISOString();
+          let command = null, locked = false;
+          editor.innerHTML = `<form class="balance-form" data-balance-form><h4>${old ? "Banksaldo corrigeren" : "Banksaldo invoeren"}</h4><p class="hint">Bedrag en peildatum gaan over het geboekte saldo aan het einde van die dag. Mutaties op die dag zitten er al in.</p>
+          <div class="balance-fields"><label>Banksaldo (€)<input name="amount" data-balance-amount type="number" step="0.01" inputmode="decimal" required value="${old ? old.amountCents / 100 : ""}"></label><label>Peildatum<input name="date" data-balance-date type="date" required max="${today()}" value="${old ? old.asOfDate : today()}"></label></div>
+          <label>Toelichting (optioneel)<textarea name="note" data-balance-note rows="2" maxlength="1000">${escape2((old == null ? void 0 : old.note) || "")}</textarea></label>
+          <p role="alert" data-balance-error></p><div data-balance-comparison aria-live="polite"></div><div class="balance-actions"><button type="submit" class="primary" data-balance-check>Controleer saldo</button><button type="button" class="primary" data-balance-confirm hidden>Bevestig banksaldo</button><button type="button" class="ghost" data-balance-cancel>Annuleren</button></div></form>`;
+          const form = editor.querySelector("form"), error2 = form.querySelector("[data-balance-error]"), confirm2 = form.querySelector("[data-balance-confirm]");
+          form.querySelector("[data-balance-amount]").focus();
+          const invalidate = () => {
+            command = null;
+            confirm2.hidden = true;
+            form.querySelector("[data-balance-comparison]").replaceChildren();
+          };
+          form.addEventListener("input", () => {
+            if (!locked) invalidate();
+          });
+          form.querySelector("[data-balance-cancel]").onclick = () => {
+            if (!locked) {
+              editor.replaceChildren();
+              button.focus();
+            }
+          };
+          form.onsubmit = async (event3) => {
+            event3.preventDefault();
+            if (locked) return;
+            try {
+              ensureScope();
+              invalidate();
+              error2.textContent = "";
+              if (!form.reportValidity()) return;
+              imports = await getImports();
+              importsAvailable = true;
+              ensureScope();
+              const amountText = form.elements.amount.value;
+              if (!amountText) throw new Error("Vul het banksaldo in.");
+              command = {
+                operationId,
+                createdAt,
+                accountProfileId,
+                amountCents: decimalAmountToCents(Number(amountText)),
+                asOfDate: form.elements.date.value,
+                note: form.elements.note.value,
+                actor: actor() || null,
+                supersedesId: (old == null ? void 0 : old.id) || null
+              };
+              const prepared = prepareBalanceCheckpoint(getState(), command, options());
+              const comparison = prepared.reconciliation;
+              command.previewSignature = prepared.previewSignature;
+              form.querySelector("[data-balance-comparison]").innerHTML = `<div class="balance-comparison"><h4>Controleer de waarneming</h4><dl><div><dt>Verwachte stand</dt><dd>${euro(comparison.expectedCents)}</dd></div><div><dt>Ingevoerd banksaldo</dt><dd>${euro(comparison.observedCents)}</dd></div><div><dt>Controleverschil</dt><dd>${euro(comparison.differenceCents)}</dd></div></dl><ul>${reasonMarkup(comparison.reasons)}</ul><p>${old ? "Deze correctie vervangt het gekozen ijkpunt; de eerdere waarneming blijft bewaard." : "Dit banksaldo wordt het nieuwe uitgangspunt vanaf de peildatum."} Een controleverschil maakt geen transactie aan.</p></div>`;
+              confirm2.hidden = false;
+              confirm2.focus();
+            } catch (e) {
+              command = null;
+              error2.textContent = e.message;
+            }
+          };
+          confirm2.onclick = async () => {
+            var _a3;
+            if (!command || locked) return;
+            locked = true;
+            [...form.elements].forEach((input) => input.disabled = true);
+            let uncertain = false;
+            try {
+              ensureScope();
+              imports = await getImports();
+              importsAvailable = true;
+              ensureScope();
+              const intent = { ...command, confirmed: true }, context = options();
+              const saved = await commit((state2) => {
+                ensureScope();
+                applyBalanceCheckpoint(state2, intent, context);
+              }, { operationId, render: false, throwOnError: true });
+              if (!saved) throw new Error("Opslaan is afgebroken. De waarneming is niet bevestigd.");
+              ensureScope();
+              refresh();
+              (_a3 = panel.querySelector(`[data-balance-account="${CSS.escape(accountProfileId)}"] [data-balance-add]`)) == null ? void 0 : _a3.focus();
+            } catch (e) {
+              uncertain = e.commitOutcome === "uncertain";
+              error2.textContent = uncertain ? "Opslaguitkomst onzeker. Herlaad de app voordat je opnieuw probeert; een bevestigde waarneming blijft bewaard." : e.message;
+              if (e.code === "balance-confirmation-required") invalidate();
+            } finally {
+              if (form.isConnected && !uncertain) {
+                locked = false;
+                [...form.elements].forEach((input) => input.disabled = false);
+              }
+            }
+          };
+        } catch (e) {
+          (_a2 = panel.querySelector("[data-balance-panel-error]")) == null ? void 0 : _a2.remove();
+          panel.insertAdjacentHTML("beforeend", `<p role="alert" data-balance-panel-error>${escape2(e.message)}</p>`);
+        }
+      });
+    }
+    return { render: render2, bind, project: (options) => selectAccountBalance(getState(), { scope: getScope(), toDate: today(), ...options }) };
+  }
+
+  // src/ui/liquidity-settings.mjs
+  var escape3 = (value) => String(value != null ? value : "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  function renderLiquiditySettings(profile) {
+    const config = profile.liquidity || {}, joint = profile.accountOwner === "gezamenlijk";
+    return `<section class="card liquidity-settings"><h3>Dagelijkse prognose</h3>
+    <form data-liquidity-form class="bank-account-form">
+    <label class="bank-account-archive-filter"><input type="checkbox" name="primaryForOwner" ${config.primaryForOwner ? "checked" : ""} ${profile.accountType !== "payment" ? "disabled" : ""}> Gebruik deze betaalrekening voor de maandplanning van ${joint ? "Gezamenlijk" : escape3(profile.accountOwner === "dion" ? "Dion" : "Dara")}</label>
+    <p class="hint">Deze keuze koppelt vaste lasten en budgetten zonder eigen rekeningkeuze aan deze fysieke rekening.</p>
+    <div class="bank-account-fields"><label>Veiligheidsbuffer (€)<input name="buffer" type="number" min="0" step="0.01" required inputmode="decimal" value="${liquidityBuffer(profile) / 100}"></label>
+    ${["dion", "dara"].map((person) => {
+      var _a2, _b;
+      return `<label>Salaris ${person === "dion" ? "Dion" : "Dara"}: betaaldag op deze rekening<input name="salary-${person}" type="number" min="1" max="31" step="1" inputmode="numeric" value="${escape3((_b = (_a2 = config.salaryDays) == null ? void 0 : _a2[person]) != null ? _b : "")}"></label>`;
+    }).join("")}</div>
+    <p class="hint">Vul alleen een bevestigde maandelijkse betaaldag in (1–31). Leeg betekent onbekend of niet op deze rekening. In een kortere maand gebruiken we de laatste dag. Dit wijzigt geen salarisbedragen. ${joint ? "De standaardbuffer voor de primaire gezamenlijke betaalrekening is € 200." : ""}</p>
+    <p role="alert" data-liquidity-error></p><div class="bank-account-actions"><button class="primary" type="submit">Prognose-instellingen opslaan</button></div></form></section>`;
+  }
+  function bindLiquiditySettings(panel, profile, { save, ensureScope, onOpen }) {
+    const form = panel.querySelector("[data-liquidity-form]");
+    if (!form) return;
+    const operationId = crypto.randomUUID(), createdAt = (/* @__PURE__ */ new Date()).toISOString(), expectedProfile = structuredClone(profile);
+    let busy2 = false;
+    form.elements.primaryForOwner.onchange = () => {
+      if (profile.accountOwner === "gezamenlijk") form.elements.buffer.value = form.elements.primaryForOwner.checked ? "200" : "0";
+    };
+    form.onsubmit = async (event2) => {
+      event2.preventDefault();
+      if (busy2 || !form.reportValidity()) return;
+      const error2 = form.querySelector("[data-liquidity-error]");
+      error2.textContent = "";
+      try {
+        const values = { primaryForOwner: form.elements.primaryForOwner.checked, bufferCents: decimalAmountToCents(Number(form.elements.buffer.value)), salaryDays: {} };
+        for (const person of ["dion", "dara"]) if (form.elements["salary-" + person].value !== "") values.salaryDays[person] = Number(form.elements["salary-" + person].value);
+        busy2 = true;
+        form.querySelectorAll("input,button").forEach((el) => el.disabled = true);
+        ensureScope();
+        await save({ type: "liquidity-settings", id: profile.id, expectedProfile, values, operationId, createdAt });
+        ensureScope();
+        onOpen();
+      } catch (failure2) {
+        error2.textContent = failure2.commitOutcome === "uncertain" ? "Opslaguitkomst onzeker. Herlaad de app voordat je opnieuw probeert." : failure2.message;
+        if (failure2.commitOutcome !== "uncertain") {
+          busy2 = false;
+          form.querySelectorAll("input,button").forEach((el) => el.disabled = false);
+          form.elements.primaryForOwner.disabled = profile.accountType !== "payment";
+        }
+      }
+    };
+  }
+
+  // src/ui/bank-accounts.mjs
+  var escape4 = (value) => String(value != null ? value : "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
+  var labels = { payment: "Betaalrekening", savings: "Spaarrekening" };
+  var statuses = { confirmed: "Bevestigd", provisional: "Voorlopig", incomplete: "Onvolledig", unknown: "Onbekend" };
+  var euro2 = (value) => value === null ? "Onbekend" : new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR" }).format(value / 100);
+  var readableIban = (value) => String(value || "").replace(/\s/g, "").replace(/(.{4})/g, "$1 ").trim();
+  var maskedIban = (value) => value ? `${String(value).replace(/\s/g, "").slice(0, 4)} •••• ${String(value).replace(/\s/g, "").slice(-4)}` : "Rekeningkenmerk ontbreekt";
+  function createBankAccountsUI({ getState, getScope, getImports, balances, save, ownerLabel: ownerLabel2, onOpen, hasConflict, openConflicts }) {
+    let selected = "", showArchived = false, editing = false;
+    const overviewButton = () => '<button type="button" class="ghost" data-accounts-back>← Bankrekeningen</button>';
+    function open(id = "") {
+      selected = id;
+      editing = false;
+      onOpen();
+    }
+    function render2() {
+      return '<section class="bank-accounts" data-bank-accounts aria-label="Bankrekeningen"><p role="status">Bankrekeningen laden…</p></section>';
+    }
+    async function bind(container) {
+      const panel = container.querySelector("[data-bank-accounts]");
+      if (!panel) return;
+      const household = getScope();
+      const ensureScope = () => {
+        if (household !== getScope()) throw new Error("Het huishouden is gewijzigd. Open Bankrekeningen opnieuw.");
+      };
+      const imports = await getImports().catch(() => null);
+      if (!panel.isConnected || household !== getScope()) return;
+      const state2 = getState(), profile = (state2.accountProfiles || []).find((row) => row.id === selected);
+      const bindConflicts = () => {
+        if (hasConflict == null ? void 0 : hasConflict()) {
+          panel.insertAdjacentHTML("afterbegin", '<div role="status"><p>Er is een synchronisatieconflict. Beide versies zijn bewaard.</p><button type="button" class="ghost" data-accounts-conflicts>Synchronisatieconflicten bekijken</button></div>');
+          panel.querySelector("[data-accounts-conflicts]").onclick = openConflicts;
+        }
+      };
+      const back = '<button type="button" class="ghost" data-accounts-settings>← Instellingen</button>';
+      if (editing) {
+        renderForm(panel, profile, ensureScope);
+        return;
+      }
+      if (profile) {
+        panel.innerHTML = `${overviewButton()}<div class="bank-accounts-heading"><h2>${escape4(profile.name)}</h2><span>${accountIsArchived(profile) ? "Gearchiveerd" : "Actief"}</span></div>
+        <section class="card bank-account-details"><div class="card-head"><h3>Rekeninggegevens</h3></div><dl class="u6-settings-list">
+        <div><dt>Bank</dt><dd>${escape4(profile.bank || "Onbekend")}</dd></div><div><dt>IBAN / kenmerk</dt><dd>${escape4(readableIban(profile.identifier))}</dd></div>
+        <div><dt>Eigenaar</dt><dd>${escape4(ownerLabel2(profile.accountOwner))}</dd></div><div><dt>Type</dt><dd>${labels[profile.accountType] || "Nog niet ingesteld"}</dd></div></dl>
+        <div class="bank-account-actions"><button type="button" class="primary" data-account-edit>Rekening bewerken</button><button type="button" class="ghost" data-account-status>${accountIsArchived(profile) ? "Rekening heractiveren" : "Rekening archiveren"}</button></div>
+        <p role="alert" data-account-error></p><div data-account-archive-confirm hidden><p>De rekening blijft met alle historie bewaard. Voor nieuwe imports en banksaldo’s moet je haar eerst heractiveren.</p><button type="button" class="primary" data-account-archive>Bevestig archiveren</button><button type="button" class="ghost" data-account-archive-cancel>Annuleren</button></div></section>
+        ${renderLiquiditySettings(profile)}${balances.render()}`;
+        panel.querySelector("[data-accounts-back]").onclick = () => open();
+        panel.querySelector("[data-account-edit]").onclick = () => {
+          editing = true;
+          onOpen();
+        };
+        const statusCommand = { type: accountIsArchived(profile) ? "reactivate" : "archive", id: profile.id, expectedProfile: structuredClone(profile), operationId: crypto.randomUUID(), createdAt: (/* @__PURE__ */ new Date()).toISOString() };
+        let busy2 = false;
+        const changeStatus = async () => {
+          if (busy2) return;
+          busy2 = true;
+          panel.querySelectorAll("button").forEach((button) => button.disabled = true);
+          try {
+            ensureScope();
+            await save(statusCommand);
+            ensureScope();
+            onOpen();
+          } catch (error2) {
+            panel.querySelector("[data-account-error]").textContent = error2.message;
+            if (error2.commitOutcome !== "uncertain") {
+              busy2 = false;
+              panel.querySelectorAll("button").forEach((button) => button.disabled = false);
+            }
+          }
+        };
+        panel.querySelector("[data-account-status]").onclick = () => accountIsArchived(profile) ? changeStatus() : panel.querySelector("[data-account-archive-confirm]").hidden = false;
+        panel.querySelector("[data-account-archive]").onclick = changeStatus;
+        panel.querySelector("[data-account-archive-cancel]").onclick = () => panel.querySelector("[data-account-archive-confirm]").hidden = true;
+        bindLiquiditySettings(panel, profile, { save, ensureScope, onOpen });
+        bindConflicts();
+        await balances.bind(panel, null, profile.id);
+        return;
+      }
+      selected = "";
+      const profiles = showArchived ? state2.accountProfiles || [] : availableAccountProfiles(state2.accountProfiles);
+      panel.innerHTML = `${back}<div class="bank-accounts-heading"><h2>Bankrekeningen</h2><button type="button" class="primary" data-account-add>Bankrekening toevoegen</button></div>
+      <label class="bank-account-archive-filter"><input type="checkbox" data-accounts-archived ${showArchived ? "checked" : ""}> Toon gearchiveerde rekeningen</label>
+      ${!profiles.length ? '<p class="hint">Nog geen actieve bankrekeningen. Voeg je eerste bankrekening toe.</p>' : ""}
+      ${ACCOUNT_OWNERS.map((owner) => {
+        const rows = profiles.filter((row) => row.accountOwner === owner);
+        return rows.length ? `<section class="bank-account-group"><h3>${escape4(ownerLabel2(owner))}</h3><div class="bank-account-list">${rows.map((row) => {
+          const projection = balances.project({ accountProfileId: row.id, imports: imports || [], importsAvailable: imports !== null });
+          return `<button type="button" class="card bank-account-row" data-account-open="${escape4(row.id)}"><span><strong>${escape4(row.name || "Bankrekening")}</strong><span>${escape4(row.bank || "Bank onbekend")} · ${escape4(maskedIban(row.identifier))}</span><span>${labels[row.accountType] || "Type nog niet ingesteld"} · ${accountIsArchived(row) ? "Gearchiveerd" : "Actief"}</span></span><span class="bank-account-row-balance"><strong>${euro2(projection.balanceCents)}</strong><span>${projection.checkpoint ? statuses[projection.status] : "Nog geen saldo-ijkpunt"}</span></span></button>`;
+        }).join("")}</div></section>` : "";
+      }).join("")}`;
+      panel.querySelector("[data-accounts-settings]").onclick = () => {
+        selected = "";
+        onOpen("settings");
+      };
+      panel.querySelector("[data-account-add]").onclick = () => {
+        selected = "";
+        editing = true;
+        onOpen();
+      };
+      panel.querySelector("[data-accounts-archived]").onchange = (event2) => {
+        showArchived = event2.target.checked;
+        onOpen();
+      };
+      panel.querySelectorAll("[data-account-open]").forEach((button) => button.onclick = () => open(button.dataset.accountOpen));
+      bindConflicts();
+    }
+    function renderForm(panel, profile, ensureScope) {
+      const option = (value, label, current) => `<option value="${value}" ${value === current ? "selected" : ""}>${escape4(label)}</option>`;
+      panel.innerHTML = `${overviewButton()}<section class="card bank-account-details"><h2>${profile ? "Rekening bewerken" : "Bankrekening toevoegen"}</h2>
+      <form class="bank-account-form" data-account-form><div class="bank-account-fields">
+      <label>Rekeningnaam<input name="name" maxlength="100" required value="${escape4((profile == null ? void 0 : profile.name) || "")}"></label>
+      <label>Banknaam (optioneel)<input name="bank" maxlength="100" value="${escape4((profile == null ? void 0 : profile.bank) || "")}"></label>
+      <label class="bank-account-iban-field">IBAN<input name="identifier" required autocomplete="off" spellcheck="false" value="${escape4((profile == null ? void 0 : profile.identifier) || "")}"></label>
+      <label>Eigenaar<select name="accountOwner" required>${!profile ? '<option value="">Kies eigenaar</option>' : ""}${ACCOUNT_OWNERS.map((owner) => option(owner, ownerLabel2(owner), profile == null ? void 0 : profile.accountOwner)).join("")}</select></label>
+      <label>Rekeningtype<select name="accountType" required>${!(profile == null ? void 0 : profile.accountType) ? '<option value="">Kies rekeningtype</option>' : ""}${Object.entries(labels).map(([type, label]) => option(type, label, profile == null ? void 0 : profile.accountType)).join("")}</select></label></div>
+      <p class="hint">Wijzig een IBAN alleen om een invoerfout te herstellen. Een andere fysieke bankrekening voeg je als nieuwe rekening toe. Bij bestaande historie kunnen IBAN en eigenaar niet worden gewijzigd.</p>
+      <p role="alert" data-account-error></p><div class="bank-account-actions"><button type="submit" class="primary">Rekening opslaan</button><button type="button" class="ghost" data-account-cancel>Annuleren</button></div></form></section>`;
+      const form = panel.querySelector("form"), operationId = crypto.randomUUID(), id = (profile == null ? void 0 : profile.id) || "account-" + crypto.randomUUID(), createdAt = (/* @__PURE__ */ new Date()).toISOString();
+      let locked = false, uncertain = false;
+      const cancel = () => {
+        if (!locked) {
+          editing = false;
+          onOpen();
+        }
+      };
+      panel.querySelector("[data-accounts-back]").onclick = cancel;
+      panel.querySelector("[data-account-cancel]").onclick = cancel;
+      form.elements.name.focus();
+      form.onsubmit = async (event2) => {
+        event2.preventDefault();
+        if (locked || !form.reportValidity()) return;
+        const values = Object.fromEntries(new FormData(form));
+        locked = true;
+        panel.querySelectorAll("button,input,select").forEach((element) => element.disabled = true);
+        const feedback = panel.querySelector("[data-account-error]");
+        feedback.textContent = "";
+        try {
+          ensureScope();
+          await save({ type: profile ? "update" : "create", id, values, operationId, createdAt, expectedProfile: profile ? structuredClone(profile) : null });
+          ensureScope();
+          selected = id;
+          editing = false;
+          onOpen();
+        } catch (error2) {
+          uncertain = error2.commitOutcome === "uncertain";
+          feedback.textContent = uncertain ? "Opslaguitkomst onzeker. Herlaad de app voordat je opnieuw probeert." : error2.message;
+        } finally {
+          if (form.isConnected && !uncertain) {
+            locked = false;
+            panel.querySelectorAll("button,input,select").forEach((element) => element.disabled = false);
+          }
+        }
+      };
+    }
+    return { open, render: render2, bind };
   }
 
   // src/storage/migration-backups.mjs
   var MIGRATION_BACKUP_DB = "finize-migration-backups";
   var STORE = "originals";
-  var bytes = (text) => new TextEncoder().encode(text);
-  async function backupDigest(text, cryptoApi = globalThis.crypto) {
-    const hash = await cryptoApi.subtle.digest("SHA-256", bytes(text));
+  var bytes = (text2) => new TextEncoder().encode(text2);
+  async function backupDigest(text2, cryptoApi = globalThis.crypto) {
+    const hash = await cryptoApi.subtle.digest("SHA-256", bytes(text2));
     return [...new Uint8Array(hash)].map((value) => value.toString(16).padStart(2, "0")).join("");
   }
   function createMigrationBackupStore({ indexedDB: indexedDB2 = globalThis.indexedDB, crypto: crypto2 = globalThis.crypto, now = () => (/* @__PURE__ */ new Date()).toISOString() } = {}) {
@@ -1933,12 +3790,12 @@
       });
       return database;
     }
-    async function operation(mode2, action) {
+    async function operation(mode2, action2) {
       const db = await open();
       return new Promise((resolve, reject) => {
         const transaction = db.transaction(STORE, mode2);
         let result2;
-        const request2 = action(transaction.objectStore(STORE));
+        const request2 = action2(transaction.objectStore(STORE));
         request2.onsuccess = () => {
           result2 = request2.result;
         };
@@ -1982,15 +3839,15 @@
     return Object.freeze({ persist: persist2, get, list: list2 });
   }
   function readLegacyMigrationBackup(storage, key) {
-    const text = key && storage.getItem(key);
-    return text ? JSON.parse(text) : null;
+    const text2 = key && storage.getItem(key);
+    return text2 ? JSON.parse(text2) : null;
   }
 
   // src/storage/state-backups.mjs
   var STATE_BACKUP_DB = "finize-state-backups";
   function createStateBackupStore({ indexedDB: indexedDB2 = globalThis.indexedDB, crypto: crypto2 = globalThis.crypto, now = () => (/* @__PURE__ */ new Date()).toISOString() } = {}) {
     let opening;
-    async function operation(mode2, action) {
+    async function operation(mode2, action2) {
       if (!indexedDB2) throw new Error("IndexedDB is niet beschikbaar; noodback-up niet bevestigd.");
       opening || (opening = new Promise((resolve, reject) => {
         const request2 = indexedDB2.open(STATE_BACKUP_DB, 1);
@@ -2011,7 +3868,7 @@
       }));
       const db = await opening;
       return new Promise((resolve, reject) => {
-        const tx = db.transaction("snapshots", mode2), request2 = action(tx.objectStore("snapshots"));
+        const tx = db.transaction("snapshots", mode2), request2 = action2(tx.objectStore("snapshots"));
         let result2;
         request2.onsuccess = () => {
           result2 = request2.result;
@@ -2069,16 +3926,16 @@
 
   // src/storage/period-projections.mjs
   var PERIOD_PROJECTION_VERSION = 1;
-  var canonical = (value) => JSON.stringify(value, (_, item) => item && typeof item === "object" && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).sort().map((key) => [key, item[key]])) : item);
-  var digest = (value) => backupDigest(typeof value === "string" ? value : canonical(value));
+  var canonical2 = (value) => JSON.stringify(value, (_, item) => item && typeof item === "object" && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).sort().map((key) => [key, item[key]])) : item);
+  var digest = (value) => backupDigest(typeof value === "string" ? value : canonical2(value));
   var storageError = (code, message) => Object.assign(new Error(message), { code, storageFailure: true });
   var validMonth2 = (month) => /^\d{4}-(0[1-9]|1[0-2])$/.test(month);
   var dimensions = ["accountCashflow", "externalHouseholdCashflow", "incomeImpact", "realExpense", "budgetImpact", "fixedRealization", "savingsDeposit", "savingsWithdrawal", "goalDelta", "savingsFunded", "unusedSavings", "refundCashflow", "advanceRepaymentEffect"];
-  var cents3 = (value) => Math.round(Number(value) * 100);
+  var cents4 = (value) => Math.round(Number(value) * 100);
   function periodFinancials(state2, month, { applicationProjection } = {}) {
     var _a2;
     if (!validMonth2(month)) throw storageError("invalid-period", "Ongeldige financiële periode.");
-    const totalsCents = Object.fromEntries(dimensions.map((dimension) => [dimension, cents3(sumTransactionEffects(state2, dimension, { month }))]));
+    const totalsCents = Object.fromEntries(dimensions.map((dimension) => [dimension, cents4(sumTransactionEffects(state2, dimension, { month }))]));
     const categories = Object.fromEntries(["gezamenlijk", "dion", "dara"].map((owner) => [owner, categoryFinancialActuals(state2, month, owner)]));
     const forecast = financialForecastForMonth(state2, month);
     return {
@@ -2150,21 +4007,21 @@
     }
     return {
       version: PERIOD_PROJECTION_VERSION,
-      totalsCents: Object.fromEntries(dimensions.map((dimension) => [dimension, cents3(projections ? sumProjectionEffects(projections, dimension) : sumTransactionEffects(state2, dimension))])),
+      totalsCents: Object.fromEntries(dimensions.map((dimension) => [dimension, cents4(projections ? sumProjectionEffects(projections, dimension) : sumTransactionEffects(state2, dimension))])),
       goals,
       bankSourceCount: selectBankTransactions(state2).length,
       approvedEffectCount: (projections || selectTransactionProjections(state2)).length
     };
   }
-  async function verifiedPeriodResult(head, document2, records, globalDocument) {
+  async function verifiedPeriodResult(head2, document2, records, globalDocument) {
     var _a2;
-    if (!head || head.phase !== "ready") throw storageError("cloud-pending", "De cloudpublicatie is nog niet volledig bevestigd.");
-    if (!document2 || document2.projectionVersion !== PERIOD_PROJECTION_VERSION || ((_a2 = head.periodHashes) == null ? void 0 : _a2[document2.month]) !== await digest(document2)) throw storageError("period-incomplete", "De financiële periode ontbreekt of is niet geverifieerd. Ontbrekende historie is geen nul.");
-    if (!globalDocument || head.globalHash !== await digest(globalDocument)) throw storageError("period-incomplete", "De cumulatieve financiële projectie ontbreekt.");
+    if (!head2 || head2.phase !== "ready") throw storageError("cloud-pending", "De cloudpublicatie is nog niet volledig bevestigd.");
+    if (!document2 || document2.projectionVersion !== PERIOD_PROJECTION_VERSION || ((_a2 = head2.periodHashes) == null ? void 0 : _a2[document2.month]) !== await digest(document2)) throw storageError("period-incomplete", "De financiële periode ontbreekt of is niet geverifieerd. Ontbrekende historie is geen nul.");
+    if (!globalDocument || head2.globalHash !== await digest(globalDocument)) throw storageError("period-incomplete", "De cumulatieve financiële projectie ontbreekt.");
     const actual = records.map((row) => ({ id: row.id, hash: row.hash })).sort((a, b) => a.id.localeCompare(b.id));
-    if (canonical(actual) !== canonical(document2.dependencies)) throw storageError("period-incomplete", "Een vereiste bankbron, effectregel of historische afhankelijkheid ontbreekt.");
+    if (canonical2(actual) !== canonical2(document2.dependencies)) throw storageError("period-incomplete", "Een vereiste bankbron, effectregel of historische afhankelijkheid ontbreekt.");
     for (const record of records) if (await digest(record.payload) !== record.hash) throw storageError("record-integrity", "Een financieel record heeft een afwijkende hash.");
-    return { month: document2.month, epoch: head.epoch, revision: head.revision, verified: true, financials: JSON.parse(document2.payload), cumulative: JSON.parse(globalDocument.payload), records: structuredClone(records), recordCount: records.length, fullHistoryLoaded: false };
+    return { month: document2.month, epoch: head2.epoch, revision: head2.revision, verified: true, financials: JSON.parse(document2.payload), cumulative: JSON.parse(globalDocument.payload), records: structuredClone(records), recordCount: records.length, fullHistoryLoaded: false };
   }
 
   // src/storage/record-manifest.mjs
@@ -2183,17 +4040,17 @@
     const root2 = (prefix) => digest(Object.fromEntries(Object.entries(hashes).filter(([id]) => id.startsWith(prefix))));
     return { stateHash: await root2("s"), importsHash: await root2("i") };
   }
-  async function verifyRecordManifests(head, records, manifests) {
-    if (!head.manifestHashes) throw storageError("manifest-missing", "Deze cloudversie vereist eerst een gecontroleerde manifestmigratie.");
-    const computed = await recordManifests(records, Object.keys(head.manifestHashes));
-    if (canonical(computed.manifestHashes) !== canonical(head.manifestHashes)) throw storageError("record-integrity", "De recordmanifesten sluiten niet aan op de canonieke bronnen.");
+  async function verifyRecordManifests(head2, records, manifests) {
+    if (!head2.manifestHashes) throw storageError("manifest-missing", "Deze cloudversie vereist eerst een gecontroleerde manifestmigratie.");
+    const computed = await recordManifests(records, Object.keys(head2.manifestHashes));
+    if (canonical2(computed.manifestHashes) !== canonical2(head2.manifestHashes)) throw storageError("record-integrity", "De recordmanifesten sluiten niet aan op de canonieke bronnen.");
     for (const expected of computed.manifests) {
       const stored = manifests.find((row) => row.id === expected.id);
-      if (!stored || await digest(stored) !== head.manifestHashes[expected.id]) throw storageError("record-integrity", "Een geverifieerd recordmanifest ontbreekt.");
+      if (!stored || await digest(stored) !== head2.manifestHashes[expected.id]) throw storageError("record-integrity", "Een geverifieerd recordmanifest ontbreekt.");
     }
-    if (head.integrityMode === "manifest") {
-      const roots = await manifestRoots(head.manifestHashes);
-      if (roots.stateHash !== head.stateHash || roots.importsHash !== head.importsHash) throw storageError("record-integrity", "De administratie wijkt af van het manifestcontract.");
+    if (head2.integrityMode === "manifest") {
+      const roots = await manifestRoots(head2.manifestHashes);
+      if (roots.stateHash !== head2.stateHash || roots.importsHash !== head2.importsHash) throw storageError("record-integrity", "De administratie wijkt af van het manifestcontract.");
     }
   }
 
@@ -2201,10 +4058,10 @@
   var RECORD_STORAGE_VERSION = 2;
   var MAX_RECORD_PAYLOAD = 18e4;
   var clone2 = (value) => structuredClone(value);
-  function parts(text) {
+  function parts(text2) {
     const result2 = [];
     let part = "", bytes3 = 0;
-    for (const char of text) {
+    for (const char of text2) {
       const n = new TextEncoder().encode(char).length;
       if (bytes3 + n > MAX_RECORD_PAYLOAD) {
         result2.push(part);
@@ -2234,16 +4091,16 @@
     for (const record of encoded.records) {
       const ordinal = ordinals.get(record.collection) || 0;
       ordinals.set(record.collection, ordinal + 1);
-      const payload = canonical(record.value), chunks = parts(payload), key = await digest(record.id), source = rawSource(record.value), sourceHash = source ? await digest(source) : "";
+      const payload = canonical2(record.value), chunks = parts(payload), key = await digest(record.id), source = rawSource(record.value), sourceHash = source ? await digest(source) : "";
       const periods = record.collection === "transactions" ? months.filter((month) => dependencies.get(month).has(record.recordId)) : record.periods;
       for (let part = 0; part < chunks.length; part++) records.push({ id: key + "-" + part, logicalId: key, recordKey: record.id, collection: record.collection, recordId: record.recordId, kind: encoded.layout[record.collection].kind, ordinal, part, partCount: chunks.length, logicalHash: await digest(payload), payload: chunks[part], hash: await digest(chunks[part]), sourceHash, periods, removed: false });
     }
     const periodDocuments = [];
     for (const month of months) {
-      const selected = records.filter((row) => row.periods.includes(month)), payload = canonical(periodFinancials(state2, month, options));
+      const selected = records.filter((row) => row.periods.includes(month)), payload = canonical2(periodFinancials(state2, month, options));
       periodDocuments.push({ id: month, month, projectionVersion: 1, payload, dependencies: selected.map((row) => ({ id: row.id, hash: row.hash })).sort((a, b) => a.id.localeCompare(b.id)) });
     }
-    const global = { id: "financial", projectionVersion: 1, payload: canonical(cumulativeFinancials(state2)) };
+    const global = { id: "financial", projectionVersion: 1, payload: canonical2(cumulativeFinancials(state2)) };
     const layout = Object.fromEntries(Object.entries(encoded.layout).map(([key, value]) => [key, value.kind]));
     const settings = { id: "settings", dependencies: records.filter((row) => row.collection !== "transactions" && !row.collection.startsWith("@") && !row.periods.length).map((row) => ({ id: row.id, hash: row.hash })).sort((a, b) => a.id.localeCompare(b.id)) };
     return { records, periods: periodDocuments, global, settings, settingsHash: await digest(settings), ...await recordManifests(records), layout, stateHash: await digest(state2), importsHash: await digest(imports), recordCount: records.length, importCount: imports.length, periodHashes: Object.fromEntries(await Promise.all(periodDocuments.map(async (row) => [row.month, await digest(row)]))), globalHash: await digest(global) };
@@ -2268,20 +4125,20 @@
     }
     return decoded;
   }
-  async function decodeRecordSnapshot(head, records) {
+  async function decodeRecordSnapshot(head2, records) {
     const decoded = await decodeRecordValues(records);
     const layout = {};
-    for (const [key, kind] of Object.entries(head.layout)) {
+    for (const [key, kind] of Object.entries(head2.layout)) {
       layout[key] = kind === "list" ? { kind, ids: decoded.filter((row) => row.collection === key).sort((a, b) => a.ordinal - b.ordinal).map((row) => row.recordId) } : { kind };
     }
-    if (records.filter((row) => !row.removed).length !== head.recordCount) throw storageError("record-integrity", "Het aantal financiële records wijkt af.");
+    if (records.filter((row) => !row.removed).length !== head2.recordCount) throw storageError("record-integrity", "Het aantal financiële records wijkt af.");
     const expanded = decodeHouseholdState({ storageVersion: 1, schemaVersion: 11, layout }, decoded), imports = expanded["@imports"] || [];
     delete expanded["@imports"];
     for (const batch of imports) {
       batch.rows = expanded["@rows:" + batch.id] || [];
       delete expanded["@rows:" + batch.id];
     }
-    if (head.integrityMode !== "manifest" && (await digest(expanded) !== head.stateHash || await digest(imports) !== head.importsHash)) throw storageError("record-integrity", "De teruggelezen administratie of importhistorie wijkt af.");
+    if (head2.integrityMode !== "manifest" && (await digest(expanded) !== head2.stateHash || await digest(imports) !== head2.importsHash)) throw storageError("record-integrity", "De teruggelezen administratie of importhistorie wijkt af.");
     return { state: expanded, imports };
   }
   function recordChanges(previous, next) {
@@ -2290,9 +4147,9 @@
     for (const path of /* @__PURE__ */ new Set([...a.keys(), ...b.keys()])) {
       const before = a.get(path) || null, value = b.get(path) || null;
       if ((before == null ? void 0 : before.sourceHash) && value && before.sourceHash !== value.sourceHash) throw storageError("source-immutable", "Onveranderlijke bankbron of CSV-bron gewijzigd.");
-      if (canonical(before) === canonical(value)) continue;
+      if (canonical2(before) === canonical2(value)) continue;
       const after = value || { ...before, removed: true, periods: [] };
-      if (canonical(before) === canonical(after)) continue;
+      if (canonical2(before) === canonical2(after)) continue;
       result2.push({ id: path.replace("/", "_"), path, before, after });
     }
     return result2;
@@ -2364,7 +4221,7 @@
     let baseline = (state2 == null ? void 0 : state2.__finizePartialHistory) ? (_b = (_a2 = state2.__finizePeriodContext) == null ? void 0 : _a2.ledgerBaseline) == null ? void 0 : _b[goalId] : 0;
     if ((state2 == null ? void 0 : state2.__finizePartialHistory) && baseline === void 0 && ((_c = state2.__finizePeriodContext) == null ? void 0 : _c.explicitFullHistory) && !Object.values(JSON.parse(state2.__finizePeriodContext.global.payload).goals || {}).flat().some((goal) => goal.id === goalId)) baseline = 0;
     if ((state2 == null ? void 0 : state2.__finizePartialHistory) && !Number.isFinite(baseline)) throw Object.assign(new Error("De geverifieerde historische spaardoelbasis ontbreekt."), { code: "period-incomplete" });
-    return round2(Number(baseline || 0) + ((state2 == null ? void 0 : state2.savingsGoalLedger) || []).filter((entry) => entry.goalId === goalId).reduce((sum, entry) => sum + contributionAmount(entry), 0));
+    return round2(Number(baseline || 0) + ((state2 == null ? void 0 : state2.savingsGoalLedger) || []).filter((entry) => entry.goalId === goalId).reduce((sum2, entry) => sum2 + contributionAmount(entry), 0));
   }
   function reconcileGoalSavedAmounts(state2, goalIds = null) {
     const selected = goalIds ? new Set(goalIds) : null;
@@ -2423,11 +4280,12 @@
     list(target, "accountProfiles");
     ensureStableRowIds(target.accountProfiles, "accountProfiles");
     target.accountProfiles = target.accountProfiles.map((profile) => {
+      var _a2;
       const next = { ...profile };
       next.name = next.name || next.rekeningnaam || "Rekening";
       next.identifier = next.identifier || normalizeIban(next.iban);
       if (!next.accountOwner && OWNERS.includes(next.owner)) next.accountOwner = next.owner;
-      next.bank = next.bank || "ING";
+      next.bank = (_a2 = next.bank) != null ? _a2 : "ING";
       next.csvFormat = next.csvFormat || "ing";
       next.createdAt = next.createdAt || epoch;
       next.updatedAt = next.updatedAt || epoch;
@@ -2536,62 +4394,65 @@
   }
 
   // src/storage/period-workspace.mjs
-  var same = (a, b) => canonical(a) === canonical(b);
-  var copy4 = (value) => structuredClone(value);
-  var transactionGlobals = /* @__PURE__ */ new Set(["transactions", "meta", "spaardoelen", "savingsGoalLedger", "importSummaries", "activeImportId", "transactionReviewQueue", "recognitionRules", "advanceLedger", "advanceRepayments", "internalTransferPairs", "savingsCoverageAllocations", "manualTransactionReplacements", "monthRecords", "__finizePartialHistory", "verifiedPeriods", "__finizePeriodContext"]);
+  var same3 = (a, b) => canonical2(a) === canonical2(b);
+  var copy5 = (value) => structuredClone(value);
+  var transactionGlobals = /* @__PURE__ */ new Set(["transactions", "meta", "spaardoelen", "savingsGoalLedger", "importSummaries", "activeImportId", "transactionReviewQueue", "recognitionRules", "advanceLedger", "advanceRepayments", "internalTransferPairs", "savingsCoverageAllocations", "manualTransactionReplacements", "monthRecords", "balanceCheckpoints", "__finizePartialHistory", "verifiedPeriods", "__finizePeriodContext"]);
   function workspaceNeedsFullHistory(before, after) {
     const ids = (value) => Object.values(value.spaardoelen || {}).flatMap((rows) => rows.map((row) => row.id)).sort();
-    if (!same(ids(before), ids(after))) return true;
+    if (!same3(ids(before), ids(after))) return true;
     const life = (row) => (row == null ? void 0 : row.lifecycle) || ((row == null ? void 0 : row.status) === "teruggedraaid" ? "withdrawn" : "active");
     if ((before.importSummaries || []).some((row) => {
       const next = (after.importSummaries || []).find((value) => value.id === row.id);
       return !next || life(row) !== life(next);
     })) return true;
+    const identity = (profiles) => (profiles || []).map((profile) => ({ id: profile.id, identifier: profile.identifier, iban: profile.iban, accountOwner: profile.accountOwner }));
+    const sameAccountIdentity = same3(identity(before.accountProfiles), identity(after.accountProfiles));
     const loaded = new Set(before.verifiedPeriods || []);
     return [.../* @__PURE__ */ new Set([...Object.keys(before), ...Object.keys(after)])].some((key) => {
-      if (same(before[key], after[key]) || transactionGlobals.has(key)) return false;
+      if (same3(before[key], after[key]) || transactionGlobals.has(key)) return false;
+      if (key === "accountProfiles" && sameAccountIdentity) return false;
       return !key.startsWith("monthly") || !Object.keys({ ...before[key], ...after[key] }).filter((month) => {
         var _a2, _b;
-        return !same((_a2 = before[key]) == null ? void 0 : _a2[month], (_b = after[key]) == null ? void 0 : _b[month]);
+        return !same3((_a2 = before[key]) == null ? void 0 : _a2[month], (_b = after[key]) == null ? void 0 : _b[month]);
       }).every((month) => loaded.has(month));
     });
   }
   function mergeWorkspaceIntent(before, after, expanded, { strict = true } = {}) {
     function merge(a, b, current, path) {
-      if (same(a, b)) return copy4(current);
+      if (same3(a, b)) return copy5(current);
       const list2 = (value) => Array.isArray(value) && value.every((row) => typeof (row == null ? void 0 : row.id) === "string") && new Set(value.map((row) => row.id)).size === value.length;
       if (list2(a) && list2(b) && list2(current)) {
         const values = new Map(current.map((row) => [row.id, row])), old = new Map(a.map((row) => [row.id, row])), next = new Map(b.map((row) => [row.id, row]));
-        for (const id of /* @__PURE__ */ new Set([...old.keys(), ...next.keys()])) if (!same(old.get(id), next.get(id))) {
+        for (const id of /* @__PURE__ */ new Set([...old.keys(), ...next.keys()])) if (!same3(old.get(id), next.get(id))) {
           if (!next.has(id)) {
-            if (strict && !same(values.get(id), old.get(id))) throw storageError("storage-conflict", "Een afhankelijke regel wijzigde tijdens voorbereiden: " + path);
+            if (strict && !same3(values.get(id), old.get(id))) throw storageError("storage-conflict", "Een afhankelijke regel wijzigde tijdens voorbereiden: " + path);
             values.delete(id);
           } else values.set(id, merge(old.get(id), next.get(id), values.get(id), path + "." + id));
         }
         return [...values.values()];
       }
       if (a && b && current && typeof a === "object" && typeof b === "object" && typeof current === "object" && !Array.isArray(a) && !Array.isArray(b) && !Array.isArray(current)) {
-        const result3 = copy4(current);
-        for (const key of /* @__PURE__ */ new Set([...Object.keys(a), ...Object.keys(b)])) if (!same(a[key], b[key])) {
+        const result3 = copy5(current);
+        for (const key of /* @__PURE__ */ new Set([...Object.keys(a), ...Object.keys(b)])) if (!same3(a[key], b[key])) {
           if (!(key in b)) {
-            if (strict && !same(current[key], a[key])) throw storageError("storage-conflict", "Een verwijderde afhankelijkheid wijzigde: " + path + "." + key);
+            if (strict && !same3(current[key], a[key])) throw storageError("storage-conflict", "Een verwijderde afhankelijkheid wijzigde: " + path + "." + key);
             delete result3[key];
           } else result3[key] = merge(a[key], b[key], current[key], path + "." + key);
         }
         return result3;
       }
-      if (strict && !same(current, a)) throw storageError("storage-conflict", "Een afhankelijke waarde wijzigde tijdens voorbereiden: " + path);
-      return copy4(b);
+      if (strict && !same3(current, a)) throw storageError("storage-conflict", "Een afhankelijke waarde wijzigde tijdens voorbereiden: " + path);
+      return copy5(b);
     }
-    const result2 = copy4(expanded);
-    for (const key of /* @__PURE__ */ new Set([...Object.keys(before), ...Object.keys(after)])) if (!["meta", "__finizePartialHistory", "verifiedPeriods", "__finizePeriodContext"].includes(key) && !same(before[key], after[key])) {
+    const result2 = copy5(expanded);
+    for (const key of /* @__PURE__ */ new Set([...Object.keys(before), ...Object.keys(after)])) if (!["meta", "__finizePartialHistory", "verifiedPeriods", "__finizePeriodContext"].includes(key) && !same3(before[key], after[key])) {
       if (!(key in after)) delete result2[key];
       else result2[key] = merge(before[key], after[key], expanded[key], key);
     }
     return result2;
   }
   function completeDependencyState(state2) {
-    const result2 = copy4(state2);
+    const result2 = copy5(state2);
     delete result2.__finizePartialHistory;
     delete result2.__finizePeriodContext;
     delete result2.verifiedPeriods;
@@ -2604,13 +4465,13 @@
     state2.__finizePartialHistory = true;
     state2.verifiedPeriods = proof.periods.map((row) => row.month);
     state2.meta.selectedMonth = selectedMonth;
-    state2.__finizePeriodContext = copy4(proof);
+    state2.__finizePeriodContext = copy5(proof);
     return state2;
   }
   function refreshWorkspaceTotals(before, next) {
     if (!next.__finizePartialHistory) return;
     assertWorkspaceMutation(before, next);
-    const a = cumulativeFinancials(completeDependencyState(before)), b = cumulativeFinancials(completeDependencyState(next)), result2 = copy4(before.__finizePeriodContext.localCumulative || JSON.parse(before.__finizePeriodContext.global.payload));
+    const a = cumulativeFinancials(completeDependencyState(before)), b = cumulativeFinancials(completeDependencyState(next)), result2 = copy5(before.__finizePeriodContext.localCumulative || JSON.parse(before.__finizePeriodContext.global.payload));
     for (const key of Object.keys(result2.totalsCents)) result2.totalsCents[key] += b.totalsCents[key] - a.totalsCents[key];
     for (const key of ["bankSourceCount", "approvedEffectCount"]) result2[key] += b[key] - a[key];
     result2.goals = b.goals;
@@ -2620,18 +4481,18 @@
     var _a2, _b, _c;
     const a = new Map(encodeHouseholdState({ transactions: before.transactions, savingsGoalLedger: before.savingsGoalLedger }).records.map((row) => [row.id, row]));
     const b = new Map(encodeHouseholdState({ transactions: after.transactions, savingsGoalLedger: after.savingsGoalLedger }).records.map((row) => [row.id, row]));
-    const changed = [.../* @__PURE__ */ new Set([...a.keys(), ...b.keys()])].filter((id) => !same(a.get(id), b.get(id)));
+    const changed = [.../* @__PURE__ */ new Set([...a.keys(), ...b.keys()])].filter((id) => !same3(a.get(id), b.get(id)));
     const ids = new Set(changed.map((id) => JSON.parse(id)[1]));
     for (const key of ["internalTransferPairs", "savingsCoverageAllocations", "manualTransactionReplacements"]) {
       const old = new Map((before[key] || []).map((row) => [row.id, row]));
-      for (const ref of [...after[key] || [], ...before[key] || []]) if (!same(old.get(ref.id), (after[key] || []).find((row) => row.id === ref.id))) for (const id of [...ref.transactionIds || [], ref.withdrawalTransactionId, ref.expenseTransactionId, ref.manualTransactionId, ref.importedTransactionId].filter(Boolean)) ids.add(id);
+      for (const ref of [...after[key] || [], ...before[key] || []]) if (!same3(old.get(ref.id), (after[key] || []).find((row) => row.id === ref.id))) for (const id of [...ref.transactionIds || [], ref.withdrawalTransactionId, ref.expenseTransactionId, ref.manualTransactionId, ref.importedTransactionId].filter(Boolean)) ids.add(id);
     }
     const changedMonths = Object.keys({ ...before.monthRecords, ...after.monthRecords }).filter((month) => {
       var _a3, _b2;
-      return !same((_a3 = before.monthRecords) == null ? void 0 : _a3[month], (_b2 = after.monthRecords) == null ? void 0 : _b2[month]);
+      return !same3((_a3 = before.monthRecords) == null ? void 0 : _a3[month], (_b2 = after.monthRecords) == null ? void 0 : _b2[month]);
     });
     for (const key of /* @__PURE__ */ new Set([...Object.keys(before), ...Object.keys(after)])) if (key.startsWith("monthly")) {
-      for (const month of Object.keys({ ...before[key], ...after[key] })) if (/^\d{4}-\d{2}$/.test(month) && !same((_a2 = before[key]) == null ? void 0 : _a2[month], (_b = after[key]) == null ? void 0 : _b[month])) changedMonths.push(month);
+      for (const month of Object.keys({ ...before[key], ...after[key] })) if (/^\d{4}-\d{2}$/.test(month) && !same3((_a2 = before[key]) == null ? void 0 : _a2[month], (_b = after[key]) == null ? void 0 : _b[month])) changedMonths.push(month);
     }
     const direct = [...a.values(), ...b.values()].filter((row) => ids.has(row.recordId)).flatMap((row) => row.periods);
     return [.../* @__PURE__ */ new Set([...changedMonths, ...direct, ...changed.flatMap((id) => {
@@ -2644,7 +4505,7 @@
     const loaded = new Set(before.verifiedPeriods || []), needed = requiredMutationPeriods(before, after);
     if (needed.some((month) => !loaded.has(month))) throw storageError("dependency-required", "Laad eerst de afhankelijke financiële maanden: " + needed.filter((month) => !loaded.has(month)).join(", "));
     if (workspaceNeedsFullHistory(before, after) && !((_a2 = before.__finizePeriodContext) == null ? void 0 : _a2.explicitFullHistory)) throw storageError("full-history-required", "Deze bewerking vereist controle van globale planning, historische doelverwijzingen of een volledige importlevenscyclus.");
-    for (const key of ["internalTransferPairs", "savingsCoverageAllocations", "manualTransactionReplacements"]) if (!same(before[key], after[key])) {
+    for (const key of ["internalTransferPairs", "savingsCoverageAllocations", "manualTransactionReplacements"]) if (!same3(before[key], after[key])) {
       const ids = new Set((after.transactions || []).map((row) => row.id));
       for (const ref of after[key] || []) {
         if (ref.active === false) continue;
@@ -2656,14 +4517,14 @@
   function createPeriodWorkspace({ transport, context, loadPeriod, stageOperation, recover, applicationProjection }) {
     async function openWorkspace(months, { explicitFullHistory = false } = {}) {
       var _a2, _b, _c, _d, _e;
-      const c = await context(), head = c.head.data;
+      const c = await context(), head2 = c.head.data;
       if (explicitFullHistory) {
-        months = [.../* @__PURE__ */ new Set([...months, ...Object.keys(head.periodHashes)])];
+        months = [.../* @__PURE__ */ new Set([...months, ...Object.keys(head2.periodHashes)])];
         months = [.../* @__PURE__ */ new Set([...months, ...[...new Set(months.map((month) => month.slice(0, 4)))].flatMap((year) => Array.from({ length: 12 }, (_, i) => year + "-" + String(i + 1).padStart(2, "0")))])];
       }
-      if (!head.manifestHashes || !head.settingsHash) throw storageError("manifest-missing", "Een gecontroleerde eenmalige manifestmigratie is nodig.");
+      if (!head2.manifestHashes || !head2.settingsHash) throw storageError("manifest-missing", "Een gecontroleerde eenmalige manifestmigratie is nodig.");
       const settings = (_a2 = await transport.get(c.root + "/globals/settings")) == null ? void 0 : _a2.data;
-      if (!settings || await digest(settings) !== head.settingsHash) throw storageError("period-incomplete", "De vereiste instellingen zijn niet geverifieerd.");
+      if (!settings || await digest(settings) !== head2.settingsHash) throw storageError("period-incomplete", "De vereiste instellingen zijn niet geverifieerd.");
       const records = [];
       for (const dep of settings.dependencies) {
         const row = (_b = await transport.get(c.root + "/records/" + dep.id)) == null ? void 0 : _b.data;
@@ -2671,34 +4532,34 @@
         records.push(row);
       }
       const periods = [], emptyMonths = [], globalDocument = (_c = await transport.get(c.root + "/globals/financial")) == null ? void 0 : _c.data;
-      if (!globalDocument || await digest(globalDocument) !== head.globalHash) throw storageError("period-incomplete", "De cumulatieve basis is niet geverifieerd.");
+      if (!globalDocument || await digest(globalDocument) !== head2.globalHash) throw storageError("period-incomplete", "De cumulatieve basis is niet geverifieerd.");
       const global = JSON.parse(globalDocument.payload);
       for (const month of [...new Set(months)]) {
-        if (!head.periodHashes[month]) {
+        if (!head2.periodHashes[month]) {
           if ((await transport.query(c.root + "/records", { field: "periods", op: "ARRAY_CONTAINS", value: month })).length) throw storageError("period-incomplete", "Deze financiële maand heeft bronnen maar geen projectiebewijs.");
           emptyMonths.push(month);
           continue;
         }
         const result2 = await loadPeriod(month);
-        if (result2.revision !== head.revision || result2.epoch !== head.epoch) throw storageError("cloud-conflict", "De periodebasis wijzigde tijdens laden.");
+        if (result2.revision !== head2.revision || result2.epoch !== head2.epoch) throw storageError("cloud-conflict", "De periodebasis wijzigde tijdens laden.");
         for (const row of result2.records) if (!records.some((old) => old.id === row.id)) records.push(row);
         periods.push((await transport.get(c.root + "/periods/" + month)).data);
       }
       if (!months.length) throw storageError("invalid-period", "Kies ten minste één financiële maand.");
       const values = await decodeRecordValues(records), layout = {};
-      for (const [key, kind] of Object.entries(head.layout)) if (!key.startsWith("@")) layout[key] = kind === "list" ? { kind, ids: values.filter((row) => row.collection === key).sort((a, b) => a.ordinal - b.ordinal).map((row) => row.recordId) } : { kind };
+      for (const [key, kind] of Object.entries(head2.layout)) if (!key.startsWith("@")) layout[key] = kind === "list" ? { kind, ids: values.filter((row) => row.collection === key).sort((a, b) => a.ordinal - b.ordinal).map((row) => row.recordId) } : { kind };
       const state2 = decodeHouseholdState({ storageVersion: 1, schemaVersion: 11, layout }, values);
-      const emptyPeriod = (month) => ({ id: month, month, projectionVersion: 1, dependencies: [], payload: canonical(periodFinancials({ ...state2, transactions: [], savingsGoalLedger: state2.savingsGoalLedger.filter((row) => !row.month || row.month === month) }, month, { applicationProjection })) });
+      const emptyPeriod = (month) => ({ id: month, month, projectionVersion: 1, dependencies: [], payload: canonical2(periodFinancials({ ...state2, transactions: [], savingsGoalLedger: state2.savingsGoalLedger.filter((row) => !row.month || row.month === month) }, month, { applicationProjection })) });
       for (const month of emptyMonths) periods.push(emptyPeriod(month));
-      const proof = { epoch: head.epoch, revision: head.revision, head: copy4(head), records, periods, global: globalDocument, settings, imports: [], explicitFullHistory };
+      const proof = { epoch: head2.epoch, revision: head2.revision, head: copy5(head2), records, periods, global: globalDocument, settings, imports: [], explicitFullHistory };
       proof.emptyPeriods = emptyMonths;
       proof.summaries = {};
       for (const year of new Set(months.map((month) => month.slice(0, 4)))) for (let i = 1; i <= 12; i++) {
         const month = year + "-" + String(i).padStart(2, "0");
         let document2 = periods.find((row) => row.month === month);
-        if (!document2 && head.periodHashes[month]) {
+        if (!document2 && head2.periodHashes[month]) {
           document2 = (_d = await transport.get(c.root + "/periods/" + month)) == null ? void 0 : _d.data;
-          if (!document2 || await digest(document2) !== head.periodHashes[month]) throw storageError("period-incomplete", "Een vereiste Dashboard-projectie ontbreekt.");
+          if (!document2 || await digest(document2) !== head2.periodHashes[month]) throw storageError("period-incomplete", "Een vereiste Dashboard-projectie ontbreekt.");
         }
         if (!document2) {
           if ((await transport.query(c.root + "/records", { field: "periods", op: "ARRAY_CONTAINS", value: month })).length) throw storageError("period-incomplete", "Een maandbron heeft geen geverifieerde projectie.");
@@ -2706,12 +4567,12 @@
         }
         proof.summaries[month] = JSON.parse(document2.payload);
       }
-      proof.ledgerBaseline = Object.fromEntries(Object.values(global.goals || {}).flatMap((goals) => goals.map((goal) => [goal.id, Math.round(Number(goal.algespaard || 0) * 100) / 100 - (state2.savingsGoalLedger || []).filter((entry) => entry.goalId === goal.id).reduce((sum, entry) => sum + contributionAmount(entry), 0)])));
+      proof.ledgerBaseline = Object.fromEntries(Object.values(global.goals || {}).flatMap((goals) => goals.map((goal) => [goal.id, Math.round(Number(goal.algespaard || 0) * 100) / 100 - (state2.savingsGoalLedger || []).filter((entry) => entry.goalId === goal.id).reduce((sum2, entry) => sum2 + contributionAmount(entry), 0)])));
       state2.__finizePartialHistory = true;
       state2.verifiedPeriods = periods.map((row) => row.month);
       state2.meta.selectedMonth = months[0];
       state2.__finizePeriodContext = proof;
-      if (!same(head, (_e = await transport.get(c.root + "/meta/head")) == null ? void 0 : _e.data)) throw storageError("cloud-conflict", "De administratie wijzigde tijdens periodeladen.");
+      if (!same3(head2, (_e = await transport.get(c.root + "/meta/head")) == null ? void 0 : _e.data)) throw storageError("cloud-conflict", "De administratie wijzigde tijdens periodeladen.");
       return state2;
     }
     async function importRecords(id, c) {
@@ -2734,13 +4595,13 @@
       var _a2, _b;
       assertWorkspaceMutation(before, state2);
       const c = await context(), proof = before.__finizePeriodContext;
-      if (!proof || proof.epoch !== c.head.data.epoch || proof.revision !== c.head.data.revision || !same(proof.head, c.head.data)) throw storageError("cloud-conflict", "De geverifieerde periodebasis is verouderd; behoud de lokale bewerking.");
+      if (!proof || proof.epoch !== c.head.data.epoch || proof.revision !== c.head.data.revision || !same3(proof.head, c.head.data)) throw storageError("cloud-conflict", "De geverifieerde periodebasis is verouderd; behoud de lokale bewerking.");
       const selected = requiredMutationPeriods(before, state2);
       const affected = workspaceNeedsFullHistory(before, state2) ? state2.verifiedPeriods : selected.length ? selected : [state2.meta.selectedMonth];
       if (affected.some((month) => !state2.verifiedPeriods.includes(month))) throw storageError("dependency-required", "Niet alle wijzigingsafhankelijkheden zijn geladen.");
       const scratch = completeDependencyState(state2), oldState = completeDependencyState(before);
       const next = await buildRecordSnapshot(scratch, imports, { onlyPeriods: affected, applicationProjection });
-      const oldRecords = copy4(proof.records);
+      const oldRecords = copy5(proof.records);
       for (const batch of imports) for (const row of await importRecords(batch.id, c)) if (!oldRecords.some((old2) => old2.id === row.id)) oldRecords.push(row);
       const ordinals = new Map(oldRecords.map((row) => [row.logicalId, row.ordinal]));
       let ordinal = c.head.data.recordCount;
@@ -2752,13 +4613,13 @@
       }
       const old = { records: oldRecords, periods: proof.periods.filter((row) => affected.includes(row.month) && proof.head.periodHashes[row.month]), global: proof.global, settings: proof.settings };
       const changes = recordChanges(old, { ...next, manifests: [] });
-      const hashes = copy4(c.head.data.manifestHashes), buckets = /* @__PURE__ */ new Map();
+      const hashes = copy5(c.head.data.manifestHashes), buckets = /* @__PURE__ */ new Map();
       for (const change of changes.filter((row) => row.path.startsWith("records/"))) {
         const key = manifestBucket(change.after);
         if (!buckets.has(key)) {
           const stored = ((_a2 = await transport.get(c.root + "/manifests/" + key)) == null ? void 0 : _a2.data) || { id: key, entries: {} };
           if (hashes[key] && await digest(stored) !== hashes[key]) throw storageError("record-integrity", "Een gewijzigd recordmanifest wijkt af.");
-          buckets.set(key, { before: hashes[key] ? copy4(stored) : null, after: copy4(stored) });
+          buckets.set(key, { before: hashes[key] ? copy5(stored) : null, after: copy5(stored) });
         }
         const bucket = buckets.get(key);
         if (!change.before && !bucket.after.entries[change.after.id]) {
@@ -2781,10 +4642,10 @@
       for (const key of Object.keys(cumulative.totalsCents)) cumulative.totalsCents[key] += b.totalsCents[key] - a.totalsCents[key];
       for (const key of ["bankSourceCount", "approvedEffectCount"]) cumulative[key] += b[key] - a[key];
       cumulative.goals = b.goals;
-      const global = { id: "financial", projectionVersion: 1, payload: canonical(cumulative) };
+      const global = { id: "financial", projectionVersion: 1, payload: canonical2(cumulative) };
       const globalChange = changes.find((row) => row.path === "globals/financial");
       if (globalChange) globalChange.after = global;
-      else if (!same(global, proof.global)) changes.push({ id: "globals_financial", path: "globals/financial", before: proof.global, after: global });
+      else if (!same3(global, proof.global)) changes.push({ id: "globals_financial", path: "globals/financial", before: proof.global, after: global });
       const periodHashes = { ...c.head.data.periodHashes, ...next.periodHashes }, roots = await manifestRoots(hashes);
       const recordDelta = changes.filter((row) => row.path.startsWith("records/")).reduce((n, row) => n + (!row.before || row.before.removed ? 1 : 0) - (row.after.removed ? 1 : 0), 0);
       const importDelta = changes.filter((row) => row.path.startsWith("records/") && row.after.collection === "@imports" && row.after.part === 0).reduce((n, row) => n + (!row.before || row.before.removed ? 1 : 0) - (row.after.removed ? 1 : 0), 0);
@@ -2878,87 +4739,6 @@
     return { migrationBackups, emergencyBackups, goalImages, localStorage: local };
   }
 
-  // src/import/import-identity.mjs
-  var original = (row) => row.bankOriginal || row;
-  var accountKey2 = (row, batch) => String(row.accountContext || row.accountOwner || (batch == null ? void 0 : batch.accountOwner) || "") + "|" + String(original(row).accountIdentifier || (batch == null ? void 0 : batch.accountProfileId) || "");
-  function immutableBankFields(row) {
-    const bank = original(row);
-    return JSON.stringify([bank.bankDate, bank.transactionTime || "", bank.bookingDate || "", bank.amount, bank.rawDescription || bank.description, bank.description, bank.counterpartyAccount || "", bank.currency || "", bank.reference || "", bank.code || "", bank.notes || "", bank.rawCells || []]);
-  }
-  function classifyCsvDuplicate(row, batch, existingBatches = []) {
-    let possible = null;
-    for (const oldBatch of existingBatches) {
-      if (oldBatch.lifecycle === "deleted") continue;
-      for (const oldRow of oldBatch.rows || []) {
-        if (accountKey2(row, batch) !== accountKey2(oldRow, oldBatch)) continue;
-        const sameFields = immutableBankFields(row) === immutableBankFields(oldRow);
-        const proof = row.sourceIdentityProof, oldProof = oldRow.sourceIdentityProof;
-        const sameFile = (proof == null ? void 0 : proof.kind) === "file-row" && (oldProof == null ? void 0 : oldProof.kind) === "file-row" && Number.isSafeInteger(proof.rowOrdinal) && proof.rowOrdinal > 0 && proof.rowOrdinal === oldProof.rowOrdinal && (typeof batch.originalCsv === "string" && batch.originalCsv === oldBatch.originalCsv || /^[a-f0-9]{64}$/.test(proof.fileDigest || "") && proof.fileDigest === oldProof.fileDigest);
-        const bankIdentity = (proof == null ? void 0 : proof.kind) === "bank-id" && (oldProof == null ? void 0 : oldProof.kind) === "bank-id" && typeof proof.authority === "string" && proof.authority.trim() !== "" && typeof proof.id === "string" && proof.id.trim() !== "" && proof.authority === oldProof.authority && proof.id === oldProof.id;
-        if (sameFields && (sameFile || bankIdentity)) return { duplicate: true, duplicateSource: { batchId: oldBatch.id, rowId: oldRow.id }, reason: "proven-source-identity" };
-        if (sameFields) possible = { duplicate: false, possibleDuplicate: { batchId: oldBatch.id, rowId: oldRow.id }, reason: "equal-bank-fields" };
-      }
-    }
-    return possible || { duplicate: false };
-  }
-  function validCalendarDate(date) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date))) return false;
-    const parsed = /* @__PURE__ */ new Date(date + "T12:00:00Z");
-    return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === date;
-  }
-  function importDateError(original2, today) {
-    if (!validCalendarDate(original2.bankDate)) return { code: "invalid-transaction-date", row: original2.lineNumber, date: original2.bankDate, message: "Ongeldige transactiedatum." };
-    if (original2.bankDate > today) return { code: "future-transaction-date", row: original2.lineNumber, date: original2.bankDate, message: `Bankregel ${original2.lineNumber}: transactiedatum ${original2.bankDate} ligt in de toekomst.` };
-    return null;
-  }
-  function csvFileDigest(text) {
-    const bytes3 = new TextEncoder().encode(String(text)), length = bytes3.length, padded = new Uint8Array((Math.floor((length + 8) / 64) + 1) * 64);
-    padded.set(bytes3);
-    padded[length] = 128;
-    const view = new DataView(padded.buffer);
-    view.setUint32(padded.length - 8, Math.floor(length / 536870912));
-    view.setUint32(padded.length - 4, length * 8);
-    const k = [1116352408, 1899447441, 3049323471, 3921009573, 961987163, 1508970993, 2453635748, 2870763221, 3624381080, 310598401, 607225278, 1426881987, 1925078388, 2162078206, 2614888103, 3248222580, 3835390401, 4022224774, 264347078, 604807628, 770255983, 1249150122, 1555081692, 1996064986, 2554220882, 2821834349, 2952996808, 3210313671, 3336571891, 3584528711, 113926993, 338241895, 666307205, 773529912, 1294757372, 1396182291, 1695183700, 1986661051, 2177026350, 2456956037, 2730485921, 2820302411, 3259730800, 3345764771, 3516065817, 3600352804, 4094571909, 275423344, 430227734, 506948616, 659060556, 883997877, 958139571, 1322822218, 1537002063, 1747873779, 1955562222, 2024104815, 2227730452, 2361852424, 2428436474, 2756734187, 3204031479, 3329325298];
-    const h = [1779033703, 3144134277, 1013904242, 2773480762, 1359893119, 2600822924, 528734635, 1541459225], w = new Uint32Array(64), rot = (n, b) => n >>> b | n << 32 - b;
-    for (let offset = 0; offset < padded.length; offset += 64) {
-      for (let n = 0; n < 16; n++) w[n] = view.getUint32(offset + n * 4);
-      for (let n = 16; n < 64; n++) {
-        const a2 = w[n - 15], b2 = w[n - 2];
-        w[n] = w[n - 16] + (rot(a2, 7) ^ rot(a2, 18) ^ a2 >>> 3) + w[n - 7] + (rot(b2, 17) ^ rot(b2, 19) ^ b2 >>> 10) >>> 0;
-      }
-      let [a, b, c, d, e, f, g, z] = h;
-      for (let n = 0; n < 64; n++) {
-        const first = z + (rot(e, 6) ^ rot(e, 11) ^ rot(e, 25)) + (e & f ^ ~e & g) + k[n] + w[n] >>> 0, second = (rot(a, 2) ^ rot(a, 13) ^ rot(a, 22)) + (a & b ^ a & c ^ b & c) >>> 0;
-        z = g;
-        g = f;
-        f = e;
-        e = d + first >>> 0;
-        d = c;
-        c = b;
-        b = a;
-        a = first + second >>> 0;
-      }
-      [a, b, c, d, e, f, g, z].forEach((v, n) => h[n] = h[n] + v >>> 0);
-    }
-    return h.map((n) => n.toString(16).padStart(8, "0")).join("");
-  }
-  function assertNoDuplicateSources(previous, next) {
-    var _a2;
-    const groups = /* @__PURE__ */ new Map();
-    for (const tx of next.transactions || []) {
-      if (!tx.importBatchId || !tx.importTransactionId || tx.batchLifecycle === "withdrawn" || tx.processingStatus !== "goedgekeurd") continue;
-      const proof = tx.sourceIdentityProof;
-      if ((proof == null ? void 0 : proof.kind) !== "file-row" || !proof.fileDigest) continue;
-      const key = JSON.stringify([tx.accountContext, ((_a2 = tx.bankOriginal) == null ? void 0 : _a2.accountIdentifier) || tx.accountProfileId, proof.fileDigest, proof.rowOrdinal]);
-      const source = tx.importBatchId + ":" + tx.importTransactionId;
-      const old = groups.get(key);
-      if (old && old.source !== source) {
-        const unchanged = (previous.transactions || []).some((row) => row.id === tx.id && JSON.stringify(row) === JSON.stringify(tx)) && (previous.transactions || []).some((row) => row.id === old.tx.id && JSON.stringify(row) === JSON.stringify(old.tx));
-        if (!unchanged) throw Object.assign(new Error("Dezelfde bewezen CSV-bron heeft twee actieve imports. Herstel/goedkeuring is geblokkeerd."), { code: "duplicate-source-conflict" });
-      } else groups.set(key, { source, tx });
-    }
-  }
-
   // src/storage/payload-parts.mjs
   var PAYLOAD_FORMAT = 2;
   var PAYLOAD_STORE = "payloadParts";
@@ -3007,18 +4787,18 @@
     }
     return result2;
   }
-  function advancePayloadPreparation(preparation, head, operationId) {
+  function advancePayloadPreparation(preparation, head2, operationId) {
     var _a2;
     const base = preparation == null ? void 0 : preparation.binding;
-    if (!base || preparation.invalid || (head == null ? void 0 : head.operationId) !== operationId || head.storageRevision !== base.storageRevision + 1 || JSON.stringify((_a2 = head.migration) != null ? _a2 : null) !== base.migration) return null;
-    return { ...preparation, binding: Object.freeze({ ...base, sha256: head.sha256, storageRevision: head.storageRevision }) };
+    if (!base || preparation.invalid || (head2 == null ? void 0 : head2.operationId) !== operationId || head2.storageRevision !== base.storageRevision + 1 || JSON.stringify((_a2 = head2.migration) != null ? _a2 : null) !== base.migration) return null;
+    return { ...preparation, binding: Object.freeze({ ...base, sha256: head2.sha256, storageRevision: head2.storageRevision }) };
   }
   function encodePayloadRow(row, digests = /* @__PURE__ */ new Map(), preparation = createPayloadPreparation()) {
     const finish = profileStart("payload.encodeRoot");
     const parts2 = /* @__PURE__ */ new Map(), strings = preparation.strings, collectors = [], counts = { compared: 0, encoded: 0, reused: 0 };
-    const digest2 = (text) => {
-      if (!digests.has(text)) digests.set(text, csvFileDigest2(text, "encode"));
-      return digests.get(text);
+    const digest2 = (text2) => {
+      if (!digests.has(text2)) digests.set(text2, csvFileDigest2(text2, "encode"));
+      return digests.get(text2);
     };
     function reference(node) {
       const payload = json(node), id = digest2(payload);
@@ -3449,8 +5229,8 @@
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw error("invalid-period", "Ongeldige cachemaand.");
     const [year, n] = month.split("-").map(Number);
     return Array.from({ length: 4 }, (_, i) => {
-      const date = new Date(Date.UTC(year, n - 1 - i, 1));
-      return date.toISOString().slice(0, 7);
+      const date2 = new Date(Date.UTC(year, n - 1 - i, 1));
+      return date2.toISOString().slice(0, 7);
     });
   }
   var calendarMonth = () => {
@@ -3472,7 +5252,7 @@
       selected.explicitFullHistory = false;
       selected.emptyPeriods = (proof.emptyPeriods || []).filter((month) => month === period.month);
       const cached = await workspaceState(selected, period.month), global = JSON.parse(proof.global.payload);
-      selected.ledgerBaseline = Object.fromEntries(Object.values(global.goals || {}).flatMap((goals) => goals.map((goal) => [goal.id, Number(goal.algespaard || 0) - (cached.savingsGoalLedger || []).filter((row) => row.goalId === goal.id).reduce((sum, row) => sum + contributionAmount(row), 0)])));
+      selected.ledgerBaseline = Object.fromEntries(Object.values(global.goals || {}).flatMap((goals) => goals.map((goal) => [goal.id, Number(goal.algespaard || 0) - (cached.savingsGoalLedger || []).filter((row) => row.goalId === goal.id).reduce((sum2, row) => sum2 + contributionAmount(row), 0)])));
       cached.__finizePeriodContext = selected;
       entries.push({ id: period.month, scope, epoch: proof.epoch, cloudRevision: proof.revision, state: cached, sha256: await backupDigest(JSON.stringify(cached)), lastUsed: now });
     }
@@ -3481,7 +5261,7 @@
   function planCacheEviction(entries, { selectedMonth, currentMonth = calendarMonth(), pinned = [], targetBytes = PERIOD_CACHE_TARGET } = {}) {
     if (!Number.isFinite(targetBytes) || targetBytes < 0) throw error("cache-target", "Ongeldige cachegrens.");
     const protectedMonths = /* @__PURE__ */ new Set([...defaultPeriodWindow(currentMonth), selectedMonth, ...pinned]);
-    let bytes3 = entries.filter((row) => !row.pinned).reduce((sum, row) => sum + storageBytes(row), 0);
+    let bytes3 = entries.filter((row) => !row.pinned).reduce((sum2, row) => sum2 + storageBytes(row), 0);
     const remove = [];
     for (const row of [...entries].sort((a, b) => a.lastUsed - b.lastUsed || a.id.localeCompare(b.id))) {
       if (bytes3 <= targetBytes) break;
@@ -3516,8 +5296,8 @@
       const physical = await inventory(), parts2 = new Map((physical[PAYLOAD_STORE] || []).map((row) => [row.id, row])), all = {};
       const internal = /* @__PURE__ */ new Set([PAYLOAD_STORE, PAYLOAD_PROTECTION, REPRESENTATION_META, REPRESENTATION_BACKUP, REPRESENTATION_STAGE]);
       for (const [name, rows] of Object.entries(physical)) if (!internal.has(name)) all[name] = await Promise.all(rows.map((row) => decodePayloadRow(row, (id) => parts2.get(id))));
-      const head = (_a2 = all.financialHead) == null ? void 0 : _a2.find((row) => row.id === "current"), active = new Set(Object.entries((head == null ? void 0 : head.layout) || {}).flatMap(([key, layout]) => (layout.kind === "list" ? layout.ids : [""]).map((id) => JSON.stringify([key, id]))));
-      const size = (rows) => (rows || []).reduce((sum, row) => sum + storageBytes(row), 0), cache = all.periodCache || [];
+      const head2 = (_a2 = all.financialHead) == null ? void 0 : _a2.find((row) => row.id === "current"), active = new Set(Object.entries((head2 == null ? void 0 : head2.layout) || {}).flatMap(([key, layout]) => (layout.kind === "list" ? layout.ids : [""]).map((id) => JSON.stringify([key, id]))));
+      const size = (rows) => (rows || []).reduce((sum2, row) => sum2 + storageBytes(row), 0), cache = all.periodCache || [];
       const categories = Object.fromEntries(["activeFinancialRecords", "offlinePeriods", "openCsvImports", "historicalCsvImports", "syncOutbox", "operationReceipts", "conflictsAndRecovery", "protectedMigrationCopies", "replaceablePeriodCache", "storageMetadata"].map((name) => [name, 0]));
       const roots = Object.fromEntries(Object.keys(categories).map((name) => [name, []]));
       function category(name, row) {
@@ -3543,7 +5323,7 @@
         };
         for (const row of roots[name]) for (const hash of payloadReferences(row)) visit(hash);
         categories[name] = size(roots[name]);
-        reachableBytes[name] = categories[name] + [...references].reduce((sum, hash) => sum + storageBytes(parts2.get(hash)), 0);
+        reachableBytes[name] = categories[name] + [...references].reduce((sum2, hash) => sum2 + storageBytes(parts2.get(hash)), 0);
         for (const hash of references) if (!used.has(hash)) {
           used.add(hash);
           categories[name] += storageBytes(parts2.get(hash));
@@ -3551,7 +5331,7 @@
       }
       const retainedUnreferencedParts = [...parts2.values()].filter((row) => !used.has(row.id)), retainedUnreferencedBytes = size(retainedUnreferencedParts);
       categories.conflictsAndRecovery += retainedUnreferencedBytes;
-      const indexedDbPayloadBytes = Object.values(physical).reduce((sum, rows) => sum + size(rows), 0), logicalHydratedBytes = Object.values(all).reduce((sum, rows) => sum + size(rows), 0);
+      const indexedDbPayloadBytes = Object.values(physical).reduce((sum2, rows) => sum2 + size(rows), 0), logicalHydratedBytes = Object.values(all).reduce((sum2, rows) => sum2 + size(rows), 0);
       const external = await protectedStorageUsage(scope);
       const legacyMigrationBytes = external.localStorage.financialState + external.localStorage.migrationBackups;
       categories.protectedMigrationCopies += legacyMigrationBytes + external.migrationBackups;
@@ -3559,14 +5339,14 @@
       categories.planningAssets = external.goalImages;
       const externalIndexedDbBytes = external.migrationBackups + external.emergencyBackups + external.goalImages;
       const totalBytes = indexedDbPayloadBytes + externalIndexedDbBytes + Object.values(external.localStorage).reduce((a, b) => a + b, 0);
-      return { scope, measurement: "UTF-8 JSON of stored roots and immutable parts, counted once; excludes IndexedDB index/page overhead", categories, totalBytes, indexedDbPayloadBytes: indexedDbPayloadBytes + externalIndexedDbBytes, householdDatabaseBytes: indexedDbPayloadBytes, logicalHydratedBytes, reachableBytes, retainedUnreferencedBytes, sharedPayloadOverlapBytes: Object.values(reachableBytes).reduce((sum, bytes3) => sum + bytes3, 0) + retainedUnreferencedBytes - indexedDbPayloadBytes, externalStorage: external, legacyMigrationBytes, categoryBytes: Object.values(categories).reduce((a, b) => a + b, 0), overlapBytes: 0, periods: cache.map(({ id, pinned, lastUsed, cloudRevision, epoch: epoch2 }) => ({ id, pinned: Boolean(pinned), lastUsed, cloudRevision, epoch: epoch2 })), browserEstimate: ((_c = (_b = globalThis.navigator) == null ? void 0 : _b.storage) == null ? void 0 : _c.estimate) ? await navigator.storage.estimate() : null };
+      return { scope, measurement: "UTF-8 JSON of stored roots and immutable parts, counted once; excludes IndexedDB index/page overhead", categories, totalBytes, indexedDbPayloadBytes: indexedDbPayloadBytes + externalIndexedDbBytes, householdDatabaseBytes: indexedDbPayloadBytes, logicalHydratedBytes, reachableBytes, retainedUnreferencedBytes, sharedPayloadOverlapBytes: Object.values(reachableBytes).reduce((sum2, bytes3) => sum2 + bytes3, 0) + retainedUnreferencedBytes - indexedDbPayloadBytes, externalStorage: external, legacyMigrationBytes, categoryBytes: Object.values(categories).reduce((a, b) => a + b, 0), overlapBytes: 0, periods: cache.map(({ id, pinned, lastUsed, cloudRevision, epoch: epoch2 }) => ({ id, pinned: Boolean(pinned), lastUsed, cloudRevision, epoch: epoch2 })), browserEstimate: ((_c = (_b = globalThis.navigator) == null ? void 0 : _b.storage) == null ? void 0 : _c.estimate) ? await navigator.storage.estimate() : null };
     }
     async function remember(state2, expectedHash) {
       const entries = await cacheEntries(state2, scope);
       if (!entries.length) return;
       const db = await openDatabase(), tx = db.transaction(["financialHead", "financialOutbox", "periodCache"], "readwrite", { durability: "strict" }), done = complete2(tx);
-      const [head, outbox] = await Promise.all([request(tx.objectStore("financialHead").get("current")), request(tx.objectStore("financialOutbox").getAll())]);
-      if ((head == null ? void 0 : head.sha256) !== expectedHash || outbox.some((row) => ["pending", "conflict"].includes(row.status))) {
+      const [head2, outbox] = await Promise.all([request(tx.objectStore("financialHead").get("current")), request(tx.objectStore("financialOutbox").getAll())]);
+      if ((head2 == null ? void 0 : head2.sha256) !== expectedHash || outbox.some((row) => ["pending", "conflict"].includes(row.status))) {
         await done;
         return;
       }
@@ -3608,11 +5388,11 @@
         const values = await Promise.all(selected.map((name) => request(tx.objectStore(name).getAll()))), raw = Object.fromEntries(selected.map((name, i) => [name, values[i]])), parts2 = new Map((raw[PAYLOAD_STORE] || []).map((row) => [row.id, row]));
         const decodeRow = createPayloadDecoder((id) => parts2.get(id));
         const decode = (rows) => Promise.all((rows || []).map(decodeRow));
-        const [heads, entries] = await Promise.all(["financialHead", "periodCache"].map((name) => decode(raw[name]))), head = heads.find((row) => row.id === "current");
+        const [heads, entries] = await Promise.all(["financialHead", "periodCache"].map((name) => decode(raw[name]))), head2 = heads.find((row) => row.id === "current");
         const [outbox, journal, queue, imports] = ["financialOutbox", "journal", "syncQueue", "imports"].map((name) => raw[name] || []);
         for (const row of [...outbox, ...journal, ...imports]) if (row.status !== void 0 && typeof row.status !== "string") throw error("cache-integrity", "De beschermingsstatus is niet betrouwbaar leesbaar.");
         const openImports = imports.filter((row) => !["completed", "processed", "verwerkt"].includes(row.status)).length;
-        if (!(head == null ? void 0 : head.verified) || outbox.some((row) => ["pending", "conflict"].includes(row.status)) || queue.length || openImports || journal.some((row) => ["conflict", "pending", "prepared", "processing", "uncertain"].includes(row.status))) {
+        if (!(head2 == null ? void 0 : head2.verified) || outbox.some((row) => ["pending", "conflict"].includes(row.status)) || queue.length || openImports || journal.some((row) => ["conflict", "pending", "prepared", "processing", "uncertain"].includes(row.status))) {
           await done;
           return { removed: [], blocked: true };
         }
@@ -3656,13 +5436,13 @@
   var LOCAL_STORAGE_VERSION = 1;
   var connections = /* @__PURE__ */ new Map();
   var clone6 = (value) => structuredClone(value);
-  var fail = (code, message) => Object.assign(new Error(message), { code, storageFailure: true });
+  var fail3 = (code, message) => Object.assign(new Error(message), { code, storageFailure: true });
   var stores = ["imports", "journal", "syncQueue", "financialRecords", "financialHead", "operationReceipts", "financialOutbox", "periodCache"];
   function openHouseholdDatabase(scope = "legacy") {
     if (connections.has(scope)) return connections.get(scope);
     const opening = new Promise((resolve, reject) => {
       if (!globalThis.indexedDB) {
-        reject(fail("storage-unavailable", "IndexedDB is niet beschikbaar."));
+        reject(fail3("storage-unavailable", "IndexedDB is niet beschikbaar."));
         return;
       }
       const request2 = indexedDB.open(scope === "legacy" ? "finize-imports-v1" : `finize-imports-v1-${scope}`, HOUSEHOLD_DATABASE_VERSION);
@@ -3678,15 +5458,15 @@
         const periods = request2.transaction.objectStore("periodCache");
         if (!periods.indexNames.contains("offline")) periods.createIndex("offline", "offline");
       };
-      request2.onerror = () => reject(request2.error || fail("storage-unavailable", "Huishoudopslag openen mislukt."));
-      let blocked = false;
+      request2.onerror = () => reject(request2.error || fail3("storage-unavailable", "Huishoudopslag openen mislukt."));
+      let blocked2 = false;
       request2.onblocked = () => {
-        blocked = true;
-        reject(fail("storage-blocked", "Sluit de andere Finize-tabbladen om de lokale opslag veilig te openen."));
+        blocked2 = true;
+        reject(fail3("storage-blocked", "Sluit de andere Finize-tabbladen om de lokale opslag veilig te openen."));
       };
       request2.onsuccess = async () => {
         const db = request2.result;
-        if (blocked) {
+        if (blocked2) {
           db.close();
           return;
         }
@@ -3752,13 +5532,13 @@
     finish();
     return { layout, records, reused, entries };
   }
-  function decodeHouseholdState(head, records) {
-    if ((head == null ? void 0 : head.storageVersion) !== LOCAL_STORAGE_VERSION || head.schemaVersion !== 11) throw fail("storage-version", "Onbekende lokale opslagversie.");
+  function decodeHouseholdState(head2, records) {
+    if ((head2 == null ? void 0 : head2.storageVersion) !== LOCAL_STORAGE_VERSION || head2.schemaVersion !== 11) throw fail3("storage-version", "Onbekende lokale opslagversie.");
     const values = new Map(records.map((record) => [record.id, record.value])), state2 = {};
-    for (const [collection, layout] of Object.entries(head.layout)) {
+    for (const [collection, layout] of Object.entries(head2.layout)) {
       const read = (id) => {
         const key = JSON.stringify([collection, id]);
-        if (!values.has(key)) throw fail("storage-integrity", "Een vereist financieel record ontbreekt: " + collection);
+        if (!values.has(key)) throw fail3("storage-integrity", "Een vereist financieel record ontbreekt: " + collection);
         return clone6(values.get(key));
       };
       state2[collection] = layout.kind === "list" ? layout.ids.map(read) : read("");
@@ -3774,24 +5554,24 @@
   function completed(transaction) {
     return new Promise((resolve, reject) => {
       transaction.oncomplete = () => resolve();
-      transaction.onerror = transaction.onabort = () => reject(transaction.error || fail("storage-aborted", "De lokale opslagtransactie is afgebroken."));
+      transaction.onerror = transaction.onabort = () => reject(transaction.error || fail3("storage-aborted", "De lokale opslagtransactie is afgebroken."));
     });
   }
   async function financialSnapshot(transaction) {
-    const head = await requestResult(transaction.objectStore("financialHead").get("current"));
-    if (!head) return { head: null, records: [] };
+    const head2 = await requestResult(transaction.objectStore("financialHead").get("current"));
+    if (!head2) return { head: null, records: [] };
     const records = transaction.objectStore("financialRecords");
-    if (!head.partialHistory) return { head, records: await requestResult(records.getAll()) };
-    const keys = Object.entries(head.layout).flatMap(([collection, layout]) => (layout.kind === "list" ? layout.ids : [""]).map((id) => JSON.stringify([collection, id])));
+    if (!head2.partialHistory) return { head: head2, records: await requestResult(records.getAll()) };
+    const keys = Object.entries(head2.layout).flatMap(([collection, layout]) => (layout.kind === "list" ? layout.ids : [""]).map((id) => JSON.stringify([collection, id])));
     const selected = await Promise.all(keys.map((id) => requestResult(records.get(id))));
-    if (selected.some((row) => !row)) throw fail("storage-integrity", "Een vereiste lokale periodeafhankelijkheid ontbreekt.");
-    return { head, records: selected };
+    if (selected.some((row) => !row)) throw fail3("storage-integrity", "Een vereiste lokale periodeafhankelijkheid ontbreekt.");
+    return { head: head2, records: selected };
   }
   function createHouseholdStore(scope = "legacy", { verifySource = async () => {
   } } = {}) {
     let cachedHead = null, cachedRecords = /* @__PURE__ */ new Map(), encodingBasis = /* @__PURE__ */ new Map();
-    function adoptBasis(head, records) {
-      cachedHead = clone6(head);
+    function adoptBasis(head2, records) {
+      cachedHead = clone6(head2);
       cachedRecords = new Map(records.map((record) => [record.id, JSON.stringify(record)]));
       encodingBasis = new Map(records.map((record) => [record.id, { signature: preparationSignature(record.value), periods: record.periods }]));
     }
@@ -3802,24 +5582,24 @@
     }
     async function load({ allowUnverified = false } = {}) {
       const db = await openHouseholdDatabase(scope), tx = db.transaction(["financialHead", "financialRecords"], "readonly"), done = completed(tx);
-      const [{ head, records }] = await Promise.all([financialSnapshot(tx), done]);
-      if (!head) return null;
-      if (!allowUnverified && !head.verified) throw fail("storage-migration", "De opslagmigratie moet eerst worden gecontroleerd.");
-      const state2 = decodeHouseholdState(head, records);
-      if (await backupDigest(JSON.stringify(state2)) !== head.sha256) throw fail("storage-integrity", "De teruggelezen financiële opslag wijkt af. De oude opslag blijft behouden.");
-      adoptBasis(head, records);
+      const [{ head: head2, records }] = await Promise.all([financialSnapshot(tx), done]);
+      if (!head2) return null;
+      if (!allowUnverified && !head2.verified) throw fail3("storage-migration", "De opslagmigratie moet eerst worden gecontroleerd.");
+      const state2 = decodeHouseholdState(head2, records);
+      if (await backupDigest(JSON.stringify(state2)) !== head2.sha256) throw fail3("storage-integrity", "De teruggelezen financiële opslag wijkt af. De oude opslag blijft behouden.");
+      adoptBasis(head2, records);
       return state2;
     }
     async function commit(state2, { expectedHash = ((_a2) => (_a2 = cachedHead == null ? void 0 : cachedHead.sha256) != null ? _a2 : null)(), operationId = crypto.randomUUID(), importMutation = null, migration = null, queueCloud = true, cloudAcceptance = null, periodAcceptance = null, resolutionAcceptance = null, payloadPreparation = null } = {}) {
       var _a3, _b, _c, _d, _e, _f;
       await verifySource(migration || (cachedHead == null ? void 0 : cachedHead.migration));
-      if (cloudAcceptance && (importMutation || queueCloud)) throw fail("storage-contract", "Een cloudontvangst accepteert geen parallelle lokale importbewerking.");
-      if (periodAcceptance && (!state2.__finizePartialHistory || queueCloud || importMutation || cloudAcceptance)) throw fail("storage-contract", "Periodeontvangst gebruikt één gecontroleerde lokale commit zonder financiële heruitvoering.");
-      if (resolutionAcceptance && (!state2.__finizePartialHistory || !queueCloud || periodAcceptance || cloudAcceptance || importMutation)) throw fail("storage-contract", "Conflictoplossing vereist één atomaire periodecommit met outbox.");
+      if (cloudAcceptance && (importMutation || queueCloud)) throw fail3("storage-contract", "Een cloudontvangst accepteert geen parallelle lokale importbewerking.");
+      if (periodAcceptance && (!state2.__finizePartialHistory || queueCloud || importMutation || cloudAcceptance)) throw fail3("storage-contract", "Periodeontvangst gebruikt één gecontroleerde lokale commit zonder financiële heruitvoering.");
+      if (resolutionAcceptance && (!state2.__finizePartialHistory || !queueCloud || periodAcceptance || cloudAcceptance || importMutation)) throw fail3("storage-contract", "Conflictoplossing vereist één atomaire periodecommit met outbox.");
       const durableBasis = cachedHead && clone6(cachedHead);
       if (payloadPreparation == null ? void 0 : payloadPreparation.binding) {
         const binding = payloadPreparation.binding;
-        if (binding.scope !== scope) throw fail("household-scope", "De commitvoorbereiding hoort bij een ander huishouden.");
+        if (binding.scope !== scope) throw fail3("household-scope", "De commitvoorbereiding hoort bij een ander huishouden.");
         if (binding.sha256 !== (durableBasis == null ? void 0 : durableBasis.sha256) || binding.storageRevision !== (durableBasis == null ? void 0 : durableBasis.storageRevision) || binding.migration !== JSON.stringify((_a3 = durableBasis == null ? void 0 : durableBasis.migration) != null ? _a3 : null)) payloadPreparation = null;
       }
       const canReuse = expectedHash === ((_b = durableBasis == null ? void 0 : durableBasis.sha256) != null ? _b : null);
@@ -3850,26 +5630,26 @@
           }
         };
         tx.oncomplete = () => resolve();
-        tx.onerror = tx.onabort = () => reject(failure2 || tx.error || fail("storage-aborted", "De lokale financiële commit is afgebroken."));
+        tx.onerror = tx.onabort = () => reject(failure2 || tx.error || fail3("storage-aborted", "De lokale financiële commit is afgebroken."));
         const heads = tx.objectStore("financialHead"), get = heads.get("current"), operation = tx.objectStore("operationReceipts").get(operationId);
         operation.onsuccess = () => {
           var _a4, _b2, _c2, _d2, _e2, _f2, _g, _h, _i, _j;
           if (((_a4 = get.result) == null ? void 0 : _a4.partialHistory) && !state2.__finizePartialHistory) {
-            abort(fail("storage-contract", "Een periodeadministratie kan niet via het oude volledige-statecontract worden overschreven."));
+            abort(fail3("storage-contract", "Een periodeadministratie kan niet via het oude volledige-statecontract worden overschreven."));
             return;
           }
           if (get.result && !get.result.verified) {
-            abort(fail("storage-migration", "Een ongecontroleerde migratiestand accepteert geen financiële wijzigingen."));
+            abort(fail3("storage-migration", "Een ongecontroleerde migratiestand accepteert geen financiële wijzigingen."));
             return;
           }
           const existing = operation.result;
           if (existing) {
             if (existing.sha256 !== sha256) {
-              abort(fail("storage-operation-reused", "Dit operatie-ID is al gebruikt voor een andere financiële wijziging."));
+              abort(fail3("storage-operation-reused", "Dit operatie-ID is al gebruikt voor een andere financiële wijziging."));
               return;
             }
             if (((_b2 = get.result) == null ? void 0 : _b2.sha256) !== sha256) {
-              abort(fail("storage-operation-committed", "Deze operatie is al bevestigd; lees eerst de nieuwere duurzame stand."));
+              abort(fail3("storage-operation-committed", "Deze operatie is al bevestigd; lees eerst de nieuwere duurzame stand."));
               return;
             }
             confirmedReceipt = existing;
@@ -3877,11 +5657,11 @@
             return;
           }
           if (!canReuse || ((_d2 = (_c2 = get.result) == null ? void 0 : _c2.sha256) != null ? _d2 : null) !== expectedHash) {
-            abort(fail("storage-conflict", "De duurzame financiële stand is intussen gewijzigd. Herlaad de actuele stand; je invoer blijft behouden."));
+            abort(fail3("storage-conflict", "De duurzame financiële stand is intussen gewijzigd. Herlaad de actuele stand; je invoer blijft behouden."));
             return;
           }
           if (((_f2 = (_e2 = get.result) == null ? void 0 : _e2.storageRevision) != null ? _f2 : null) !== ((_g = durableBasis == null ? void 0 : durableBasis.storageRevision) != null ? _g : null) || JSON.stringify((_i = (_h = get.result) == null ? void 0 : _h.migration) != null ? _i : null) !== JSON.stringify((_j = durableBasis == null ? void 0 : durableBasis.migration) != null ? _j : null)) {
-            abort(fail("storage-conflict", "De revisie of migratiebasis van de commitvoorbereiding is gewijzigd."));
+            abort(fail3("storage-conflict", "De revisie of migratiebasis van de commitvoorbereiding is gewijzigd."));
             return;
           }
           const publish = () => {
@@ -3899,7 +5679,7 @@
                 const journal = tx.objectStore("journal"), read2 = journal.get(resolutionAcceptance.id), outbox = tx.objectStore("financialOutbox"), all = outbox.getAll();
                 read2.onsuccess = () => {
                   if (!read2.result || read2.result.status !== "conflict" || read2.result.localHash !== expectedHash) {
-                    abort(fail("storage-conflict", "De beoordeelde conflictstand is gewijzigd."));
+                    abort(fail3("storage-conflict", "De beoordeelde conflictstand is gewijzigd."));
                     return;
                   }
                   journal.put({ ...read2.result, resolution: { ...clone6(resolutionAcceptance.resolution), outcome: "pending" } });
@@ -3933,12 +5713,12 @@
             const imports2 = tx.objectStore("imports").getAll(), queue = tx.objectStore("syncQueue").getAll();
             queue.onsuccess = () => {
               try {
-                if (JSON.stringify(imports2.result) !== cloudAcceptance.expectedImportsSignature || queue.result.length) throw fail("import-conflict", "Lokale importkeuzes wijzigden tijdens cloudontvangst.");
+                if (JSON.stringify(imports2.result) !== cloudAcceptance.expectedImportsSignature || queue.result.length) throw fail3("import-conflict", "Lokale importkeuzes wijzigden tijdens cloudontvangst.");
                 for (const old of imports2.result) {
                   const incoming = cloudAcceptance.imports.find((row) => row.id === old.id);
                   if (!incoming) {
                     if (cloudAcceptance.partial === true) continue;
-                    throw fail("import-conflict", "Een lokale import ontbreekt in de externe stand.");
+                    throw fail3("import-conflict", "Een lokale import ontbreekt in de externe stand.");
                   }
                   assertOriginalBankDataUnchanged(old.rows, incoming.rows);
                 }
@@ -3957,8 +5737,8 @@
           read.onsuccess = () => {
             try {
               const old = read.result, expected = importMutation.previousBatch;
-              if ((Number(old == null ? void 0 : old.version) || 0) !== (Number(expected == null ? void 0 : expected.version) || 0) || String((old == null ? void 0 : old.operationId) || "") !== String((expected == null ? void 0 : expected.operationId) || "")) throw fail("import-conflict", "De importrevisie is intussen gewijzigd.");
-              if ((old == null ? void 0 : old.lifecycle) === "deleted" && importMutation.batch.lifecycle !== "deleted") throw fail("import-conflict", "De import is al verwijderd.");
+              if ((Number(old == null ? void 0 : old.version) || 0) !== (Number(expected == null ? void 0 : expected.version) || 0) || String((old == null ? void 0 : old.operationId) || "") !== String((expected == null ? void 0 : expected.operationId) || "")) throw fail3("import-conflict", "De importrevisie is intussen gewijzigd.");
+              if ((old == null ? void 0 : old.lifecycle) === "deleted" && importMutation.batch.lifecycle !== "deleted") throw fail3("import-conflict", "De import is al verwijderd.");
               assertOriginalBankDataUnchanged(old == null ? void 0 : old.rows, importMutation.batch.rows);
               publish();
             } catch (error2) {
@@ -3982,7 +5762,7 @@
       if (!state2) return null;
       await (verifySource2 == null ? void 0 : verifySource2(cachedHead.migration));
       if (cachedHead.verified) return state2;
-      if (((_a2 = cachedHead.migration) == null ? void 0 : _a2.retainedStores) && JSON.stringify(await retainedInventory()) !== JSON.stringify(cachedHead.migration.retainedStores)) throw fail("storage-migration-conflict", "De bestaande import- of herstelopslag wijzigde tijdens migratie; beide kopieën blijven behouden.");
+      if (((_a2 = cachedHead.migration) == null ? void 0 : _a2.retainedStores) && JSON.stringify(await retainedInventory()) !== JSON.stringify(cachedHead.migration.retainedStores)) throw fail3("storage-migration-conflict", "De bestaande import- of herstelopslag wijzigde tijdens migratie; beide kopieën blijven behouden.");
       const hash = cachedHead.sha256, db = await openHouseholdDatabase(scope);
       await new Promise((resolve, reject) => {
         const tx = db.transaction("financialHead", "readwrite", { durability: "strict" }), store = tx.objectStore("financialHead"), read = store.get("current");
@@ -3990,7 +5770,7 @@
         read.onsuccess = () => {
           var _a3;
           if (((_a3 = read.result) == null ? void 0 : _a3.sha256) !== hash) {
-            failure2 = fail("storage-conflict", "De migratiestand wijzigde tijdens controle.");
+            failure2 = fail3("storage-conflict", "De migratiestand wijzigde tijdens controle.");
             tx.abort();
             return;
           }
@@ -4035,18 +5815,18 @@
     }
     async function inspectOperation(id) {
       const db = await openHouseholdDatabase(scope), tx = db.transaction(["financialHead", "financialRecords", "operationReceipts"], "readonly"), done = completed(tx);
-      const [{ head, records }, receipt] = await Promise.all([financialSnapshot(tx), requestResult(tx.objectStore("operationReceipts").get(id)), done]);
-      const state2 = head ? decodeHouseholdState(head, records) : null;
-      if (head && await backupDigest(JSON.stringify(state2)) !== head.sha256) throw fail("storage-integrity", "Het operatiebewijs heeft geen betrouwbare financiële stand.");
-      adoptBasis(head, records);
+      const [{ head: head2, records }, receipt] = await Promise.all([financialSnapshot(tx), requestResult(tx.objectStore("operationReceipts").get(id)), done]);
+      const state2 = head2 ? decodeHouseholdState(head2, records) : null;
+      if (head2 && await backupDigest(JSON.stringify(state2)) !== head2.sha256) throw fail3("storage-integrity", "Het operatiebewijs heeft geen betrouwbare financiële stand.");
+      adoptBasis(head2, records);
       return { state: state2, receipt: receipt || null };
     }
     async function readCloudSnapshot() {
       const db = await openHouseholdDatabase(scope), tx = db.transaction(stores, "readonly"), done = completed(tx);
       const financial = financialSnapshot(tx), pending = requestResult(tx.objectStore("financialOutbox").getAll()), queued = requestResult(tx.objectStore("syncQueue").getAll());
       const importsRead = (async () => {
-        const { head: head2 } = await financial;
-        if (!(head2 == null ? void 0 : head2.partialHistory)) return requestResult(tx.objectStore("imports").getAll());
+        const { head: head3 } = await financial;
+        if (!(head3 == null ? void 0 : head3.partialHistory)) return requestResult(tx.objectStore("imports").getAll());
         const queue = await queued;
         return (await Promise.all([...new Set(queue.map((row) => row.importId || row.id))].map((id) => requestResult(tx.objectStore("imports").get(id))))).filter(Boolean);
       })();
@@ -4055,23 +5835,23 @@
         return (await Promise.all(rows.filter((row) => row.id !== "current" && ["pending", "conflict"].includes(row.status)).map((row) => requestResult(tx.objectStore("operationReceipts").get(row.id))))).filter(Boolean);
       })();
       const journalsRead = (async () => {
-        const { head: head2 } = await financial;
-        if (!(head2 == null ? void 0 : head2.partialHistory)) return requestResult(tx.objectStore("journal").getAll());
+        const { head: head3 } = await financial;
+        if (!(head3 == null ? void 0 : head3.partialHistory)) return requestResult(tx.objectStore("journal").getAll());
         const rows = await pending;
         return (await Promise.all([...new Set(rows.map((row) => row.conflictId).filter(Boolean))].map((id) => requestResult(tx.objectStore("journal").get(id))))).filter(Boolean);
       })();
-      const [{ head, records }, imports, outbox, receipts, journals, importQueue] = await Promise.all([financial, importsRead, pending, receiptsRead, journalsRead, queued, done]);
-      if (!(head == null ? void 0 : head.verified)) throw fail("storage-migration", "Synchronisatie vereist geverifieerde lokale opslag.");
-      const state2 = decodeHouseholdState(head, records);
-      if (await backupDigest(JSON.stringify(state2)) !== head.sha256) throw fail("storage-integrity", "De lokale synchronisatiebasis heeft een afwijkende hash.");
+      const [{ head: head2, records }, imports, outbox, receipts, journals, importQueue] = await Promise.all([financial, importsRead, pending, receiptsRead, journalsRead, queued, done]);
+      if (!(head2 == null ? void 0 : head2.verified)) throw fail3("storage-migration", "Synchronisatie vereist geverifieerde lokale opslag.");
+      const state2 = decodeHouseholdState(head2, records);
+      if (await backupDigest(JSON.stringify(state2)) !== head2.sha256) throw fail3("storage-integrity", "De lokale synchronisatiebasis heeft een afwijkende hash.");
       const operations = outbox.filter((row) => ["pending", "conflict"].includes(row.status) && row.id !== "current").sort((a, b) => a.storageRevision - b.storageRevision);
       const pointer = outbox.find((row) => row.id === "current");
-      if (pointer && !operations.some((row) => row.id === pointer.operationId)) throw fail("storage-integrity", "De synchronisatiewijzer mist een duurzaam operatiebewijs.");
+      if (pointer && !operations.some((row) => row.id === pointer.operationId)) throw fail3("storage-integrity", "De synchronisatiewijzer mist een duurzaam operatiebewijs.");
       for (const row of operations) {
         row.receipt = receipts.find((receipt) => receipt.id === row.id);
-        if (!row.receipt || row.receipt.sha256 !== row.sha256) throw fail("storage-integrity", "Een lokaal operatiebewijs ontbreekt.");
+        if (!row.receipt || row.receipt.sha256 !== row.sha256) throw fail3("storage-integrity", "Een lokaal operatiebewijs ontbreekt.");
       }
-      return { state: state2, imports, operations, head, importQueue, conflicts: journals.filter((row) => row.operation === "record-cloud-conflict" && row.status === "conflict"), cloudBase: outbox.find((row) => row.id === "cloud-base") || null };
+      return { state: state2, imports, operations, head: head2, importQueue, conflicts: journals.filter((row) => row.operation === "record-cloud-conflict" && row.status === "conflict"), cloudBase: outbox.find((row) => row.id === "cloud-base") || null };
     }
     async function acknowledgeRecordCloud(ids, base, confirmedImports = [], resolution = null) {
       const db = await openHouseholdDatabase(scope), tx = db.transaction(["financialOutbox", "syncQueue", "journal"], "readwrite", { durability: "strict" }), store = tx.objectStore("financialOutbox"), done = completed(tx), all = store.getAll();
@@ -4197,13 +5977,13 @@
   var CLOUD_STATE_FORMAT = "finize-json-chunks-v1";
   var CLOUD_CHUNK_BYTES = 24e4;
   var byteLength = (value) => new TextEncoder().encode(value).length;
-  var canonical2 = (value) => JSON.stringify(value, (_, item) => item && typeof item === "object" && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).sort().map((key) => [key, item[key]])) : item);
-  var fail2 = (message) => {
+  var canonical3 = (value) => JSON.stringify(value, (_, item) => item && typeof item === "object" && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).sort().map((key) => [key, item[key]])) : item);
+  var fail4 = (message) => {
     throw new Error(`Cloudstate-integriteit: ${message}`);
   };
   async function encodeCloudState(state2, generation, crypto2 = globalThis.crypto) {
     var _a2;
-    if (((_a2 = state2 == null ? void 0 : state2.meta) == null ? void 0 : _a2.schemaVersion) !== 11 || !/^[a-zA-Z0-9_-]{1,160}$/.test(generation)) fail2("schema/generation ongeldig");
+    if (((_a2 = state2 == null ? void 0 : state2.meta) == null ? void 0 : _a2.schemaVersion) !== 11 || !/^[a-zA-Z0-9_-]{1,160}$/.test(generation)) fail4("schema/generation ongeldig");
     const payload = JSON.stringify(state2), parts2 = [];
     let part = "", size = 0;
     for (const char of payload) {
@@ -4229,23 +6009,23 @@
   async function decodeCloudState(manifest, descriptor, chunks, crypto2 = globalThis.crypto) {
     var _a2;
     const id = manifest.activeGeneration;
-    if (manifest.stateFormat !== CLOUD_STATE_FORMAT || !(descriptor == null ? void 0 : descriptor.complete) || descriptor.generation !== id || descriptor.schema !== 11 || descriptor.stateFormat !== CLOUD_STATE_FORMAT || !Number.isSafeInteger(manifest.chunkCount) || manifest.chunkCount < 1 || manifest.chunkCount !== descriptor.chunkCount || chunks.length !== descriptor.chunkCount || manifest.totalSha256 !== descriptor.totalSha256 || manifest.totalByteLength !== descriptor.totalByteLength || canonical2(manifest.stateMeta) !== canonical2(descriptor.stateMeta)) fail2("generation/manifest niet compleet of onjuist");
+    if (manifest.stateFormat !== CLOUD_STATE_FORMAT || !(descriptor == null ? void 0 : descriptor.complete) || descriptor.generation !== id || descriptor.schema !== 11 || descriptor.stateFormat !== CLOUD_STATE_FORMAT || !Number.isSafeInteger(manifest.chunkCount) || manifest.chunkCount < 1 || manifest.chunkCount !== descriptor.chunkCount || chunks.length !== descriptor.chunkCount || manifest.totalSha256 !== descriptor.totalSha256 || manifest.totalByteLength !== descriptor.totalByteLength || canonical3(manifest.stateMeta) !== canonical3(descriptor.stateMeta)) fail4("generation/manifest niet compleet of onjuist");
     let total = 0;
     for (let sequence = 0; sequence < chunks.length; sequence++) {
       const chunk = chunks[sequence];
-      if (!chunk || chunk.generation !== id || chunk.sequence !== sequence || chunk.chunkCount !== chunks.length || typeof chunk.payload !== "string" || chunk.byteLength !== byteLength(chunk.payload) || chunk.byteLength > CLOUD_CHUNK_BYTES || chunk.sha256 !== await backupDigest(chunk.payload, crypto2)) fail2(`deel ${sequence} ontbreekt of is corrupt`);
+      if (!chunk || chunk.generation !== id || chunk.sequence !== sequence || chunk.chunkCount !== chunks.length || typeof chunk.payload !== "string" || chunk.byteLength !== byteLength(chunk.payload) || chunk.byteLength > CLOUD_CHUNK_BYTES || chunk.sha256 !== await backupDigest(chunk.payload, crypto2)) fail4(`deel ${sequence} ontbreekt of is corrupt`);
       total += chunk.byteLength;
-      if (chunk.cumulativeBytes !== total) fail2(`deel ${sequence} volgorde/lengte ongeldig`);
+      if (chunk.cumulativeBytes !== total) fail4(`deel ${sequence} volgorde/lengte ongeldig`);
     }
     const payload = chunks.map((chunk) => chunk.payload).join("");
-    if (total !== manifest.totalByteLength || await backupDigest(payload, crypto2) !== manifest.totalSha256) fail2("totale checksum/lengte ongeldig");
+    if (total !== manifest.totalByteLength || await backupDigest(payload, crypto2) !== manifest.totalSha256) fail4("totale checksum/lengte ongeldig");
     const state2 = JSON.parse(payload);
-    if (((_a2 = state2 == null ? void 0 : state2.meta) == null ? void 0 : _a2.schemaVersion) !== 11 || canonical2(state2.meta) !== canonical2(manifest.stateMeta)) fail2("state/schema/metadata ongeldig");
+    if (((_a2 = state2 == null ? void 0 : state2.meta) == null ? void 0 : _a2.schemaVersion) !== 11 || canonical3(state2.meta) !== canonical3(manifest.stateMeta)) fail4("state/schema/metadata ongeldig");
     return state2;
   }
   function cloudStateManifest(descriptor, { syncVersion, commitId, updatedAt, updatedBy }) {
     const { complete: complete3, generation, ...metadata } = descriptor;
-    if (!complete3) fail2("incomplete generation kan niet worden geactiveerd");
+    if (!complete3) fail4("incomplete generation kan niet worden geactiveerd");
     return { ...metadata, activeGeneration: generation, app: "finize", revision: Number(descriptor.stateMeta.revision) || 0, baseVersion: syncVersion - 1, syncVersion, commitId, updatedAt, updatedBy };
   }
   function createChunkedCloudStore(firestore, db, currentRef) {
@@ -4255,11 +6035,11 @@
     const read = (ref) => (firestore.getDocFromServer || firestore.getDoc)(ref);
     async function hydrate(documentData) {
       if (!(documentData == null ? void 0 : documentData.stateFormat)) return documentData;
-      if (documentData.stateFormat !== CLOUD_STATE_FORMAT) fail2("onbekend opslagformaat");
+      if (documentData.stateFormat !== CLOUD_STATE_FORMAT) fail4("onbekend opslagformaat");
       const descriptorSnapshot = await read(generationRef(documentData.activeGeneration));
-      if (!descriptorSnapshot.exists()) fail2("generation ontbreekt");
+      if (!descriptorSnapshot.exists()) fail4("generation ontbreekt");
       const descriptor = descriptorSnapshot.data();
-      if (!Number.isSafeInteger(descriptor.chunkCount) || descriptor.chunkCount < 1 || descriptor.chunkCount > 1e4) fail2("deelcount ongeldig");
+      if (!Number.isSafeInteger(descriptor.chunkCount) || descriptor.chunkCount < 1 || descriptor.chunkCount > 1e4) fail4("deelcount ongeldig");
       const chunks = [];
       for (let sequence = 0; sequence < descriptor.chunkCount; sequence++) {
         const snapshot2 = await read(chunkRef(documentData.activeGeneration, sequence));
@@ -4279,7 +6059,7 @@
         persisted.push(snapshot2.exists() ? snapshot2.data() : null);
       }
       const storedDescriptor = await read(generationRef(generation));
-      if (!storedDescriptor.exists() || canonical2({ ...storedDescriptor.data(), stateMeta: canonical2(storedDescriptor.data().stateMeta) }) !== canonical2({ ...encoded.descriptor, stateMeta: canonical2(encoded.descriptor.stateMeta) })) fail2("generationdescriptor gewijzigd");
+      if (!storedDescriptor.exists() || canonical3({ ...storedDescriptor.data(), stateMeta: canonical3(storedDescriptor.data().stateMeta) }) !== canonical3({ ...encoded.descriptor, stateMeta: canonical3(encoded.descriptor.stateMeta) })) fail4("generationdescriptor gewijzigd");
       await decodeCloudState(manifest, complete3, persisted);
       await firestore.updateDoc(generationRef(generation), { complete: true });
       const sealed = await read(generationRef(generation));
@@ -4290,7 +6070,7 @@
   }
 
   // src/storage/cloud-records.mjs
-  var same2 = (a, b) => canonical(a) === canonical(b);
+  var same4 = (a, b) => canonical2(a) === canonical2(b);
   var batches = (values) => Array.from({ length: Math.ceil(values.length / 8) }, (_, index) => values.slice(index * 8, index * 8 + 8));
   function createRecordCloudStore({ transport, householdId, applicationProjection, readLegacyImports } = {}) {
     const testTransport = (transport == null ? void 0 : transport.emulator) && /^demo-/.test(transport.emulator.projectId) && /^127\.0\.0\.1:\d+$/.test(transport.emulator.host);
@@ -4303,31 +6083,31 @@
       const control = await transport.get(controlPath), c = control == null ? void 0 : control.data;
       if (gate2 && ((c == null ? void 0 : c.epoch) !== gate2.epoch || (c == null ? void 0 : c.minClientVersion) !== gate2.minClientVersion)) throw storageError("storage-version", "Het vrijgegeven productie-epoch wijkt af.");
       if ((c == null ? void 0 : c.storageVersion) !== RECORD_STORAGE_VERSION || !["active", ...allowMigration ? ["preparing", "verified"] : []].includes(c.phase)) throw storageError("storage-version", "Het recordmodel is nog niet geverifieerd en geactiveerd.");
-      const root2 = epochPath(c.epoch), head = await transport.get(root2 + "/meta/head");
-      if (!head || head.data.epoch !== c.epoch || head.data.storageVersion !== RECORD_STORAGE_VERSION) throw storageError("storage-version", "Het cloudversiecontract is inconsistent.");
-      if (!allowPending && head.data.phase !== "ready") throw storageError("cloud-pending", "Een onderbroken cloudpublicatie moet eerst worden gecontroleerd en hervat.");
-      return { control, head, root: root2 };
+      const root2 = epochPath(c.epoch), head2 = await transport.get(root2 + "/meta/head");
+      if (!head2 || head2.data.epoch !== c.epoch || head2.data.storageVersion !== RECORD_STORAGE_VERSION) throw storageError("storage-version", "Het cloudversiecontract is inconsistent.");
+      if (!allowPending && head2.data.phase !== "ready") throw storageError("cloud-pending", "Een onderbroken cloudpublicatie moet eerst worden gecontroleerd en hervat.");
+      return { control, head: head2, root: root2 };
     }
     async function components(root2) {
       const [records, periods, global, manifests, settings] = await Promise.all([transport.query(root2 + "/records"), transport.query(root2 + "/periods"), transport.get(root2 + "/globals/financial"), transport.query(root2 + "/manifests"), transport.get(root2 + "/globals/settings")]);
       return { records: records.map((row) => row.data), periods: periods.map((row) => row.data), global: (global == null ? void 0 : global.data) || null, manifests: manifests.map((row) => row.data), settings: (settings == null ? void 0 : settings.data) || null };
     }
-    async function verifyAt(root2, head) {
-      const values = await components(root2), decoded = await decodeRecordSnapshot(head, values.records);
-      if (head.manifestHashes) await verifyRecordManifests(head, values.records, values.manifests);
-      if (head.settingsHash && head.settingsHash !== await digest(values.settings)) throw storageError("cloud-integrity", "De globale instellingen wijken af.");
-      if (head.globalHash !== await digest(values.global)) throw storageError("cloud-integrity", "De cumulatieve cloudprojectie wijkt af.");
-      for (const [month, hash] of Object.entries(head.periodHashes)) {
+    async function verifyAt(root2, head2) {
+      const values = await components(root2), decoded = await decodeRecordSnapshot(head2, values.records);
+      if (head2.manifestHashes) await verifyRecordManifests(head2, values.records, values.manifests);
+      if (head2.settingsHash && head2.settingsHash !== await digest(values.settings)) throw storageError("cloud-integrity", "De globale instellingen wijken af.");
+      if (head2.globalHash !== await digest(values.global)) throw storageError("cloud-integrity", "De cumulatieve cloudprojectie wijkt af.");
+      for (const [month, hash] of Object.entries(head2.periodHashes)) {
         const period = values.periods.find((row) => row.month === month);
         if (!period || await digest(period) !== hash) throw storageError("cloud-integrity", "Financiële maandprojectie ontbreekt of is corrupt: " + month);
         const dependencies = values.records.filter((row) => row.periods.includes(month)).map((row) => ({ id: row.id, hash: row.hash })).sort((a, b) => a.id.localeCompare(b.id));
-        if (!same2(dependencies, period.dependencies)) throw storageError("cloud-integrity", "Financiële maandafhankelijkheden zijn niet compleet: " + month);
+        if (!same4(dependencies, period.dependencies)) throw storageError("cloud-integrity", "Financiële maandafhankelijkheden zijn niet compleet: " + month);
       }
-      return { ...decoded, ...values, head };
+      return { ...decoded, ...values, head: head2 };
     }
     async function verifyIntegrity(options = {}) {
       const c = await context(options), result2 = await verifyAt(c.root, c.head.data), after = await transport.get(c.root + "/meta/head");
-      if (!same2(after.data, c.head.data)) throw storageError("cloud-conflict", "De cloudstand wijzigde tijdens integriteitscontrole.");
+      if (!same4(after.data, c.head.data)) throw storageError("cloud-conflict", "De cloudstand wijzigde tijdens integriteitscontrole.");
       return result2;
     }
     async function assertLegacySource(control) {
@@ -4345,7 +6125,7 @@
       let existing = await transport.get(controlPath);
       if (!existing) {
         const legacy = await transport.get(legacyPath);
-        if (!same2((legacy == null ? void 0 : legacy.data) || null, legacyPointer || null)) throw storageError("migration-source-conflict", "De gelezen oude cloudstand is intussen gewijzigd.");
+        if (!same4((legacy == null ? void 0 : legacy.data) || null, legacyPointer || null)) throw storageError("migration-source-conflict", "De gelezen oude cloudstand is intussen gewijzigd.");
         let sourceState = (_a2 = legacy == null ? void 0 : legacy.data) == null ? void 0 : _a2.state;
         if ((_b = legacy == null ? void 0 : legacy.data) == null ? void 0 : _b.stateFormat) {
           const pointer = legacy.data, path = legacyPath + "/generations/" + pointer.activeGeneration, descriptor = (_c = await transport.get(path)) == null ? void 0 : _c.data;
@@ -4354,17 +6134,17 @@
           for (let i = 0; i < descriptor.chunkCount; i++) chunks.push(((_d = await transport.get(path + "/chunks/" + i)) == null ? void 0 : _d.data) || null);
           sourceState = await decodeCloudState(pointer, descriptor, chunks);
         }
-        if (sourceState && !same2(sourceState, state2)) throw storageError("migration-source-conflict", "De migratiekandidaat wijkt af van de teruggelezen oude financiële bron.");
+        if (sourceState && !same4(sourceState, state2)) throw storageError("migration-source-conflict", "De migratiekandidaat wijkt af van de teruggelezen oude financiële bron.");
         const oldHeaders = await transport.query(household + "/imports");
         if (initialization && (legacy || oldHeaders.length)) throw storageError("migration-source-conflict", "Een nieuwe administratie mag geen bestaande cloudhistorie vervangen.");
         const sourceImports = readLegacyImports ? await readLegacyImports(oldHeaders, transport) : oldHeaders.map((row) => {
           if (!Array.isArray(row.data.rows)) throw storageError("migration-incomplete", "De bestaande importdelen vereisen een volledige legacy-readback.");
           return row.data;
         });
-        if (!initialization && !same2(sourceImports, imports)) throw storageError("migration-source-conflict", "Niet alle bestaande cloudimports en CSV-bronnen zijn verliesloos meegenomen.");
+        if (!initialization && !same4(sourceImports, imports)) throw storageError("migration-source-conflict", "Niet alle bestaande cloudimports en CSV-bronnen zijn verliesloos meegenomen.");
         const control = { storageVersion: 2, minClientVersion: 117, epoch: epoch2, phase: "preparing", sourceVersion: ((_e = legacy == null ? void 0 : legacy.data) == null ? void 0 : _e.syncVersion) || 0, sourcePointerHash: await digest((legacy == null ? void 0 : legacy.data) || null), sourceImportHeadersHash: await digest(oldHeaders.map((row) => ({ path: row.path, data: row.data })).sort((a, b) => a.path.localeCompare(b.path))), sourceStateHash: await digest(state2), sourceImportsHash: await digest(imports) };
-        const head = { storageVersion: 2, epoch: epoch2, phase: "ready", revision: 0, lastOperation: "", pendingOperation: "", stateHash: "", importsHash: "", layout: {}, recordCount: 0, importCount: 0, periodHashes: {}, globalHash: "" };
-        await transport.commit([{ path: controlPath, data: control }, { path: epochPath(epoch2) + "/meta/head", data: head }], /* @__PURE__ */ new Map([[controlPath, null], [epochPath(epoch2) + "/meta/head", null]]));
+        const head2 = { storageVersion: 2, epoch: epoch2, phase: "ready", revision: 0, lastOperation: "", pendingOperation: "", stateHash: "", importsHash: "", layout: {}, recordCount: 0, importCount: 0, periodHashes: {}, globalHash: "" };
+        await transport.commit([{ path: controlPath, data: control }, { path: epochPath(epoch2) + "/meta/head", data: head2 }], /* @__PURE__ */ new Map([[controlPath, null], [epochPath(epoch2) + "/meta/head", null]]));
         existing = { data: control };
       }
       if (existing.data.epoch !== epoch2 || existing.data.sourceStateHash !== await digest(state2) || existing.data.sourceImportsHash !== await digest(imports)) throw storageError("migration-source-conflict", "Een ander migratie-epoch of andere bron is al beschermd.");
@@ -4399,7 +6179,7 @@
       const previous = next.preparedChanges ? null : c.head.data.revision ? await components(c.root) : null, changes = (next.preparedChanges || recordChanges(previous, next)).sort((a, b) => a.path.localeCompare(b.path));
       const targetHead = { storageVersion: 2, epoch: c.control.data.epoch, phase: "ready", revision: c.head.data.revision + 1, lastOperation: operationId, pendingOperation: "", stateHash: next.stateHash, importsHash: next.importsHash, layout: next.layout, recordCount: next.recordCount, importCount: next.importCount, periodHashes: next.periodHashes, globalHash: next.globalHash, manifestHashes: next.manifestHashes, settingsHash: next.settingsHash, ...next.targeted ? { integrityMode: "manifest" } : {} };
       const operation = { storageVersion: 2, epoch: c.control.data.epoch, id: operationId, phase: "prepared", baseRevision: c.head.data.revision, stateHash: next.stateHash, importsHash: next.importsHash, changeCount: changes.length, changeHash: await digest(changes), targetHead, memberCount: members.length, memberHash: await digest(members), ...next.targeted ? { verificationMode: "patch", requestHash: next.requestHash } : {} };
-      if (old && !same2(old.data, operation)) throw storageError("operation-reused", "Het voorbereide operatiebewijs wijkt af.");
+      if (old && !same4(old.data, operation)) throw storageError("operation-reused", "Het voorbereide operatiebewijs wijkt af.");
       if (!old) await transport.commit([{ path, data: operation }], /* @__PURE__ */ new Map([[path, null]]));
       await checkpoint("operation-prepared");
       for (const batch of batches(changes)) await transport.commit(batch.map((change) => ({ path: path + "/changes/" + change.id, data: change })));
@@ -4429,7 +6209,7 @@
       if (operation.verificationMode === "patch") {
         for (const change of changes) {
           const actual = (_a2 = await transport.get(c.root + "/" + change.path)) == null ? void 0 : _a2.data;
-          if (!same2(actual, change.after)) throw storageError("cloud-integrity", "Een gerichte wijziging is niet duurzaam teruggelezen.");
+          if (!same4(actual, change.after)) throw storageError("cloud-integrity", "Een gerichte wijziging is niet duurzaam teruggelezen.");
         }
         for (const change of changes.filter((row) => row.path.startsWith("periods/"))) {
           const rows = await transport.query(c.root + "/records", { field: "periods", op: "ARRAY_CONTAINS", value: change.after.month });
@@ -4437,12 +6217,12 @@
         }
       } else await verifyAt(c.root, operation.targetHead);
       await checkpoint("target-verified");
-      const [head, op] = await Promise.all([transport.get(c.root + "/meta/head"), transport.get(operationPath)]);
-      if (head.data.pendingOperation !== operationId || head.data.revision !== operation.baseRevision) throw storageError("cloud-conflict", "Het publicatiebewijs is intussen gewijzigd.");
+      const [head2, op] = await Promise.all([transport.get(c.root + "/meta/head"), transport.get(operationPath)]);
+      if (head2.data.pendingOperation !== operationId || head2.data.revision !== operation.baseRevision) throw storageError("cloud-conflict", "Het publicatiebewijs is intussen gewijzigd.");
       const members = memberProofs.map((member) => ({ path: c.root + "/receipts/" + member.id, data: { ...member, epoch: operation.epoch, storageVersion: 2, cloudOperation: operationId, cloudRevision: operation.targetHead.revision, outcome: "prepared" } }));
       for (const batch of batches(members)) await transport.commit(batch);
       await checkpoint("members-staged");
-      await transport.commit([{ path: c.root + "/meta/head", data: operation.targetHead }, { path: operationPath, data: { ...operation, phase: "committed" } }], /* @__PURE__ */ new Map([[c.root + "/meta/head", head.version], [operationPath, op.version]]));
+      await transport.commit([{ path: c.root + "/meta/head", data: operation.targetHead }, { path: operationPath, data: { ...operation, phase: "committed" } }], /* @__PURE__ */ new Map([[c.root + "/meta/head", head2.version], [operationPath, op.version]]));
       await checkpoint("committed");
       return { outcome: "committed", operationId, revision: operation.targetHead.revision, replayed: false };
     }
@@ -4470,7 +6250,7 @@
     async function loadPeriod(month) {
       const c = await context(), [period, global, rows] = await Promise.all([transport.get(c.root + "/periods/" + month), transport.get(c.root + "/globals/financial"), transport.query(c.root + "/records", { field: "periods", op: "ARRAY_CONTAINS", value: month })]);
       const result2 = await verifiedPeriodResult(c.head.data, period == null ? void 0 : period.data, rows.map((row) => row.data), global == null ? void 0 : global.data), after = await transport.get(c.root + "/meta/head");
-      if (!same2(c.head.data, after == null ? void 0 : after.data)) throw storageError("cloud-conflict", "De financiële periode wijzigde tijdens het laden. Probeer opnieuw.");
+      if (!same4(c.head.data, after == null ? void 0 : after.data)) throw storageError("cloud-conflict", "De financiële periode wijzigde tijdens het laden. Probeer opnieuw.");
       result2.transactions = (await decodeRecordValues(result2.records)).filter((row) => row.collection === "transactions").map((row) => row.value);
       result2.state = { __finizePartialHistory: true, verifiedPeriods: [month], transactions: clone2(result2.transactions) };
       return result2;
@@ -4482,7 +6262,7 @@
       const values = await decodeRecordValues([...headers, ...rows].map((row) => row.data)), header = (_a2 = values.find((row) => row.collection === "@imports")) == null ? void 0 : _a2.value;
       if (!header) throw storageError("cloud-missing", "De cloudimport ontbreekt.");
       const result2 = { ...header, rows: values.filter((row) => row.collection === "@rows:" + id).sort((a, b) => a.ordinal - b.ordinal).map((row) => row.value) };
-      if (!same2(c.head.data, (_b = await transport.get(c.root + "/meta/head")) == null ? void 0 : _b.data)) throw storageError("cloud-conflict", "De import wijzigde tijdens laden.");
+      if (!same4(c.head.data, (_b = await transport.get(c.root + "/meta/head")) == null ? void 0 : _b.data)) throw storageError("cloud-conflict", "De import wijzigde tijdens laden.");
       return result2;
     }
     async function operationReceipt(id) {
@@ -4496,7 +6276,7 @@
       var _a2;
       const result2 = await verifyIntegrity(), root2 = epochPath(result2.head.epoch), ops = await transport.query(root2 + "/operations");
       const operations = await Promise.all(ops.map(async (row) => ({ ...row.data, members: (await transport.query(row.path + "/members")).map((member) => member.data), changes: (await transport.query(row.path + "/changes")).map((change) => change.data) })));
-      if (!same2(result2.head, (_a2 = await transport.get(root2 + "/meta/head")) == null ? void 0 : _a2.data)) throw storageError("cloud-conflict", "De cloudstand wijzigde tijdens het maken van het herstelpakket.");
+      if (!same4(result2.head, (_a2 = await transport.get(root2 + "/meta/head")) == null ? void 0 : _a2.data)) throw storageError("cloud-conflict", "De cloudstand wijzigde tijdens het maken van het herstelpakket.");
       return { storageVersion: 2, epoch: result2.head.epoch, revision: result2.head.revision, stateHash: result2.head.stateHash, importsHash: result2.head.importsHash, state: result2.state, imports: result2.imports, operations, receipts: (await transport.query(root2 + "/receipts")).map((row) => row.data), warning: "Exporteer deze actuele stand; zet nooit uitsluitend een oud generatiepointer terug." };
     }
     async function operationStatus(id) {
@@ -4522,8 +6302,8 @@
   }
 
   // src/core/transaction-processing.mjs
-  var copy5 = (value) => JSON.parse(JSON.stringify(value));
-  var money2 = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+  var copy6 = (value) => JSON.parse(JSON.stringify(value));
+  var money3 = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
   function applyFinancialCandidate(target, candidate) {
     if (Array.isArray(target) && Array.isArray(candidate)) {
       const ids = new Map(target.filter((row) => row && typeof row === "object" && row.id).map((row) => [row.id, row]));
@@ -4556,7 +6336,7 @@
     const goalIds = [...new Set((state2.savingsGoalLedger || []).filter((entry) => ids.has(entry.transactionId) && entry.source !== "planned").map((entry) => entry.goalId))];
     if (dryRun) return { transactionIds: [...ids], goalIds };
     if (header && getTransactionProcessingStatus(header) !== "nakijken") {
-      header.approvalHistory = [...header.approvalHistory || [], { approvalSource: header.approvalSource || "", approvedAt: header.approvedAt || "", status: getTransactionProcessingStatus(header), processing: copy5(header.approvedProcessing || {}) }];
+      header.approvalHistory = [...header.approvalHistory || [], { approvalSource: header.approvalSource || "", approvedAt: header.approvedAt || "", status: getTransactionProcessingStatus(header), processing: copy6(header.approvedProcessing || {}) }];
       header.processingStatus = "nakijken";
       header.reviewStatus = "nakijken";
       header.certainty = "nakijken";
@@ -4567,7 +6347,7 @@
     rows.forEach((tx) => {
       if (tx.processingStatus === "nakijken") return;
       tx.approvalHistory = tx.approvalHistory || [];
-      tx.approvalHistory.push({ approvalSource: tx.approvalSource || "", approvedAt: tx.approvedAt || "", certainty: tx.certainty || "", processing: copy5(tx.processing || {}) });
+      tx.approvalHistory.push({ approvalSource: tx.approvalSource || "", approvedAt: tx.approvedAt || "", certainty: tx.certainty || "", processing: copy6(tx.processing || {}) });
       tx.processingStatus = "nakijken";
       tx.reviewStatus = "nakijken";
       tx.certainty = "nakijken";
@@ -4590,7 +6370,7 @@
     (state2.advanceRepayments || []).filter((entry) => ids.has(entry.transactionId) && entry.active !== false).forEach((entry) => {
       const advance = (state2.advanceLedger || []).find((item) => item.id === entry.advanceId);
       if (advance) {
-        advance.outstandingAmount = money2(Number(advance.outstandingAmount) + Number(entry.amount));
+        advance.outstandingAmount = money3(Number(advance.outstandingAmount) + Number(entry.amount));
         advance.status = "open";
         advance.repaymentAllocationIds = (advance.repaymentAllocationIds || []).filter((id) => id !== entry.id);
       }
@@ -4598,7 +6378,7 @@
       entry.status = "heropend";
     });
     (state2.internalTransferPairs || []).filter((pair) => (pair.transactionIds || []).some((id) => ids.has(id))).forEach((pair) => {
-      if (["bevestigd", "confirmed", "uitgevoerd"].includes(pair.status)) pair.confirmationHistory = [...pair.confirmationHistory || [], { status: pair.status, transactionIds: copy5(pair.transactionIds) }];
+      if (["bevestigd", "confirmed", "uitgevoerd"].includes(pair.status)) pair.confirmationHistory = [...pair.confirmationHistory || [], { status: pair.status, transactionIds: copy6(pair.transactionIds) }];
       pair.status = "voorgesteld";
     });
     reconcileGoalSavedAmounts(state2, goalIds);
@@ -4615,10 +6395,10 @@
     state2.transactions = (state2.transactions || []).filter((tx) => !matches(tx));
     const next = newRows.map((tx) => {
       var _a3;
-      return { ...tx, ...((_a3 = oldById.get(tx.id)) == null ? void 0 : _a3.approvalHistory) ? { approvalHistory: copy5(oldById.get(tx.id).approvalHistory) } : {} };
+      return { ...tx, ...((_a3 = oldById.get(tx.id)) == null ? void 0 : _a3.approvalHistory) ? { approvalHistory: copy6(oldById.get(tx.id).approvalHistory) } : {} };
     });
-    if (next.length && sourceHistory.length) next[0].sourceApprovalHistory = copy5(sourceHistory);
-    state2.transactions.splice(insert, 0, ...copy5(next));
+    if (next.length && sourceHistory.length) next[0].sourceApprovalHistory = copy6(sourceHistory);
+    state2.transactions.splice(insert, 0, ...copy6(next));
     const replacementId = ((_a2 = next.find((tx) => tx.processingStatus === "goedgekeurd")) == null ? void 0 : _a2.id) || ((_b = next[0]) == null ? void 0 : _b.id);
     if (replacementId) (state2.internalTransferPairs || []).filter((pair) => (pair.transactionIds || []).some((id) => oldById.has(id))).forEach((pair) => {
       pair.transactionIds = [...new Set(pair.transactionIds.map((id) => oldById.has(id) ? replacementId : id))];
@@ -4638,7 +6418,7 @@
     const previousBalances = new Map(allGoals(previous).map(({ goal }) => [goal.id, calculateGoalSavedAmount(previous, goal.id)]));
     allGoals(next).forEach(({ goal }) => {
       const balance = calculateGoalSavedAmount(next, goal.id);
-      if (balance < 0 && balance !== previousBalances.get(goal.id)) throw new Error(`Onvoldoende saldo in spaardoel ${goal.naam || goal.id}: ${money2(previousBalances.get(goal.id) || 0).toLocaleString("nl-NL", { style: "currency", currency: "EUR" })} beschikbaar. De wijziging maakt het saldo negatief: ${money2(balance).toLocaleString("nl-NL", { style: "currency", currency: "EUR" })}. Corrigeer eerst de afhankelijke spaarbewegingen.`);
+      if (balance < 0 && balance !== previousBalances.get(goal.id)) throw new Error(`Onvoldoende saldo in spaardoel ${goal.naam || goal.id}: ${money3(previousBalances.get(goal.id) || 0).toLocaleString("nl-NL", { style: "currency", currency: "EUR" })} beschikbaar. De wijziging maakt het saldo negatief: ${money3(balance).toLocaleString("nl-NL", { style: "currency", currency: "EUR" })}. Corrigeer eerst de afhankelijke spaarbewegingen.`);
     });
     const codes = /* @__PURE__ */ new Set(["coverage-exceeds-withdrawal", "coverage-exceeds-expense", "coverage-cents"]);
     const errors = coverageAllocationStatus(next).filter((row) => codes.has(row.reason));
@@ -4648,7 +6428,7 @@
   }
   function reopenTransactionSource(state2, importId, rowId, options = {}) {
     if (!importId || !rowId) throw new Error("Een betrouwbare import- en bronverwijzing is vereist.");
-    const candidate = copy5(state2), result2 = reopenSourceInPlace(candidate, importId, rowId, { dryRun: false });
+    const candidate = copy6(state2), result2 = reopenSourceInPlace(candidate, importId, rowId, { dryRun: false });
     assertFinancialMutationSafe(state2, candidate);
     if (!options.dryRun) {
       const oldById = new Map((state2.transactions || []).map((tx) => [tx.id, tx]));
@@ -4665,7 +6445,7 @@
     return result2;
   }
   function replaceProcessedSourceRows(state2, importId, rowId, rows) {
-    const candidate = copy5(state2), result2 = replaceSourceInPlace(candidate, importId, rowId, rows);
+    const candidate = copy6(state2), result2 = replaceSourceInPlace(candidate, importId, rowId, rows);
     assertFinancialMutationSafe(state2, candidate);
     applyFinancialCandidate(state2, candidate);
     return result2;
@@ -4673,7 +6453,7 @@
   function commitProcessedSourceGroup(state2, importId, { reopenIds = [], replacements = [] } = {}, applyEffects = () => {
   }) {
     if (!importId) throw new Error("Een betrouwbare importverwijzing is vereist.");
-    const candidate = copy5(state2);
+    const candidate = copy6(state2);
     for (const id of reopenIds) reopenSourceInPlace(candidate, importId, id);
     for (const replacement of replacements) replaceSourceInPlace(candidate, importId, replacement.rowId, replacement.rows);
     applyEffects(candidate);
@@ -4687,7 +6467,7 @@
     const type = getTransactionClassification(tx), goalId = tx.savingsGoalId || ((_a2 = tx.processing) == null ? void 0 : _a2.savingsGoalId);
     if (!["sparen", "naar-spaarrekening", "van-spaarrekening"].includes(type) || !goalId || getTransactionProcessingStatus(tx) !== "goedgekeurd") return null;
     if (!allGoals(state2).some(({ goal }) => goal.id === goalId)) return null;
-    const month = String(tx.transactionDate || ((_b = tx.bankOriginal) == null ? void 0 : _b.bankDate) || tx.date || "").slice(0, 7), amount = money2(Math.abs(Number((_d = tx.amount) != null ? _d : (_c = tx.processing) == null ? void 0 : _c.processedAmount) || 0)) * (type === "van-spaarrekening" ? -1 : 1);
+    const month = String(tx.transactionDate || ((_b = tx.bankOriginal) == null ? void 0 : _b.bankDate) || tx.date || "").slice(0, 7), amount = money3(Math.abs(Number((_d = tx.amount) != null ? _d : (_c = tx.processing) == null ? void 0 : _c.processedAmount) || 0)) * (type === "van-spaarrekening" ? -1 : 1);
     const candidates = (state2.savingsGoalLedger || []).filter((entry) => entry.goalId === goalId && entry.month === month && entry.active !== false && !entry.transactionId && entry.source === "planned");
     const planned = amount > 0 ? candidates.find((entry) => Math.abs(Number(entry.plannedAmount || entry.effectiveAmount) - amount) <= 0.01) || (candidates.length === 1 ? candidates[0] : null) : null;
     return { id: `saving-${tx.id}`, transactionId: tx.id, sourceTransactionId: tx.sourceTransactionId || "", importBatchId: tx.importBatchId || "", goalId, month, plannedAmount: 0, actualAmount: amount, effectiveAmount: amount, matchedContributionId: (planned == null ? void 0 : planned.id) || "", status: planned && Math.abs(amount - Number(planned.plannedAmount || 0)) > 4e-3 ? "afwijkend" : "uitgevoerd", source: getTransactionSource(tx) === "manual" ? "manual-transaction" : planned ? "bank-match" : "bank-import", active: true, createdAt: tx.createdAt || tx.approvedAt || (/* @__PURE__ */ new Date(0)).toISOString(), updatedAt: tx.approvedAt || tx.createdAt || (/* @__PURE__ */ new Date(0)).toISOString() };
@@ -4728,7 +6508,7 @@
           matched.actualAmount = null;
           matched.status = "gepland";
         }
-        const history = [...old.processingHistory || [], copy5({ ...old, processingHistory: void 0 })];
+        const history = [...old.processingHistory || [], copy6({ ...old, processingHistory: void 0 })];
         Object.assign(old, next, { id: old.id, createdAt: old.createdAt || next.createdAt, processingHistory: history });
       } else state2.savingsGoalLedger.push(next);
       const planned = state2.savingsGoalLedger.find((entry) => entry.id === next.matchedContributionId);
@@ -4744,13 +6524,13 @@
   }
   function setSavingsCoverageAllocation(state2, allocation, { createdAt = "", updatedBy = "" } = {}) {
     if (!allocation.id) throw new Error("Een stabiel allocation-ID is vereist.");
-    const candidate = copy5(state2);
+    const candidate = copy6(state2);
     candidate.savingsCoverageAllocations = candidate.savingsCoverageAllocations || [];
     const existing = candidate.savingsCoverageAllocations.find((row) => row.id === allocation.id);
-    const next = { ...existing || {}, ...copy5(allocation), active: true, createdAt: (existing == null ? void 0 : existing.createdAt) || createdAt, updatedAt: createdAt, updatedBy };
+    const next = { ...existing || {}, ...copy6(allocation), active: true, createdAt: (existing == null ? void 0 : existing.createdAt) || createdAt, updatedAt: createdAt, updatedBy };
     validateSavingsCoverageAllocation(candidate, next);
     if (existing) {
-      next.history = [...existing.history || [], copy5({ ...existing, history: void 0 })];
+      next.history = [...existing.history || [], copy6({ ...existing, history: void 0 })];
       Object.assign(existing, next);
     } else candidate.savingsCoverageAllocations.push(next);
     assertFinancialMutationSafe(state2, candidate);
@@ -4758,9 +6538,9 @@
     return next;
   }
   function removeSavingsCoverageAllocation(state2, id, { updatedAt = "", updatedBy = "" } = {}) {
-    const candidate = copy5(state2), allocation = (candidate.savingsCoverageAllocations || []).find((row) => row.id === id);
+    const candidate = copy6(state2), allocation = (candidate.savingsCoverageAllocations || []).find((row) => row.id === id);
     if (!allocation) return;
-    allocation.history = [...allocation.history || [], copy5({ ...allocation, history: void 0 })];
+    allocation.history = [...allocation.history || [], copy6({ ...allocation, history: void 0 })];
     allocation.active = false;
     allocation.updatedAt = updatedAt;
     allocation.updatedBy = updatedBy;
@@ -4771,24 +6551,24 @@
     if (!id || !Number.isSafeInteger(Math.round(Number(amount) * 100)) || !Number.isFinite(Number(amount)) || Number(amount) < 0 || Math.abs(Number(amount) * 100 - Math.round(Number(amount) * 100)) > 1e-6) throw new Error("Vul een geldig niet-negatief saldo in gehele eurocenten in.");
     if (!allGoals(state2).some(({ goal }) => goal.id === goalId)) throw new Error("Spaardoel ontbreekt.");
     if ((state2.savingsGoalLedger || []).some((entry) => entry.id === id)) return;
-    const candidate = copy5(state2), before = calculateGoalSavedAmount(state2, goalId), difference = money2(Number(amount) - before);
+    const candidate = copy6(state2), before = calculateGoalSavedAmount(state2, goalId), difference = money3(Number(amount) - before);
     if (!difference) return;
     candidate.savingsGoalLedger = candidate.savingsGoalLedger || [];
-    candidate.savingsGoalLedger.push({ id, goalId, month, plannedAmount: 0, actualAmount: null, effectiveAmount: difference, source: "manual-correction", transactionId: "", status: "uitgevoerd", active: true, balanceBefore: before, balanceAfter: money2(amount), note, createdAt, updatedAt: createdAt, updatedBy });
+    candidate.savingsGoalLedger.push({ id, goalId, month, plannedAmount: 0, actualAmount: null, effectiveAmount: difference, source: "manual-correction", transactionId: "", status: "uitgevoerd", active: true, balanceBefore: before, balanceAfter: money3(amount), note, createdAt, updatedAt: createdAt, updatedBy });
     reconcileGoalSavedAmounts(candidate, [goalId]);
     assertFinancialMutationSafe(state2, candidate);
     applyFinancialCandidate(state2, candidate);
   }
   function localTransactionToday() {
-    const date = /* @__PURE__ */ new Date();
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    const date2 = /* @__PURE__ */ new Date();
+    return `${date2.getFullYear()}-${String(date2.getMonth() + 1).padStart(2, "0")}-${String(date2.getDate()).padStart(2, "0")}`;
   }
   function validTransactionDate(value) {
     if (!/^\d{4}-(0[1-9]|1[0-2])-\d{2}$/.test(String(value))) return false;
-    const [y, m, d] = value.split("-").map(Number), date = /* @__PURE__ */ new Date(0);
-    date.setUTCFullYear(y, m - 1, d);
-    date.setUTCHours(12, 0, 0, 0);
-    return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
+    const [y, m, d] = value.split("-").map(Number), date2 = /* @__PURE__ */ new Date(0);
+    date2.setUTCFullYear(y, m - 1, d);
+    date2.setUTCHours(12, 0, 0, 0);
+    return date2.getUTCFullYear() === y && date2.getUTCMonth() === m - 1 && date2.getUTCDate() === d;
   }
   function validateManualTransactionInput(state2, tx, accountContext, { today = localTransactionToday(), existing = null } = {}) {
     var _a2, _b, _c, _d;
@@ -4796,8 +6576,8 @@
     if (getTransactionSource(tx) === "csv" || existing && getTransactionSource(existing) === "csv") throw new Error("CSV moet via de bronverwerking worden bewerkt.");
     if (!ACCOUNT_CONTEXTS.includes(accountContext)) throw new Error("Een betrouwbare fysieke rekeningcontext ontbreekt.");
     if (existing && getTransactionAccountContext(existing, { accountProfiles: state2.accountProfiles || [] }) !== accountContext) throw new Error("De fysieke rekening van een bestaande transactie mag niet worden gewijzigd of gegokt.");
-    const date = getTransactionDate(tx);
-    if (!validTransactionDate(date) || !validTransactionDate(today) || date > today) throw new Error("Vul een geldige transactiedatum van vandaag of in het verleden in.");
+    const date2 = getTransactionDate(tx);
+    if (!validTransactionDate(date2) || !validTransactionDate(today) || date2 > today) throw new Error("Vul een geldige transactiedatum van vandaag of in het verleden in.");
     if (!(Number(tx.amount) > 0) || !Number.isFinite(Number(tx.amount)) || !Number.isSafeInteger(Math.round(Number(tx.amount) * 100)) || Math.abs(Number(tx.amount) * 100 - Math.round(Number(tx.amount) * 100)) > 1e-6) throw new Error("Vul een geldig positief bedrag in eurocenten in.");
     if (tx.splitId || ((_a2 = tx.splits) == null ? void 0 : _a2.length) || ((_c = (_b = tx.processing) == null ? void 0 : _b.splits) == null ? void 0 : _c.length)) throw new Error("Handmatige transacties kunnen niet worden gesplitst.");
     const owner = getTransactionFinancialDestination(tx) || accountContext, type = getTransactionClassification(tx);
@@ -4805,20 +6585,20 @@
     if (!types.includes(type) && !(existing && getTransactionClassification(existing) === type)) throw new Error("Kies een ondersteund transactietype.");
     if (!ACCOUNT_CONTEXTS.includes(owner)) throw new Error("Een geldige financiële bestemming is vereist.");
     if (type === "uitgave" && !tx.fixedExpenseId && !tx.fixedOccurrenceId) {
-      const known = expenseCategoriesForMonth(state2, date.slice(0, 7), owner).includes(tx.category);
-      const unchanged = existing && existing.category === tx.category && getTransactionDate(existing) === date && getTransactionFinancialDestination(existing) === owner;
+      const known = expenseCategoriesForMonth(state2, date2.slice(0, 7), owner).includes(tx.category);
+      const unchanged = existing && existing.category === tx.category && getTransactionDate(existing) === date2 && getTransactionFinancialDestination(existing) === owner;
       if (!known && !unchanged) throw new Error("Kies een actieve budgetcategorie voor de transactiemaand of Overig.");
     }
     const closed = (month2) => {
       var _a3, _b2;
       return ["afgesloten", "correctie-nodig"].includes((_b2 = (_a3 = state2.monthRecords) == null ? void 0 : _a3[month2]) == null ? void 0 : _b2.status);
     };
-    if (closed(date.slice(0, 7)) || existing && closed(getTransactionDate(existing).slice(0, 7))) throw new Error("Deze maand is afgesloten. Heropen de maand of maak een correctie om financiële gegevens te wijzigen.");
+    if (closed(date2.slice(0, 7)) || existing && closed(getTransactionDate(existing).slice(0, 7))) throw new Error("Deze maand is afgesloten. Heropen de maand of maak een correctie om financiële gegevens te wijzigen.");
     if ((state2.manualTransactionReplacements || []).some((row) => {
       var _a3;
       return row.active !== false && (row.manualTransactionId || ((_a3 = row.manualTransaction) == null ? void 0 : _a3.id)) === tx.id;
     })) throw new Error("Deze handmatige transactie is vervangen door CSV. Bewerk de officiële importbron.");
-    const p = tx.processing || tx, fixed = p.fixedExpenseId || tx.fixedExpenseId, month = p.fixedOccurrenceMonth || tx.fixedOccurrenceMonth || date.slice(0, 7);
+    const p = tx.processing || tx, fixed = p.fixedExpenseId || tx.fixedExpenseId, month = p.fixedOccurrenceMonth || tx.fixedOccurrenceMonth || date2.slice(0, 7);
     const occurrences = fixed ? u3PlannedOccurrences(state2.recurringFixedExpenses || [], month) : null;
     const result2 = validateTransactionProcessing(tx, { fixedOccurrences: occurrences, goalExists: (id) => allGoals(state2).some(({ goal }) => goal.id === id), refundCategoryExists: (category, refundMonth, destination) => refundCategoryIsRecognizable(state2, category, refundMonth, destination) });
     if (!result2.ok) throw new Error(result2.errors.map((error2) => error2.message).join(" "));
@@ -4838,11 +6618,11 @@
     assertFinancialMutationSafe(previous, candidate);
     const old = coverageAllocationStatus(previous), invalid = coverageAllocationStatus(candidate).find((row) => row.reason && row.reason !== "coverage-inactive-reference" && !old.some((was) => was.id === row.id && was.reason === row.reason));
     if (invalid) throw new Error(coverageMessage(invalid.reason));
-    for (const pair of candidate.internalTransferPairs || []) if (pair.active !== false && ["bevestigd", "confirmed", "uitgevoerd"].includes(pair.status) && (pair.transactionIds || []).includes(id)) confirmInternalTransferPair(copy5(candidate), pair.id);
+    for (const pair of candidate.internalTransferPairs || []) if (pair.active !== false && ["bevestigd", "confirmed", "uitgevoerd"].includes(pair.status) && (pair.transactionIds || []).includes(id)) confirmInternalTransferPair(copy6(candidate), pair.id);
   }
   function upsertManualFinancialTransaction(state2, tx, accountContext, options = {}) {
     var _a2, _b;
-    const previous = copy5(state2), existing = (state2.transactions || []).find((row) => row.id === tx.id), next = { ...copy5(existing || {}), ...copy5(tx) };
+    const previous = copy6(state2), existing = (state2.transactions || []).find((row) => row.id === tx.id), next = { ...copy6(existing || {}), ...copy6(tx) };
     if (Object.hasOwn(tx, "date") && Object.hasOwn(tx, "transactionDate") && tx.date !== tx.transactionDate) throw new Error("De handmatige transactiedatums spreken elkaar tegen.");
     if (Object.hasOwn(tx, "date")) next.transactionDate = tx.date;
     else if (Object.hasOwn(tx, "transactionDate")) next.date = tx.transactionDate;
@@ -4886,7 +6666,7 @@
     markManualTransaction(next, accountContext);
     next.account = accountContext;
     next.accountOwner = accountContext;
-    const candidate = copy5(state2);
+    const candidate = copy6(state2);
     candidate.transactions = candidate.transactions || [];
     const index = candidate.transactions.findIndex((row) => row.id === next.id);
     if (index >= 0) candidate.transactions[index] = next;
@@ -4898,10 +6678,10 @@
   }
 
   // src/storage/record-sync.mjs
-  var same3 = (a, b) => canonical(a) === canonical(b);
+  var same5 = (a, b) => canonical2(a) === canonical2(b);
   function conflictApprovalReview(value) {
     const local = new Map((value.local.transactions || []).map((row) => [row.id, row]));
-    return (value.remote.transactions || []).filter((row) => getTransactionProcessingStatus(row) === "goedgekeurd" && !same3(row, local.get(row.id))).map((row) => ({ id: row.id, bankSourceId: row.bankSourceId || "", remote: row, local: local.get(row.id) || null }));
+    return (value.remote.transactions || []).filter((row) => getTransactionProcessingStatus(row) === "goedgekeurd" && !same5(row, local.get(row.id))).map((row) => ({ id: row.id, bankSourceId: row.bankSourceId || "", remote: row, local: local.get(row.id) || null }));
   }
   function createRecordSync({ localStore, cloudStore, onStatus = () => {
   }, prepareState = async (state2) => state2, onAdopt = () => {
@@ -4929,7 +6709,7 @@
     }
     async function establishBase() {
       const local = await readLocal(), remote = await cloudStore.verifyIntegrity();
-      if (!same3(local.state, remote.state) || !same3(local.imports, remote.imports)) return conflict(local, remote, "initial-offline-difference");
+      if (!same5(local.state, remote.state) || !same5(local.imports, remote.imports)) return conflict(local, remote, "initial-offline-difference");
       await localStore.acknowledgeRecordCloud([], { epoch: remote.head.epoch, revision: remote.head.revision, localSha256: local.head.sha256, stateHash: remote.head.stateHash, importsHash: remote.head.importsHash });
       return { outcome: "matched", revision: remote.head.revision };
     }
@@ -5103,12 +6883,12 @@
         if (base.__finizePeriodContext.revision !== incoming.__finizePeriodContext.revision) return conflict(snapshot2, { state: incoming, imports: [], head: incoming.__finizePeriodContext.head }, "open-period-revision-changed");
         const next = copyState(incoming), oldRows = new Map(base.transactions.map((row) => [row.id, row])), localRows = new Map(snapshot2.state.transactions.map((row) => [row.id, row]));
         next.transactions = next.transactions.filter((row) => !oldRows.has(row.id) || localRows.has(row.id));
-        for (const [id2, row] of localRows) if (!same3(oldRows.get(id2), row)) {
+        for (const [id2, row] of localRows) if (!same5(oldRows.get(id2), row)) {
           const at = next.transactions.findIndex((value) => value.id === id2);
           if (at < 0) next.transactions.push(copyState(row));
           else next.transactions[at] = copyState(row);
         }
-        for (const key of Object.keys(snapshot2.state)) if (!["transactions", "meta", "__finizePartialHistory", "verifiedPeriods", "__finizePeriodContext"].includes(key) && !same3(base[key], snapshot2.state[key])) next[key] = copyState(snapshot2.state[key]);
+        for (const key of Object.keys(snapshot2.state)) if (!["transactions", "meta", "__finizePartialHistory", "verifiedPeriods", "__finizePeriodContext"].includes(key) && !same5(base[key], snapshot2.state[key])) next[key] = copyState(snapshot2.state[key]);
         next.meta = { ...snapshot2.state.meta, selectedMonth: month };
         refreshWorkspaceTotals(incoming, next);
         incoming = next;
@@ -5167,7 +6947,7 @@
         const lost = (snapshot2.state.transactions || []).filter((row) => row.recordRole === "bank-source" || row.source === "manual").some((row) => !incoming.has(row.id) || getTransactionProcessingStatus(row) === "goedgekeurd" && getTransactionProcessingStatus(incoming.get(row.id)) !== "goedgekeurd");
         if (lost) return conflict(snapshot2, remote, "existing-approval-missing");
       }
-      if (same3(snapshot2.state, remote.state) && same3(snapshot2.imports, remote.imports)) {
+      if (same5(snapshot2.state, remote.state) && same5(snapshot2.imports, remote.imports)) {
         await localStore.acknowledgeRecordCloud([], { epoch: remote.head.epoch, revision: remote.head.revision, localSha256: snapshot2.head.sha256, stateHash: remote.head.stateHash, importsHash: remote.head.importsHash });
         return { outcome: "matched", revision: remote.head.revision };
       }
@@ -5202,16 +6982,16 @@
       if (value.scope && value.scope !== localStore.scope || value.epoch !== c.head.data.epoch || c.head.data.revision !== expectedRemoteRevision || value.remoteRevision !== expectedRemoteRevision || value.localHash !== local.head.sha256) throw storageError("cloud-conflict", "De beoordeelde conflictversies zijn intussen gewijzigd.");
       if (local.state.__finizePartialHistory) {
         const saved = local.conflicts.find((row) => row.id === value.id);
-        if (!saved || saved.remoteHash !== c.head.data.stateHash || !same3(saved.local, value.local) || !same3(saved.remote, value.remote) || !same3(saved.localImports, value.localImports) || !same3(value.local, local.state)) throw storageError("cloud-conflict", "De conflictinhoud wijkt af van het duurzame beoordelingsbewijs.");
+        if (!saved || saved.remoteHash !== c.head.data.stateHash || !same5(saved.local, value.local) || !same5(saved.remote, value.remote) || !same5(saved.localImports, value.localImports) || !same5(value.local, local.state)) throw storageError("cloud-conflict", "De conflictinhoud wijkt af van het duurzame beoordelingsbewijs.");
         const reviewed2 = conflictApprovalReview(value).map((row) => row.id).sort();
-        if (!same3([...new Set(reviewedRemoteChanges)].sort(), reviewed2)) throw storageError("approval-review-required", "Bevestig iedere afwijkende externe goedkeuring; beide versies blijven bewaard.");
+        if (!same5([...new Set(reviewedRemoteChanges)].sort(), reviewed2)) throw storageError("approval-review-required", "Bevestig iedere afwijkende externe goedkeuring; beide versies blijven bewaard.");
         const base = await workspaceState(((_a2 = local.cloudBase) == null ? void 0 : _a2.workspace) || local.state.__finizePeriodContext, local.state.meta.selectedMonth), remote = await cloudStore.openWorkspace(local.state.verifiedPeriods, { explicitFullHistory: local.state.__finizePeriodContext.explicitFullHistory });
         if (remote.__finizePeriodContext.revision !== expectedRemoteRevision) throw storageError("cloud-conflict", "De externe stand is intussen gewijzigd.");
         const old = new Map(base.transactions.map((row) => [row.id, row])), incoming = new Map(remote.transactions.map((row) => [row.id, row]));
         const chosen = new Map(local.state.transactions.map((row) => [row.id, row]));
         for (const id of /* @__PURE__ */ new Set([...old.keys(), ...chosen.keys()])) {
           const row = chosen.get(id), external = incoming.get(id);
-          if (!same3(row, old.get(id)) && !same3(external, old.get(id)) && !same3(row, external)) throw storageError("financial-reapproval-required", "Dezelfde bankverwerking is op beide apparaten gewijzigd. Een nieuwe financiële beoordeling is vereist; beide goedkeuringen blijven beschermd.");
+          if (!same5(row, old.get(id)) && !same5(external, old.get(id)) && !same5(row, external)) throw storageError("financial-reapproval-required", "Dezelfde bankverwerking is op beide apparaten gewijzigd. Een nieuwe financiële beoordeling is vereist; beide goedkeuringen blijven beschermd.");
         }
         const merged = mergeWorkspaceIntent(base, local.state, remote, { strict: false });
         synchronizeChangedSavings(merged, remote);
@@ -5226,9 +7006,9 @@
         await onAdopt(merged, { previousState: local.localState });
         return sync();
       }
-      if (value.remoteHash !== c.head.data.stateHash || await digest(value.remote) !== value.remoteHash || await digest(value.remoteImports) !== c.head.data.importsHash || !same3(value.local, local.state) || !same3(value.localImports, local.imports)) throw storageError("cloud-conflict", "De conflictinhoud hoort niet bij de bewezen lokale en externe standen.");
+      if (value.remoteHash !== c.head.data.stateHash || await digest(value.remote) !== value.remoteHash || await digest(value.remoteImports) !== c.head.data.importsHash || !same5(value.local, local.state) || !same5(value.localImports, local.imports)) throw storageError("cloud-conflict", "De conflictinhoud hoort niet bij de bewezen lokale en externe standen.");
       const reviewed = conflictApprovalReview(value).map((row) => row.id).sort();
-      if (!same3([...new Set(reviewedRemoteChanges)].sort(), reviewed)) throw storageError("approval-review-required", "Beoordeel en bevestig eerst iedere afwijkende externe financiële goedkeuring. Beide versies blijven bewaard.");
+      if (!same5([...new Set(reviewedRemoteChanges)].sort(), reviewed)) throw storageError("approval-review-required", "Beoordeel en bevestig eerst iedere afwijkende externe financiële goedkeuring. Beide versies blijven bewaard.");
       const members = local.operations.map((row) => ({ id: row.id, sha256: row.sha256, storageRevision: row.storageRevision }));
       await localStore.markRecordResolution(value.id, { choice, operationId, reviewedRemoteChanges: reviewed });
       const result2 = await cloudStore.commit({ state: local.state, imports: local.imports, operationId, expectedRevision: expectedRemoteRevision, members });
@@ -5252,9 +7032,9 @@
         const localStore = getLocalStore();
         if (options.householdId !== localStore.scope) throw storageError("household-scope", "De testsessie hoort bij een ander huishouden.");
         const transport = createEmulatorRecordTransport(options), cloudStore = createRecordCloudStore({ ...options, transport, applicationProjection, readLegacyImports });
-        const sync = createRecordSync({ localStore, cloudStore, prepareState, onAdopt, validateIncoming, onStatus: (status) => {
+        const sync = createRecordSync({ localStore, cloudStore, prepareState, onAdopt, validateIncoming, onStatus: (status2) => {
           var _a2;
-          root2.CloudAdapter.status = status;
+          root2.CloudAdapter.status = status2;
           (_a2 = root2.renderCloudStatus) == null ? void 0 : _a2.call(root2);
         } });
         return {
@@ -5324,7 +7104,7 @@
   }
 
   // src/import/import-sync-protocol.mjs
-  var copy6 = (value) => JSON.parse(JSON.stringify(value));
+  var copy7 = (value) => JSON.parse(JSON.stringify(value));
   var importVersion = (record) => Number.isSafeInteger(Number(record == null ? void 0 : record.version)) ? Number(record.version) : 0;
   function sameImportOperation(left, right) {
     return !!(left == null ? void 0 : left.operationId) && left.operationId === (right == null ? void 0 : right.operationId) && importVersion(left) === importVersion(right);
@@ -5370,15 +7150,15 @@
     return conflicts;
   }
   function mergeImportDetails(base, local, remote) {
-    if (remote.lifecycle === "deleted") return { record: copy6(remote), conflicts: [{ kind: "deleted", id: remote.id }] };
-    const result2 = copy6(remote), conflicts = [];
+    if (remote.lifecycle === "deleted") return { record: copy7(remote), conflicts: [{ kind: "deleted", id: remote.id }] };
+    const result2 = copy7(remote), conflicts = [];
     const old = new Map(((base == null ? void 0 : base.rows) || []).map((row) => [row.id, row])), rows = new Map((remote.rows || []).map((row) => [row.id, row]));
     if ((local.lifecycle || "active") !== ((base == null ? void 0 : base.lifecycle) || "active") && (remote.lifecycle || "active") !== ((base == null ? void 0 : base.lifecycle) || "active") && local.lifecycle !== remote.lifecycle) conflicts.push({ kind: "lifecycle", id: local.id });
     for (const row of local.rows || []) {
       if (signature(row) === signature(old.get(row.id))) continue;
       const cloud = rows.get(row.id);
       if (signature(cloud) !== signature(old.get(row.id)) && signature(row) !== signature(cloud)) conflicts.push({ kind: "source", id: row.id });
-      else rows.set(row.id, copy6(row));
+      else rows.set(row.id, copy7(row));
     }
     result2.rows = [...rows.values()];
     return { record: result2, conflicts };
@@ -5403,6 +7183,76 @@
 
   // src/storage/sync-protocol.mjs
   var CLOUD_CONFLICT_CODE = "finize/cloud-conflict";
+  function mergeAccountProfiles(base = [], local = [], remote = []) {
+    const conflict = () => {
+      throw Object.assign(new Error("Rekeninggegevens verschillen tussen lokaal en cloud. Beide versies blijven bewaard; beoordeel het rekeningconflict."), { code: CLOUD_CONFLICT_CODE, accountProfileConflict: true });
+    };
+    for (const rows of [base, local, remote]) if (!Array.isArray(rows) || new Set(rows.map((row) => row.id)).size !== rows.length) conflict();
+    const b = new Map(base.map((row) => [row.id, row])), l = new Map(local.map((row) => [row.id, row])), r = new Map(remote.map((row) => [row.id, row]));
+    const result2 = [];
+    for (const id of /* @__PURE__ */ new Set([...r.keys(), ...l.keys(), ...b.keys()])) {
+      const previous = b.get(id), left = l.get(id), right = r.get(id);
+      if (previous && (!left || !right)) conflict();
+      if (!left || !right) {
+        result2.push(copyValue(left || right));
+        continue;
+      }
+      if (!previous && !sameValue(left, right)) conflict();
+      const merged = {};
+      for (const key of /* @__PURE__ */ new Set([...Object.keys(previous || {}), ...Object.keys(left), ...Object.keys(right)])) {
+        if (["updatedAt", "lastAccountOperationId", "lastAccountOperationSignature"].includes(key)) {
+          const latest2 = String(left.updatedAt || "") > String(right.updatedAt || "") ? left : right;
+          if (latest2[key] !== void 0) merged[key] = copyValue(latest2[key]);
+          continue;
+        }
+        const a = previous == null ? void 0 : previous[key], x = left[key], y = right[key];
+        if (!sameValue(x, a) && !sameValue(y, a) && !sameValue(x, y)) conflict();
+        const value = sameValue(x, a) ? y : x;
+        if (value !== void 0) merged[key] = copyValue(value);
+      }
+      result2.push(merged);
+    }
+    const seen = /* @__PURE__ */ new Map();
+    for (const row of result2) {
+      const iban3 = normalizeAccountIban(row.identifier || row.iban);
+      if (!iban3) continue;
+      if (seen.has(iban3) && !base.some((a) => a.id === row.id && normalizeAccountIban(a.identifier || a.iban) === iban3) && !base.some((a) => a.id === seen.get(iban3) && normalizeAccountIban(a.identifier || a.iban) === iban3)) conflict();
+      if (seen.has(iban3)) {
+        const oldMatches = base.filter((a) => normalizeAccountIban(a.identifier || a.iban) === iban3);
+        if (!oldMatches.some((a) => a.id === row.id) || !oldMatches.some((a) => a.id === seen.get(iban3))) conflict();
+      }
+      seen.set(iban3, row.id);
+    }
+    try {
+      for (const profile of result2) validateLiquiditySettings(profile, result2);
+    } catch (e) {
+      conflict();
+    }
+    return result2;
+  }
+  function assertAccountProfilesPreserved(previous, next, base = null) {
+    try {
+      assertAccountProfileMutation(previous, next);
+      if (base) {
+        const merged = mergeAccountProfiles(base.accountProfiles || [], previous.accountProfiles || [], next.accountProfiles || []);
+        const byId = (rows) => JSON.stringify([...rows].sort((a, b) => a.id.localeCompare(b.id)), (_, value) => isPlainObject(value) ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, value[key]])) : value);
+        if (byId(merged) !== byId(next.accountProfiles || [])) throw new Error("Lokale rekeningwijzigingen ontbreken in de cloudstand.");
+      } else {
+        for (const row of previous.accountProfiles || []) {
+          const incoming = (next.accountProfiles || []).find((item) => item.id === row.id);
+          if (row.lastAccountOperationId && !sameValue(row, incoming)) throw new Error("Lokale rekeningwijzigingen zijn nog niet gezamenlijk bevestigd.");
+        }
+      }
+    } catch (error2) {
+      throw Object.assign(new Error(error2.message), { code: CLOUD_CONFLICT_CODE, accountProfileConflict: true });
+    }
+  }
+  function assertCheckpointHistoryPreserved(previous, next) {
+    const canonical4 = (value) => JSON.stringify(value, (_, item) => item && typeof item === "object" && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).sort().map((key) => [key, item[key]])) : item);
+    const rows = new Map((next.balanceCheckpoints || []).map((row) => [row.id, row]));
+    for (const row of previous.balanceCheckpoints || []) if (canonical4(rows.get(row.id)) !== canonical4(row))
+      throw Object.assign(new Error("De cloudstand mist een bestaande saldo-waarneming of heeft deze gewijzigd. De lokale historie blijft behouden."), { code: CLOUD_CONFLICT_CODE });
+  }
   function cloudDocumentVersion(documentData) {
     const value = Number(documentData == null ? void 0 : documentData.syncVersion);
     return Number.isSafeInteger(value) && value >= 0 ? value : 0;
@@ -5494,6 +7344,38 @@
     return result2;
   }
   function rebaseLocalChanges(base, local, remote) {
+    if ([base, local, remote].some((value) => isPlainObject(value) && Object.hasOwn(value, "accountProfiles"))) {
+      const profiles = mergeAccountProfiles((base == null ? void 0 : base.accountProfiles) || [], (local == null ? void 0 : local.accountProfiles) || [], (remote == null ? void 0 : remote.accountProfiles) || []);
+      const without = (value) => {
+        if (!isPlainObject(value)) return value;
+        const copy10 = { ...value };
+        delete copy10.accountProfiles;
+        return copy10;
+      };
+      const result2 = rebaseLocalChanges(without(base), without(local), without(remote));
+      result2.accountProfiles = profiles;
+      return result2;
+    }
+    if ([base, local, remote].some((value) => isPlainObject(value) && Object.hasOwn(value, "balanceCheckpoints"))) {
+      const rows = /* @__PURE__ */ new Map(), canonical4 = (value) => JSON.stringify(value, (_, item) => isPlainObject(item) ? Object.fromEntries(Object.keys(item).sort().map((key) => [key, item[key]])) : item);
+      for (const value of [base, remote, local]) {
+        if ((value == null ? void 0 : value.balanceCheckpoints) !== void 0 && !Array.isArray(value.balanceCheckpoints)) throw Object.assign(new Error("De saldo-ijkpunthistorie is ongeldig; beide standen blijven behouden."), { code: CLOUD_CONFLICT_CODE });
+        for (const row of (value == null ? void 0 : value.balanceCheckpoints) || []) {
+          if (!(row == null ? void 0 : row.id) || rows.has(row.id) && canonical4(rows.get(row.id)) !== canonical4(row)) throw Object.assign(new Error("Een bestaande saldo-waarneming is gewijzigd; beide standen blijven behouden."), { code: CLOUD_CONFLICT_CODE });
+          rows.set(row.id, copyValue(row));
+        }
+      }
+      const without = (value) => {
+        if (!isPlainObject(value)) return value;
+        const result3 = { ...value };
+        delete result3.balanceCheckpoints;
+        return result3;
+      };
+      const result2 = rebaseLocalChanges(without(base), without(local), without(remote));
+      if (!isPlainObject(result2)) throw Object.assign(new Error("De huishoudstand ontbreekt bij saldo-synchronisatie."), { code: CLOUD_CONFLICT_CODE });
+      result2.balanceCheckpoints = [...rows.values()];
+      return result2;
+    }
     if (sameValue(local, base)) return copyValue(remote);
     if (sameValue(remote, base)) return copyValue(local);
     if (Array.isArray(base) && Array.isArray(local) && Array.isArray(remote)) {
@@ -5832,9 +7714,9 @@
       card.querySelectorAll("[data-goal-move]").forEach((button) => {
         const direction = Number(button.dataset.goalMove) || 0;
         button.disabled = index < 0 || index + direction < 0 || index + direction >= goals.length;
-        button.addEventListener("click", async (event) => {
-          event.preventDefault();
-          event.stopPropagation();
+        button.addEventListener("click", async (event2) => {
+          event2.preventDefault();
+          event2.stopPropagation();
           if (button.disabled) return;
           await move(owner, id, index + direction);
         });
@@ -5894,8 +7776,8 @@
     for (const [re, label] of aliases) if (re.test(normalized)) return label;
     return raw.charAt(0).toUpperCase() + raw.slice(1);
   }
-  function monthKey(date = /* @__PURE__ */ new Date()) {
-    return date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0");
+  function monthKey(date2 = /* @__PURE__ */ new Date()) {
+    return date2.getFullYear() + "-" + String(date2.getMonth() + 1).padStart(2, "0");
   }
   function previousMonthKey(key) {
     const [y, m] = String(key || monthKey()).split("-").map(Number);
@@ -6069,15 +7951,15 @@
   var U3_SCHEMA_VERSION = CURRENT_SCHEMA_VERSION;
   var U3_ACCOUNTS = ["gezamenlijk", "dion", "dara"];
   var U3_FREQUENCY_UNITS2 = ["weken", "maanden", "jaren"];
-  function u3IsoDate2(date) {
-    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "";
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  function u3IsoDate2(date2) {
+    if (!(date2 instanceof Date) || Number.isNaN(date2.getTime())) return "";
+    return `${date2.getFullYear()}-${String(date2.getMonth() + 1).padStart(2, "0")}-${String(date2.getDate()).padStart(2, "0")}`;
   }
   function u3ParseDate2(value) {
     const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
     if (!match) return null;
-    const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12);
-    return date.getFullYear() === Number(match[1]) && date.getMonth() === Number(match[2]) - 1 && date.getDate() === Number(match[3]) ? date : null;
+    const date2 = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12);
+    return date2.getFullYear() === Number(match[1]) && date2.getMonth() === Number(match[2]) - 1 && date2.getDate() === Number(match[3]) ? date2 : null;
   }
   function u3MonthBounds2(month) {
     const match = String(month || "").match(/^(\d{4})-(\d{2})$/);
@@ -6110,8 +7992,8 @@
     if ((item == null ? void 0 : item.frequentieEenheid) === "jaren") return round22(amount / (12 * count));
     return round22(amount / count);
   }
-  function u3OccurrenceId2(itemId, date) {
-    return `${itemId}:${date}`;
+  function u3OccurrenceId2(itemId, date2) {
+    return `${itemId}:${date2}`;
   }
   function u3PlannedOccurrences2(items, month) {
     return u3PlannedOccurrences(items, month);
@@ -6419,7 +8301,7 @@
   function sumTransactions(owner = null, category = null, month = getSelectedMonth(), budgetItemId = "") {
     if (category && owner) return budgetActual(state, month, owner, category, budgetItemId);
     const actuals = categoryActuals(state, month, owner);
-    return round22(Object.entries(actuals).reduce((sum, [label, amount]) => category && !budgetCategoryMatches({ category: label }, category) ? sum : sum + amount, 0));
+    return round22(Object.entries(actuals).reduce((sum2, [label, amount]) => category && !budgetCategoryMatches({ category: label }, category) ? sum2 : sum2 + amount, 0));
   }
   function transactionsByCategory(owner, month = getSelectedMonth()) {
     return categoryActuals(state, month, owner);
@@ -6432,23 +8314,23 @@
   }
   function unmatchedMonthlyRefundTotal(owner, month, transactions) {
     var _a2, _b;
-    return round22((((_b = (_a2 = state.monthlyTeruggaven) == null ? void 0 : _a2[month]) == null ? void 0 : _b[owner]) || []).reduce((sum, refund) => {
-      return transactions.some((tx) => u3IncomeTransactionOwner(tx) === owner && transactionMatchesLegacyRefund(tx, refund)) ? sum : sum + (Number(refund.bedrag) || 0);
+    return round22((((_b = (_a2 = state.monthlyTeruggaven) == null ? void 0 : _a2[month]) == null ? void 0 : _b[owner]) || []).reduce((sum2, refund) => {
+      return transactions.some((tx) => u3IncomeTransactionOwner(tx) === owner && transactionMatchesLegacyRefund(tx, refund)) ? sum2 : sum2 + (Number(refund.bedrag) || 0);
     }, 0));
   }
   function representedFixedRefund(owner, month, incomeRows) {
     const sources = (state.recurringIncomeSources || []).filter((source) => source.legacyKind === "fixed-refund" && source.eigenaar === owner && source.actief !== false);
-    return round22(sources.reduce((sum, source) => {
+    return round22(sources.reduce((sum2, source) => {
       const recognition = source.recognition || {};
       const expected = Math.abs(u3AmountAt2(source, month));
       const tolerance = Math.max(0, Number(recognition.amountTolerance) || 0);
       const recognitionText = bankText(recognition.text || source.naam || "");
       const represented = incomeRows.some((tx) => {
         if (u3IncomeTransactionOwner(tx) !== owner || normalizedTransactionType(tx) === "salaris") return false;
-        const text = bankText(tx.description || tx.title || tx.name || "");
-        return !!recognitionText && text.includes(recognitionText) && Math.abs(Math.abs(Number(tx.amount) || 0) - expected) <= tolerance;
+        const text2 = bankText(tx.description || tx.title || tx.name || "");
+        return !!recognitionText && text2.includes(recognitionText) && Math.abs(Math.abs(Number(tx.amount) || 0) - expected) <= tolerance;
       });
-      return represented ? sum + expected : sum;
+      return represented ? sum2 + expected : sum2;
     }, 0));
   }
   function monthlyFinancialForecast(month = getSelectedMonth()) {
@@ -6467,7 +8349,7 @@
     const legacyOwners = legacySalaryForecastOwners(state, month, standard);
     const dion = incomeProjectionForMonth(state, month, "dion", standard.dion, { legacyOwners }), dara = incomeProjectionForMonth(state, month, "dara", standard.dara, { legacyOwners });
     const projections = selectTransactionProjections(state, { month, account: "gezamenlijk" });
-    const extraTransactions = round22(projections.reduce((sum, p) => sum + (p.transactionType === "salaris" && ["dion", "dara"].includes(legacyOwners.get(p.id) || p.financialFor) ? 0 : p.effects.incomeImpact), 0));
+    const extraTransactions = round22(projections.reduce((sum2, p) => sum2 + (p.transactionType === "salaris" && ["dion", "dara"].includes(legacyOwners.get(p.id) || p.financialFor) ? 0 : p.effects.incomeImpact), 0));
     const salaryBase = round22(dion.salary + dara.salary);
     const fixedRefundBase = round22(
       Math.max(0, standard.dion.refund - representedFixedRefund("dion", month, rows)) + Math.max(0, standard.dara.refund - representedFixedRefund("dara", month, rows))
@@ -6509,7 +8391,7 @@
     add("Vaste teruggaven", Math.max(0, parts2.refund - representedFixedRefund(owner, month, rows)));
     add("Persoonlijke teruggaven", monthlyRefunds);
     const items = [...sources.entries()].map(([label, amount]) => ({ label, amount }));
-    return { total: round22(items.reduce((sum, item) => sum + item.amount, 0)), items };
+    return { total: round22(items.reduce((sum2, item) => sum2 + item.amount, 0)), items };
   }
   function renderIncomeSources(overview, owner = "gezamenlijk") {
     return `<div class="personal-income-sources">${overview.items.map((item) => `<div><span><button type="button" class="income-source-link" data-income-source="${attrSafe(item.label)}" data-income-owner="${attrSafe(owner)}" data-income-month="${attrSafe(getSelectedMonth())}" aria-label="Transacties bij ${attrSafe(item.label)} bekijken">${textSafe(item.label)}</button></span><strong>${eur(item.amount)}</strong></div>`).join("")}</div>`;
@@ -6533,9 +8415,9 @@
     });
   }
   function bindIncomeSourceLinks(root2) {
-    root2.querySelectorAll("[data-income-source]").forEach((button) => button.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
+    root2.querySelectorAll("[data-income-source]").forEach((button) => button.addEventListener("click", (event2) => {
+      event2.preventDefault();
+      event2.stopPropagation();
       openIncomeSourceTransactions(button.dataset.incomeOwner, button.dataset.incomeSource, button.dataset.incomeMonth, button);
     }));
   }
@@ -6547,7 +8429,7 @@
     const all = incomeSourceProjectionRows(owner, label, month);
     const rows = all.filter((p) => p.accountContext === "gezamenlijk" || canViewPersonalTab(p.accountContext) && personalKpiVisible(p.accountContext, "income"));
     const hidden = rows.length < all.length;
-    const linkedCents = all.reduce((sum, p) => sum + Math.round((p.effects.incomeImpact || p.amount) * 100), 0);
+    const linkedCents = all.reduce((sum2, p) => sum2 + Math.round((p.effects.incomeImpact || p.amount) * 100), 0);
     const unlinked = linkedCents !== Math.round(item.amount * 100);
     const modal = document.getElementById("transactionModal");
     const fromOverview = document.getElementById("incomeEditModal").classList.contains("open");
@@ -6564,9 +8446,9 @@
       if (fromOverview) document.getElementById("incomeEditModal").classList.add("open");
       if (trigger == null ? void 0 : trigger.isConnected) trigger.focus();
     };
-    const onKey = (event) => {
-      if (event.key === "Escape") {
-        event.stopPropagation();
+    const onKey = (event2) => {
+      if (event2.key === "Escape") {
+        event2.stopPropagation();
         close();
       }
     };
@@ -6702,8 +8584,8 @@
     });
     const monthButton = root2.querySelector("#monthPickerButton");
     if (monthButton && !monthButton.querySelector(".finize-action-icon")) {
-      const text = monthButton.textContent.trim();
-      monthButton.innerHTML = finizeIconWrap("calendar") + `<span class="month-picker-label">${text}</span>`;
+      const text2 = monthButton.textContent.trim();
+      monthButton.innerHTML = finizeIconWrap("calendar") + `<span class="month-picker-label">${text2}</span>`;
     }
     const buttonRules = [
       ["[data-open-joint-transaction], [data-open-personal-transaction]", "plus"],
@@ -6742,8 +8624,8 @@
     });
     root2.querySelectorAll("td:first-child").forEach((cell) => {
       var _a2, _b;
-      const text = cell.textContent.trim();
-      if (/^[⌂~⚡◆▤▶◌▣□€•…]$/.test(text)) {
+      const text2 = cell.textContent.trim();
+      if (/^[⌂~⚡◆▤▶◌▣□€•…]$/.test(text2)) {
         const row = cell.closest("tr");
         const category = ((_a2 = row == null ? void 0 : row.querySelector('input[data-path$=".categorie"]')) == null ? void 0 : _a2.value) || ((_b = row == null ? void 0 : row.querySelector("td:nth-child(2) input")) == null ? void 0 : _b.value) || "";
         cell.classList.add("finize-icon-cell");
@@ -6881,9 +8763,9 @@
   }
   function renderIconKpi(icon, color, label, value, sub, opts = {}) {
     const valClass = opts.valueClass ? ` ${opts.valueClass}` : "";
-    const action = opts.openFixedOwner ? `button type="button" data-u3-open="planning" data-u3-planning-owner="${opts.openFixedOwner}" aria-label="Vaste lasten van ${textSafe(ownerLabel(opts.openFixedOwner))} wijzigen"` : opts.editSavingOwner ? `button type="button" data-personal-saving-edit="${opts.editSavingOwner}" aria-label="Spaargeld van ${textSafe(ownerLabel(opts.editSavingOwner))} voor deze maand aanpassen"` : opts.editSaving ? 'button type="button" data-saving-edit aria-label="Spaargeld van deze maand aanpassen"' : "div";
-    const tag = action.startsWith("button") ? "button" : "div";
-    const attrs = tag === "button" ? action.slice("button".length) : "";
+    const action2 = opts.openFixedOwner ? `button type="button" data-u3-open="planning" data-u3-planning-owner="${opts.openFixedOwner}" aria-label="Vaste lasten van ${textSafe(ownerLabel(opts.openFixedOwner))} wijzigen"` : opts.editSavingOwner ? `button type="button" data-personal-saving-edit="${opts.editSavingOwner}" aria-label="Spaargeld van ${textSafe(ownerLabel(opts.editSavingOwner))} voor deze maand aanpassen"` : opts.editSaving ? 'button type="button" data-saving-edit aria-label="Spaargeld van deze maand aanpassen"' : "div";
+    const tag = action2.startsWith("button") ? "button" : "div";
+    const attrs = tag === "button" ? action2.slice("button".length) : "";
     const kpiId = opts.kpiId ? ` data-personal-kpi="${opts.kpiId}"` : "";
     return `<${tag}${attrs}${kpiId} class="card metric-card icon-kpi ${opts.span || "span-3"}${tag === "button" ? " overview-kpi-action" : ""}">
     <div class="icon-kpi-top"><span class="icon-circle ${color}">${renderIconContent(icon)}</span><div class="metric-label">${label}</div></div>
@@ -6897,8 +8779,8 @@
     <div><h3>${title}</h3><p>${desc}</p>${extra}</div>
   </div>`;
   }
-  function renderEmptyState(icon, title, text, action = "") {
-    return `<div class="empty-state"><span class="icon-circle">${renderIconContent(icon)}</span><h4>${title}</h4><p>${text}</p>${action}</div>`;
+  function renderEmptyState(icon, title, text2, action2 = "") {
+    return `<div class="empty-state"><span class="icon-circle">${renderIconContent(icon)}</span><h4>${title}</h4><p>${text2}</p>${action2}</div>`;
   }
   function renderPageHeading(title, subtitle) {
     return `<div class="page-heading"><h2>${textSafe(title)}</h2>${subtitle ? `<p>${textSafe(subtitle)}</p>` : ""}</div>`;
@@ -7023,11 +8905,11 @@
   function bindDashboardAccordionKeyboard(root2) {
     if (!root2 || root2.dataset.dashboardAccordionKeyboardBound === "true") return;
     root2.dataset.dashboardAccordionKeyboardBound = "true";
-    root2.addEventListener("keydown", (event) => {
+    root2.addEventListener("keydown", (event2) => {
       var _a2, _b;
-      const summary = (_b = (_a2 = event.target).closest) == null ? void 0 : _b.call(_a2, "[data-dashboard-accordion] > summary");
-      if (!summary || !root2.contains(summary) || !["Enter", " ", "Spacebar"].includes(event.key)) return;
-      event.preventDefault();
+      const summary = (_b = (_a2 = event2.target).closest) == null ? void 0 : _b.call(_a2, "[data-dashboard-accordion] > summary");
+      if (!summary || !root2.contains(summary) || !["Enter", " ", "Spacebar"].includes(event2.key)) return;
+      event2.preventDefault();
       summary.parentElement.open = !summary.parentElement.open;
     });
   }
@@ -7059,20 +8941,20 @@
     return (line.match(/;/g) || []).length >= (line.match(/,/g) || []).length ? ";" : ",";
   }
   function bankDate(value) {
-    const text = String(value || "").trim();
-    const iso = text.match(/^(\d{4})[-/]?(\d{2})[-/]?(\d{2})$/);
+    const text2 = String(value || "").trim();
+    const iso = text2.match(/^(\d{4})[-/]?(\d{2})[-/]?(\d{2})$/);
     if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
-    const nl = text.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/);
+    const nl = text2.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/);
     if (!nl) return "";
     const year = nl[3].length === 2 ? `20${nl[3]}` : nl[3];
     return `${year}-${String(nl[2]).padStart(2, "0")}-${String(nl[1]).padStart(2, "0")}`;
   }
   function bankAmount(value) {
-    let text = String(value || "").trim().replace(/\s/g, "").replace(/€|EUR/gi, "");
-    if (!text) return NaN;
-    if (text.includes(",") && text.includes(".")) text = text.lastIndexOf(",") > text.lastIndexOf(".") ? text.replace(/\./g, "").replace(",", ".") : text.replace(/,/g, "");
-    else text = text.replace(",", ".");
-    return Number(text);
+    let text2 = String(value || "").trim().replace(/\s/g, "").replace(/€|EUR/gi, "");
+    if (!text2) return NaN;
+    if (text2.includes(",") && text2.includes(".")) text2 = text2.lastIndexOf(",") > text2.lastIndexOf(".") ? text2.replace(/\./g, "").replace(",", ".") : text2.replace(/,/g, "");
+    else text2 = text2.replace(",", ".");
+    return Number(text2);
   }
   function dataUrlByteSize(dataUrl) {
     const comma = String(dataUrl || "").indexOf(",");
@@ -7133,8 +9015,8 @@
     return [...expenseCategoriesForMonth(state, month, owner), "Vaste lasten"];
   }
   function bankSuggestedCategory(description, owner) {
-    const text = bankText(description);
-    const rule = (state.bankImportRules || []).find((item) => text && text.includes(item.match));
+    const text2 = bankText(description);
+    const rule = (state.bankImportRules || []).find((item) => text2 && text2.includes(item.match));
     const categories = bankOwnerCategories(owner);
     return categories.find((category) => category.toLocaleLowerCase() === String((rule == null ? void 0 : rule.category) || "").toLocaleLowerCase()) || "Overig";
   }
@@ -7147,13 +9029,13 @@
     const { headers, rawRows, mapping, owner } = bankImportDraft;
     const dateIndex = Number(mapping.date), descriptionIndex = Number(mapping.description), amountIndex = Number(mapping.amount), directionIndex = Number(mapping.direction);
     bankImportDraft.rows = rawRows.map((cells, index) => {
-      const date = bankDate(cells[dateIndex]);
+      const date2 = bankDate(cells[dateIndex]);
       const description = String(cells[descriptionIndex] || "").trim();
       let amount = bankAmount(cells[amountIndex]);
       const direction = directionIndex >= 0 ? bankText(cells[directionIndex]) : "";
       if (/^af|debit|debet/.test(direction)) amount = -Math.abs(amount);
       if (/^bij|credit|crediter/.test(direction)) amount = Math.abs(amount);
-      const row = { id: `bank-${index}`, index, date, description, amount, owner, category: amount > 0 ? "Teruggave" : bankSuggestedCategory(description, owner), valid: !!date && !!description && Number.isFinite(amount) };
+      const row = { id: `bank-${index}`, index, date: date2, description, amount, owner, category: amount > 0 ? "Teruggave" : bankSuggestedCategory(description, owner), valid: !!date2 && !!description && Number.isFinite(amount) };
       row.positive = row.amount > 0;
       row.duplicate = row.valid && row.amount < 0 && bankIsDuplicate(row);
       row.selected = row.valid && !row.duplicate;
@@ -7169,12 +9051,12 @@
     const rows = draft.rows || [];
     const rowsHtml = rows.map((row) => {
       const categories = row.positive ? ["Teruggave"] : bankOwnerCategories(draft.owner);
-      const status = !row.valid ? "Niet leesbaar" : row.positive ? "Teruggave bij inkomen" : row.duplicate ? "Mogelijk dubbel" : "Klaar";
+      const status2 = !row.valid ? "Niet leesbaar" : row.positive ? "Teruggave bij inkomen" : row.duplicate ? "Mogelijk dubbel" : "Klaar";
       return `<div class="bank-review-row ${row.positive ? "bank-credit" : ""} ${row.duplicate ? "bank-duplicate" : ""}" data-bank-row="${row.index}">
       <input type="checkbox" data-bank-select="${row.index}" ${row.selected ? "checked" : ""} ${!row.valid || row.duplicate ? "disabled" : ""} aria-label="Transactie selecteren">
       <span class="bank-review-date">${row.date || "—"}</span><span class="bank-review-description" title="${textSafe(row.description)}">${textSafe(row.description || "Onbekend")}</span><strong class="bank-review-amount">${Number.isFinite(row.amount) ? eur(Math.abs(row.amount)) : "—"}</strong>
       <select data-bank-category="${row.index}" ${!row.valid ? "disabled" : ""}>${categories.map((category) => `<option value="${textSafe(category)}" ${String(category).toLocaleLowerCase() === String(row.category).toLocaleLowerCase() ? "selected" : ""}>${textSafe(category)}</option>`).join("")}</select>
-      <span class="bank-review-status">${status}</span><button type="button" class="ghost small" data-bank-import-row="${row.index}" ${!row.selected || row.duplicate ? "disabled" : ""}>Toevoegen</button>
+      <span class="bank-review-status">${status2}</span><button type="button" class="ghost small" data-bank-import-row="${row.index}" ${!row.selected || row.duplicate ? "disabled" : ""}>Toevoegen</button>
     </div>`;
     }).join("");
     return `<div class="bank-import-panel">${base}<div class="bank-mapping"><strong>${textSafe(draft.fileName)}</strong><div>${mapSelect("date", "Datum")}${mapSelect("description", "Omschrijving")}${mapSelect("amount", "Bedrag")}${mapSelect("direction", "Af/bij (optioneel)")}</div></div><div class="bank-review-head"><strong>Controle vóór import</strong><span>${rows.filter((row) => row.selected).length} uitgaven geselecteerd</span></div><div class="bank-review-list">${rowsHtml || '<p class="hint">Geen regels gevonden.</p>'}</div><button type="button" class="primary bank-import-all" data-bank-import-all ${rows.some((row) => row.selected) ? "" : "disabled"}>Geselecteerde uitgaven importeren</button></div>`;
@@ -7248,7 +9130,7 @@
       Math.max(0, Math.round((Number(b.doel.vasteInleg) || 0) * 100)),
       Math.max(0, Math.round((Number(b.nogTeGaan) || 0) * 100))
     ));
-    const totaalVasteCents = vasteCents.reduce((sum, value) => sum + value, 0);
+    const totaalVasteCents = vasteCents.reduce((sum2, value) => sum2 + value, 0);
     const totaalVasteInleg = round22(totaalVasteCents / 100);
     const verdeelbaar = berekend.filter((b) => !b.doel.vastBedrag);
     const totaalBenodigd = round22(verdeelbaar.reduce((s, b) => s + (b.benodigdPerMaand || 0), 0));
@@ -7259,7 +9141,7 @@
     const capacities = berekend.map((b, index) => Math.max(0, Math.round((Number(b.nogTeGaan) || 0) * 100) - vasteCents[index]));
     let active = berekend.map((b, index) => ({ index, weight: Math.max(0, Number(b.benodigdeExtraInleg) || 0) })).filter((item) => !berekend[item.index].doel.vastBedrag && item.weight > 0 && capacities[item.index] > 0);
     while (resterendePotCents > 0 && active.length) {
-      const totalWeight = active.reduce((sum, item) => sum + item.weight, 0);
+      const totalWeight = active.reduce((sum2, item) => sum2 + item.weight, 0);
       if (!(totalWeight > 0)) break;
       const capped = active.filter((item) => resterendePotCents * (item.weight / totalWeight) >= capacities[item.index]);
       if (capped.length) {
@@ -7276,7 +9158,7 @@
         const raw = resterendePotCents * (item.weight / totalWeight);
         return { ...item, cents: Math.floor(raw), fraction: raw - Math.floor(raw) };
       });
-      let assigned = shares.reduce((sum, item) => sum + item.cents, 0);
+      let assigned = shares.reduce((sum2, item) => sum2 + item.cents, 0);
       shares.sort((a, b) => b.fraction - a.fraction || a.index - b.index);
       for (let cent = 0; cent < resterendePotCents - assigned; cent++) shares[cent % shares.length].cents += 1;
       shares.forEach((item) => {
@@ -7563,13 +9445,13 @@
       });
       return this.dbPromise;
     },
-    async transact(mode2, action) {
+    async transact(mode2, action2) {
       const db = await this.open();
       return new Promise((resolve, reject) => {
         const tx = db.transaction(GOAL_IMAGE_STORE_NAME, mode2);
         const store = tx.objectStore(GOAL_IMAGE_STORE_NAME);
         try {
-          action(store);
+          action2(store);
         } catch (error2) {
           reject(error2);
           return;
@@ -7963,8 +9845,8 @@
   function firebaseConfigIsComplete(config) {
     return !!(config && config.apiKey && config.authDomain && config.projectId && config.appId);
   }
-  function saveFirebaseConfigFromText(text) {
-    const parsed = JSON.parse(text);
+  function saveFirebaseConfigFromText(text2) {
+    const parsed = JSON.parse(text2);
     const config = { ...DEFAULT_FIREBASE_CONFIG, ...parsed };
     if (!firebaseConfigIsComplete(config)) {
       throw new Error("Firebase-config mist apiKey, authDomain, projectId of appId.");
@@ -8102,6 +9984,13 @@
         if (this.initialSyncComplete && isStaleCloudSnapshot({ ...documentData, state: normalizedRemote }, this.cloudVersion, this.lastCloudSignature)) return false;
         if (retainNewLocalCommit()) return false;
         const candidate = cloneState(normalizedRemote);
+        try {
+          assertAccountProfilesPreserved(committedStateSnapshot || state, candidate, this.confirmedState);
+        } catch (error2) {
+          await this.preserveAccountProfileConflict(committedStateSnapshot || state, normalizedRemote, documentData);
+          throw error2;
+        }
+        assertCheckpointHistoryPreserved(committedStateSnapshot || state, candidate);
         await GoalImageStore.initializeState(candidate);
         if (((_e = activeStorageKeys()) == null ? void 0 : _e.state) !== acceptanceScope || this.docRef !== acceptanceRef) return false;
         if (this.initialSyncComplete && isStaleCloudSnapshot({ ...documentData, state: normalizedRemote }, this.cloudVersion, this.lastCloudSignature)) return false;
@@ -8171,7 +10060,13 @@
         renderCloudStatus();
         return false;
       }
-      const merged = rebaseLocalChanges(base, localSnapshot, normalizedRemote);
+      let merged;
+      try {
+        merged = rebaseLocalChanges(base, localSnapshot, normalizedRemote);
+      } catch (error2) {
+        if (error2.accountProfileConflict) await this.preserveAccountProfileConflict(localSnapshot, normalizedRemote, documentData);
+        throw error2;
+      }
       assertNoDuplicateSources(normalizedRemote, merged);
       assertFinancialMutationSafe(normalizedRemote, merged);
       merged.meta = isPlainObject2(merged.meta) ? merged.meta : {};
@@ -8202,6 +10097,16 @@
       this.status = "Opslaan…";
       renderActiveTab();
       return true;
+    },
+    async preserveAccountProfileConflict(local, remote, documentData) {
+      var _a2;
+      if (!((_a2 = window.FinizeImportSync) == null ? void 0 : _a2.preserveConflict)) throw new Error("Rekeningconflict kan nog niet veilig worden opgeslagen.");
+      await window.FinizeImportSync.preserveConflict({ id: "account-profiles", fileName: "Bankrekeningen", state: cloneState(local) }, { id: "account-profiles", fileName: "Bankrekeningen", state: cloneState(remote), documentData: cloneState(documentData) }, [{ kind: "account-profile-conflict" }]);
+      this.remoteStateWaiting = { documentData: cloneState(documentData), normalizedRemote: cloneState(remote) };
+      this.conflict = true;
+      this.lastFailureRetryable = false;
+      this.status = "Rekeningconflict — beide versies bewaard";
+      renderCloudStatus();
     },
     async preserveImportStateConflict(local, remote, conflicts) {
       var _a2;
@@ -8757,6 +10662,7 @@
       const mutation = typeof change === "function" ? change(state) : typeof (change == null ? void 0 : change.apply) === "function" ? change.apply(state) : null;
       if (mutation && typeof mutation.then === "function") throw new Error("Een financiële mutatie moet synchroon een kandidaat maken; de opslag wordt daarna awaited.");
       if (JSON.stringify(before) === JSON.stringify(state)) return true;
+      assertAccountProfileMutation(before, state);
       if (before.__finizePartialHistory) {
         try {
           assertWorkspaceMutation(before, state);
@@ -8810,7 +10716,8 @@
       ensurePersistentIds(state);
       const finishAccountNormalization = profileStart("commit.accountNormalization");
       const previousTransactions = new Map(before.transactions.map((tx) => [tx.id, tx]));
-      const sameAccountProfiles = JSON.stringify(before.accountProfiles) === JSON.stringify(state.accountProfiles);
+      const accountIdentity = (profiles) => (profiles || []).map((profile) => ({ id: profile.id, identifier: profile.identifier, iban: profile.iban, accountOwner: profile.accountOwner }));
+      const sameAccountProfiles = JSON.stringify(accountIdentity(before.accountProfiles)) === JSON.stringify(accountIdentity(state.accountProfiles));
       state.transactions = state.transactions.map((tx) => sameAccountProfiles && JSON.stringify(previousTransactions.get(tx.id)) === JSON.stringify(tx) ? tx : normalizeDataTransaction(tx, { accountProfiles: state.accountProfiles }));
       finishAccountNormalization();
       state.meta = isPlainObject2(state.meta) ? state.meta : {};
@@ -8857,16 +10764,16 @@
     const cloud = document.getElementById("cloudStatus");
     if (cloud) cloud.textContent = CloudAdapter.statusText();
     const save = document.getElementById("saveStatus");
-    const status = CloudAdapter.statusText();
-    const online = CloudAdapter.isConnected() && status !== "Synchronisatie mislukt" && status !== "Synchronisatieconflict";
+    const status2 = CloudAdapter.statusText();
+    const online = CloudAdapter.isConnected() && status2 !== "Synchronisatie mislukt" && status2 !== "Synchronisatieconflict";
     if (save) {
-      save.textContent = status;
-      save.title = status + " · klik voor back-up en cloud";
-      save.dataset.storageStatus = status;
+      save.textContent = status2;
+      save.title = status2 + " · klik voor back-up en cloud";
+      save.dataset.storageStatus = status2;
       save.classList.toggle("offline", !online);
     }
     document.querySelectorAll(".mobile-status-pill").forEach((pill) => {
-      pill.textContent = status;
+      pill.textContent = status2;
       pill.classList.toggle("offline", !online);
     });
   }
@@ -9286,115 +11193,11 @@
       });
     });
   }
+  var p3Dashboard;
   function renderDashboard() {
     rescueMonthControl();
-    const r = calcScenario(state);
-    const scenarioData = getMonthlyScenarioData();
-    const gGoals = calcGroep(state.spaardoelen.gezamenlijk, r.spaarpotDezeMaand, TODAY);
-    const dionGoals = calcGroep(state.spaardoelen.dion, r.dion.beschikbaarVoorSparen, TODAY);
-    const daraGoals = calcGroep(state.spaardoelen.dara, r.dara.beschikbaarVoorSparen, TODAY);
-    const allGoals2 = [
-      ...gGoals.map((g) => ({ ...g, owner: "Gezamenlijk" })),
-      ...dionGoals.map((g) => ({ ...g, owner: "Dion" })),
-      ...daraGoals.map((g) => ({ ...g, owner: "Dara" }))
-    ];
-    const totalZakgeld = round22(r.dion.zakgeld + r.dara.zakgeld);
-    const incomeBreakdown = dashboardIncomeBreakdown(getSelectedMonth());
-    const dashboardTotalIncome = incomeBreakdown.total;
-    const jointRemaining = r.forecast.distributable;
-    const splitDion = totalZakgeld > 0 ? Math.max(0, r.dion.zakgeld / totalZakgeld) : 0.5;
-    const variabelBudgetPct = r.variabelBudgetTotaal > 0 ? Math.min(100, Math.round(r.variabelTotaal / r.variabelBudgetTotaal * 100)) : 0;
-    const zakgeldTekort = totalZakgeld <= 0 || r.dion.zakgeld < 0 || r.dara.zakgeld < 0;
-    const zakgeldTekortBarClass = !zakgeldTekort ? "" : r.dion.zakgeld > 0 && r.dara.zakgeld <= 0 ? " split-bar-single-color-dion" : r.dara.zakgeld > 0 && r.dion.zakgeld <= 0 ? " split-bar-single-color-dara" : " split-bar-single-color";
-    const zakgeldCardBody = `<div class="allowance-return-body ${zakgeldTekort ? "allowance-return-body-short" : "allowance-return-body-split"}"><div class="metric-value">${eur(totalZakgeld)}</div>
-       <div class="split-bar${zakgeldTekortBarClass}"><span style="width:${zakgeldTekort ? 100 : Math.round(splitDion * 100)}%"></span><span style="width:${zakgeldTekort ? 0 : 100 - Math.round(splitDion * 100)}%"></span></div>
-       <div class="summary-list">
-         <div class="summary-line"><span class="summary-person-label"><span class="person-dot dion"></span>Dion</span><strong class="${zakgeldTekort ? r.dion.zakgeld < 0 ? "value neg" : "value pos" : ""}">${eur(r.dion.zakgeld)}${zakgeldTekort ? "" : ` · ${pct(splitDion)}`}</strong></div>
-         <div class="summary-line"><span class="summary-person-label"><span class="person-dot dara"></span>Dara</span><strong class="${zakgeldTekort ? r.dara.zakgeld < 0 ? "value neg" : "value pos" : ""}">${eur(r.dara.zakgeld)}${zakgeldTekort ? "" : ` · ${pct(1 - splitDion)}`}</strong></div>
-       </div></div>`;
-    const budgetRows = (scenarioData.gezamenlijk.variabel || []).filter((row) => row.post || row.bedrag).map((row) => {
-      const budget = Number(row.bedrag) || 0;
-      const used = sumTransactions("gezamenlijk", row.post, getSelectedMonth(), row.id);
-      const ratio = budget > 0 ? Math.max(0, Math.min(1, used / budget)) : 0;
-      const label = row.post || row.categorie || "Budget";
-      return `<button type="button" class="budget-preview-item budget-preview-button" data-open-budget-transactions="${textSafe(label)}" data-budget-id="${textSafe(row.id || "")}" aria-label="Open transacties voor ${textSafe(label)}">
-      <div class="budget-preview-thumb tone-green">${iconSvg(categoryIconName(label))}</div>
-      <div class="budget-preview-main">
-        <div class="budget-preview-top"><strong>${textSafe(label)}</strong><span><span class="neutral-amount">${eur(used)}</span> / <span class="neutral-amount">${eur(budget)}</span></span></div>
-        <div class="progress-track budget-gradient"><div class="progress-fill budget-gradient" style="width:${Math.round(ratio * 100)}%"></div></div>
-      </div>
-    </button>`;
-    }).join("");
-    const vasteByCat = {};
-    (scenarioData.gezamenlijk.vasteLasten || []).forEach((row) => {
-      const cat = normalizeCategoryName(row.categorie);
-      vasteByCat[cat] = round22((vasteByCat[cat] || 0) + effectiveBedrag(row));
-    });
-    const vasteEntriesSorted = Object.entries(vasteByCat).sort((a, b) => b[1] - a[1]);
-    const vasteRows = vasteEntriesSorted.map(([cat, amount]) => {
-      const ratio = r.vasteLastenTotaal > 0 ? amount / r.vasteLastenTotaal : 0;
-      const note = "";
-      return `<div class="progress-item ${note ? "joint-fixed-has-note" : ""}">
-      <div class="progress-item-icon tone-green">${iconSvg(jointFixedCategoryIconName(cat))}</div><div class="progress-top"><strong>${cat}</strong><span>${eur(amount)} · ${pct(ratio)}</span></div>
-      ${note}
-      <div class="progress-track"><div class="progress-fill" style="width:${Math.round(ratio * 100)}%"></div></div>
-    </div>`;
-    }).join("");
-    const sortedGoals = [...allGoals2].sort((a, b) => {
-      if (!!a.doel.favoriet !== !!b.doel.favoriet) return a.doel.favoriet ? -1 : 1;
-      const ad = a.doel.doeldatum ? new Date(a.doel.doeldatum).getTime() : Infinity;
-      const bd = b.doel.doeldatum ? new Date(b.doel.doeldatum).getTime() : Infinity;
-      return ad - bd;
-    });
-    const favoriteGoals = sortedGoals.filter((item) => {
-      var _a2;
-      return (_a2 = item.doel) == null ? void 0 : _a2.favoriet;
-    });
-    const goalCardsDesktop = favoriteGoals.length ? `<div class="dashboard-goals-preview-list">${favoriteGoals.slice(0, 4).map((g) => renderDashboardGoalPreviewCard(g)).join("")}</div>` : `<div class="u5-goal-fallback"><strong>Nog geen favoriete spaardoelen</strong><span>${allGoals2.length} doelen beschikbaar</span></div>`;
-    const goalCardsMobile = favoriteGoals.length ? `<div class="dashboard-goals-preview-list">${favoriteGoals.slice(0, 3).map((g) => renderDashboardGoalPreviewCard(g)).join("")}</div>` : `<div class="u5-goal-fallback"><strong>Nog geen favoriete spaardoelen</strong><span>${allGoals2.length} doelen beschikbaar</span></div>`;
-    const year = Number(getSelectedMonth().slice(0, 4));
-    const yearData = Array.from({ length: 12 }, (_, i) => {
-      var _a2, _b;
-      const key = monthKey(new Date(year, i, 1));
-      const monthResult = getMonthFinancialResult(key);
-      const income = round22(Number((_a2 = monthResult.income) == null ? void 0 : _a2.total) || 0);
-      const spent = round22((Number(monthResult.fixedExpenses) || 0) + (Number((_b = monthResult.variableExpenses) == null ? void 0 : _b.total) || 0));
-      const saving = round22(Number(monthResult.savings) || 0);
-      return { key, name: ["Jan", "Feb", "Mrt", "Apr", "Mei", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dec"][i], income, spent, saving };
-    });
-    const currentMonthKey = monthKey(TODAY);
-    const yearTotals = {
-      income: round22(yearData.reduce((s, m) => s + m.income, 0)),
-      spent: round22(yearData.reduce((s, m) => s + m.spent, 0)),
-      saving: round22(yearData.reduce((s, m) => s + m.saving, 0))
-    };
-    const yearTableRows = yearData.map((m) => {
-      const isFuture = m.key > currentMonthKey;
-      const rowClass = `${m.key === getSelectedMonth() ? " selected" : ""}${isFuture ? " future" : ""}`.trim();
-      return `<tr${rowClass ? ` class="${rowClass}"` : ""}><th scope="row">${m.name}</th><td class="num value pos">${eur(m.income)}</td><td class="num value neg">${eur(m.spent)}</td><td class="num value pos">${eur(m.saving)}</td></tr>`;
-    }).join("");
-    const personSummary = (label, rr) => `
-    <div class="card span-4 dash-status-card v4-desktop-only-block">
-      ${renderDashboardCardHead(label, "", label === "Dion" ? "terracotta" : "blue")}
-      <div class="summary-list">
-        <div class="summary-line"><span>Zakgeld ontvangen</span><strong class="${rr.zakgeld < 0 ? "value neg" : "value pos"}">${eur(rr.zakgeld)}</strong></div>
-        <div class="summary-line"><span>Persoonlijke vaste lasten / correcties</span><strong class="value neg">${eur(rr.persoonlijkeVasteLasten)}</strong></div>
-        <div class="summary-line"><span>Uitgaven deze maand</span><strong class="value neg">${eur(rr.variabeleUitgaven)}</strong></div>
-        <div class="summary-line"><span>Beschikbaar voor sparen/vrij gebruik</span><strong class="${rr.available < 0 ? "value neg" : "value pos"}">${eur(rr.available)}</strong></div>
-      </div>
-    </div>`;
-    const jointSummary = `
-    <div class="card span-4 dash-status-card v4-desktop-only-block">
-      ${renderDashboardCardHead("Gezamenlijk", "", "green")}
-      <div class="summary-list">
-        <div class="summary-line"><span>Vaste lasten + budgetten</span><strong class="value neg">${eur(r.gezamenlijkeLastenTotaal)}</strong></div>
-        <div class="summary-line"><span>Variabel gebruikt</span><strong class="value neg">${eur(r.variabelTotaal)}</strong></div>
-        <div class="summary-line"><span>Sparen</span><strong class="value pos">${eur(r.spaarpotDezeMaand)}</strong></div>
-        <div class="summary-line"><span>Resterend voor zakgeld</span><strong class="${jointRemaining < 0 ? "value neg" : "value pos"}">${eur(jointRemaining)}</strong></div>
-      </div>
-    </div>`;
-    document.getElementById("tab-dashboard").innerHTML = `
-    <div class="mobile-header-top v4-mobile-only-block">
+    const root2 = document.getElementById("tab-dashboard");
+    root2.innerHTML = `    <div class="mobile-header-top v4-mobile-only-block">
       <div class="mobile-brand">
         <div class="mobile-brand-icon"><img src="data:image/png;base64,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" alt="" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"><span class="mobile-brand-icon-fallback">F</span></div>
         <div>
@@ -9419,70 +11222,64 @@
         <p>Welkom terug! Hier is jullie financiële overzicht voor deze maand.</p>
       </div>
     </div>
-    <div class="u5-primary-kpis v4-desktop-only-grid" aria-label="Geplande financiële verdeling">
-      <button type="button" class="card u5-primary-kpi tone-income" data-income-edit="dion" data-income-label="Dion" aria-label="Inkomen van Dion aanpassen"><div class="metric-label">Inkomen Dion</div><div class="metric-value value pos">${eur(r.salarisDion)}</div><div class="metric-sub">Klik om aan te passen</div></button>
-      <button type="button" class="card u5-primary-kpi tone-budget" data-income-edit="dara" data-income-label="Dara" aria-label="Inkomen van Dara aanpassen"><div class="metric-label">Inkomen Dara</div><div class="metric-value value pos">${eur(r.salarisDara)}</div><div class="metric-sub">Klik om aan te passen</div></button>
-      <div class="card u5-primary-kpi tone-saving"><div class="metric-label">Totaal gezamenlijke rekening</div><div class="metric-value value pos">${eur(dashboardTotalIncome)}</div><div class="metric-sub">${renderIncomeSources(incomeBreakdown)}</div></div>
-      <div class="card u5-primary-kpi tone-allowance u5-variable-kpi"><div class="metric-label">Variabel gebruikt</div><div class="metric-value neutral-amount">${eur(r.variabelTotaal)} / ${eur(r.variabelBudgetTotaal)}</div><div class="mobile-kpi-budget-track" style="--used-pct:${variabelBudgetPct}%" aria-label="Gezamenlijk variabel budget gebruikt: ${variabelBudgetPct}%"></div></div>
-    </div>
-    <div class="mobile-kpi-grid v4-mobile-only-grid">
-      <button type="button" class="card mobile-kpi-card mobile-kpi-card--editable" data-income-edit="dion" data-income-label="Dion">
-        <div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-dion">${iconSvg("euro")}</span><span class="mobile-kpi-chevron">›</span></div>
-        <div class="mobile-kpi-label">Inkomen Dion</div>
-        <div class="mobile-kpi-value value pos">${eur(r.salarisDion)}</div>
-        <div class="mobile-kpi-edit-hint">${finizeIconWrap("edit")}<span>Tik om aan te passen</span></div>
-      </button>
-      <button type="button" class="card mobile-kpi-card mobile-kpi-card--editable" data-income-edit="dara" data-income-label="Dara">
-        <div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-dara">${iconSvg("euro")}</span><span class="mobile-kpi-chevron">›</span></div>
-        <div class="mobile-kpi-label">Inkomen Dara</div>
-        <div class="mobile-kpi-value value pos">${eur(r.salarisDara)}</div>
-        <div class="mobile-kpi-edit-hint">${finizeIconWrap("edit")}<span>Tik om aan te passen</span></div>
-      </button>
-      <button type="button" class="card mobile-kpi-card static mobile-kpi-card-total-joint mobile-kpi-card--joint-total" data-open-income-overview="dashboard" aria-label="Inkomensoverzicht gezamenlijke rekening" aria-haspopup="dialog">
-        <div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg("wallet")}</span></div>
-        <div class="mobile-kpi-label">Totaal gezamenlijke rekening</div>
-        <div class="mobile-kpi-value value pos">${eur(dashboardTotalIncome)}</div>
-        <div class="mobile-kpi-edit-hint mobile-kpi-edit-hint-placeholder" aria-hidden="true">${finizeIconWrap("edit")}<span>Tik om aan te passen</span></div>
-      </button>
-      <div class="card mobile-kpi-card static mobile-kpi-card--budget">
-        <div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg("chart")}</span></div>
-        <div class="mobile-kpi-label">Variabel gebruikt</div>
-        <div class="mobile-kpi-value mobile-kpi-value-budget neutral-amount">${eur(r.variabelTotaal)} / ${eur(r.variabelBudgetTotaal)}</div>
-        <div class="mobile-kpi-budget-track" style="--used-pct:${variabelBudgetPct}%" aria-label="Gezamenlijk variabel budget gebruikt: ${variabelBudgetPct}%"></div>
-      </div>
-    </div>
-    <div class="dashboard-grid u5-planning-realisation v4-desktop-only-grid">
-      <div class="card span-6 u5-planned-flow">
-        ${renderDashboardCardHead("Geplande verdeling", "op basis van budgetten", "green")}
-        <div class="u5-flow-list">
-          <div><span>Totaal inkomen</span><strong class="value pos">${eur(r.totaalSalaris)}</strong></div>
-          <div><span>Vaste gezamenlijke lasten${r.hypotheekBedrag ? " + hypotheek" : ""}</span><strong>${eur(r.forecast.allowanceBasis.owners.gezamenlijk.fixedReserve)}</strong></div>
-          <div><span>Variabele kostenbudgetten</span><strong>${eur(r.variabelBudgetTotaal)}</strong></div>
-          <div><span>Gezamenlijk sparen</span><strong>${eur(r.spaarpotDezeMaand)}</strong></div>
-          <div class="u5-flow-result"><span>Zakgeld totaal</span><strong class="${totalZakgeld < 0 ? "value neg" : "value pos"}">${eur(totalZakgeld)}</strong></div>
-        </div>
-      </div>
-      <div class="card span-6 u5-allowance-split">${renderDashboardCardHead("Verdeling Dion / Dara", "bestaande verdelingsregels", "terracotta")}${zakgeldCardBody}</div>
-    </div>
-    <div class="dashboard-grid dashboard-summary-row u5-mobile-dashboard-preserved">
-      <div class="card span-6 joint-account-card">${renderDashboardCardHead("Gezamenlijke rekening", "", "green")}<div class="summary-list"><div class="summary-line"><span>Totaal inkomen</span><strong class="value pos">${eur(dashboardTotalIncome)}</strong></div>${incomeBreakdown.extra ? `<div class="summary-line"><span>Waarvan extra / teruggaven</span><strong class="value pos">${eur(incomeBreakdown.extra)}</strong></div>` : ``}<div class="summary-line"><span>Vaste lasten + budgetten</span><strong class="value neg">${eur(r.gezamenlijkeLastenTotaal)}</strong></div><div class="summary-line joint-saving-line"><span>Gezamenlijk sparen</span><strong class="value pos">${eur(r.spaarpotDezeMaand)}</strong></div><div class="summary-line joint-remaining-line"><span>Resterend voor zakgeld</span><strong class="${jointRemaining < 0 ? "value neg" : "value pos"}">${eur(jointRemaining)}</strong></div></div></div>
-      <div class="card span-6 allowance-return-card">${renderDashboardCardHead("Zakgeld teruggestort", "Dion / Dara", "terracotta")}${zakgeldCardBody}</div>
-      ${jointSummary}
-      ${personSummary("Dion", r.dion)}
-      ${personSummary("Dara", r.dara)}
-    </div>
-    <div class="dashboard-grid dashboard-preview-row">
-      <div class="card span-6 v4-bottom-card card-scroll budget-preview-card">${renderDashboardCardHead("Gezamenlijk budget deze maand", "transacties vs budget", "green")}<div class="scroll-area">${budgetRows || '<p class="hint">Nog geen variabele budgetten.</p>'}</div></div>
-      <div class="card span-6 v4-bottom-card card-scroll dashboard-goals-preview v4-desktop-only-block">${renderDashboardCardHead("Spaardoelen preview", "", "blue")}<div class="scroll-area">${goalCardsDesktop || '<p class="hint">Nog geen spaardoelen.</p>'}</div><button type="button" class="goals-preview-link" data-tab-shortcut="spaardoelen"><span>Alle spaardoelen bekijken</span><strong>›</strong></button></div>
-      <div class="card span-6 dashboard-goals-preview savings-preview-card v4-mobile-only-block">${renderDashboardCardHead("Spaardoelen preview", "", "blue")}${goalCardsMobile || '<p class="hint">Nog geen spaardoelen.</p>'}<button type="button" class="goals-preview-link" data-tab-shortcut="spaardoelen"><span>Alle spaardoelen</span><strong>›</strong></button></div>
-    </div>
-    <section class="card dashboard-year-overview" aria-labelledby="dashboardYearTitle">
-      <div class="card-head"><h2 id="dashboardYearTitle">Jaaroverzicht ${year}</h2></div>
-      <div class="dashboard-year-table-wrap">
-        <table class="dashboard-year-table"><thead><tr><th scope="col">Maand</th><th scope="col" class="num">Inkomen</th><th scope="col" class="num">Uitgaven</th><th scope="col" class="num">Sparen</th></tr></thead><tbody>${yearTableRows}</tbody><tfoot><tr><th scope="row">Totaal</th><td class="num value pos">${eur(yearTotals.income)}</td><td class="num value neg">${eur(yearTotals.spent)}</td><td class="num value pos">${eur(yearTotals.saving)}</td></tr></tfoot></table>
-      </div>
-    </section>
-  `;
+`;
+    p3Dashboard != null ? p3Dashboard : p3Dashboard = createDashboard({
+      profiles: () => state.accountProfiles || [],
+      personalRole: () => update6AccountContext().role,
+      today: localTransactionToday,
+      month: getSelectedMonth,
+      monthLabel: () => monthLabel(getSelectedMonth()),
+      ownerLabel,
+      eur,
+      project: (options) => window.FinizeLiquidity.project(options),
+      balance: openBankAccountDetails,
+      settings: (id) => window.FinizeLiquidity.openSettings(id),
+      getMonth: getMonthFinancialResult,
+      goalIcon: goalImageIcon,
+      iconSvg,
+      canOpenEvent: (event2) => event2.type === "bank" ? state.transactions.some((tx) => sourceRecordKey(tx) === event2.sourceId) : !!event2.planningSourceId && event2.month === getSelectedMonth(),
+      openEvent: (event2) => {
+        var _a2, _b, _c;
+        (_a2 = document.getElementById("incomeEditModal")) == null ? void 0 : _a2.classList.remove("open", "u3-admin-open");
+        if (event2.type === "bank") {
+          const tx = state.transactions.find((tx2) => sourceRecordKey(tx2) === event2.sourceId);
+          if (tx) routeImportedTransactionEdit(tx);
+        } else if (event2.type === "fixed") u3OpenPlanning(((_b = state.accountProfiles.find((p) => p.id === event2.accountProfileId)) == null ? void 0 : _b.accountOwner) || "gezamenlijk");
+        else if (event2.type === "income") u3OpenPlanning(((_c = state.accountProfiles.find((p) => p.id === event2.accountProfileId)) == null ? void 0 : _c.accountOwner) || "gezamenlijk");
+      },
+      navigate: (tab) => {
+        activeTab = tab;
+        renderActiveTab();
+      },
+      modal: (html, onEvent) => {
+        const opened = u3AdminModal(`<div class="u3-admin-head"><div>Vooruitblik</div><button type="button" class="ghost" data-u3-close>Sluiten</button></div>` + html);
+        opened.modal.querySelectorAll("[data-p3-event]").forEach((button) => button.onclick = () => onEvent(button.dataset.p3Event));
+      },
+      summary: (owner) => {
+        const r = calcScenario(state), month = getSelectedMonth();
+        const budgets = resolveVariableBudgetsForMonth(state, month, owner);
+        const budget = round22(budgets.reduce((sum2, b) => sum2 + (Number(b.bedrag) || 0), 0));
+        const used = round22(budgets.reduce((sum2, b) => sum2 + sumTransactions(owner, b.post || b.categorie, month, b.id), 0));
+        const allowances = (owner === "gezamenlijk" ? ["dion", "dara"] : [owner]).map((person) => ({ name: ownerLabel(person), amount: r[person].zakgeld }));
+        const goals = calcGroep(state.spaardoelen[owner] || [], owner === "gezamenlijk" ? r.spaarpotDezeMaand : r[owner].beschikbaarVoorSparen, TODAY).sort((a, b) => Number(!!b.doel.favoriet) - Number(!!a.doel.favoriet));
+        return { budget, used, allowances, allowanceDistribution: [r.dion.zakgeld, r.dara.zakgeld], goals };
+      },
+      eventLabel: (event2) => {
+        var _a2;
+        if (event2.type === "salary") return "Salaris " + ownerLabel(event2.person);
+        if (event2.type === "bank") {
+          const mutation = state.transactions.find((tx) => sourceRecordKey(tx) === event2.sourceId);
+          return ((_a2 = mutation == null ? void 0 : mutation.bankOriginal) == null ? void 0 : _a2.description) || (mutation == null ? void 0 : mutation.description) || "Bankbetaling";
+        }
+        if (event2.planningSourceId) {
+          const rows = event2.type === "fixed" ? resolveFixedExpensesForMonth(state, event2.month) : resolveIncomeSourcesForMonth(state, event2.month);
+          const row = rows.find((item) => item.id === event2.planningSourceId);
+          return (row == null ? void 0 : row.post) || (row == null ? void 0 : row.naam) || (row == null ? void 0 : row.description) || (row == null ? void 0 : row.categorie) || "Geplande betaling";
+        }
+        return event2.type === "internal-transfer" ? "Interne overboeking" : "Betaling";
+      }
+    });
+    p3Dashboard.mount(root2);
   }
   function renderRecentTransactionsList(owner, limit = 4) {
     const rows = getAccountMonthTransactions(owner).sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, limit);
@@ -9517,11 +11314,11 @@
     return `<div class="progress-list">${(((_a2 = data[owner]) == null ? void 0 : _a2.variabel) || []).filter((row) => row.post || row.bedrag).map((row) => {
       const budget = Number(row.bedrag) || 0;
       const used = sumTransactions(owner, row.post, getSelectedMonth(), row.id);
-      const status = budgetStatus(used, budget);
+      const status2 = budgetStatus(used, budget);
       const label = row.post || row.categorie || "Budget";
       return `<button type="button" class="progress-item budget-usage-button" data-open-budget-transactions="${textSafe(label)}" data-budget-id="${textSafe(row.id || "")}" data-budget-owner="${owner}" aria-label="Open transacties voor ${textSafe(label)}">
-      <div class="progress-top"><strong>${textSafe(row.post || row.categorie)}</strong><span><span class="neutral-amount">${eur(used)}</span> / <span class="neutral-amount">${eur(budget)}</span> <span class="status-badge ${status.cls}">${status.label}</span></span></div>
-      <div class="progress-track"><div class="progress-fill" style="width:${Math.max(0, Math.min(100, Math.round(status.ratio * 100)))}%"></div></div>
+      <div class="progress-top"><strong>${textSafe(row.post || row.categorie)}</strong><span><span class="neutral-amount">${eur(used)}</span> / <span class="neutral-amount">${eur(budget)}</span> <span class="status-badge ${status2.cls}">${status2.label}</span></span></div>
+      <div class="progress-track"><div class="progress-fill" style="width:${Math.max(0, Math.min(100, Math.round(status2.ratio * 100)))}%"></div></div>
     </button>`;
     }).join("") || '<p class="hint">Nog geen budgetten.</p>'}</div>`;
   }
@@ -9550,7 +11347,7 @@
       return financialFor === owner;
     });
     const month = getSelectedMonth();
-    const total = round22(u3FixedOccurrences(month).filter((item) => (item.financialFor || item.rekening || "gezamenlijk") === owner).reduce((sum, item) => sum + (Number(item.amount) || 0), 0));
+    const total = round22(u3FixedOccurrences(month).filter((item) => (item.financialFor || item.rekening || "gezamenlijk") === owner).reduce((sum2, item) => sum2 + (Number(item.amount) || 0), 0));
     const rowsHtml = rows.map((item) => `
     <div class="summary-line">
       <span><strong>${textSafe(item.naam || "Vaste last")}</strong><small class="hint">${textSafe(item.categorie || "Overig")} · elke ${Math.max(1, Number(item.frequentieAantal) || 1)} ${textSafe(item.frequentieEenheid || "maanden")}${item.actief === false ? " · gestopt" : ""}</small></span>
@@ -9571,7 +11368,7 @@
     const used = {};
     let uncategorized = 0;
     for (const [key, row] of budgets) used[key] = budgetActual(state, getSelectedMonth(), owner, row.label, row.id);
-    uncategorized = round22(sumTransactions(owner) - Object.values(used).reduce((sum, n) => sum + n, 0));
+    uncategorized = round22(sumTransactions(owner) - Object.values(used).reduce((sum2, n) => sum2 + n, 0));
     const rows = [...budgets.entries()].map(([key, row]) => {
       const amount = used[key] || 0;
       const ratio = row.budget > 0 ? Math.min(1, amount / row.budget) : 0;
@@ -9622,7 +11419,11 @@
   }
   function configureUpdate6Navigation() {
     const context = update6AccountContext();
-    if (!context.enabled) return;
+    document.querySelectorAll('[data-update6-nav][data-tab="settings"]').forEach((button) => button.hidden = false);
+    if (!context.enabled) {
+      applyFinizeIconSystem();
+      return;
+    }
     document.querySelectorAll("[data-update6-nav]").forEach((button) => button.hidden = false);
     document.querySelectorAll('.v4-sidebar .tab-btn[data-tab="data"]').forEach((button) => button.hidden = true);
     document.querySelectorAll('.v4-sidebar .tab-btn[data-tab="dion"],.v4-sidebar .tab-btn[data-tab="dara"]').forEach((button) => {
@@ -9771,9 +11572,9 @@
     const imageStatus = imageField.querySelector("#goalEditImageStatus");
     const saveButton = modal.querySelector("#goalEditSave");
     let imageProcessing = false;
-    imageInput.addEventListener("change", async (event) => {
+    imageInput.addEventListener("change", async (event2) => {
       var _a3;
-      const file = (_a3 = event.target.files) == null ? void 0 : _a3[0];
+      const file = (_a3 = event2.target.files) == null ? void 0 : _a3[0];
       if (!file) return;
       imageProcessing = true;
       saveButton.disabled = true;
@@ -9786,7 +11587,7 @@
         imageField.querySelector("#goalEditImageRemove").disabled = false;
         imageStatus.textContent = `Klaar · ${Math.max(1, Math.round(dataUrlByteSize(goalImageData) / 1024))} kB`;
       } catch (error2) {
-        event.target.value = "";
+        event2.target.value = "";
         imageStatus.textContent = "Afbeelding verwerken mislukt.";
         alert((error2 == null ? void 0 : error2.message) || "Afbeelding verwerken mislukt.");
       } finally {
@@ -9899,15 +11700,15 @@
         openMobileGoalEditor(owner, btn.dataset.openManagerGoal);
       };
       btn.addEventListener("click", open);
-      btn.addEventListener("keydown", (event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
+      btn.addEventListener("keydown", (event2) => {
+        if (event2.key === "Enter" || event2.key === " ") {
+          event2.preventDefault();
           open();
         }
       });
     });
-    modal.querySelectorAll("[data-move-manager-goal]").forEach((btn) => btn.addEventListener("click", async (event) => {
-      event.stopPropagation();
+    modal.querySelectorAll("[data-move-manager-goal]").forEach((btn) => btn.addEventListener("click", async (event2) => {
+      event2.stopPropagation();
       const [id, deltaText] = btn.dataset.moveManagerGoal.split(":");
       const index = goals.findIndex((goal) => goal.id === id);
       const target = index + Number(deltaText);
@@ -9915,8 +11716,8 @@
       if (!await commitChange(() => moveItemById(`spaardoelen.${owner}`, `spaardoelen.${owner}`, id, target), { render: false })) return;
       openMobileGoalManager(owner);
     }));
-    modal.querySelectorAll("[data-remove-manager-goal]").forEach((btn) => btn.addEventListener("click", async (event) => {
-      event.stopPropagation();
+    modal.querySelectorAll("[data-remove-manager-goal]").forEach((btn) => btn.addEventListener("click", async (event2) => {
+      event2.stopPropagation();
       modal.classList.remove("open", "goal-manager-editor-open");
       await removeWithUndo(`spaardoelen.${owner}`, btn.dataset.removeManagerGoal, "Spaardoel verwijderd");
     }));
@@ -9932,15 +11733,15 @@
     const groups = [{ key: "gezamenlijk", label: "Gezamenlijk", pot: r.spaarpotDezeMaand, doelen: state.spaardoelen.gezamenlijk }, { key: "dion", label: "Dion", pot: r.dion.beschikbaarVoorSparen, doelen: state.spaardoelen.dion }, { key: "dara", label: "Dara", pot: r.dara.beschikbaarVoorSparen, doelen: state.spaardoelen.dara }].filter((group) => visibleOwners.includes(group.key));
     const calculated = groups.map((group) => ({ ...group, items: calcGroep(group.doelen, group.pot, TODAY) }));
     const all = calculated.flatMap((group) => group.items);
-    const saved = round22(all.reduce((sum, item) => sum + (Number(item.doel.algespaard) || 0), 0));
-    const target = round22(all.reduce((sum, item) => sum + (Number(item.doel.doelbedrag) || 0), 0));
+    const saved = round22(all.reduce((sum2, item) => sum2 + (Number(item.doel.algespaard) || 0), 0));
+    const target = round22(all.reduce((sum2, item) => sum2 + (Number(item.doel.doelbedrag) || 0), 0));
     const average = target > 0 ? saved / target : 0;
-    const monthly = round22(all.reduce((sum, item) => sum + (item.werkelijkeInleg || 0), 0));
+    const monthly = round22(all.reduce((sum2, item) => sum2 + (item.werkelijkeInleg || 0), 0));
     const groupSummary = calculated.map((group) => {
-      const goalTarget = round22(group.items.reduce((sum, item) => sum + (Number(item.doel.doelbedrag) || 0), 0));
-      const goalSaved = round22(group.items.reduce((sum, item) => sum + (Number(item.doel.algespaard) || 0), 0));
+      const goalTarget = round22(group.items.reduce((sum2, item) => sum2 + (Number(item.doel.doelbedrag) || 0), 0));
+      const goalSaved = round22(group.items.reduce((sum2, item) => sum2 + (Number(item.doel.algespaard) || 0), 0));
       const ratio = target > 0 ? goalTarget / target : 0;
-      return { label: group.label, saved: goalSaved, target: goalTarget, ratio, monthly: round22(group.items.reduce((sum, item) => sum + (item.werkelijkeInleg || 0), 0)) };
+      return { label: group.label, saved: goalSaved, target: goalTarget, ratio, monthly: round22(group.items.reduce((sum2, item) => sum2 + (item.werkelijkeInleg || 0), 0)) };
     });
     const distribution = groupSummary.map((group) => `<div class="mobile-goal-summary-line"><span>${group.label}</span><i><b style="width:${Math.round(group.ratio * 100)}%"></b></i><strong>${eur(group.target)} (${pct(group.ratio)})</strong></div>`).join("");
     const monthSummary = groupSummary.map((group) => `<div class="mobile-goal-summary-line"><span>${group.label}</span><i><b style="width:${monthly > 0 ? Math.round(group.monthly / monthly * 100) : 0}%"></b></i><strong>${eur(group.monthly)}</strong></div>`).join("");
@@ -10213,10 +12014,10 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       if (target) target.textContent = `Vervangbare cache: ${(usage.categories.replaceablePeriodCache / 1048576).toFixed(2)} MiB / richtwaarde 64 MiB. Beschermde opslag en metadata: ${((usage.totalBytes - usage.categories.replaceablePeriodCache) / 1048576).toFixed(2)} MiB. Gemeten gegevensomvang; browseroverhead kan afwijken.`;
       if (list2) list2.textContent = "Offline bewaard: " + (usage.periods.filter((row) => row.pinned).map((row) => row.id).join(", ") || "geen extra maanden");
     };
-    const cacheAction = async (action) => {
+    const cacheAction = async (action2) => {
       try {
         if (DataAdapter.store().scope !== cacheStore.scope) throw new Error("Het huishouden is gewijzigd.");
-        await action();
+        await action2();
         await updateCacheUsage();
       } catch (error2) {
         alert("Offline opslag: " + error2.message);
@@ -10294,9 +12095,9 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     modal.__finizeBackdropClose = close;
     if (modal.dataset.finizeBackdropBound === "true") return;
     modal.dataset.finizeBackdropBound = "true";
-    modal.addEventListener("click", (event) => {
+    modal.addEventListener("click", (event2) => {
       var _a2;
-      if (event.target === modal) (_a2 = modal.__finizeBackdropClose) == null ? void 0 : _a2.call(modal);
+      if (event2.target === modal) (_a2 = modal.__finizeBackdropClose) == null ? void 0 : _a2.call(modal);
     });
   }
   function openTransactionModal() {
@@ -10341,20 +12142,20 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
   }
   function bindBankImport(root2) {
     var _a2, _b, _c, _d;
-    (_a2 = root2.querySelector('[data-dashboard-accordion="bank-import"]')) == null ? void 0 : _a2.addEventListener("toggle", (event) => {
-      bankImportOpen = event.currentTarget.open;
+    (_a2 = root2.querySelector('[data-dashboard-accordion="bank-import"]')) == null ? void 0 : _a2.addEventListener("toggle", (event2) => {
+      bankImportOpen = event2.currentTarget.open;
     });
     root2.querySelectorAll("[data-open-general-transaction]").forEach((button) => button.addEventListener("click", openGeneralTransactionModal));
-    (_b = root2.querySelector("[data-bank-import-owner]")) == null ? void 0 : _b.addEventListener("change", (event) => {
+    (_b = root2.querySelector("[data-bank-import-owner]")) == null ? void 0 : _b.addEventListener("change", (event2) => {
       if (!bankImportDraft) return;
       bankImportOpen = true;
-      bankImportDraft.owner = event.target.value;
+      bankImportDraft.owner = event2.target.value;
       bankParseDraft();
       renderActiveTab();
     });
-    (_c = root2.querySelector("[data-bank-csv-file]")) == null ? void 0 : _c.addEventListener("change", (event) => {
+    (_c = root2.querySelector("[data-bank-csv-file]")) == null ? void 0 : _c.addEventListener("change", (event2) => {
       var _a3;
-      const file = (_a3 = event.target.files) == null ? void 0 : _a3[0];
+      const file = (_a3 = event2.target.files) == null ? void 0 : _a3[0];
       if (!file) return;
       const reader = new FileReader();
       reader.onload = (loaded) => {
@@ -10419,10 +12220,10 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     }).join("")}</select></label><label data-p4-refund>Refundcategorie<input id="${prefix}RefundCategory" value="${attrSafe(tx.refundCategory || ((_b = tx.processing) == null ? void 0 : _b.refundCategory) || "")}" placeholder="Historische categorie"></label><label data-p4-refund>Refundmaand<input id="${prefix}RefundMonth" type="month" value="${attrSafe(tx.refundMonth || ((_c = tx.processing) == null ? void 0 : _c.refundMonth) || "")}"></label><label data-manual-fixed>Maand vaste last<input id="${prefix}FixedMonth" type="month" value="${attrSafe(tx.fixedOccurrenceMonth || ((_d = tx.processing) == null ? void 0 : _d.fixedOccurrenceMonth) || getTransactionDate(tx).slice(0, 7))}"></label><label data-manual-fixed>Betaalmoment vaste last<select id="${prefix}Fixed"><option value="">Kies vast betaalmoment</option></select></label><label data-manual-salary>Salaris van<select id="${prefix}SalaryPerson"><option value="">Kies Dion of Dara</option>${["dion", "dara"].map((person) => `<option value="${person}" ${person === (salaryPerson(tx, state) || owner) ? "selected" : ""}>${textSafe(ownerLabel(person))}</option>`).join("")}</select></label><label data-manual-income>Inkomstenbron<select id="${prefix}Income"><option value="">Geen koppeling</option></select></label>`;
   }
   function bindFinancialProcessingFields(modal, prefix, owner, existing, account = owner) {
-    const date = modal.querySelector(`#${prefix}Date`), type = modal.querySelector(`#${prefix}Type`), category = modal.querySelector(`#${prefix}Category`);
+    const date2 = modal.querySelector(`#${prefix}Date`), type = modal.querySelector(`#${prefix}Type`), category = modal.querySelector(`#${prefix}Category`);
     const update = () => {
       var _a2, _b;
-      const month = String(date.value).slice(0, 7), valid = /^\d{4}-(0[1-9]|1[0-2])$/.test(month), value = type.value;
+      const month = String(date2.value).slice(0, 7), valid = /^\d{4}-(0[1-9]|1[0-2])$/.test(month), value = type.value;
       const income = value === "inkomen" || INCOME_TRANSACTION_TYPES.includes(value), savings = ["sparen", "naar-spaarrekening", "van-spaarrekening"].includes(value), refund = ["terugbetaling", "refund"].includes(value);
       for (const [selector, visible] of [["[data-p4-goal]", savings], ["[data-p4-refund]", refund], ["[data-manual-fixed]", value === "vaste-last"], ["[data-manual-income]", income], ["[data-manual-salary]", value === "salaris"], ["[data-manual-category]", value === "uitgave"]]) modal.querySelectorAll(selector).forEach((el) => {
         el.hidden = !visible;
@@ -10444,12 +12245,12 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       if (oldSource && !rows.some((row) => row.id === oldSource)) source.insertAdjacentHTML("beforeend", '<option value="' + attrSafe(oldSource) + '" selected disabled>Bestaande historische inkomstenkoppeling</option>');
       if (oldSource) source.value = oldSource;
     };
-    modal.querySelector("#" + prefix + "Income").addEventListener("change", (event) => {
-      const source = resolveIncomeSourcesForMonth(state, String(date.value).slice(0, 7)).find((row) => row.id === event.target.value);
+    modal.querySelector("#" + prefix + "Income").addEventListener("change", (event2) => {
+      const source = resolveIncomeSourcesForMonth(state, String(date2.value).slice(0, 7)).find((row) => row.id === event2.target.value);
       if (type.value === "salaris" && (source == null ? void 0 : source.legacyKind) === "salary") modal.querySelector("#" + prefix + "SalaryPerson").value = source.eigenaar;
     });
     type.addEventListener("change", update);
-    date.addEventListener("change", update);
+    date2.addEventListener("change", update);
     modal.querySelector("#" + prefix + "FixedMonth").addEventListener("change", update);
     update();
   }
@@ -10477,8 +12278,8 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       alert("Deze legacy transactie heeft geen betrouwbare fysieke rekeningcontext. Bewerken is geblokkeerd; bestaande gegevens blijven behouden.");
       return;
     }
-    const date = existing ? getTransactionDate(existing) : manualDefaultDate(month, today), categories = jointVariableCategoryOptions((existing == null ? void 0 : existing.category) || "", destination, date.slice(0, 7)), name = ownerLabel(account);
-    modal.innerHTML = `<div class="modal joint-transaction-fullscreen-editor"><div class="card-head"><h2>${name} transactie ${existing ? "bewerken" : "toevoegen"}</h2><button class="danger-ghost" id="btnClose${suffix}" aria-label="Sluiten">×</button></div><p class="hint" style="margin-top:-4px">${monthLabel(month)}</p><div class="modal-grid"><label>Bedrag<input id="${prefix}Amount" type="number" step="0.01" inputmode="decimal" value="${existing ? Number(existing.amount) || "" : ""}"></label><label>Datum<input id="${prefix}Date" type="date" required max="${today}" value="${attrSafe(date)}"></label><label class="full">Omschrijving<input id="${prefix}Description" type="text" value="${attrSafe((existing == null ? void 0 : existing.description) || "")}"></label><label data-manual-category>Categorie<select id="${prefix}Category">${categories.map((category) => `<option value="${attrSafe(category)}" ${category === (existing == null ? void 0 : existing.category) ? "selected" : ""}>${textSafe(category)}</option>`).join("")}</select></label><label class="full">Notitie<input id="${prefix}Note" value="${attrSafe((existing == null ? void 0 : existing.note) || "")}"></label>${financialProcessingFields(prefix, destination, existing || {})}</div><p class="hint" data-p4-error role="alert"></p>${existing ? `<button class="ghost" data-p4-open-coverage="${attrSafe(existing.id)}">Spaardekking beheren</button>` : ""}<div class="modal-actions"><button class="ghost" id="btnCancel${suffix}">Annuleren</button><button class="primary" id="btnSave${suffix}">${existing ? "Wijzigingen opslaan" : "Transactie opslaan"}</button></div></div>`;
+    const date2 = existing ? getTransactionDate(existing) : manualDefaultDate(month, today), categories = jointVariableCategoryOptions((existing == null ? void 0 : existing.category) || "", destination, date2.slice(0, 7)), name = ownerLabel(account);
+    modal.innerHTML = `<div class="modal joint-transaction-fullscreen-editor"><div class="card-head"><h2>${name} transactie ${existing ? "bewerken" : "toevoegen"}</h2><button class="danger-ghost" id="btnClose${suffix}" aria-label="Sluiten">×</button></div><p class="hint" style="margin-top:-4px">${monthLabel(month)}</p><div class="modal-grid"><label>Bedrag<input id="${prefix}Amount" type="number" step="0.01" inputmode="decimal" value="${existing ? Number(existing.amount) || "" : ""}"></label><label>Datum<input id="${prefix}Date" type="date" required max="${today}" value="${attrSafe(date2)}"></label><label class="full">Omschrijving<input id="${prefix}Description" type="text" value="${attrSafe((existing == null ? void 0 : existing.description) || "")}"></label><label data-manual-category>Categorie<select id="${prefix}Category">${categories.map((category) => `<option value="${attrSafe(category)}" ${category === (existing == null ? void 0 : existing.category) ? "selected" : ""}>${textSafe(category)}</option>`).join("")}</select></label><label class="full">Notitie<input id="${prefix}Note" value="${attrSafe((existing == null ? void 0 : existing.note) || "")}"></label>${financialProcessingFields(prefix, destination, existing || {})}</div><p class="hint" data-p4-error role="alert"></p>${existing ? `<button class="ghost" data-p4-open-coverage="${attrSafe(existing.id)}">Spaardekking beheren</button>` : ""}<div class="modal-actions"><button class="ghost" id="btnCancel${suffix}">Annuleren</button><button class="primary" id="btnSave${suffix}">${existing ? "Wijzigingen opslaan" : "Transactie opslaan"}</button></div></div>`;
     modal.classList.add("open", "joint-transaction-modal-open");
     bindFinancialProcessingFields(modal, prefix, destination, existing, account);
     const close = () => modal.classList.remove("open", "joint-transaction-modal-open");
@@ -10491,17 +12292,17 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       const button = modal.querySelector("#btnSave" + suffix);
       if (button.disabled) return;
       try {
-        const amount = bankAmount(document.getElementById(prefix + "Amount").value), fields = readFinancialProcessingFields(prefix), date2 = document.getElementById(prefix + "Date").value, type = fields.transactionType;
+        const amount = bankAmount(document.getElementById(prefix + "Amount").value), fields = readFinancialProcessingFields(prefix), date3 = document.getElementById(prefix + "Date").value, type = fields.transactionType;
         const income = type === "inkomen" || INCOME_TRANSACTION_TYPES.includes(type), fixed = type === "vaste-last" ? u3FixedOccurrences(document.getElementById(prefix + "FixedMonth").value).find((row) => row.id === document.getElementById(prefix + "Fixed").value) : null;
         if (type === "vaste-last" && !fixed) throw new Error("Kies een geldig gepland betaalmoment.");
         const category = income ? "Inkomen" : fields.savingsGoalId ? "Sparen" : ["terugbetaling", "refund"].includes(type) ? "Terugbetaling" : (fixed == null ? void 0 : fixed.categorie) || document.getElementById(prefix + "Category").value;
-        const incomeSourceId = income ? document.getElementById(prefix + "Income").value : "", incomeSource = incomeSourceId ? resolveIncomeSourcesForMonth(state, date2.slice(0, 7)).find((row) => row.id === incomeSourceId) : null;
+        const incomeSourceId = income ? document.getElementById(prefix + "Income").value : "", incomeSource = incomeSourceId ? resolveIncomeSourcesForMonth(state, date3.slice(0, 7)).find((row) => row.id === incomeSourceId) : null;
         const explicitNewLink = !existing || incomeSourceId !== (existing.incomeSourceId || ((_a3 = existing.processing) == null ? void 0 : _a3.incomeSourceId) || "");
         const chosenSalaryPerson = document.getElementById(prefix + "SalaryPerson").value;
         if (type === "salaris" && !["dion", "dara"].includes(chosenSalaryPerson) && (incomeSource == null ? void 0 : incomeSource.legacyKind) !== "salary") throw new Error("Kies Dion of Dara voor deze salarisbetaling.");
         const leavingSalary = existing && getTransactionClassification(existing) === "salaris" && type !== "salaris";
         const financialDestination = type === "salaris" && ["dion", "dara"].includes(chosenSalaryPerson) ? chosenSalaryPerson : explicitNewLink && ["salaris", "inkomen"].includes(type) && (incomeSource == null ? void 0 : incomeSource.legacyKind) === "salary" && ["dion", "dara"].includes(incomeSource.eigenaar) ? incomeSource.eigenaar : leavingSalary ? account : destination;
-        const next = { ...existing || {}, ...fields, salaryPersonId: type === "salaris" ? financialDestination : "", id: (existing == null ? void 0 : existing.id) || uid(), date: date2, transactionDate: date2, owner: financialDestination, financialFor: financialDestination, budgetOwner: financialDestination, category, amount, description: document.getElementById(prefix + "Description").value.trim(), note: document.getElementById(prefix + "Note").value.trim(), kind: income ? "inkomen" : "uitgave", createdAt: (existing == null ? void 0 : existing.createdAt) || (/* @__PURE__ */ new Date()).toISOString(), fixedExpenseId: (fixed == null ? void 0 : fixed.itemId) || "", fixedOccurrenceId: (fixed == null ? void 0 : fixed.id) || "", fixedOccurrenceMonth: (fixed == null ? void 0 : fixed.month) || "", incomeSourceId };
+        const next = { ...existing || {}, ...fields, salaryPersonId: type === "salaris" ? financialDestination : "", id: (existing == null ? void 0 : existing.id) || uid(), date: date3, transactionDate: date3, owner: financialDestination, financialFor: financialDestination, budgetOwner: financialDestination, category, amount, description: document.getElementById(prefix + "Description").value.trim(), note: document.getElementById(prefix + "Note").value.trim(), kind: income ? "inkomen" : "uitgave", createdAt: (existing == null ? void 0 : existing.createdAt) || (/* @__PURE__ */ new Date()).toISOString(), fixedExpenseId: (fixed == null ? void 0 : fixed.itemId) || "", fixedOccurrenceId: (fixed == null ? void 0 : fixed.id) || "", fixedOccurrenceMonth: (fixed == null ? void 0 : fixed.month) || "", incomeSourceId };
         if (existing == null ? void 0 : existing.processing) next.processing = { ...existing.processing, ...fields, transactionType: type, category, budgetOwner: financialDestination, processedAmount: amount, fixedExpenseId: next.fixedExpenseId, fixedOccurrenceId: next.fixedOccurrenceId, fixedOccurrenceMonth: next.fixedOccurrenceMonth, incomeSourceId: next.incomeSourceId };
         const candidate = cloneState(state);
         upsertManualFinancialTransaction(candidate, next, account, { today: localTransactionToday() });
@@ -10524,11 +12325,11 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     let editing = "";
     const label = (p) => `${p.transaction.description || p.category} · ${ownerLabel(p.financialFor)} · ${eur(p.amount)}${p.splitId ? " · split " + p.splitId : ""}`;
     const render2 = () => {
-      const statuses = new Map(coverageAllocationStatus(state).map((row) => [row.id, row])), allocations = (state.savingsCoverageAllocations || []).filter((a) => a.active !== false && (!anchor || a.withdrawalTransactionId === anchor.id || a.expenseTransactionId === anchor.id));
+      const statuses2 = new Map(coverageAllocationStatus(state).map((row) => [row.id, row])), allocations = (state.savingsCoverageAllocations || []).filter((a) => a.active !== false && (!anchor || a.withdrawalTransactionId === anchor.id || a.expenseTransactionId === anchor.id));
       const current = allocations.find((a) => a.id === editing);
       modal.innerHTML = `<div class="modal joint-transaction-fullscreen-editor"><div class="card-head"><h2>Spaardekking · ${monthLabel(month)}</h2><button class="ghost" data-p4-close>Sluiten</button></div><p class="hint">Echte uitgaven blijven behouden. Dekking vermindert alleen de reguliere maandbelasting.</p><div class="modal-grid"><label>Spaaropname<select data-p4-withdrawal><option value="">Kies opname</option>${withdrawals.map((p) => `<option value="${attrSafe(p.id)}" ${p.id === ((current == null ? void 0 : current.withdrawalTransactionId) || (anchor == null ? void 0 : anchor.transactionType) === "van-spaarrekening" && anchor.id) ? "selected" : ""}>${textSafe(label(p))} · ongebruikt ${eur(p.effects.unusedSavings)}</option>`).join("")}</select></label><label>Uitgave / split<select data-p4-expense><option value="">Kies uitgave</option>${expenses.map((p) => `<option value="${attrSafe(p.id)}" ${p.id === ((current == null ? void 0 : current.expenseTransactionId) || (anchor == null ? void 0 : anchor.effects.realExpense) > 0 && anchor.id) ? "selected" : ""}>${textSafe(label(p))}</option>`).join("")}</select></label><label>Dekkingsbedrag<input data-p4-amount type="number" step="0.01" min="0.01" value="${current ? current.amountCents / 100 : ""}"></label></div><p class="hint" role="alert" data-p4-error></p><div class="modal-actions"><button class="primary" data-p4-save>${editing ? "Dekking wijzigen" : "Dekking toevoegen"}</button></div><div class="summary-list">${allocations.map((a) => {
-        const status = statuses.get(a.id);
-        return `<div class="summary-line"><span>${eur(a.amountCents / 100)} · ${(status == null ? void 0 : status.active) ? "Actief" : textSafe(coverageMessage(status == null ? void 0 : status.reason))}</span><button class="ghost small" data-p4-edit="${attrSafe(a.id)}">Wijzigen</button><button class="danger-ghost small" data-p4-remove="${attrSafe(a.id)}">Verwijderen</button></div>`;
+        const status2 = statuses2.get(a.id);
+        return `<div class="summary-line"><span>${eur(a.amountCents / 100)} · ${(status2 == null ? void 0 : status2.active) ? "Actief" : textSafe(coverageMessage(status2 == null ? void 0 : status2.reason))}</span><button class="ghost small" data-p4-edit="${attrSafe(a.id)}">Wijzigen</button><button class="danger-ghost small" data-p4-remove="${attrSafe(a.id)}">Verwijderen</button></div>`;
       }).join("") || '<p class="hint">Nog geen dekking.</p>'}</div></div>`;
       modal.classList.add("open", "joint-transaction-modal-open");
       modal.querySelector("[data-p4-close]").onclick = () => modal.classList.remove("open", "joint-transaction-modal-open");
@@ -10788,8 +12589,8 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
         renderActiveTab();
       };
       (_a2 = modal.querySelector("[data-close-joint-variable-costs]")) == null ? void 0 : _a2.addEventListener("click", close);
-      (_b = modal.querySelector("[data-variable-scope]")) == null ? void 0 : _b.addEventListener("change", (event) => {
-        saveScope = event.target.value;
+      (_b = modal.querySelector("[data-variable-scope]")) == null ? void 0 : _b.addEventListener("change", (event2) => {
+        saveScope = event2.target.value;
       });
       modal.querySelectorAll("[data-variable-field]").forEach((el) => {
         el.addEventListener("input", syncDraftFromInputs);
@@ -10987,8 +12788,8 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       modal.removeEventListener("keydown", onKey);
       if (trigger == null ? void 0 : trigger.isConnected) trigger.focus();
     };
-    const onKey = (event) => {
-      if (event.key === "Escape") close();
+    const onKey = (event2) => {
+      if (event2.key === "Escape") close();
     };
     modal.querySelector("[data-close-income-overview]").addEventListener("click", close);
     (_a2 = modal.querySelector("[data-edit-overview-income]")) == null ? void 0 : _a2.addEventListener("click", () => {
@@ -11086,7 +12887,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       return Number.isFinite(parsed) ? round22(parsed) : 0;
     };
     const updatePreview = () => {
-      document.getElementById("totalIncomePreview").textContent = eur(round22(inputs.reduce((sum, input) => sum + amount(input), 0)));
+      document.getElementById("totalIncomePreview").textContent = eur(round22(inputs.reduce((sum2, input) => sum2 + amount(input), 0)));
     };
     inputs.forEach((input) => input.addEventListener("input", updatePreview));
     document.getElementById("btnCloseTotalIncomeEdit").addEventListener("click", close);
@@ -11178,7 +12979,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     const usedByBudgetKey = {};
     let unassignedUsed = 0;
     for (const [key, row] of variableBudgetMap) usedByBudgetKey[key] = budgetActual(state, getSelectedMonth(), "gezamenlijk", row.label, row.id);
-    unassignedUsed = round22(sumTransactions("gezamenlijk") - Object.values(usedByBudgetKey).reduce((sum, n) => sum + n, 0));
+    unassignedUsed = round22(sumTransactions("gezamenlijk") - Object.values(usedByBudgetKey).reduce((sum2, n) => sum2 + n, 0));
     const variableRows = Array.from(variableBudgetMap.entries()).map(([key, row]) => {
       const used = usedByBudgetKey[key] || 0;
       const ratio = row.budget > 0 ? Math.min(1, used / row.budget) : 0;
@@ -11323,7 +13124,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     const modal = document.getElementById("transactionModal");
     const month = getSelectedMonth();
     const rows = categoryProcessingDetails(state, month, owner, { budgetOnly: true }).filter((tx) => budgetCategoryMatches(tx, category, owner, month, budgetItemId)).sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
-    const total = round22(rows.reduce((sum, tx) => sum + tx.displayImpact, 0));
+    const total = round22(rows.reduce((sum2, tx) => sum2 + tx.displayImpact, 0));
     modal.innerHTML = `<div class="modal budget-transactions-modal"><div class="modal-head"><div><h2>${textSafe(category)}</h2><p>${monthLabel(month)} · ${rows.length} transactie${rows.length === 1 ? "" : "s"} · ${eur(total)}</p></div><button type="button" class="ghost" data-close-budget-transactions>Sluiten</button></div><div class="budget-transactions-list">${rows.length ? rows.map((tx) => `<button type="button" class="budget-transaction-row" data-open-budget-transaction-id="${textSafe(tx.id)}"><span><strong>${textSafe(tx.description || tx.category || "Transactie")}</strong><small>${formatDateNL(tx.date)} · ${textSafe(tx.category || "Overig")}${tx.savingsFunded ? " · gedekt " + eur(tx.savingsFunded) : ""}${tx.categoryOnlyRefundCorrection ? " · aparte categoriecorrectie" : tx.refundCorrection ? " · refundcorrectie" : ""}</small></span><b class="${tx.displayImpact < 0 ? "value pos" : "value neg"}">${eur(tx.displayImpact)}</b></button>`).join("") : '<p class="muted-empty">Geen budgettransacties in deze categorie.</p>'}</div></div>`;
     modal.classList.add("open");
     const close = () => {
@@ -11338,13 +13139,32 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       owner === "gezamenlijk" ? openJointTransactionModal(id) : openPersonalTransactionModal(owner, id);
     }));
   }
+  var bankAccountsSettingsOpen = false;
+  function openBankAccountDetails(id = "") {
+    var _a2;
+    bankAccountsSettingsOpen = true;
+    activeTab = "settings";
+    (_a2 = document.getElementById("u4ImportModalRoot")) == null ? void 0 : _a2.classList.remove("open");
+    window.FinizeAccounts.open(id);
+  }
   function renderSettings() {
     var _a2, _b, _c, _d, _e, _f;
     const root2 = document.getElementById("tab-settings");
     const context = update6AccountContext();
     if (!root2) return;
+    if (bankAccountsSettingsOpen) {
+      root2.innerHTML = `${renderPageHeading("Bankrekeningen", "Beheer rekeninggegevens en banksaldo’s.")}<div data-bank-accounts-root>${window.FinizeAccounts.render()}</div>`;
+      window.FinizeAccounts.bind(root2).catch((error2) => {
+        const panel = root2.querySelector("[data-bank-accounts]");
+        if (panel) panel.textContent = error2.message;
+      });
+      return;
+    }
+    const bankAccountsCard = `<section class="card u6-settings-card"><div class="card-head"><h2>Bankrekeningen</h2></div><p>Bekijk en beheer je bankrekeningen, rekeninggegevens en banksaldo’s.</p><button type="button" class="primary" data-open-bank-accounts>Bankrekeningen openen</button></section>`;
     if (!context.enabled) {
       root2.innerHTML = `${renderPageHeading("Instellingen", "Account- en huishoudinstellingen worden zichtbaar zodra Update 6 actief is.")}<section class="card"><div class="card-head"><h2>Data & back-up</h2></div><p class="hint">De bestaande lokale en cloudinstellingen blijven beschikbaar.</p><button type="button" class="primary" data-tab-shortcut="data">Open Data & back-up</button></section>`;
+      root2.insertAdjacentHTML("beforeend", bankAccountsCard);
+      root2.querySelector("[data-open-bank-accounts]").onclick = () => openBankAccountDetails();
       return;
     }
     const email = ((_b = (_a2 = globalThis.FinizeAuth) == null ? void 0 : _a2.user) == null ? void 0 : _b.email) || "";
@@ -11393,13 +13213,15 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
         <button type="button" class="ghost" data-tab-shortcut="data">Data & back-up beheren</button>
       </section>
     </div>`;
+    root2.querySelector(".u6-settings-grid").insertAdjacentHTML("afterbegin", bankAccountsCard);
+    root2.querySelector("[data-open-bank-accounts]").onclick = () => openBankAccountDetails();
     const master = root2.querySelector("[data-u6-share-master]");
     const fieldset = root2.querySelector(".u6-kpi-sharing");
     master == null ? void 0 : master.addEventListener("change", () => {
       fieldset.disabled = !master.checked;
     });
-    (_d = root2.querySelector("[data-u6-save-sharing]")) == null ? void 0 : _d.addEventListener("click", async (event) => {
-      const button = event.currentTarget;
+    (_d = root2.querySelector("[data-u6-save-sharing]")) == null ? void 0 : _d.addEventListener("click", async (event2) => {
+      const button = event2.currentTarget;
       const feedback = root2.querySelector("[data-u6-sharing-feedback]");
       const hiddenKpis = [...root2.querySelectorAll("[data-u6-share-kpi]")].filter((input) => !input.checked).map((input) => input.dataset.u6ShareKpi);
       button.disabled = true;
@@ -11417,8 +13239,8 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
         button.disabled = false;
       }
     });
-    (_e = root2.querySelector("[data-u6-open-shared]")) == null ? void 0 : _e.addEventListener("click", (event) => {
-      activeTab = event.currentTarget.dataset.u6OpenShared;
+    (_e = root2.querySelector("[data-u6-open-shared]")) == null ? void 0 : _e.addEventListener("click", (event2) => {
+      activeTab = event2.currentTarget.dataset.u6OpenShared;
       renderActiveTab();
     });
     (_f = root2.querySelector("[data-u6-signout]")) == null ? void 0 : _f.addEventListener("click", async () => {
@@ -11431,6 +13253,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
   }
   function renderActiveTabMeasured() {
     var _a2, _b, _c;
+    if (activeTab !== "dashboard") p3Dashboard == null ? void 0 : p3Dashboard.unmount();
     if (["dion", "dara"].includes(activeTab) && !canViewPersonalTab(activeTab)) activeTab = "settings";
     ensureMonthData(getSelectedMonth());
     renderMonthSelect();
@@ -11483,9 +13306,9 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       btn.addEventListener("click", () => {
         openIncomeEditModal(btn.dataset.incomeEdit, btn.dataset.incomeLabel);
       });
-      btn.addEventListener("keydown", (event) => {
-        if (event.target === btn && btn.tagName !== "BUTTON" && ["Enter", " "].includes(event.key)) {
-          event.preventDefault();
+      btn.addEventListener("keydown", (event2) => {
+        if (event2.target === btn && btn.tagName !== "BUTTON" && ["Enter", " "].includes(event2.key)) {
+          event2.preventDefault();
           btn.click();
         }
       });
@@ -11493,9 +13316,9 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     bindIncomeSourceLinks(root2);
     root2.querySelectorAll("[data-open-income-overview]").forEach((btn) => {
       btn.addEventListener("click", () => openIncomeOverview(btn.dataset.openIncomeOverview, btn));
-      btn.addEventListener("keydown", (event) => {
-        if (event.target === btn && btn.tagName !== "BUTTON" && ["Enter", " "].includes(event.key)) {
-          event.preventDefault();
+      btn.addEventListener("keydown", (event2) => {
+        if (event2.target === btn && btn.tagName !== "BUTTON" && ["Enter", " "].includes(event2.key)) {
+          event2.preventDefault();
           btn.click();
         }
       });
@@ -11521,8 +13344,8 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     });
     root2.querySelectorAll(".mobile-savings-overview .manage-section").forEach((section) => {
       var _a3;
-      (_a3 = section.querySelector("summary")) == null ? void 0 : _a3.addEventListener("click", (event) => {
-        event.preventDefault();
+      (_a3 = section.querySelector("summary")) == null ? void 0 : _a3.addEventListener("click", (event2) => {
+        event2.preventDefault();
         openMobileGoalManager(section.dataset.goalOwner);
       });
     });
@@ -11557,27 +13380,27 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       btn.addEventListener("click", () => openTransactionEntryMenu(btn.dataset.openPersonalTransaction));
     });
     root2.querySelectorAll("[data-edit-personal-transaction]").forEach((row) => {
-      const openEditor = (event) => {
-        if (!(event == null ? void 0 : event.target.closest("button"))) openPersonalTransactionModal(row.dataset.owner, row.dataset.editPersonalTransaction);
+      const openEditor = (event2) => {
+        if (!(event2 == null ? void 0 : event2.target.closest("button"))) openPersonalTransactionModal(row.dataset.owner, row.dataset.editPersonalTransaction);
       };
       row.addEventListener("click", openEditor);
-      row.addEventListener("keydown", (event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          openEditor(event);
+      row.addEventListener("keydown", (event2) => {
+        if (event2.key === "Enter" || event2.key === " ") {
+          event2.preventDefault();
+          openEditor(event2);
         }
       });
     });
     root2.querySelectorAll("[data-edit-joint-transaction]").forEach((row) => {
-      const openEditor = (event) => {
-        if (event == null ? void 0 : event.target.closest("button")) return;
+      const openEditor = (event2) => {
+        if (event2 == null ? void 0 : event2.target.closest("button")) return;
         openJointTransactionModal(row.dataset.editJointTransaction);
       };
       row.addEventListener("click", openEditor);
-      row.addEventListener("keydown", (event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          openEditor(event);
+      row.addEventListener("keydown", (event2) => {
+        if (event2.key === "Enter" || event2.key === " ") {
+          event2.preventDefault();
+          openEditor(event2);
         }
       });
     });
@@ -11713,10 +13536,10 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
   var U2_OWNERS = ["gezamenlijk", "dion", "dara"];
   function u2GoalTarget(goal) {
     const children = Array.isArray(goal == null ? void 0 : goal.subdoelen) ? goal.subdoelen : [];
-    return round22(children.length ? children.reduce((sum, child) => sum + Math.max(0, Number(child.doelbedrag) || 0), 0) : Math.max(0, Number(goal == null ? void 0 : goal.doelbedrag) || 0));
+    return round22(children.length ? children.reduce((sum2, child) => sum2 + Math.max(0, Number(child.doelbedrag) || 0), 0) : Math.max(0, Number(goal == null ? void 0 : goal.doelbedrag) || 0));
   }
   function u2GoalSaved(goal) {
-    return round22(Math.max(Number(goal == null ? void 0 : goal.algespaard) || 0, ((goal == null ? void 0 : goal.subdoelen) || []).reduce((sum, child) => sum + Math.max(0, Number(child.gespaard) || 0), 0)));
+    return round22(Math.max(Number(goal == null ? void 0 : goal.algespaard) || 0, ((goal == null ? void 0 : goal.subdoelen) || []).reduce((sum2, child) => sum2 + Math.max(0, Number(child.gespaard) || 0), 0)));
   }
   function u2NormalizeChildren(goal) {
     const children = Array.isArray(goal.subdoelen) ? goal.subdoelen.filter(isPlainObject2) : [];
@@ -11766,9 +13589,9 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
   function u2AverageContribution(goal) {
     const rows = u2MonthHistory(goal.eigenaar).slice(0, 6);
     if (!rows.length) return null;
-    const total = rows.reduce((sum, entry) => {
+    const total = rows.reduce((sum2, entry) => {
       const transaction = entry.transacties.find((tx) => tx.doelId === goal.id);
-      return sum + (Number(transaction == null ? void 0 : transaction.bedrag) || 0);
+      return sum2 + (Number(transaction == null ? void 0 : transaction.bedrag) || 0);
     }, 0);
     return round22(total / rows.length);
   }
@@ -11779,16 +13602,16 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     if (!(monthly > 0)) return null;
     const rate = monthlyRateFromGoal(goal);
     const reference = getCalculationDateForSelectedMonth(getSelectedMonth(), goal.eigenaar || "gezamenlijk");
-    const date = new Date(reference.getFullYear(), reference.getMonth(), 1);
+    const date2 = new Date(reference.getFullYear(), reference.getMonth(), 1);
     for (let month = 1; month <= 1200; month++) {
       balance = balance * (1 + rate) + monthly;
-      date.setMonth(date.getMonth() + 1);
-      if (balance + 5e-3 >= target) return new Date(date);
+      date2.setMonth(date2.getMonth() + 1);
+      if (balance + 5e-3 >= target) return new Date(date2);
     }
     return null;
   }
-  function u2DateLabel(date) {
-    return date instanceof Date && !isNaN(date) ? date.toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" }) : "Niet berekenbaar";
+  function u2DateLabel(date2) {
+    return date2 instanceof Date && !isNaN(date2) ? date2.toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" }) : "Niet berekenbaar";
   }
   function u2Status(item) {
     if (item.nogTeGaan <= 0) return { key: "voltooid", label: "Voltooid" };
@@ -11837,7 +13660,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     let remaining = Math.max(0, totalCents);
     let active = candidates.filter((item) => item.weight > 0 && capacities[item.index] > 0);
     while (remaining > 0 && active.length) {
-      const totalWeight = active.reduce((sum, item) => sum + item.weight, 0);
+      const totalWeight = active.reduce((sum2, item) => sum2 + item.weight, 0);
       if (!(totalWeight > 0)) break;
       const capped = active.filter((item) => remaining * (item.weight / totalWeight) >= capacities[item.index] - output.get(item.index));
       if (capped.length) {
@@ -11855,7 +13678,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
         const raw = remaining * (item.weight / totalWeight);
         return { ...item, cents: Math.floor(raw), fraction: raw - Math.floor(raw) };
       });
-      let assigned = shares.reduce((sum, item) => sum + item.cents, 0);
+      let assigned = shares.reduce((sum2, item) => sum2 + item.cents, 0);
       shares.sort((a, b) => b.fraction - a.fraction || a.index - b.index);
       for (let cent = 0; cent < remaining - assigned; cent++) shares[cent % shares.length].cents++;
       shares.forEach((item) => output.set(item.index, output.get(item.index) + item.cents));
@@ -11874,7 +13697,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     const potCents = Math.max(0, Math.round((Number(spaarpotDezeMaand) || 0) * 100));
     const capacities = berekend.map((b) => Math.max(0, Math.round(b.nogTeGaan * 100)));
     const vasteCents = berekend.map((b, index) => Math.min(capacities[index], Math.max(0, Math.round((Number(b.doel.vasteInleg) || 0) * 100))));
-    const totaalVasteCents = vasteCents.reduce((sum, value) => sum + value, 0);
+    const totaalVasteCents = vasteCents.reduce((sum2, value) => sum2 + value, 0);
     const onvoldoende = potCents < totaalVasteCents;
     const extraCents = berekend.map(() => 0);
     let resterendePotCents = onvoldoende ? potCents : Math.max(0, potCents - totaalVasteCents);
@@ -11885,7 +13708,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       distributed.output.forEach((value, index) => extraCents[index] = value);
       resterendePotCents = distributed.remaining;
     }
-    const totalNeeded = round22(berekend.reduce((sum, b) => sum + (b.benodigdPerMaand || 0), 0));
+    const totalNeeded = round22(berekend.reduce((sum2, b) => sum2 + (b.benodigdPerMaand || 0), 0));
     return berekend.map((b, index) => {
       const result2 = {
         ...b,
@@ -11914,22 +13737,22 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
   function u2ApplyContribution(goal, amount) {
     var _a2;
     const fullBalance = round22(u2GoalSaved(goal) + amount);
-    let cents4 = Math.max(0, Math.round(amount * 100));
+    let cents5 = Math.max(0, Math.round(amount * 100));
     if ((_a2 = goal.subdoelen) == null ? void 0 : _a2.length) {
       goal.subdoelen.forEach((child) => {
-        if (cents4 <= 0) return;
+        if (cents5 <= 0) return;
         const room = Math.max(0, Math.round((Number(child.doelbedrag) || 0) * 100) - Math.round((Number(child.gespaard) || 0) * 100));
-        const applied = Math.min(room, cents4);
+        const applied = Math.min(room, cents5);
         child.gespaard = round22((Math.round((Number(child.gespaard) || 0) * 100) + applied) / 100);
         child.voltooid = Number(child.doelbedrag) > 0 && child.gespaard >= Number(child.doelbedrag);
-        cents4 -= applied;
+        cents5 -= applied;
       });
       goal.doelbedrag = u2GoalTarget(goal);
       goal.algespaard = fullBalance;
     } else {
       goal.algespaard = round22((Number(goal.algespaard) || 0) + amount);
     }
-    return round22(cents4 / 100);
+    return round22(cents5 / 100);
   }
   function u2ReconcileSavingsGoals(goalIds = null) {
     const runtime = window.FinizeUpdate4Runtime;
@@ -11958,10 +13781,10 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     return new Date(Number(match[1]), Number(match[2]) - 1 + (processed ? 1 : 0), 1, 12);
   }
   function u2FixedFallback(items, pot) {
-    const cents4 = Math.round(pot * 100);
+    const cents5 = Math.round(pot * 100);
     const candidates = items.map((item, index) => ({ index, weight: Math.max(0, Number(item.doel.vasteInleg) || 0) })).filter((item) => item.weight > 0);
     const capacities = items.map((item) => Math.max(0, Math.round(item.nogTeGaan * 100)));
-    const result2 = u2DistributeCents(cents4, candidates, capacities);
+    const result2 = u2DistributeCents(cents5, candidates, capacities);
     return items.map((item, index) => round22((result2.output.get(index) || 0) / 100));
   }
   function u2OpenProcessModal(owner) {
@@ -11988,7 +13811,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     const modal = document.getElementById("transactionModal");
     const render2 = () => {
       var _a2;
-      const total = round22(amounts.reduce((sum, value) => sum + (Number(value) || 0), 0));
+      const total = round22(amounts.reduce((sum2, value) => sum2 + (Number(value) || 0), 0));
       const rows = items.map((item, index) => `<label class="u2-process-row"><span><strong>${textSafe(item.doel.naam)}</strong><small>Vast ${eur(Number(item.doel.vasteInleg) || 0)} · nodig ${item.benodigdPerMaand === null ? "—" : eur(item.benodigdPerMaand)}</small></span><input type="number" min="0" max="${item.nogTeGaan}" step="0.01" data-u2-process="${index}" value="${Number(amounts[index]).toFixed(2)}"></label>`).join("");
       modal.innerHTML = `<div class="modal u2-process-modal"><div class="u2-modal-head"><div><div class="section-kicker">${ownerLabel(owner)}</div><h2>Spaarpot ${monthLabel(month)}</h2></div><button class="ghost" data-u2-close>Sluiten</button></div>
       ${insufficient ? `<div class="u2-warning"><strong>Onvoldoende spaargeld om alle vaste inleggen uit te voeren.</strong><span>Kies automatische ratoverdeling over de vaste inleggen of pas de bedragen zelf aan.</span><button class="ghost small" data-u2-fixed-ratio>Automatisch naar rato</button></div>` : ""}
@@ -11998,7 +13821,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       <div class="modal-actions"><button class="ghost" data-u2-close>Annuleren</button><button class="primary" data-u2-confirm>Spaarpot verwerken</button></div></div>`;
       modal.classList.add("open", "u2-process-open");
       const refresh = () => {
-        const total2 = round22(amounts.reduce((sum, value) => sum + (Number(value) || 0), 0));
+        const total2 = round22(amounts.reduce((sum2, value) => sum2 + (Number(value) || 0), 0));
         modal.querySelector("[data-u2-total]").textContent = eur(total2);
         const error2 = modal.querySelector("[data-u2-error]");
         error2.textContent = total2 > pot + 5e-3 ? "De verdeling is hoger dan de beschikbare spaarpot." : "";
@@ -12016,7 +13839,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
         render2();
       });
       modal.querySelector("[data-u2-confirm]").addEventListener("click", async () => {
-        const total2 = round22(amounts.reduce((sum, value) => sum + (Number(value) || 0), 0));
+        const total2 = round22(amounts.reduce((sum2, value) => sum2 + (Number(value) || 0), 0));
         const invalid = amounts.some((value, index) => value < 0 || value > items[index].nogTeGaan + 5e-3);
         if (invalid) {
           modal.querySelector("[data-u2-error]").textContent = "Een bedrag is ongeldig of hoger dan de resterende doelruimte.";
@@ -12111,8 +13934,8 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       { key: "dara", label: "Dara", pot: Math.max(0, r.dara.beschikbaarVoorSparen) }
     ];
     const all = groups.flatMap((group) => calcGroep(state.spaardoelen[group.key], group.pot, TODAY));
-    const saved = round22(all.reduce((sum, item) => sum + u2GoalSaved(item.doel), 0));
-    const target = round22(all.reduce((sum, item) => sum + u2GoalTarget(item.doel), 0));
+    const saved = round22(all.reduce((sum2, item) => sum2 + u2GoalSaved(item.doel), 0));
+    const target = round22(all.reduce((sum2, item) => sum2 + u2GoalTarget(item.doel), 0));
     const root2 = document.getElementById("tab-spaardoelen");
     root2.innerHTML = `${renderSharedEmptyTabHeader("Slimme spaardoelen")}
     <div class="mobile-savings-overview u2-savings">
@@ -12176,9 +13999,9 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     const history = Object.values(state.spaardoelGeschiedenis || {}).filter((entry) => visibleOwners.includes(entry.eigenaar)).sort((a, b) => String(b.maand).localeCompare(String(a.maand)));
     const historyHtml = `<div class="u2-history-list">${history.map((entry) => `<article><strong>${ownerLabel(entry.eigenaar)} · ${monthLabel(entry.maand)}</strong><span>Spaarpot ${eur(entry.spaarpot)} · verdeeld ${eur(entry.verdeeld)} · onverdeeld ${eur(entry.onverdeeld)}</span><small>${entry.transacties.map((tx) => `${textSafe(tx.doelNaam)} ${eur(tx.bedrag)}`).join(" · ")}</small></article>`).join("") || '<p class="hint">Nog geen maanden verwerkt.</p>'}</div>`;
     root2.insertAdjacentHTML("beforeend", `<div class="manage-stack u2-history-stack">${renderManageSection("Spaargeschiedenis", historyHtml, false)}</div>`);
-    root2.querySelectorAll(".u2-goal-accordion [data-open-goal-editor]").forEach((btn) => btn.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
+    root2.querySelectorAll(".u2-goal-accordion [data-open-goal-editor]").forEach((btn) => btn.addEventListener("click", (event2) => {
+      event2.preventDefault();
+      event2.stopPropagation();
     }));
     root2.querySelectorAll("[data-u2-process-owner]").forEach((btn) => btn.addEventListener("click", () => u2OpenProcessModal(btn.dataset.u2ProcessOwner)));
   };
@@ -12204,12 +14027,12 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       var _a3;
       section.innerHTML = `<div class="u2-subgoal-head"><div><h3>Subdoelen</h3><p>Er wordt altijd van boven naar beneden gespaard.</p></div><button type="button" class="ghost small" data-u2-add-child>+ Subdoel</button></div><div class="u2-subgoal-list">${drafts.map((child, index) => `<div class="u2-subgoal-row" draggable="true" data-u2-child="${index}"><span class="u2-drag" title="Sleep om te verplaatsen">⋮⋮</span><input aria-label="Naam subdoel" data-u2-child-name="${index}" value="${textSafe(child.naam || "")}"><input aria-label="Doelbedrag subdoel" type="number" min="0" step="0.01" data-u2-child-target="${index}" value="${Number(child.doelbedrag) || 0}"><input aria-label="Link subdoel" type="url" data-u2-child-link="${index}" value="${textSafe(child.link || "")}" placeholder="Optionele link"><span>${eur(Number(child.gespaard) || 0)}</span><button type="button" class="ghost small" data-u2-child-up="${index}" ${index === 0 ? "disabled" : ""}>↑</button><button type="button" class="ghost small" data-u2-child-down="${index}" ${index === drafts.length - 1 ? "disabled" : ""}>↓</button><button type="button" class="danger-ghost" data-u2-child-remove="${index}">×</button></div>`).join("") || '<p class="hint">Nog geen subdoelen. Het hoofddoelbedrag blijft handmatig instelbaar.</p>'}</div>`;
       targetInput.disabled = drafts.length > 0;
-      if (drafts.length) targetInput.value = round22(drafts.reduce((sum, child) => sum + (Number(child.doelbedrag) || 0), 0));
+      if (drafts.length) targetInput.value = round22(drafts.reduce((sum2, child) => sum2 + (Number(child.doelbedrag) || 0), 0));
       const sync = () => {
         section.querySelectorAll("[data-u2-child-name]").forEach((input) => drafts[Number(input.dataset.u2ChildName)].naam = input.value);
         section.querySelectorAll("[data-u2-child-target]").forEach((input) => drafts[Number(input.dataset.u2ChildTarget)].doelbedrag = Math.max(0, round22(bankAmount(input.value) || 0)));
         section.querySelectorAll("[data-u2-child-link]").forEach((input) => drafts[Number(input.dataset.u2ChildLink)].link = input.value);
-        if (drafts.length) targetInput.value = round22(drafts.reduce((sum, child) => sum + (Number(child.doelbedrag) || 0), 0));
+        if (drafts.length) targetInput.value = round22(drafts.reduce((sum2, child) => sum2 + (Number(child.doelbedrag) || 0), 0));
       };
       const lookupProduct = async (input) => {
         sync();
@@ -12227,7 +14050,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
           const target = row == null ? void 0 : row.querySelector("[data-u2-child-target]");
           if (nameInput) nameInput.value = current.naam || "";
           if (target) target.value = Number(current.doelbedrag) || 0;
-          if (drafts.length) targetInput.value = round22(drafts.reduce((sum, item) => sum + (Number(item.doelbedrag) || 0), 0));
+          if (drafts.length) targetInput.value = round22(drafts.reduce((sum2, item) => sum2 + (Number(item.doelbedrag) || 0), 0));
           if (snapshot2.price === null) showQuickToast("Product gevonden, maar geen prijs. Vul het bedrag handmatig in.");
         }).catch((error2) => {
           console.info("Productinformatie bij subdoel niet automatisch aangevuld.", (error2 == null ? void 0 : error2.message) || error2);
@@ -12263,9 +14086,9 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
           row.classList.add("dragging");
         });
         row.addEventListener("dragend", () => row.classList.remove("dragging"));
-        row.addEventListener("dragover", (event) => event.preventDefault());
-        row.addEventListener("drop", async (event) => {
-          event.preventDefault();
+        row.addEventListener("dragover", (event2) => event2.preventDefault());
+        row.addEventListener("drop", async (event2) => {
+          event2.preventDefault();
           const target = Number(row.dataset.u2Child);
           if (dragIndex !== null && dragIndex !== target) await move(dragIndex, target);
         });
@@ -12277,20 +14100,20 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     grid.insertBefore(ratioField, grid.querySelector(".goal-calculation-card"));
     grid.insertBefore(section, grid.querySelector(".goal-calculation-card"));
     renderChildren();
-    modal.querySelector("#goalEditSave").addEventListener("click", async (event) => {
+    modal.querySelector("#goalEditSave").addEventListener("click", async (event2) => {
       if (!productLookups.size) return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      const button = event.currentTarget;
+      event2.preventDefault();
+      event2.stopImmediatePropagation();
+      const button = event2.currentTarget;
       button.disabled = true;
       await Promise.allSettled([...productLookups.values()]);
       button.disabled = false;
       button.click();
     }, { capture: true });
     const u2CloseButton = modal.querySelector("[data-close-goal-editor]");
-    const u2CloseEditor = (event) => {
-      event.preventDefault();
-      event.stopImmediatePropagation();
+    const u2CloseEditor = (event2) => {
+      event2.preventDefault();
+      event2.stopImmediatePropagation();
       modal.classList.remove("open", "goal-detail-editor-open");
       modal.innerHTML = "";
       renderActiveTab();
@@ -12356,7 +14179,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       return actual.paid ? { id: actual.rows[0].id, amount: actual.actual, transactions: actual.rows.map((p) => p.transaction) } : null;
     }
     const rows = selectTransactionProjections(state, { month }).filter((p) => p.incomeOccurrenceId === occurrenceId && p.effects.incomeImpact > 0);
-    return rows.length ? { id: rows[0].id, amount: round22(rows.reduce((sum, p) => sum + p.effects.incomeImpact, 0)), transactions: rows.map((p) => p.transaction) } : null;
+    return rows.length ? { id: rows[0].id, amount: round22(rows.reduce((sum2, p) => sum2 + p.effects.incomeImpact, 0)), transactions: rows.map((p) => p.transaction) } : null;
   }
   function u3IncomeOccurrenceValue(occurrence) {
     const actual = u3LinkedActual("income", occurrence.id, occurrence.month);
@@ -12364,7 +14187,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
   }
   function u3IncomeForOwner(owner, options = {}) {
     const month = options.month || getSelectedMonth();
-    return round22(u3IncomeOccurrences(month).filter((row) => row.owner === owner && (options.type ? row.type === options.type : true) && (options.distributionOnly ? row.meetellenVoorVerdeling : true)).reduce((sum, row) => sum + u3IncomeOccurrenceValue(row), 0));
+    return round22(u3IncomeOccurrences(month).filter((row) => row.owner === owner && (options.type ? row.type === options.type : true) && (options.distributionOnly ? row.meetellenVoorVerdeling : true)).reduce((sum2, row) => sum2 + u3IncomeOccurrenceValue(row), 0));
   }
   function u3IncomeTransactionOwner(tx) {
     return getTransactionFinancialDestination(tx);
@@ -12380,10 +14203,10 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     return sumTransactionEffects(state, "realExpense", { month, owner: financialFor });
   }
   function u3ExpectedIncome(month = getSelectedMonth(), financialFor = null) {
-    return round22(u3IncomeOccurrences(month).filter((row) => !financialFor || row.financialFor === financialFor).reduce((sum, row) => sum + Number(row.amount || 0), 0));
+    return round22(u3IncomeOccurrences(month).filter((row) => !financialFor || row.financialFor === financialFor).reduce((sum2, row) => sum2 + Number(row.amount || 0), 0));
   }
   function u3PlannedFixedTotal(month = getSelectedMonth(), financialFor = null) {
-    return round22(u3FixedOccurrences(month).filter((row) => !financialFor || row.financialFor === financialFor).reduce((sum, row) => sum + Number(row.amount || 0), 0));
+    return round22(u3FixedOccurrences(month).filter((row) => !financialFor || row.financialFor === financialFor).reduce((sum2, row) => sum2 + Number(row.amount || 0), 0));
   }
   function u3VariableBudgets(owner, month = getSelectedMonth()) {
     return resolveVariableBudgetsForMonth(state, month, owner);
@@ -12421,10 +14244,10 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     });
   }
   function u3ReserveDelta(owner, month = getSelectedMonth(), scenario = null) {
-    return round22(u3BudgetSummary(owner, month, scenario).reduce((sum, row) => sum + row.difference, 0));
+    return round22(u3BudgetSummary(owner, month, scenario).reduce((sum2, row) => sum2 + row.difference, 0));
   }
   function u3ReserveBalance(owner, throughMonth = "9999-12") {
-    return round22((state.reserveLedger || []).filter((row) => row.owner === owner && String(row.month || "") <= throughMonth && row.status !== "vervallen").reduce((sum, row) => sum + (Number(row.amount) || 0), 0));
+    return round22((state.reserveLedger || []).filter((row) => row.owner === owner && String(row.month || "") <= throughMonth && row.status !== "vervallen").reduce((sum2, row) => sum2 + (Number(row.amount) || 0), 0));
   }
   function u3OpeningBalance(account, month) {
     var _a2, _b, _c, _d, _e;
@@ -12436,21 +14259,21 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
   function u3ConfirmedTransfersInCalendarMonth(account, month) {
     const banks = currentBankTransactions({ month }), keys = new Set(banks.map((tx) => tx.bankSourceId || tx.id));
     const actualIds = /* @__PURE__ */ new Set([...banks.map((tx) => tx.id), ...(state.transactions || []).filter((tx) => keys.has(tx.bankSourceId || tx.id)).map((tx) => tx.id)]);
-    return (state.internalTransfers || []).filter((row) => row.status === "uitgevoerd" && String(row.date || "").slice(0, 7) === month && !actualIds.has(row.actualTransactionId) && !(row.transactionIds || []).some((id) => actualIds.has(id))).reduce((sum, row) => {
+    return (state.internalTransfers || []).filter((row) => row.status === "uitgevoerd" && String(row.date || "").slice(0, 7) === month && !actualIds.has(row.actualTransactionId) && !(row.transactionIds || []).some((id) => actualIds.has(id))).reduce((sum2, row) => {
       var _a2;
       const amount = Number((_a2 = row.actualAmount) != null ? _a2 : row.calculatedAmount) || 0;
-      if (row.sourceAccount === account) return sum - amount;
-      if (row.targetAccount === account) return sum + amount;
-      return sum;
+      if (row.sourceAccount === account) return sum2 - amount;
+      if (row.targetAccount === account) return sum2 + amount;
+      return sum2;
     }, 0);
   }
   function u3AccountControl(month = getSelectedMonth()) {
     const result2 = {};
     U3_ACCOUNTS.forEach((account) => {
       const opening = u3OpeningBalance(account, month);
-      const transactionDelta = currentBankTransactions({ month, account }).reduce((sum, tx) => sum + tx.bankAmount, 0);
+      const transactionDelta = currentBankTransactions({ month, account }).reduce((sum2, tx) => sum2 + tx.bankAmount, 0);
       const transferDelta = u3ConfirmedTransfersInCalendarMonth(account, month);
-      const corrections = (state.monthCorrections || []).filter((row) => row.account === account && row.effectiveMonth === month && row.status !== "vervallen").reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
+      const corrections = (state.monthCorrections || []).filter((row) => row.account === account && row.effectiveMonth === month && row.status !== "vervallen").reduce((sum2, row) => sum2 + (Number(row.amount) || 0), 0);
       result2[account] = { opening, transactionDelta: round22(transactionDelta), transferDelta: round22(transferDelta), corrections: round22(corrections), calculatedEnd: round22(opening + transactionDelta + transferDelta + corrections) };
     });
     return result2;
@@ -12539,11 +14362,11 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     }
   }
   function u3LiveFinancialSnapshot(month = getSelectedMonth()) {
-    const forecast = monthlyFinancialForecast(month), owners2 = forecast.owners;
-    const income = { dion: owners2.dion.income, dara: owners2.dara.income, joint: owners2.gezamenlijk.income, total: forecast.household.income, sources: { dion: owners2.dion.salarySource, dara: owners2.dara.salarySource, joint: "transactions", total: "forecast" } };
-    const variableExpenses = { dion: owners2.dion.variableBurden, dara: owners2.dara.variableBurden, joint: owners2.gezamenlijk.variableBurden };
+    const forecast = monthlyFinancialForecast(month), owners3 = forecast.owners;
+    const income = { dion: owners3.dion.income, dara: owners3.dara.income, joint: owners3.gezamenlijk.income, total: forecast.household.income, sources: { dion: owners3.dion.salarySource, dara: owners3.dara.salarySource, joint: "transactions", total: "forecast" } };
+    const variableExpenses = { dion: owners3.dion.variableBurden, dara: owners3.dara.variableBurden, joint: owners3.gezamenlijk.variableBurden };
     variableExpenses.total = round22(variableExpenses.dion + variableExpenses.dara + variableExpenses.joint);
-    const fixedExpenses = round22(U3_ACCOUNTS.reduce((sum, owner) => sum + owners2[owner].fixedBurden, 0)), savings = round22(U3_ACCOUNTS.reduce((sum, owner) => sum + owners2[owner].savingsDeposit, 0));
+    const fixedExpenses = round22(U3_ACCOUNTS.reduce((sum2, owner) => sum2 + owners3[owner].fixedBurden, 0)), savings = round22(U3_ACCOUNTS.reduce((sum2, owner) => sum2 + owners3[owner].savingsDeposit, 0));
     const contributions = { dion: 0, dara: 0, joint: 0, total: 0 };
     (state.savingsGoalLedger || []).filter((entry) => entry.active !== false && entry.month === month && entry.source !== "planned" && !["geannuleerd", "teruggedraaid"].includes(entry.status)).forEach((entry) => {
       const owner = U3_ACCOUNTS.find((owner2) => {
@@ -12554,7 +14377,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       contributions[key] = round22(contributions[key] + Number(entry.effectiveAmount || 0));
     });
     contributions.total = round22(contributions.dion + contributions.dara + contributions.joint);
-    return { month, version: 3, status: "open", legacy: false, income, actualIncome: forecast.household.actualIncome, fixedExpenses, variableExpenses, refunds: forecast.household.refundCashflow, savings, unusedSavings: forecast.household.unusedSavings, savingsFunded: forecast.household.savingsFunded, realExpense: forecast.household.realExpense, allowance: { dion: owners2.dion.allowance, dara: owners2.dara.allowance }, contributions, remaining: forecast.household.available, goalAllocations: (state.savingsGoalLedger || []).filter((entry) => entry.month === month && entry.active !== false).map((entry) => ({ id: entry.id, goalId: entry.goalId, amount: round22(Number(entry.effectiveAmount) || 0), status: entry.status })), closedAt: "" };
+    return { month, version: 3, status: "open", legacy: false, income, actualIncome: forecast.household.actualIncome, fixedExpenses, variableExpenses, refunds: forecast.household.refundCashflow, savings, unusedSavings: forecast.household.unusedSavings, savingsFunded: forecast.household.savingsFunded, realExpense: forecast.household.realExpense, allowance: { dion: owners3.dion.allowance, dara: owners3.dara.allowance }, contributions, remaining: forecast.household.available, goalAllocations: (state.savingsGoalLedger || []).filter((entry) => entry.month === month && entry.active !== false).map((entry) => ({ id: entry.id, goalId: entry.goalId, amount: round22(Number(entry.effectiveAmount) || 0), status: entry.status })), closedAt: "" };
   }
   function getMonthFinancialResult(month = getSelectedMonth()) {
     var _a2, _b, _c, _d, _e;
@@ -12668,16 +14491,16 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       remaining = round22(remaining - applied);
     });
   }
-  function u3ConfirmTransfer(id, actualAmount, date, status = "uitgevoerd") {
+  function u3ConfirmTransfer(id, actualAmount, date2, status2 = "uitgevoerd") {
     const transfer = (state.internalTransfers || []).find((row) => row.id === id);
     if (!transfer) return false;
     assertMonthMutationAllowed(transfer.month);
-    if (transfer.status === "uitgevoerd" && status === "uitgevoerd") return true;
+    if (transfer.status === "uitgevoerd" && status2 === "uitgevoerd") return true;
     transfer.actualAmount = round22(Math.max(0, Number(actualAmount) || 0));
-    transfer.date = date || u3IsoDate2(/* @__PURE__ */ new Date());
-    transfer.status = status;
+    transfer.date = date2 || u3IsoDate2(/* @__PURE__ */ new Date());
+    transfer.status = status2;
     transfer.correction = round22(transfer.actualAmount - (Number(transfer.calculatedAmount) || 0));
-    if (status === "uitgevoerd") {
+    if (status2 === "uitgevoerd") {
       u3ApplyTransferToAdvances(transfer, transfer.actualAmount);
       if (Math.abs(transfer.correction) > 4e-3) {
         const [year, month] = transfer.month.split("-").map(Number);
@@ -12690,21 +14513,21 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
   }
   function u3SuggestedRecognition(description, account, amount) {
     var _a2;
-    const text = bankText(description);
+    const text2 = bankText(description);
     return ((_a2 = (state.recognitionRules || []).map((rule) => {
       let score = 0;
-      if (rule.text && text.includes(bankText(rule.text))) score += 5;
-      if (rule.counterparty && text.includes(bankText(rule.counterparty))) score += 3;
+      if (rule.text && text2.includes(bankText(rule.text))) score += 5;
+      if (rule.counterparty && text2.includes(bankText(rule.counterparty))) score += 3;
       if (rule.account && rule.account === account) score += 2;
       if (Number.isFinite(Number(rule.amount)) && Math.abs(Math.abs(Number(amount)) - Math.abs(Number(rule.amount))) <= Number(rule.tolerance || 5)) score += 2;
       return { rule, score };
     }).filter((row) => row.score > 0).sort((a, b) => b.score - a.score)[0]) == null ? void 0 : _a2.rule) || null;
   }
   function u3RememberRecognition(tx) {
-    const text = bankText(tx.description);
-    if (!text) return;
-    const id = `recognition-${tx.account}-${text}`.replace(/[^a-z0-9_-]/g, "-").slice(0, 180);
-    const next = { id, text, counterparty: "", account: tx.account, category: tx.category || "Overig", fixedExpenseId: tx.fixedExpenseId || "", incomeSourceId: tx.incomeSourceId || "", financialFor: tx.financialFor || tx.account, amount: round22(Math.abs(Number(tx.amount) || 0)), tolerance: Math.max(5, round22(Math.abs(Number(tx.amount) || 0) * 0.15)), updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
+    const text2 = bankText(tx.description);
+    if (!text2) return;
+    const id = `recognition-${tx.account}-${text2}`.replace(/[^a-z0-9_-]/g, "-").slice(0, 180);
+    const next = { id, text: text2, counterparty: "", account: tx.account, category: tx.category || "Overig", fixedExpenseId: tx.fixedExpenseId || "", incomeSourceId: tx.incomeSourceId || "", financialFor: tx.financialFor || tx.account, amount: round22(Math.abs(Number(tx.amount) || 0)), tolerance: Math.max(5, round22(Math.abs(Number(tx.amount) || 0) * 0.15)), updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
     const index = state.recognitionRules.findIndex((row) => row.id === id);
     if (index >= 0) state.recognitionRules[index] = next;
     else state.recognitionRules.unshift(next);
@@ -12715,8 +14538,8 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
   }
   function assertMonthMutationAllowed(month = getSelectedMonth(), mode2 = "direct") {
     var _a2, _b;
-    const status = (_b = (_a2 = state.monthRecords) == null ? void 0 : _a2[month]) == null ? void 0 : _b.status;
-    if (!["afgesloten", "correctie-nodig"].includes(status)) return true;
+    const status2 = (_b = (_a2 = state.monthRecords) == null ? void 0 : _a2[month]) == null ? void 0 : _b.status;
+    if (!["afgesloten", "correctie-nodig"].includes(status2)) return true;
     if (["reopen", "correction", "late-import"].includes(mode2)) return true;
     throw new Error("Deze maand is afgesloten. Heropen de maand of maak een correctie om financiële gegevens te wijzigen.");
   }
@@ -12746,10 +14569,10 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     const pending = u3PendingReviews(month).length;
     const control = u3AccountControl(month);
     const needsCorrection = (record == null ? void 0 : record.status) === "correctie-nodig";
-    const status = (record == null ? void 0 : record.status) === "afgesloten" ? "closed" : needsCorrection || pending ? "pending" : "ok";
+    const status2 = (record == null ? void 0 : record.status) === "afgesloten" ? "closed" : needsCorrection || pending ? "pending" : "ok";
     const statusLabel = (record == null ? void 0 : record.status) === "afgesloten" ? "Afgesloten" : needsCorrection ? "Correctie nodig" : pending ? `${pending} te controleren` : "Klaar voor controle";
     const body = `<section class="card u3-admin-card">
-    <div class="u3-admin-head"><p>Verwacht, werkelijk, rekeningen, reserve en onderlinge voorschotten</p><span class="u3-status ${status}">${statusLabel}</span></div>
+    <div class="u3-admin-head"><p>Verwacht, werkelijk, rekeningen, reserve en onderlinge voorschotten</p><span class="u3-status ${status2}">${statusLabel}</span></div>
     <div class="u3-admin-metrics">
       <div class="u3-admin-metric"><span>Verwacht inkomen</span><strong>${eur(summary.expectedIncome)}</strong></div>
       <div class="u3-admin-metric"><span>Werkelijk inkomen</span><strong>${eur(summary.actualIncome)}</strong></div>
@@ -12821,7 +14644,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
   }
   function fixedRealizationLabel(item) {
     const rows = u3FixedOccurrences(getSelectedMonth()).filter((row) => row.itemId === item.id).map((row) => fixedOccurrenceActuals(state, row));
-    const actual = round22(rows.reduce((sum, row) => sum + row.actual, 0)), planned = round22(rows.reduce((sum, row) => sum + row.planned, 0));
+    const actual = round22(rows.reduce((sum2, row) => sum2 + row.actual, 0)), planned = round22(rows.reduce((sum2, row) => sum2 + row.planned, 0));
     return ` · ${rows.some((row) => row.paid) ? "Betaald" : "Niet betaald"} · werkelijk ${eur(actual)} · verschil ${eur(actual - planned)}`;
   }
   function u3OpenPlanning(owner = "") {
@@ -13120,7 +14943,77 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     upsertManualFinancialTransaction(cloneState(state), tx, account);
     return await commitChange(() => upsertManualFinancialTransaction(state, tx, account), { render: false });
   } });
-  window.FinizeTransactions = Object.freeze({ bankSources: (options) => currentBankTransactions(options), bankTotal: (options) => round22(currentBankTransactions(options).reduce((sum, tx) => sum + tx.bankAmount, 0)), project: (tx) => projectTransaction(tx, { state }), effects: (options) => selectTransactionProjections(state, options), total: (dimension, options) => sumTransactionEffects(state, dimension, options), fixedActual: (occurrence) => fixedOccurrenceActuals(state, occurrence), income: (month, owner) => actualIncomeForMonth(state, month, owner), forecast: (month) => monthlyFinancialForecast(month), coverage: () => coverageAllocationStatus(state), openCoverage: (id) => openSavingsCoverageModal(id), confirmPair: async (id) => await commitChange(() => confirmInternalTransferPair(state, id)) });
+  window.FinizeBalances = createAccountBalanceUI({ getState: () => state, getScope: () => ({ householdId: CloudAdapter.importScope(), accountProfiles: state.accountProfiles || [] }), getImports: () => window.FinizeUpdate4.importStore.listImports(), commit: (change, options) => commitChange(change, options), today: localTransactionToday, actor: () => {
+    var _a2, _b;
+    return ((_b = (_a2 = globalThis.FinizeAuth) == null ? void 0 : _a2.user) == null ? void 0 : _b.uid) || null;
+  } });
+  window.FinizeAccounts = createBankAccountsUI({
+    getState: () => state,
+    getScope: () => CloudAdapter.importScope(),
+    getImports: () => window.FinizeUpdate4.importStore.listImports(),
+    balances: window.FinizeBalances,
+    ownerLabel,
+    onOpen: (destination) => {
+      if (destination === "settings") bankAccountsSettingsOpen = false;
+      activeTab = "settings";
+      renderActiveTab();
+    },
+    save: saveBankAccount,
+    hasConflict: () => CloudAdapter.conflict,
+    openConflicts: () => window.FinizeUpdate4.openConflicts()
+  });
+  async function saveBankAccount(command) {
+    var _a2;
+    const scope = CloudAdapter.importScope();
+    if (command.type === "update" && state.__finizePartialHistory && !((_a2 = state.__finizePeriodContext) == null ? void 0 : _a2.explicitFullHistory)) {
+      const old = state.accountProfiles.find((row) => row.id === command.id);
+      if (old && (command.values.identifier !== old.identifier || command.values.accountOwner !== old.accountOwner)) {
+        const session = CloudAdapter.recordSession;
+        if (!session) throw new Error("De volledige rekeninghistorie is nog niet beschikbaar. Open de rekening opnieuw nadat de historie is geladen.");
+        const result2 = await session.openFullHistory(state.meta.selectedMonth, "IBAN of eigenaar controleren");
+        if (result2.outcome !== "committed") throw new Error("De volledige rekeninghistorie kon niet betrouwbaar worden geladen.");
+      }
+    }
+    const imports = await window.FinizeUpdate4.importStore.listImports();
+    if (scope !== CloudAdapter.importScope()) throw new Error("Het huishouden is gewijzigd. Open de rekening opnieuw.");
+    const saved = await commitChange((target) => {
+      if (scope !== CloudAdapter.importScope()) throw new Error("Het huishouden is gewijzigd.");
+      applyAccountProfileCommand(target, command, { imports });
+    }, { operationId: command.operationId, render: false, throwOnError: true });
+    if (!saved) throw new Error("Rekening opslaan is afgebroken. Probeer opnieuw.");
+    return state.accountProfiles.find((row) => row.id === command.id);
+  }
+  window.FinizeAccountsSave = saveBankAccount;
+  window.openBankAccountDetails = openBankAccountDetails;
+  window.FinizeLiquidity = Object.freeze({
+    select: (options) => selectDailyLiquidity(state, { importsAvailable: Array.isArray(options.imports), ...options, monthlyForecast: (_, month) => monthlyFinancialForecast(month), scope: { householdId: CloudAdapter.importScope(), accountProfiles: state.accountProfiles || [] } }),
+    requiredMonths: (options) => liquidityRequiredMonths(state, { ...options, scope: { householdId: CloudAdapter.importScope(), accountProfiles: state.accountProfiles || [] } }),
+    project: async (options) => {
+      const scope = CloudAdapter.importScope();
+      if (state.__finizePartialHistory && CloudAdapter.recordSession) {
+        const months = liquidityRequiredMonths(state, { ...options, scope: { householdId: scope, accountProfiles: state.accountProfiles || [] } });
+        if (months.some((month) => {
+          var _a2;
+          return !((_a2 = state.verifiedPeriods) == null ? void 0 : _a2.includes(month));
+        })) await CloudAdapter.recordSession.openMonth(state.meta.selectedMonth, { additionalMonths: months });
+      }
+      const imports = await window.FinizeUpdate4.importStore.listImports();
+      if (scope !== CloudAdapter.importScope()) throw new Error("Het huishouden is gewijzigd. Open de prognose opnieuw.");
+      const select = () => selectDailyLiquidity(state, { ...options, imports, monthlyForecast: (_, month) => monthlyFinancialForecast(month), scope: { householdId: scope, accountProfiles: state.accountProfiles || [] } });
+      let result2 = select();
+      if (state.__finizePartialHistory && CloudAdapter.recordSession && result2.requiredMonths.some((month) => {
+        var _a2;
+        return !((_a2 = state.verifiedPeriods) == null ? void 0 : _a2.includes(month));
+      })) {
+        await CloudAdapter.recordSession.openMonth(state.meta.selectedMonth, { additionalMonths: result2.requiredMonths });
+        if (scope !== CloudAdapter.importScope()) throw new Error("Het huishouden is gewijzigd. Open de prognose opnieuw.");
+        result2 = select();
+      }
+      return result2;
+    },
+    openSettings: openBankAccountDetails
+  });
+  window.FinizeTransactions = Object.freeze({ bankSources: (options) => currentBankTransactions(options), bankTotal: (options) => round22(currentBankTransactions(options).reduce((sum2, tx) => sum2 + tx.bankAmount, 0)), project: (tx) => projectTransaction(tx, { state }), effects: (options) => selectTransactionProjections(state, options), total: (dimension, options) => sumTransactionEffects(state, dimension, options), fixedActual: (occurrence) => fixedOccurrenceActuals(state, occurrence), income: (month, owner) => actualIncomeForMonth(state, month, owner), forecast: (month) => monthlyFinancialForecast(month), coverage: () => coverageAllocationStatus(state), openCoverage: (id) => openSavingsCoverageModal(id), confirmPair: async (id) => await commitChange(() => confirmInternalTransferPair(state, id)) });
   window.FinizeUpdate3 = Object.freeze({
     schemaVersion: U3_SCHEMA_VERSION,
     occurrenceDates: (item, month) => u3OccurrenceDates2(cloneState(item), month),
@@ -13140,7 +15033,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     netAdvances: (month) => u3NetAdvances(month),
     closeMonth: (month, actualBalances, correctionAccounts) => u3CloseMonth(month, actualBalances, correctionAccounts),
     reopenMonth: (month) => u3ReopenMonth(month),
-    confirmTransfer: (id, amount, date, status) => u3ConfirmTransfer(id, amount, date, status),
+    confirmTransfer: (id, amount, date2, status2) => u3ConfirmTransfer(id, amount, date2, status2),
     suggestRecognition: (description, account, amount) => cloneState(u3SuggestedRecognition(description, account, amount)),
     normalize: (candidate) => migrateBudgetState(candidate)
   });
@@ -13148,9 +15041,9 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     schemaVersion: U2_SCHEMA_VERSION,
     calculateGroup: (goals, pot, today) => calcGroep(cloneState(goals), pot, new Date(today)),
     normalizeSubgoals: (goal) => {
-      const copy9 = cloneState(goal);
-      u2NormalizeChildren(copy9);
-      return copy9;
+      const copy10 = cloneState(goal);
+      u2NormalizeChildren(copy10);
+      return copy10;
     },
     historyKey: u2HistoryKey
   });
@@ -13167,10 +15060,10 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
   window.__finizeDataReady = new Promise((resolve) => {
     resolveDataReady = resolve;
   });
-  window.addEventListener("finize:auth-session", (event) => {
+  window.addEventListener("finize:auth-session", (event2) => {
     var _a2, _b, _c, _d;
     if (!window.__finizeBootstrap.authReady) return;
-    const previous = activeAuthSession, next = event.detail;
+    const previous = activeAuthSession, next = event2.detail;
     if ((previous == null ? void 0 : previous.status) === (next == null ? void 0 : next.status) && ((_a2 = previous == null ? void 0 : previous.user) == null ? void 0 : _a2.uid) === ((_b = next == null ? void 0 : next.user) == null ? void 0 : _b.uid) && ((_c = previous == null ? void 0 : previous.assignment) == null ? void 0 : _c.householdId) === ((_d = next == null ? void 0 : next.assignment) == null ? void 0 : _d.householdId)) return;
     document.body.classList.add("auth-pending");
     location.reload();
@@ -13269,7 +15162,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
   });
 
   // src/import/source-repair.mjs
-  var copy7 = (value) => JSON.parse(JSON.stringify(value));
+  var copy8 = (value) => JSON.parse(JSON.stringify(value));
   var iban2 = (value) => String(value || "").replace(/\s/g, "").toUpperCase();
   function inspectSourceAvailability(state2, tx, batch) {
     var _a2, _b;
@@ -13286,11 +15179,11 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     const identifier = iban2(((_a2 = tx.bankOriginal) == null ? void 0 : _a2.accountIdentifier) || (profile == null ? void 0 : profile.identifier));
     if (!identifier) throw new Error("Het oorspronkelijke rekeningkenmerk ontbreekt. Herstel dit eerst vanuit een betrouwbare rekeningregistratie.");
     const related = (state2.transactions || []).filter((row) => !isBankSource(row) && (tx.bankSourceId ? row.bankSourceId === tx.bankSourceId : tx.importBatchId && tx.importTransactionId ? row.importBatchId === tx.importBatchId && row.importTransactionId === tx.importTransactionId : row.id === tx.id));
-    const amount = (_c = (_b = tx.bankOriginal) == null ? void 0 : _b.amount) != null ? _c : related.reduce((sum, row) => sum + Math.abs(Number(row.amount) || 0), 0) * (tx.kind === "inkomen" || ["van-spaarrekening", "terugbetaling", "refund"].includes(tx.transactionType) ? 1 : -1);
-    const date = ((_d = tx.bankOriginal) == null ? void 0 : _d.bankDate) || tx.transactionDate || tx.date;
+    const amount = (_c = (_b = tx.bankOriginal) == null ? void 0 : _b.amount) != null ? _c : related.reduce((sum2, row) => sum2 + Math.abs(Number(row.amount) || 0), 0) * (tx.kind === "inkomen" || ["van-spaarrekening", "terugbetaling", "refund"].includes(tx.transactionType) ? 1 : -1);
+    const date2 = ((_d = tx.bankOriginal) == null ? void 0 : _d.bankDate) || tx.transactionDate || tx.date;
     return rows.filter((bank) => {
       var _a3, _b2;
-      return bank.valid && iban2(bank.accountIdentifier) === identifier && bank.bankDate === date && Math.round(Number(bank.amount) * 100) === Math.round(amount * 100) && (!((_a3 = tx.bankOriginal) == null ? void 0 : _a3.reference) || bank.reference === tx.bankOriginal.reference) && (!((_b2 = tx.bankOriginal) == null ? void 0 : _b2.counterpartyAccount) || iban2(bank.counterpartyAccount) === iban2(tx.bankOriginal.counterpartyAccount));
+      return bank.valid && iban2(bank.accountIdentifier) === identifier && bank.bankDate === date2 && Math.round(Number(bank.amount) * 100) === Math.round(amount * 100) && (!((_a3 = tx.bankOriginal) == null ? void 0 : _a3.reference) || bank.reference === tx.bankOriginal.reference) && (!((_b2 = tx.bankOriginal) == null ? void 0 : _b2.counterpartyAccount) || iban2(bank.counterpartyAccount) === iban2(tx.bankOriginal.counterpartyAccount));
     });
   }
   function planSourceRepair(state2, txId, batch, bank, { confirmed = false, operationId, timestamp, sourceIdentityProof } = {}) {
@@ -13299,33 +15192,33 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     if (!tx) throw new Error("De oorspronkelijke transactie bestaat niet meer.");
     if (inspectSourceAvailability(state2, tx, batch).ok) throw new Error("Deze transactie heeft al een geldige bron. Herstel is niet nodig.");
     if (!confirmed || !sourceRepairCandidates(state2, tx, [bank]).length) throw new Error("Bevestig een overeenkomst met dezelfde rekening, bankdatum en hetzelfde bedrag.");
-    const candidate = copy7(state2), nextBatch = batch ? copy7(batch) : { id: tx.importBatchId || `recovery-${tx.id}`, rows: [], accountProfileId: tx.accountProfileId, accountOwner: getTransactionAccountContext(tx, { accountProfiles: state2.accountProfiles || [] }), lifecycle: tx.batchLifecycle || "active", status: "verwerkt", version: 0, summary: {}, fileName: "Herstelde oorspronkelijke CSV-bron" };
+    const candidate = copy8(state2), nextBatch = batch ? copy8(batch) : { id: tx.importBatchId || `recovery-${tx.id}`, rows: [], accountProfileId: tx.accountProfileId, accountOwner: getTransactionAccountContext(tx, { accountProfiles: state2.accountProfiles || [] }), lifecycle: tx.batchLifecycle || "active", status: "verwerkt", version: 0, summary: {}, fileName: "Herstelde oorspronkelijke CSV-bron" };
     const rowId = tx.importTransactionId || `recovery-row-${tx.id}`;
     const existing = bankSourceForImport(candidate, nextBatch.id, rowId);
     if (existing && existing.bankSourceId !== tx.bankSourceId) throw new Error("Deze importregel is al aan een andere bankbeweging gekoppeld.");
     const related = candidate.transactions.filter((row) => !isBankSource(row) && (tx.bankSourceId ? row.bankSourceId === tx.bankSourceId : tx.importBatchId && tx.importTransactionId ? row.importBatchId === tx.importBatchId && row.importTransactionId === tx.importTransactionId : row.id === tx.id));
-    const p = copy7(tx.approvedProcessing || tx.processing || {});
-    p.processedAmount = Math.round(related.reduce((sum, row) => sum + Math.abs(Number(row.amount) || 0), 0) * 100) / 100;
+    const p = copy8(tx.approvedProcessing || tx.processing || {});
+    p.processedAmount = Math.round(related.reduce((sum2, row) => sum2 + Math.abs(Number(row.amount) || 0), 0) * 100) / 100;
     p.processingDate = p.processingDate || bank.bankDate;
     p.transactionType = p.transactionType || tx.transactionType || "uitgave";
     p.budgetOwner = p.budgetOwner || tx.budgetOwner || tx.financialFor;
     p.category = p.category || tx.category;
     p.include = p.include !== false;
-    if (related.length > 1 && !((_a2 = p.splits) == null ? void 0 : _a2.length)) p.splits = related.map((row) => ({ ...copy7(row.processing || {}), id: row.splitId || row.id, amount: Math.abs(Number(row.amount)), amountMode: "manual", transactionType: row.transactionType, category: row.category, budgetOwner: row.budgetOwner || row.financialFor }));
-    const original2 = copy7(tx.bankOriginal || bank);
+    if (related.length > 1 && !((_a2 = p.splits) == null ? void 0 : _a2.length)) p.splits = related.map((row) => ({ ...copy8(row.processing || {}), id: row.splitId || row.id, amount: Math.abs(Number(row.amount)), amountMode: "manual", transactionType: row.transactionType, category: row.category, budgetOwner: row.budgetOwner || row.financialFor }));
+    const original2 = copy8(tx.bankOriginal || bank);
     for (const field of ["bankDate", "amount", "accountIdentifier"]) if (original2[field] === void 0 || original2[field] === null || original2[field] === "") original2[field] = bank[field];
     original2.valid = true;
     const oldHeader = candidate.transactions.find((row) => isBankSource(row) && row.bankSourceId === tx.bankSourceId);
     if (oldHeader && (!((_b = oldHeader.bankOriginal) == null ? void 0 : _b.bankDate) || oldHeader.bankOriginal.amount === void 0 || oldHeader.bankOriginal.amount === null)) {
-      nextBatch.sourceRepairHistory = [...nextBatch.sourceRepairHistory || [], { operationId, timestamp, bankSourceId: oldHeader.bankSourceId, bankOriginal: copy7(oldHeader.bankOriginal) }];
+      nextBatch.sourceRepairHistory = [...nextBatch.sourceRepairHistory || [], { operationId, timestamp, bankSourceId: oldHeader.bankSourceId, bankOriginal: copy8(oldHeader.bankOriginal) }];
       candidate.transactions = candidate.transactions.filter((row) => row.id !== oldHeader.id);
     }
     related.forEach((row) => {
       row.importBatchId = nextBatch.id;
       row.importTransactionId = rowId;
-      if (!row.bankOriginal) row.bankOriginal = copy7(original2);
+      if (!row.bankOriginal) row.bankOriginal = copy8(original2);
     });
-    const recovered = { id: rowId, bankOriginal: original2, sourceIdentityProof: copy7(sourceIdentityProof || null), accountProfileId: tx.accountProfileId || nextBatch.accountProfileId, accountOwner: nextBatch.accountOwner, processing: p, processingStatus: getTransactionProcessingStatus(tx), certainty: "goedgekeurd", approvalSource: tx.approvalSource || "legacy-confirmed", approvedAt: tx.approvedAt || "", repairedAt: timestamp };
+    const recovered = { id: rowId, bankOriginal: original2, sourceIdentityProof: copy8(sourceIdentityProof || null), accountProfileId: tx.accountProfileId || nextBatch.accountProfileId, accountOwner: nextBatch.accountOwner, processing: p, processingStatus: getTransactionProcessingStatus(tx), certainty: "goedgekeurd", approvalSource: tx.approvalSource || "legacy-confirmed", approvedAt: tx.approvedAt || "", repairedAt: timestamp };
     nextBatch.rows = nextBatch.rows.filter((row) => row.id !== rowId).concat(recovered);
     nextBatch.version = Number(nextBatch.version || 0) + 1;
     nextBatch.operationId = operationId;
@@ -13339,9 +15232,9 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       repairedHeader.id = `${repairedHeader.id}-repair-${operationId}`;
       repairedHeader.processingRevision = (oldHeader.processingRevision || 0) + 1;
       repairedHeader.importReferences = [...new Map([...oldHeader.importReferences || [], ...repairedHeader.importReferences].map((ref) => [`${ref.batchId}:${ref.rowId}`, ref])).values()];
-      if (oldHeader.approvedProcessing) repairedHeader.approvedProcessing = copy7(oldHeader.approvedProcessing);
+      if (oldHeader.approvedProcessing) repairedHeader.approvedProcessing = copy8(oldHeader.approvedProcessing);
     }
-    const before = selectBankTransactions(state2).reduce((sum, row) => sum + Math.round(row.bankAmount * 100), 0), after = selectBankTransactions(candidate).reduce((sum, row) => sum + Math.round(row.bankAmount * 100), 0);
+    const before = selectBankTransactions(state2).reduce((sum2, row) => sum2 + Math.round(row.bankAmount * 100), 0), after = selectBankTransactions(candidate).reduce((sum2, row) => sum2 + Math.round(row.bankAmount * 100), 0);
     if (before !== after) throw new Error("Deze herstelkoppeling zou het rekeningtotaal veranderen. Laat de bron eerst handmatig controleren.");
     return { state: candidate, batch: nextBatch, rowId };
   }
@@ -13407,17 +15300,17 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     return { results, total: requests.length, committed: results.filter((row) => row.status === "geslaagd").length };
   }
   function approvalGroupSummary(group) {
-    const labels = { ongeldig: "ongeldig", conflicterend: "conflict", "niet-geprobeerd": "niet geprobeerd", onzeker: "uitkomst onzeker", opslagfout: "niet opgeslagen door een opslagfout" };
+    const labels2 = { ongeldig: "ongeldig", conflicterend: "conflict", "niet-geprobeerd": "niet geprobeerd", onzeker: "uitkomst onzeker", opslagfout: "niet opgeslagen door een opslagfout" };
     const parts2 = [`${group.committed} van ${group.total} transacties goedgekeurd.`];
-    for (const [status, label] of Object.entries(labels)) {
-      const count = group.results.filter((row) => row.status === status).length;
+    for (const [status2, label] of Object.entries(labels2)) {
+      const count = group.results.filter((row) => row.status === status2).length;
       if (count) parts2.push(`${count} ${label}.`);
     }
     return parts2.join(" ");
   }
 
   // src/import/import-lifecycle.mjs
-  var copy8 = (value) => JSON.parse(JSON.stringify(value));
+  var copy9 = (value) => JSON.parse(JSON.stringify(value));
   var batchRows = (state2, id) => (state2.transactions || []).filter((tx) => {
     var _a2, _b;
     return !isBankSource(tx) && (tx.importBatchId === id || ((_b = (_a2 = bankSourceForTransaction(state2, tx)) == null ? void 0 : _a2.importReferences) == null ? void 0 : _b.some((ref) => ref.batchId === id)));
@@ -13442,7 +15335,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     }
     return { counts, status: counts.onbekend || counts.nakijken ? counts.goedgekeurd || counts["niet-meetellen"] ? "gedeeltelijk" : "concept" : "verwerkt" };
   }
-  function fail3(message, code = "import-dependency") {
+  function fail5(message, code = "import-dependency") {
     const error2 = new Error(message);
     error2.code = code;
     throw error2;
@@ -13458,51 +15351,51 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     }));
     for (const id of sourceIds) {
       const source = batch.rows.find((row) => row.id === id);
-      if (!source) fail3(`Importbron ${id} ontbreekt; herstel is geblokkeerd.`);
+      if (!source) fail5(`Importbron ${id} ontbreekt; herstel is geblokkeerd.`);
       const header = (next.transactions || []).find((tx) => isBankSource(tx) && tx.importReferences.some((ref) => ref.batchId === batch.id && ref.rowId === id));
       const check = validateRow((header == null ? void 0 : header.approvedProcessing) ? { ...source, processing: header.approvedProcessing } : source, next);
-      if (!check.ok) fail3(check.errors.map((e) => e.message).join(" "));
+      if (!check.ok) fail5(check.errors.map((e) => e.message).join(" "));
     }
     for (const tx of active) {
-      if (!tx.importTransactionId || !tx.bankOriginal) fail3(`Betrouwbare bronidentiteit ontbreekt voor ${tx.id}.`);
-      if (!Number.isFinite(Number(tx.amount))) fail3(`Verwerkt bedrag ontbreekt voor ${tx.id}.`);
+      if (!tx.importTransactionId || !tx.bankOriginal) fail5(`Betrouwbare bronidentiteit ontbreekt voor ${tx.id}.`);
+      if (!Number.isFinite(Number(tx.amount))) fail5(`Verwerkt bedrag ontbreekt voor ${tx.id}.`);
     }
     const missing = coverageAllocationStatus(next).find((row) => row.reason === "coverage-missing-reference" && (ids.has(row.withdrawalTransactionId) || ids.has(row.expenseTransactionId)));
-    if (missing) fail3("Spaardekking verwijst naar een verwijderd endpoint. Herstel is geblokkeerd.");
+    if (missing) fail5("Spaardekking verwijst naar een verwijderd endpoint. Herstel is geblokkeerd.");
     for (const pair of next.internalTransferPairs || []) {
       if (pair.active === false || !["bevestigd", "confirmed", "uitgevoerd"].includes(pair.status)) continue;
       const old = (previous.internalTransferPairs || []).find((row) => row.id === pair.id);
-      if (JSON.stringify(old) !== JSON.stringify(pair)) confirmInternalTransferPair(copy8(next), pair.id);
+      if (JSON.stringify(old) !== JSON.stringify(pair)) confirmInternalTransferPair(copy9(next), pair.id);
     }
     const coverage = coverageAllocationStatus(next).find((row) => row.reason && !["coverage-inactive-reference"].includes(row.reason));
-    if (coverage && !coverageAllocationStatus(previous).some((old) => old.id === coverage.id && old.reason === coverage.reason)) fail3(`Spaardekking is ongeldig: ${coverage.reason}.`);
+    if (coverage && !coverageAllocationStatus(previous).some((old) => old.id === coverage.id && old.reason === coverage.reason)) fail5(`Spaardekking is ongeldig: ${coverage.reason}.`);
     for (const relation of next.manualTransactionReplacements || []) {
       if (relation.active === false) continue;
       const manualId = relation.manualTransactionId || ((_a2 = relation.manualTransaction) == null ? void 0 : _a2.id);
       if ((next.manualTransactionReplacements || []).filter((r) => {
         var _a3;
         return r.active !== false && (r.manualTransactionId || ((_a3 = r.manualTransaction) == null ? void 0 : _a3.id)) === manualId;
-      }).length > 1) fail3(`De handmatige transactie ${manualId} heeft twee actieve vervangingen.`);
+      }).length > 1) fail5(`De handmatige transactie ${manualId} heeft twee actieve vervangingen.`);
     }
     for (const repayment of next.advanceRepayments || []) {
       if (repayment.active === false || !ids.has(repayment.transactionId)) continue;
       const advance = (next.advanceLedger || []).find((row) => row.id === repayment.advanceId && row.active !== false);
-      if (!advance) fail3(`Voorschot ${repayment.advanceId} ontbreekt of is inactief.`);
+      if (!advance) fail5(`Voorschot ${repayment.advanceId} ontbreekt of is inactief.`);
     }
     return true;
   }
   function planImportCommand(state2, batch, intent, options = {}) {
     var _a2;
-    if (!(batch == null ? void 0 : batch.id) || !(intent == null ? void 0 : intent.operationId)) fail3("Batch-ID en operation-ID zijn vereist.");
-    const previous = copy8(state2), candidate = copy8(state2), nextBatch = copy8(batch), id = batch.id;
+    if (!(batch == null ? void 0 : batch.id) || !(intent == null ? void 0 : intent.operationId)) fail5("Batch-ID en operation-ID zijn vereist.");
+    const previous = copy9(state2), candidate = copy9(state2), nextBatch = copy9(batch), id = batch.id;
     const deletion = (candidate.importDeletionProofs || []).find((row) => row.id === id);
     if (deletion) {
-      if (intent.type === "delete") return { state: candidate, batch: copy8(deletion), noop: true };
-      fail3("Deze batch is permanent verwijderd.", "import-deleted");
+      if (intent.type === "delete") return { state: candidate, batch: copy9(deletion), noop: true };
+      fail5("Deze batch is permanent verwijderd.", "import-deleted");
     }
     const current = batchLifecycle(batch);
     if (intent.type === "withdraw" && current === "withdrawn" || intent.type === "restore" && current === "active") return { state: candidate, batch: nextBatch, noop: true };
-    if (!["withdraw", "restore", "delete"].includes(intent.type)) fail3("Onbekende batchactie.");
+    if (!["withdraw", "restore", "delete"].includes(intent.type)) fail5("Onbekende batchactie.");
     nextBatch.lifecycle = intent.type === "restore" ? "active" : "withdrawn";
     const summaryBefore = (candidate.importSummaries || []).find((row) => row.id === id);
     if (summaryBefore) {
@@ -13521,10 +15414,10 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     if (rows.some((tx) => !tx.importTransactionId || !tx.bankOriginal) || rows.some((tx) => {
       var _a3;
       return !bankSourceForTransaction(candidate, tx) && !((_a3 = batch.rows) == null ? void 0 : _a3.some((row) => row.id === tx.importTransactionId));
-    })) fail3("Betrouwbare bronidentiteit ontbreekt; batchactie is geblokkeerd.");
+    })) fail5("Betrouwbare bronidentiteit ontbreekt; batchactie is geblokkeerd.");
     const ownAdvances = (candidate.advanceLedger || []).filter((row) => belongs(row, id, ids, retainedIds));
     for (const advance of ownAdvances) {
-      if ((candidate.advanceRepayments || []).some((row) => row.active !== false && row.advanceId === advance.id && !ids.has(row.transactionId)) || (advance.settlementTransferIds || []).length) fail3(`Voorschot ${advance.id} heeft onafhankelijke aflossingen/verrekeningen.`);
+      if ((candidate.advanceRepayments || []).some((row) => row.active !== false && row.advanceId === advance.id && !ids.has(row.transactionId)) || (advance.settlementTransferIds || []).length) fail5(`Voorschot ${advance.id} heeft onafhankelijke aflossingen/verrekeningen.`);
     }
     const restoring = intent.type === "restore";
     nextBatch.lifecycle = restoring ? "active" : "withdrawn";
@@ -13563,7 +15456,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
           advance.status = "open";
         }
       } else if (restoring && repayment.lifecycleWasActive) {
-        if (!advance || advance.active === false || Number(advance.outstandingAmount) < Number(repayment.amount)) fail3(`Aflossing ${repayment.id} kan niet volledig worden hersteld.`);
+        if (!advance || advance.active === false || Number(advance.outstandingAmount) < Number(repayment.amount)) fail5(`Aflossing ${repayment.id} kan niet volledig worden hersteld.`);
         advance.outstandingAmount = Math.round((Number(advance.outstandingAmount) - Number(repayment.amount)) * 100) / 100;
         advance.status = advance.outstandingAmount === 0 ? "voldaan" : "open";
         repayment.active = true;
@@ -13735,7 +15628,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
         });
         return this.dbPromise;
       },
-      async request(storeName, mode2, action, options) {
+      async request(storeName, mode2, action2, options) {
         const db = await this.open();
         return new Promise((resolve, reject) => {
           const tx = db.transaction(storeName, mode2, options);
@@ -13743,7 +15636,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
           let request2, result2;
           tx.oncomplete = () => resolve(result2);
           try {
-            request2 = action(store);
+            request2 = action2(store);
           } catch (error2) {
             reject(error2);
             return;
@@ -14128,8 +16021,8 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     function normalizeText(value) {
       return String(value || "").toLocaleLowerCase("nl-NL").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, " ");
     }
-    function detectDelimiter(text) {
-      const first = String(text || "").replace(/^\uFEFF/, "").split(/\r?\n/, 1)[0] || "";
+    function detectDelimiter(text2) {
+      const first = String(text2 || "").replace(/^\uFEFF/, "").split(/\r?\n/, 1)[0] || "";
       const counts = [[";", 0], [",", 0], ["	", 0]];
       let quoted = false;
       for (const char of first) {
@@ -14141,12 +16034,12 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       }
       return counts.sort((a, b) => b[1] - a[1])[0][0];
     }
-    function parseDelimited(text, delimiter = detectDelimiter(text)) {
+    function parseDelimited(text2, delimiter = detectDelimiter(text2)) {
       const rows = [];
       let row = [];
       let cell = "";
       let quoted = false;
-      const input = String(text || "").replace(/^\uFEFF/, "");
+      const input = String(text2 || "").replace(/^\uFEFF/, "");
       for (let index = 0; index < input.length; index++) {
         const char = input[index];
         if (char === '"') {
@@ -14170,16 +16063,16 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       return rows;
     }
     function parseDate(value) {
-      const text = String(value || "").trim();
-      let match = text.match(/^(\d{4})[-/]?(\d{2})[-/]?(\d{2})$/);
+      const text2 = String(value || "").trim();
+      let match = text2.match(/^(\d{4})[-/]?(\d{2})[-/]?(\d{2})$/);
       if (match) {
-        const date2 = `${match[1]}-${match[2]}-${match[3]}`;
-        return validCalendarDate(date2) ? date2 : "";
+        const date3 = `${match[1]}-${match[2]}-${match[3]}`;
+        return validCalendarDate(date3) ? date3 : "";
       }
-      match = text.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2}|\d{4})$/);
+      match = text2.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2}|\d{4})$/);
       if (!match) return "";
-      const date = `${match[3].length === 2 ? "20" + match[3] : match[3]}-${match[2].padStart(2, "0")}-${match[1].padStart(2, "0")}`;
-      return validCalendarDate(date) ? date : "";
+      const date2 = `${match[3].length === 2 ? "20" + match[3] : match[3]}-${match[2].padStart(2, "0")}-${match[1].padStart(2, "0")}`;
+      return validCalendarDate(date2) ? date2 : "";
     }
     function displayDate(value) {
       const normalized = parseDate(value);
@@ -14188,13 +16081,13 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       return `${day}-${month}-${year}`;
     }
     function parseAmount(value) {
-      let text = String(value != null ? value : "").trim().replace(/\s/g, "").replace(/€|EUR/gi, "");
-      if (!text) return NaN;
-      let negative = /^\(.*\)$/.test(text) || text.endsWith("-");
-      text = text.replace(/[()]/g, "").replace(/-$/, "");
-      if (text.includes(",") && text.includes(".")) text = text.lastIndexOf(",") > text.lastIndexOf(".") ? text.replace(/\./g, "").replace(",", ".") : text.replace(/,/g, "");
-      else text = text.replace(",", ".");
-      const amount = Number(text);
+      let text2 = String(value != null ? value : "").trim().replace(/\s/g, "").replace(/€|EUR/gi, "");
+      if (!text2) return NaN;
+      let negative = /^\(.*\)$/.test(text2) || text2.endsWith("-");
+      text2 = text2.replace(/[()]/g, "").replace(/-$/, "");
+      if (text2.includes(",") && text2.includes(".")) text2 = text2.lastIndexOf(",") > text2.lastIndexOf(".") ? text2.replace(/\./g, "").replace(",", ".") : text2.replace(/,/g, "");
+      else text2 = text2.replace(",", ".");
+      const amount = Number(text2);
       return negative ? -Math.abs(amount) : amount;
     }
     const HEADER_ALIASES = {
@@ -14247,20 +16140,20 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       return normalizeText(description).replace(/\b(pasvolgnr|betaalautomaat|incasso|ideal|sepa|europese|betaling|kenmerk|omschrijving)\b.*$/, "").replace(/\b\d{3,}\b.*$/, "").trim();
     }
     function proposeType(original2, profiles = []) {
-      const text = normalizeText(`${original2.description} ${original2.notes || ""}`);
+      const text2 = normalizeText(`${original2.description} ${original2.notes || ""}`);
       const counterpart = normalizeIban2(original2.counterpartyAccount);
       if (counterpart && profiles.some((profile) => normalizeIban2(profile.identifier) === counterpart)) return "interne-overboeking";
-      if (/\bvakantiegeld\b/.test(text)) return "vakantiegeld";
-      if (/\b(nabetaling|correctie loon)\b/.test(text)) return "nabetaling";
-      if (/\b(bonus|gratificatie|eindejaarsuitkering|dertiende maand)\b/.test(text)) return "overige-inkomsten";
-      if (/\b(salaris|loon|payroll)\b/.test(text)) return "salaris";
-      if (/\b(belastingdienst|belastingteruggave)\b/.test(text) && Number(original2.amount) > 0) return "belastingteruggave";
-      if (/\b(vergoeding|declaratie|onkosten|kilometer)\b/.test(text) && Number(original2.amount) > 0) return "vergoeding";
-      if (/\b(spaar|sparen|deposito)\b/.test(text)) return "sparen";
-      if (Number(original2.amount) > 0 && /\b(retour|refund|terugbetaling)\b/.test(text)) return "terugbetaling";
+      if (/\bvakantiegeld\b/.test(text2)) return "vakantiegeld";
+      if (/\b(nabetaling|correctie loon)\b/.test(text2)) return "nabetaling";
+      if (/\b(bonus|gratificatie|eindejaarsuitkering|dertiende maand)\b/.test(text2)) return "overige-inkomsten";
+      if (/\b(salaris|loon|payroll)\b/.test(text2)) return "salaris";
+      if (/\b(belastingdienst|belastingteruggave)\b/.test(text2) && Number(original2.amount) > 0) return "belastingteruggave";
+      if (/\b(vergoeding|declaratie|onkosten|kilometer)\b/.test(text2) && Number(original2.amount) > 0) return "vergoeding";
+      if (/\b(spaar|sparen|deposito)\b/.test(text2)) return "sparen";
+      if (Number(original2.amount) > 0 && /\b(retour|refund|terugbetaling)\b/.test(text2)) return "terugbetaling";
       return Number(original2.amount) > 0 ? "overige-inkomsten" : "uitgave";
     }
-    function recognitionProposal(original2, rules = []) {
+    function recognitionProposal(original2, rules = [], profile = null) {
       const description = normalizeText(original2.description);
       const organization = organizationName(original2.rawDescription || original2.description);
       const counterpart = normalizeIban2(original2.counterpartyAccount);
@@ -14272,9 +16165,12 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
         ["prediction", (rule) => description && description.includes(normalizeText(rule.value))]
       ];
       for (const [level, match] of levels) {
-        const hits = (rules || []).filter((rule) => rule.enabled !== false && rule.level === level && rule.value && match(rule));
+        const hits = (rules || []).filter((rule) => rule.enabled !== false && rule.level === level && rule.value && match(rule) && (!rule.context || profile && rule.context.accountProfileId === profile.id && rule.context.accountOwner === profile.accountOwner && (!rule.context.accountIdentifier || normalizeIban2(rule.context.accountIdentifier) === normalizeIban2(original2.accountIdentifier || profile.identifier)) && (!rule.context.direction || rule.context.direction === (Number(original2.amount) > 0 ? "in" : "out"))));
         if (!hits.length) continue;
-        const signatures = new Set(hits.map((rule) => [rule.category, rule.transactionType, rule.budgetItemId, rule.fixedExpenseId, rule.savingsGoalId].join("|")));
+        const signatures = new Set(hits.map((rule) => {
+          var _a2;
+          return [rule.category, rule.transactionType, rule.budgetItemId, rule.fixedExpenseId, rule.savingsGoalId, ((_a2 = rule.context) == null ? void 0 : _a2.budgetOwner) || ""].join("|");
+        }));
         return { level, rules: hits, rule: hits[0], conflict: signatures.size > 1 };
       }
       return null;
@@ -14291,8 +16187,8 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       const expected = Math.abs(fixedAmountAt(item, original2.bankDate));
       const actual = Math.abs(Number(original2.amount) || 0);
       const tolerance = Math.max(5, round23(expected * 0.15));
-      const safe = expected > 0 && Math.abs(actual - expected) <= tolerance + 4e-3;
-      return { required: true, safe, item, expected, tolerance, reason: safe ? "" : `bedrag wijkt meer dan ${tolerance.toFixed(2)} af` };
+      const safe2 = expected > 0 && Math.abs(actual - expected) <= tolerance + 4e-3;
+      return { required: true, safe: safe2, item, expected, tolerance, reason: safe2 ? "" : `bedrag wijkt meer dan ${tolerance.toFixed(2)} af` };
     }
     function isExplicitlyApproved(row) {
       return (row == null ? void 0 : row.approvalSource) === "manual" && ["goedgekeurd", "niet-meetellen"].includes(getTransactionProcessingStatus({ ...row, source: "csv" }));
@@ -14318,18 +16214,18 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       const organization = organizationName(original2.rawDescription || original2.description);
       return organization ? titleCaseMerchant(organization) : String(original2.rawDescription || original2.description || "").trim();
     }
-    function classifyOriginal(original2, profile, rules = [], profiles = [], fixedExpenses = [], transactions = []) {
-      var _a2, _b, _c, _d, _e, _f, _g, _h;
-      const proposal = recognitionProposal(original2, rules);
+    function classifyOriginal(original2, profile, rules = [], profiles = [], fixedExpenses = [], transactions = [], state2 = null) {
+      var _a2, _b, _c, _d, _e, _f, _g, _h, _i;
+      const proposal = recognitionProposal(original2, rules, profile);
       const explicitExtra = Number(original2.amount) > 0 && /\b(vakantiegeld|nabetaling|correctie loon|bonus|gratificatie|eindejaarsuitkering|dertiende maand)\b/.test(normalizeText(original2.rawDescription || original2.description));
       const proposedType = explicitExtra ? proposeType(original2, profiles) : ((_a2 = proposal == null ? void 0 : proposal.rule) == null ? void 0 : _a2.transactionType) || proposeType(original2, profiles);
       const type = !explicitExtra && ((_b = proposal == null ? void 0 : proposal.rule) == null ? void 0 : _b.fixedExpenseId) ? "vaste-last" : proposedType;
       const fixedMatch = fixedRecognition(original2, profile, proposal == null ? void 0 : proposal.rule, fixedExpenses);
       const special = !["uitgave", "vaste-last"].includes(type);
       const category = ((_c = proposal == null ? void 0 : proposal.rule) == null ? void 0 : _c.category) || "Ongecategoriseerd";
-      const alwaysReview = ((_d = proposal == null ? void 0 : proposal.rules) == null ? void 0 : _d.some((rule) => rule.alwaysReview)) === true;
+      const alwaysReview = ((_d = proposal == null ? void 0 : proposal.rules) == null ? void 0 : _d.some((rule2) => rule2.alwaysReview)) === true;
       const recognized = Boolean(proposal) || type !== "uitgave" && type !== "overige-inkomsten";
-      return {
+      const result2 = {
         certainty: recognized ? "nakijken" : "onbekend",
         recognitionState: recognized ? "known" : "unknown",
         approvalSource: "",
@@ -14362,9 +16258,136 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
           note: ""
         }
       };
+      const p = result2.processing, month = String(original2.bankDate || "").slice(0, 7), rule = proposal == null ? void 0 : proposal.rule;
+      const evidence = { version: 118, status: proposal ? "supported" : "none", level: (proposal == null ? void 0 : proposal.level) || "", ruleIds: (proposal == null ? void 0 : proposal.rules.map((item) => item.id)) || [], reasons: [], needsConfirmation: [], alternatives: [] };
+      const uncertain = (message) => {
+        if (evidence.status !== "conflict") evidence.status = "uncertain";
+        evidence.needsConfirmation.push(message);
+      };
+      const conflict = (message) => {
+        evidence.status = "conflict";
+        evidence.needsConfirmation.push(message);
+      };
+      if (proposal) {
+        const proof = rule.provenance;
+        const proved = (proof == null ? void 0 : proof.kind) === "manual-approval" && proof.sourceRowId && proof.approvedAt;
+        evidence.provenance = proved ? cloneState(proof) : { kind: "legacy-rule" };
+        evidence.reasons.push(proved ? rule.context ? "Gebaseerd op een eerdere expliciete goedkeuring binnen deze rekeningcontext." : "Gebaseerd op een eerdere expliciete goedkeuring; rekeningcontext niet vastgelegd." : "Herkomst onbekend / bestaande regel.");
+        evidence.reasons.push(`Herkenningssignaal: ${{ counterparty: "tegenrekening", description: "omschrijving", organization: "organisatie", keyword: "trefwoord", prediction: "bestaande voorspelling" }[proposal.level]}.`);
+        if (!proved || !rule.context || ["organization", "keyword", "prediction"].includes(proposal.level)) uncertain("Controleer de financiële bestemming.");
+        if (rule.context && OWNERS2.includes(rule.context.budgetOwner)) {
+          if (rule.context.budgetOwner === (profile == null ? void 0 : profile.accountOwner)) p.budgetOwner = rule.context.budgetOwner;
+          else {
+            evidence.destinationOwner = rule.context.budgetOwner;
+            uncertain(`Eerder gekozen bestemming: ${ownerLabel2(rule.context.budgetOwner)}. Bevestig die keuze zelf; een winkelmatch bewijst geen andere eigenaar.`);
+          }
+        }
+        if (proposal.conflict) {
+          conflict("Meerdere herkenningsregels geven verschillende bestemmingen. Kies zelf een bestemming.");
+          evidence.alternatives = proposal.rules.filter((item) => {
+            if (!state2) return true;
+            const owner = (profile == null ? void 0 : profile.accountOwner) || "";
+            if (item.fixedExpenseId) return fixedExpenses.some((fixed) => fixed.id === item.fixedExpenseId && (fixed.financialFor || fixed.rekening) === owner);
+            if ((item.transactionType || "uitgave") === "uitgave") return Boolean(resolveBudgetAssignment(state2, month, owner, item));
+            return true;
+          }).map((item) => ({ ruleId: item.id, category: item.category, budgetOwner: (profile == null ? void 0 : profile.accountOwner) || "", budgetItemId: item.budgetItemId || "", fixedExpenseId: item.fixedExpenseId || "", savingsGoalId: item.savingsGoalId || "" }));
+          p.category = "Ongecategoriseerd";
+          p.budgetItemId = "";
+          p.fixedExpenseId = "";
+          p.savingsGoalId = "";
+          p.budgetOwner = (profile == null ? void 0 : profile.accountOwner) || "";
+          p.transactionType = proposeType(original2, profiles);
+        }
+      }
+      if (!profile) uncertain("Kies eerst een fysieke bankrekening.");
+      if (state2 && p.transactionType === "uitgave" && p.category !== "Ongecategoriseerd") {
+        const budget = resolveBudgetAssignment(state2, month, p.budgetOwner, p);
+        if (!budget) {
+          uncertain("Deze budgetbestemming is niet eenduidig geldig in de bankmaand. Kies het budget opnieuw.");
+          p.category = "Ongecategoriseerd";
+          p.budgetItemId = "";
+        } else {
+          p.budgetItemId = budget.id;
+          p.category = budget.post || budget.categorie;
+        }
+      }
+      if (p.transactionType === "salaris") {
+        if (Number(original2.amount) <= 0) {
+          p.salaryPersonId = "";
+          uncertain("Een salarisontvangst vereist een bijschrijving.");
+        } else if (!p.salaryPersonId) uncertain("Werkgever en ontvangstrekening leveren geen eenduidige salarispersoon. Kies Dion of Dara.");
+        else {
+          evidence.status = evidence.status === "conflict" ? "conflict" : "supported";
+          evidence.reasons.push("Werkgever en ontvangstrekening komen overeen met actief, handmatig goedgekeurd salaris.");
+        }
+      }
+      if (p.fixedExpenseId) {
+        if (!fixedMatch.safe) uncertain(fixedMatch.reason);
+        const occurrences = u3PlannedOccurrences(fixedExpenses.filter((item) => item.begindatum), month).filter((item) => item.itemId === p.fixedExpenseId && item.financialFor === p.budgetOwner && (!item.source.accountProfileId || item.source.accountProfileId === (profile == null ? void 0 : profile.id)));
+        const used = new Set(transactions.filter((tx) => isTransactionFinanciallyActive(tx)).map((tx) => {
+          var _a3;
+          return ((_a3 = tx.processing) == null ? void 0 : _a3.fixedOccurrenceId) || tx.fixedOccurrenceId;
+        }).filter(Boolean));
+        const available = occurrences.filter((item) => !used.has(item.id));
+        const cashDate = (item) => {
+          var _a3;
+          const explicit = (_a3 = item.source.cashDates) == null ? void 0 : _a3[item.id];
+          if (explicit) return validCalendarDate(explicit) ? explicit : "";
+          const debit = item.source.afschrijfdatum;
+          if (!validCalendarDate(debit)) return item.date;
+          if (item.source.frequentieEenheid === "weken") return debit === item.date ? item.date : "";
+          const lastDay = new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate();
+          return month + "-" + String(Math.min(Number(debit.slice(8)), lastDay)).padStart(2, "0");
+        };
+        evidence.occurrences = available.map((item) => ({ id: item.id, date: cashDate(item) || item.date, month: item.month, name: item.naam }));
+        const exact = available.filter((item) => cashDate(item) === original2.bankDate);
+        if (fixedMatch.safe && (proposal == null ? void 0 : proposal.level) === "counterparty" && exact.length === 1) {
+          p.fixedOccurrenceId = exact[0].id;
+          p.fixedOccurrenceMonth = month;
+          evidence.reasons.push("Vaste-lastregel, eigenaar en gepland betaalmoment komen overeen.");
+          uncertain("Bevestig de voorgestelde koppeling aan het betaalmoment.");
+        } else if (available.length > 1) conflict("Meerdere betaalmomenten zijn mogelijk. Kies het betaalmoment.");
+        else uncertain(available.length ? "Bevestig de geplande maand en het betaalmoment." : "Geen vrij geldig betaalmoment in deze bankmaand.");
+      }
+      if (p.transactionType === "interne-overboeking") {
+        const own = profiles.filter((item) => normalizeIban2(item.identifier) && normalizeIban2(item.identifier) === normalizeIban2(original2.accountIdentifier || (profile == null ? void 0 : profile.identifier)));
+        const other = profiles.filter((item) => normalizeIban2(item.identifier) && normalizeIban2(item.identifier) === normalizeIban2(original2.counterpartyAccount));
+        if (own.length === 1 && other.length === 1 && own[0].id !== other[0].id) {
+          p.sourceAccountProfileId = Number(original2.amount) < 0 ? own[0].id : other[0].id;
+          p.destinationAccountProfileId = Number(original2.amount) < 0 ? other[0].id : own[0].id;
+          evidence.reasons.push("De tegenrekening hoort eenduidig bij een andere eigen bankrekening.");
+          const candidates = transactions.filter((tx) => isBankSource(tx) && tx.bankOriginal && normalizeIban2(tx.bankOriginal.accountIdentifier) === normalizeIban2(original2.counterpartyAccount) && normalizeIban2(tx.bankOriginal.counterpartyAccount) === normalizeIban2(original2.accountIdentifier || (profile == null ? void 0 : profile.identifier)) && Number(tx.bankOriginal.amount) === -Number(original2.amount) && tx.bankOriginal.bankDate === original2.bankDate && (tx.bankOriginal.currency || "EUR") === (original2.currency || "EUR"));
+          evidence.transfer = { kind: candidates.length === 1 ? "possible-pair" : candidates.length > 1 ? "ambiguous-pair" : "single-source", candidateSourceIds: candidates.map((tx) => tx.id) };
+          if (candidates.length > 1) conflict("Meerdere mogelijke transferbronnen. Bevestig het juiste paar afzonderlijk.");
+          else uncertain(candidates.length ? "Mogelijk transferpaar; rekening, bedrag en datum zijn signalen. Bevestig het paar expliciet." : "Eén bankbron herkend; een transferpaar is nog niet bevestigd.");
+        } else {
+          delete p.sourceAccountProfileId;
+          delete p.destinationAccountProfileId;
+          conflict("De eigen tegenrekening is niet eenduidig. Kies de rekeningen zelf.");
+        }
+      }
+      if (["sparen", "naar-spaarrekening"].includes(p.transactionType)) {
+        const goal = state2 && OWNERS2.flatMap((owner) => {
+          var _a3;
+          return (((_a3 = state2.spaardoelen) == null ? void 0 : _a3[owner]) || []).map((item) => ({ ...item, owner }));
+        }).find((item) => item.id === p.savingsGoalId && item.owner === p.budgetOwner);
+        if (!(rule == null ? void 0 : rule.context) || ((_i = evidence.provenance) == null ? void 0 : _i.kind) !== "manual-approval" || !goal) {
+          p.savingsGoalId = "";
+          uncertain("Kies het spaardoel; één spaarrekening kan meerdere doelen hebben.");
+        } else uncertain("Spaardoel uit een eerdere goedkeuring in deze rekeningcontext; bevestig dit doel voor deze bron.");
+      }
+      if (["terugbetaling", "refund"].includes(p.transactionType)) {
+        p.refundMonth = "";
+        p.refundCategory = "";
+        if (state2 && (rule == null ? void 0 : rule.context) && refundCategoryIsRecognizable(state2, p.category, month, p.budgetOwner)) p.refundCategory = p.category;
+        uncertain("Kies de oorspronkelijke uitgavemaand en controleer de categorie. De bankmaand bewijst geen correctiemaand.");
+      }
+      if (!proposal && evidence.status === "none" && recognized) uncertain("Type herkend uit bankgegevens; bevestig de bestemming.");
+      result2.suggestion = evidence;
+      return result2;
     }
-    function parseBankCsv(text, options = {}) {
-      const table = parseDelimited(text);
+    function parseBankCsv(text2, options = {}) {
+      const table = parseDelimited(text2);
       if (table.length < 2) throw new Error("CSV bevat geen transactieregels.");
       const headers = table[0].map((value) => String(value || "").trim());
       const format = detectFormat(headers);
@@ -14403,12 +16426,13 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       if (identifiers.length !== 1) return null;
       return profiles.find((profile) => normalizeIban2(profile.identifier) === identifiers[0]) || null;
     }
-    function createImportDraft({ text, fileName = "import.csv", profiles = [], rules = [], transactions = [], existingImports = [], fixedExpenses = [], entryOwner = "", today = (/* @__PURE__ */ new Date()).toLocaleDateString("sv-SE"), id = uid2("import") }) {
-      const parsed = parseBankCsv(text);
+    function createImportDraft({ text: text2, fileName = "import.csv", profiles = [], rules = [], transactions = [], existingImports = [], fixedExpenses = [], state: state2 = null, entryOwner = "", today = (/* @__PURE__ */ new Date()).toLocaleDateString("sv-SE"), id = uid2("import") }) {
+      const parsed = parseBankCsv(text2);
       const detectedProfile = findProfile(parsed, profiles);
-      const ownerProfiles = OWNERS2.includes(entryOwner) ? profiles.filter((profile2) => profile2.accountOwner === entryOwner) : [];
+      if (accountIsArchived(detectedProfile)) throw new Error("Deze bankrekening is gearchiveerd. Heractiveer haar via Instellingen → Bankrekeningen voordat je een nieuw bestand importeert.");
+      const ownerProfiles = OWNERS2.includes(entryOwner) ? availableAccountProfiles(profiles).filter((profile2) => profile2.accountOwner === entryOwner) : [];
       const profile = detectedProfile || (ownerProfiles.length === 1 ? ownerProfiles[0] : null);
-      const fileDigest = csvFileDigest(text);
+      const fileDigest = csvFileDigest(text2);
       const observed = new Map(existingImports.map((batch) => [batch.id, batch]));
       for (const tx of transactions || []) {
         if (!tx.importBatchId || !tx.bankOriginal || observed.has(tx.importBatchId)) continue;
@@ -14422,21 +16446,21 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
         original2.importTransactionId = `${id}-${String(index + 1).padStart(5, "0")}`;
         original2.fingerprint = fingerprint(original2, (profile == null ? void 0 : profile.id) || original2.accountIdentifier);
         const sourceIdentityProof = { kind: "file-row", fileDigest, rowOrdinal: index + 1 };
-        const duplicateResult = classifyCsvDuplicate({ bankOriginal: original2, accountOwner: (profile == null ? void 0 : profile.accountOwner) || entryOwner, sourceIdentityProof }, { originalCsv: text, accountOwner: (profile == null ? void 0 : profile.accountOwner) || entryOwner, accountProfileId: (profile == null ? void 0 : profile.id) || "" }, [...observed.values()]);
+        const duplicateResult = classifyCsvDuplicate({ bankOriginal: original2, accountOwner: (profile == null ? void 0 : profile.accountOwner) || entryOwner, sourceIdentityProof }, { originalCsv: text2, accountOwner: (profile == null ? void 0 : profile.accountOwner) || entryOwner, accountProfileId: (profile == null ? void 0 : profile.id) || "" }, [...observed.values()]);
         const importError = importDateError(original2, today);
-        const matchingFixed = original2.valid && /^\d{4}-\d{2}-\d{2}$/.test(original2.bankDate) ? fixedExpenses.map((item) => item.begindatum ? resolveRecurringConfig(item, original2.bankDate.slice(0, 7)) : item).filter(Boolean) : [];
-        const proposal = classifyOriginal(original2, profile, rules, profiles, matchingFixed, transactions);
+        const matchingFixed = original2.valid && /^\d{4}-\d{2}-\d{2}$/.test(original2.bankDate) ? state2 ? resolveFixedExpensesForMonth(state2, original2.bankDate.slice(0, 7)) : fixedExpenses.map((item) => item.begindatum ? resolveRecurringConfig(item, original2.bankDate.slice(0, 7)) : item).filter(Boolean) : [];
+        const proposal = original2.valid && !importError ? classifyOriginal(original2, profile, rules, profiles, matchingFixed, transactions, state2) : { certainty: "onbekend", recognitionState: "unknown", approvalSource: "", approvedAt: "", reasons: ["Ongeldige bankregel"], processing: { processingDate: original2.bankDate, processedAmount: Math.abs(Number(original2.amount) || 0), transactionType: "uitgave", category: "Ongecategoriseerd", budgetOwner: (profile == null ? void 0 : profile.accountOwner) || "", splits: [], include: true } };
         return { id: original2.importTransactionId, bankOriginal: original2, accountProfileId: (profile == null ? void 0 : profile.id) || "", accountOwner: (profile == null ? void 0 : profile.accountOwner) || "", sourceIdentityProof, ...duplicateResult, importError, ...proposal };
       });
       const active = rows.filter((row) => row.bankOriginal.valid && !row.importError && !row.duplicate);
       const dates = active.map((row) => row.bankOriginal.bankDate).sort();
-      const income = active.filter((row) => row.bankOriginal.amount > 0).reduce((sum, row) => sum + row.processing.processedAmount, 0);
-      const expenses = active.filter((row) => row.bankOriginal.amount < 0).reduce((sum, row) => sum + row.processing.processedAmount, 0);
+      const income = active.filter((row) => row.bankOriginal.amount > 0).reduce((sum2, row) => sum2 + row.processing.processedAmount, 0);
+      const expenses = active.filter((row) => row.bankOriginal.amount < 0).reduce((sum2, row) => sum2 + row.processing.processedAmount, 0);
       return {
         id,
         fileName,
         fileDigest,
-        originalCsv: String(text),
+        originalCsv: String(text2),
         lifecycle: "active",
         version: 0,
         bank: parsed.format === "ing" ? "ING" : "Onbekend",
@@ -14463,7 +16487,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     function escAttr(value) {
       return esc(value).replace(/`/g, "&#96;").replace(/[\u0000-\u001f\u007f]/g, "");
     }
-    function euro(value) {
+    function euro3(value) {
       return new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR" }).format(Number(value) || 0);
     }
     function ownerLabel2(value) {
@@ -14485,8 +16509,8 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       draft.summary = {
         newCount: active.length,
         duplicateCount: (draft.rows || []).filter((row) => row.duplicate).length,
-        totalIncome: round23(active.filter((row) => row.bankOriginal.amount > 0 && row.processing.include).reduce((sum, row) => sum + Number(row.processing.processedAmount || 0), 0)),
-        totalExpenses: round23(active.filter((row) => row.bankOriginal.amount < 0 && row.processing.include).reduce((sum, row) => sum + Number(row.processing.processedAmount || 0), 0)),
+        totalIncome: round23(active.filter((row) => row.bankOriginal.amount > 0 && row.processing.include).reduce((sum2, row) => sum2 + Number(row.processing.processedAmount || 0), 0)),
+        totalExpenses: round23(active.filter((row) => row.bankOriginal.amount < 0 && row.processing.include).reduce((sum2, row) => sum2 + Number(row.processing.processedAmount || 0), 0)),
         sureCount: active.filter(isExplicitlyApproved).length,
         approvedCount: active.filter(isExplicitlyApproved).length,
         reviewCount: active.filter((row) => importReviewState(row) === "nakijken").length,
@@ -14531,26 +16555,26 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     async function commitSummary(root2, draft) {
       if (!await root2.commitChange(() => applyImportSummary(root2.state, draft), { render: false, throwOnError: true })) throw new Error("Importsamenvatting kon niet worden opgeslagen.");
     }
-    function updateImportSaveStatus(text, error2 = false) {
+    function updateImportSaveStatus(text2, error2 = false) {
       if (typeof document === "undefined") return;
-      const status = document.querySelector("#u4ImportModalRoot [data-u4-save-status]");
-      if (!status) return;
-      status.textContent = text;
-      status.classList.toggle("u4-error", Boolean(error2));
+      const status2 = document.querySelector("#u4ImportModalRoot [data-u4-save-status]");
+      if (!status2) return;
+      status2.textContent = text2;
+      status2.classList.toggle("u4-error", Boolean(error2));
     }
     function sameEditorBase(left, right) {
       if (importVersion(left) !== importVersion(right)) return false;
       if ((left == null ? void 0 : left.operationId) || (right == null ? void 0 : right.operationId)) return sameImportOperation(left, right);
       const comparable = (value) => {
-        const copy9 = cloneState(value);
-        delete copy9.confirmedBatch;
-        delete copy9.syncConflict;
-        delete copy9.baseVersion;
-        for (const row of copy9.rows || []) {
+        const copy10 = cloneState(value);
+        delete copy10.confirmedBatch;
+        delete copy10.syncConflict;
+        delete copy10.baseVersion;
+        for (const row of copy10.rows || []) {
           delete row.bankSourceRevision;
           if (row.processing) delete row.processing.editorVersion;
         }
-        return JSON.stringify(copy9);
+        return JSON.stringify(copy10);
       };
       return comparable(left) === comparable(right);
     }
@@ -14725,6 +16749,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
         if (updateSummary) updateDraftSummary(draft, { touch: false });
         else draft.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
         const stored = await ImportStore.getImport(id);
+        if (!stored && accountIsArchived((root2.state.accountProfiles || []).find((profile) => profile.id === draft.accountProfileId))) throw new Error("Heractiveer de rekening voordat je een nieuwe import opslaat.");
         if (stored) {
           const left = cloneState(stored), right = cloneState(draft);
           for (const value of [left, right]) {
@@ -14933,14 +16958,15 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       return item ? { item } : null;
     }
     function rowProcessingValidation(row, state2) {
-      var _a2, _b, _c;
+      var _a2, _b, _c, _d;
       if (row.importError) return { ok: false, errors: [row.importError] };
       if (!((_a2 = row.bankOriginal) == null ? void 0 : _a2.valid)) return { ok: false, errors: [{ code: "original", message: "Originele bankregel is ongeldig." }] };
       if (row.possibleDuplicate && !row.identityDecision && !row.duplicate) return { ok: false, errors: [{ code: "identity-choice", field: "identityDecision", message: "Kies of deze bankregel dezelfde of een afzonderlijke betaling is." }] };
       const p = row.processing || {}, lines = ((_b = p.splits) == null ? void 0 : _b.length) ? p.splits : [p];
+      if (((_c = row.suggestion) == null ? void 0 : _c.version) === 118 && lines.some((line) => ["terugbetaling", "refund"].includes(line.transactionType || p.transactionType) && !/^\d{4}-(0[1-9]|1[0-2])$/.test(line.refundMonth || ""))) return { ok: false, errors: [{ code: "refund-month", field: "refundMonth", message: "Kies de oorspronkelijke correctiemaand expliciet; de bankmaand is geen bewijs." }] };
       if (p.contributionGoalId) {
         const n = Number(p.contributionAmount), c = Math.round(n * 100);
-        if (!["interne-overboeking", "extra-bijdrage"].includes(p.transactionType) || row.bankOriginal.amount <= 0 || !goalExists(state2, p.contributionGoalId) || !Number.isSafeInteger(c) || c <= 0 || Math.abs(n * 100 - c) > 1e-6 || n > Math.min(p.processedAmount, row.bankOriginal.amount) || ((_c = p.splits) == null ? void 0 : _c.length)) return { ok: false, errors: [{ code: "savings-contribution", message: "Kies een bestaand spaardoel en een inlegbedrag binnen deze ontvangen interne overboeking. Een gesplitste ontvangst kan nog niet als inleg worden gekoppeld." }] };
+        if (!["interne-overboeking", "extra-bijdrage"].includes(p.transactionType) || row.bankOriginal.amount <= 0 || !goalExists(state2, p.contributionGoalId) || !Number.isSafeInteger(c) || c <= 0 || Math.abs(n * 100 - c) > 1e-6 || n > Math.min(p.processedAmount, row.bankOriginal.amount) || ((_d = p.splits) == null ? void 0 : _d.length)) return { ok: false, errors: [{ code: "savings-contribution", message: "Kies een bestaand spaardoel en een inlegbedrag binnen deze ontvangen interne overboeking. Een gesplitste ontvangst kan nog niet als inleg worden gekoppeld." }] };
       }
       if (p.savingsContributionId) {
         const prior = (state2.transactions || []).find((tx) => tx.importTransactionId === row.id), id = (prior == null ? void 0 : prior.id) || `tx-${row.id}`;
@@ -15397,8 +17423,8 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     function learnedRecognitionRules(draft) {
       const groups = /* @__PURE__ */ new Map();
       (draft.rows || []).filter((row) => {
-        var _a2;
-        return isExplicitlyApproved(row) && ((_a2 = row.bankOriginal) == null ? void 0 : _a2.valid) && !row.duplicate;
+        var _a2, _b, _c;
+        return isExplicitlyApproved(row) && ((_a2 = row.bankOriginal) == null ? void 0 : _a2.valid) && !row.duplicate && ((_b = row.processing) == null ? void 0 : _b.include) !== false && !(((_c = row.processing) == null ? void 0 : _c.splits) || []).length;
       }).forEach((row) => {
         const original2 = row.bankOriginal;
         const p = row.processing || {};
@@ -15411,21 +17437,23 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
         const transactionType = p.fixedExpenseId ? "vaste-last" : p.include === false ? "niet-meetellen" : p.transactionType || "uitgave";
         const category = p.fixedExpenseId ? "Vaste lasten" : String(p.category || "Ongecategoriseerd");
         const signature2 = [category, transactionType, p.budgetItemId || "", p.fixedExpenseId || "", p.savingsGoalId || ""].join("|");
-        const key = `${level}|${normalizeText(value)}`;
+        const accountProfileId = row.accountProfileId || draft.accountProfileId || "", accountOwner = row.accountOwner || draft.accountOwner || "";
+        const context = accountProfileId && OWNERS2.includes(accountOwner) ? { accountProfileId, accountOwner, accountIdentifier: normalizeIban2(original2.accountIdentifier), budgetOwner: p.budgetOwner, direction: Number(original2.amount) > 0 ? "in" : "out" } : null;
+        const key = `${level}|${normalizeText(value)}${context ? "|" + [context.accountProfileId, context.accountOwner, context.direction].join("|") : ""}`;
         if (!groups.has(key)) groups.set(key, { level, value, rows: [], signatures: /* @__PURE__ */ new Set() });
         const group = groups.get(key);
-        group.rows.push({ p, category, transactionType });
-        group.signatures.add(signature2);
+        group.rows.push({ p, category, transactionType, context, row });
+        group.signatures.add(signature2 + "|" + ((context == null ? void 0 : context.budgetOwner) || ""));
       });
       return [...groups.entries()].filter(([, group]) => group.signatures.size === 1).map(([key, group]) => {
-        const { p, category, transactionType } = group.rows[0];
-        return normalizeRule({ id: `u4-rule-${hashText(key)}`, enabled: true, level: group.level, value: group.value, displayName: p.description || "", category, transactionType, budgetItemId: p.budgetItemId || "", fixedExpenseId: p.fixedExpenseId || "", savingsGoalId: p.savingsGoalId || "", alwaysReview: false, updatedAt: (/* @__PURE__ */ new Date()).toISOString() });
+        const { p, category, transactionType, context, row } = group.rows[0];
+        return normalizeRule({ id: `u4-rule-${hashText(key)}`, enabled: true, level: group.level, value: group.value, displayName: p.description || "", category, transactionType, budgetItemId: p.budgetItemId || "", fixedExpenseId: p.fixedExpenseId || "", savingsGoalId: p.savingsGoalId || "", ...context ? { context } : {}, ...row.approvedAt ? { provenance: { kind: "manual-approval", sourceRowId: row.id, importBatchId: draft.id || row.bankOriginal.importBatchId || "", approvedAt: row.approvedAt } } : {}, alwaysReview: false, updatedAt: (/* @__PURE__ */ new Date()).toISOString() });
       });
     }
     function rememberRecognitionRules(state2, draft) {
       state2.recognitionRules = Array.isArray(state2.recognitionRules) ? state2.recognitionRules : [];
       learnedRecognitionRules(draft).forEach((rule) => {
-        const index = state2.recognitionRules.findIndex((existing) => existing.id === rule.id || existing.level === rule.level && normalizeText(existing.value) === normalizeText(rule.value));
+        const index = state2.recognitionRules.findIndex((existing) => existing.id === rule.id || existing.level === rule.level && normalizeText(existing.value) === normalizeText(rule.value) && JSON.stringify(existing.context || null) === JSON.stringify(rule.context || null));
         if (index >= 0) state2.recognitionRules[index] = rule;
         else state2.recognitionRules.unshift(rule);
       });
@@ -15536,7 +17564,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       return true;
     }
     function processedSummaryHtml(plan) {
-      return `<div class="u4-import-summary"><div><span>Uitgaven</span><strong>${plan.counts.expenses}</strong></div><div><span>Inkomsten</span><strong>${plan.counts.income}</strong></div><div><span>Interne overboekingen</span><strong>${plan.counts.internal}</strong></div><div><span>Sparen</span><strong>${plan.counts.savings}</strong></div><div><span>Terugbetalingen</span><strong>${plan.counts.refunds}</strong></div><div><span>Voorschotten</span><strong>${plan.counts.advances}</strong></div><div><span>Ongecategoriseerd</span><strong>${plan.counts.uncategorized}</strong></div><div><span>Duplicaten</span><strong>${plan.duplicateCount}</strong></div></div><p><strong>Inkomsten ${euro(plan.totalIncome)}</strong> · uitgaven ${euro(plan.totalExpenses)}</p>`;
+      return `<div class="u4-import-summary"><div><span>Uitgaven</span><strong>${plan.counts.expenses}</strong></div><div><span>Inkomsten</span><strong>${plan.counts.income}</strong></div><div><span>Interne overboekingen</span><strong>${plan.counts.internal}</strong></div><div><span>Sparen</span><strong>${plan.counts.savings}</strong></div><div><span>Terugbetalingen</span><strong>${plan.counts.refunds}</strong></div><div><span>Voorschotten</span><strong>${plan.counts.advances}</strong></div><div><span>Ongecategoriseerd</span><strong>${plan.counts.uncategorized}</strong></div><div><span>Duplicaten</span><strong>${plan.duplicateCount}</strong></div></div><p><strong>Inkomsten ${euro3(plan.totalIncome)}</strong> · uitgaven ${euro3(plan.totalExpenses)}</p>`;
     }
     function validationTargetLabel(draft, error2) {
       var _a2, _b, _c, _d, _e, _f, _g;
@@ -15544,9 +17572,9 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       const row = (draft.rows || []).find((item) => String(item.id) === String(error2.rowId));
       if (!row) return "Transactie";
       const description = String(((_a2 = row.bankOriginal) == null ? void 0 : _a2.description) || "Onbekende transactie").trim();
-      const date = String(((_b = row.processing) == null ? void 0 : _b.processingDate) || ((_c = row.bankOriginal) == null ? void 0 : _c.bankDate) || "").trim();
-      const amount = euro((_g = (_f = (_d = row.processing) == null ? void 0 : _d.processedAmount) != null ? _f : (_e = row.bankOriginal) == null ? void 0 : _e.amount) != null ? _g : 0);
-      return `${date ? `${date} · ` : ""}${description} · ${amount}`;
+      const date2 = String(((_b = row.processing) == null ? void 0 : _b.processingDate) || ((_c = row.bankOriginal) == null ? void 0 : _c.bankDate) || "").trim();
+      const amount = euro3((_g = (_f = (_d = row.processing) == null ? void 0 : _d.processedAmount) != null ? _f : (_e = row.bankOriginal) == null ? void 0 : _e.amount) != null ? _g : 0);
+      return `${date2 ? `${date2} · ` : ""}${description} · ${amount}`;
     }
     function findDraftRowElement(modal, rowId) {
       var _a2;
@@ -15605,8 +17633,8 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       document.body.appendChild(overlay);
       const close = () => overlay.remove();
       (_b = overlay.querySelector("[data-u4-validation-close]")) == null ? void 0 : _b.addEventListener("click", close);
-      overlay.addEventListener("click", (event) => {
-        if (event.target === overlay) close();
+      overlay.addEventListener("click", (event2) => {
+        if (event2.target === overlay) close();
       });
       overlay.querySelectorAll("[data-u4-validation-index]").forEach((button) => button.addEventListener("click", () => focusValidationError(root2, draft, shown[Number(button.dataset.u4ValidationIndex)])));
     }
@@ -15632,7 +17660,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     function renderReceipt(root2, summary) {
       const profile = (root2.state.accountProfiles || []).find((item) => item.id === summary.accountProfileId);
       const accountTitle = profileDisplayLabel(profile || { name: summary.bank || "Rekening" });
-      return `<article class="u4-receipt" data-u4-open-receipt="${esc(summary.id)}"><div class="u4-receipt-head"><div><strong>${esc(accountTitle)}</strong></div><span class="u4-status ${esc(summary.status)}">${esc(summary.status)}</span></div><div class="u4-muted">${Number(summary.newCount) || 0} transacties · ${Number(summary.duplicateCount) || 0} duplicaten · ${euro(summary.totalExpenses)} uitgaven</div></article>`;
+      return `<article class="u4-receipt" data-u4-open-receipt="${esc(summary.id)}"><div class="u4-receipt-head"><div><strong>${esc(accountTitle)}</strong></div><span class="u4-status ${esc(summary.status)}">${esc(summary.status)}</span></div><div class="u4-muted">${Number(summary.newCount) || 0} transacties · ${Number(summary.duplicateCount) || 0} duplicaten · ${euro3(summary.totalExpenses)} uitgaven</div></article>`;
     }
     function summaryMonth(summary) {
       return String(summary.periodFrom || summary.importDate || summary.updatedAt || "").slice(0, 7);
@@ -15671,6 +17699,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       const selectedMonth = String(((_a2 = root2.state.meta) == null ? void 0 : _a2.selectedMonth) || "").slice(0, 7);
       const selectedSummaries = summaries.filter((summary) => summaryIncludesMonth(summary, selectedMonth));
       return `<div class="u4-import-panel">
+      <button type="button" class="ghost small" data-u4-bank-accounts>Bankrekeningen en banksaldo’s beheren</button>
       <div class="u4-import-actions">
         <label class="primary">Bank-CSV importeren<input type="file" accept=".csv,text/csv" data-u4-file></label>
         <button type="button" class="ghost small" data-u4-manage-rules>Herkenningsregels</button>
@@ -15715,7 +17744,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       { label: "Sparen en overboeken", items: [["sparen", "Naar spaardoel"], ["naar-spaarrekening", "Naar spaarrekening"], ["van-spaarrekening", "Van spaarrekening"], ["interne-overboeking", "Interne overboeking"], ["maandelijkse-bijdrage", "Maandelijkse bijdrage"], ["extra-bijdrage", "Extra bijdrage"]] },
       { label: "Correctie en verrekening", items: [["terugbetaling-voorschot", "Terugbetaling voorschot"]] }
     ];
-    const TYPES = TYPE_GROUPS.flatMap((group) => group.items.map((item) => item[0]));
+    const TYPES2 = TYPE_GROUPS.flatMap((group) => group.items.map((item) => item[0]));
     const INCOME_TYPES = INCOME_TRANSACTION_TYPES;
     const TRANSFER_TYPES = ["naar-spaarrekening", "van-spaarrekening", "interne-overboeking"];
     const REPAYMENT_TYPES = ["terugbetaling", "terugbetaling-voorschot"];
@@ -15739,8 +17768,8 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     }
     function ownerOptions(row) {
       const family = transactionFamily(row.processing);
-      const owners2 = family === "zakgeld" ? ["dion", "dara"] : OWNERS2;
-      return `${family === "zakgeld" && !owners2.includes(row.processing.budgetOwner) ? '<option value="" selected>Kies Dion of Dara</option>' : ""}${owners2.map((owner) => option(owner, ownerLabel2(owner), row.processing.budgetOwner)).join("")}`;
+      const owners3 = family === "zakgeld" ? ["dion", "dara"] : OWNERS2;
+      return `${family === "zakgeld" && !owners3.includes(row.processing.budgetOwner) ? '<option value="" selected>Kies Dion of Dara</option>' : ""}${owners3.map((owner) => option(owner, ownerLabel2(owner), row.processing.budgetOwner)).join("")}`;
     }
     function setProcessingType(line, type) {
       const previous = transactionFamily(line), next = transactionFamily({ transactionType: type, include: true });
@@ -15816,7 +17845,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       return type === "interne-overboeking";
     }
     function profileOptions(root2, current) {
-      return `<option value="">Kies rekening</option>${(root2.state.accountProfiles || []).map((profile) => option(profile.id, profileDisplayLabel(profile), current)).join("")}`;
+      return `<option value="">Kies rekening</option>${availableAccountProfiles(root2.state.accountProfiles, current).map((profile) => option(profile.id, profileDisplayLabel(profile) + (accountIsArchived(profile) ? " · Gearchiveerd" : ""), current)).join("")}`;
     }
     function compactText(value) {
       return String(value || "").toLocaleLowerCase("nl-NL").replace(/\s+/g, " ").trim();
@@ -15841,20 +17870,20 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
         if ((Number(original2.amount) >= 0 ? "in" : "out") !== sourceDirection) return null;
         const identity = matchIdentity(original2);
         let score = 0;
-        const reasons = [];
+        const reasons2 = [];
         if (sourceIdentity.account && identity.account && sourceIdentity.account === identity.account) {
           score += 6;
-          reasons.push("zelfde tegenrekening");
+          reasons2.push("zelfde tegenrekening");
         }
         if (sourceIdentity.organization && identity.organization && sourceIdentity.organization === identity.organization) {
           score += 4;
-          reasons.push("zelfde organisatie");
+          reasons2.push("zelfde organisatie");
         }
         if (sourceIdentity.description && identity.description && sourceIdentity.description === identity.description) {
           score += 3;
-          reasons.push("zelfde omschrijving");
+          reasons2.push("zelfde omschrijving");
         }
-        return score >= 3 ? { row, score, reasons } : null;
+        return score >= 3 ? { row, score, reasons: reasons2 } : null;
       }).filter(Boolean).sort((a, b) => {
         var _a2, _b;
         return b.score - a.score || String(((_a2 = b.row.processing) == null ? void 0 : _a2.processingDate) || "").localeCompare(String(((_b = a.row.processing) == null ? void 0 : _b.processingDate) || ""));
@@ -15862,25 +17891,21 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     }
     function copiedProcessing(source, target, root2) {
       setProcessingType(target.processing, source.processing.transactionType);
-      ["contributionGoalId", "contributionAmount", "savingsContributionId", "savingsContributionAmount"].forEach((field) => delete target.processing[field]);
-      ["budgetOwner", "category", "transactionType", "budgetItemId", "fixedExpenseId", "fixedAmountMode", "savingsGoalId", "refundCategory", "refundMonth", "advanceMode", "include", "sourceAccountProfileId", "destinationAccountProfileId", "salaryPersonId"].forEach((field) => {
+      ["budgetOwner", "category", "transactionType", "budgetItemId", "fixedExpenseId", "fixedAmountMode", "savingsGoalId", "advanceMode", "include"].forEach((field) => {
         const value = source.processing[field];
         if (value === void 0) delete target.processing[field];
         else target.processing[field] = cloneState(value);
       });
-      if (target.processing.transactionType === "vaste-last") {
-        target.processing.fixedOccurrenceId = "";
-        target.processing.fixedOccurrenceMonth = String(target.bankOriginal.bankDate).slice(0, 7);
-        if (root2) selectFixedOccurrence(root2, target, target.processing);
-      }
+      if (target.processing.transactionType === "vaste-last" && target.processing.fixedOccurrenceId && !String(target.processing.fixedOccurrenceId).startsWith(target.processing.fixedExpenseId + ":")) target.processing.fixedOccurrenceId = "";
     }
     function occurrenceFields(root2, row, line, split = false) {
       const month = line.fixedOccurrenceMonth || String(row.bankOriginal.bankDate).slice(0, 7);
       const attr = split ? "data-u4-split-field" : "data-u4-field";
       const occurrences = /^\d{4}-(0[1-9]|1[0-2])$/.test(month) ? u3PlannedOccurrences(resolveFixedExpensesForMonth(root2.state, month), month).filter((item) => item.itemId === line.fixedExpenseId) : [];
-      return `<label>Geplande maand<input type="month" ${attr}="fixedOccurrenceMonth" value="${esc(month)}"></label><label>Betaalmoment<select ${attr}="fixedOccurrenceId"><option value="">Kies expliciet een betaalmoment</option>${occurrences.map((item) => option(item.id, `${displayDate(item.date)} · ${item.naam} · ${euro(item.amount)}`, line.fixedOccurrenceId || "")).join("")}</select></label>`;
+      return `<label>Geplande maand<input type="month" ${attr}="fixedOccurrenceMonth" value="${esc(month)}"></label><label>Betaalmoment<select ${attr}="fixedOccurrenceId"><option value="">Kies expliciet een betaalmoment</option>${occurrences.map((item) => option(item.id, `${displayDate(item.date)} · ${item.naam} · ${euro3(item.amount)}`, line.fixedOccurrenceId || "")).join("")}</select></label>`;
     }
     function splitHtml(root2, row, split, index) {
+      var _a2;
       const p = row.processing, family = transactionFamily(p), month = split.refundMonth || row.bankOriginal.bankDate.slice(0, 7), owner = split.budgetOwner || p.budgetOwner;
       const fixed = split.transactionType === "vaste-last", excluded = split.transactionType === "niet-meetellen" || split.include === false;
       let destination = "", extra = "";
@@ -15889,7 +17914,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
         if (fixed) extra = `<label>Vaste last<select data-u4-split-field="fixedExpenseId">${fixedOptions(root2, owner, split.fixedExpenseId, split.fixedOccurrenceMonth || month)}</select></label>${occurrenceFields(root2, row, split, true)}`;
       } else if (family === "terugbetaling") {
         destination = `<select data-u4-split-field="refundCategory" aria-label="Budgetcategorie split ${index + 1}"><option value="">Kies budgetcategorie</option>${categoryOptions(root2, owner, split.refundCategory, month)}</select>`;
-        extra = `<label>Correctiemaand<input type="month" data-u4-split-field="refundMonth" value="${esc(split.refundMonth || month)}"></label>`;
+        extra = `<label>Correctiemaand<input type="month" data-u4-split-field="refundMonth" value="${esc(split.refundMonth || (((_a2 = row.suggestion) == null ? void 0 : _a2.version) === 118 ? "" : month))}"></label>`;
       } else if (family === "sparen" && p.transactionType === "van-spaarrekening") {
         destination = `<select data-u4-split-field="withdrawalBudgetCategory" aria-label="Optionele budgetcategorie split ${index + 1}"><option value="">Zonder budgetcorrectie</option>${categoryOptions(root2, owner, split.withdrawalBudgetCategory, row.bankOriginal.bankDate.slice(0, 7))}</select>`;
       } else destination = `<span>${esc(family === "sparen" ? "Naar hetzelfde spaardoel" : split.category || "Verwerking")}</span>`;
@@ -15901,12 +17926,12 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
         var _a2;
         return replacement.active !== false && ((_a2 = replacement.manualTransaction) == null ? void 0 : _a2.id) === tx.id;
       }));
-      return candidates.length ? `<label class="wide">Handmatige registratie vervangen<select data-u4-replacement-choice><option value="">Geen vervanging</option>${candidates.map((tx) => option(tx.id, `${Math.abs(Math.abs(Number(tx.amount)) - Math.abs(Number(row.bankOriginal.amount))) < 5e-3 && daysBetween(tx.date, row.bankOriginal.bankDate) <= 3 ? "Mogelijke match · " : ""}${displayDate(tx.date)} · ${tx.description || tx.category} · ${euro(tx.amount)}`, "")).join("")}</select></label><button type="button" class="ghost small" data-u4-confirm-replacement>Bevestig vervanging → Nakijken</button>` : "";
+      return candidates.length ? `<label class="wide">Handmatige registratie vervangen<select data-u4-replacement-choice><option value="">Geen vervanging</option>${candidates.map((tx) => option(tx.id, `${Math.abs(Math.abs(Number(tx.amount)) - Math.abs(Number(row.bankOriginal.amount))) < 5e-3 && daysBetween(tx.date, row.bankOriginal.bankDate) <= 3 ? "Mogelijke match · " : ""}${displayDate(tx.date)} · ${tx.description || tx.category} · ${euro3(tx.amount)}`, "")).join("")}</select></label><button type="button" class="ghost small" data-u4-confirm-replacement>Bevestig vervanging → Nakijken</button>` : "";
     }
     function pairConfirmationFields(root2, draft) {
       const ids = new Set((root2.state.transactions || []).filter((tx) => tx.importBatchId === draft.id).map((tx) => tx.id));
       const pairs = (root2.state.internalTransferPairs || []).filter((pair) => (pair.transactionIds || []).some((id) => ids.has(id)));
-      return pairs.length ? `<details class="u4-section"><summary><span>Interne transferparen</span><span>${pairs.length}</span></summary><div class="u4-section-list">${pairs.map((pair) => `<div class="u4-receipt"><span>${euro(pair.amount)} · ${esc(pair.status)}${pair.status === "voorgesteld" ? " · buiten externe huishoudtotalen, nog onbevestigd" : ""}</span>${pair.status === "voorgesteld" ? `<button type="button" class="ghost small" data-u4-confirm-pair="${escAttr(pair.id)}">Bevestig transferpaar</button>` : ""}</div>`).join("")}</div></details>` : "";
+      return pairs.length ? `<details class="u4-section"><summary><span>Interne transferparen</span><span>${pairs.length}</span></summary><div class="u4-section-list">${pairs.map((pair) => `<div class="u4-receipt"><span>${euro3(pair.amount)} · ${esc(pair.status)}${pair.status === "voorgesteld" ? " · buiten externe huishoudtotalen, nog onbevestigd" : ""}</span>${pair.status === "voorgesteld" ? `<button type="button" class="ghost small" data-u4-confirm-pair="${escAttr(pair.id)}">Bevestig transferpaar</button>` : ""}</div>`).join("")}</div></details>` : "";
     }
     function repaymentRelation(root2, row) {
       const counter = (root2.state.accountProfiles || []).find((profile) => normalizeIban2(profile.identifier) === normalizeIban2(row.bankOriginal.counterpartyAccount));
@@ -15921,7 +17946,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       return `<div class="u4-repayment-list"><strong>${ownerLabel2(relation.debtor)} → ${ownerLabel2(relation.creditor)}</strong>${allocations.map((allocation, index) => {
         const advance = (root2.state.advanceLedger || []).find((item) => item.id === allocation.advanceId);
         const tx = (root2.state.transactions || []).find((item) => item.id === (advance == null ? void 0 : advance.transactionId));
-        return `<div class="u4-repayment-row" data-u4-allocation="${index}"><span>${esc((tx == null ? void 0 : tx.description) || (advance == null ? void 0 : advance.transactionId) || "Voorschot")} · open ${euro(advance == null ? void 0 : advance.outstandingAmount)}</span><input type="number" step="0.01" value="${Number(allocation.amount) || 0}" data-u4-allocation-field="amount"></div>`;
+        return `<div class="u4-repayment-row" data-u4-allocation="${index}"><span>${esc((tx == null ? void 0 : tx.description) || (advance == null ? void 0 : advance.transactionId) || "Voorschot")} · open ${euro3(advance == null ? void 0 : advance.outstandingAmount)}</span><input type="number" step="0.01" value="${Number(allocation.amount) || 0}" data-u4-allocation-field="amount"></div>`;
       }).join("") || '<span class="u4-muted">Geen passend openstaand voorschot gevonden.</span>'}</div>`;
     }
     function transferFieldsHtml(root2, row) {
@@ -15929,7 +17954,8 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       return `<div class="u4-context-block wide"><strong>Interne overboeking</strong><div class="u4-context-grid"><label>Van rekening<select data-u4-field="sourceAccountProfileId">${profileOptions(root2, row.processing.sourceAccountProfileId || "")}</select></label><label>Naar rekening<select data-u4-field="destinationAccountProfileId">${profileOptions(root2, row.processing.destinationAccountProfileId || "")}</select></label></div><span class="u4-muted">Accountcashflow blijft meetellen. Onbevestigde transfers blijven apart buiten externe huishoudtotalen.</span></div>`;
     }
     function refundFieldsHtml(root2, row, line, split = false) {
-      const attr = split ? "data-u4-split-field" : "data-u4-field", month = line.refundMonth || row.bankOriginal.bankDate.slice(0, 7);
+      var _a2;
+      const attr = split ? "data-u4-split-field" : "data-u4-field", month = line.refundMonth || (((_a2 = row.suggestion) == null ? void 0 : _a2.version) === 118 ? "" : row.bankOriginal.bankDate.slice(0, 7));
       const owner = line.budgetOwner || row.processing.budgetOwner;
       const categories = /^\d{4}-(0[1-9]|1[0-2])$/.test(month) ? expenseCategoriesForMonth(root2.state, month, owner).filter((category) => refundCategoryIsRecognizable(root2.state, category, month, owner)) : [];
       if (line.refundCategory && refundCategoryIsRecognizable(root2.state, line.refundCategory, month, owner) && !categories.includes(line.refundCategory)) categories.push(line.refundCategory);
@@ -15950,7 +17976,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
         return ["interne-overboeking", "extra-bijdrage"].includes(t.transactionType) && t.effects.accountCashflow > 0 && t.calendarMonth === month && t.financialFor === p.budgetOwner && ((_a2 = t.transaction.processing) == null ? void 0 : _a2.contributionGoalId) === p.savingsGoalId;
       });
       const missing = p.savingsContributionId && !sources.some((t) => t.id === p.savingsContributionId);
-      return `<label>Betaald uit interne inleg<select data-u4-field="savingsContributionId"><option value="">Geen koppeling — uit maandruimte</option>${missing ? option(p.savingsContributionId, "Gekoppelde inleg niet beschikbaar", p.savingsContributionId) : ""}${sources.map((t) => option(t.id, `${t.transaction.description || "Interne inleg"} · ${euro(t.transaction.processing.contributionAmount)}`, p.savingsContributionId || "")).join("")}</select></label>${p.savingsContributionId ? `<label>Gekoppeld bedrag<input type="number" min="0.01" step="0.01" data-u4-field="savingsContributionAmount" value="${Number(p.savingsContributionAmount) || 0}"></label><span class="u4-muted">Dit deel komt uit bestaand eigen geld en wordt niet van Over deze maand afgetrokken. De volledige spaarboeking blijft meetellen voor het spaardoel.</span>` : ""}`;
+      return `<label>Betaald uit interne inleg<select data-u4-field="savingsContributionId"><option value="">Geen koppeling — uit maandruimte</option>${missing ? option(p.savingsContributionId, "Gekoppelde inleg niet beschikbaar", p.savingsContributionId) : ""}${sources.map((t) => option(t.id, `${t.transaction.description || "Interne inleg"} · ${euro3(t.transaction.processing.contributionAmount)}`, p.savingsContributionId || "")).join("")}</select></label>${p.savingsContributionId ? `<label>Gekoppeld bedrag<input type="number" min="0.01" step="0.01" data-u4-field="savingsContributionAmount" value="${Number(p.savingsContributionAmount) || 0}"></label><span class="u4-muted">Dit deel komt uit bestaand eigen geld en wordt niet van Over deze maand afgetrokken. De volledige spaarboeking blijft meetellen voor het spaardoel.</span>` : ""}`;
     }
     function dependentFieldsHtml(root2, row) {
       var _a2, _b, _c, _d;
@@ -15976,6 +18002,36 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       var _a2;
       return String(((_a2 = row.bankOriginal) == null ? void 0 : _a2.bankDate) || "").slice(0, 7);
     }
+    function suggestionHtml(row) {
+      var _a2, _b, _c, _d;
+      const s = row.suggestion;
+      if (!s || !["nakijken", "onbekend"].includes(importReviewState(row))) return "";
+      const labels2 = { supported: "Onderbouwd voorstel", uncertain: "Controle nodig", conflict: "Conflicterende voorstellen", none: "Geen bruikbaar voorstel" };
+      return `<div class="u4-suggestion" data-suggestion-status="${escAttr(s.status)}"><strong>${esc(labels2[s.status] || labels2.uncertain)}</strong>${((_a2 = s.needsConfirmation) == null ? void 0 : _a2.length) ? `<p>${esc(s.needsConfirmation.join(" "))}</p>` : ""}<details><summary>Waarom dit voorstel?</summary><ul>${(((_b = s.reasons) == null ? void 0 : _b.length) ? s.reasons : ["Geen herkenningsregel beschikbaar."]).map((reason) => `<li>${esc(reason)}</li>`).join("")}</ul>${((_c = s.occurrences) == null ? void 0 : _c.length) ? `<p>Mogelijke betaalmomenten: ${s.occurrences.map((item) => esc(`${item.name} · ${displayDate(item.date)}`)).join("; ")}. Kies hieronder bij Betaalmoment.</p>` : ""}<p>Dit voorstel boekt niets. Controleer de velden en keur expliciet goed.</p></details>${((_d = s.alternatives) == null ? void 0 : _d.length) ? `<label>Alternatief voorstel<select data-u4-suggestion-rule><option value="">Kies een voorstel</option>${s.alternatives.map((item) => option(item.ruleId, `${item.category} · ${ownerLabel2(item.budgetOwner)}${item.budgetItemId ? " · " + item.budgetItemId : ""}${item.fixedExpenseId ? " · " + item.fixedExpenseId : ""}${item.savingsGoalId ? " · " + item.savingsGoalId : ""}`, "")).join("")}</select></label>` : ""}</div>`;
+    }
+    function applySuggestionAlternative(row, ruleId, state2) {
+      var _a2;
+      if (!(((_a2 = row.suggestion) == null ? void 0 : _a2.alternatives) || []).some((item) => item.ruleId === ruleId)) return false;
+      const rule = (state2.recognitionRules || []).find((item) => item.id === ruleId), profile = (state2.accountProfiles || []).find((item) => item.id === row.accountProfileId);
+      if (!rule || !profile) return false;
+      const month = String(row.bankOriginal.bankDate).slice(0, 7);
+      const proposal = classifyOriginal(row.bankOriginal, profile, [rule], state2.accountProfiles, resolveFixedExpensesForMonth(state2, month), state2.transactions, state2);
+      if (!proposal.suggestion.ruleIds.includes(ruleId)) return false;
+      for (const key of ["category", "transactionType", "budgetOwner", "budgetItemId", "fixedExpenseId", "fixedOccurrenceId", "fixedOccurrenceMonth", "savingsGoalId", "recognitionRuleId"]) row.processing[key] = proposal.processing[key] || "";
+      row.suggestion = proposal.suggestion;
+      row.reasons = proposal.reasons;
+      reopenForReview(row);
+      return true;
+    }
+    function applyBulkCategory(draft, ids, category) {
+      const selected = new Set(ids);
+      for (const row of draft.rows || []) {
+        if (!selected.has(row.id) || isExplicitlyApproved(row) || row.duplicate || row.importError) continue;
+        row.processing.category = category;
+        row.processing.budgetItemId = "";
+        reopenForReview(row);
+      }
+    }
     function rowHtml(root2, row) {
       var _a2, _b, _c;
       const p = row.processing;
@@ -15984,7 +18040,8 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       const reviewState = importReviewState(row);
       const statusLabel = reviewState === "niet-meetellen" ? "Niet meetellen" : reviewState === "goedgekeurd" ? "Goedgekeurd" : reviewState === "onbekend" ? "Onbekend" : "Nakijken";
       return `<article class="u4-import-row" data-u4-row="${escAttr(row.id)}">
-      <div class="u4-import-row-main"><div><strong>${esc(p.description || original2.rawDescription || original2.description || "Onbekende transactie")}</strong><span class="u4-muted">${esc(displayDate(original2.bankDate))} · ${euro(original2.amount)}</span>${Math.abs(Number(p.processedAmount) - Math.abs(Number(original2.amount))) > 4e-3 ? `<span class="u4-muted">Verwerking ${euro(p.processedAmount)} · bankcashflow ${euro(original2.amount)}</span>` : ""}${((_a2 = row.reasons) == null ? void 0 : _a2.length) ? `<div class="u4-row-reasons">${esc(row.reasons.join(" · "))}</div>` : ""}</div><div class="u4-row-approval">${["onbekend", "nakijken"].includes(reviewState) ? `<input type="checkbox" data-u4-select-approval="${escAttr(row.id)}" aria-label="${escAttr(p.description || original2.description || row.id)} selecteren voor groepsgoedkeuring">` : ""}<span class="u4-status ${reviewState}">${statusLabel}</span>${["goedgekeurd", "niet-meetellen"].includes(reviewState) ? '<button type="button" class="ghost small" data-u4-reopen>Bewerken</button>' : `<button type="button" class="primary small" data-u4-approve>Opslaan en verwerken</button>`}</div></div>
+      <div class="u4-import-row-main"><div><strong>${esc(p.description || original2.rawDescription || original2.description || "Onbekende transactie")}</strong><span class="u4-muted">${esc(displayDate(original2.bankDate))} · ${euro3(original2.amount)}</span>${Math.abs(Number(p.processedAmount) - Math.abs(Number(original2.amount))) > 4e-3 ? `<span class="u4-muted">Verwerking ${euro3(p.processedAmount)} · bankcashflow ${euro3(original2.amount)}</span>` : ""}${((_a2 = row.reasons) == null ? void 0 : _a2.length) ? `<div class="u4-row-reasons">${esc(row.reasons.join(" · "))}</div>` : ""}</div><div class="u4-row-approval">${["onbekend", "nakijken"].includes(reviewState) ? `<input type="checkbox" data-u4-select-approval="${escAttr(row.id)}" aria-label="${escAttr(p.description || original2.description || row.id)} selecteren voor groepsgoedkeuring">` : ""}<span class="u4-status ${reviewState}">${statusLabel}</span>${["goedgekeurd", "niet-meetellen"].includes(reviewState) ? '<button type="button" class="ghost small" data-u4-reopen>Bewerken</button>' : `<button type="button" class="primary small" data-u4-approve>Opslaan en verwerken</button>`}</div></div>
+      ${suggestionHtml(row)}
       ${(root2.state.transactions || []).filter((tx) => !isBankSource(tx) && tx.importTransactionId === row.id).map((tx) => `<button type="button" class="ghost small" data-u4-coverage="${escAttr(tx.id)}">Spaardekking · ${esc(tx.category)}${tx.splitId ? " · split " + esc(tx.splitId) : ""}</button>`).join("")}
       <div class="u4-row-grid">
         <label>${p.transactionType === "vaste-last" ? "Bankdatum" : "Verwerkingsdatum"}<input type="date" data-u4-field="processingDate" value="${esc(p.transactionType === "vaste-last" ? original2.bankDate : p.processingDate)}" ${p.transactionType === "vaste-last" ? "readonly" : ""}></label>
@@ -15996,18 +18053,18 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       ${dependentFieldsHtml(root2, row)}
       ${rowProcessingValidation(row, root2.state).errors.filter((error2) => error2.splitIndex == null && error2.code !== "splits").map((error2) => `<p class="u4-error" data-u4-validation-field="${escAttr(error2.field || "")}" role="status">${esc(error2.message)}</p>`).join("")}
       <details><summary>Meer opties voor deze verwerking</summary><div class="u4-more-grid">
-        <div class="u4-original wide">Origineel: ${esc(displayDate(original2.bankDate))} · ${euro(original2.amount)}<br>${esc(original2.accountIdentifier || "Geen rekeningkenmerk")} → ${esc(original2.counterpartyAccount || "Geen tegenrekening")}<br>Regel ${Number(original2.lineNumber) || "—"} · ${esc(original2.fingerprint)}</div>
+        <div class="u4-original wide">Origineel: ${esc(displayDate(original2.bankDate))} · ${euro3(original2.amount)}<br>${esc(original2.accountIdentifier || "Geen rekeningkenmerk")} → ${esc(original2.counterpartyAccount || "Geen tegenrekening")}<br>Regel ${Number(original2.lineNumber) || "—"} · ${esc(original2.fingerprint)}</div>
         ${["uitgave", "terugbetaling"].includes(family) ? `<label>Budgetpost<input data-u4-field="budgetItemId" value="${esc(p.budgetItemId)}"></label>${p.transactionType === "vaste-last" ? `<label>Afwijkend vast bedrag<select data-u4-field="fixedAmountMode">${option("none", "Planning niet aanpassen", p.fixedAmountMode || "none")}${option("month", "Alleen deze maand", p.fixedAmountMode)}${option("from", "Vanaf deze maand", p.fixedAmountMode)}</select></label>` : ""}<label>Voorschot<select data-u4-field="advanceMode">${option("auto", "Automatisch bij andere eigenaar", p.advanceMode)}${option("none", "Geen voorschot", p.advanceMode)}${option("force", "Altijd voorschot", p.advanceMode)}</select></label>` : ""}
         <label>Meetellen<select data-u4-field="include">${option("true", "Meetellen", String(p.include))}${option("false", "Niet meetellen", String(p.include))}</select></label>
         ${sourceConfirmationFields(root2, UI.draft, row)}<label class="wide">Notitie<input data-u4-field="note" value="${esc(p.note)}"></label>
       </div>${["uitgave", "terugbetaling", "sparen", "inkomen"].includes(family) ? `<div class="u4-split-list">${(p.splits || []).map((split, index) => splitHtml(root2, row, split, index)).join("")}</div><button type="button" class="ghost small" data-u4-add-split>${((_c = p.splits) == null ? void 0 : _c.length) ? "+ Regel" : "Splitsen"}</button>${(() => {
         const d = splitDifference(p);
-        return `<p class="u4-error" role="status" data-u4-split-total ${d.differenceCents ? "" : "hidden"}>${d.differenceCents > 0 ? "Nog " + euro(d.differenceCents / 100) + " te verdelen" : d.differenceCents < 0 ? euro(-d.differenceCents / 100) + " te veel verdeeld" : ""}</p>`;
+        return `<p class="u4-error" role="status" data-u4-split-total ${d.differenceCents ? "" : "hidden"}>${d.differenceCents > 0 ? "Nog " + euro3(d.differenceCents / 100) + " te verdelen" : d.differenceCents < 0 ? euro3(-d.differenceCents / 100) + " te veel verdeeld" : ""}</p>`;
       })()}` : ""}</details>
     </article>`;
     }
     function bulkEditor(root2, draft) {
-      return `<details class="u4-section u4-bulk-section"><summary><span>Meerdere transacties aanpassen</span><span>Optioneel</span></summary><div class="u4-section-list"><p class="u4-muted">Pas één keuze in één keer toe. Goedgekeurde transacties worden standaard overgeslagen en iedere aangepaste regel moet daarna expliciet worden goedgekeurd.</p><div class="u4-profile-grid"><label>Toepassen op<select data-u4-bulk-scope><option value="review">Alleen Nakijken</option><option value="unknown">Alleen Onbekend</option><option value="uncategorized">Alleen ongecategoriseerd</option><option value="all">Alle niet-goedgekeurde transacties</option></select></label><label>Budgeteigenaar<select data-u4-bulk-owner><option value="">Niet wijzigen</option>${OWNERS2.map((owner) => option(owner, ownerLabel2(owner), "")).join("")}</select></label><label>Categorie<select data-u4-bulk-category><option value="">Niet wijzigen</option>${categoryOptions(root2, "gezamenlijk", "")}</select></label><label>Transactie<select data-u4-bulk-type><option value="">Niet wijzigen</option>${typeOptions("")}</select></label></div><button type="button" class="ghost small" data-u4-apply-bulk>Voorbeeld en toepassen</button></div></details>`;
+      return `<details class="u4-section u4-bulk-section"><summary><span>Meerdere transacties aanpassen</span><span>Optioneel</span></summary><div class="u4-section-list"><p class="u4-muted">Pas één keuze in één keer toe. Goedgekeurde transacties worden standaard overgeslagen en iedere aangepaste regel moet daarna expliciet worden goedgekeurd.</p><div class="u4-profile-grid"><label>Toepassen op<select data-u4-bulk-scope><option value="selected">Alleen aangevinkte transacties</option><option value="review">Alleen Nakijken</option><option value="unknown">Alleen Onbekend</option><option value="uncategorized">Alleen ongecategoriseerd</option><option value="all">Alle niet-goedgekeurde transacties</option></select></label><label>Budgeteigenaar<select data-u4-bulk-owner><option value="">Niet wijzigen</option>${OWNERS2.map((owner) => option(owner, ownerLabel2(owner), "")).join("")}</select></label><label>Categorie<select data-u4-bulk-category><option value="">Niet wijzigen</option>${categoryOptions(root2, "gezamenlijk", "")}</select></label><label>Transactie<select data-u4-bulk-type><option value="">Niet wijzigen</option>${typeOptions("")}</select></label></div><button type="button" class="ghost small" data-u4-apply-bulk>Voorbeeld en toepassen</button></div></details>`;
     }
     async function approveSelectedSources(root2, draft, ids, { template = null } = {}) {
       const scope = ImportStore.scope, session = editorSession(draft), groupPreparation = { current: null };
@@ -16053,7 +18110,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
       feedback.textContent = approvalGroupSummary(result2);
       for (const item of result2.results.filter((row) => row.status !== "geslaagd")) {
         const source = draft.rows.find((row) => row.id === item.rowId), line = document.createElement("p");
-        line.textContent = `${((_b = source == null ? void 0 : source.bankOriginal) == null ? void 0 : _b.bankDate) || ""} · ${euro(((_c = source == null ? void 0 : source.bankOriginal) == null ? void 0 : _c.amount) || 0)} · ${item.message || "Niet geprobeerd"}`;
+        line.textContent = `${((_b = source == null ? void 0 : source.bankOriginal) == null ? void 0 : _b.bankDate) || ""} · ${euro3(((_c = source == null ? void 0 : source.bankOriginal) == null ? void 0 : _c.amount) || 0)} · ${item.message || "Niet geprobeerd"}`;
         feedback.appendChild(line);
       }
       body == null ? void 0 : body.prepend(feedback);
@@ -16088,7 +18145,7 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
       const overlay = document.createElement("div");
       overlay.className = "u4-match-overlay";
       const candidates = [{ row: source, score: 99, reasons: ["Oorspronkelijke transactie"] }, ...matches];
-      overlay.innerHTML = `<div class="u4-match-dialog" role="dialog" aria-modal="true" aria-labelledby="u4-match-title"><div class="u4-match-head"><div><h3 id="u4-match-title">Vergelijkbare transacties gevonden</h3><p>Kies welke afzonderlijke bankbewegingen je definitief wilt goedkeuren.</p></div><button type="button" class="ghost small" data-u4-match-close>Sluiten</button></div><div class="u4-match-change"><strong>Gezamenlijke verwerking</strong><span>${esc(ownerLabel2(source.processing.budgetOwner))} · ${esc(source.processing.category)} · ${esc(((_c = TYPE_GROUPS.flatMap((g) => g.items).find((item) => item[0] === source.processing.transactionType)) == null ? void 0 : _c[1]) || source.processing.transactionType)}</span></div><div class="u4-match-list">${candidates.map(({ row, score, reasons }) => `<label class="u4-match-row"><input type="checkbox" data-u4-match-id="${escAttr(row.id)}" ${score >= 4 ? "checked" : ""}><span><strong>${esc(displayDate(row.bankOriginal.bankDate))} · ${esc(row.bankOriginal.description || "Onbekend")}</strong><small>${euro(row.bankOriginal.amount)} · ${esc(importReviewState(row))} · ${esc(reasons.join(", "))}</small></span></label>`).join("")}</div><div class="u4-match-feedback" data-u4-match-feedback aria-live="polite"></div><div class="u4-match-actions"><button type="button" class="ghost" data-u4-match-only>Alleen deze transactie</button><button type="button" class="primary" data-u4-match-apply></button></div></div>`;
+      overlay.innerHTML = `<div class="u4-match-dialog" role="dialog" aria-modal="true" aria-labelledby="u4-match-title"><div class="u4-match-head"><div><h3 id="u4-match-title">Vergelijkbare transacties gevonden</h3><p>Kies welke afzonderlijke bankbewegingen je definitief wilt goedkeuren.</p></div><button type="button" class="ghost small" data-u4-match-close>Sluiten</button></div><div class="u4-match-change"><strong>Gezamenlijke verwerking</strong><span>${esc(ownerLabel2(source.processing.budgetOwner))} · ${esc(source.processing.category)} · ${esc(((_c = TYPE_GROUPS.flatMap((g) => g.items).find((item) => item[0] === source.processing.transactionType)) == null ? void 0 : _c[1]) || source.processing.transactionType)}</span></div><div class="u4-match-list">${candidates.map(({ row, score, reasons: reasons2 }) => `<label class="u4-match-row"><input type="checkbox" data-u4-match-id="${escAttr(row.id)}" ${score >= 4 ? "checked" : ""}><span><strong>${esc(displayDate(row.bankOriginal.bankDate))} · ${esc(row.bankOriginal.description || "Onbekend")}</strong><small>${euro3(row.bankOriginal.amount)} · ${esc(importReviewState(row))} · ${esc(reasons2.join(", "))}</small></span></label>`).join("")}</div><div class="u4-match-feedback" data-u4-match-feedback aria-live="polite"></div><div class="u4-match-actions"><button type="button" class="ghost" data-u4-match-only>Alleen deze transactie</button><button type="button" class="primary" data-u4-match-apply></button></div></div>`;
       document.body.appendChild(overlay);
       let busy2 = false;
       const apply = overlay.querySelector("[data-u4-match-apply]");
@@ -16103,8 +18160,8 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
         if (!busy2) overlay.remove();
       };
       overlay.querySelector("[data-u4-match-close]").onclick = close;
-      overlay.addEventListener("click", (event) => {
-        if (event.target === overlay) close();
+      overlay.addEventListener("click", (event2) => {
+        if (event2.target === overlay) close();
       });
       async function commitSelection(only) {
         if (busy2) return;
@@ -16130,7 +18187,7 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
       apply.onclick = () => commitSelection(false);
     }
     function profileEditor(root2, draft) {
-      const profiles = (root2.state.accountProfiles || []).filter((profile) => !draft.entryOwner || profile.accountOwner === draft.entryOwner);
+      const profiles = availableAccountProfiles(root2.state.accountProfiles, draft.accountProfileId).filter((profile) => !draft.entryOwner || profile.accountOwner === draft.entryOwner);
       const detected = [...new Set(draft.rows.map((row) => row.bankOriginal.accountIdentifier).filter(Boolean))][0] || "";
       const profileOwner = draft.entryOwner || draft.accountOwner || "gezamenlijk";
       const known = Boolean(draft.accountProfileId);
@@ -16140,6 +18197,7 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
       <label>IBAN/rekeningkenmerk<input data-u4-profile-identifier value="${esc(detected)}"></label>
       ${draft.entryOwner ? `<label>Rekeninghouder<span class="u4-profile-owner-static">${esc(ownerLabel2(profileOwner))}</span><input type="hidden" data-u4-profile-owner value="${esc(profileOwner)}"></label>` : `<label>Rekeninghouder<select data-u4-profile-owner>${OWNERS2.map((owner) => option(owner, ownerLabel2(owner), profileOwner)).join("")}</select></label>`}
       <label>Bank<input data-u4-profile-bank value="${esc(draft.bank || "ING")}"></label>
+      <label>Rekeningtype<select data-u4-profile-type><option value="payment">Betaalrekening</option><option value="savings">Spaarrekening</option></select></label>
     </div><button type="button" class="primary small" data-u4-apply-profile>Profiel gebruiken</button></div></details>`;
     }
     function renderDraftModal(root2, draft) {
@@ -16158,11 +18216,11 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
       modal.innerHTML = `<div class="u4-import-modal" role="dialog" aria-modal="true" aria-label="Bankimport controleren">
       <header class="u4-modal-head"><div><h2>${isConcept ? "Bankimport controleren" : "Importdetails"}</h2><p>${esc(draft.fileName)} · ${esc(draft.bank)} · ${esc(displayDate(draft.periodFrom) || "—")} t/m ${esc(displayDate(draft.periodTo) || "—")} · ${esc(draft.status)}</p></div><button type="button" class="ghost" data-u4-close>Sluiten</button></header>
       <main class="u4-modal-body"><p class="u4-muted" data-u4-local-notice>Wijzigingen blijven een lokaal concept. Alleen Opslaan en verwerken vervangt de goedgekeurde verwerking. Sluiten bewaart je concept; Annuleren verwijdert het concept.</p><button type="button" class="ghost small" data-u4-approve-selection ${batchLifecycle(draft) !== "active" ? "disabled" : ""}>Geselecteerde regels goedkeuren</button>${draft.syncConflict ? `<div class="u4-original">Synchronisatieconflict: de cloudstand blijft behouden. De lokale keuze is veilig bewaard.<button class="ghost small" data-u4-conflict-cloud>Cloudstand behouden</button><button class="primary small" data-u4-conflict-local>Lokale verwerking opnieuw nakijken</button></div>` : ""}${isConcept ? profileEditor(root2, draft) + bulkEditor(root2, draft) : ""}
-        <div class="u4-import-summary"><div><span>Nieuw</span><strong>${draft.summary.newCount}</strong></div><div><span>Duplicaten</span><strong>${draft.summary.duplicateCount}</strong></div><div><span>Inkomsten</span><strong>${euro(draft.summary.totalIncome)}</strong></div><div><span>Uitgaven</span><strong>${euro(draft.summary.totalExpenses)}</strong></div></div>
+        <div class="u4-import-summary"><div><span>Nieuw</span><strong>${draft.summary.newCount}</strong></div><div><span>Duplicaten</span><strong>${draft.summary.duplicateCount}</strong></div><div><span>Inkomsten</span><strong>${euro3(draft.summary.totalIncome)}</strong></div><div><span>Uitgaven</span><strong>${euro3(draft.summary.totalExpenses)}</strong></div></div>
         <details class="u4-section u4-section-unknown" ${draft.summary.unknownCount ? "open" : ""}><summary><span>Onbekend</span><span>${draft.summary.unknownCount}</span></summary><div class="u4-section-list">${unknown.map((row) => rowHtml(root2, row)).join("") || '<div class="u4-empty">Alle transacties zijn herkend.</div>'}</div></details>
         <details class="u4-section u4-section-review" ${draft.summary.unknownCount ? "" : "open"}><summary><span>Nakijken</span><span>${draft.summary.reviewCount}</span></summary><div class="u4-section-list">${review.map((row) => rowHtml(root2, row)).join("") || '<div class="u4-empty">Geen herkende transacties om na te kijken.</div>'}</div></details>
         <details class="u4-section u4-section-approved"><summary><span>Goedgekeurd</span><span>${draft.summary.approvedCount}</span></summary><div class="u4-section-list">${approved.map((row) => rowHtml(root2, row)).join("") || '<div class="u4-empty">Nog geen transacties expliciet goedgekeurd.</div>'}</div></details>
-        ${draft.summary.duplicateCount ? `<details class="u4-section"><summary><span>Eerder geïmporteerd — overgeslagen</span><span>${draft.summary.duplicateCount}</span></summary><div class="u4-section-list">${draft.rows.filter((row) => row.duplicate).map((row) => `<div class="u4-original">${esc(displayDate(row.bankOriginal.bankDate))} · ${esc(row.bankOriginal.description)} · ${euro(row.bankOriginal.amount)}</div>`).join("")}</div></details>` : ""}
+        ${draft.summary.duplicateCount ? `<details class="u4-section"><summary><span>Eerder geïmporteerd — overgeslagen</span><span>${draft.summary.duplicateCount}</span></summary><div class="u4-section-list">${draft.rows.filter((row) => row.duplicate).map((row) => `<div class="u4-original">${esc(displayDate(row.bankOriginal.bankDate))} · ${esc(row.bankOriginal.description)} · ${euro3(row.bankOriginal.amount)}</div>`).join("")}</div></details>` : ""}
       ${draft.rows.some((row) => row.importError) ? `<details class="u4-section" open><summary>Importfouten</summary>${draft.rows.filter((row) => row.importError).map((row) => `<div class="u4-original">${esc(row.importError.message)} · bronregel ${row.bankOriginal.lineNumber}</div>`).join("")}</details>` : ""}${draft.rows.some((row) => row.possibleDuplicate) ? '<p class="u4-muted">Gelijke bankvelden gevonden: mogelijke duplicaten zijn niet automatisch overgeslagen.</p>' : ""}${pairConfirmationFields(root2, draft)}</main>
       <footer class="u4-modal-actions"><span class="u4-muted" data-u4-save-status>Goedkeuring vraagt altijd een expliciete keuze per bron of geselecteerde groep. ${batchLifecycle(draft) === "withdrawn" ? "Deze batch is teruggetrokken." : ""}</span><button type="button" class="ghost" data-u4-cancel-concept>Annuleren</button><button type="button" class="ghost" data-u4-save-concept>Concept opslaan</button>${batchLifecycle(draft) === "withdrawn" ? '<button type="button" class="primary" data-u4-restore>Herstellen</button>' : '<button type="button" class="danger-ghost" data-u4-withdraw>Terugtrekken</button>'}<button type="button" class="danger-ghost" data-u4-delete-batch>Verwijderen</button>${batchLifecycle(draft) === "active" ? '<button type="button" class="primary" data-u4-process>Goedgekeurde verwerken</button>' : ""}</footer>
     </div>`;
@@ -16188,15 +18246,15 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
       modal.classList.add("open");
       (_a2 = modal.querySelector("[data-u4-close]")) == null ? void 0 : _a2.addEventListener("click", closeDraft);
       (_b = modal.querySelector("[data-u4-cloud-retry]")) == null ? void 0 : _b.addEventListener("click", () => openDraft(root2, id));
-      (_c = modal.querySelector("[data-u4-discard-concept]")) == null ? void 0 : _c.addEventListener("click", async (event) => {
+      (_c = modal.querySelector("[data-u4-discard-concept]")) == null ? void 0 : _c.addEventListener("click", async (event2) => {
         if (!confirm("Dit onverwerkte importconcept verwijderen? De financiële administratie en verwerkte imports blijven behouden.")) return;
-        event.currentTarget.disabled = true;
+        event2.currentTarget.disabled = true;
         try {
           await discardImportConcept(root2, id);
           closeDraft();
           alert("Het vastgelopen importconcept is verwijderd. Je kunt nu een nieuw CSV-bestand kiezen.");
         } catch (discardError) {
-          event.currentTarget.disabled = false;
+          event2.currentTarget.disabled = false;
           alert(discardError.message);
         }
       });
@@ -16253,11 +18311,9 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
         const name = modal.querySelector("[data-u4-profile-name]").value.trim();
         const identifier = normalizeIban2(modal.querySelector("[data-u4-profile-identifier]").value);
         if (!name || !identifier) throw new Error("Vul een profielnaam en rekeningkenmerk in.");
-        profile = { id: `account-${hashText(identifier)}`, name, identifier, bank: modal.querySelector("[data-u4-profile-bank]").value.trim() || "ING", csvFormat: draft.format, accountOwner: modal.querySelector("[data-u4-profile-owner]").value, createdAt: (/* @__PURE__ */ new Date()).toISOString(), updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
-        const ok = await root2.commitChange(() => {
-          root2.state.accountProfiles.push(profile);
-        }, { render: false });
-        if (!ok) throw new Error("Rekeningprofiel opslaan mislukt.");
+        const pending = draft.p1bProfileCommand || { id: "account-" + crypto.randomUUID(), operationId: crypto.randomUUID(), createdAt: (/* @__PURE__ */ new Date()).toISOString() };
+        draft.p1bProfileCommand = pending;
+        profile = await root2.FinizeAccountsSave({ type: "create", ...pending, values: { name, identifier, bank: modal.querySelector("[data-u4-profile-bank]").value.trim(), accountOwner: modal.querySelector("[data-u4-profile-owner]").value, accountType: modal.querySelector("[data-u4-profile-type]").value } });
       }
       const activeRows = draft.rows.filter((row) => sourceIsActive(root2, draft, row));
       activeRows.forEach(markEditorRowChanged);
@@ -16268,13 +18324,14 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
         row.accountOwner = profile.accountOwner;
         const sourceMonth = String(row.bankOriginal.bankDate).slice(0, 7);
         const fixedExpenses = /^\d{4}-(0[1-9]|1[0-2])$/.test(sourceMonth) ? resolveFixedExpensesForMonth(root2.state, sourceMonth) : [];
-        const proposal = classifyOriginal(row.bankOriginal, profile, root2.state.recognitionRules, root2.state.accountProfiles, fixedExpenses, root2.state.transactions);
+        const proposal = classifyOriginal(row.bankOriginal, profile, root2.state.recognitionRules, root2.state.accountProfiles, fixedExpenses, root2.state.transactions, root2.state);
         row.certainty = proposal.certainty;
         row.processingStatus = proposal.certainty;
         row.recognitionState = proposal.recognitionState;
         row.approvalSource = "";
         row.approvedAt = "";
         row.reasons = proposal.reasons;
+        row.suggestion = proposal.suggestion;
         row.processing = { ...proposal.processing, ...row.processing, budgetOwner: row.processing.budgetOwner || profile.accountOwner };
       });
       await persistLocalImportEditor(root2, draft);
@@ -16322,8 +18379,8 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
       var _a2, _b;
       UI.root = root2;
       UI.draft = draft;
-      (_a2 = modal.querySelector("[data-u4-close]")) == null ? void 0 : _a2.addEventListener("click", async (event) => {
-        const button = event.currentTarget, opening = UI.openSequence;
+      (_a2 = modal.querySelector("[data-u4-close]")) == null ? void 0 : _a2.addEventListener("click", async (event2) => {
+        const button = event2.currentTarget, opening = UI.openSequence;
         button.disabled = true;
         updateImportSaveStatus("Laatste lokale wijzigingen opslaan…");
         try {
@@ -16345,11 +18402,11 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
       });
       if (modal.dataset.u4DraftDelegated === "true") return;
       modal.dataset.u4DraftDelegated = "true";
-      const onDraftChange = async (event) => {
+      const onDraftChange = async (event2) => {
         root2 = UI.root;
         draft = UI.draft;
         modal = ensureModalRoot();
-        const container = event.target.closest("[data-u4-row]");
+        const container = event2.target.closest("[data-u4-row]");
         if (!container) return;
         const row = draft.rows.find((item) => item.id === container.dataset.u4Row);
         if (!row) return;
@@ -16361,12 +18418,15 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
         const wasApproved = isExplicitlyApproved(row) || sourceIsActive(root2, draft, row);
         let rerender = false;
         if (wasApproved) markEditorRowChanged(row);
-        if (event.target.hasAttribute("data-u4-family")) {
-          applyTransactionFamily(row, event.target.value);
+        if (event2.target.hasAttribute("data-u4-suggestion-rule")) {
+          if (!applySuggestionAlternative(row, event2.target.value, root2.state)) return;
           rerender = true;
-        } else if (event.target.dataset.u4Field) {
-          const field = event.target.dataset.u4Field;
-          let value = event.target.value;
+        } else if (event2.target.hasAttribute("data-u4-family")) {
+          applyTransactionFamily(row, event2.target.value);
+          rerender = true;
+        } else if (event2.target.dataset.u4Field) {
+          const field = event2.target.dataset.u4Field;
+          let value = event2.target.value;
           if (["processedAmount", "singleLineAmount", "contributionAmount", "savingsContributionAmount"].includes(field)) value = Math.abs(Number(value));
           if (field === "include") value = value === "true";
           if (field === "transactionType") {
@@ -16424,12 +18484,12 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
             selectFixedOccurrence(root2, row, row.processing);
           }
           rerender = rerender || ["singleLineAmount", "withdrawalBudgetCategory", "transactionType", "budgetOwner", "category", "include", "fixedExpenseId", "processingDate", "fixedOccurrenceMonth", "fixedOccurrenceId", "refundMonth", "refundCategory", "salaryPersonId"].includes(field);
-        } else if (event.target.hasAttribute("data-u4-row-certainty")) reopenForReview(row);
-        else if (event.target.dataset.u4SplitField) {
-          const split = row.processing.splits[Number(event.target.closest("[data-u4-split]").dataset.u4Split)];
-          let value = event.target.value;
-          if (event.target.dataset.u4SplitField === "amount") value = Math.abs(Number(value));
-          const field = event.target.dataset.u4SplitField;
+        } else if (event2.target.hasAttribute("data-u4-row-certainty")) reopenForReview(row);
+        else if (event2.target.dataset.u4SplitField) {
+          const split = row.processing.splits[Number(event2.target.closest("[data-u4-split]").dataset.u4Split)];
+          let value = event2.target.value;
+          if (event2.target.dataset.u4SplitField === "amount") value = Math.abs(Number(value));
+          const field = event2.target.dataset.u4SplitField;
           if (field === "destination") {
             setProcessingType(split, value === "Vaste lasten" ? "vaste-last" : value === "Niet meetellen" ? "niet-meetellen" : "uitgave");
             split.category = value;
@@ -16453,24 +18513,24 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
             split.fixedOccurrenceId = "";
           }
           rerender = rerender || ["destination", "transactionType", "fixedExpenseId", "fixedOccurrenceMonth", "fixedOccurrenceId", "budgetOwner", "refundMonth", "refundCategory"].includes(field);
-        } else if (event.target.dataset.u4AllocationField) {
-          const allocation = row.processing.repaymentAllocations[Number(event.target.closest("[data-u4-allocation]").dataset.u4Allocation)];
-          allocation[event.target.dataset.u4AllocationField] = round23(Math.abs(Number(event.target.value) || 0));
+        } else if (event2.target.dataset.u4AllocationField) {
+          const allocation = row.processing.repaymentAllocations[Number(event2.target.closest("[data-u4-allocation]").dataset.u4Allocation)];
+          allocation[event2.target.dataset.u4AllocationField] = round23(Math.abs(Number(event2.target.value) || 0));
         }
         if (wasApproved) {
           reopenForReview(row);
           rerender = true;
         }
-        const amountChange = event.target.dataset.u4SplitField === "amount" || ["processedAmount", "singleLineAmount"].includes(event.target.dataset.u4Field);
+        const amountChange = event2.target.dataset.u4SplitField === "amount" || ["processedAmount", "singleLineAmount"].includes(event2.target.dataset.u4Field);
         if (amountChange) {
           container.querySelectorAll("[data-u4-split]").forEach((node) => {
             const line = row.processing.splits[Number(node.dataset.u4Split)], input = node.querySelector('[data-u4-split-field="amount"]');
-            if (line && input && input !== event.target) input.value = line.amount;
+            if (line && input && input !== event2.target) input.value = line.amount;
           });
-          const difference = splitDifference(row.processing), status = container.querySelector("[data-u4-split-total]");
-          if (status) {
-            status.textContent = difference.differenceCents > 0 ? "Nog " + euro(difference.differenceCents / 100) + " te verdelen" : difference.differenceCents < 0 ? euro(-difference.differenceCents / 100) + " te veel verdeeld" : "";
-            status.hidden = !difference.differenceCents;
+          const difference = splitDifference(row.processing), status2 = container.querySelector("[data-u4-split-total]");
+          if (status2) {
+            status2.textContent = difference.differenceCents > 0 ? "Nog " + euro3(difference.differenceCents / 100) + " te verdelen" : difference.differenceCents < 0 ? euro3(-difference.differenceCents / 100) + " te veel verdeeld" : "";
+            status2.hidden = !difference.differenceCents;
           }
           if (wasApproved) {
             const button = container.querySelector("[data-u4-reopen]");
@@ -16491,12 +18551,12 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
         persistLocalImportEditor(root2, draft).catch((error2) => console.warn("Automatisch lokaal opslaan mislukt.", error2));
       };
       modal.addEventListener("change", onDraftChange);
-      modal.addEventListener("input", (event) => {
-        if (event.target.dataset.u4SplitField === "amount" || ["processedAmount", "singleLineAmount"].includes(event.target.dataset.u4Field)) onDraftChange(event);
+      modal.addEventListener("input", (event2) => {
+        if (event2.target.dataset.u4SplitField === "amount" || ["processedAmount", "singleLineAmount"].includes(event2.target.dataset.u4Field)) onDraftChange(event2);
       });
-      modal.addEventListener("click", async (event) => {
+      modal.addEventListener("click", async (event2) => {
         var _a3, _b2, _c, _d, _e, _f;
-        const coverage = event.target.closest("[data-u4-coverage]");
+        const coverage = event2.target.closest("[data-u4-coverage]");
         if (coverage) {
           modal.classList.remove("open");
           (_a3 = window.FinizeTransactions) == null ? void 0 : _a3.openCoverage(coverage.dataset.u4Coverage);
@@ -16505,16 +18565,16 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
         root2 = UI.root;
         draft = UI.draft;
         modal = ensureModalRoot();
-        const container = event.target.closest("[data-u4-row]");
+        const container = event2.target.closest("[data-u4-row]");
         const row = container ? draft.rows.find((item) => item.id === container.dataset.u4Row) : null;
-        if (event.target.closest("[data-u4-cancel-concept]")) {
+        if (event2.target.closest("[data-u4-cancel-concept]")) {
           await sessionWrite(draft);
           await ImportStore.deleteJournal(`editor-draft-${draft.id}`);
           ImportEditors.delete(String(draft.id));
           closeDraft();
           return;
         }
-        const identity = event.target.closest("[data-u4-identity]");
+        const identity = event2.target.closest("[data-u4-identity]");
         if (identity && row) {
           try {
             await sessionWrite(draft);
@@ -16542,7 +18602,7 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
           }
           return;
         }
-        const pairButton = event.target.closest("[data-u4-confirm-pair]");
+        const pairButton = event2.target.closest("[data-u4-confirm-pair]");
         if (pairButton) {
           try {
             if (!await root2.commitChange(() => confirmInternalTransferPair(root2.state, pairButton.dataset.u4ConfirmPair), { render: false })) throw new Error("Transferpaar opslaan mislukt.");
@@ -16552,7 +18612,7 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
           }
           return;
         }
-        if (event.target.closest("[data-u4-confirm-replacement]") && row) {
+        if (event2.target.closest("[data-u4-confirm-replacement]") && row) {
           const manualId = (_b2 = container.querySelector("[data-u4-replacement-choice]")) == null ? void 0 : _b2.value;
           if (!manualId) {
             alert("Kies eerst de handmatige registratie.");
@@ -16568,14 +18628,14 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
           }
           return;
         }
-        if (event.target.closest("[data-u4-approve-selection]")) {
+        if (event2.target.closest("[data-u4-approve-selection]")) {
           const ids = [...modal.querySelectorAll("[data-u4-select-approval]:checked")].map((input) => input.dataset.u4SelectApproval);
           if (!ids.length) {
             alert("Selecteer eerst de regels die je wilt goedkeuren.");
             return;
           }
           if (!confirm(`${ids.length} geselecteerde regels expliciet goedkeuren?`)) return;
-          const button = event.target.closest("[data-u4-approve-selection]");
+          const button = event2.target.closest("[data-u4-approve-selection]");
           button.disabled = true;
           modal.inert = true;
           try {
@@ -16589,13 +18649,13 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
           }
           return;
         }
-        if (event.target.closest("[data-u4-approve]") && row) {
-          event.preventDefault();
-          event.stopPropagation();
+        if (event2.target.closest("[data-u4-approve]") && row) {
+          event2.preventDefault();
+          event2.stopPropagation();
           await showMatchDialog(root2, draft, row, modal);
           return;
         }
-        if (event.target.closest("[data-u4-reopen]") && row) {
+        if (event2.target.closest("[data-u4-reopen]") && row) {
           try {
             reopenForReview(row);
             await persistLocalImportEditor(root2, draft);
@@ -16607,7 +18667,7 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
           persistLocalImportEditor(root2, draft).catch((error2) => console.warn("Opnieuw nakijken opslaan mislukt.", error2));
           return;
         }
-        if (event.target.closest("[data-u4-apply-bulk]")) {
+        if (event2.target.closest("[data-u4-apply-bulk]")) {
           const scope = ((_c = modal.querySelector("[data-u4-bulk-scope]")) == null ? void 0 : _c.value) || "review";
           const owner = ((_d = modal.querySelector("[data-u4-bulk-owner]")) == null ? void 0 : _d.value) || "";
           const category = ((_e = modal.querySelector("[data-u4-bulk-category]")) == null ? void 0 : _e.value) || "";
@@ -16616,9 +18676,10 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
             alert("Kies minimaal één veld om aan te passen.");
             return;
           }
+          const selectedIds = new Set([...modal.querySelectorAll("[data-u4-select-approval]:checked")].map((input) => input.dataset.u4SelectApproval));
           const targets = draft.rows.filter((item) => {
             var _a4;
-            return ((_a4 = item.bankOriginal) == null ? void 0 : _a4.valid) && !item.duplicate && !isExplicitlyApproved(item) && (scope === "all" || scope === "review" && importReviewState(item) === "nakijken" || scope === "unknown" && importReviewState(item) === "onbekend" || scope === "uncategorized" && (!item.processing.category || item.processing.category === "Ongecategoriseerd"));
+            return ((_a4 = item.bankOriginal) == null ? void 0 : _a4.valid) && !item.duplicate && !isExplicitlyApproved(item) && (scope === "all" || scope === "selected" && selectedIds.has(item.id) || scope === "review" && importReviewState(item) === "nakijken" || scope === "unknown" && importReviewState(item) === "onbekend" || scope === "uncategorized" && (!item.processing.category || item.processing.category === "Ongecategoriseerd"));
           });
           if (!targets.length) {
             alert("Geen transacties binnen deze selectie.");
@@ -16629,7 +18690,7 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
             if (owner) item.processing.budgetOwner = owner;
             if (type) setProcessingType(item.processing, type);
             if (category) {
-              item.processing.category = category;
+              applyBulkCategory(draft, [item.id], category);
               if (category === "Vaste lasten") {
                 setProcessingType(item.processing, "vaste-last");
                 selectFixedOccurrence(root2, item, item.processing);
@@ -16641,7 +18702,7 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
           persistLocalImportEditor(root2, draft).catch((error2) => console.warn("Bulkbewerking opslaan mislukt.", error2));
           return;
         }
-        if (event.target.closest("[data-u4-add-split]") && row) {
+        if (event2.target.closest("[data-u4-add-split]") && row) {
           if (isExplicitlyApproved(row) || sourceIsActive(root2, draft, row)) markEditorRowChanged(row);
           row.processing.editorVersion = 113;
           addProcessingSplit(row.processing, uid2("split"), uid2("split"));
@@ -16649,7 +18710,7 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
           persistLocalImportEditor(root2, draft).catch((error2) => console.warn("Splitsregel opslaan mislukt.", error2));
           return;
         }
-        const remove = event.target.closest("[data-u4-remove-split]");
+        const remove = event2.target.closest("[data-u4-remove-split]");
         if (remove && row) {
           if (isExplicitlyApproved(row) || sourceIsActive(root2, draft, row)) markEditorRowChanged(row);
           removeProcessingSplit(row.processing, Number(remove.dataset.u4RemoveSplit));
@@ -16657,16 +18718,16 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
           persistLocalImportEditor(root2, draft).catch((error2) => console.warn("Splitsregel verwijderen opslaan mislukt.", error2));
           return;
         }
-        const saveButton = event.target.closest("[data-u4-save-concept]");
+        const saveButton = event2.target.closest("[data-u4-save-concept]");
         if (saveButton) {
-          const status = modal.querySelector("[data-u4-save-status]");
+          const status2 = modal.querySelector("[data-u4-save-status]");
           saveButton.disabled = true;
           saveButton.textContent = "Opslaan…";
-          if (status) status.textContent = "Concept wordt lokaal bewaard; de huidige verwerking blijft actief…";
+          if (status2) status2.textContent = "Concept wordt lokaal bewaard; de huidige verwerking blijft actief…";
           try {
             await persistLocalImportEditor(root2, draft);
             saveButton.textContent = "Opgeslagen";
-            if (status) status.textContent = "Concept is lokaal bewaard. Kies Opslaan en verwerken om het toe te passen.";
+            if (status2) status2.textContent = "Concept is lokaal bewaard. Kies Opslaan en verwerken om het toe te passen.";
             setTimeout(() => {
               if (!saveButton.isConnected) return;
               saveButton.disabled = false;
@@ -16675,22 +18736,22 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
           } catch (error2) {
             saveButton.disabled = false;
             saveButton.textContent = "Opnieuw opslaan";
-            if (status) status.textContent = "Cloudopslag is niet afgerond. Het concept staat wel lokaal op dit apparaat.";
+            if (status2) status2.textContent = "Cloudopslag is niet afgerond. Het concept staat wel lokaal op dit apparaat.";
             alert(`Concept opslaan mislukt: ${error2.message}`);
           }
           return;
         }
-        if (event.target.closest("[data-u4-conflict-cloud],[data-u4-conflict-local]")) {
+        if (event2.target.closest("[data-u4-conflict-cloud],[data-u4-conflict-local]")) {
           try {
-            await resolveImportConflict(root2, draft.id, event.target.closest("[data-u4-conflict-local]") ? "local" : "cloud");
+            await resolveImportConflict(root2, draft.id, event2.target.closest("[data-u4-conflict-local]") ? "local" : "cloud");
             await openDraft(root2, draft.id);
           } catch (error2) {
             alert(error2.message);
           }
           return;
         }
-        if (event.target.closest("[data-u4-withdraw],[data-u4-restore],[data-u4-delete-batch]")) {
-          const type = event.target.closest("[data-u4-delete-batch]") ? "delete" : event.target.closest("[data-u4-restore]") ? "restore" : "withdraw";
+        if (event2.target.closest("[data-u4-withdraw],[data-u4-restore],[data-u4-delete-batch]")) {
+          const type = event2.target.closest("[data-u4-delete-batch]") ? "delete" : event2.target.closest("[data-u4-restore]") ? "restore" : "withdraw";
           if (type === "delete" && !confirm("Deze batch permanent verwijderen? Alleen technisch verwijderbewijs blijft bewaard.")) return;
           try {
             await sessionWrite(draft);
@@ -16706,32 +18767,33 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
           }
           return;
         }
-        if (event.target.closest("[data-u4-process]")) {
+        if (event2.target.closest("[data-u4-process]")) {
           if (typeof root2.FinizeUpdate4Process !== "function") {
             alert("De verwerkingslaag wordt in de volgende fase geactiveerd. Het concept blijft bewaard.");
             return;
           }
           await root2.FinizeUpdate4Process(draft);
         }
-        if (event.target.closest("[data-u4-undo]")) {
+        if (event2.target.closest("[data-u4-undo]")) {
           if (confirm("Deze import terugtrekken?")) await commitImportCommand(root2, draft, { type: "withdraw" });
         }
-        if (event.target.closest("[data-u4-reconcile]")) {
+        if (event2.target.closest("[data-u4-reconcile]")) {
           if (confirm("De bestaande import vervangen door deze aangepaste verwerking?")) await reconcileImport(root2, draft);
         }
       });
     }
     function bindImportPanel(rootElement, root2, owner = "") {
-      var _a2, _b, _c, _d;
-      (_a2 = rootElement.querySelector("[data-u4-conflicts]")) == null ? void 0 : _a2.addEventListener("click", () => renderImportConflicts(root2));
-      (_b = rootElement.querySelector("[data-u4-file]")) == null ? void 0 : _b.addEventListener("change", (event) => {
+      var _a2, _b, _c, _d, _e;
+      (_a2 = rootElement.querySelector("[data-u4-bank-accounts]")) == null ? void 0 : _a2.addEventListener("click", () => root2.openBankAccountDetails());
+      (_b = rootElement.querySelector("[data-u4-conflicts]")) == null ? void 0 : _b.addEventListener("click", () => renderImportConflicts(root2));
+      (_c = rootElement.querySelector("[data-u4-file]")) == null ? void 0 : _c.addEventListener("change", (event2) => {
         var _a3;
-        const file = (_a3 = event.target.files) == null ? void 0 : _a3[0];
+        const file = (_a3 = event2.target.files) == null ? void 0 : _a3[0];
         if (!file) return;
         const reader = new FileReader();
         reader.onload = async (loaded) => {
           try {
-            const draft = createImportDraft({ text: String(loaded.target.result || ""), fileName: file.name, profiles: root2.state.accountProfiles, rules: root2.state.recognitionRules, transactions: root2.state.transactions, existingImports: await ImportStore.listImports(), fixedExpenses: root2.state.recurringFixedExpenses || [], entryOwner: owner });
+            const draft = createImportDraft({ text: String(loaded.target.result || ""), fileName: file.name, profiles: root2.state.accountProfiles, rules: root2.state.recognitionRules, transactions: root2.state.transactions, existingImports: await ImportStore.listImports(), fixedExpenses: root2.state.recurringFixedExpenses || [], state: root2.state, entryOwner: owner });
             if (owner && draft.accountProfileId && draft.accountOwner !== owner) throw new Error(`Dit bankbestand hoort bij ${ownerLabel2(draft.accountOwner)}. Open de juiste persoonlijke of gezamenlijke tab.`);
             if (owner) {
               draft.entryOwner = owner;
@@ -16754,8 +18816,8 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
         reader.readAsText(file);
       });
       rootElement.querySelectorAll("[data-u4-open-concept],[data-u4-open-receipt]").forEach((button) => button.addEventListener("click", () => openDraft(root2, button.dataset.u4OpenConcept || button.dataset.u4OpenReceipt).catch((error2) => alert(error2.message))));
-      (_c = rootElement.querySelector("[data-u4-all-imports]")) == null ? void 0 : _c.addEventListener("click", () => renderImportHistory(root2, owner));
-      (_d = rootElement.querySelector("[data-u4-manage-rules]")) == null ? void 0 : _d.addEventListener("click", () => renderRules(root2));
+      (_d = rootElement.querySelector("[data-u4-all-imports]")) == null ? void 0 : _d.addEventListener("click", () => renderImportHistory(root2, owner));
+      (_e = rootElement.querySelector("[data-u4-manage-rules]")) == null ? void 0 : _e.addEventListener("click", () => renderRules(root2));
     }
     function renderImportHistory(root2, owner = "") {
       const modal = ensureModalRoot();
@@ -16781,20 +18843,23 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
     function renderRules(root2) {
       const modal = ensureModalRoot();
       const rules = root2.state.recognitionRules || [];
-      modal.innerHTML = `<div class="u4-import-modal"><header class="u4-modal-head"><div><h2>Herkenningsregels</h2><p>Eigenaren worden nooit in regels opgeslagen.</p></div><button class="ghost" data-u4-close>Sluiten</button></header><main class="u4-modal-body"><div class="u4-import-receipts">${rules.map((rule) => `<article class="u4-receipt" data-u4-rule="${esc(rule.id)}"><div class="u4-row-grid"><label>Type<select data-rule-field="level">${["counterparty", "description", "organization", "keyword", "prediction"].map((level) => option(level, level, rule.level)).join("")}</select></label><label class="wide">Waarde<input data-rule-field="value" value="${esc(rule.value)}"></label><label>Categorie<input data-rule-field="category" value="${esc(rule.category)}"></label><label><input type="checkbox" data-rule-field="enabled" ${rule.enabled !== false ? "checked" : ""}> Actief</label><label><input type="checkbox" data-rule-field="alwaysReview" ${rule.alwaysReview ? "checked" : ""}> Altijd Nakijken</label><button class="danger-ghost small" data-u4-delete-rule="${esc(rule.id)}">Verwijderen</button></div></article>`).join("") || '<div class="u4-empty">Nog geen herkenningsregels.</div>'}</div></main></div>`;
+      modal.innerHTML = `<div class="u4-import-modal"><header class="u4-modal-head"><div><h2>Herkenningsregels</h2><p>Nieuwe regels bewaren de rekeningcontext van een expliciete goedkeuring. Controleer iedere nieuwe transactie.</p></div><button class="ghost" data-u4-close>Sluiten</button></header><main class="u4-modal-body"><div class="u4-import-receipts">${rules.map((rule) => `<article class="u4-receipt" data-u4-rule="${esc(rule.id)}"><div class="u4-row-grid"><label>Type<select data-rule-field="level">${["counterparty", "description", "organization", "keyword", "prediction"].map((level) => option(level, level, rule.level)).join("")}</select></label><label class="wide">Waarde<input data-rule-field="value" value="${esc(rule.value)}"></label><label>Categorie<input data-rule-field="category" value="${esc(rule.category)}"></label><label><input type="checkbox" data-rule-field="enabled" ${rule.enabled !== false ? "checked" : ""}> Actief</label><label><input type="checkbox" data-rule-field="alwaysReview" ${rule.alwaysReview ? "checked" : ""}> Altijd Nakijken</label><button class="danger-ghost small" data-u4-delete-rule="${esc(rule.id)}">Verwijderen</button></div></article>`).join("") || '<div class="u4-empty">Nog geen herkenningsregels.</div>'}</div></main></div>`;
       modal.classList.add("open");
       modal.querySelector("[data-u4-close]").addEventListener("click", closeDraft);
-      modal.addEventListener("change", async (event) => {
-        const card = event.target.closest("[data-u4-rule]");
+      modal.addEventListener("change", async (event2) => {
+        const card = event2.target.closest("[data-u4-rule]");
         if (!card) return;
-        const field = event.target.dataset.ruleField, value = event.target.type === "checkbox" ? event.target.checked : event.target.value;
+        const field = event2.target.dataset.ruleField, value = event2.target.type === "checkbox" ? event2.target.checked : event2.target.value;
         if (!await root2.commitChange(() => {
           const rule = root2.state.recognitionRules.find((item) => item.id === card.dataset.u4Rule);
-          if (rule) rule[field] = value;
+          if (rule) {
+            rule[field] = value;
+            if (["level", "value", "category"].includes(field)) delete rule.provenance;
+          }
         }, { render: false })) return;
       });
-      modal.addEventListener("click", async (event) => {
-        const button = event.target.closest("[data-u4-delete-rule]");
+      modal.addEventListener("click", async (event2) => {
+        const button = event2.target.closest("[data-u4-delete-rule]");
         if (!button) return;
         if (!await root2.commitChange(() => {
           root2.state.recognitionRules = root2.state.recognitionRules.filter((rule) => rule.id !== button.dataset.u4DeleteRule);
@@ -16816,12 +18881,12 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
       modal.innerHTML = `<div class="u4-import-modal"><header class="u4-modal-head"><div><h2>Onderling te verrekenen</h2><p>Directionele saldi worden niet automatisch tegen elkaar weggestreept.</p></div><button class="ghost" data-u4-close>Sluiten</button></header><main class="u4-modal-body"><div class="u4-profile-grid"><label>Persoon<select data-u4-settlement-person><option value="">Iedereen</option>${OWNERS2.map((owner) => option(owner, ownerLabel2(owner), person)).join("")}</select></label><label>Maand<select data-u4-settlement-month><option value="">Alle maanden</option>${months.map((value) => option(value, value, month)).join("")}</select></label></div><div class="u4-import-receipts">${advances.map((advance) => {
         const tx = (root2.state.transactions || []).find((item) => item.id === advance.transactionId);
         const paid = round23(Number(advance.originalAmount || 0) - Number(advance.outstandingAmount || 0));
-        return `<article class="u4-receipt"><div class="u4-receipt-head"><div><strong>${esc((tx == null ? void 0 : tx.description) || "Voorschot")}</strong><div class="u4-muted">${esc((tx == null ? void 0 : tx.date) || advance.month)} · ${ownerLabel2(advance.debtor)} → ${ownerLabel2(advance.creditor)}</div></div><strong>${euro(advance.outstandingAmount)}</strong></div><div class="u4-muted">Oorspronkelijk ${euro(advance.originalAmount)} · afgelost ${euro(paid)}</div></article>`;
+        return `<article class="u4-receipt"><div class="u4-receipt-head"><div><strong>${esc((tx == null ? void 0 : tx.description) || "Voorschot")}</strong><div class="u4-muted">${esc((tx == null ? void 0 : tx.date) || advance.month)} · ${ownerLabel2(advance.debtor)} → ${ownerLabel2(advance.creditor)}</div></div><strong>${euro3(advance.outstandingAmount)}</strong></div><div class="u4-muted">Oorspronkelijk ${euro3(advance.originalAmount)} · afgelost ${euro3(paid)}</div></article>`;
       }).join("") || '<div class="u4-empty">Geen openstaande voorschotten voor dit filter.</div>'}</div></main></div>`;
       modal.classList.add("open");
       modal.querySelector("[data-u4-close]").addEventListener("click", closeDraft);
-      modal.querySelector("[data-u4-settlement-person]").addEventListener("change", (event) => renderSettlementDetail(root2, { person: event.target.value, month: modal.querySelector("[data-u4-settlement-month]").value }));
-      modal.querySelector("[data-u4-settlement-month]").addEventListener("change", (event) => renderSettlementDetail(root2, { person: modal.querySelector("[data-u4-settlement-person]").value, month: event.target.value }));
+      modal.querySelector("[data-u4-settlement-person]").addEventListener("change", (event2) => renderSettlementDetail(root2, { person: event2.target.value, month: modal.querySelector("[data-u4-settlement-month]").value }));
+      modal.querySelector("[data-u4-settlement-month]").addEventListener("change", (event2) => renderSettlementDetail(root2, { person: modal.querySelector("[data-u4-settlement-person]").value, month: event2.target.value }));
     }
     function installUI(root2) {
       var _a2;
@@ -16864,11 +18929,15 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
       (_b = root2.dispatchEvent) == null ? void 0 : _b.call(root2, new CustomEvent("finize:import-conflict", { detail: { id: local.id } }));
     }
     function renderImportConflicts(root2) {
+      const accountPreview = (choice) => {
+        var _a2;
+        return (((_a2 = choice == null ? void 0 : choice.state) == null ? void 0 : _a2.accountProfiles) || []).map((profile) => `<li>${esc(profile.name || "Bankrekening")} · ${esc(profile.identifier || "")} · ${esc(ownerLabel2(profile.accountOwner))} · ${profile.status === "archived" ? "Gearchiveerd" : "Actief"} · ${esc(profile.bank || "Bank onbekend")}</li>`).join("");
+      };
       const modal = ensureModalRoot();
       modal.innerHTML = `<div class="u4-import-modal"><header class="u4-modal-head"><h2>Synchronisatieconflicten</h2><button class="ghost" data-u4-close>Sluiten</button></header><main class="u4-modal-body">${[...UI.conflicts.values()].map((conflict) => {
         var _a2, _b, _c;
-        return `<div class="u4-receipt"><strong>${esc(((_a2 = conflict.localChoice) == null ? void 0 : _a2.fileName) || conflict.importId)}</strong><p>Cloudstand blijft actief. Lokale keuze is veilig opgeslagen.</p><button class="ghost small" data-u4-resolve="${escAttr(conflict.importId)}" data-choice="cloud">Cloudstand behouden</button>${((_b = conflict.localChoice) == null ? void 0 : _b.rows) || ((_c = conflict.localChoice) == null ? void 0 : _c.lifecycle) === "deleted" ? `<button class="primary small" data-u4-resolve="${escAttr(conflict.importId)}" data-choice="local">Lokale keuze opnieuw toetsen</button>` : '<p class="u4-muted">De lokale snapshot is bewaard. Beoordeel de betrokken imports afzonderlijk.</p>'}</div>`;
-      }).join("")}</main></div>`;
+        return `<div class="u4-receipt"><strong>${esc(((_a2 = conflict.localChoice) == null ? void 0 : _a2.fileName) || conflict.importId)}</strong>${conflict.importId === "account-profiles" ? `<p>Beide rekeningversies zijn bewaard. De lokale stand blijft actief totdat je een keuze maakt. Historie en ontbrekende rekeningen worden behouden.</p><details><summary>Lokale rekeninggegevens</summary><ul>${accountPreview(conflict.localChoice)}</ul></details><details><summary>Cloudrekeninggegevens</summary><ul>${accountPreview(conflict.cloudChoice)}</ul></details>` : "<p>Cloudstand blijft actief. Lokale keuze is veilig opgeslagen.</p>"}<button class="ghost small" data-u4-resolve="${escAttr(conflict.importId)}" data-choice="cloud">${conflict.importId === "account-profiles" ? "Cloudrekeninggegevens gebruiken" : "Cloudstand behouden"}</button>${conflict.importId === "account-profiles" || ((_b = conflict.localChoice) == null ? void 0 : _b.rows) || ((_c = conflict.localChoice) == null ? void 0 : _c.lifecycle) === "deleted" ? `<button class="primary small" data-u4-resolve="${escAttr(conflict.importId)}" data-choice="local">Lokale keuze opnieuw toetsen</button>` : '<p class="u4-muted">De lokale snapshot is bewaard. Beoordeel de betrokken imports afzonderlijk.</p>'}</div>`;
+      }).join("") || "<p>Geen openstaande synchronisatieconflicten.</p>"}</main></div>`;
       modal.classList.add("open");
       modal.querySelector("[data-u4-close]").onclick = closeDraft;
       modal.querySelectorAll("[data-u4-resolve]").forEach((button) => button.onclick = async () => {
@@ -16900,9 +18969,37 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
       return preserved;
     }
     async function resolveImportConflict(root2, id, choice) {
-      var _a2, _b, _c, _d;
+      var _a2, _b, _c, _d, _e;
       const conflict = await ImportStore.getJournal(`conflict-${id}`);
       if (!conflict || conflict.status !== "conflict") return false;
+      if (id === "account-profiles") {
+        if (!["local", "cloud"].includes(choice)) throw new Error("Kies de lokale rekeninggegevens of de cloudgegevens.");
+        const selected = conflict[choice === "local" ? "localChoice" : "cloudChoice"].state.accountProfiles || [];
+        const profiles = new Map((root2.state.accountProfiles || []).map((profile) => [profile.id, cloneState(profile)]));
+        for (const profile of profiles.values()) {
+          const choices = [conflict.localChoice, conflict.cloudChoice].map((value) => {
+            var _a3;
+            return (_a3 = value.state.accountProfiles) == null ? void 0 : _a3.find((row) => row.id === profile.id);
+          }).filter(Boolean);
+          if (choices.length && !choices.some((value) => JSON.stringify(value) === JSON.stringify(profile))) throw new Error("De rekening is na het bewaren van dit conflict opnieuw gewijzigd. Beoordeel eerst de actuele rekeninggegevens.");
+        }
+        for (const profile of selected) profiles.set(profile.id, cloneState(profile));
+        const saved = await root2.commitChange((target) => {
+          target.accountProfiles = [...profiles.values()];
+        }, { operationId: uid2("account-conflict"), render: false, throwOnError: true });
+        if (!saved) throw new Error("De rekeningkeuze kon niet worden opgeslagen.");
+        const adapter = root2.CloudAdapter, remote2 = conflict.cloudChoice.state;
+        adapter.confirmedState = { ...cloneState(adapter.confirmedState || remote2), accountProfiles: cloneState(remote2.accountProfiles || []) };
+        conflict.status = "resolved";
+        conflict.resolvedChoice = choice;
+        conflict.resolvedAt = (/* @__PURE__ */ new Date()).toISOString();
+        await ImportStore.putJournal(conflict);
+        UI.conflicts.delete(id);
+        adapter.conflict = UI.conflicts.size > 0;
+        adapter.lastFailureRetryable = true;
+        (_a2 = adapter.queueSave) == null ? void 0 : _a2.call(adapter, root2.state);
+        return true;
+      }
       if (id === "compact-state") {
         if (choice !== "cloud") throw new Error("Deze keuze omvat meerdere imports. Heropen en beoordeel de veilig bewaarde imports afzonderlijk.");
         conflict.status = "resolved";
@@ -16944,8 +19041,8 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
       UI.conflicts.delete(id);
       if (root2.CloudAdapter) {
         root2.CloudAdapter.conflict = UI.conflicts.size > 0;
-        (_b = (_a2 = root2.CloudAdapter).queueSave) == null ? void 0 : _b.call(_a2, root2.state);
-        (_d = (_c = root2.CloudAdapter).flushQueue) == null ? void 0 : _d.call(_c);
+        (_c = (_b = root2.CloudAdapter).queueSave) == null ? void 0 : _c.call(_b, root2.state);
+        (_e = (_d = root2.CloudAdapter).flushQueue) == null ? void 0 : _e.call(_d);
       }
       return true;
     }
@@ -17001,6 +19098,9 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
       const commandScope = ImportStore.scope, sourceToken = JSON.stringify((_a2 = draft.rows) == null ? void 0 : _a2.find((row) => row.id === command.rowId));
       const stored = await ImportStore.getImport(draft.id);
       if (ImportStore.scope !== commandScope) throw new Error("Het huishouden is intussen gewijzigd. Heropen de import in het oorspronkelijke huishouden.");
+      const archivedProfile = (root2.state.accountProfiles || []).find((profile) => profile.id === draft.accountProfileId && accountIsArchived(profile));
+      const approveIds = command.approveIds || (["approve-source", "approve", "source-approve"].includes(command.type) ? [command.rowId] : []);
+      if (archivedProfile && approveIds.some((id) => !isExplicitlyApproved(bankSourceForImport(root2.state, draft.id, id) || {}))) throw new Error("Heractiveer de rekening voordat je nieuwe bankmutaties goedkeurt.");
       const unresolved = (await ImportStore.listJournal({ operation: "import-command", importId: draft.id, status: ["pending", "uncertain"] })).find((entry) => entry.operation === "import-command" && entry.importId === draft.id && ["pending", "uncertain"].includes(entry.status));
       if (unresolved) throw commitOutcomeError(new Error("Heropen de import om de eerdere opslag eerst te controleren."), "uncertain", unresolved.id);
       if (command.operationId && (stored == null ? void 0 : stored.operationId) === command.operationId) {
@@ -17047,7 +19147,7 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
             if (changed2 || reopenIds.has(source.id)) {
               source.approvalHistory = [...source.approvalHistory || [], { approvalSource: source.approvalSource || "", approvedAt: source.approvedAt || "", status: source.processingStatus || source.certainty }];
               source.processing = cloneState(desired.processing);
-              for (const key of ["accountProfileId", "accountOwner", "recognitionState", "reasons"]) {
+              for (const key of ["accountProfileId", "accountOwner", "recognitionState", "reasons", "suggestion"]) {
                 if (desired[key] !== void 0) source[key] = cloneState(desired[key]);
               }
               reopenForReview(source);
@@ -17072,6 +19172,7 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
             if (plan) applyImportPlanInPlace(state2, { ...plan, fixedAdjustments: [], sourceCorrection: true });
           });
           if (plan) {
+            rememberRecognitionRules(candidate, { ...nextBatch, rows: selectedRows });
             nextBatch.effectManifest = nextBatch.effectManifest || {};
             const effects = effectManifest(plan);
             for (const key of ["transactionIds", "savingIds", "advanceIds", "repaymentIds", "replacementIds", "internalPairIds"]) nextBatch.effectManifest[key] = [.../* @__PURE__ */ new Set([...nextBatch.effectManifest[key] || [], ...effects[key] || []])];
@@ -17095,6 +19196,7 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
           const single = { ...nextBatch, rows: [row] }, plan = planImportEffects(single, candidate);
           if (!plan.ok) throw new Error(plan.errors.map((e) => e.message).join(" "));
           applySourceApproval(candidate, nextBatch, row, plan);
+          rememberRecognitionRules(candidate, single);
           nextBatch.effectManifest = nextBatch.effectManifest || {};
           const effects = effectManifest(plan);
           for (const key of ["transactionIds", "savingIds", "advanceIds", "repaymentIds", "replacementIds", "internalPairIds"]) nextBatch.effectManifest[key] = [.../* @__PURE__ */ new Set([...nextBatch.effectManifest[key] || [], ...effects[key] || []])];
@@ -17510,20 +19612,20 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
       modal.classList.add("open");
       modal.querySelector("[data-u4-close]").onclick = closeDraft;
       const baseSignature = JSON.stringify(root2.state);
-      modal.querySelector("[data-u4-repair-file]").onchange = async (event) => {
+      modal.querySelector("[data-u4-repair-file]").onchange = async (event2) => {
         var _a3;
         const result2 = modal.querySelector("[data-u4-repair-result]");
         try {
-          const file = (_a3 = event.target.files) == null ? void 0 : _a3[0];
+          const file = (_a3 = event2.target.files) == null ? void 0 : _a3[0];
           if (!file) return;
-          const text = await file.text(), parsed = parseBankCsv(text), matches = sourceRepairCandidates(root2.state, tx, parsed.rows);
+          const text2 = await file.text(), parsed = parseBankCsv(text2), matches = sourceRepairCandidates(root2.state, tx, parsed.rows);
           if (!matches.length) throw new Error("Geen passende bankregel gevonden met dezelfde rekening, oorspronkelijke datum en hetzelfde bedrag. Controleer of dit de juiste oorspronkelijke CSV is.");
-          result2.innerHTML = `<p>Controleer en bevestig de juiste bankregel. Een gelijk bedrag en dezelfde datum vormen op zichzelf geen bewijs.</p>${matches.map((bank, index) => `<button type="button" class="ghost" data-u4-repair-match="${index}">${esc(bank.bankDate)} · ${euro(bank.amount)} · ${esc(bank.description)} · ${esc(bank.accountIdentifier)} · regel ${bank.lineNumber}</button>`).join("")}`;
+          result2.innerHTML = `<p>Controleer en bevestig de juiste bankregel. Een gelijk bedrag en dezelfde datum vormen op zichzelf geen bewijs.</p>${matches.map((bank, index) => `<button type="button" class="ghost" data-u4-repair-match="${index}">${esc(bank.bankDate)} · ${euro3(bank.amount)} · ${esc(bank.description)} · ${esc(bank.accountIdentifier)} · regel ${bank.lineNumber}</button>`).join("")}`;
           result2.querySelectorAll("[data-u4-repair-match]").forEach((button) => button.onclick = async () => {
             try {
               if (JSON.stringify(root2.state) !== baseSignature) throw new Error("De transactie is intussen gewijzigd. Sluit herstel en open de actuele transactie.");
               const bank = matches[Number(button.dataset.u4RepairMatch)], index = parsed.rows.indexOf(bank);
-              const repaired = await commitSourceRepair(root2, tx.id, batch, bank, { confirmed: true, sourceIdentityProof: { kind: "file-row", fileDigest: csvFileDigest(text), rowOrdinal: index + 1 } });
+              const repaired = await commitSourceRepair(root2, tx.id, batch, bank, { confirmed: true, sourceIdentityProof: { kind: "file-row", fileDigest: csvFileDigest(text2), rowOrdinal: index + 1 } });
               await openDraft(root2, repaired.batch.id);
               root2.renderActiveTab();
             } catch (error2) {
@@ -17592,6 +19694,7 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
           }
           return draft;
         },
+        openConflicts: () => renderImportConflicts(root2),
         parseBankCsv,
         createImportDraft,
         fingerprint,
@@ -17618,7 +19721,14 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
       }
       Promise.resolve(root2.__finizeDataReady).then(async () => {
         root2.FinizeImportSync.setScope();
-        for (const entry of await ImportStore.listJournal({ status: "conflict", operation: "conflict" })) if (entry.status === "conflict" && entry.operation === "conflict") UI.conflicts.set(entry.importId, entry);
+        for (const entry of await ImportStore.listJournal({ status: "conflict", operation: "conflict" })) if (entry.status === "conflict" && entry.operation === "conflict") {
+          UI.conflicts.set(entry.importId, entry);
+          if (entry.importId === "account-profiles" && root2.CloudAdapter) {
+            root2.CloudAdapter.conflict = true;
+            root2.CloudAdapter.lastFailureRetryable = false;
+            root2.CloudAdapter.status = "Rekeningconflict — beide versies bewaard";
+          }
+        }
         await recoverJournal(root2);
       }).then(() => reconcileActiveImportReference(root2)).then(() => ImportStore.listImports()).catch((error2) => console.warn("Update 4 opslaginitialisatie uitgesteld.", error2)).finally(() => {
         var _a3;
@@ -17627,7 +19737,7 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
         flushImportSync(root2).catch((error2) => console.warn("Importsynchronisatie uitgesteld.", error2));
       });
     }
-    return { approveSelectedSources, inspectSourceAvailability, sourceRepairCandidates, planSourceRepair, commitSourceRepair, openTransactionSource, addProcessingSplit, removeProcessingSplit, redistributeProcessing, splitDifference, getTransactionAccountContext, getTransactionSource, getTransactionProcessingStatus, isTransactionFinanciallyActive, getTransactionOriginalBankData, beginImportEditor, persistLocalImportEditor, commitImportEditor, setProcessingType, selectFixedOccurrence, SCHEMA_VERSION, CLOUD_STORAGE_VERSION, CLOUD_READ_CONCURRENCY, OWNERS: OWNERS2, IMPORT_STATUSES, normalizeIban: normalizeIban2, normalizeRule, normalizeTransaction, normalizeCore, validateCore, calculateGoalSavedAmount, reconcileGoalSavedAmounts, chunkRows, canonicalValue, rowsChecksum, buildCloudImportEnvelope, assembleCloudImport, mapWithConcurrency, classifyCloudError, fetchImportFromCloud, resolveImportDetails, reconcileActiveImportReference, deleteCloudImportBestEffort, discardImportConcept, rowProcessingValidation, reopenStoredSource, approveStoredSource, normalizeText, matchIdentity, matchCandidates, detectDelimiter, parseDelimited, parseDate, parseAmount, detectFormat, inferMapping, hashText, fingerprint, organizationName, proposeType, recognitionProposal, fixedAmountAt, fixedRecognition, isExplicitlyApproved, importReviewState, markExplicitlyApproved, classifyOriginal, parseBankCsv, findProfile, createImportDraft, updateDraftSummary, compactSummary, validateDraft, transactionKind, expenseImpact, financialRows, advanceForTransaction, savingsForTransaction, detectInternalPairs, directionalBalances, proposeRepaymentAllocations, planImportCommand, commitImportCommand, deriveBatchReviewStatus, stageImportCloudWrites, preserveImportConflict, resolveImportConflict, preservePendingImportsBeforeRemote, planImportEffects, applyImportPlan, learnedRecognitionRules, rememberRecognitionRules, effectManifest, undoImportEffects, transactionFamily, applyTransactionFamily, ImportStore, persistImportDraft, scheduleImportDraftPersist, flushScheduledImportDraft, queueImportSync, flushImportSync, recoverJournal, install, round2: round23, uid: uid2, clone: cloneState, testRenderDraftModal: renderDraftModal };
+    return { applySuggestionAlternative, applyBulkCategory, copiedProcessing, suggestionHtml, approveSelectedSources, inspectSourceAvailability, sourceRepairCandidates, planSourceRepair, commitSourceRepair, openTransactionSource, addProcessingSplit, removeProcessingSplit, redistributeProcessing, splitDifference, getTransactionAccountContext, getTransactionSource, getTransactionProcessingStatus, isTransactionFinanciallyActive, getTransactionOriginalBankData, beginImportEditor, persistLocalImportEditor, commitImportEditor, setProcessingType, selectFixedOccurrence, SCHEMA_VERSION, CLOUD_STORAGE_VERSION, CLOUD_READ_CONCURRENCY, OWNERS: OWNERS2, IMPORT_STATUSES, normalizeIban: normalizeIban2, normalizeRule, normalizeTransaction, normalizeCore, validateCore, calculateGoalSavedAmount, reconcileGoalSavedAmounts, chunkRows, canonicalValue, rowsChecksum, buildCloudImportEnvelope, assembleCloudImport, mapWithConcurrency, classifyCloudError, fetchImportFromCloud, resolveImportDetails, reconcileActiveImportReference, deleteCloudImportBestEffort, discardImportConcept, rowProcessingValidation, reopenStoredSource, approveStoredSource, normalizeText, matchIdentity, matchCandidates, detectDelimiter, parseDelimited, parseDate, parseAmount, detectFormat, inferMapping, hashText, fingerprint, organizationName, proposeType, recognitionProposal, fixedAmountAt, fixedRecognition, isExplicitlyApproved, importReviewState, markExplicitlyApproved, classifyOriginal, parseBankCsv, findProfile, createImportDraft, updateDraftSummary, compactSummary, validateDraft, transactionKind, expenseImpact, financialRows, advanceForTransaction, savingsForTransaction, detectInternalPairs, directionalBalances, proposeRepaymentAllocations, planImportCommand, commitImportCommand, deriveBatchReviewStatus, stageImportCloudWrites, preserveImportConflict, resolveImportConflict, preservePendingImportsBeforeRemote, planImportEffects, applyImportPlan, learnedRecognitionRules, rememberRecognitionRules, effectManifest, undoImportEffects, transactionFamily, applyTransactionFamily, ImportStore, persistImportDraft, scheduleImportDraftPersist, flushScheduledImportDraft, queueImportSync, flushImportSync, recoverJournal, install, round2: round23, uid: uid2, clone: cloneState, testRenderDraftModal: renderDraftModal };
   });
   var FinizeImportRuntime = globalThis.FinizeUpdate4Runtime;
 
@@ -17773,16 +19883,16 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
         renderActiveTab();
       }));
       root2.querySelectorAll("[data-u5-select-goal]").forEach((button) => {
-        const select = (event) => {
-          if (event.target.closest(".goal-direct-order-controls")) return;
+        const select = (event2) => {
+          if (event2.target.closest(".goal-direct-order-controls")) return;
           selectedGoalRef = button.dataset.u5SelectGoal;
           renderActiveTab();
         };
         button.addEventListener("click", select);
-        button.addEventListener("keydown", (event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            select(event);
+        button.addEventListener("keydown", (event2) => {
+          if (event2.key === "Enter" || event2.key === " ") {
+            event2.preventDefault();
+            select(event2);
           }
         });
       });
@@ -17798,11 +19908,11 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
       const allowedFilters = /* @__PURE__ */ new Set(["alle", ...groups.map((group) => group.owner)]);
       if (!allowedFilters.has(goalOwnerFilter)) goalOwnerFilter = "alle";
       const items = calculatedGoals();
-      const totals = items.reduce((sum, item) => {
-        sum.saved += Number(item.doel.algespaard) || 0;
-        sum.target += Number(item.doel.doelbedrag) || 0;
-        sum.monthly += Number(item.werkelijkeInleg) || 0;
-        return sum;
+      const totals = items.reduce((sum2, item) => {
+        sum2.saved += Number(item.doel.algespaard) || 0;
+        sum2.target += Number(item.doel.doelbedrag) || 0;
+        sum2.monthly += Number(item.werkelijkeInleg) || 0;
+        return sum2;
       }, { saved: 0, target: 0, monthly: 0 });
       const selection = selectedGoal(items);
       const root2 = document.getElementById("tab-spaardoelen");
@@ -17868,9 +19978,11 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
     });
     reuseMobileNavigationIcons();
     window.addEventListener("resize", () => {
+      var _a3;
       const next = window.innerWidth >= 768;
       if (next === largeLayoutActive) return;
       largeLayoutActive = next;
+      if ((_a3 = document.getElementById("tab-dashboard")) == null ? void 0 : _a3.classList.contains("active")) return;
       renderActiveTab();
     });
     if (window.__finizeBootstrap) window.__finizeBootstrap.update5Ready = true;
