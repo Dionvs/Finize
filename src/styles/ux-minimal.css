@@ -1,0 +1,58 @@
+/* V118: local accessibility corrections, preserving incumbent layout. */
+.ux-action-card,.u5-goal-list-card{position:relative}
+body.v4-app button.ux-card-primary{position:absolute;inset:0;z-index:1;width:100%;height:100%;margin:0;padding:0;border:0;border-radius:inherit;background:transparent;box-shadow:none;transform:none}
+body.v4-app button.ux-card-primary:hover{background:transparent;box-shadow:none;transform:none}
+body.v4-app button.ux-card-primary:focus-visible{outline:2px solid var(--navy-bright);outline-offset:2px}
+.ux-action-card .income-source-link,.ux-action-card .joint-transaction-delete,.u5-goal-list-card .goal-direct-order-controls{position:relative;z-index:2}
+
+/* Extend hit areas into unused space; the visible controls retain their dimensions. */
+body.v4-app :is(.joint-fixed-edit-btn,.joint-transaction-add-btn,.mobile-status-pill){position:relative;overflow:visible}
+body.v4-app .joint-fixed-edit-btn::after{content:"";position:absolute;inset:-12px}
+body.v4-app .joint-transaction-add-btn::after{content:"";position:absolute;inset:-8px -10px}
+body.v4-app .mobile-status-pill::after{content:"";position:absolute;inset:-16px 0}
+/* At narrow widths the status is beside the month picker: do not extend into its target. */
+@media(max-width:389px){body.v4-app .mobile-status-pill::after{content:none}}
+/* Each arrow gains horizontal space only: extending vertically would overlap its neighbour. */
+body.v4-app .goal-direct-order-arrow{position:relative;overflow:visible}
+body.v4-app .goal-direct-order-arrow::after{content:"";position:absolute;inset:0 -4px}
+
+/* Darker incumbent hues only on text and controls that failed the audit. */
+body.v4-app button.primary{background:#5d7648;border-color:#5d7648;color:#fff}
+body.v4-app :is(.value.pos,.mobile-savings-month-total,.joint-variable-edit-label,.mobile-kpi-edit-hint,.u3-status.ok,.u3-status.closed){color:#526632!important}
+body.v4-app .v4-bottom-nav .bottom-nav-btn:not(.active)>span:last-child{color:var(--text-dim)!important}
+body.v4-app .v4-sidebar .tab-btn.active{color:#526632!important}
+body.v4-app :is(.metric-sub,.income-source-link,.status-card p,.page-heading p,.u6-inline-note,.mobile-status-pill,.mobile-goal-needed){color:var(--text-dim)!important}
+body.v4-app[data-active-tab="dashboard"] .mobile-status-pill{color:var(--text-dim)!important}
+body.v4-app[data-real-active-tab] .wrap .mobile-kpi-card .mobile-kpi-value.value.pos{color:#526632!important}
+body.v4-app :is(.savings-month-button strong,.joint-variable-editor-summary strong,.section-kicker,.u5-goal-detail-hero>div>strong,.status-badge:not(.danger)){color:#526632!important}
+body.v4-app :is(.goal-table th,.scroll-area th,.joint-transactions-empty,.empty-state p,.u5-goal-owner-label small){color:var(--text-dim)!important}
+body.v4-app .u5-joint-goals-preview td[colspan]{color:var(--text-dim)!important}
+body.v4-app .u5-segmented button.active{background:#5d7648;border-color:#5d7648;color:#fff}
+body.v4-app #goalEditDelete{color:var(--text-dim)}
+.p3-chart-legend .p3-income-key{color:#36669e}
+#authRoot :is(.auth-kicker,.auth-text-button){color:#36669e}
+#authRoot :is(.auth-intro p:not(.auth-kicker),.auth-state-card>p:not(.auth-kicker),.auth-assurances,.auth-panel-head p,.auth-divider,.auth-stay small,.auth-feedback){color:var(--text-dim)}
+
+.p3-kpi{position:relative}
+.p3-kpi-title{display:flex;align-items:flex-start;gap:4px}
+.p3-kpi-title>span{min-width:0}
+.p3-surface button.p3-info-button{position:relative;z-index:2;flex:0 0 16px;width:16px;height:16px;min-height:16px;padding:0;border:0;background:transparent;color:var(--text-dim);font-size:15px;line-height:16px;box-shadow:none;transform:none}
+.p3-info-button::after{content:"";position:absolute;inset:-8px}
+.p3-info-popover{position:fixed;inset:auto;margin:0;width:min(340px,calc(100vw - 24px));max-height:min(70vh,520px);overflow:auto;padding:14px;border:1px solid var(--border);border-radius:12px;background:var(--card);color:var(--text);box-shadow:var(--shadow);font-size:13px;line-height:1.5;text-align:left;z-index:1000}
+.p3-info-popover::backdrop{background:transparent}
+.p3-info-popover p{margin:8px 0}
+.p3-info-popover strong{font-size:13px;line-height:1.5;font-weight:700}
+.p3-info-heading{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.p3-info-popover section+section{margin-top:12px;padding-top:12px;border-top:1px solid var(--border-soft)}
+.p3-info-popover summary{cursor:pointer;font-size:12px;color:var(--text-dim)}
+.p3-info-popover .p3-link{white-space:normal;text-align:left}
+.p3-account-name{font-size:12px;line-height:1.5;color:var(--text-dim)}
+.p3-outlook-footer{align-items:center;justify-content:space-between}
+.p3-kpi.p3-no-room{background:var(--red-bg)}
+[data-p3-savings-alert]{display:block;color:var(--red)}
+.p3-year-chart{--p3-year-income:var(--navy-bright);--p3-year-expense:var(--green-soft)}
+.p3-year-chart .p3-bar-pair i,.p3-year-income-key i{background:var(--p3-year-income)}
+.p3-year-chart .p3-bar-pair i+i,.p3-year-expense-key i{background:var(--p3-year-expense)}
+.p3-year-chart .p3-chart-legend i{display:inline-block;width:8px;height:8px;font-size:0}
+.p3-year-chart [tabindex]:focus-visible{outline:2px solid var(--navy-bright);outline-offset:2px}
+@supports not selector(:popover-open){.p3-info-popover{display:none}.p3-info-popover[data-open=true]{display:block}}

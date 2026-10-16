@@ -1112,7 +1112,7 @@ function renderJointTransactionsCardHead(){
 }
 function renderJointTransactionsCard(){
   const rows = getAccountMonthTransactions('gezamenlijk').sort((a,b)=>String(b.date || '').localeCompare(String(a.date || '')));
-  const rowsHtml = rows.map(tx=>`<div class="joint-transaction-row" data-edit-joint-transaction="${attrSafe(tx.id)}" role="button" tabindex="0" aria-label="Transactie ${attrSafe(tx.description || tx.category || 'bewerken')} bewerken">
+  const rowsHtml = rows.map(tx=>`<div class="joint-transaction-row ux-action-card" data-edit-joint-transaction="${attrSafe(tx.id)}"><button type="button" class="ux-card-primary" aria-label="${attrSafe(tx.description || tx.category || 'Transactie')} ${eur(transactionDisplayAmount(tx))} · Transactie bewerken"></button>
     <span class="joint-transaction-meta"><span class="joint-transaction-date" title="${formatDateNL(tx.date)}">${formatDayMonth(tx.date)}</span><span class="joint-transaction-category" title="${textSafe(tx.category || 'Overig')}">${textSafe(tx.category || 'Overig')}</span></span>
     <span class="joint-transaction-description"><span class="joint-transaction-description-text" title="${textSafe(tx.description || '')}">${textSafe(tx.description || '—')}</span>${tx.note ? `<span class="joint-transaction-note" title="${textSafe(tx.note)}">${textSafe(tx.note)}</span>` : ''}</span>
     <strong class="joint-transaction-amount">${eur(transactionDisplayAmount(tx))}</strong>
@@ -3886,7 +3886,7 @@ function renderDataTab(){
     <div class="dashboard-grid">
       ${renderStatusCard('✓','green','Lokale opslag actief','Je data wordt lokaal in je browser opgeslagen.')}
       ${renderStatusCard('◷','green',`Laatste back-up`, backupDesc, lastBackupDate ? `<span class="status-badge">${isToday?'Actueel':'Bewaard'}</span>` : '')}
-      ${renderStatusCard('☁','terracotta', cloudTitle, cloudConnected ? 'Data synchroniseert live met Firebase.' : 'Verbind met Firebase om te synchroniseren (optioneel).')}
+      ${renderStatusCard('☁','terracotta', cloudTitle, cloudConnected ? 'Je gegevens worden met je andere apparaten gesynchroniseerd.' : 'Verbind met de cloud om je gegevens op je andere apparaten te gebruiken (optioneel).')}
     </div>
     <div class="card">
       <div class="card-head"><h2>Back-up</h2></div>
@@ -3901,26 +3901,26 @@ function renderDataTab(){
     </div>
     <div class="card">
       <div class="card-head"><h2>Offline opslag</h2></div>
-      <p class="hint">De actieve maand en drie voorafgaande maanden blijven beschikbaar. Bewaar extra maanden voor offline gebruik. Beschermde gegevens worden niet automatisch opgeruimd.</p>
+      <p class="hint">De huidige maand en de drie vorige maanden blijven beschikbaar zonder internet. Je kunt extra maanden bewaren. Beschermde gegevens blijven behouden.</p>
       <p id="periodCacheUsage" role="status">Opslag meten…</p>
-      <div class="toolbar"><label>Maand <input type="month" id="offlinePeriodMonth" data-storage-scope="${attrSafe(storageScope)}" value="${attrSafe(offlineMonth)}"></label><button class="ghost small" id="btnPinOfflinePeriod">Offline bewaren</button><button class="ghost small" id="btnUnpinOfflinePeriod">Offline bescherming opheffen</button><button class="ghost small" id="btnTrimPeriodCache">Vervangbare cache opruimen</button></div>
+      <div class="toolbar"><label>Maand <input type="month" id="offlinePeriodMonth" data-storage-scope="${attrSafe(storageScope)}" value="${attrSafe(offlineMonth)}"></label><button class="ghost small" id="btnPinOfflinePeriod">Offline bewaren</button><button class="ghost small" id="btnUnpinOfflinePeriod">Offline bescherming opheffen</button><button class="ghost small" id="btnTrimPeriodCache">Tijdelijke maandkopieën opruimen</button></div>
       <p id="offlinePeriodList" class="hint"></p>
     </div>
     <div class="card">
       <div class="card-head"><h2>Firebase / Firestore</h2><span class="hint" id="cloudStatus">${textSafe(CloudAdapter.statusText())}</span></div>
-      <p class="hint" style="margin-top:-4px">Verbind met Firebase om je data veilig in de cloud te bewaren en te synchroniseren tussen apparaten.</p>
-      <textarea id="firebaseConfigInput" spellcheck="false" placeholder="${attrSafe(firebaseConfigTemplate())}">${CloudAdapter.isConfigured() ? textSafe(JSON.stringify(CloudAdapter.config, null, 2)) : ''}</textarea>
+      <p class="hint" style="margin-top:-4px">Verbind met de cloud om je gegevens op je andere apparaten te gebruiken. De verbindingsinstellingen staan hieronder.</p>
+      <label class="sr-only" for="firebaseConfigInput">Cloudconfiguratie (Firebase)</label><textarea id="firebaseConfigInput" spellcheck="false" placeholder="${attrSafe(firebaseConfigTemplate())}">${CloudAdapter.isConfigured() ? textSafe(JSON.stringify(CloudAdapter.config, null, 2)) : ''}</textarea>
       <div class="toolbar" style="margin-top:8px">
         <button class="ghost small" id="btnSaveFirebaseConfig">💾 Firebase-config opslaan</button>
         <button class="primary small" id="btnConnectFirebase">☁ Verbinden met cloud</button>
         <button class="ghost small" id="btnReloadCloud">↻ Cloudstand opnieuw laden</button>
         <button class="ghost small" id="btnFirebaseSignOut">⛓ Cloud loskoppelen</button>
       </div>
-      <pre>De actuele beveiligde regels staan in firestore.rules.
+      <details><summary>Technische informatie over cloudopslag</summary><pre>De actuele beveiligde regels staan in firestore.rules.
 Alleen een geverifieerd account met een koppeling aan dit huishouden krijgt toegang.
 Hoofdstate, imports en onveranderlijke chunks gebruiken versiecontrole.
 Het oude openbare opslagpad is afgesloten.
-Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
+Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre></details>
     </div>
     <div class="info-callout">
       <span class="icon-circle">ⓘ</span>
@@ -4047,7 +4047,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre>
     const usage=await cache.usage();
     if(DataAdapter.store().scope!==cacheStore.scope)return;
     const target=document.getElementById('periodCacheUsage'),list=document.getElementById('offlinePeriodList');
-    if(target)target.textContent=`Vervangbare cache: ${(usage.categories.replaceablePeriodCache/1048576).toFixed(2)} MiB / richtwaarde 64 MiB. Beschermde opslag en metadata: ${((usage.totalBytes-usage.categories.replaceablePeriodCache)/1048576).toFixed(2)} MiB. Gemeten gegevensomvang; browseroverhead kan afwijken.`;
+    if(target)target.textContent=`Tijdelijk bewaarde maanden: ${(usage.categories.replaceablePeriodCache/1048576).toFixed(2)} MiB / richtwaarde 64 MiB. Blijvend bewaarde gegevens: ${((usage.totalBytes-usage.categories.replaceablePeriodCache)/1048576).toFixed(2)} MiB. De browser kan daarnaast extra ruimte gebruiken.`;
     if(list)list.textContent='Offline bewaard: '+(usage.periods.filter(row=>row.pinned).map(row=>row.id).join(', ')||'geen extra maanden');
   };
   const cacheAction=async action=>{
@@ -4932,7 +4932,7 @@ function renderJointFirstRow(){
       </div>
       <div class="mobile-kpi-label">Variabel gebruikt</div>
       <div class="mobile-kpi-value mobile-kpi-value-budget neu">${eur(r.variabelTotaal)} / ${eur(r.variabelBudgetTotaal)}</div>
-      <div class="mobile-kpi-budget-track" style="--used-pct:${variabelBudgetPct}%" aria-label="Gezamenlijk variabel budget gebruikt: ${variabelBudgetPct}%"></div>
+      <div class="mobile-kpi-budget-track" style="--used-pct:${variabelBudgetPct}%" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${variabelBudgetPct}" aria-label="Gezamenlijk variabel budget gebruikt"></div>
     </div>
   </div>
   <div class="card joint-fullwidth-card joint-fixed-category-card v4-mobile-only-block" aria-label="Gezamenlijk vaste lasten per categorie">
@@ -4949,7 +4949,7 @@ function renderJointFirstRow(){
 function renderPersonalTransactionsCard(owner){
   const name = ownerLabel(owner);
   const rows = getAccountMonthTransactions(owner).sort((a,b)=>String(b.date || '').localeCompare(String(a.date || '')));
-  const rowsHtml = rows.map(tx=>`<div class="joint-transaction-row" data-edit-personal-transaction="${attrSafe(tx.id)}" data-owner="${attrSafe(owner)}" role="button" tabindex="0" aria-label="Transactie bewerken">
+  const rowsHtml = rows.map(tx=>`<div class="joint-transaction-row ux-action-card" data-edit-personal-transaction="${attrSafe(tx.id)}" data-owner="${attrSafe(owner)}"><button type="button" class="ux-card-primary" aria-label="${attrSafe(tx.description || tx.category || 'Transactie')} ${eur(transactionDisplayAmount(tx))} · Transactie bewerken"></button>
     <span class="joint-transaction-meta"><span class="joint-transaction-date">${formatDayMonth(tx.date)}</span><span class="joint-transaction-category">${textSafe(tx.category || 'Overig')}</span></span>
     <span class="joint-transaction-description"><span class="joint-transaction-description-text">${textSafe(tx.description || '—')}</span>${tx.note ? `<span class="joint-transaction-note">${textSafe(tx.note)}</span>` : ''}</span>
     <strong class="joint-transaction-amount">${eur(transactionDisplayAmount(tx))}</strong>
@@ -4972,10 +4972,10 @@ function renderPersonalFirstRow(owner){
   const fixedRows=Object.entries(fixed).sort((a,b)=>b[1]-a[1]).map(([cat,amount])=>{ const ratio=person.persoonlijkeVasteLasten>0?amount/person.persoonlijkeVasteLasten:0; return `<div class="progress-item"><div class="progress-item-icon tone-green">${iconSvg(jointFixedCategoryIconName(cat))}</div><div class="progress-top"><strong>${cat}</strong><span>${eur(amount)} · ${pct(ratio)}</span></div><div class="progress-track"><div class="progress-fill" style="width:${Math.round(ratio*100)}%"></div></div></div>`; }).join('');
   const variableBudget=sumBedrag(data.variabel||[]); const variablePct=variableBudget>0?Math.min(100,Math.round((person.variabeleUitgaven/variableBudget)*100)):0;
   return `<div class="mobile-kpi-grid v4-mobile-only-grid joint-first-row" aria-label="${name} rij 1">
-    ${personalKpiVisible(owner,'income')?`<div role="button" tabindex="0" class="mobile-kpi-card joint-kpi-card joint-total-income-card" data-personal-kpi-mobile="income" data-open-income-overview="${owner}" aria-label="Inkomensoverzicht ${textSafe(name)}" aria-haspopup="dialog"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg('allowance')}</span></div><div class="mobile-kpi-label">Totaal inkomen</div><div class="mobile-kpi-value ${personalIncome.total<0?'value neg':'value pos'}">${eur(personalIncome.total)}</div>${renderPersonalIncomeSources(personalIncome,owner)}</div>`:''}
+    ${personalKpiVisible(owner,'income')?`<div class="mobile-kpi-card joint-kpi-card joint-total-income-card ux-action-card" data-personal-kpi-mobile="income" data-open-income-overview="${owner}"><button type="button" class="ux-card-primary" aria-label="Totaal inkomen ${eur(personalIncome.total)} · Inkomensoverzicht ${textSafe(name)}" aria-haspopup="dialog"></button><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg('allowance')}</span></div><div class="mobile-kpi-label">Totaal inkomen</div><div class="mobile-kpi-value ${personalIncome.total<0?'value neg':'value pos'}">${eur(personalIncome.total)}</div>${renderPersonalIncomeSources(personalIncome,owner)}</div>`:''}
     <div class="mobile-kpi-card joint-kpi-card joint-fixed-costs-card"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg('wallet')}</span></div><div class="mobile-kpi-label">Vaste lasten</div><div class="mobile-kpi-value value neg">${eur(person.persoonlijkeVasteLasten)}</div><div class="mobile-kpi-edit-hint-placeholder">.</div></div>
     ${personalKpiVisible(owner,'saving')?`<div class="mobile-kpi-card joint-kpi-card joint-saving-card" data-personal-kpi-mobile="saving"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg('piggy')}</span></div><div class="mobile-kpi-label">Over deze maand</div><div class="mobile-kpi-value ${r.forecast.owners[owner].available<0?'value neg':'value pos'}">${eur(r.forecast.owners[owner].available)}</div><div class="mobile-kpi-edit-hint">Na vaste lasten, gebruikt budget en spaargeld</div></div>`:''}
-    <div class="mobile-kpi-card joint-kpi-card static joint-variable-card"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg('chart')}</span></div><div class="mobile-kpi-label">Variabel gebruikt</div><div class="mobile-kpi-value mobile-kpi-value-budget neu">${eur(person.variabeleUitgaven)} / ${eur(variableBudget)}</div><div class="mobile-kpi-budget-track" style="--used-pct:${variablePct}%"></div></div>
+    <div class="mobile-kpi-card joint-kpi-card static joint-variable-card"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg('chart')}</span></div><div class="mobile-kpi-label">Variabel gebruikt</div><div class="mobile-kpi-value mobile-kpi-value-budget neu">${eur(person.variabeleUitgaven)} / ${eur(variableBudget)}</div><div class="mobile-kpi-budget-track" style="--used-pct:${variablePct}%" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${variablePct}" aria-label="${textSafe(name)} variabel budget gebruikt"></div></div>
   </div>
   <div class="card joint-fullwidth-card joint-fixed-category-card v4-mobile-only-block">${renderJointFixedCostsCardHead(owner)}<div class="joint-fixed-category-body">${fixedRows || '<p class="hint">Nog geen vaste lasten.</p>'}</div></div>
   <div class="joint-two-column-row v4-mobile-only-grid"><div class="card joint-two-column-card joint-variable-overview-card">${renderJointVariableCostsCardHead(owner)}<div class="joint-variable-overview-list">${variableRows.join('') || '<p class="hint" style="margin:0">Nog geen variabele budgetten.</p>'}</div></div>${renderPersonalTransactionsCard(owner)}</div>
@@ -5038,7 +5038,7 @@ function renderSettings(){
   }
   const bankAccountsCard=`<section class="card u6-settings-card"><div class="card-head"><h2>Bankrekeningen</h2></div><p>Bekijk en beheer je bankrekeningen, rekeninggegevens en banksaldo’s.</p><button type="button" class="primary" data-open-bank-accounts>Bankrekeningen openen</button></section>`;
   if(!context.enabled){
-    root.innerHTML=`${renderPageHeading('Instellingen','Account- en huishoudinstellingen worden zichtbaar zodra Update 6 actief is.')}<section class="card"><div class="card-head"><h2>Data & back-up</h2></div><p class="hint">De bestaande lokale en cloudinstellingen blijven beschikbaar.</p><button type="button" class="primary" data-tab-shortcut="data">Open Data & back-up</button></section>`;
+    root.innerHTML=`${renderPageHeading('Instellingen','Beheer je bankrekeningen, gegevens en back-ups.')}<section class="card"><div class="card-head"><h2>Data & back-up</h2></div><p class="hint">Bewaar een back-up of beheer de verbinding met je andere apparaten.</p><button type="button" class="primary" data-tab-shortcut="data">Open Data & back-up</button></section>`;
     root.insertAdjacentHTML('beforeend',bankAccountsCard);
     root.querySelector('[data-open-bank-accounts]').onclick=()=>openBankAccountDetails();
     return;
@@ -5080,12 +5080,12 @@ function renderSettings(){
       <section class="card u6-settings-card">
         <div class="card-head"><div class="card-head-title">${iconBadge('cloud','blue','card-head-icon')}<h2>Cloud</h2></div></div>
         <p class="hint">Status: <strong>${textSafe(CloudAdapter.statusText())}</strong></p>
-        <p>Je huishouddata gebruikt de bestaande Finize-sync, maar via het beveiligde huishoudpad.</p>
+        <p>Via de cloud kun je de gegevens van je huishouden op je andere apparaten gebruiken.</p>
         <button type="button" class="ghost" data-tab-shortcut="data">Cloudverbinding openen</button>
       </section>
       <section class="card u6-settings-card u6-data-card">
         <div class="card-head"><div class="card-head-title">${iconBadge('download','green','card-head-icon')}<h2>Data & back-up</h2></div></div>
-        <p>Exporteer, importeer of herstel dezelfde Finize-state als voor Update 6.</p>
+        <p>Bewaar een back-up van je gegevens, zet een back-up terug of herstel de lokale kopie.</p>
         <button type="button" class="ghost" data-tab-shortcut="data">Data & back-up beheren</button>
       </section>
     </div>`;
@@ -5125,7 +5125,12 @@ function renderActiveTabMeasured(){
   renderMonthSelect();
   updateV4SidebarMeta();
   document.body.dataset.activeTab = activeTab;
-  document.querySelectorAll('.tab-btn').forEach(b=> b.classList.toggle('active', b.dataset.tab===activeTab));
+  document.querySelectorAll('.tab-btn').forEach(b=> {
+    b.classList.toggle('active', b.dataset.tab===activeTab);
+    const label=b.querySelector('.u5-nav-label')?.textContent || b.querySelector('span:last-child')?.textContent;
+    if(label)b.setAttribute('aria-label',label.trim());
+    b.querySelector('.u5-nav-icon,.bn-icon')?.setAttribute('aria-hidden','true');
+  });
   document.querySelectorAll('.wrap').forEach(w=> w.classList.toggle('active', w.id === 'tab-'+activeTab));
 
   parkMonthControlBeforeRender();
@@ -5180,7 +5185,7 @@ function renderActiveTabMeasured(){
   });
   bindIncomeSourceLinks(root);
   root.querySelectorAll('[data-open-income-overview]').forEach(btn=>{
-    btn.addEventListener('click',()=>openIncomeOverview(btn.dataset.openIncomeOverview,btn));
+    btn.addEventListener('click',event=>openIncomeOverview(btn.dataset.openIncomeOverview,event.target.closest('button')||btn));
     btn.addEventListener('keydown',event=>{
       if(event.target===btn&&btn.tagName!=='BUTTON'&&['Enter',' '].includes(event.key)){event.preventDefault();btn.click();}
     });
@@ -5238,18 +5243,18 @@ function renderActiveTabMeasured(){
     btn.addEventListener('click', ()=>openTransactionEntryMenu(btn.dataset.openPersonalTransaction));
   });
   root.querySelectorAll('[data-edit-personal-transaction]').forEach(row=>{
-    const openEditor = event=>{ if (!event?.target.closest('button')) openPersonalTransactionModal(row.dataset.owner, row.dataset.editPersonalTransaction); };
+    const openEditor = event=>{ if (!event?.target.closest('button:not(.ux-card-primary)')) openPersonalTransactionModal(row.dataset.owner, row.dataset.editPersonalTransaction); };
     row.addEventListener('click', openEditor);
-    row.addEventListener('keydown', event=>{ if (event.key === 'Enter' || event.key === ' '){ event.preventDefault(); openEditor(event); } });
+    row.addEventListener('keydown', event=>{ if (event.target === row && (event.key === 'Enter' || event.key === ' ')){ event.preventDefault(); openEditor(event); } });
   });
   root.querySelectorAll('[data-edit-joint-transaction]').forEach(row=>{
     const openEditor = event=>{
-      if (event?.target.closest('button')) return;
+      if (event?.target.closest('button:not(.ux-card-primary)')) return;
       openJointTransactionModal(row.dataset.editJointTransaction);
     };
     row.addEventListener('click', openEditor);
     row.addEventListener('keydown', event=>{
-      if (event.key === 'Enter' || event.key === ' '){
+      if (event.target === row && (event.key === 'Enter' || event.key === ' ')){
         event.preventDefault();
         openEditor(event);
       }
@@ -5259,6 +5264,10 @@ function renderActiveTabMeasured(){
   placeMonthControl();
   placeDesktopPageHeading(root);
   window.FinizeUpdate5?.markNegativeValues(root);
+  root.querySelectorAll('button[aria-label]').forEach(button=>{
+    const text=button.innerText.replace(/\s+/g,' ').trim(),name=button.getAttribute('aria-label');
+    if(text&&!name.includes(text))button.setAttribute('aria-label',text+' · '+name);
+  });
 }
 
 function placeMonthControl(){

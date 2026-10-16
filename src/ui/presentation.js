@@ -86,7 +86,8 @@ import {
     const saved = Number(goal.algespaard)||0;
     const progress = target > 0 ? Math.min(100,Math.round(saved/target*100)) : 0;
     const reference = `${item.owner}:${goal.id}`;
-    return `<div class="u5-goal-list-card${reference===selectedGoalRef?' active':''}" data-u5-select-goal="${textSafe(reference)}" data-reorder-goal data-goal-owner="${item.owner}" data-goal-id="${textSafe(goal.id)}" role="button" tabindex="0">
+    return `<div class="u5-goal-list-card${reference===selectedGoalRef?' active':''}" data-u5-select-goal="${textSafe(reference)}" data-reorder-goal data-goal-owner="${item.owner}" data-goal-id="${textSafe(goal.id)}">
+      <button type="button" class="ux-card-primary" aria-label="${textSafe(goal.naam||'Spaardoel')} · ${textSafe(item.ownerLabel)} · ${eur(saved)} van ${eur(target)} · ${progress}% · Bekijk doel"></button>
       <span class="goal-direct-order-controls" aria-label="Volgorde aanpassen"><button type="button" class="goal-direct-order-arrow up" data-goal-move="-1" aria-label="${textSafe(goal.naam||'Spaardoel')} omhoog" title="Omhoog"></button><button type="button" class="goal-direct-order-arrow down" data-goal-move="1" aria-label="${textSafe(goal.naam||'Spaardoel')} omlaag" title="Omlaag"></button></span>
       ${goalImageMarkup(goal,'u5-goal-list-image')}
       <span class="u5-goal-list-copy">
@@ -182,7 +183,7 @@ import {
         renderActiveTab();
       };
       button.addEventListener('click',select);
-      button.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();select(event);}});
+      button.addEventListener('keydown',event=>{if(event.target===button&&(event.key==='Enter'||event.key===' ')){event.preventDefault();select(event);}});
     });
     root.querySelectorAll('[data-u5-goal-view]').forEach(button=>button.addEventListener('click',()=>{
       goalViewMode = button.dataset.u5GoalView;
