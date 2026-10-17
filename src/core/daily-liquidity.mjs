@@ -139,10 +139,12 @@ function allowancePlans(state,month,forecast,projections) {
 }
 
 /** Required periods are explicit. The caller can load these through the existing period session. */
-export function liquidityRequiredMonths(state,{accountProfileId,asOfDate,endDate,startDate,scope}={}) {
+export function liquidityRequiredMonths(state,{accountProfileId,asOfDate,endDate,startDate,horizonLimitDate,scope}={}) {
   if (!validCalendarDate(asOfDate)) return [];
-  const checkpoint = startDate ? planningAnchor(state,{accountProfileId,asOfDate,startDate,scope}) : checkpointHistory(state,accountProfileId,scope).active.find(row => row.asOfDate <= asOfDate);
-  const end = validCalendarDate(endDate) ? endDate : monthEnd(nextPlanningMonth(asOfDate.slice(0,7)));
+  const periodEnd=endDate || horizonLimitDate;
+  const cutoff=periodEnd&&periodEnd<asOfDate?periodEnd:asOfDate;
+  const checkpoint = startDate ? planningAnchor(state,{accountProfileId,asOfDate:cutoff,startDate,scope}) : checkpointHistory(state,accountProfileId,scope).active.find(row => row.asOfDate <= asOfDate);
+  const end = validCalendarDate(periodEnd) ? periodEnd : monthEnd(nextPlanningMonth(asOfDate.slice(0,7)));
   return balanceRequiredMonths(startDate&&checkpoint?shiftLiquidityDay(checkpoint.asOfDate,1):checkpoint?.asOfDate || startDate || asOfDate,end);
 }
 
@@ -407,34 +409,44 @@ function withAvailability(projection,input,fromDate,goalInputFor) {
     availability:{...hard.availability,excludedSavingsPlanIds:[...softIds]},softSavings:guidance};
 }
 function planningAnchor(state,{accountProfileId,asOfDate,startDate,scope}) {
-  const history=checkpointHistory(state,accountProfileId,scope).active;
+  const history=checkpointHistory(state,accountProfileId,scope).active.filter(row=>row.asOfDate<=asOfDate);
   return history.find(row=>row.asOfDate<startDate) || history.filter(row=>row.asOfDate>=startDate&&row.asOfDate<=asOfDate).at(-1) || null;
 }
 export function selectDailyLiquidity(state, options) {
   if(!options.startDate){const input=buildLiquidityInput(state,options);return withAvailability(projectDailyLiquidity(input),input,options.asOfDate,endDate=>buildLiquidityInput(state,{...options,endDate,salaryOnly:false}));}
   const {startDate,asOfDate}=options;
-  if(!validCalendarDate(startDate)||startDate>asOfDate)throw new Error('Kies een geldige beginperiode tot en met vandaag.');
+  if(!validCalendarDate(startDate)||!validCalendarDate(asOfDate)||options.endDate!==undefined&&(!validCalendarDate(options.endDate)||options.endDate<startDate))throw new Error('Kies een geldige begin- en einddatum voor de prognose.');
+  if(options.horizonLimitDate!==undefined&&(!validCalendarDate(options.horizonLimitDate)||options.horizonLimitDate<startDate))throw new Error('Kies een geldige maandgrens voor de prognose.');
   if(balanceRequiredMonths(startDate,options.endDate || asOfDate).length>24)throw new Error('Kies een prognose van maximaal 24 kalendermaanden.');
-  const current=buildLiquidityInput(state,options),anchor=planningAnchor(state,options);
+  // Observation cutoff and visible calendar range are separate: future months
+  // roll forward from known cash; historical months never borrow later anchors.
+  const periodEnd=options.endDate || options.horizonLimitDate;
+  const referenceCutoff=periodEnd&&periodEnd<asOfDate?periodEnd:asOfDate;
+  const horizon={...buildLiquidityInput(state,{...options,asOfDate:options.horizonReferenceDate || referenceCutoff}).horizon};
+  if(options.horizonLimitDate&&horizon.endDate>options.horizonLimitDate){horizon.endDate=options.horizonLimitDate;horizon.kind='month-limit';horizon.boundary='end-of-day';}
+  const cutoff=horizon.endDate&&horizon.endDate<referenceCutoff?horizon.endDate:referenceCutoff;
+  const current=buildLiquidityInput(state,{...options,asOfDate:cutoff,endDate:cutoff,salaryOnly:false});
+  const anchor=planningAnchor(state,{...options,asOfDate:cutoff});
+  const availabilityFromDate=asOfDate>=startDate&&asOfDate<=horizon.endDate?asOfDate:startDate;
   const origin=anchor?.asOfDate || shiftLiquidityDay(startDate,-1);
   const inputFor=endDate=>{
   const input=buildLiquidityInput(state,{...options,asOfDate:origin,endDate,salaryOnly:false,planningBasis:true});
-  input.displayStartDate=startDate;input.availabilityFromDate=asOfDate;
-  input.observations=checkpointHistory(state,options.accountProfileId,options.scope).active.filter(row=>row.asOfDate>origin&&row.asOfDate<=asOfDate);
+  input.displayStartDate=startDate;input.availabilityFromDate=availabilityFromDate;
+  input.observations=checkpointHistory(state,options.accountProfileId,options.scope).active.filter(row=>row.asOfDate>origin&&row.asOfDate<=cutoff&&row.asOfDate<=endDate);
   for(const row of current.opening.reasons)input.reasons.push(issue(row.code,row.sourceId,current.opening.status==='incomplete'||current.opening.status==='unknown'?'incomplete':'provisional'));
   if(!anchor||origin>=startDate)input.reasons.push(issue('missing-period-opening'));
   input.reservations=input.reservations.map(row=>({...row,reserveForDisplay:row.type!=='budget'||row.month>=startDate.slice(0,7)}));
   input.savingsPlans=input.savingsPlans.filter(row=>row.month>=startDate.slice(0,7));
   return input;
   };
-  const input=inputFor(current.horizon.endDate || asOfDate);
-  input.horizon=current.horizon;
-  if(!current.horizon.endDate)input.reasons.push(issue('missing-reliable-horizon'));
+  const input=inputFor(horizon.endDate || options.horizonLimitDate || (startDate>cutoff?startDate:cutoff));
+  input.horizon=horizon;
+  if(!horizon.endDate)input.reasons.push(issue('missing-reliable-horizon'));
   const result=projectDailyLiquidity(input);
   for(const row of result.events.filter(row=>row.type==='bank'))row.replacedPlans=result.events.filter(plan=>plan.status==='replaced'&&plan.replacedBy.includes(row.sourceId)).map(plan=>({id:plan.id,type:plan.type,amountCents:plan.amountCents,date:plan.date,planningSourceId:plan.planningSourceId,person:plan.person}));
   if(origin>=startDate&&result.days[0]?.date===origin)result.days[0]={...result.days[0],openingBalanceCents:null,checkpointId:anchor.id};
-  const reconciliations=result.events.filter(row=>row.type==='checkpoint').map(row=>{
+  const reconciliations=result.events.filter(row=>row.type==='checkpoint'&&row.date>=startDate&&row.date<=horizon.endDate).map(row=>{
     return {checkpointId:row.id.slice('checkpoint:'.length),date:row.date,observedCents:row.observedBalanceCents,modeledCents:row.modeledBalanceCents,differenceCents:row.amountCents};
   });
-  return withAvailability({...result,asOfDate,calculationStartDate:origin,currentBalance:current.opening,displayStartDate:startDate,historyComplete:!!anchor&&origin<startDate,reconciliations},input,asOfDate,inputFor);
+  return withAvailability({...result,asOfDate,calculationStartDate:origin,currentBalance:current.opening,displayStartDate:startDate,historyComplete:!!anchor&&origin<startDate,reconciliations},input,availabilityFromDate,inputFor);
 }

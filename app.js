@@ -2763,10 +2763,12 @@
     }
     return result2;
   }
-  function liquidityRequiredMonths(state2, { accountProfileId, asOfDate, endDate, startDate, scope } = {}) {
+  function liquidityRequiredMonths(state2, { accountProfileId, asOfDate, endDate, startDate, horizonLimitDate, scope } = {}) {
     if (!validCalendarDate(asOfDate)) return [];
-    const checkpoint = startDate ? planningAnchor(state2, { accountProfileId, asOfDate, startDate, scope }) : checkpointHistory(state2, accountProfileId, scope).active.find((row) => row.asOfDate <= asOfDate);
-    const end = validCalendarDate(endDate) ? endDate : monthEnd(nextPlanningMonth(asOfDate.slice(0, 7)));
+    const periodEnd = endDate || horizonLimitDate;
+    const cutoff = periodEnd && periodEnd < asOfDate ? periodEnd : asOfDate;
+    const checkpoint = startDate ? planningAnchor(state2, { accountProfileId, asOfDate: cutoff, startDate, scope }) : checkpointHistory(state2, accountProfileId, scope).active.find((row) => row.asOfDate <= asOfDate);
+    const end = validCalendarDate(periodEnd) ? periodEnd : monthEnd(nextPlanningMonth(asOfDate.slice(0, 7)));
     return balanceRequiredMonths(startDate && checkpoint ? shiftLiquidityDay(checkpoint.asOfDate, 1) : (checkpoint == null ? void 0 : checkpoint.asOfDate) || startDate || asOfDate, end);
   }
   function buildLiquidityInput(state2, { accountProfileId, asOfDate, endDate, scope, imports = [], importsAvailable = true, coverage = [], monthlyForecast = financialForecastForMonth, salaryOnly = false, planningBasis = false } = {}) {
@@ -3157,7 +3159,7 @@
     };
   }
   function planningAnchor(state2, { accountProfileId, asOfDate, startDate, scope }) {
-    const history = checkpointHistory(state2, accountProfileId, scope).active;
+    const history = checkpointHistory(state2, accountProfileId, scope).active.filter((row) => row.asOfDate <= asOfDate);
     return history.find((row) => row.asOfDate < startDate) || history.filter((row) => row.asOfDate >= startDate && row.asOfDate <= asOfDate).at(-1) || null;
   }
   function selectDailyLiquidity(state2, options) {
@@ -3167,31 +3169,43 @@
       return withAvailability(projectDailyLiquidity(input2), input2, options.asOfDate, (endDate) => buildLiquidityInput(state2, { ...options, endDate, salaryOnly: false }));
     }
     const { startDate, asOfDate } = options;
-    if (!validCalendarDate(startDate) || startDate > asOfDate) throw new Error("Kies een geldige beginperiode tot en met vandaag.");
+    if (!validCalendarDate(startDate) || !validCalendarDate(asOfDate) || options.endDate !== void 0 && (!validCalendarDate(options.endDate) || options.endDate < startDate)) throw new Error("Kies een geldige begin- en einddatum voor de prognose.");
+    if (options.horizonLimitDate !== void 0 && (!validCalendarDate(options.horizonLimitDate) || options.horizonLimitDate < startDate)) throw new Error("Kies een geldige maandgrens voor de prognose.");
     if (balanceRequiredMonths(startDate, options.endDate || asOfDate).length > 24) throw new Error("Kies een prognose van maximaal 24 kalendermaanden.");
-    const current = buildLiquidityInput(state2, options), anchor = planningAnchor(state2, options);
+    const periodEnd = options.endDate || options.horizonLimitDate;
+    const referenceCutoff = periodEnd && periodEnd < asOfDate ? periodEnd : asOfDate;
+    const horizon = { ...buildLiquidityInput(state2, { ...options, asOfDate: options.horizonReferenceDate || referenceCutoff }).horizon };
+    if (options.horizonLimitDate && horizon.endDate > options.horizonLimitDate) {
+      horizon.endDate = options.horizonLimitDate;
+      horizon.kind = "month-limit";
+      horizon.boundary = "end-of-day";
+    }
+    const cutoff = horizon.endDate && horizon.endDate < referenceCutoff ? horizon.endDate : referenceCutoff;
+    const current = buildLiquidityInput(state2, { ...options, asOfDate: cutoff, endDate: cutoff, salaryOnly: false });
+    const anchor = planningAnchor(state2, { ...options, asOfDate: cutoff });
+    const availabilityFromDate = asOfDate >= startDate && asOfDate <= horizon.endDate ? asOfDate : startDate;
     const origin = (anchor == null ? void 0 : anchor.asOfDate) || shiftLiquidityDay(startDate, -1);
     const inputFor = (endDate) => {
       const input2 = buildLiquidityInput(state2, { ...options, asOfDate: origin, endDate, salaryOnly: false, planningBasis: true });
       input2.displayStartDate = startDate;
-      input2.availabilityFromDate = asOfDate;
-      input2.observations = checkpointHistory(state2, options.accountProfileId, options.scope).active.filter((row) => row.asOfDate > origin && row.asOfDate <= asOfDate);
+      input2.availabilityFromDate = availabilityFromDate;
+      input2.observations = checkpointHistory(state2, options.accountProfileId, options.scope).active.filter((row) => row.asOfDate > origin && row.asOfDate <= cutoff && row.asOfDate <= endDate);
       for (const row of current.opening.reasons) input2.reasons.push(issue(row.code, row.sourceId, current.opening.status === "incomplete" || current.opening.status === "unknown" ? "incomplete" : "provisional"));
       if (!anchor || origin >= startDate) input2.reasons.push(issue("missing-period-opening"));
       input2.reservations = input2.reservations.map((row) => ({ ...row, reserveForDisplay: row.type !== "budget" || row.month >= startDate.slice(0, 7) }));
       input2.savingsPlans = input2.savingsPlans.filter((row) => row.month >= startDate.slice(0, 7));
       return input2;
     };
-    const input = inputFor(current.horizon.endDate || asOfDate);
-    input.horizon = current.horizon;
-    if (!current.horizon.endDate) input.reasons.push(issue("missing-reliable-horizon"));
+    const input = inputFor(horizon.endDate || options.horizonLimitDate || (startDate > cutoff ? startDate : cutoff));
+    input.horizon = horizon;
+    if (!horizon.endDate) input.reasons.push(issue("missing-reliable-horizon"));
     const result2 = projectDailyLiquidity(input);
     for (const row of result2.events.filter((row2) => row2.type === "bank")) row.replacedPlans = result2.events.filter((plan) => plan.status === "replaced" && plan.replacedBy.includes(row.sourceId)).map((plan) => ({ id: plan.id, type: plan.type, amountCents: plan.amountCents, date: plan.date, planningSourceId: plan.planningSourceId, person: plan.person }));
     if (origin >= startDate && ((_a2 = result2.days[0]) == null ? void 0 : _a2.date) === origin) result2.days[0] = { ...result2.days[0], openingBalanceCents: null, checkpointId: anchor.id };
-    const reconciliations = result2.events.filter((row) => row.type === "checkpoint").map((row) => {
+    const reconciliations = result2.events.filter((row) => row.type === "checkpoint" && row.date >= startDate && row.date <= horizon.endDate).map((row) => {
       return { checkpointId: row.id.slice("checkpoint:".length), date: row.date, observedCents: row.observedBalanceCents, modeledCents: row.modeledBalanceCents, differenceCents: row.amountCents };
     });
-    return withAvailability({ ...result2, asOfDate, calculationStartDate: origin, currentBalance: current.opening, displayStartDate: startDate, historyComplete: !!anchor && origin < startDate, reconciliations }, input, asOfDate, inputFor);
+    return withAvailability({ ...result2, asOfDate, calculationStartDate: origin, currentBalance: current.opening, displayStartDate: startDate, historyComplete: !!anchor && origin < startDate, reconciliations }, input, availabilityFromDate, inputFor);
   }
 
   // src/ui/liquidity-explanations.mjs
@@ -3264,7 +3278,7 @@
     const dated = (value) => new Intl.DateTimeFormat("nl-NL", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(/* @__PURE__ */ new Date(value + "T12:00:00Z"));
     const start = p.displayStartDate || p.asOfDate;
     const from = start.slice(0, 4) === p.horizon.endDate.slice(0, 4) ? date(start) : dated(start);
-    return `${from} – ${dated(p.horizon.endDate)} · ${p.horizon.kind === "allowance-window" ? "Zakgeldprognose tot einde maand" : p.horizon.kind === "manual" ? "Einddatum inbegrepen" : "Tot vóór volgend salaris"}`;
+    return `${from} – ${dated(p.horizon.endDate)} · ${p.horizon.kind === "allowance-window" ? "Zakgeldprognose tot einde maand" : ["manual", "month-limit"].includes(p.horizon.kind) ? "Einddatum inbegrepen" : "Tot vóór volgend salaris"}`;
   }
   function pointMeaning(events, isMinimum) {
     const income = events.some((e) => e.amountCents > 0), expense = events.some((e) => e.amountCents < 0);
@@ -3281,6 +3295,21 @@
     return custom || void 0;
   }
   var horizonStart = (filter, today) => filter === "month" ? today.slice(0, 7) + "-01" : today;
+  function dashboardPeriod({ month, today, filter = "month", custom = "" }) {
+    const first = month + "-01", last = horizonEnd("month", first);
+    const anchor = today.slice(0, 7) === month ? today : first;
+    const startDate = filter === "month" ? first : anchor;
+    if (filter === "custom" && (!/^\d{4}-\d{2}-\d{2}$/.test(custom) || custom < startDate || custom > last || (/* @__PURE__ */ new Date(custom + "T12:00:00Z")).toISOString().slice(0, 10) !== custom)) throw new Error("Kies een einddatum binnen de geselecteerde maand, vanaf " + date(startDate) + ".");
+    const endDate = filter === "salary" ? void 0 : filter === "month" ? last : filter === "custom" ? custom : [horizonEnd(filter, anchor), last].sort()[0];
+    return { startDate, endDate, salaryOnly: filter === "salary", horizonReferenceDate: anchor, horizonLimitDate: last, minDate: anchor, maxDate: last };
+  }
+  function chartDays(p) {
+    var _a2;
+    if (!((_a2 = p == null ? void 0 : p.horizon) == null ? void 0 : _a2.endDate)) return [];
+    const known = new Map(p.days.map((day) => [day.date, day])), days = [];
+    for (let day = p.displayStartDate || p.asOfDate; day <= p.horizon.endDate; day = shiftLiquidityDay(day, 1)) days.push(known.get(day) || { date: day, openingBalanceCents: null, expectedBalanceCents: null, mutationCents: null, eventIds: [] });
+    return days;
+  }
   function chartSegments(days, today) {
     const index = days.findIndex((d) => d.date >= today);
     return { past: days.filter((d) => d.date < today), future: index < 0 ? [] : days.slice(index) };
@@ -3337,11 +3366,11 @@
     width = Math.max(210, width);
     const plotStart = 76, plotEnd = width - 24;
     if (p && !p.horizon.endDate) return '<p class="p3-empty">Een betrouwbare volgende salarisdatum ontbreekt. Kies een andere periode of stel salaris in bij Bankrekeningen.</p>';
-    if (!(p == null ? void 0 : p.days.length)) return '<p class="p3-empty">Een bruikbaar beginsaldo ontbreekt. Stel een saldo-ijkpunt in. Bekende geplande kasbewegingen blijven in de betalingslijst zichtbaar.</p>';
-    const days = p.days, values = days.map((d) => d.expectedBalanceCents), lo = Math.min(0, p.bufferCents, ...values), hi = Math.max(p.bufferCents, ...values, 100), range = hi - lo || 1;
+    if (!p) return '<p class="p3-empty">Een bruikbaar beginsaldo ontbreekt. Stel een saldo-ijkpunt in.</p>';
+    const days = chartDays(p), known = days.filter((d) => Number.isSafeInteger(d.expectedBalanceCents)), values = known.map((d) => d.expectedBalanceCents), lo = Math.min(0, p.bufferCents, ...values), hi = Math.max(p.bufferCents, ...values, 100), range = hi - lo || 1;
     const chartHeight = width >= 440 ? 205 : 245, baseline = chartHeight - 40;
     const x = (i) => plotStart + i * (plotEnd - plotStart) / Math.max(1, days.length - 1), y = (v) => baseline - (v - lo) / range * (baseline - 32);
-    const segments = chartSegments(days, p.asOfDate), pathFor = (rows) => rows.map((d, i) => `${i ? "L" : "M"}${x(days.indexOf(d)).toFixed(2)},${y(d.expectedBalanceCents).toFixed(2)}`).join(" ");
+    const segments = chartSegments(known, p.asOfDate), pathFor = (rows) => rows.map((d, i) => `${i ? "L" : "M"}${x(days.indexOf(d)).toFixed(2)},${y(d.expectedBalanceCents).toFixed(2)}`).join(" ");
     const segment = (rows, kind) => {
       if (!rows.length) return "";
       const lineRows = kind === "history" && segments.future.length ? [...rows, segments.future[0]] : rows;
@@ -3354,18 +3383,20 @@
       return `<line x1="${plotStart}" x2="${plotEnd}" y1="${yy}" y2="${yy}" class="p3-gridline"/><text x="${plotStart - 5}" y="${yy + 4}" text-anchor="end">${money2(Math.round(v)).replace(",00", "")}</text>`;
     }).join("");
     const labels2 = [.../* @__PURE__ */ new Set([0, Math.floor((days.length - 1) / 2), days.length - 1])].map((i) => `<text x="${x(i)}" y="${chartHeight - 11}" text-anchor="${i === 0 ? "start" : i === days.length - 1 ? "end" : "middle"}">${date(days[i].date)}</text>`).join("");
-    const events = paymentEvents(p), points = days.map((d, i) => ({ d, i, events: events.filter((e) => e.date === d.date) })).filter(({ d, i, events: events2 }) => events2.length || d.date === p.minimumDate || i === 0 || i === days.length - 1);
+    const events = paymentEvents(p), points = days.map((d, i) => ({ d, i, events: events.filter((e) => e.date === d.date) })).filter(({ d, i, events: events2 }) => Number.isSafeInteger(d.expectedBalanceCents) && (events2.length || d.date === p.minimumDate || d === known[0] || i === days.length - 1));
     const markers = points.map(({ d, i, events: events2 }) => {
       const meaning = pointMeaning(events2, d.date === p.minimumDate), cx = x(i), cy = y(d.expectedBalanceCents);
       const dot = meaning.income ? "p3-income" : meaning.expense ? "p3-expense" : "p3-neutral";
       return `<g role="button" tabindex="0" data-p3-point="${d.date}" aria-label="${meaning.isMinimum ? "Minimum · " : ""}${date(d.date)}: ${money2(d.expectedBalanceCents)} · ${meaning.label}" aria-pressed="false"><circle class="p3-hit" cx="${cx}" cy="${cy}" r="22" fill="transparent"/>${meaning.isMinimum ? `<rect class="p3-min" x="${cx - 7}" y="${cy - 7}" width="14" height="14" rx="2" transform="rotate(45 ${cx} ${cy})"/>` : ""}<circle cx="${cx}" cy="${cy}" r="${meaning.isMinimum ? 3 : 4}" class="${dot}"/>${meaning.income && meaning.expense ? `<circle cx="${cx}" cy="${cy}" r="8" class="p3-mixed"/>` : ""}${meaning.isMinimum ? `<text class="p3-min-label" x="${Math.max(plotStart, Math.min(plotEnd - 6, cx))}" y="${Math.max(15, cy - 16)}" text-anchor="${cx > (plotStart + plotEnd) / 2 ? "end" : "start"}">Minimum · ${date(d.date)}</text>` : ""}</g>`;
     }).join("");
-    return `<div class="p3-chart"><svg viewBox="0 0 ${width} ${chartHeight}" role="group" aria-label="Verwachte saldo-ontwikkeling; selecteer een dag voor bedragen en gebeurtenissen">${ticks}${segment(segments.past, "history")}${segment(segments.future, "future")}<line x1="${plotStart}" x2="${plotEnd}" y1="${y(p.bufferCents)}" y2="${y(p.bufferCents)}" class="p3-buffer-line"/>${today}${markers}${labels2}</svg><div class="p3-chart-legend">${segments.past.length ? '<span class="p3-history-key"><i aria-hidden="true">━</i> Verstreken dagen</span>' : ""}<span>━ Vandaag en toekomst</span><span class="p3-income-key">● Inkomsten</span><span class="p3-expense-key">● Uitgaven</span><span>◇ Minimum</span><span>┄ Buffer ${money2(p.bufferCents)}</span></div><div class="p3-chart-controls"><label class="p3-day-select">Bekijk een dag <select data-p3-day aria-label="Dag in saldo-ontwikkeling">${days.map((d) => `<option value="${d.date}">${date(d.date)}</option>`).join("")}</select></label><div class="p3-point-detail" data-p3-point-detail aria-live="polite"></div></div></div>`;
+    const unknown = days.filter((d) => !Number.isSafeInteger(d.expectedBalanceCents));
+    const gap = unknown.length ? `<p class="p3-caption" data-p3-unknown-days>${date(unknown[0].date)} – ${date(unknown.at(-1).date)}: saldo onbekend. Een bruikbaar beginsaldo ontbreekt voor deze dagen; de lijn begint bij het eerste bekende saldo.</p>` : "";
+    return `<div class="p3-chart">${gap}<svg viewBox="0 0 ${width} ${chartHeight}" role="group" aria-label="Verwachte saldo-ontwikkeling; selecteer een dag voor bedragen en gebeurtenissen">${known.length ? ticks : ""}${segment(segments.past, "history")}${segment(segments.future, "future")}${known.length ? `<line x1="${plotStart}" x2="${plotEnd}" y1="${y(p.bufferCents)}" y2="${y(p.bufferCents)}" class="p3-buffer-line"/>` : ""}${today}${markers}${labels2}</svg><div class="p3-chart-legend">${segments.past.length ? '<span class="p3-history-key"><i aria-hidden="true">━</i> Verstreken dagen</span>' : ""}<span>━ Vandaag en toekomst</span><span class="p3-income-key">● Inkomsten</span><span class="p3-expense-key">● Uitgaven</span><span>◇ Minimum</span><span>┄ Buffer ${money2(p.bufferCents)}</span></div><div class="p3-chart-controls"><label class="p3-day-select">Bekijk een dag <select data-p3-day aria-label="Dag in saldo-ontwikkeling">${days.map((d) => `<option value="${d.date}">${date(d.date)}${Number.isSafeInteger(d.expectedBalanceCents) ? "" : " · onbekend"}</option>`).join("")}</select></label><div class="p3-point-detail" data-p3-point-detail aria-live="polite"></div></div></div>`;
   }
   var info = (key, title, content) => `<button type="button" class="p3-info-button" data-p3-info="${key}" aria-label="Uitleg over ${escape(title)}" aria-controls="p3-info-${key}" aria-expanded="false">ⓘ</button><div class="p3-info-popover" id="p3-info-${key}" popover="auto" role="dialog" aria-modal="false" aria-label="${escape(title)}" data-p3-info-panel="${key}"><div class="p3-info-heading"><strong>${title}</strong><button type="button" class="ghost small" data-p3-close-info="${key}" aria-label="Sluiten · uitleg over ${escape(title)}">Sluiten</button></div>${content}</div>`;
   var calculationHelp = (p) => {
     var _a2;
-    return `<p>Dit is de maximale extra uitgave vandaag zonder vanaf vandaag onder je veiligheidsbuffer te komen, na resterende verplichtingen en budgetten. Beoordeling: ${date(((_a2 = p.availability) == null ? void 0 : _a2.fromDate) || p.asOfDate)} tot en met ${date(p.horizon.endDate)}.</p><p>De grafiek kan ook verstreken dagen tonen. Gepland sparen is een streefdoel, geen extra harde aftrek. De spaardoelruimte volgt de verwachte kasruimte aan het maandeinde en de bestaande spaarplanning.</p>`;
+    return `<p>Dit is de maximale extra uitgave binnen de beoordelingsperiode zonder onder je veiligheidsbuffer te komen, na resterende verplichtingen en budgetten. Beoordeling: ${date(((_a2 = p.availability) == null ? void 0 : _a2.fromDate) || p.asOfDate)} tot en met ${date(p.horizon.endDate)}.</p><p>De grafiek kan ook verstreken dagen tonen. Gepland sparen is een streefdoel, geen extra harde aftrek. De spaardoelruimte volgt de verwachte kasruimte aan het maandeinde en de bestaande spaarplanning.</p>`;
   };
   function qualityHelp(p) {
     const reasons2 = explainLiquidityReasons(p);
@@ -3385,7 +3416,7 @@
     const balanceSub = `${status(balance.status)}${balanceDate ? ` · Saldo van ${date(balanceDate)}` : ""} · Saldo bijwerken`;
     const reconciliations = (p.reconciliations || []).filter((r) => r.differenceCents !== null && r.differenceCents !== 0).map((r) => `<p class="p3-caption">Saldo-ijkpunt ${date(r.date)}: ${money2(r.observedCents)} · berekend ${money2(r.modeledCents)} · verschil ${money2(r.differenceCents)}. Vanaf deze dag loopt de berekening verder met het handmatig ingestelde saldo.</p>`).join("");
     const qualityActions = p.reasons.length ? `<div class="p3-quality-actions">${action("settings", p.reasons.some((r) => r.code === "missing-reliable-horizon") ? "Salarisdatum instellen" : "Prognose instellen")}${v.balance === null ? action("balance", "Saldo instellen") : ""}</div>` : "";
-    return `<div class="p3-kpis">${kpi("free", "Vrij na verplichtingen", money2(v.free), freeSub, "income", calculationHelp(p) + savingDetails)}${kpi("balance", "Huidig saldo", v.balance === null ? "Saldo onbekend" : money2(v.balance), balanceSub, "wallet", `<p>Dit is de rekeningstand op basis van je vastgelegde banksaldo en beschikbare bankboekingen. De saldodatum hoort bij het laatste bruikbare saldo-ijkpunt; dit is geen automatische bevestiging van je bank.</p>${qualityHelp(p)}`, "balance")}${kpi("minimum", "Laagste prognose", money2(v.minimum), `${date(v.minimumDate)} · ${status(p.status)}`, "chart", `<p>Het laagste berekende saldo binnen de gekozen periode. De datum en het bedrag komen uit dezelfde saldolijn.</p>${qualityHelp(p)}`)}${kpi("buffer", "Buffer", money2(v.buffer), "Buffer instellen", "shield", `<p>De buffer is de veiligheidsmarge die je op deze rekening wilt houden. Vrij na verplichtingen houdt rekening met deze marge. Je buffer is geen aparte bankboeking.</p>`, "settings")}</div>${warning}<div class="p3-outlook-footer"><span class="p3-account-name">Rekening: ${escape(profile.name)}</span>${qualityActions}${reconciliations}</div>`;
+    return `<div class="p3-kpis">${kpi("free", "Vrij na verplichtingen", money2(v.free), freeSub, "income", calculationHelp(p) + savingDetails)}${kpi("balance", p.horizon.endDate < p.asOfDate ? "Saldo op " + date(p.horizon.endDate) : "Huidig saldo", v.balance === null ? "Saldo onbekend" : money2(v.balance), balanceSub, "wallet", `<p>Dit is de rekeningstand op basis van je vastgelegde banksaldo en beschikbare bankboekingen. De saldodatum hoort bij het laatste bruikbare saldo-ijkpunt; dit is geen automatische bevestiging van je bank.</p>${qualityHelp(p)}`, "balance")}${kpi("minimum", "Laagste prognose", money2(v.minimum), `${date(v.minimumDate)} · ${status(p.status)}`, "chart", `<p>Het laagste berekende saldo binnen de gekozen periode. De datum en het bedrag komen uit dezelfde saldolijn.</p>${qualityHelp(p)}`)}${kpi("buffer", "Buffer", money2(v.buffer), "Buffer instellen", "shield", `<p>De buffer is de veiligheidsmarge die je op deze rekening wilt houden. Vrij na verplichtingen houdt rekening met deze marge. Je buffer is geen aparte bankboeking.</p>`, "settings")}</div>${warning}<div class="p3-outlook-footer"><span class="p3-account-name">Rekening: ${escape(profile.name)}</span>${qualityActions}${reconciliations}</div>`;
   }
   function yearHtml(year, getMonth) {
     const v = yearView(year, getMonth), max = Math.max(1, ...v.months.filter((m) => !m.missing).flatMap((m) => [m.income, m.spent]));
@@ -3393,14 +3424,22 @@
   }
   function createDashboard(deps) {
     let controller = null, chartObserver = null, chartFrame = 0, selectedDay = null, lastChartWidth = 0;
-    let generation = 0, projection = null, filter = "month", custom = "", context = "gezamenlijk", year = null, localPerson = "dion";
+    let generation = 0, projection = null, filter = "month", custom = "", context = "gezamenlijk", year = null, localPerson = "dion", selectedMonth = null;
     try {
       const pref = JSON.parse(localStorage.getItem("finize-dashboard-context") || "null");
       if ((pref == null ? void 0 : pref.context) === "persoonlijk") context = pref.context;
       if (["dion", "dara"].includes(pref == null ? void 0 : pref.person)) localPerson = pref.person;
       if (["month", "7", "14", "custom", "salary"].includes(pref == null ? void 0 : pref.filter)) filter = pref.filter;
-      if (/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test((pref == null ? void 0 : pref.custom) || "") && pref.custom >= deps.today()) custom = pref.custom;
-      else if (filter === "custom") filter = "month";
+      if ((pref == null ? void 0 : pref.month) === deps.month()) custom = pref.custom || "";
+      else filter = "month";
+      if (filter === "custom") {
+        try {
+          dashboardPeriod({ month: deps.month(), today: deps.today(), filter, custom });
+        } catch (e) {
+          custom = "";
+          filter = "month";
+        }
+      }
     } catch (e) {
     }
     function owner() {
@@ -3408,16 +3447,16 @@
     }
     function savePreference() {
       try {
-        localStorage.setItem("finize-dashboard-context", JSON.stringify({ context, person: localPerson, filter, custom }));
+        localStorage.setItem("finize-dashboard-context", JSON.stringify({ context, person: localPerson, filter, custom, month: deps.month() }));
       } catch (e) {
       }
     }
     function renderLower(root2) {
       const data = deps.summary(owner());
-      root2.querySelector("[data-p3-summary]").innerHTML = `<section class="p3-panel p3-budget">${head("Budgetten", action("budgets"))}<p class="p3-caption">${escape(deps.monthLabel())} · ${escape(deps.ownerLabel(owner()))}</p><div class="p3-budget-body"><div class="p3-ring" style="--progress:${Math.max(0, Math.min(100, data.budget ? data.used / data.budget * 100 : 0))}%"><strong>${deps.eur(data.used)}</strong><span>van ${deps.eur(data.budget)}</span></div><dl><dt>Besteed</dt><dd>${deps.eur(data.used)}</dd><dt>Resterend</dt><dd>${deps.eur(data.budget - data.used)}</dd></dl></div></section><section class="p3-panel p3-allowance">${head("Zakgeld", action("allowance"))}<p class="p3-caption">Geplande verdeling</p>${data.allowances.map((p) => {
+      root2.querySelector("[data-p3-summary]").innerHTML = `<section class="p3-panel p3-budget">${head("Budgetten", action("budgets"))}<p class="p3-caption">${escape(deps.monthLabel())} · ${escape(deps.ownerLabel(owner()))}</p><div class="p3-budget-body"><div class="p3-ring" style="--progress:${Math.max(0, Math.min(100, data.budget ? data.used / data.budget * 100 : 0))}%"><strong>${deps.eur(data.used)}</strong><span>van ${deps.eur(data.budget)}</span></div><dl><dt>Besteed</dt><dd>${deps.eur(data.used)}</dd><dt>Resterend</dt><dd>${deps.eur(data.budget - data.used)}</dd></dl></div></section><section class="p3-panel p3-allowance">${head("Zakgeld", action("allowance"))}<p class="p3-caption">${escape(deps.monthLabel())} · Geplande verdeling</p>${data.allowances.map((p) => {
         const share = allowanceShare(p.amount, data.allowanceDistribution);
         return `<div class="p3-allowance-row"><strong>${escape(p.name)}</strong><span>${deps.eur(p.amount)} · ${share === null ? "Verdeling niet beschikbaar" : new Intl.NumberFormat("nl-NL", { maximumFractionDigits: 1 }).format(share) + "%"}</span>${share === null ? "" : meter(share, "Aandeel " + p.name)}</div>`;
-      }).join("")}</section><section class="p3-panel p3-goals">${head("Spaardoelen", action("goals"))}<div class="p3-goal-list">${data.goals.slice(0, 2).map((g) => {
+      }).join("")}</section><section class="p3-panel p3-goals">${head("Spaardoelen", action("goals"))}<p class="p3-caption">Huidige stand · planning ${escape(deps.monthLabel())}</p><div class="p3-goal-list">${data.goals.slice(0, 2).map((g) => {
         const target = Number(g.doel.doelbedrag) || 0, saved = Number(g.doel.algespaard) || 0, progress = target > 0 ? saved / target * 100 : 0;
         return `<div class="p3-goal">${deps.goalIcon(g.doel)}<div><strong>${escape(g.doel.naam)}</strong><span>${deps.eur(saved)} / ${deps.eur(target)} · ${Math.round(progress)}%</span>${meter(progress, g.doel.naam)}</div></div>`;
       }).join("") || '<p class="p3-empty">Nog geen spaardoelen in deze context.</p>'}</div></section>`;
@@ -3425,7 +3464,7 @@
     }
     function showDay(root2, day) {
       if (!projection) return;
-      const d = projection.days.find((d2) => d2.date === day);
+      const d = chartDays(projection).find((d2) => d2.date === day);
       if (!d) return;
       selectedDay = day;
       root2.querySelectorAll("g[data-p3-point]").forEach((point) => point.setAttribute("aria-pressed", String(point.dataset.p3Point === day)));
@@ -3436,19 +3475,24 @@
       detail.removeAttribute("data-hover-tooltip");
       detail.removeAttribute("style");
       const signed = (value) => (value > 0 ? "+ " : "") + money2(value);
+      if (!Number.isSafeInteger(d.expectedBalanceCents)) {
+        detail.innerHTML = `<div class="p3-detail-heading"><strong>${date(day)} ${day.slice(0, 4)}</strong><button type="button" class="ghost small" data-p3-close-detail aria-label="Sluiten · datumdetails">Sluiten</button></div><p>Saldo onbekend: er is voor deze dag geen bruikbaar beginsaldo. Er wordt geen saldo teruggerekend uit een later ijkpunt.</p>${action("balance", "Saldo controleren")}`;
+        return;
+      }
       const rows = projection.events.filter((e) => d.eventIds.includes(e.id));
       const replaced = (e) => (e.replacedPlans || []).map((plan) => ` (planning ${money2(Math.abs(plan.amountCents))} vervangen)`).join("");
       detail.innerHTML = `<div class="p3-detail-heading"><strong>${date(day)} ${day.slice(0, 4)}</strong><button type="button" class="ghost small" data-p3-close-detail aria-label="Sluiten · datumdetails">Sluiten</button></div><span>Berekend beginsaldo: ${money2(d.openingBalanceCents)}</span><ul>${rows.map((e) => `<li>${escape(e.type === "checkpoint" ? "Handmatig saldo-ijkpunt" : deps.eventLabel(e))}: <strong>${signed(e.amountCents)}</strong>${escape(replaced(e))} <span>(${e.type === "checkpoint" ? "Saldo ingesteld op " + money2(e.observedBalanceCents) : e.type === "bank" ? e.status === "provisional" ? "Voorlopig verwerkt · geboekt, nog nakijken" : "Werkelijk" : e.type === "fixed" ? "Geplande vaste last" : e.type === "allowance" || e.type === "internal-transfer" ? "Geplande interne overboeking" : "Geplande inkomsten"})</span></li>`).join("") || (d.estimatedBudgetCents ? "" : "<li>Geen mutaties</li>")}${d.estimatedBudgetCents ? `<li>Geschatte resterende budgetuitgaven: <strong>${signed(-d.estimatedBudgetCents)}</strong></li>` : ""}</ul><span>Totaal mutaties: ${signed(d.mutationCents)}</span><strong>Berekend eindsaldo: ${money2(d.expectedBalanceCents)}</strong><span>${d.checkpointId ? "Saldo-ijkpunt aan het einde van deze dag · beginsaldo onbekend" : "Berekend uit planning en beschikbare bankboekingen"} · ${status(projection.status)}</span>`;
     }
     function chartDay(root2, e) {
-      if (!(projection == null ? void 0 : projection.days.length)) return;
+      var _a2;
+      if (!chartDays(projection).length) return;
       const svg = e.target.closest("[data-p3-chart] svg");
       if (!svg) return;
       const point = e.target.closest("[data-p3-point]");
       if (point) return point.dataset.p3Point;
       const rect = svg.getBoundingClientRect(), x = (e.clientX - rect.left) * svg.viewBox.baseVal.width / rect.width;
-      const index = Math.round(Math.max(0, Math.min(1, (x - 76) / (svg.viewBox.baseVal.width - 100))) * (projection.days.length - 1));
-      return projection.days[index].date;
+      const index = Math.round(Math.max(0, Math.min(1, (x - 76) / (svg.viewBox.baseVal.width - 100))) * (chartDays(projection).length - 1));
+      return (_a2 = chartDays(projection)[index]) == null ? void 0 : _a2.date;
     }
     function unmount() {
       ++generation;
@@ -3470,7 +3514,8 @@
       const focusSelect = host.contains(focused) && focused.matches("[data-p3-day]");
       lastChartWidth = width;
       host.innerHTML = chartHtml(projection, width);
-      if (projection.days.length) showDay(root2, projection.days.some((day) => day.date === selectedDay) ? selectedDay : projection.days[0].date);
+      const days = chartDays(projection);
+      if (days.length) showDay(root2, days.some((day) => day.date === selectedDay) ? selectedDay : days[0].date);
       if (focusDay) (_b = [...host.querySelectorAll("[data-p3-point]")].find((point) => point.dataset.p3Point === focusDay)) == null ? void 0 : _b.focus({ preventScroll: true });
       else if (focusSelect) (_c = host.querySelector("[data-p3-day]")) == null ? void 0 : _c.focus({ preventScroll: true });
     }
@@ -3503,7 +3548,8 @@
         return;
       }
       try {
-        const p = await deps.project({ accountProfileId: profile.id, asOfDate: deps.today(), startDate: horizonStart(filter, deps.today()), endDate: horizonEnd(filter, deps.today(), custom), salaryOnly: filter === "salary" });
+        const period = dashboardPeriod({ month: deps.month(), today: deps.today(), filter, custom });
+        const p = await deps.project({ accountProfileId: profile.id, asOfDate: deps.today(), ...period });
         if (token !== generation || !root2.isConnected) return;
         projection = p;
         root2.querySelector("[data-p3-outlook]").innerHTML = outlookHtml(p, profile, deps.eventLabel, deps.iconSvg);
@@ -3522,9 +3568,19 @@
       unmount();
       controller = new AbortController();
       const signal = controller.signal;
-      year != null ? year : year = Number(deps.month().slice(0, 4));
+      const month = deps.month();
+      if (selectedMonth !== null && selectedMonth !== month) {
+        filter = "month";
+        custom = "";
+        selectedDay = null;
+        year = Number(month.slice(0, 4));
+        savePreference();
+      }
+      selectedMonth = month;
+      year != null ? year : year = Number(month.slice(0, 4));
+      const bounds = dashboardPeriod({ month, today: deps.today() });
       root2.classList.add("p3-dashboard");
-      root2.insertAdjacentHTML("beforeend", `<div class="p3-surface"><section class="p3-panel p3-outlook"><div class="p3-toolbar"><div><h2>Vooruitblik</h2></div><div class="p3-context" role="group" aria-label="Dashboardcontext">${["gezamenlijk", "persoonlijk"].map((c) => `<button type="button" data-p3-context="${c}" aria-pressed="${context === c}">${c === "gezamenlijk" ? "Gezamenlijk" : "Persoonlijk"}</button>`).join("")}</div>${!deps.personalRole() ? `<label class="p3-person" ${context === "gezamenlijk" ? "hidden" : ""}>Persoon <select data-p3-person><option value="dion" ${localPerson === "dion" ? "selected" : ""}>Dion</option><option value="dara" ${localPerson === "dara" ? "selected" : ""}>Dara</option></select></label>` : ""}<div class="p3-filters" role="group" aria-label="Prognoseperiode">${[["month", "Deze maand"], ["7", "7 dagen"], ["14", "14 dagen"], ["custom", "Eigen datum"], ["salary", "Volgend salaris"]].map(([value, title]) => `<button type="button" data-p3-filter="${value}" aria-pressed="${filter === value}">${title}</button>`).join("")}</div></div><label class="p3-custom" ${filter === "custom" ? "" : "hidden"}>Tot en met <input type="date" data-p3-custom min="${deps.today()}" value="${custom}" required></label><div data-p3-outlook></div></section><div class="p3-main"><section class="p3-panel">${head("Saldo-ontwikkeling", info("chart", "Saldo-ontwikkeling", "<p>Berekend saldo uit planning en bankboekingen. Oranje toont het verleden, groen vandaag en de toekomst. Budgetuitgaven zonder datum zijn geschat.</p><p>Het minimum en de bufferlijn blijven in de grafiek zichtbaar. Kies een dag voor de bijbehorende bedragen en betalingen.</p>"))}<p class="p3-period" data-p3-period aria-live="polite"></p><div data-p3-chart></div></section><section class="p3-panel">${head("Betalingen in deze periode", action("payments"))}<ul class="p3-payments" data-p3-payments></ul></section></div><div class="p3-summary" data-p3-summary></div><section class="p3-panel p3-year" data-p3-year-panel></section></div>`);
+      root2.insertAdjacentHTML("beforeend", `<div class="p3-surface"><section class="p3-panel p3-outlook"><div class="p3-toolbar"><div><h2>Vooruitblik</h2></div><div class="p3-context" role="group" aria-label="Dashboardcontext">${["gezamenlijk", "persoonlijk"].map((c) => `<button type="button" data-p3-context="${c}" aria-pressed="${context === c}">${c === "gezamenlijk" ? "Gezamenlijk" : "Persoonlijk"}</button>`).join("")}</div>${!deps.personalRole() ? `<label class="p3-person" ${context === "gezamenlijk" ? "hidden" : ""}>Persoon <select data-p3-person><option value="dion" ${localPerson === "dion" ? "selected" : ""}>Dion</option><option value="dara" ${localPerson === "dara" ? "selected" : ""}>Dara</option></select></label>` : ""}<div class="p3-filters" role="group" aria-label="Prognoseperiode">${[["month", "Deze maand"], ["7", "7 dagen"], ["14", "14 dagen"], ["custom", "Eigen datum"], ["salary", "Volgend salaris"]].map(([value, title]) => `<button type="button" data-p3-filter="${value}" aria-pressed="${filter === value}">${title}</button>`).join("")}</div></div><label class="p3-custom" ${filter === "custom" ? "" : "hidden"}>Tot en met <input type="date" data-p3-custom min="${bounds.minDate}" max="${bounds.maxDate}" value="${custom}" required></label><div data-p3-outlook></div></section><div class="p3-main"><section class="p3-panel">${head("Saldo-ontwikkeling", info("chart", "Saldo-ontwikkeling", "<p>Berekend saldo uit planning en bankboekingen. Oranje toont het verleden, groen vandaag en de toekomst. Budgetuitgaven zonder datum zijn geschat.</p><p>Het minimum en de bufferlijn blijven in de grafiek zichtbaar. Kies een dag voor de bijbehorende bedragen en betalingen.</p>"))}<p class="p3-period" data-p3-period aria-live="polite"></p><div data-p3-chart></div></section><section class="p3-panel">${head("Betalingen in deze periode", action("payments"))}<ul class="p3-payments" data-p3-payments></ul></section></div><div class="p3-summary" data-p3-summary></div><section class="p3-panel p3-year" data-p3-year-panel></section></div>`);
       const isInfoOpen = (panel) => typeof panel.showPopover === "function" ? panel.matches(":popover-open") : panel.dataset.open === "true";
       const closeInfo = (panel) => {
         var _a2;
@@ -3682,7 +3738,7 @@
               deps.balance();
               break;
             case "payments":
-              deps.modal(`<h2>Betalingen binnen je prognoseperiode</h2><p>${date(projection == null ? void 0 : projection.asOfDate)} tot en met ${date((_a2 = projection == null ? void 0 : projection.horizon) == null ? void 0 : _a2.endDate)}</p><ul class="p3-payments">${projection ? paymentsHtml(projection, deps.eventLabel, true, deps.canOpenEvent) : "<li>Stel eerst je prognose in.</li>"}</ul>`, (id) => {
+              deps.modal(`<h2>Betalingen binnen je prognoseperiode</h2><p>${date((projection == null ? void 0 : projection.displayStartDate) || (projection == null ? void 0 : projection.asOfDate))} tot en met ${date((_a2 = projection == null ? void 0 : projection.horizon) == null ? void 0 : _a2.endDate)}</p><ul class="p3-payments">${projection ? paymentsHtml(projection, deps.eventLabel, true, deps.canOpenEvent) : "<li>Stel eerst je prognose in.</li>"}</ul>`, (id) => {
                 const event2 = paymentEvents(projection).find((e2) => e2.id === id);
                 if (event2) deps.openEvent(event2);
               });
@@ -3696,7 +3752,7 @@
         }
       }, { signal });
       root2.addEventListener("change", (e) => {
-        if (e.target.matches("[data-p3-custom]") && e.target.reportValidity()) {
+        if (e.target.matches("[data-p3-custom]")) {
           custom = e.target.value;
           savePreference();
           load(root2);
