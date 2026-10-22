@@ -59,3 +59,30 @@ test('inkomenskoppeling bewaakt ontvangen bedrag, goedkeuring, maand en eigenaar
  const s=state([source,deposit,{...structuredClone(deposit),id:'saving-again'}]);
  assert(e.selectTransactionProjections(s).filter(p=>p.effects.savingsDeposit>0).every(p=>p.savingsContributionError&&!p.savingsContribution));
 });
+
+
+for(const owner of ['gezamenlijk','dion','dara'])for(const type of ['belastingteruggave','vergoeding','overige-inkomsten'])test('extra inkomen '+type+' voor '+owner+' kan buiten zakgeld blijven zonder dubbel sparen',()=>{
+ const incoming=tx('extra',225,type,{financialFor:owner,processing:{meetellenVoorVerdeling:false}}),s=state([incoming]),base=forecast(state([])),held=forecast(s);
+ assert.equal(held.owners.dion.allowance,base.owners.dion.allowance);assert.equal(held.owners.dara.allowance,base.owners.dara.allowance);
+ assert.equal(held.owners.gezamenlijk.available,base.owners.gezamenlijk.available+225);assert.equal(held.household.income,base.household.income+225);assert.equal(held.allowanceBasis.retainedJointIncome,225);
+ const effects=e.projectTransaction(incoming,{state:s}).effects;
+ incoming.processing.meetellenVoorVerdeling=true;const shared=forecast(s);
+ assert.equal(shared.owners.dion.allowance+shared.owners.dara.allowance,base.owners.dion.allowance+base.owners.dara.allowance+225);
+ assert.equal(shared.household.available,held.household.available);assert.equal(shared.household.income,held.household.income);assert.deepEqual(e.projectTransaction(incoming,{state:s}).effects,effects);
+ delete incoming.processing.meetellenVoorVerdeling;assert.deepEqual(forecast(s),shared);
+ incoming.processing.meetellenVoorVerdeling=false;
+ s.transactions.push(tx('saving',225,'sparen',{financialFor:owner,savingsGoalId:'garden',processing:{savingsContributionId:'extra',savingsContributionAmount:225}}));
+ const saved=forecast(s);assert.equal(saved.household.available,base.household.available);assert.equal(saved.owners.dion.allowance,base.owners.dion.allowance);assert.equal(saved.owners.dara.allowance,base.owners.dara.allowance);
+ assert.equal(saved.owners.gezamenlijk.available,base.owners.gezamenlijk.available);assert.equal(saved.owners.dion.available,base.owners.dion.available);assert.equal(saved.owners.dara.available,base.owners.dara.available);
+ const p=e.projectTransaction(s.transactions[1],{state:s});assert.equal(p.effects.savingsDeposit,225);assert.equal(p.effects.goalDelta,225);assert.equal(p.effects.existingCapitalDeposit||0,0);
+ assert.deepEqual(forecast(JSON.parse(JSON.stringify(s))),saved);
+});
+
+
+test('apart gehouden inkomen met gedeeltelijke spaarinleg houdt het restant gezamenlijk',()=>{
+ const base=forecast(state([])),source=tx('extra',225,'belastingteruggave',{processing:{meetellenVoorVerdeling:false}});
+ const deposit=tx('saving',100,'sparen',{savingsGoalId:'garden',processing:{savingsContributionId:'extra',savingsContributionAmount:100}}),s=state([source,deposit]),f=forecast(s);
+ assert.equal(f.owners.gezamenlijk.available,base.owners.gezamenlijk.available+125);assert.equal(f.household.available,base.household.available+125);
+ assert.equal(f.owners.dion.allowance,base.owners.dion.allowance);assert.equal(f.owners.dara.allowance,base.owners.dara.allowance);
+ s.transactions[0].processing.meetellenVoorVerdeling=true;const shared=forecast(s);assert.equal(shared.household.available,f.household.available);assert.equal(shared.owners.dion.allowance+shared.owners.dara.allowance,base.owners.dion.allowance+base.owners.dara.allowance+225);
+});

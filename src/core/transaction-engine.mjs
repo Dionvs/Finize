@@ -390,20 +390,34 @@ export function financialForecastForMonth(state,month,{compatibilityIncome={},pl
     allowanceOwners[occurrence.financialFor].fixedReserve=money(allowanceOwners[occurrence.financialFor].fixedReserve+Number(occurrence.amount));
     if(occurrence.financialFor==='gezamenlijk'&&occurrence.source?.distributionMode==='equal')equalJointReserve=money(equalJointReserve+Number(occurrence.amount));
   });
-  const dion=owners.dion,dara=owners.dara,joint=owners.gezamenlijk,incomeBasis=money(dion.income+dara.income),minimum=Number(state.planning?.verdeling?.minimumDion??.4),ratioDion=Math.max(minimum,incomeBasis>0?dion.income/incomeBasis:0),ratioDara=1-ratioDion;
-  const burden=owner=>money(owner.fixedBurden+owner.variableBurden+owner.savingsDeposit-(owner.existingCapitalDeposit||0)-owner.unusedSavings-owner.refundCashflow);
+  // Keep all income in the household forecast; only explicitly opted-out extra income
+  // stays on the joint account instead of increasing either allowance.
+  const allowanceIncome=Object.fromEntries(ACCOUNT_CONTEXTS.map(owner=>[owner,owners[owner].income]));
+  for(const p of rows)if(p.calendarMonth===month&&p.effects.incomeImpact>0&&p.transactionType!=='salaris'&&(p.transaction.processing?.meetellenVoorVerdeling??p.transaction.meetellenVoorVerdeling)===false&&owners[p.financialFor])allowanceIncome[p.financialFor]=money(allowanceIncome[p.financialFor]-p.effects.incomeImpact);
+  // A linked saving funded by explicitly joint-retained income consumes that joint
+  // money, including when the saving itself belongs to a personal goal.
+  const jointFundedSavings=Object.fromEntries(ACCOUNT_CONTEXTS.map(owner=>[owner,0]));
+  const byId=new Map(rows.map(p=>[p.id,p]));
+  for(const p of rows)if(p.calendarMonth===month&&p.financialFor!=='gezamenlijk'&&p.savingsContribution?.kind==='income'){
+    const source=byId.get(p.savingsContribution.sourceId);
+    if(source?.transactionType!=='salaris'&&(source?.transaction.processing?.meetellenVoorVerdeling??source?.transaction.meetellenVoorVerdeling)===false)jointFundedSavings[p.financialFor]=money(jointFundedSavings[p.financialFor]+p.savingsContribution.amountCents/100);
+  }
+  const jointSavingFunding=money(jointFundedSavings.dion+jointFundedSavings.dara);
+  const retainedJointIncome=money(ACCOUNT_CONTEXTS.reduce((sum,owner)=>sum+owners[owner].income-allowanceIncome[owner],0));
+  const dion=owners.dion,dara=owners.dara,joint=owners.gezamenlijk,incomeBasis=money(dion.income+dara.income),distributionIncomeBasis=money(allowanceIncome.dion+allowanceIncome.dara),minimum=Number(state.planning?.verdeling?.minimumDion??.4),ratioDion=Math.max(minimum,distributionIncomeBasis>0?allowanceIncome.dion/distributionIncomeBasis:0),ratioDara=1-ratioDion;
+  const burden=owner=>money(owner.fixedBurden+owner.variableBurden+owner.savingsDeposit-(owner.existingCapitalDeposit||0)-(jointFundedSavings[owner.owner]||0)+(owner.owner==='gezamenlijk'?jointSavingFunding:0)-owner.unusedSavings-owner.refundCashflow);
   // Allowance is determined by month planning. Actual spending, refunds, coverage and
   // savings realizations only affect forecast/account buffers, never this reservation.
   const savingsOverrides=state.monthlySavingOverrides?.[month]||{};
   const jointPlan=allowanceOwners.gezamenlijk;
   jointPlan.savingsReserve=money(Object.hasOwn(savingsOverrides,'gezamenlijk')?savingsOverrides.gezamenlijk:state.planning?.spaarpotDezeMaand);
   jointPlan.totalReserve=money(jointPlan.fixedReserve+jointPlan.budgetReserve+jointPlan.savingsReserve);
-  const distributable=money(incomeBasis+joint.income-jointPlan.totalReserve);
-  const ratioCosts=money(jointPlan.totalReserve-equalJointReserve-joint.income);
-  dion.allowance=money(dion.income-equalJointReserve*.5-ratioCosts*ratioDion);dara.allowance=money(dara.income-equalJointReserve*.5-ratioCosts*ratioDara);
+  const distributable=money(distributionIncomeBasis+allowanceIncome.gezamenlijk-jointPlan.totalReserve);
+  const ratioCosts=money(jointPlan.totalReserve-equalJointReserve-allowanceIncome.gezamenlijk);
+  dion.allowance=money(allowanceIncome.dion-equalJointReserve*.5-ratioCosts*ratioDion);dara.allowance=money(allowanceIncome.dara-equalJointReserve*.5-ratioCosts*ratioDara);
   ['dion','dara'].forEach(owner=>{const plan=allowanceOwners[owner];plan.automaticallyAvailableForSavings=money(owners[owner].allowance-plan.fixedReserve-plan.budgetReserve);plan.savingsReserve=Object.hasOwn(savingsOverrides,owner)?money(savingsOverrides[owner]):Math.max(0,plan.automaticallyAvailableForSavings);plan.totalReserve=money(plan.fixedReserve+plan.budgetReserve+plan.savingsReserve);});
   dion.available=money(dion.allowance-burden(dion));dara.available=money(dara.allowance-burden(dara));
   joint.availableBeforeAllowance=money(incomeBasis+joint.income-burden(joint));joint.available=money(joint.availableBeforeAllowance-dion.allowance-dara.allowance);
   const household={income:money(ACCOUNT_CONTEXTS.reduce((sum,owner)=>sum+owners[owner].income,0)),available:money(ACCOUNT_CONTEXTS.reduce((sum,owner)=>sum+owners[owner].income-burden(owners[owner]),0)),actualIncome:actualIncomeForMonth(state,month).amount,realExpense:sumTransactionEffects(state,'realExpense',{month}),savingsFunded:sumTransactionEffects(state,'savingsFunded',{month}),unusedSavings:sumTransactionEffects(state,'unusedSavings',{month}),refundCashflow:sumTransactionEffects(state,'refundCashflow',{month})};
-  return {month,owners,household,ratioDion,ratioDara,distributable,allowanceBasis:{owners:allowanceOwners,distributable,income:money(incomeBasis+joint.income)},coverage:coverageAllocationStatus(state)};
+  return {month,owners,household,ratioDion,ratioDara,distributable,allowanceBasis:{owners:allowanceOwners,distributable,income:money(distributionIncomeBasis+allowanceIncome.gezamenlijk),...(retainedJointIncome?{retainedJointIncome}:{})},coverage:coverageAllocationStatus(state)};
 }

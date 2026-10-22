@@ -168,3 +168,40 @@ for(const width of [390,430,1440])test('belastingteruggave administratief koppel
  expect(await snapshot()).toEqual(before);
  expect(await page.evaluate(()=>state.transactions.find(t=>t.id==='tx-income-saving-1').processing.savingsContributionId)).toBe('tx-income-saving-0');expect(errors).toEqual([]);
 });
+
+
+for(const width of [430,1440])test('extra inkomen kiezen voor gezamenlijk zonder dubbel zakgeld of sparen '+width+'px',async({page})=>{
+ const errors=[];page.on('pageerror',e=>errors.push(e.message));await boot(page,width);
+ await page.evaluate(()=>commitChange(()=>{state.spaardoelen.gezamenlijk.push({id:'held-income-goal',naam:'Belasting apart',doelbedrag:1000,algespaard:0});},{render:false}));
+ const snapshot=()=>page.evaluate(()=>{const f=FinizeTransactions.forecast('2026-10');return {dion:f.owners.dion.allowance,dara:f.owners.dara.allowance,joint:f.owners.gezamenlijk.available,income:f.household.income,available:f.household.available,held:f.allowanceBasis.retainedJointIncome||0,goal:state.spaardoelen.gezamenlijk.find(g=>g.id==='held-income-goal').algespaard};});
+ const base=await snapshot();
+ await draft(page,'allowance-choice','gezamenlijk',[
+  {date:'2026-10-15',amount:225,label:'Belastingteruggave apart',type:'belastingteruggave'},
+  {date:'2026-10-15',amount:-225,label:'Sparen belasting',type:'sparen',processing:{savingsGoalId:'held-income-goal'}}
+ ]);
+ const originals=await page.evaluate(()=>JSON.stringify(__p3Draft.rows.map(r=>r.bankOriginal)));
+ const source=page.locator('[data-u4-row="allowance-choice-0"]'),choice=source.locator('[data-u4-field="meetellenVoorVerdeling"]');
+ await expect(choice).toBeChecked();await choice.uncheck();await approve(page,'allowance-choice-0');await expect.poll(()=>page.evaluate(()=>state.transactions.find(t=>t.id==='tx-allowance-choice-0')?.processing.meetellenVoorVerdeling)).toBe(false);
+ let result=await snapshot();expect(result).toMatchObject({dion:base.dion,dara:base.dara,joint:base.joint+225,income:base.income+225,held:225,goal:0});
+ await page.locator('[data-u4-row="allowance-choice-1"] [data-u4-field="savingsContributionId"]').selectOption('tx-allowance-choice-0');await approve(page,'allowance-choice-1');
+ result=await snapshot();expect(result).toMatchObject({dion:base.dion,dara:base.dara,joint:base.joint,income:base.income+225,available:base.available,goal:225,held:225});
+ await sections(page);await source.locator('[data-u4-reopen]').click();await expect(choice).not.toBeChecked();await choice.check();await approve(page,'allowance-choice-0');await expect.poll(()=>page.evaluate(()=>state.transactions.find(t=>t.id==='tx-allowance-choice-0').processing.meetellenVoorVerdeling)).toBe(true);
+ const shared=await snapshot();expect(shared.dion+shared.dara).toBeCloseTo(base.dion+base.dara+225,2);expect(shared.income).toBe(result.income);expect(shared.available).toBe(result.available);expect(shared.goal).toBe(225);
+ await sections(page);await source.locator('[data-u4-reopen]').click();await choice.uncheck();await approve(page,'allowance-choice-0');
+ await expect.poll(snapshot).toEqual(result);expect(await page.evaluate(()=>JSON.stringify(__p3Draft.rows.map(r=>r.bankOriginal)))).toBe(originals);
+ fs.mkdirSync('.cache/upcoming-payments',{recursive:true});await page.screenshot({path:'.cache/upcoming-payments/allowance-choice-'+width+'.png',fullPage:true});await process(page);
+ await page.reload();await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);expect(await snapshot()).toEqual(result);
+ expect(await page.evaluate(()=>state.transactions.find(t=>t.id==='tx-allowance-choice-0').processing.meetellenVoorVerdeling)).toBe(false);
+ await page.evaluate(()=>document.querySelector('#tabs [data-tab="dashboard"]').click());await expect(page.locator('[data-p3-retained-income]')).toContainText('blijft bij gezamenlijk');
+ expect(errors).toEqual([]);
+});
+
+for(const width of [430,1440])test('handmatige extra inkomsten hebben dezelfde zakgeldkeuze '+width+'px',async({page})=>{
+ await boot(page,width);const base=await page.evaluate(()=>FinizeTransactions.forecast('2026-10'));
+ await page.evaluate(()=>FinizeManual.open('gezamenlijk'));
+ await page.locator('#jointTxType').selectOption('belastingteruggave');await expect(page.locator('#jointTxDistribution')).toBeChecked();await page.locator('#jointTxDistribution').uncheck();
+ await page.locator('#jointTxAmount').fill('225');await page.locator('#jointTxDate').fill('2026-10-15');await page.locator('#jointTxDescription').fill('Handmatige teruggave apart');await page.locator('#btnSaveJointTransaction').click();await expect(page.locator('#transactionModal')).not.toHaveClass(/open/);
+ const current=await page.evaluate(()=>FinizeTransactions.forecast('2026-10'));expect(current.owners.dion.allowance).toBe(base.owners.dion.allowance);expect(current.owners.dara.allowance).toBe(base.owners.dara.allowance);expect(current.owners.gezamenlijk.available).toBe(base.owners.gezamenlijk.available+225);
+ const id=await page.evaluate(()=>state.transactions.find(t=>t.description==='Handmatige teruggave apart').id);await page.evaluate(id=>FinizeManual.open('gezamenlijk',id),id);await expect(page.locator('#jointTxDistribution')).not.toBeChecked();await page.locator('#jointTxDistribution').check();await page.locator('#btnSaveJointTransaction').click();await expect(page.locator('#transactionModal')).not.toHaveClass(/open/);
+ const shared=await page.evaluate(()=>FinizeTransactions.forecast('2026-10'));expect(shared.owners.dion.allowance+shared.owners.dara.allowance).toBeCloseTo(base.owners.dion.allowance+base.owners.dara.allowance+225,2);
+});

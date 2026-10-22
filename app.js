@@ -2537,7 +2537,7 @@
     return details;
   }
   function financialForecastForMonth(state2, month, { compatibilityIncome = {}, plannedIncome = null, fixedOccurrences = null } = {}) {
-    var _a2, _b, _c, _d, _e;
+    var _a2, _b, _c, _d, _e, _f, _g, _h, _i, _j;
     state2 = periodDependencyState(state2, month);
     if (!validMonth(month)) throw new Error("Ongeldige prognosemaand.");
     const planned = Object.fromEntries(["dion", "dara"].map((owner) => {
@@ -2578,16 +2578,26 @@
       allowanceOwners[occurrence.financialFor].fixedReserve = money(allowanceOwners[occurrence.financialFor].fixedReserve + Number(occurrence.amount));
       if (occurrence.financialFor === "gezamenlijk" && ((_a3 = occurrence.source) == null ? void 0 : _a3.distributionMode) === "equal") equalJointReserve = money(equalJointReserve + Number(occurrence.amount));
     });
-    const dion = owners3.dion, dara = owners3.dara, joint = owners3.gezamenlijk, incomeBasis = money(dion.income + dara.income), minimum = Number((_c = (_b = (_a2 = state2.planning) == null ? void 0 : _a2.verdeling) == null ? void 0 : _b.minimumDion) != null ? _c : 0.4), ratioDion = Math.max(minimum, incomeBasis > 0 ? dion.income / incomeBasis : 0), ratioDara = 1 - ratioDion;
-    const burden = (owner) => money(owner.fixedBurden + owner.variableBurden + owner.savingsDeposit - (owner.existingCapitalDeposit || 0) - owner.unusedSavings - owner.refundCashflow);
-    const savingsOverrides = ((_d = state2.monthlySavingOverrides) == null ? void 0 : _d[month]) || {};
+    const allowanceIncome = Object.fromEntries(ACCOUNT_CONTEXTS.map((owner) => [owner, owners3[owner].income]));
+    for (const p of rows) if (p.calendarMonth === month && p.effects.incomeImpact > 0 && p.transactionType !== "salaris" && ((_b = (_a2 = p.transaction.processing) == null ? void 0 : _a2.meetellenVoorVerdeling) != null ? _b : p.transaction.meetellenVoorVerdeling) === false && owners3[p.financialFor]) allowanceIncome[p.financialFor] = money(allowanceIncome[p.financialFor] - p.effects.incomeImpact);
+    const jointFundedSavings = Object.fromEntries(ACCOUNT_CONTEXTS.map((owner) => [owner, 0]));
+    const byId = new Map(rows.map((p) => [p.id, p]));
+    for (const p of rows) if (p.calendarMonth === month && p.financialFor !== "gezamenlijk" && ((_c = p.savingsContribution) == null ? void 0 : _c.kind) === "income") {
+      const source = byId.get(p.savingsContribution.sourceId);
+      if ((source == null ? void 0 : source.transactionType) !== "salaris" && ((_e = (_d = source == null ? void 0 : source.transaction.processing) == null ? void 0 : _d.meetellenVoorVerdeling) != null ? _e : source == null ? void 0 : source.transaction.meetellenVoorVerdeling) === false) jointFundedSavings[p.financialFor] = money(jointFundedSavings[p.financialFor] + p.savingsContribution.amountCents / 100);
+    }
+    const jointSavingFunding = money(jointFundedSavings.dion + jointFundedSavings.dara);
+    const retainedJointIncome = money(ACCOUNT_CONTEXTS.reduce((sum2, owner) => sum2 + owners3[owner].income - allowanceIncome[owner], 0));
+    const dion = owners3.dion, dara = owners3.dara, joint = owners3.gezamenlijk, incomeBasis = money(dion.income + dara.income), distributionIncomeBasis = money(allowanceIncome.dion + allowanceIncome.dara), minimum = Number((_h = (_g = (_f = state2.planning) == null ? void 0 : _f.verdeling) == null ? void 0 : _g.minimumDion) != null ? _h : 0.4), ratioDion = Math.max(minimum, distributionIncomeBasis > 0 ? allowanceIncome.dion / distributionIncomeBasis : 0), ratioDara = 1 - ratioDion;
+    const burden = (owner) => money(owner.fixedBurden + owner.variableBurden + owner.savingsDeposit - (owner.existingCapitalDeposit || 0) - (jointFundedSavings[owner.owner] || 0) + (owner.owner === "gezamenlijk" ? jointSavingFunding : 0) - owner.unusedSavings - owner.refundCashflow);
+    const savingsOverrides = ((_i = state2.monthlySavingOverrides) == null ? void 0 : _i[month]) || {};
     const jointPlan = allowanceOwners.gezamenlijk;
-    jointPlan.savingsReserve = money(Object.hasOwn(savingsOverrides, "gezamenlijk") ? savingsOverrides.gezamenlijk : (_e = state2.planning) == null ? void 0 : _e.spaarpotDezeMaand);
+    jointPlan.savingsReserve = money(Object.hasOwn(savingsOverrides, "gezamenlijk") ? savingsOverrides.gezamenlijk : (_j = state2.planning) == null ? void 0 : _j.spaarpotDezeMaand);
     jointPlan.totalReserve = money(jointPlan.fixedReserve + jointPlan.budgetReserve + jointPlan.savingsReserve);
-    const distributable = money(incomeBasis + joint.income - jointPlan.totalReserve);
-    const ratioCosts = money(jointPlan.totalReserve - equalJointReserve - joint.income);
-    dion.allowance = money(dion.income - equalJointReserve * 0.5 - ratioCosts * ratioDion);
-    dara.allowance = money(dara.income - equalJointReserve * 0.5 - ratioCosts * ratioDara);
+    const distributable = money(distributionIncomeBasis + allowanceIncome.gezamenlijk - jointPlan.totalReserve);
+    const ratioCosts = money(jointPlan.totalReserve - equalJointReserve - allowanceIncome.gezamenlijk);
+    dion.allowance = money(allowanceIncome.dion - equalJointReserve * 0.5 - ratioCosts * ratioDion);
+    dara.allowance = money(allowanceIncome.dara - equalJointReserve * 0.5 - ratioCosts * ratioDara);
     ["dion", "dara"].forEach((owner) => {
       const plan = allowanceOwners[owner];
       plan.automaticallyAvailableForSavings = money(owners3[owner].allowance - plan.fixedReserve - plan.budgetReserve);
@@ -2599,7 +2609,7 @@
     joint.availableBeforeAllowance = money(incomeBasis + joint.income - burden(joint));
     joint.available = money(joint.availableBeforeAllowance - dion.allowance - dara.allowance);
     const household = { income: money(ACCOUNT_CONTEXTS.reduce((sum2, owner) => sum2 + owners3[owner].income, 0)), available: money(ACCOUNT_CONTEXTS.reduce((sum2, owner) => sum2 + owners3[owner].income - burden(owners3[owner]), 0)), actualIncome: actualIncomeForMonth(state2, month).amount, realExpense: sumTransactionEffects(state2, "realExpense", { month }), savingsFunded: sumTransactionEffects(state2, "savingsFunded", { month }), unusedSavings: sumTransactionEffects(state2, "unusedSavings", { month }), refundCashflow: sumTransactionEffects(state2, "refundCashflow", { month }) };
-    return { month, owners: owners3, household, ratioDion, ratioDara, distributable, allowanceBasis: { owners: allowanceOwners, distributable, income: money(incomeBasis + joint.income) }, coverage: coverageAllocationStatus(state2) };
+    return { month, owners: owners3, household, ratioDion, ratioDara, distributable, allowanceBasis: { owners: allowanceOwners, distributable, income: money(distributionIncomeBasis + allowanceIncome.gezamenlijk), ...retainedJointIncome ? { retainedJointIncome } : {} }, coverage: coverageAllocationStatus(state2) };
   }
 
   // src/core/daily-liquidity.mjs
@@ -3462,7 +3472,7 @@
     }
     function renderLower(root2) {
       const data = deps.summary(owner());
-      root2.querySelector("[data-p3-summary]").innerHTML = `<section class="p3-panel p3-budget">${head("Budgetten", action("budgets"))}<p class="p3-caption">${escape(deps.monthLabel())} · ${escape(deps.ownerLabel(owner()))}</p><div class="p3-budget-body"><div class="p3-ring" style="--progress:${Math.max(0, Math.min(100, data.budget ? data.used / data.budget * 100 : 0))}%"><strong>${deps.eur(data.used)}</strong><span>van ${deps.eur(data.budget)}</span></div><dl><dt>Besteed</dt><dd>${deps.eur(data.used)}</dd><dt>Resterend</dt><dd>${deps.eur(data.budget - data.used)}</dd></dl></div></section><section class="p3-panel p3-allowance">${head("Zakgeld", action("allowance"))}<p class="p3-caption">${escape(deps.monthLabel())} · Geplande verdeling</p>${data.allowances.map((p) => {
+      root2.querySelector("[data-p3-summary]").innerHTML = `<section class="p3-panel p3-budget">${head("Budgetten", action("budgets"))}<p class="p3-caption">${escape(deps.monthLabel())} · ${escape(deps.ownerLabel(owner()))}</p><div class="p3-budget-body"><div class="p3-ring" style="--progress:${Math.max(0, Math.min(100, data.budget ? data.used / data.budget * 100 : 0))}%"><strong>${deps.eur(data.used)}</strong><span>van ${deps.eur(data.budget)}</span></div><dl><dt>Besteed</dt><dd>${deps.eur(data.used)}</dd><dt>Resterend</dt><dd>${deps.eur(data.budget - data.used)}</dd></dl></div></section><section class="p3-panel p3-allowance">${head("Zakgeld", action("allowance"))}<p class="p3-caption">${escape(deps.monthLabel())} · Geplande verdeling</p>${data.retainedJointIncome ? `<p class="p3-caption" data-p3-retained-income>${deps.eur(data.retainedJointIncome)} inkomen blijft bij gezamenlijk en wordt niet als zakgeld verdeeld.</p>` : ""}${data.allowances.map((p) => {
         const share = allowanceShare(p.amount, data.allowanceDistribution);
         return `<div class="p3-allowance-row"><strong>${escape(p.name)}</strong><span>${deps.eur(p.amount)} · ${share === null ? "Verdeling niet beschikbaar" : new Intl.NumberFormat("nl-NL", { maximumFractionDigits: 1 }).format(share) + "%"}</span>${share === null ? "" : meter(share, "Aandeel " + p.name)}</div>`;
       }).join("")}</section><section class="p3-panel p3-goals">${head("Spaardoelen", action("goals"))}<p class="p3-caption">Huidige stand · planning ${escape(deps.monthLabel())}</p><div class="p3-goal-list">${data.goals.slice(0, 2).map((g) => {
@@ -11800,7 +11810,7 @@
         const used = round22(budgets.reduce((sum2, b) => sum2 + sumTransactions(owner, b.post || b.categorie, month, b.id), 0));
         const allowances = (owner === "gezamenlijk" ? ["dion", "dara"] : [owner]).map((person) => ({ name: ownerLabel(person), amount: r[person].zakgeld }));
         const goals = calcGroep(state.spaardoelen[owner] || [], owner === "gezamenlijk" ? r.spaarpotDezeMaand : r[owner].beschikbaarVoorSparen, TODAY).sort((a, b) => Number(!!b.doel.favoriet) - Number(!!a.doel.favoriet));
-        return { budget, used, allowances, allowanceDistribution: [r.dion.zakgeld, r.dara.zakgeld], goals };
+        return { budget, used, allowances, retainedJointIncome: r.forecast.allowanceBasis.retainedJointIncome || 0, allowanceDistribution: [r.dion.zakgeld, r.dara.zakgeld], goals };
       },
       eventLabel: (event2) => {
         var _a2;
@@ -12747,16 +12757,16 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
     return `${month}-${String(Math.min(Number(today.slice(-2)), last)).padStart(2, "0")}`;
   }
   function financialProcessingFields(prefix, owner, tx = {}) {
-    var _a2, _b, _c, _d;
+    var _a2, _b, _c, _d, _e, _f;
     const type = tx.fixedExpenseId || tx.fixedOccurrenceId || ((_a2 = tx.processing) == null ? void 0 : _a2.fixedExpenseId) ? "vaste-last" : getTransactionClassification(tx), goals = U3_ACCOUNTS.flatMap((key) => {
       var _a3;
       return (((_a3 = state.spaardoelen) == null ? void 0 : _a3[key]) || []).map((goal) => ({ ...goal, owner: key }));
     });
     const typeOptions = MANUAL_PROCESSING_TYPES.some(([value]) => value === type) ? MANUAL_PROCESSING_TYPES : [...MANUAL_PROCESSING_TYPES, [type, "Bestaand type · " + type]];
-    return `<label>Soort<select id="${prefix}Type">${typeOptions.map(([value, label]) => `<option value="${value}" ${value === type ? "selected" : ""}>${textSafe(label)}</option>`).join("")}</select></label><label data-p4-goal>Spaardoel<select id="${prefix}Goal"><option value="">Kies spaardoel</option>${goals.map((goal) => {
+    return `<label data-manual-distribution class="u2-checkbox"><input id="${prefix}Distribution" type="checkbox" ${((_c = (_b = tx.processing) == null ? void 0 : _b.meetellenVoorVerdeling) != null ? _c : tx.meetellenVoorVerdeling) !== false ? "checked" : ""}> Meetellen voor zakgeldverdeling</label><p data-manual-distribution class="hint">Uitgevinkt blijft dit inkomen bij gezamenlijk, bijvoorbeeld om te sparen.</p><label>Soort<select id="${prefix}Type">${typeOptions.map(([value, label]) => `<option value="${value}" ${value === type ? "selected" : ""}>${textSafe(label)}</option>`).join("")}</select></label><label data-p4-goal>Spaardoel<select id="${prefix}Goal"><option value="">Kies spaardoel</option>${goals.map((goal) => {
       var _a3;
       return `<option value="${attrSafe(goal.id)}" ${goal.id === (tx.savingsGoalId || ((_a3 = tx.processing) == null ? void 0 : _a3.savingsGoalId)) ? "selected" : ""}>${textSafe(ownerLabel(goal.owner) + " · " + goal.naam)}</option>`;
-    }).join("")}</select></label><label data-p4-refund>Refundcategorie<input id="${prefix}RefundCategory" value="${attrSafe(tx.refundCategory || ((_b = tx.processing) == null ? void 0 : _b.refundCategory) || "")}" placeholder="Historische categorie"></label><label data-p4-refund>Refundmaand<input id="${prefix}RefundMonth" type="month" value="${attrSafe(tx.refundMonth || ((_c = tx.processing) == null ? void 0 : _c.refundMonth) || "")}"></label><label data-manual-fixed>Maand vaste last<input id="${prefix}FixedMonth" type="month" value="${attrSafe(tx.fixedOccurrenceMonth || ((_d = tx.processing) == null ? void 0 : _d.fixedOccurrenceMonth) || getTransactionDate(tx).slice(0, 7))}"></label><label data-manual-fixed>Betaalmoment vaste last<select id="${prefix}Fixed"><option value="">Kies vast betaalmoment</option></select></label><label data-manual-salary>Salaris van<select id="${prefix}SalaryPerson"><option value="">Kies Dion of Dara</option>${["dion", "dara"].map((person) => `<option value="${person}" ${person === (salaryPerson(tx, state) || owner) ? "selected" : ""}>${textSafe(ownerLabel(person))}</option>`).join("")}</select></label><label data-manual-income>Inkomstenbron<select id="${prefix}Income"><option value="">Geen koppeling</option></select></label>`;
+    }).join("")}</select></label><label data-p4-refund>Refundcategorie<input id="${prefix}RefundCategory" value="${attrSafe(tx.refundCategory || ((_d = tx.processing) == null ? void 0 : _d.refundCategory) || "")}" placeholder="Historische categorie"></label><label data-p4-refund>Refundmaand<input id="${prefix}RefundMonth" type="month" value="${attrSafe(tx.refundMonth || ((_e = tx.processing) == null ? void 0 : _e.refundMonth) || "")}"></label><label data-manual-fixed>Maand vaste last<input id="${prefix}FixedMonth" type="month" value="${attrSafe(tx.fixedOccurrenceMonth || ((_f = tx.processing) == null ? void 0 : _f.fixedOccurrenceMonth) || getTransactionDate(tx).slice(0, 7))}"></label><label data-manual-fixed>Betaalmoment vaste last<select id="${prefix}Fixed"><option value="">Kies vast betaalmoment</option></select></label><label data-manual-salary>Salaris van<select id="${prefix}SalaryPerson"><option value="">Kies Dion of Dara</option>${["dion", "dara"].map((person) => `<option value="${person}" ${person === (salaryPerson(tx, state) || owner) ? "selected" : ""}>${textSafe(ownerLabel(person))}</option>`).join("")}</select></label><label data-manual-income>Inkomstenbron<select id="${prefix}Income"><option value="">Geen koppeling</option></select></label>`;
   }
   function bindFinancialProcessingFields(modal, prefix, owner, existing, account = owner) {
     const date2 = modal.querySelector(`#${prefix}Date`), type = modal.querySelector(`#${prefix}Type`), category = modal.querySelector(`#${prefix}Category`);
@@ -12764,7 +12774,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
       var _a2, _b;
       const month = String(date2.value).slice(0, 7), valid = /^\d{4}-(0[1-9]|1[0-2])$/.test(month), value = type.value;
       const income = value === "inkomen" || INCOME_TRANSACTION_TYPES.includes(value), savings = ["sparen", "naar-spaarrekening", "van-spaarrekening"].includes(value), refund = ["terugbetaling", "refund"].includes(value);
-      for (const [selector, visible2] of [["[data-p4-goal]", savings], ["[data-p4-refund]", refund], ["[data-manual-fixed]", value === "vaste-last"], ["[data-manual-income]", income], ["[data-manual-salary]", value === "salaris"], ["[data-manual-category]", value === "uitgave"]]) modal.querySelectorAll(selector).forEach((el) => {
+      for (const [selector, visible2] of [["[data-p4-goal]", savings], ["[data-p4-refund]", refund], ["[data-manual-fixed]", value === "vaste-last"], ["[data-manual-income]", income], ["[data-manual-distribution]", income && value !== "salaris"], ["[data-manual-salary]", value === "salaris"], ["[data-manual-category]", value === "uitgave"]]) modal.querySelectorAll(selector).forEach((el) => {
         el.hidden = !visible2;
         el.style.display = visible2 ? "" : "none";
       });
@@ -12795,7 +12805,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
   }
   function readFinancialProcessingFields(prefix) {
     const transactionType = document.getElementById(prefix + "Type").value;
-    return { transactionType, savingsGoalId: ["sparen", "naar-spaarrekening", "van-spaarrekening"].includes(transactionType) ? document.getElementById(prefix + "Goal").value : "", refundCategory: ["terugbetaling", "refund"].includes(transactionType) ? document.getElementById(prefix + "RefundCategory").value.trim() : "", refundMonth: ["terugbetaling", "refund"].includes(transactionType) ? document.getElementById(prefix + "RefundMonth").value : "" };
+    return { transactionType, ...(transactionType === "inkomen" || INCOME_TRANSACTION_TYPES.includes(transactionType)) && transactionType !== "salaris" ? { meetellenVoorVerdeling: document.getElementById(prefix + "Distribution").checked } : {}, savingsGoalId: ["sparen", "naar-spaarrekening", "van-spaarrekening"].includes(transactionType) ? document.getElementById(prefix + "Goal").value : "", refundCategory: ["terugbetaling", "refund"].includes(transactionType) ? document.getElementById(prefix + "RefundCategory").value.trim() : "", refundMonth: ["terugbetaling", "refund"].includes(transactionType) ? document.getElementById(prefix + "RefundMonth").value : "" };
   }
   function openContextTransactionModal(owner, transactionId = "") {
     var _a2;
@@ -18548,7 +18558,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
       if (family === "inkomen") return `<div class="u4-dependent-grid"><label>Soort inkomen<select data-u4-field="transactionType">${INCOME_TYPES.map((type) => {
         var _a3;
         return option(type, ((_a3 = TYPE_GROUPS[1].items.find((item) => item[0] === type)) == null ? void 0 : _a3[1]) || type, p.transactionType);
-      }).join("")}</select></label>${p.transactionType === "salaris" ? `<label>Salaris van<select data-u4-field="salaryPersonId"><option value="">Kies Dion of Dara</option>${["dion", "dara"].map((person) => option(person, ownerLabel2(person), p.salaryPersonId || "")).join("")}</select></label><span class="u4-muted">Salarismaand ${esc(originalSalaryMonth(row))}. Een voorstel wordt pas definitief na Opslaan en verwerken.</span>` : ""}</div>`;
+      }).join("")}</select></label>${p.transactionType !== "salaris" ? `<label class="u2-checkbox"><input type="checkbox" data-u4-field="meetellenVoorVerdeling" ${p.meetellenVoorVerdeling !== false ? "checked" : ""}> Meetellen voor zakgeldverdeling</label><span class="u4-muted">Uitgevinkt blijft dit inkomen bij gezamenlijk, bijvoorbeeld om te sparen. Een spaarinleg telt één keer mee.</span>` : ""}${p.transactionType === "salaris" ? `<label>Salaris van<select data-u4-field="salaryPersonId"><option value="">Kies Dion of Dara</option>${["dion", "dara"].map((person) => option(person, ownerLabel2(person), p.salaryPersonId || "")).join("")}</select></label><span class="u4-muted">Salarismaand ${esc(originalSalaryMonth(row))}. Een voorstel wordt pas definitief na Opslaan en verwerken.</span>` : ""}</div>`;
       if (family === "sparen") return `<div class="u4-dependent-grid"><label>Spaarbeweging<select data-u4-field="transactionType">${option("sparen", "Naar spaardoel", p.transactionType)}${option("naar-spaarrekening", "Naar spaarrekening", p.transactionType)}${option("van-spaarrekening", "Van spaarrekening", p.transactionType)}</select></label><label>Spaardoel<select data-u4-field="savingsGoalId">${goalOptions(root2, p.savingsGoalId)}</select></label>${["sparen", "naar-spaarrekening"].includes(p.transactionType) ? savingsContributionFields(root2, row) : ""}${p.transactionType === "van-spaarrekening" && !((_d = p.splits) == null ? void 0 : _d.length) ? `<label>Budgetcorrectie (optioneel)<select data-u4-field="withdrawalBudgetCategory"><option value="">Zonder budgetcorrectie</option>${categoryOptions(root2, p.budgetOwner, p.withdrawalBudgetCategory, row.bankOriginal.bankDate.slice(0, 7))}</select></label>` : ""}</div>`;
       if (family === "overboeking") return `${incomingContributionFields(root2, row)}<div class="u4-dependent-grid"><label>Soort overboeking<select data-u4-field="transactionType">${TYPE_GROUPS[2].items.filter((item) => TRANSFER_TYPES.includes(item[0])).map(([type, label]) => option(type, label, p.transactionType)).join("")}</select></label></div>${transferFieldsHtml(root2, row)}`;
       if (family === "zakgeld") return '<p class="u4-dependent-hint">Kies Dion of Dara bij Budgeteigenaar.</p>';
@@ -18987,6 +18997,7 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
           let value = event2.target.value;
           if (["processedAmount", "singleLineAmount", "contributionAmount", "savingsContributionAmount"].includes(field)) value = Math.abs(Number(value));
           if (field === "include") value = value === "true";
+          if (field === "meetellenVoorVerdeling") value = event2.target.checked;
           if (field === "transactionType") {
             setProcessingType(row.processing, value);
             for (const line of row.processing.splits || []) setProcessingType(line, value);
