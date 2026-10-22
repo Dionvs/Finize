@@ -16,3 +16,24 @@ test('P3 herstel gezamenlijke noemer houdt beide persoonlijke aandelen en bedrag
 test('P3 herstel nul en tekort houden bestaande presentatiebehandeling',()=>{for(const values of [[0,0],[-5,10],[10,-5],[-5,-10]])for(const amount of values)assert.equal(allowanceShare(amount,values),null);assert.equal(allowanceShare(0,[0,100]),0);assert.equal(allowanceShare(100,[0,100]),100);});
 test('P3 herstel periode uit P2, inclusieve handmatige grens en onbekende horizon',()=>{const p=projection();assert.match(forecastPeriod(p),/14 okt – 27 okt 2026/);assert.match(forecastPeriod(p),/vóór volgend salaris/);p.horizon.kind='manual';assert.match(forecastPeriod(p),/Einddatum inbegrepen/);p.horizon.endDate=null;assert.match(forecastPeriod(p),/onbekend/);assert.doesNotMatch(forecastPeriod(p),/27 okt/);p.asOfDate='2026-12-30';p.horizon.endDate='2027-01-03';assert.match(forecastPeriod(p),/30 dec 2026 – 3 jan 2027/);});
 test('P3 herstel neutraal minimum inkomen en uitgave benoemen uitsluitend concrete gebeurtenissen',()=>{assert.equal(pointMeaning([],false).label,'Saldopunt zonder concrete betaling');assert.equal(pointMeaning([],true).label,'Laagste prognose · Saldopunt zonder concrete betaling');assert.equal(pointMeaning([{amountCents:-100}],true).label,'Laagste prognose · Uitgave');assert.equal(pointMeaning([{amountCents:200},{amountCents:-100}],false).label,'Inkomst · Uitgave');assert.equal(pointMeaning([],false).expense,false);});
+
+
+test('betalingskaart toont uitsluitend toekomstige vaste plannen binnen rekening en periode',()=>{
+ const row={id:'future-fixed',accountProfileId:'joint',type:'fixed',status:'planned',date:'2026-10-20',amountCents:-100};
+ const p={accountProfileId:'joint',asOfDate:'2026-10-14',displayStartDate:'2026-10-01',horizon:{endDate:'2026-10-31'},events:[
+  row,...[
+   {id:'past',date:'2026-10-13'}, {id:'today',date:'2026-10-14'}, {id:'outside',date:'2026-11-01'},
+   {id:'actual',type:'bank',status:'actual'}, {id:'provisional',type:'bank',status:'provisional'},
+   {id:'replaced',status:'replaced'}, {id:'reservation',status:'reservation'}, {id:'undated',date:null},
+   {id:'other-account',accountProfileId:'personal'}, {id:'transfer',type:'internal-transfer'},
+   {id:'income',type:'income'}, {id:'salary',type:'salary'}, {id:'allowance',type:'allowance'}
+  ].map(extra=>({...row,...extra}))
+ ]};
+ const before=JSON.stringify(p);
+ assert.deepEqual(paymentEvents(p).map(e=>e.id),['allowance','future-fixed','income','salary']);
+ assert.equal(JSON.stringify(p),before);
+ assert.deepEqual(paymentEvents({...p,displayStartDate:'2026-10-21'}),[]);
+ assert.deepEqual(paymentEvents({...p,asOfDate:'2026-11-01'}),[]);
+ assert.deepEqual(paymentEvents({...p,horizon:{endDate:null}}),[]);
+ assert.deepEqual(paymentEvents(null),[]);
+});

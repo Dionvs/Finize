@@ -1,3 +1,4 @@
+import { isSavingsIncomeSource, savingsContributionCapacity } from '../core/savings-contributions.mjs';
 import { fixedCashDate } from '../core/liquidity-settings.mjs';
 import { profileSync, profileStart } from '../storage/performance.mjs';
 import { availableAccountProfiles, accountIsArchived } from '../core/account-profiles.mjs';
@@ -1062,7 +1063,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
       const candidate={id,source:'csv',approvalSource:'manual',processingStatus:'goedgekeurd',date:row.bankOriginal.bankDate,bankOriginal:row.bankOriginal,amount:p.processedAmount,transactionType:p.transactionType,accountContext:row.accountOwner,financialFor:p.budgetOwner,processing:clone(p),savingsGoalId:p.savingsGoalId};
       const checkState={...state,transactions:[...(state.transactions||[]).filter(tx=>tx.importTransactionId!==row.id&&tx.id!==id),candidate]};
       const result=projectTransaction(candidate,{state:checkState});
-      if(result.savingsContributionError||!result.effects.existingCapitalDeposit)return {ok:false,errors:[{code:'savings-contribution',message:result.savingsContributionError||'Deze interne inleg kan niet aan de spaarboeking worden gekoppeld.'}]};
+      if(result.savingsContributionError||!result.savingsContribution)return {ok:false,errors:[{code:'savings-contribution',message:result.savingsContributionError||'Deze ontvangst kan niet aan de spaarboeking worden gekoppeld.'}]};
     }
     if(p.salaryLinkVersion===117&&lines.some(line=>(line.transactionType||p.transactionType)==='salaris')){
       try{salaryLink({...row,processing:p},{},{requireChoice:true});}catch(error){return {ok:false,errors:[{code:error.code,field:error.field,message:error.message}]};}
@@ -1756,9 +1757,10 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
   }
   function savingsContributionFields(root,row){
     const p=row.processing,month=row.bankOriginal.bankDate.slice(0,7);
-    const sources=selectTransactionProjections(root.state).filter(t=>['interne-overboeking','extra-bijdrage'].includes(t.transactionType)&&t.effects.accountCashflow>0&&t.calendarMonth===month&&t.financialFor===p.budgetOwner&&t.transaction.processing?.contributionGoalId===p.savingsGoalId);
-    const missing=p.savingsContributionId&&!sources.some(t=>t.id===p.savingsContributionId);
-    return `<label>Betaald uit interne inleg<select data-u4-field="savingsContributionId"><option value="">Geen koppeling — uit maandruimte</option>${missing?option(p.savingsContributionId,'Gekoppelde inleg niet beschikbaar',p.savingsContributionId):''}${sources.map(t=>option(t.id,`${t.transaction.description||'Interne inleg'} · ${euro(t.transaction.processing.contributionAmount)}`,p.savingsContributionId||'')).join('')}</select></label>${p.savingsContributionId?`<label>Gekoppeld bedrag<input type="number" min="0.01" step="0.01" data-u4-field="savingsContributionAmount" value="${Number(p.savingsContributionAmount)||0}"></label><span class="u4-muted">Dit deel komt uit bestaand eigen geld en wordt niet van Over deze maand afgetrokken. De volledige spaarboeking blijft meetellen voor het spaardoel.</span>`:''}`;
+    const sources=selectTransactionProjections(root.state).filter(t=>t.active&&t.effects.accountCashflow>0&&t.calendarMonth===month&&t.financialFor===p.budgetOwner&&(isSavingsIncomeSource(t)||['interne-overboeking','extra-bijdrage'].includes(t.transactionType)&&t.transaction.processing?.contributionGoalId===p.savingsGoalId));
+    const selected=sources.find(t=>t.id===p.savingsContributionId);
+    const missing=p.savingsContributionId&&!selected;
+    return `<label>Gekoppelde inleg of inkomen<select data-u4-field="savingsContributionId"><option value="">Geen koppeling</option>${missing?option(p.savingsContributionId,'Gekoppelde inleg niet beschikbaar',p.savingsContributionId):''}${sources.map(t=>option(t.id,`${t.transaction.description||(isSavingsIncomeSource(t)?'Inkomen':'Interne inleg')} · ${euro(savingsContributionCapacity(t)/100)}`,p.savingsContributionId||'')).join('')}</select></label>${p.savingsContributionId?`<label>Gekoppeld bedrag<input type="number" min="0.01" step="0.01" data-u4-field="savingsContributionAmount" value="${Number(p.savingsContributionAmount)||0}"></label><span class="u4-muted">${isSavingsIncomeSource(selected)?'Administratieve koppeling: inkomen, maandruimte en spaarbedrag veranderen hierdoor niet.':'Dit deel komt uit bestaand eigen geld en wordt niet van Over deze maand afgetrokken.'} De volledige spaarboeking blijft meetellen voor het spaardoel.</span>`:''}`;
   }
   function dependentFieldsHtml(root,row){
     const p=row.processing;const family=transactionFamily(p);

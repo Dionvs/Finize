@@ -142,3 +142,29 @@ for(const width of [390,1440])test(`Legacy CSV zonder importreferentie blijft in
  expect(await page.evaluate(()=>FinizeTransactions.total('budgetImpact',{month:'2026-10'}))).toBe(25);
  await expect(page.locator('#transactionModal')).not.toHaveClass(/open/);
 });
+
+
+for(const width of [390,430,1440])test('belastingteruggave administratief koppelen aan spaarinleg '+width+'px',async({page})=>{
+ const errors=[];page.on('pageerror',error=>errors.push(error.message));
+ await boot(page,width);
+ await page.evaluate(()=>commitChange(()=>{state.spaardoelen.gezamenlijk.push({id:'income-goal',naam:'Belasting sparen',doelbedrag:1000,algespaard:0});},{render:false}));
+ await draft(page,'income-saving','gezamenlijk',[
+  {date:'2026-10-15',amount:225,label:'Belastingteruggave test',type:'belastingteruggave'},
+  {date:'2026-10-15',amount:-225,label:'Sparen uit belastingteruggave',type:'sparen',processing:{savingsGoalId:'income-goal'}}
+ ]);
+ await approve(page,'income-saving-0');await approve(page,'income-saving-1');
+ const snapshot=()=>page.evaluate(()=>({forecast:FinizeTransactions.forecast('2026-10'),goal:state.spaardoelen.gezamenlijk.find(g=>g.id==='income-goal').algespaard,effects:FinizeTransactions.effects({month:'2026-10'}).map(p=>p.effects)}));
+ const before=await snapshot();
+ await sections(page);await page.locator('[data-u4-row="income-saving-1"] [data-u4-reopen]').click();
+ const deposit=page.locator('[data-u4-row="income-saving-1"]');
+ await deposit.locator('[data-u4-field="savingsContributionId"]').selectOption('tx-income-saving-0');
+ await expect(deposit).toContainText('Administratieve koppeling');
+ await expect(deposit.locator('[data-u4-field="savingsContributionAmount"]')).toHaveValue('225');
+ fs.mkdirSync('.cache/upcoming-payments',{recursive:true});await page.screenshot({path:'.cache/upcoming-payments/income-link-'+width+'.png',fullPage:true});
+ await approve(page,'income-saving-1');await process(page);
+ expect(await snapshot()).toEqual(before);
+ expect(await page.evaluate(()=>FinizeTransactions.effects({month:'2026-10'}).find(p=>p.id==='tx-income-saving-1').savingsContribution)).toEqual({sourceId:'tx-income-saving-0',amountCents:22500,kind:'income'});
+ await page.reload();await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
+ expect(await snapshot()).toEqual(before);
+ expect(await page.evaluate(()=>state.transactions.find(t=>t.id==='tx-income-saving-1').processing.savingsContributionId)).toBe('tx-income-saving-0');expect(errors).toEqual([]);
+});

@@ -32,10 +32,7 @@ for(const width of [320,390,768,1440])test(`gekozen kalendermaand, onbekende dag
  const eur=n=>new Intl.NumberFormat('nl-NL',{style:'currency',currency:'EUR'}).format(n);
  await expect(page.locator('.p3-budget')).toContainText(eur(r.variabelBudgetTotaal));
  await expect(page.locator('.p3-allowance')).toContainText(eur(r.dion.zakgeld));
- await page.locator('[data-p3-action="payments"]').click();
- await expect(page.locator('#incomeEditModal')).toContainText('1 nov tot en met 30 nov');
- expect(await page.locator('#incomeEditModal time').evaluateAll(nodes=>nodes.every(n=>n.dateTime.startsWith('2026-11')))).toBe(true);
- await page.locator('[data-u3-close]').click();
+ await expect(page.locator('[data-p3-payments]').locator('..').locator('.p3-head button')).toHaveCount(0);
  await page.locator('[data-p3-context="persoonlijk"]').click();
  await expect(page.locator('[data-p3-period]')).toContainText('1 nov – 30 nov 2026');
  await page.locator('[data-p3-person]').selectOption('dara');
@@ -89,4 +86,48 @@ test('historisch salarisfilter en toekomstige korte horizon blijven bij hun gese
  await page.locator('[data-p3-context="persoonlijk"]').click();await page.locator('[data-p3-filter="salary"]').click();
  await expect(page.locator('[data-p3-period]')).toContainText('onbekend');
  await expect(page.locator('[data-p3-chart]')).toContainText('betrouwbare volgende salarisdatum ontbreekt');
+});
+
+
+for(const width of [390,430,1440])test('betalingskaart toont toekomstige vaste planning en scrollt compact '+width+'px',async({page})=>{
+ const errors=[];page.on('pageerror',error=>errors.push(error.message));
+ await boot(page,width);
+ const before=await snapshot(page);
+ const paths=await page.locator('.p3-line').evaluateAll(nodes=>nodes.map(n=>n.getAttribute('d')));
+ await page.evaluate(()=>{
+  const original=FinizeLiquidity.project;
+  window.FinizeLiquidity={...FinizeLiquidity,project:async options=>{
+   const p=await original(options);
+   const base={accountProfileId:p.accountProfileId,type:'fixed',status:'planned',date:'2026-10-20',amountCents:-12345,warnings:[]};
+   return {...p,events:[
+    ...Array.from({length:10},(_,i)=>({...base,id:'test-future-'+i})),
+    ...[{id:'test-past',date:'2026-10-13'},{id:'test-today',date:'2026-10-14'},
+     {id:'test-bank',type:'bank',status:'actual'},{id:'test-provisional',type:'bank',status:'provisional'},
+     {id:'test-transfer',type:'internal-transfer'},{id:'test-replaced',status:'replaced'},
+     {id:'test-outside',date:'2026-11-01'},
+     {id:'test-salary',type:'salary',date:'2026-10-25',amountCents:250000}
+    ].map(extra=>({...base,...extra}))
+   ]};
+  }};
+ });
+ await navigate(page,'dashboard');
+ const list=page.locator('[data-p3-payments]');
+ await expect(list.locator('time')).toHaveCount(11);
+ expect(await list.locator('time').evaluateAll(nodes=>nodes.map(n=>n.dateTime))).toEqual([...Array(10).fill('2026-10-20'),'2026-10-25']);
+ await expect(list).not.toContainText('Werkelijk');
+ await expect(list).not.toContainText('Voorlopig');
+ expect(await page.locator('.p3-line').evaluateAll(nodes=>nodes.map(n=>n.getAttribute('d')))).toEqual(paths);
+
+ await expect(list.locator('..').locator('.p3-head button')).toHaveCount(0);
+ const scroll=await list.evaluate(el=>{el.scrollTop=el.scrollHeight;return {height:el.clientHeight,content:el.scrollHeight,top:el.scrollTop,overflow:getComputedStyle(el).overflowY};});
+ expect(scroll.height).toBeLessThanOrEqual(360);expect(scroll.content).toBeGreaterThan(scroll.height);expect(scroll.top).toBeGreaterThan(0);expect(scroll.overflow).toBe('auto');
+ fs.mkdirSync('.cache/upcoming-payments',{recursive:true});
+ await page.screenshot({path:'.cache/upcoming-payments/dashboard-'+width+'.png',fullPage:true});
+ await page.locator('[data-p3-filter="7"]').click();
+ await expect(list.locator('time')).toHaveCount(10);
+ await page.locator('[data-p3-filter="custom"]').click();
+ await page.locator('[data-p3-custom]').fill('2026-10-19');
+ await page.locator('[data-p3-custom]').dispatchEvent('change');
+ await expect(list).toContainText('Geen toekomstige vaste betalingen of inkomsten');
+ expect(await snapshot(page)).toEqual(before);expect(errors).toEqual([]);
 });

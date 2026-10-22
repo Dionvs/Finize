@@ -26,7 +26,7 @@ for(const width of [1440,390,320])test(`P3 ${width}px echte P2 waarden, layout, 
 test('P3 filters, eigen datum, salaris, grafiek toetsenbord/touch en state ongewijzigd',async({page})=>{
  await boot(page);const before=await page.evaluate(()=>JSON.stringify(state));
  await page.locator('[data-p3-filter="7"]').click();await expect(page.locator('[data-p3-outlook]')).not.toContainText('laden');await expect(page.locator('[data-p3-day] option').last()).toHaveAttribute('value','2026-10-20');
- await page.locator('[data-p3-filter="14"]').click();await expect(page.locator('[data-p3-day] option').last()).toHaveAttribute('value','2026-10-27');await page.locator('[data-p3-action="payments"]').click();await expect(page.locator('#incomeEditModal')).toContainText('Salaris Dion');await page.locator('[data-u3-close]').click();
+ await page.locator('[data-p3-filter="14"]').click();await expect(page.locator('[data-p3-day] option').last()).toHaveAttribute('value','2026-10-27');await expect(page.locator('[data-p3-payments]')).toContainText('Salaris Dion');
  await page.locator('[data-p3-filter="month"]').click();await expect(page.locator('[data-p3-day] option').last()).toHaveAttribute('value','2026-10-31');
  await page.locator('[data-p3-filter="custom"]').click();await page.locator('[data-p3-custom]').fill('2026-10-30');await page.locator('[data-p3-custom]').dispatchEvent('change');await expect(page.locator('[data-p3-day] option').last()).toHaveAttribute('value','2026-10-30');
  const point=page.locator('svg g[data-p3-point]').first();await point.focus();await page.keyboard.press('Enter');await expect(page.locator('[data-p3-point-detail]')).toContainText('14 okt');await point.tap();await page.locator('[data-p3-day]').selectOption('2026-10-25');await expect(page.locator('[data-p3-point-detail]')).toContainText('Salaris Dion');
@@ -36,7 +36,7 @@ test('P3 context onthouden, persoonlijke rekening en juiste bestaande instelling
  await boot(page);await page.locator('[data-p3-context="persoonlijk"]').click();await expect(page.locator('.p3-kpi').nth(1)).toContainText('Saldo onbekend');await expect(page.locator('.p3-kpi').nth(3)).toContainText('€ 0,00');await page.reload();await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);await expect(page.locator('[data-p3-context="persoonlijk"]')).toHaveAttribute('aria-pressed','true');await page.locator('[data-p3-action="settings"]:visible').first().click();await expect(page.locator('[data-liquidity-form]')).toBeVisible();await expect(page.locator('[name="buffer"]')).toHaveValue('0');
 });
 test('P3 bekijk alles, jaarselectie en bestaande budget/zakgeld/doelenroutes',async({page})=>{
- await boot(page,1440);await page.locator('[data-p3-action="payments"]').click();await expect(page.locator('#incomeEditModal')).toContainText('Betalingen binnen je prognoseperiode');await page.locator('[data-u3-close]').click();
+ await boot(page,1440);await expect(page.locator('[data-p3-payments]').locator('..').locator('.p3-head button')).toHaveCount(0);
  await page.locator('[data-p3-year]').selectOption('2025');await expect(page.locator('[data-p3-year-panel] h2')).toContainText('2025');
  for(const [action,tab] of [['budgets','gezamenlijk'],['allowance','gezamenlijk'],['goals','spaardoelen']]){await page.locator(`[data-p3-action="${action}"]`).click();expect(await page.evaluate(()=>document.querySelector('.wrap.active')?.id.replace('tab-',''))).toBe(tab);await page.evaluate(()=>{document.querySelector('#tabs [data-tab="dashboard"]').click();});}
 });

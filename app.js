@@ -2016,6 +2016,11 @@
 
   // src/core/savings-contributions.mjs
   var cents = (value) => Math.round(Number(value) * 100);
+  var isSavingsIncomeSource = (source) => (source == null ? void 0 : source.active) && source.effects.accountCashflow > 0 && source.effects.incomeImpact > 0;
+  function savingsContributionCapacity(source) {
+    var _a2;
+    return Math.min(cents(source.amount), cents(source.effects.accountCashflow), cents(isSavingsIncomeSource(source) ? source.effects.incomeImpact : (_a2 = source.transaction.processing) == null ? void 0 : _a2.contributionAmount));
+  }
   function applySavingsContributions(rows, state2) {
     const goals = new Set(Object.values(state2.spaardoelen || {}).flat().map((goal) => goal.id));
     const byId = new Map(rows.map((p) => [p.id, p])), claims = /* @__PURE__ */ new Map(), pending = [];
@@ -2027,28 +2032,29 @@
       let error2 = "";
       if (!deposit.active) continue;
       if (!(source == null ? void 0 : source.active)) error2 = "De gekoppelde inleg ontbreekt of is niet goedgekeurd.";
-      else if (!["interne-overboeking", "extra-bijdrage"].includes(source.transactionType) || source.effects.accountCashflow <= 0) error2 = "De bron moet een ontvangen interne inleg zijn.";
-      else if (!(deposit.effects.savingsDeposit > 0) || !goals.has(deposit.savingsGoalId) || origin.contributionGoalId !== deposit.savingsGoalId) error2 = "De inleg en spaarboeking moeten hetzelfde bestaande spaardoel hebben.";
+      else if (!isSavingsIncomeSource(source) && (!["interne-overboeking", "extra-bijdrage"].includes(source.transactionType) || source.effects.accountCashflow <= 0)) error2 = "De bron moet ontvangen inkomen of een interne inleg zijn.";
+      else if (!(deposit.effects.savingsDeposit > 0) || !goals.has(deposit.savingsGoalId) || !isSavingsIncomeSource(source) && origin.contributionGoalId !== deposit.savingsGoalId) error2 = "De inleg en spaarboeking moeten hetzelfde bestaande spaardoel hebben.";
       else if (source.calendarMonth !== deposit.calendarMonth || source.financialFor !== deposit.financialFor) error2 = "De inleg en spaarboeking moeten dezelfde maand en budgeteigenaar hebben.";
       else if (!Number.isSafeInteger(amountCents) || amountCents <= 0 || Math.abs(amount * 100 - amountCents) > 1e-6 || amountCents > cents(deposit.effects.savingsDeposit)) error2 = "De gekoppelde inleg moet binnen het spaarbedrag passen.";
       if (error2) {
         deposit.savingsContributionError = error2;
         continue;
       }
-      const cap = Math.min(cents(source.amount), cents(source.effects.accountCashflow), cents(origin.contributionAmount));
+      const cap = savingsContributionCapacity(source);
       if (!Number.isSafeInteger(cap) || cap <= 0) {
         deposit.savingsContributionError = "Vul een geldig inlegbedrag in bij de interne ontvangst.";
         continue;
       }
       claims.set(sourceId, (claims.get(sourceId) || 0) + amountCents);
-      pending.push({ deposit, sourceId, cap, amountCents });
+      pending.push({ deposit, sourceId, cap, amountCents, income: isSavingsIncomeSource(source) });
     }
-    for (const { deposit, sourceId, cap, amountCents } of pending) {
+    for (const { deposit, sourceId, cap, amountCents, income } of pending) {
       if (claims.get(sourceId) > cap) {
         deposit.savingsContributionError = "Deze inleg is vaker of voor een hoger bedrag gekoppeld dan beschikbaar.";
         continue;
       }
-      deposit.effects.existingCapitalDeposit = amountCents / 100;
+      deposit.savingsContribution = { sourceId, amountCents, kind: income ? "income" : "existing-capital" };
+      if (!income) deposit.effects.existingCapitalDeposit = amountCents / 100;
     }
   }
 
@@ -3321,8 +3327,11 @@
     });
     return matches.length === 1 ? matches[0] : null;
   }
-  function paymentEvents(p) {
+  function chartPaymentEvents(p) {
     return ((p == null ? void 0 : p.events) || []).filter((e) => e.accountProfileId === p.accountProfileId && ["actual", "provisional", "planned"].includes(e.status) && (p.displayStartDate ? e.date >= p.displayStartDate : e.date > p.asOfDate) && e.date <= p.horizon.endDate).sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+  }
+  function paymentEvents(p) {
+    return chartPaymentEvents(p).filter((e) => e.status === "planned" && ["fixed", "income", "salary", "allowance"].includes(e.type) && e.date > p.asOfDate);
   }
   function liquidityView(p) {
     var _a2;
@@ -3358,9 +3367,9 @@
   var head = (title, action2 = "") => `<div class="p3-head"><h2>${title}</h2>${action2}</div>`;
   var action = (name, label = "Bekijk alles") => `<button type="button" class="p3-link" data-p3-action="${name}">${label}<span aria-hidden="true"> ›</span></button>`;
   var meter = (value, label) => `<progress max="100" value="${Math.max(0, Math.min(100, value))}" aria-label="${escape(label)}"></progress>`;
-  function paymentsHtml(p, label, all = false, canOpen = () => false) {
+  function paymentsHtml(p, label, canOpen = () => false) {
     const rows = paymentEvents(p);
-    return rows.slice(0, all ? rows.length : 6).map((e) => `<li${canOpen(e) ? "" : ' class="p3-payment"'}>${canOpen(e) ? `<button type="button" class="p3-payment p3-payment-button" data-p3-event="${escape(e.id)}">` : ""}<time datetime="${e.date}">${date(e.date)}</time><span class="p3-event-icon ${e.amountCents < 0 ? "out" : "in"}" aria-hidden="true">${e.amountCents < 0 ? "↗" : "↙"}</span><span class="p3-payment-copy"><strong>${escape(label(e))}</strong><small>${status(e.status)}${e.dateQuality === "estimated" ? " · Geschat" : ""}</small></span><strong class="${e.amountCents < 0 ? "" : "p3-positive"}">${e.amountCents > 0 ? "+ " : ""}${money2(e.amountCents)}</strong>${canOpen(e) ? "</button>" : ""}</li>`).join("") || '<li class="p3-empty">Geen gedateerde betalingen binnen deze periode.</li>';
+    return rows.map((e) => `<li${canOpen(e) ? "" : ' class="p3-payment"'}>${canOpen(e) ? `<button type="button" class="p3-payment p3-payment-button" data-p3-event="${escape(e.id)}">` : ""}<time datetime="${e.date}">${date(e.date)}</time><span class="p3-event-icon ${e.amountCents < 0 ? "out" : "in"}" aria-hidden="true">${e.amountCents < 0 ? "↗" : "↙"}</span><span class="p3-payment-copy"><strong>${escape(label(e))}</strong><small>${status(e.status)}${e.dateQuality === "estimated" ? " · Geschat" : ""}</small></span><strong class="${e.amountCents < 0 ? "" : "p3-positive"}">${e.amountCents > 0 ? "+ " : ""}${money2(e.amountCents)}</strong>${canOpen(e) ? "</button>" : ""}</li>`).join("") || '<li class="p3-empty">Geen toekomstige vaste betalingen of inkomsten binnen deze periode.</li>';
   }
   function chartHtml(p, width = 720) {
     width = Math.max(210, width);
@@ -3383,7 +3392,7 @@
       return `<line x1="${plotStart}" x2="${plotEnd}" y1="${yy}" y2="${yy}" class="p3-gridline"/><text x="${plotStart - 5}" y="${yy + 4}" text-anchor="end">${money2(Math.round(v)).replace(",00", "")}</text>`;
     }).join("");
     const labels2 = [.../* @__PURE__ */ new Set([0, Math.floor((days.length - 1) / 2), days.length - 1])].map((i) => `<text x="${x(i)}" y="${chartHeight - 11}" text-anchor="${i === 0 ? "start" : i === days.length - 1 ? "end" : "middle"}">${date(days[i].date)}</text>`).join("");
-    const events = paymentEvents(p), points = days.map((d, i) => ({ d, i, events: events.filter((e) => e.date === d.date) })).filter(({ d, i, events: events2 }) => Number.isSafeInteger(d.expectedBalanceCents) && (events2.length || d.date === p.minimumDate || d === known[0] || i === days.length - 1));
+    const events = chartPaymentEvents(p), points = days.map((d, i) => ({ d, i, events: events.filter((e) => e.date === d.date) })).filter(({ d, i, events: events2 }) => Number.isSafeInteger(d.expectedBalanceCents) && (events2.length || d.date === p.minimumDate || d === known[0] || i === days.length - 1));
     const markers = points.map(({ d, i, events: events2 }) => {
       const meaning = pointMeaning(events2, d.date === p.minimumDate), cx = x(i), cy = y(d.expectedBalanceCents);
       const dot = meaning.income ? "p3-income" : meaning.expense ? "p3-expense" : "p3-neutral";
@@ -3555,7 +3564,7 @@
         root2.querySelector("[data-p3-outlook]").innerHTML = outlookHtml(p, profile, deps.eventLabel, deps.iconSvg);
         root2.querySelector("[data-p3-period]").textContent = forecastPeriod(p);
         drawChart(root2, true);
-        root2.querySelector("[data-p3-payments]").innerHTML = paymentsHtml(p, deps.eventLabel, false, deps.canOpenEvent);
+        root2.querySelector("[data-p3-payments]").innerHTML = paymentsHtml(p, deps.eventLabel, deps.canOpenEvent);
       } catch (e) {
         if (token !== generation || !root2.isConnected) return;
         root2.querySelector("[data-p3-outlook]").innerHTML = `<p class="p3-empty" role="status">${escape(e.message)}</p>${action("settings", "Prognose instellen")}`;
@@ -3580,7 +3589,7 @@
       year != null ? year : year = Number(month.slice(0, 4));
       const bounds = dashboardPeriod({ month, today: deps.today() });
       root2.classList.add("p3-dashboard");
-      root2.insertAdjacentHTML("beforeend", `<div class="p3-surface"><section class="p3-panel p3-outlook"><div class="p3-toolbar"><div><h2>Vooruitblik</h2></div><div class="p3-context" role="group" aria-label="Dashboardcontext">${["gezamenlijk", "persoonlijk"].map((c) => `<button type="button" data-p3-context="${c}" aria-pressed="${context === c}">${c === "gezamenlijk" ? "Gezamenlijk" : "Persoonlijk"}</button>`).join("")}</div>${!deps.personalRole() ? `<label class="p3-person" ${context === "gezamenlijk" ? "hidden" : ""}>Persoon <select data-p3-person><option value="dion" ${localPerson === "dion" ? "selected" : ""}>Dion</option><option value="dara" ${localPerson === "dara" ? "selected" : ""}>Dara</option></select></label>` : ""}<div class="p3-filters" role="group" aria-label="Prognoseperiode">${[["month", "Deze maand"], ["7", "7 dagen"], ["14", "14 dagen"], ["custom", "Eigen datum"], ["salary", "Volgend salaris"]].map(([value, title]) => `<button type="button" data-p3-filter="${value}" aria-pressed="${filter === value}">${title}</button>`).join("")}</div></div><label class="p3-custom" ${filter === "custom" ? "" : "hidden"}>Tot en met <input type="date" data-p3-custom min="${bounds.minDate}" max="${bounds.maxDate}" value="${custom}" required></label><div data-p3-outlook></div></section><div class="p3-main"><section class="p3-panel">${head("Saldo-ontwikkeling", info("chart", "Saldo-ontwikkeling", "<p>Berekend saldo uit planning en bankboekingen. Oranje toont het verleden, groen vandaag en de toekomst. Budgetuitgaven zonder datum zijn geschat.</p><p>Het minimum en de bufferlijn blijven in de grafiek zichtbaar. Kies een dag voor de bijbehorende bedragen en betalingen.</p>"))}<p class="p3-period" data-p3-period aria-live="polite"></p><div data-p3-chart></div></section><section class="p3-panel">${head("Betalingen in deze periode", action("payments"))}<ul class="p3-payments" data-p3-payments></ul></section></div><div class="p3-summary" data-p3-summary></div><section class="p3-panel p3-year" data-p3-year-panel></section></div>`);
+      root2.insertAdjacentHTML("beforeend", `<div class="p3-surface"><section class="p3-panel p3-outlook"><div class="p3-toolbar"><div><h2>Vooruitblik</h2></div><div class="p3-context" role="group" aria-label="Dashboardcontext">${["gezamenlijk", "persoonlijk"].map((c) => `<button type="button" data-p3-context="${c}" aria-pressed="${context === c}">${c === "gezamenlijk" ? "Gezamenlijk" : "Persoonlijk"}</button>`).join("")}</div>${!deps.personalRole() ? `<label class="p3-person" ${context === "gezamenlijk" ? "hidden" : ""}>Persoon <select data-p3-person><option value="dion" ${localPerson === "dion" ? "selected" : ""}>Dion</option><option value="dara" ${localPerson === "dara" ? "selected" : ""}>Dara</option></select></label>` : ""}<div class="p3-filters" role="group" aria-label="Prognoseperiode">${[["month", "Deze maand"], ["7", "7 dagen"], ["14", "14 dagen"], ["custom", "Eigen datum"], ["salary", "Volgend salaris"]].map(([value, title]) => `<button type="button" data-p3-filter="${value}" aria-pressed="${filter === value}">${title}</button>`).join("")}</div></div><label class="p3-custom" ${filter === "custom" ? "" : "hidden"}>Tot en met <input type="date" data-p3-custom min="${bounds.minDate}" max="${bounds.maxDate}" value="${custom}" required></label><div data-p3-outlook></div></section><div class="p3-main"><section class="p3-panel">${head("Saldo-ontwikkeling", info("chart", "Saldo-ontwikkeling", "<p>Berekend saldo uit planning en bankboekingen. Oranje toont het verleden, groen vandaag en de toekomst. Budgetuitgaven zonder datum zijn geschat.</p><p>Het minimum en de bufferlijn blijven in de grafiek zichtbaar. Kies een dag voor de bijbehorende bedragen en betalingen.</p>"))}<p class="p3-period" data-p3-period aria-live="polite"></p><div data-p3-chart></div></section><section class="p3-panel">${head("Betalingen in deze periode")}<p class="p3-caption">Toekomstige vaste lasten en inkomsten na vandaag.</p><ul class="p3-payments" data-p3-payments tabindex="0" aria-label="Toekomstige vaste betalingen en inkomsten"></ul></section></div><div class="p3-summary" data-p3-summary></div><section class="p3-panel p3-year" data-p3-year-panel></section></div>`);
       const isInfoOpen = (panel) => typeof panel.showPopover === "function" ? panel.matches(":popover-open") : panel.dataset.open === "true";
       const closeInfo = (panel) => {
         var _a2;
@@ -3738,7 +3747,7 @@
               deps.balance();
               break;
             case "payments":
-              deps.modal(`<h2>Betalingen binnen je prognoseperiode</h2><p>${date((projection == null ? void 0 : projection.displayStartDate) || (projection == null ? void 0 : projection.asOfDate))} tot en met ${date((_a2 = projection == null ? void 0 : projection.horizon) == null ? void 0 : _a2.endDate)}</p><ul class="p3-payments">${projection ? paymentsHtml(projection, deps.eventLabel, true, deps.canOpenEvent) : "<li>Stel eerst je prognose in.</li>"}</ul>`, (id) => {
+              deps.modal(`<h2>Betalingen binnen je prognoseperiode</h2><p>${date((projection == null ? void 0 : projection.displayStartDate) || (projection == null ? void 0 : projection.asOfDate))} tot en met ${date((_a2 = projection == null ? void 0 : projection.horizon) == null ? void 0 : _a2.endDate)}</p><ul class="p3-payments">${projection ? paymentsHtml(projection, deps.eventLabel, deps.canOpenEvent) : "<li>Stel eerst je prognose in.</li>"}</ul>`, (id) => {
                 const event2 = paymentEvents(projection).find((e2) => e2.id === id);
                 if (event2) deps.openEvent(event2);
               });
@@ -17521,7 +17530,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
         const candidate = { id, source: "csv", approvalSource: "manual", processingStatus: "goedgekeurd", date: row.bankOriginal.bankDate, bankOriginal: row.bankOriginal, amount: p.processedAmount, transactionType: p.transactionType, accountContext: row.accountOwner, financialFor: p.budgetOwner, processing: cloneState(p), savingsGoalId: p.savingsGoalId };
         const checkState = { ...state2, transactions: [...(state2.transactions || []).filter((tx) => tx.importTransactionId !== row.id && tx.id !== id), candidate] };
         const result2 = projectTransaction(candidate, { state: checkState });
-        if (result2.savingsContributionError || !result2.effects.existingCapitalDeposit) return { ok: false, errors: [{ code: "savings-contribution", message: result2.savingsContributionError || "Deze interne inleg kan niet aan de spaarboeking worden gekoppeld." }] };
+        if (result2.savingsContributionError || !result2.savingsContribution) return { ok: false, errors: [{ code: "savings-contribution", message: result2.savingsContributionError || "Deze ontvangst kan niet aan de spaarboeking worden gekoppeld." }] };
       }
       if (p.salaryLinkVersion === 117 && lines.some((line) => (line.transactionType || p.transactionType) === "salaris")) {
         try {
@@ -18521,10 +18530,11 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
       const p = row.processing, month = row.bankOriginal.bankDate.slice(0, 7);
       const sources = selectTransactionProjections(root2.state).filter((t) => {
         var _a2;
-        return ["interne-overboeking", "extra-bijdrage"].includes(t.transactionType) && t.effects.accountCashflow > 0 && t.calendarMonth === month && t.financialFor === p.budgetOwner && ((_a2 = t.transaction.processing) == null ? void 0 : _a2.contributionGoalId) === p.savingsGoalId;
+        return t.active && t.effects.accountCashflow > 0 && t.calendarMonth === month && t.financialFor === p.budgetOwner && (isSavingsIncomeSource(t) || ["interne-overboeking", "extra-bijdrage"].includes(t.transactionType) && ((_a2 = t.transaction.processing) == null ? void 0 : _a2.contributionGoalId) === p.savingsGoalId);
       });
-      const missing = p.savingsContributionId && !sources.some((t) => t.id === p.savingsContributionId);
-      return `<label>Betaald uit interne inleg<select data-u4-field="savingsContributionId"><option value="">Geen koppeling — uit maandruimte</option>${missing ? option(p.savingsContributionId, "Gekoppelde inleg niet beschikbaar", p.savingsContributionId) : ""}${sources.map((t) => option(t.id, `${t.transaction.description || "Interne inleg"} · ${euro3(t.transaction.processing.contributionAmount)}`, p.savingsContributionId || "")).join("")}</select></label>${p.savingsContributionId ? `<label>Gekoppeld bedrag<input type="number" min="0.01" step="0.01" data-u4-field="savingsContributionAmount" value="${Number(p.savingsContributionAmount) || 0}"></label><span class="u4-muted">Dit deel komt uit bestaand eigen geld en wordt niet van Over deze maand afgetrokken. De volledige spaarboeking blijft meetellen voor het spaardoel.</span>` : ""}`;
+      const selected = sources.find((t) => t.id === p.savingsContributionId);
+      const missing = p.savingsContributionId && !selected;
+      return `<label>Gekoppelde inleg of inkomen<select data-u4-field="savingsContributionId"><option value="">Geen koppeling</option>${missing ? option(p.savingsContributionId, "Gekoppelde inleg niet beschikbaar", p.savingsContributionId) : ""}${sources.map((t) => option(t.id, `${t.transaction.description || (isSavingsIncomeSource(t) ? "Inkomen" : "Interne inleg")} · ${euro3(savingsContributionCapacity(t) / 100)}`, p.savingsContributionId || "")).join("")}</select></label>${p.savingsContributionId ? `<label>Gekoppeld bedrag<input type="number" min="0.01" step="0.01" data-u4-field="savingsContributionAmount" value="${Number(p.savingsContributionAmount) || 0}"></label><span class="u4-muted">${isSavingsIncomeSource(selected) ? "Administratieve koppeling: inkomen, maandruimte en spaarbedrag veranderen hierdoor niet." : "Dit deel komt uit bestaand eigen geld en wordt niet van Over deze maand afgetrokken."} De volledige spaarboeking blijft meetellen voor het spaardoel.</span>` : ""}`;
     }
     function dependentFieldsHtml(root2, row) {
       var _a2, _b, _c, _d;

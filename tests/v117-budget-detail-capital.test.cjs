@@ -37,3 +37,25 @@ test('V117 removing an allocated contribution is blocked until its deposit is un
  const next=structuredClone(s);next.transactions.shift();assert.throws(()=>commands.assertFinancialMutationSafe(s,next),/koppeling/);
  delete next.transactions[0].processing.savingsContributionId;assert.doesNotThrow(()=>commands.assertFinancialMutationSafe(s,next));
 });
+
+
+for(const type of ['belastingteruggave','vergoeding','vakantiegeld','nabetaling','overige-inkomsten'])test('inkomen '+type+' koppelen aan sparen is uitsluitend administratief',()=>{
+ const source=tx('income',225,type),deposit=tx('saving',300,'sparen',{savingsGoalId:'garden',processing:{}});
+ const s=state([source,deposit]),before=forecast(s),effects=e.selectTransactionProjections(s).map(p=>p.effects);
+ deposit.processing={savingsContributionId:'income',savingsContributionAmount:225};
+ const original=structuredClone(s),linked=e.projectTransaction(deposit,{state:s});
+ assert.equal(linked.savingsContributionError,undefined);assert.deepEqual(linked.savingsContribution,{sourceId:'income',amountCents:22500,kind:'income'});
+ assert.equal(linked.effects.existingCapitalDeposit||0,0);
+ assert.deepEqual(e.selectTransactionProjections(s).map(p=>p.effects),effects);
+ assert.deepEqual(forecast(s),before);assert.deepEqual(s,original);
+ assert.deepEqual(forecast(JSON.parse(JSON.stringify(s))),before);
+});
+
+test('inkomenskoppeling bewaakt ontvangen bedrag, goedkeuring, maand en eigenaar',()=>{
+ const source=tx('income',225,'belastingteruggave'),deposit=tx('saving',300,'sparen',{savingsGoalId:'garden',processing:{savingsContributionId:'income',savingsContributionAmount:225}});
+ for(const change of [s=>s.transactions.shift(),s=>s.transactions[0].processing={include:false},s=>s.transactions[0].financialFor='dara',s=>s.transactions[0].date='2026-09-01',s=>s.transactions[1].processing.savingsContributionAmount=226]){
+  const s=state(structuredClone([source,deposit]));change(s);const p=e.projectTransaction(s.transactions.at(-1),{state:s});assert(p.savingsContributionError);assert(!p.savingsContribution);assert(!p.effects.existingCapitalDeposit);
+ }
+ const s=state([source,deposit,{...structuredClone(deposit),id:'saving-again'}]);
+ assert(e.selectTransactionProjections(s).filter(p=>p.effects.savingsDeposit>0).every(p=>p.savingsContributionError&&!p.savingsContribution));
+});
