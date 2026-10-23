@@ -39,6 +39,6 @@ test('P2 cloudconflict bewaart instellingen en keuze overleeft herladen',async({
  expect(result).toEqual({code:'finize/cloud-conflict',local:27550,remote:30000});await page.reload();await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);expect(await page.evaluate(()=>state.accountProfiles[0].liquidity.bufferCents)).toBe(27550);
 });
 test('P2 native validatie en verouderde invoer beschermen gehele instelling',async({page})=>{
- await boot(page);await fill(page);await page.locator('[name="salary-dion"]').fill('32');await submit(page);expect(await page.evaluate(()=>state.accountProfiles[0].liquidity)).toBeUndefined();await page.locator('[name="salary-dion"]').fill('25');
+ await boot(page);await fill(page);await page.locator('[name="buffer"]').fill('-1');await submit(page);expect(await page.evaluate(()=>state.accountProfiles[0].liquidity)).toBeUndefined();await page.locator('[name="buffer"]').fill('275.50');
  await page.evaluate(async()=>{const p=structuredClone(state.accountProfiles[0]);await FinizeAccountsSave({type:'update',id:p.id,expectedProfile:p,values:{...p,name:'Andere naam'},operationId:'other-change',createdAt:'2026-10-14T12:00:00Z'});});await submit(page);await expect(page.locator('[data-liquidity-error]')).toContainText('intussen gewijzigd');await expect(page.locator('[name="salary-dion"]')).toHaveValue('25');expect(await page.evaluate(()=>state.accountProfiles[0].liquidity)).toBeUndefined();
 });

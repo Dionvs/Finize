@@ -19,7 +19,7 @@
 <h2>1. Inleiding</h2>
 <p>Finize is een persoonlijke financiële webapp waarmee gebruikers hun inkomsten, uitgaven, bankrekeningen, budgetten, vaste lasten en spaardoelen kunnen beheren.</p>
 <p>Wij vinden het belangrijk dat gebruikers begrijpen welke gegevens Finize verwerkt, waarom deze gegevens nodig zijn en hoe zij ermee kunnen omgaan.</p>
-<p>Dit privacybeleid beschrijft de verwerking van gegevens binnen Finize en de eventuele toekomstige koppeling met externe banken.</p>
+<p>Dit privacybeleid beschrijft de verwerking van gegevens binnen Finize en het gebruik van een bankkoppeling wanneer die afzonderlijk is ingeschakeld en geautoriseerd.</p>
 <h2>2. Wie is verantwoordelijk?</h2>
 <p>Finize is een onafhankelijk ontwikkeld softwareproject voor persoonlijk en huishoudelijk gebruik.</p>
 <p>Dion van Sluijs is de ontwikkelaar en beheerder van Finize en de verwerkingsverantwoordelijke voor zover hij de doeleinden en middelen van de verwerking van persoonsgegevens binnen Finize bepaalt.</p>
@@ -70,7 +70,7 @@
 <h2>5. Rechtsgrond voor gegevensverwerking</h2>
 <p>Finize verwerkt persoonsgegevens uitsluitend voor doeleinden waarvoor een toepasselijke rechtsgrond bestaat.</p>
 <p>Voor noodzakelijke appfunctionaliteit, waaronder het aanbieden van het account, financiële overzichten, opslag en synchronisatie, is de grondslag uitvoering van de gebruiksovereenkomst, voor zover de betreffende verwerking daarvoor daadwerkelijk noodzakelijk is.</p>
-<p>Bij een toekomstige bankkoppeling moet de rekeninghouder de benodigde banktoegang afzonderlijk autoriseren.</p>
+<p>Bij een bankkoppeling moet de rekeninghouder de benodigde banktoegang afzonderlijk autoriseren. Het inschakelen van de functie in Finize geeft op zichzelf geen toegang tot bankgegevens.</p>
 <p>De toestemming voor het delen van bankrekeninginformatie via een open-bankingdienstverlener staat los van eventuele andere rechtsgronden voor het verwerken van gegevens binnen Finize.</p>
 <h2>6. Opslag van gegevens</h2>
 <p>Finize gebruikt lokale gegevensopslag en synchronisatie. De applicatie bewaart financiële administratie, importgegevens en instellingen lokaal op het gebruikte apparaat, onder meer via browseropslag en IndexedDB. Daarbij kunnen ook synchronisatiewachtrijen, conflictversies en herstel- en migratiekopieën worden opgeslagen.</p>
@@ -84,37 +84,39 @@
 <p>De daadwerkelijke toegang wordt bepaald door de authenticatie en de actieve opslagrechten.</p>
 <h2>8. Bankkoppeling via Enable Banking</h2>
 <p>Finize ondersteunt momenteel het handmatig importeren van banktransacties.</p>
-<p>In de toekomst kan Finize een koppeling aanbieden met Enable Banking, een externe dienstverlener voor toegang tot bankrekeninginformatie.</p>
-<p>Wanneer deze functionaliteit beschikbaar wordt, kan Finize na de vereiste autorisatie bijvoorbeeld de volgende informatie ophalen:</p>
+<p>Voor de bankkoppeling gebruikt Finize Enable Banking. De server voor deze koppeling is ingericht in Google Cloud, regio europe-west4. De eerste configuratie is beperkt tot één vooraf toegestane eigen ING-rekening. Andere rekeningen krijgen daardoor niet automatisch toegang.</p>
+<p>Wanneer de functie in Finize is ingeschakeld en de rekeninghouder toestemming bij ING heeft gegeven, kan Finize handmatig de volgende informatie ophalen:</p>
 <ul>
-<li>Beschikbare bankrekeningen.</li>
-<li>Rekeningidentificaties.</li>
+<li>Identificatie van de vooraf toegestane rekening.</li>
 <li>Banksaldi.</li>
 <li>Transactiedatums.</li>
 <li>Transactiebedragen.</li>
 <li>Transactieomschrijvingen.</li>
 <li>Overige rekeninginformatie die de bank via de toegestane koppeling beschikbaar stelt.</li>
 </ul>
-<p>Het doel hiervan is het automatiseren van het bijwerken van de persoonlijke financiële administratie.</p>
-<p>De geplande integratie is uitsluitend bedoeld voor het lezen van rekeninginformatie.</p>
-<p>Finize zal via deze koppeling geen betalingen initiëren of zelfstandig geld overmaken.</p>
+<p>Ophalen gebeurt met de knop Bank bijwerken; er is geen automatische ophaaltaak. Finize bewaart oorspronkelijke brongegevens om mutaties, rekeningstanden en mogelijke overlap met CSV-imports te kunnen controleren. Geboekte bankmutaties kunnen direct meetellen voor de fysieke rekeningstand. Categorieën, budgetten en andere financiële verwerking bevestig je afzonderlijk bij Nakijken. Opnieuw ophalen geeft geen nieuwe financiële goedkeuring.</p>
+<p>De koppeling leest uitsluitend rekeninginformatie en initieert geen betalingen of overboekingen.</p>
+<p>Wanneer de bank dit vereist, kunnen technische verbindingsgegevens zoals IP-adres, browserinformatie en de verwijzende pagina via Enable Banking aan de bank worden doorgegeven. Deze gegevens worden gebruikt om het verzoek te verwerken.</p>
+<p>De privésleutel en sessiereferenties blijven op de server en worden niet in de app of browseropslag opgenomen. De Finize-server sluit HTTP-toegangslogs van de autorisatiecallback uit om te voorkomen dat de daarin meegestuurde autorisatiecode in die logs wordt opgeslagen.</p>
 <p>De beschikbaarheid van bankkoppelingen is afhankelijk van de betreffende bank, Enable Banking, technische mogelijkheden en toepasselijke voorwaarden.</p>
-<p>De Enable Banking-koppeling is momenteel niet actief. Een bankkoppeling wordt pas actief nadat deze daadwerkelijk in Finize is geïmplementeerd en door de rekeninghouder is geautoriseerd.</p>
+<p>Je kunt Banktoegang intrekken gebruiken om verder ophalen door Finize te blokkeren en de sessie bij Enable Banking te laten intrekken. Als die externe intrekking niet bevestigd kan worden, meldt Finize dat je opnieuw moet proberen. Intrekken verwijdert geen eerder opgehaalde transacties, CSV-bronnen of financiële historie. Toestemming in een eerder gebruikt Control Panel vervangt niet de autorisatie voor de API-koppeling in Finize.</p>
 <h2>9. Delen van gegevens met externe diensten</h2>
 <p>Voor het functioneren van Finize kan verwerking plaatsvinden via externe technische dienstverleners.</p>
 <p>Voor zover daadwerkelijk gebruikt, gaat het onder meer om:</p>
 <ul>
-<li><strong>Google Firebase:</strong> authenticatie, gegevensopslag en synchronisatie.</li>
+<li><strong>Google Firebase en Google Cloud:</strong> authenticatie, gegevensopslag, synchronisatie en de server voor de bankkoppeling.</li>
 <li><strong>GitHub Pages:</strong> beschikbaar stellen van de website en verwerken van technische verbindingsgegevens.</li>
 <li><strong>Microlink:</strong> ophalen van productinformatie bij een opgegeven productlink voor een spaardoel. Daarbij worden de product-URL en technische verbindingsgegevens aan Microlink doorgegeven. Bij het laden van externe productafbeeldingen kan de browser ook verbinding maken met de aanbieder van die afbeelding.</li>
 <li><strong>Google Drive en Microsoft OneDrive:</strong> voor zover daarin handmatige beheerexports of herstelkopieën worden bewaard.</li>
-<li><strong>Enable Banking:</strong> toekomstige verwerking van bankrekeninginformatie nadat de koppeling is geïmplementeerd en geautoriseerd.</li>
+<li><strong>Enable Banking:</strong> controle van de applicatie en beschikbare bankconnector; na afzonderlijke banktoestemming ook het doorgeven van toegestane rekeninginformatie.</li>
 </ul>
-<p>Deze dienstverleners hanteren hun eigen voorwaarden en privacyinformatie. Zie de <a href="https://firebase.google.com/support/privacy">privacyinformatie van Firebase</a>, <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">GitHub</a>, <a href="https://microlink.io/privacy">Microlink</a>, <a href="https://policies.google.com/privacy">Google</a> en <a href="https://privacy.microsoft.com/nl-nl/privacystatement">Microsoft</a>. Enable Banking is pas een ontvanger van bankrekeninginformatie wanneer de toekomstige koppeling daadwerkelijk wordt gebruikt.</p>
+<p>Deze dienstverleners hanteren hun eigen voorwaarden en privacyinformatie. Zie de <a href="https://firebase.google.com/support/privacy">privacyinformatie van Firebase</a>, <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">GitHub</a>, <a href="https://microlink.io/privacy">Microlink</a>, <a href="https://policies.google.com/privacy">Google</a>, <a href="https://privacy.microsoft.com/nl-nl/privacystatement">Microsoft</a> en de <a href="https://enablebanking.com/privacy/">privacyinformatie van het Enable Banking Control Panel</a>. De bank en Enable Banking tonen bij de bankautorisatie de informatie en voorwaarden die op die gegevensuitwisseling van toepassing zijn.</p>
 <p>Finize verkoopt geen financiële gebruikersgegevens aan adverteerders.</p>
 <p>Er worden geen banktransacties aan externe partijen verstrekt voor advertentiedoeleinden als onderdeel van de beschreven Finize-functionaliteit.</p>
 <h2>10. Bewaartermijnen en verwijderen</h2>
-<p>Financiële historie en oorspronkelijke CSV-bronnen blijven bewaard zolang zij nodig zijn voor de huishoudelijke administratie, waaronder terugkijken, controleren en vergelijken. Er is geen automatische verwijdering bij maand- of jaarafsluiting. Voor de onderzochte financiële opslag zijn geen automatische verwijdertermijnen ingesteld.</p>
+<p>Financiële historie en oorspronkelijke CSV- en bank-API-bronnen blijven bewaard zolang zij nodig zijn voor de huishoudelijke administratie, waaronder terugkijken, controleren en vergelijken. Er is geen automatische verwijdering bij maand- of jaarafsluiting. Voor deze financiële opslag zijn geen automatische verwijdertermijnen ingesteld.</p>
+<p>Tijdelijke koppelgegevens staan afzonderlijk van de financiële administratie op de server. Een autorisatiepoging is tien minuten geldig; een ophaalvergrendeling maximaal drie minuten. Deze tijdelijke records worden vanaf 24 uur na hun vervalmoment automatisch opgeruimd. Sessiereferenties worden vanaf zeven dagen na het oorspronkelijke toestemmingsverloop opgeruimd; bij bevestigde intrekking wordt de actieve sessiewaarde direct leeggemaakt. Google Firestore verwerkt automatische verwijdering asynchroon, doorgaans binnen 24 uur na het ingestelde opschoonmoment. Verlopen gegevens geven intussen geen recht op banktoegang.</p>
+<p>De vaste rekeningbinding blijft afzonderlijk bewaard zolang het rekeningprofiel bestaat, zodat opnieuw koppelen niet ongemerkt een andere rekeningidentiteit accepteert. Een mislukte sessie-intrekking blijft beschikbaar om opnieuw te proberen, tot uiterlijk het opschoonmoment na het oorspronkelijke toestemmingsverloop. Als een betrouwbare vervaldatum ontbreekt, blijft de referentie behouden voor intrekking of handmatige beoordeling. Financiële historie valt buiten deze automatische opschoning.</p>
 <p>Verwijderverzoeken worden handmatig beoordeeld. Bij beëindiging van een huishouden kunnen gegevens via een beheerprocedure worden verwijderd, rekening houdend met de daadwerkelijke opslaglocaties en de rechten van betrokkenen. Bij een individueel verzoek kunnen gedeelde financiële gegevens niet zonder meer worden gewist als die ook betrekking hebben op andere huishoudleden. Het intrekken van toegang of verwijderen van een account betekent niet automatisch dat alle financiële gegevens zijn gewist.</p>
 <p>De beheerprocedure omvat het intrekken van huishoudtoegang en maatregelen om ongewenste heractivering via synchronisatie of herstel te voorkomen, voor zover deze aantoonbaar uitvoerbaar zijn. Historische versies, exports en back-ups kunnen nog gegevens bevatten. Niet alle oudere beheerback-ups en apparaatkopieën zijn volledig geïnventariseerd; onmiddellijke of volledige verwijdering uit alle kopieën kan daarom niet worden gegarandeerd.</p>
 <p>Deze technische beperkingen vormen geen algemene vrijstelling van toepasselijke wettelijke verwijderverplichtingen. Per verzoek wordt beoordeeld welke gegevens moeten worden verwijderd, welke gegevens op een geldige grond behouden moeten blijven en welke aanvullende handelingen nodig zijn. De aanvrager wordt geïnformeerd over de afhandeling en eventuele beperkingen.</p>
@@ -123,7 +125,7 @@
 <p>Finize gebruikt de authenticatie-, opslag- en toegangsmechanismen van de daadwerkelijk geïmplementeerde diensten.</p>
 <p>Gebruikers zijn zelf verantwoordelijk voor het zorgvuldig omgaan met hun inloggegevens en het beveiligen van de apparaten waarop zij Finize gebruiken.</p>
 <p>Geen enkele online applicatie kan absolute beveiliging garanderen.</p>
-<p>Bij toekomstige bankkoppelingen mogen geheime API-sleutels en andere vertrouwelijke authenticatiegegevens niet openbaar in de frontend of broncode worden opgenomen.</p>
+<p>De privésleutel voor de bankkoppeling staat in Google Secret Manager. De bankserver gebruikt een eigen serviceaccount met beperkte rechten; browsergebruikers krijgen daarmee geen rechtstreekse toegang tot de sleutel of private sessiegegevens.</p>
 <h2>12. Privacyrechten</h2>
 <p>Voor zover de Algemene verordening gegevensbescherming (AVG) op de betreffende verwerking van toepassing is, kunnen betrokkenen onder de daarvoor geldende voorwaarden rechten hebben, waaronder:</p>
 <ul>

@@ -1,0 +1,8 @@
+node_modules/
+.env*
+.secret*
+*.pem
+*.key
+shared/
+*-debug.log
+node_modules.incomplete-p5b/

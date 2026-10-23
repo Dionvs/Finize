@@ -1,4 +1,5 @@
 import { selectAccountBalance, balanceRequiredMonths, checkpointHistory } from './balance-checkpoints.mjs';
+import { providerBalanceHistory } from './provider-balances.mjs';
 import { validCalendarDate } from '../import/import-identity.mjs';
 import { decimalAmountToCents } from '../import/bank-input-contract.mjs';
 import { selectDependencyProjections, budgetActual, financialForecastForMonth } from './transaction-engine.mjs';
@@ -21,6 +22,8 @@ const event = values => ({id:'',accountProfileId:null,date:null,amountCents:0,ty
 const issue = (code, eventId='', severity='incomplete') => ({code,eventId,severity});
 export function liquidityReasonMessage(reason) {
   return ({
+    'intraday-provider-balance':'Het beginsaldo is een geboekte bankstand op het vermelde tijdstip; de bankdag is nog niet afgesloten.',
+    'provider-sync-incomplete':'De laatste banksynchronisatie is onvolledig. Eerdere gegevens blijven behouden.',
     'missing-checkpoint':'Er is nog geen bruikbaar saldo-ijkpunt voor deze rekening.',
     'missing-period-opening':'Een beginsaldo vóór deze periode ontbreekt. De saldolijn begint bij het eerste bruikbare saldo-ijkpunt; eerdere saldi worden niet verzonnen.',
     'planning-basis':'Deze saldolijn is berekend uit de planning en beschikbare bankboekingen; dit is geen door de bank bevestigd historisch saldo.',
@@ -301,11 +304,11 @@ export function projectDailyLiquidity(input) {
     if(!row.id || !Number.isSafeInteger(row.amountCents) || row.amountCents<0) throw new Error('Een prognosereservering mist een geldig ID of niet-negatief centbedrag.');
     if(reservationIds.has(row.id)) {reasons.push(issue('duplicate-reservation',row.id));continue;}
     reservationIds.add(row.id);
-    const covered=sum(events.filter(e=>e.status==='planned'&&e.date>asOfDate&&e.date<=horizon.endDate&&e.amountCents<0&&e.reservationId===row.id).map(e=>-e.amountCents));
+    const covered=sum(events.filter(e=>e.status==='planned'&&(e.date>asOfDate||e.date===asOfDate&&opening.boundary==='timestamp')&&e.date<=horizon.endDate&&e.amountCents<0&&e.reservationId===row.id).map(e=>-e.amountCents));
     reservations.push({...row,coveredByConcreteCents:Math.min(row.amountCents,covered),amountCents:Math.max(0,row.amountCents-covered)});
   }
   const reserveCents=sum(reservations.filter(row=>row.reserveForDisplay!==false).map(row=>row.amountCents));
-  const dated=events.filter(row=>['actual','provisional','planned'].includes(row.status)&&row.accountProfileId===input.accountProfileId&&row.date>asOfDate&&row.date<=horizon.endDate);
+  const dated=events.filter(row=>['actual','provisional','planned'].includes(row.status)&&row.accountProfileId===input.accountProfileId&&(row.date>asOfDate||row.date===asOfDate&&row.status==='planned'&&opening.boundary==='timestamp')&&row.date<=horizon.endDate);
   const estimated=new Map(),allocations=new Map();
   const distribute=(row,fromDate=row.fromDate)=>{
     const previous=allocations.get(row.id) || new Map();
@@ -327,10 +330,13 @@ export function projectDailyLiquidity(input) {
       if(input.displayStartDate&&date<input.displayStartDate.slice(0,7)+'-01')earlierEstimated=safe(earlierEstimated+(estimated.get(date)||0));
       const observation=observations.get(date);
       if(observation){
-        const modeledCents=safe(bank-spent),amountCents=safe(observation.amountCents-modeledCents);
+        // A timestamp observation is not an end-of-day observation: retain today's
+        // still-planned cash events rather than swallowing them into the bank stand.
+        const remainingPlans=observation.boundary==='timestamp'?sum(rows.filter(row=>row.status==='planned').map(row=>row.amountCents)):0;
+        const modeledCents=safe(bank-spent-remainingPlans),amountCents=safe(observation.amountCents-modeledCents);
         const adjustment=event({id:'checkpoint:'+observation.id,accountProfileId:input.accountProfileId,date,amountCents,type:'checkpoint',status:'observed',dateQuality:'confirmed',observedBalanceCents:observation.amountCents,modeledBalanceCents:modeledCents});
         events.push(adjustment);rows.push(adjustment);mutationCents=safe(mutationCents+amountCents);
-        bank=observation.amountCents;spent=0;earlierEstimated=0;lastObservationMonth=date.slice(0,7);
+        bank=safe(observation.amountCents+remainingPlans);spent=0;earlierEstimated=0;lastObservationMonth=date.slice(0,7);
         // An observation confirms cash, not budget spending. Reuse the existing
         // unspent budget reservation after this end-of-day anchor.
         for(const row of reservations.filter(row=>row.type==='budget'&&row.fromDate<=date&&row.toDate>date))distribute(row,shiftLiquidityDay(date,1));
@@ -408,8 +414,13 @@ function withAvailability(projection,input,fromDate,goalInputFor) {
   return {...projection,freeAfterObligationsCents:hard.freeAfterObligationsCents,indicativeFreeAfterObligationsCents:hard.indicativeFreeAfterObligationsCents,
     availability:{...hard.availability,excludedSavingsPlanIds:[...softIds]},softSavings:guidance};
 }
+function liquidityObservations(state,accountProfileId,toDate,scope) {
+  const rows=new Map(checkpointHistory(state,accountProfileId,scope).active.filter(row=>row.asOfDate<=toDate).map(row=>[row.asOfDate,row]));
+  for(const row of providerBalanceHistory(state,accountProfileId,toDate,scope))rows.set(row.asOfDate,row);
+  return [...rows.values()].sort((a,b)=>b.asOfDate.localeCompare(a.asOfDate));
+}
 function planningAnchor(state,{accountProfileId,asOfDate,startDate,scope}) {
-  const history=checkpointHistory(state,accountProfileId,scope).active.filter(row=>row.asOfDate<=asOfDate);
+  const history=liquidityObservations(state,accountProfileId,asOfDate,scope);
   return history.find(row=>row.asOfDate<startDate) || history.filter(row=>row.asOfDate>=startDate&&row.asOfDate<=asOfDate).at(-1) || null;
 }
 export function selectDailyLiquidity(state, options) {
@@ -432,7 +443,7 @@ export function selectDailyLiquidity(state, options) {
   const inputFor=endDate=>{
   const input=buildLiquidityInput(state,{...options,asOfDate:origin,endDate,salaryOnly:false,planningBasis:true});
   input.displayStartDate=startDate;input.availabilityFromDate=availabilityFromDate;
-  input.observations=checkpointHistory(state,options.accountProfileId,options.scope).active.filter(row=>row.asOfDate>origin&&row.asOfDate<=cutoff&&row.asOfDate<=endDate);
+  input.observations=liquidityObservations(state,options.accountProfileId,cutoff,options.scope).filter(row=>row.asOfDate>origin&&row.asOfDate<=endDate);
   for(const row of current.opening.reasons)input.reasons.push(issue(row.code,row.sourceId,current.opening.status==='incomplete'||current.opening.status==='unknown'?'incomplete':'provisional'));
   if(!anchor||origin>=startDate)input.reasons.push(issue('missing-period-opening'));
   input.reservations=input.reservations.map(row=>({...row,reserveForDisplay:row.type!=='budget'||row.month>=startDate.slice(0,7)}));

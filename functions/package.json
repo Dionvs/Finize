@@ -1,0 +1,9 @@
+{
+  "name": "finize-bank-backend",
+  "private": true,
+  "type": "module",
+  "main": "src/index.mjs",
+  "engines": { "node": "22" },
+  "scripts": { "test": "node --test ../tests/v118-p5b-backend.test.mjs", "build": "node build.mjs" },
+  "dependencies": { "firebase-admin": "^13.6.0", "firebase-functions": "^6.6.0" }
+}

@@ -30,7 +30,7 @@ export function ensureImportBankSources(state,batch){
       const original=copy(first?.bankOriginal?.bankDate&&first.bankOriginal.amount!==undefined?first.bankOriginal:row.bankOriginal),accountProfileId=first?.accountProfileId||row.accountProfileId||batch.accountProfileId;
       const accountContext=getTransactionAccountContext(first||{...row,accountProfileId,accountOwner:row.accountOwner||batch.accountOwner},{accountProfiles:state.accountProfiles||[]});
       if(!accountContext)continue;
-      source={id:`source-${bankSourceId}`,recordRole:'bank-source',bankSourceId,source:'csv',bankOriginal:original,transactionDate:original.bankDate,date:original.bankDate,amount:Math.abs(original.amount),description:original.description,accountContext,accountOwner:accountContext,account:accountContext,accountProfileId,importBatchId:ref?.batchId||batch.id,importTransactionId:ref?.rowId||row.id,processingRowId:first?.importTransactionId||ref?.rowId||row.id,importReferences:[],processingRevision:0,processingStatus:'nakijken',batchLifecycle:'active'};
+      source={id:`source-${bankSourceId}`,recordRole:'bank-source',bankSourceId,source:row.source==='bank-api'?'bank-api':'csv',sourceIdentityProof:copy(row.sourceIdentityProof||null),bankOriginal:original,transactionDate:original.bankDate,date:original.bankDate,amount:Math.abs(original.amount),description:original.description,accountContext,accountOwner:accountContext,account:accountContext,accountProfileId,importBatchId:ref?.batchId||batch.id,importTransactionId:ref?.rowId||row.id,processingRowId:first?.importTransactionId||ref?.rowId||row.id,importReferences:[],processingRevision:0,processingStatus:'nakijken',batchLifecycle:'active'};
       if(first){source.importReferences.push({batchId:first.importBatchId,rowId:first.importTransactionId});source.approvedProcessing=copy(first.processing||{});source.approvedProcessing.processedAmount=Math.round(legacy.reduce((sum,tx)=>sum+Math.abs(Number(tx.amount)||0),0)*100)/100;source.processingStatus=getTransactionProcessingStatus(first);source.approvalSource=first.approvalSource||'';source.approvedAt=first.approvedAt||'';}
       state.transactions.push(source);
       legacy.forEach(tx=>{tx.bankSourceId=bankSourceId;});
@@ -65,7 +65,7 @@ export function selectBankTransactions(state,{month=null,account=null,accountId=
   for(const tx of [...headers,...(state.transactions||[]).filter(tx=>!isBankSource(tx))]){
     const source=bankSourceForTransaction(state,tx)||tx,key=sourceRecordKey(source);
     if(seen.has(key))continue;seen.add(key);
-    const csv=getTransactionSource(source)==='csv',active=isBankSource(source)?bankSourceActive(state,source):!['withdrawn','deleted'].includes(source.batchLifecycle);
+    const csv=['csv','bank-api'].includes(getTransactionSource(source)),active=isBankSource(source)?bankSourceActive(state,source):!['withdrawn','deleted'].includes(source.batchLifecycle);
     if(!includeInactive&&!active)continue;
     if(!csv&&(state.manualTransactionReplacements||[]).some(ref=>ref.active!==false&&(ref.manualTransactionId||ref.manualTransaction?.id)===source.id))continue;
     const date=source.bankOriginal?.bankDate||source.transactionDate||source.date||'',context=getTransactionAccountContext(source,{accountProfiles:state.accountProfiles||[]});

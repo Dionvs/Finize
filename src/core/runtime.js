@@ -1,3 +1,4 @@
+import { installBankConnection } from '../ui/bank-connection.mjs';
 import { fixedPaymentDay } from './liquidity-settings.mjs';
 import { createDashboard } from '../ui/dashboard.mjs';
 import { profileSync, profileStart } from '../storage/performance.mjs';
@@ -6573,6 +6574,7 @@ window.FinizePlanning=Object.freeze({
 });
 window.FinizeManual=Object.freeze({open:(owner,id='')=>openContextTransactionModal(owner,id),categories:(owner,month)=>expenseCategoriesForMonth(state,month,owner),save:async (tx,account)=>{upsertManualFinancialTransaction(clone(state),tx,account);return await commitChange(()=>upsertManualFinancialTransaction(state,tx,account),{render:false});}});
 window.FinizeBalances=createAccountBalanceUI({getState:()=>state,getScope:()=>({householdId:CloudAdapter.importScope(),accountProfiles:state.accountProfiles||[]}),getImports:()=>window.FinizeUpdate4.importStore.listImports(),commit:(change,options)=>commitChange(change,options),today:localTransactionToday,actor:()=>globalThis.FinizeAuth?.user?.uid||null});
+window.FinizeBank=installBankConnection(window);
 window.FinizeAccounts=createBankAccountsUI({getState:()=>state,getScope:()=>CloudAdapter.importScope(),getImports:()=>window.FinizeUpdate4.importStore.listImports(),balances:window.FinizeBalances,
   ownerLabel,onOpen:destination=>{if(destination==='settings')bankAccountsSettingsOpen=false;activeTab='settings';renderActiveTab();},
   save:saveBankAccount,hasConflict:()=>CloudAdapter.conflict,openConflicts:()=>window.FinizeUpdate4.openConflicts()});

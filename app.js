@@ -469,6 +469,7 @@
         const sameFile = (proof == null ? void 0 : proof.kind) === "file-row" && (oldProof == null ? void 0 : oldProof.kind) === "file-row" && Number.isSafeInteger(proof.rowOrdinal) && proof.rowOrdinal > 0 && proof.rowOrdinal === oldProof.rowOrdinal && (typeof batch.originalCsv === "string" && batch.originalCsv === oldBatch.originalCsv || /^[a-f0-9]{64}$/.test(proof.fileDigest || "") && proof.fileDigest === oldProof.fileDigest);
         const bankIdentity = (proof == null ? void 0 : proof.kind) === "bank-id" && (oldProof == null ? void 0 : oldProof.kind) === "bank-id" && typeof proof.authority === "string" && proof.authority.trim() !== "" && typeof proof.id === "string" && proof.id.trim() !== "" && proof.authority === oldProof.authority && proof.id === oldProof.id;
         if (sameFields && (sameFile || bankIdentity)) return { duplicate: true, duplicateSource: { batchId: oldBatch.id, rowId: oldRow.id }, reason: "proven-source-identity" };
+        if ((oldRow.source === "bank-api" || row.source === "bank-api" || oldBatch.channel === "bank-api" || batch.channel === "bank-api") && original(row).bankDate === original(oldRow).bankDate && original(row).amount === original(oldRow).amount && !sameFields) possible = { duplicate: false, possibleDuplicate: { batchId: oldBatch.id, rowId: oldRow.id }, reason: "cross-channel-identity-unproven" };
         if (sameFields) possible = { duplicate: false, possibleDuplicate: { batchId: oldBatch.id, rowId: oldRow.id }, reason: "equal-bank-fields" };
       }
     }
@@ -529,62 +530,6 @@
         const unchanged = (previous.transactions || []).some((row) => row.id === tx.id && JSON.stringify(row) === JSON.stringify(tx)) && (previous.transactions || []).some((row) => row.id === old.tx.id && JSON.stringify(row) === JSON.stringify(old.tx));
         if (!unchanged) throw Object.assign(new Error("Dezelfde bewezen CSV-bron heeft twee actieve imports. Herstel/goedkeuring is geblokkeerd."), { code: "duplicate-source-conflict" });
       } else groups.set(key, { source, tx });
-    }
-  }
-
-  // src/core/liquidity-settings.mjs
-  var validPaymentDay = (day) => day === "last" || Number.isInteger(day) && day >= 1 && day <= 31;
-  function monthlyPaymentDate(month, day) {
-    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month) || !validPaymentDay(day)) return null;
-    const last = new Date(Number(month.slice(0, 4)), Number(month.slice(5)), 0, 12).getDate();
-    return month + "-" + String(day === "last" ? last : Math.min(day, last)).padStart(2, "0");
-  }
-  function fixedPaymentDay(source) {
-    if (Object.hasOwn(source, "afschrijfdag")) return source.afschrijfdag;
-    return validCalendarDate(source.afschrijfdatum) ? Number(source.afschrijfdatum.slice(8)) : "";
-  }
-  function fixedCashDate(occurrence) {
-    var _a2;
-    const source = occurrence.source;
-    if ((_a2 = source.cashDates) == null ? void 0 : _a2[occurrence.id]) return source.cashDates[occurrence.id];
-    if (source.frequentieEenheid === "weken") return Object.hasOwn(source, "afschrijfdag") ? occurrence.date : source.afschrijfdatum === occurrence.date ? occurrence.date : null;
-    return monthlyPaymentDate(occurrence.month, fixedPaymentDay(source));
-  }
-  function liquidityBuffer(profile) {
-    var _a2, _b, _c;
-    return (_c = (_a2 = profile == null ? void 0 : profile.liquidity) == null ? void 0 : _a2.bufferCents) != null ? _c : (profile == null ? void 0 : profile.accountOwner) === "gezamenlijk" && ((_b = profile == null ? void 0 : profile.liquidity) == null ? void 0 : _b.primaryForOwner) ? 2e4 : 0;
-  }
-  function validateLiquiditySettings(profile, profiles) {
-    const value = profile.liquidity;
-    if (value === void 0) return;
-    const fail6 = (message) => {
-      throw Object.assign(new Error(message), { code: "invalid-liquidity-settings" });
-    };
-    if (!value || value.version !== 1 || typeof value.primaryForOwner !== "boolean" || !Number.isSafeInteger(value.bufferCents) || value.bufferCents < 0)
-      fail6("Vul een niet-negatieve veiligheidsbuffer in hele eurocenten in.");
-    if (value.primaryForOwner && profile.accountType !== "payment") fail6("Kies een betaalrekening voor de maandplanning.");
-    if (value.primaryForOwner && profiles.some((p) => {
-      var _a2;
-      return p.id !== profile.id && p.accountOwner === profile.accountOwner && ((_a2 = p.liquidity) == null ? void 0 : _a2.primaryForOwner);
-    }))
-      fail6("Er is al een rekening voor deze maandplanning. Schakel die keuze daar eerst uit.");
-    if (profile.accountOwner === "gezamenlijk" && !value.primaryForOwner && value.bufferCents !== 0)
-      fail6("De gezamenlijke buffer hoort alleen bij de primaire gezamenlijke betaalrekening.");
-    if (!value.salaryDays || typeof value.salaryDays !== "object" || Array.isArray(value.salaryDays)) fail6("Controleer de salarisbetaaldagen.");
-    for (const [person, day] of Object.entries(value.salaryDays)) {
-      if (!["dion", "dara"].includes(person) || !validPaymentDay(day)) fail6("Kies voor salaris een dag van 1 tot en met 31, de laatste dag, of laat het veld leeg.");
-      if (profiles.some((p) => {
-        var _a2, _b;
-        return p.id !== profile.id && ((_b = (_a2 = p.liquidity) == null ? void 0 : _a2.salaryDays) == null ? void 0 : _b[person]);
-      })) fail6("Dit salaris is al aan een andere rekening gekoppeld. Verwijder die betaaldag daar eerst.");
-    }
-    if (value.allowanceDays !== void 0 && (!value.allowanceDays || typeof value.allowanceDays !== "object" || Array.isArray(value.allowanceDays))) fail6("Controleer de zakgeldbetaaldagen.");
-    for (const [person, day] of Object.entries(value.allowanceDays || {})) {
-      if (!["dion", "dara"].includes(person) || profile.accountOwner !== person || profile.accountType !== "payment" || !validPaymentDay(day)) fail6("Koppel zakgeld aan de persoonlijke betaalrekening van de juiste eigenaar en kies een afschrijfdag.");
-      if (profiles.some((p) => {
-        var _a2, _b;
-        return p.id !== profile.id && ((_b = (_a2 = p.liquidity) == null ? void 0 : _a2.allowanceDays) == null ? void 0 : _b[person]);
-      })) fail6("Dit zakgeld is al aan een andere rekening gekoppeld. Verwijder die betaaldag daar eerst.");
     }
   }
 
@@ -824,20 +769,465 @@
     return !conflict && x.amountCents === y.amountCents && x.transactionDate === y.transactionDate ? result2("possible-duplicate", "matching-facts-without-shared-identity") : result2("distinct", "different-facts");
   }
 
+  // src/import/enable-banking-adapter.mjs
+  var copy = (value) => structuredClone(value);
+  var fail = (code) => {
+    throw Object.assign(new Error(code), { code });
+  };
+  var authority = "enablebanking:ING:NL";
+  var iban = (value) => String(value || "").replace(/\s/g, "").toUpperCase();
+  var canonical = (value) => JSON.stringify(value, (_, item) => item && typeof item === "object" && !Array.isArray(item) ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b))) : item);
+  function providerAmountCents(value) {
+    if (typeof value !== "string" || !/^-?\d+(?:\.\d{1,2})?$/.test(value)) fail("invalid-provider-amount");
+    const negative = value.startsWith("-"), [integer, fraction = ""] = value.replace(/^-/, "").split(".");
+    const cents5 = Number(integer) * 100 + Number(fraction.padEnd(2, "0"));
+    if (!Number.isSafeInteger(cents5)) fail("unsafe-provider-amount");
+    return negative ? -cents5 : cents5;
+  }
+  var providerBatchId = (profileId, accountHash) => "bank-api-" + csvFileDigest(JSON.stringify([profileId, accountHash])).slice(0, 32);
+  function normalizeProviderTransaction(raw, snapshot2, scope) {
+    var _a2, _b, _c, _d, _e, _f;
+    const cents5 = providerAmountCents((_a2 = raw.transaction_amount) == null ? void 0 : _a2.amount);
+    if (!["CRDT", "DBIT"].includes(raw.credit_debit_indicator) || cents5 < 0) fail("invalid-credit-debit-indicator");
+    const amountCents = raw.credit_debit_indicator === "DBIT" ? -cents5 : cents5;
+    const booked = raw.status === "BOOK";
+    const description = (raw.remittance_information || []).filter((value) => typeof value === "string").join(" ").trim() || ((_b = raw.creditor) == null ? void 0 : _b.name) || ((_c = raw.debtor) == null ? void 0 : _c.name) || "Banktransactie";
+    return normalizeBankInput({
+      version: 1,
+      recordType: "bank-transaction",
+      householdId: snapshot2.householdId,
+      accountProfileId: snapshot2.accountProfileId,
+      channel: "bank-api",
+      authority,
+      identity: typeof raw.entry_reference === "string" && raw.entry_reference.trim() ? { kind: "bank-id", authority, id: JSON.stringify([snapshot2.account.identificationHash, raw.entry_reference]) } : null,
+      facts: {
+        amountCents,
+        currency: (_d = raw.transaction_amount) == null ? void 0 : _d.currency,
+        transactionDate: raw.booking_date || raw.value_date,
+        bookingDate: raw.booking_date || null,
+        valueDate: raw.value_date || null,
+        bankStatus: booked ? "booked" : raw.status === "PDNG" ? "pending" : null,
+        description,
+        counterpartyAccount: raw.credit_debit_indicator === "DBIT" ? ((_e = raw.creditor_account) == null ? void 0 : _e.iban) || null : ((_f = raw.debtor_account) == null ? void 0 : _f.iban) || null,
+        reference: raw.reference_number || raw.end_to_end_id || null
+      },
+      provenance: { payload: copy(raw), fetchedAt: snapshot2.fetchedAt, accountHash: snapshot2.account.identificationHash }
+    }, scope);
+  }
+  function normalizeProviderBalances(snapshot2, scope) {
+    return (snapshot2.balances || []).map((raw, index) => {
+      var _a2, _b;
+      const type = ["CLBD", "ITBD", "OPBD"].includes(raw.balance_type) ? "booked" : ["CLAV", "ITAV", "OPAV", "PRAV", "FWAV"].includes(raw.balance_type) ? "available" : null;
+      const timestamp = raw.last_change_date_time;
+      const boundary = raw.balance_type === "CLBD" && validCalendarDate(raw.reference_date) ? "end-of-bank-day" : "timestamp";
+      const asOfDate = boundary === "end-of-bank-day" ? raw.reference_date : typeof timestamp === "string" ? timestamp.slice(0, 10) : raw.reference_date;
+      const input = {
+        version: 1,
+        recordType: "balance-observation",
+        householdId: snapshot2.householdId,
+        accountProfileId: snapshot2.accountProfileId,
+        channel: "bank-api",
+        authority,
+        identity: { kind: "observation-id", id: "provider-balance-" + csvFileDigest(canonical([snapshot2.account.identificationHash, raw, snapshot2.fetchedAt])) },
+        facts: {
+          amountCents: providerAmountCents((_a2 = raw.balance_amount) == null ? void 0 : _a2.amount),
+          currency: (_b = raw.balance_amount) == null ? void 0 : _b.currency,
+          balanceType: type,
+          boundary,
+          asOfDate,
+          observedAt: timestamp || null
+        },
+        provenance: { payload: copy(raw), fetchedAt: snapshot2.fetchedAt, providerType: raw.balance_type, accountHash: snapshot2.account.identificationHash }
+      };
+      const normalized = normalizeBankInput(input, scope);
+      return normalized.ok ? { id: input.identity.id, ...normalized.record } : { id: "unusable-balance-" + index, unusable: true, raw: copy(raw), errors: normalized.errors };
+    });
+  }
+  function stageProviderSnapshot(snapshot2, state2, previous, imports, classify) {
+    var _a2, _b, _c, _d;
+    const scope = { householdId: snapshot2.householdId, accountProfiles: state2.accountProfiles || [] };
+    const profiles = scope.accountProfiles.filter((row) => row.id === snapshot2.accountProfileId);
+    if (snapshot2.version !== 1 || profiles.length !== 1 || profiles[0].status === "archived" || !((_a2 = snapshot2.account) == null ? void 0 : _a2.identificationHash) || iban(profiles[0].identifier || profiles[0].iban) !== iban(snapshot2.account.iban) || !Array.isArray(snapshot2.transactions) || !validCalendarDate(snapshot2.fromDate) || !validCalendarDate(snapshot2.toDate) || !Number.isFinite(Date.parse(snapshot2.fetchedAt))) fail("invalid-provider-snapshot");
+    const profile = profiles[0], id = providerBatchId(profile.id, snapshot2.account.identificationHash);
+    if (previous && (previous.id !== id || previous.channel !== "bank-api" || ["deleted", "withdrawn"].includes(previous.lifecycle))) fail("provider-batch-conflict");
+    const batch = previous ? copy(previous) : {
+      id,
+      channel: "bank-api",
+      provider: "enablebanking",
+      fileName: "ING-bankkoppeling",
+      format: "bank-api",
+      bank: "ING",
+      householdId: scope.householdId,
+      accountProfileId: profile.id,
+      accountOwner: profile.accountOwner,
+      lifecycle: "active",
+      version: 0,
+      status: "concept",
+      rows: [],
+      createdAt: snapshot2.fetchedAt
+    };
+    const seen = /* @__PURE__ */ new Map(), rows = new Map(batch.rows.map((row) => [row.id, row]));
+    for (const raw of snapshot2.transactions) {
+      const normalized = normalizeProviderTransaction(raw, snapshot2, scope);
+      if (!normalized.ok) fail("invalid-provider-transaction");
+      const input = normalized.record;
+      if (normalized.disposition !== "ready") continue;
+      if (!input.facts.bookingDate) fail("missing-provider-booking-date");
+      const key = ((_b = input.identity) == null ? void 0 : _b.id) || canonical(raw);
+      const occurrence = (seen.get(key) || 0) + 1;
+      seen.set(key, occurrence);
+      const rowId = "api-row-" + csvFileDigest(key + (input.identity ? "" : ":" + occurrence));
+      const old = rows.get(rowId);
+      if (old) {
+        if (canonical(old.providerInput.facts) !== canonical(input.facts)) fail("provider-identity-conflict");
+        continue;
+      }
+      const f = input.facts;
+      const original2 = {
+        valid: true,
+        provider: "enablebanking",
+        bankDate: f.bookingDate,
+        bookingDate: f.bookingDate,
+        valueDate: f.valueDate,
+        amount: f.amountCents / 100,
+        currency: f.currency,
+        bankStatus: f.bankStatus,
+        description: f.description,
+        rawDescription: f.description,
+        accountIdentifier: snapshot2.account.iban,
+        counterpartyAccount: f.counterpartyAccount,
+        reference: f.reference,
+        importBatchId: id,
+        importTransactionId: rowId
+      };
+      const proposal = classify(original2, profile, state2.recognitionRules || [], scope.accountProfiles, state2.recurringFixedExpenses || [], state2.transactions || [], state2);
+      const row = {
+        ...proposal,
+        id: rowId,
+        source: "bank-api",
+        accountProfileId: profile.id,
+        accountOwner: profile.accountOwner,
+        bankOriginal: original2,
+        providerInput: input,
+        sourceIdentityProof: input.identity,
+        processingStatus: "nakijken",
+        certainty: "nakijken",
+        approvalSource: "",
+        approvedAt: "",
+        duplicate: false
+      };
+      if (!input.identity) row.importError = { code: "unproven-provider-identity", message: "Bankidentiteit ontbreekt; niet verwerken." };
+      for (const existing of imports.filter((item) => item.id !== id && !["deleted", "withdrawn"].includes(item.lifecycle))) {
+        for (const other of existing.rows || []) {
+          if (other.importError || other.duplicate || (other.accountProfileId || existing.accountProfileId) !== profile.id) continue;
+          const result2 = other.providerInput ? { ok: true, record: other.providerInput } : normalizeCsvBankInput(other, existing, scope);
+          const sameBasicFacts = ((_c = other.bankOriginal) == null ? void 0 : _c.bankDate) === original2.bankDate && ((_d = other.bankOriginal) == null ? void 0 : _d.amount) === original2.amount;
+          const comparison = result2.ok ? compareBankInputs(input, result2.record, scope) : null;
+          if ((comparison == null ? void 0 : comparison.status) === "identity-conflict") fail("provider-identity-conflict");
+          if ((comparison == null ? void 0 : comparison.status) === "same-source") {
+            row.duplicate = true;
+            row.duplicateSource = { batchId: existing.id, rowId: other.id };
+            break;
+          }
+          if (sameBasicFacts && (comparison == null ? void 0 : comparison.reason) !== "different-bank-ids") row.possibleDuplicate = { batchId: existing.id, rowId: other.id };
+        }
+        if (row.duplicate) break;
+      }
+      rows.set(row.id, row);
+    }
+    batch.rows = [...rows.values()];
+    const dates = batch.rows.map((row) => row.bankOriginal.bankDate).sort();
+    batch.periodFrom = dates[0] || snapshot2.fromDate;
+    batch.periodTo = dates.at(-1) || snapshot2.toDate;
+    batch.status = "concept";
+    batch.updatedAt = snapshot2.fetchedAt;
+    batch.balanceObservations = normalizeProviderBalances(snapshot2, scope);
+    const coverage = normalizeBankInput({
+      version: 1,
+      recordType: "coverage",
+      channel: "bank-api",
+      authority,
+      householdId: scope.householdId,
+      accountProfileId: profile.id,
+      identity: { kind: "observation-id", id: "provider-coverage-" + snapshot2.runId },
+      facts: { fromDate: snapshot2.fromDate, toDate: snapshot2.toDate, completeness: "partial", basis: "provider-assertion" },
+      provenance: { payload: { allPagesFetched: snapshot2.complete === true, issue: snapshot2.issue || null }, fetchedAt: snapshot2.fetchedAt }
+    }, scope);
+    if (!coverage.ok) fail("invalid-provider-coverage");
+    batch.providerCoverage = { id: coverage.record.identity.id, ...coverage.record };
+    batch.providerSync = { fetchedAt: snapshot2.fetchedAt, complete: snapshot2.complete === true, issue: snapshot2.issue || null };
+    return batch;
+  }
+  function applyProviderObservations(state2, batch) {
+    if (batch.channel !== "bank-api") return;
+    const observations = new Map((state2.bankBalanceObservations || []).map((row) => [row.id, row]));
+    for (const row of batch.balanceObservations || []) if (!row.unusable) observations.set(row.id, copy(row));
+    state2.bankBalanceObservations = [...observations.values()];
+    if (batch.providerCoverage) {
+      const previous = state2.bankCoverage || [];
+      state2.bankCoverage = [...previous.filter((row) => row.id !== batch.providerCoverage.id), copy(batch.providerCoverage)];
+    }
+    state2.bankSyncStatus = { ...state2.bankSyncStatus || {}, [batch.accountProfileId]: copy(batch.providerSync) };
+  }
+
+  // src/ui/bank-connection.mjs
+  var BANK_BACKEND_URL = "https://europe-west4-financien-7dd43.cloudfunctions.net/enableBanking";
+  var BANK_API_ENABLED = true;
+  var escape = (value) => String(value != null ? value : "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
+  var messages = {
+    "backend-not-configured": "De bankkoppeling is nog niet geactiveerd.",
+    "reauthorization-required": "Banktoegang is verlopen. Autoriseer de rekening opnieuw.",
+    "forbidden-user": "Dit account mag de bankkoppeling niet gebruiken.",
+    "forbidden-account": "Deze rekening is niet toegestaan.",
+    "unauthenticated": "Log opnieuw in bij Finize en probeer het nog eens.",
+    "invalid-token": "Je aanmelding is verlopen. Log opnieuw in bij Finize.",
+    "scope-changed": "Het huishouden is gewijzigd. Open deze rekening opnieuw.",
+    "no-bank-transactions": "Nog geen banktransacties opgehaald. Bestaande CSV-imports blijven beschikbaar bij Importeren.",
+    "synchronization-busy": "Deze rekening wordt al bijgewerkt. Probeer het straks opnieuw.",
+    "provider-identity-conflict": "Afwijkende gegevens voor dezelfde bankidentiteit. Bestaande gegevens blijven behouden.",
+    "provider-unavailable": "De bank is tijdelijk niet bereikbaar. Bestaande gegevens blijven behouden."
+  };
+  function installBankConnection(root2, { enabled: enabled2 = BANK_API_ENABLED, baseUrl = BANK_BACKEND_URL } = {}) {
+    var _a2;
+    const production = new URL(BANK_BACKEND_URL), target = new URL(baseUrl);
+    const local = ["127.0.0.1", "localhost"].includes((_a2 = root2.location) == null ? void 0 : _a2.hostname) && target.hostname === "127.0.0.1" && target.protocol === "http:";
+    if (!local && (target.origin !== production.origin || target.pathname !== production.pathname || target.protocol !== "https:")) throw new Error("Ongeldige bankbackend.");
+    let busy2 = false;
+    async function request2(route, payload) {
+      var _a3;
+      if (!enabled2) throw new Error("backend-not-configured");
+      const user = (_a3 = root2.FinizeAuth) == null ? void 0 : _a3.user;
+      if (!(user == null ? void 0 : user.getIdToken)) throw new Error("forbidden-user");
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), route === "/sync" ? 19e4 : 65e3);
+      try {
+        const response = await root2.fetch(baseUrl + route, {
+          method: "POST",
+          cache: "no-store",
+          redirect: "error",
+          signal: controller.signal,
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + await user.getIdToken() },
+          body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+        if (!response.ok) throw Object.assign(new Error(data.error || "provider-unavailable"), { code: data.error });
+        return data;
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+    function lastSync(profile) {
+      var _a3, _b;
+      const sync = (_b = (_a3 = root2.state) == null ? void 0 : _a3.bankSyncStatus) == null ? void 0 : _b[profile.id];
+      const at = new Date(sync == null ? void 0 : sync.fetchedAt);
+      return sync && Number.isFinite(at.getTime()) ? " Laatst opgehaald: " + new Intl.DateTimeFormat("nl-NL", { dateStyle: "short", timeStyle: "short" }).format(at) + (sync.complete ? "." : " · onvolledig.") : "";
+    }
+    function render2(profile) {
+      const disabled = !enabled2 || profile.status === "archived" ? "disabled" : "";
+      const status2 = !enabled2 ? "Nog niet geactiveerd. De bestaande administratie blijft beschikbaar." : profile.status === "archived" ? "Deze rekening is gearchiveerd. De historie blijft beschikbaar." : "Verbinding controleren…";
+      return '<section class="balance-panel" data-bank-connection="' + escape(profile.id) + '" aria-label="ING-bankkoppeling"><h3>ING-bankkoppeling</h3><p>Geboekte bankmutaties tellen direct mee voor de rekeningstand. Financiële verwerking bevestig je bij Nakijken.</p><p role="status" aria-live="polite" data-bank-status>' + status2 + '</p><div class="balance-actions"><button type="button" class="ghost" data-bank-authorize ' + disabled + '>Banktoegang autoriseren</button><button type="button" class="primary" data-bank-sync disabled>Bank bijwerken</button><button type="button" class="ghost" data-bank-review>Nakijken</button><button type="button" class="ghost" data-bank-disconnect ' + disabled + ">Banktoegang intrekken</button></div></section>";
+    }
+    async function ingest(snapshot2, householdId) {
+      const runtime = root2.FinizeUpdate4Runtime, imports = await runtime.ImportStore.listImports();
+      if (root2.CloudAdapter.importScope() !== householdId || snapshot2.householdId !== householdId) throw new Error("Het huishouden is gewijzigd.");
+      const id = providerBatchId(snapshot2.accountProfileId, snapshot2.account.identificationHash);
+      const previous = imports.find((batch2) => batch2.id === id);
+      const batch = stageProviderSnapshot(snapshot2, root2.state, previous, imports, runtime.classifyOriginal);
+      await runtime.persistImportDraft(root2, batch);
+      return batch;
+    }
+    function bind(panel, profile) {
+      const element = panel.querySelector("[data-bank-connection]");
+      if (!element || element.dataset.bound) return;
+      element.dataset.bound = "true";
+      const householdId = root2.CloudAdapter.importScope(), status2 = element.querySelector("[data-bank-status]");
+      let connected = false, checking = false;
+      const eligible = enabled2 && profile.status !== "archived";
+      const sameScope = () => {
+        if (root2.CloudAdapter.importScope() !== householdId) throw Object.assign(new Error("scope-changed"), { code: "scope-changed" });
+      };
+      const controls = () => element.querySelectorAll("button").forEach((item) => {
+        item.disabled = busy2 || checking && !item.hasAttribute("data-bank-review") || !eligible && !item.hasAttribute("data-bank-review") || item.hasAttribute("data-bank-sync") && !connected;
+      });
+      const failureMessage = (error2) => messages[error2.code || error2.message] || (error2.name === "AbortError" ? "De bank reageert niet op tijd. Probeer het opnieuw." : "De actie is niet afgerond. Controleer je verbinding en probeer opnieuw.");
+      async function checkConnection() {
+        if (!eligible) return;
+        checking = true;
+        controls();
+        try {
+          const result2 = await request2("/status", { accountProfileId: profile.id });
+          sameScope();
+          connected = result2.connected === true;
+          status2.textContent = (connected ? "Verbonden. Je kunt de bank handmatig bijwerken." : "Geen geldige bankverbinding. Geef toestemming bij ING om deze rekening te koppelen.") + (result2.revocationPending ? " Eerdere banktoegang is nog niet volledig ingetrokken. Kies Banktoegang intrekken om het opnieuw te proberen." : "") + lastSync(profile);
+        } catch (error2) {
+          connected = false;
+          status2.textContent = failureMessage(error2) + lastSync(profile);
+        } finally {
+          checking = false;
+          controls();
+        }
+      }
+      void checkConnection();
+      element.addEventListener("click", async (event2) => {
+        var _a3;
+        const button = event2.target.closest("button");
+        if (!button || button.disabled || busy2 || checking && !button.hasAttribute("data-bank-review")) return;
+        busy2 = true;
+        element.querySelectorAll("button").forEach((item) => {
+          item.disabled = true;
+        });
+        try {
+          sameScope();
+          if (button.hasAttribute("data-bank-review")) {
+            const imports = await root2.FinizeUpdate4Runtime.ImportStore.listImports();
+            sameScope();
+            const batch = imports.find((item) => item.channel === "bank-api" && item.accountProfileId === profile.id);
+            if (!batch) throw Object.assign(new Error("no-bank-transactions"), { code: "no-bank-transactions" });
+            await root2.FinizeUpdate4.openImportDetails(batch.id);
+          } else if (button.hasAttribute("data-bank-authorize")) {
+            status2.textContent = "Toestemmingspagina van ING openen via Enable Banking…";
+            const result2 = await request2("/auth/start", { accountProfileId: profile.id });
+            sameScope();
+            const url = new URL(result2.url);
+            if (url.protocol !== "https:" || url.hostname !== "auth.enablebanking.com") throw new Error("Ongeldige autorisatielink.");
+            root2.location.assign(url.toString());
+          } else if (button.hasAttribute("data-bank-disconnect")) {
+            status2.textContent = "Banktoegang intrekken…";
+            await request2("/disconnect", { accountProfileId: profile.id });
+            sameScope();
+            connected = false;
+            status2.textContent = "Banktoegang ingetrokken. Je financiële historie blijft behouden.";
+          } else if (button.hasAttribute("data-bank-sync")) {
+            status2.textContent = "Bankgegevens ophalen…";
+            const toDate = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+            const fromDate = new Date(Date.parse(toDate) - 30 * 864e5).toISOString().slice(0, 10);
+            const snapshot2 = await request2("/sync", { accountProfileId: profile.id, fromDate, toDate });
+            sameScope();
+            await ingest(snapshot2, householdId);
+            status2.textContent = snapshot2.complete ? "Bank bijgewerkt. Financiële verwerking staat klaar bij Nakijken." : "Gedeeltelijk opgehaald. Eerdere transacties blijven behouden; probeer later opnieuw.";
+            (_a3 = root2.renderActiveTab) == null ? void 0 : _a3.call(root2);
+          }
+        } catch (error2) {
+          if (error2.code === "reauthorization-required" || button.hasAttribute("data-bank-disconnect")) connected = false;
+          status2.textContent = button.hasAttribute("data-bank-disconnect") ? "Het intrekken is nog niet bevestigd. Probeer Banktoegang intrekken opnieuw. Je financiële historie blijft behouden." : failureMessage(error2);
+        } finally {
+          busy2 = false;
+          controls();
+        }
+      });
+    }
+    return { render: render2, bind, ingest };
+  }
+
+  // src/core/liquidity-settings.mjs
+  var validPaymentDay = (day) => day === "last" || Number.isInteger(day) && day >= 1 && day <= 31;
+  function monthlyPaymentDate(month, day) {
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month) || !validPaymentDay(day)) return null;
+    const last = new Date(Number(month.slice(0, 4)), Number(month.slice(5)), 0, 12).getDate();
+    return month + "-" + String(day === "last" ? last : Math.min(day, last)).padStart(2, "0");
+  }
+  function fixedPaymentDay(source) {
+    if (Object.hasOwn(source, "afschrijfdag")) return source.afschrijfdag;
+    return validCalendarDate(source.afschrijfdatum) ? Number(source.afschrijfdatum.slice(8)) : "";
+  }
+  function fixedCashDate(occurrence) {
+    var _a2;
+    const source = occurrence.source;
+    if ((_a2 = source.cashDates) == null ? void 0 : _a2[occurrence.id]) return source.cashDates[occurrence.id];
+    if (source.frequentieEenheid === "weken") return Object.hasOwn(source, "afschrijfdag") ? occurrence.date : source.afschrijfdatum === occurrence.date ? occurrence.date : null;
+    return monthlyPaymentDate(occurrence.month, fixedPaymentDay(source));
+  }
+  function liquidityBuffer(profile) {
+    var _a2, _b, _c;
+    return (_c = (_a2 = profile == null ? void 0 : profile.liquidity) == null ? void 0 : _a2.bufferCents) != null ? _c : (profile == null ? void 0 : profile.accountOwner) === "gezamenlijk" && ((_b = profile == null ? void 0 : profile.liquidity) == null ? void 0 : _b.primaryForOwner) ? 2e4 : 0;
+  }
+  function validateLiquiditySettings(profile, profiles) {
+    const value = profile.liquidity;
+    if (value === void 0) return;
+    const fail7 = (message) => {
+      throw Object.assign(new Error(message), { code: "invalid-liquidity-settings" });
+    };
+    if (!value || value.version !== 1 || typeof value.primaryForOwner !== "boolean" || !Number.isSafeInteger(value.bufferCents) || value.bufferCents < 0)
+      fail7("Vul een niet-negatieve veiligheidsbuffer in hele eurocenten in.");
+    if (value.primaryForOwner && profile.accountType !== "payment") fail7("Kies een betaalrekening voor de maandplanning.");
+    if (value.primaryForOwner && profiles.some((p) => {
+      var _a2;
+      return p.id !== profile.id && p.accountOwner === profile.accountOwner && ((_a2 = p.liquidity) == null ? void 0 : _a2.primaryForOwner);
+    }))
+      fail7("Er is al een rekening voor deze maandplanning. Schakel die keuze daar eerst uit.");
+    if (profile.accountOwner === "gezamenlijk" && !value.primaryForOwner && value.bufferCents !== 0)
+      fail7("De gezamenlijke buffer hoort alleen bij de primaire gezamenlijke betaalrekening.");
+    if (!value.salaryDays || typeof value.salaryDays !== "object" || Array.isArray(value.salaryDays)) fail7("Controleer de salarisbetaaldagen.");
+    for (const [person, day] of Object.entries(value.salaryDays)) {
+      if (!["dion", "dara"].includes(person) || !validPaymentDay(day)) fail7("Kies voor salaris een dag van 1 tot en met 31, de laatste dag, of laat het veld leeg.");
+      if (profiles.some((p) => {
+        var _a2, _b;
+        return p.id !== profile.id && ((_b = (_a2 = p.liquidity) == null ? void 0 : _a2.salaryDays) == null ? void 0 : _b[person]);
+      })) fail7("Dit salaris is al aan een andere rekening gekoppeld. Verwijder die betaaldag daar eerst.");
+    }
+    if (value.allowanceDays !== void 0 && (!value.allowanceDays || typeof value.allowanceDays !== "object" || Array.isArray(value.allowanceDays))) fail7("Controleer de zakgeldbetaaldagen.");
+    for (const [person, day] of Object.entries(value.allowanceDays || {})) {
+      if (!["dion", "dara"].includes(person) || profile.accountOwner !== person || profile.accountType !== "payment" || !validPaymentDay(day)) fail7("Koppel zakgeld aan de persoonlijke betaalrekening van de juiste eigenaar en kies een afschrijfdag.");
+      if (profiles.some((p) => {
+        var _a2, _b;
+        return p.id !== profile.id && ((_b = (_a2 = p.liquidity) == null ? void 0 : _a2.allowanceDays) == null ? void 0 : _b[person]);
+      })) fail7("Dit zakgeld is al aan een andere rekening gekoppeld. Verwijder die betaaldag daar eerst.");
+    }
+  }
+
+  // src/core/provider-balances.mjs
+  function providerBalanceAnchor(state2, accountProfileId, toDate, scope, checkpointId = null) {
+    var _a2;
+    const candidates = [];
+    for (const value of state2.bankBalanceObservations || []) {
+      const result2 = normalizeBankInput(value, scope);
+      if (!result2.ok) continue;
+      const { facts, provenance, identity } = result2.record;
+      if (result2.record.accountProfileId !== accountProfileId || facts.balanceType !== "booked" || facts.asOfDate > toDate || !Number.isFinite(Date.parse(provenance.fetchedAt)) || facts.asOfDate > provenance.fetchedAt.slice(0, 10) || checkpointId && identity.id !== checkpointId) continue;
+      if (facts.boundary === "timestamp" && (provenance.providerType !== "ITBD" || !facts.observedAt || Date.parse(facts.observedAt) > Date.parse(provenance.fetchedAt) || facts.asOfDate !== ((_a2 = provenance.fetchedAt) == null ? void 0 : _a2.slice(0, 10)))) continue;
+      if (facts.boundary === "end-of-bank-day" && provenance.providerType !== "CLBD") continue;
+      candidates.push({
+        id: identity.id,
+        accountProfileId,
+        amountCents: facts.amountCents,
+        currency: facts.currency,
+        asOfDate: facts.asOfDate,
+        boundary: facts.boundary,
+        observedAt: facts.observedAt,
+        source: "provider-observation",
+        fetchedAt: provenance.fetchedAt
+      });
+    }
+    candidates.sort((a, b) => b.asOfDate.localeCompare(a.asOfDate) || (b.boundary === "end-of-bank-day") - (a.boundary === "end-of-bank-day") || String(b.observedAt || b.fetchedAt).localeCompare(String(a.observedAt || a.fetchedAt)));
+    const selected = candidates[0];
+    if (selected && candidates.some((row) => row.asOfDate === selected.asOfDate && row.boundary === selected.boundary && row.observedAt === selected.observedAt && row.amountCents !== selected.amountCents)) return null;
+    return selected || null;
+  }
+  function providerBalanceHistory(state2, accountProfileId, toDate, scope) {
+    const dates = [...new Set((state2.bankBalanceObservations || []).map((row) => {
+      var _a2;
+      return (_a2 = row.facts) == null ? void 0 : _a2.asOfDate;
+    }).filter((date2) => date2 && date2 <= toDate))];
+    return dates.flatMap((date2) => {
+      const row = providerBalanceAnchor(state2, accountProfileId, date2, scope);
+      return (row == null ? void 0 : row.asOfDate) === date2 ? [row] : [];
+    });
+  }
+
   // src/core/transaction-model.mjs
   var CURRENT_SCHEMA_VERSION = 11;
   var ACCOUNT_CONTEXTS = Object.freeze(["gezamenlijk", "dion", "dara"]);
   var INCOME_TRANSACTION_TYPES = Object.freeze(["salaris", "vakantiegeld", "nabetaling", "vergoeding", "belastingteruggave", "overige-inkomsten"]);
   var PROCESSING_STATUSES = Object.freeze(["onbekend", "nakijken", "goedgekeurd", "niet-meetellen"]);
-  var copy = (value) => JSON.parse(JSON.stringify(value));
+  var copy2 = (value) => JSON.parse(JSON.stringify(value));
   var validAccount = (value) => ACCOUNT_CONTEXTS.includes(value);
-  var iban = (value) => String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  var iban2 = (value) => String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
   function resolveTransactionAccountContext(tx, { accountProfiles = [] } = {}) {
     if ((tx == null ? void 0 : tx.accountContextResolution) === "ambiguous") return { value: null, evidence: "", ambiguous: true, reason: "unresolved-account-context" };
     const candidates = ["accountContext", "accountOwner", "account"].filter((key) => validAccount(tx == null ? void 0 : tx[key])).map((key) => ({ value: tx[key], evidence: key }));
     const profileMatches = accountProfiles.filter((profile) => {
       var _a2;
-      return (tx == null ? void 0 : tx.accountProfileId) && profile.id === tx.accountProfileId || ((_a2 = tx == null ? void 0 : tx.bankOriginal) == null ? void 0 : _a2.accountIdentifier) && iban(profile.identifier || profile.iban) === iban(tx.bankOriginal.accountIdentifier);
+      return (tx == null ? void 0 : tx.accountProfileId) && profile.id === tx.accountProfileId || ((_a2 = tx == null ? void 0 : tx.bankOriginal) == null ? void 0 : _a2.accountIdentifier) && iban2(profile.identifier || profile.iban) === iban2(tx.bankOriginal.accountIdentifier);
     });
     profileMatches.forEach((profile) => {
       if (validAccount(profile.accountOwner)) candidates.push({ value: profile.accountOwner, evidence: "account-profile" });
@@ -849,6 +1239,8 @@
     return resolveTransactionAccountContext(tx, options).value;
   }
   function getTransactionSource(tx) {
+    var _a2;
+    if (((_a2 = tx == null ? void 0 : tx.bankOriginal) == null ? void 0 : _a2.provider) === "enablebanking" || (tx == null ? void 0 : tx.source) === "bank-api") return "bank-api";
     if ((tx == null ? void 0 : tx.bankOriginal) || (tx == null ? void 0 : tx.importBatchId) || (tx == null ? void 0 : tx.sourceFile) || (tx == null ? void 0 : tx.rawData) || (tx == null ? void 0 : tx.importedAt)) return "csv";
     return ["manual", "csv"].includes(tx == null ? void 0 : tx.source) ? tx.source : null;
   }
@@ -920,12 +1312,12 @@
     return value;
   }
   function getTransactionOriginalBankData(tx) {
-    return (tx == null ? void 0 : tx.bankOriginal) ? freezeTree(copy(tx.bankOriginal)) : null;
+    return (tx == null ? void 0 : tx.bankOriginal) ? freezeTree(copy2(tx.bankOriginal)) : null;
   }
   function normalizeDataTransaction(tx, { accountProfiles = [], legacyMain = false, diagnostics = [] } = {}) {
     var _a2;
     if (!tx || typeof tx !== "object" || Array.isArray(tx)) throw new Error("Ongeldige transactieregel; oorspronkelijke data behouden.");
-    const next = copy(tx);
+    const next = copy2(tx);
     const context = resolveTransactionAccountContext(tx, { accountProfiles });
     if (context.value) {
       next.accountContext = context.value;
@@ -969,7 +1361,7 @@
   }
 
   // src/core/bank-sources.mjs
-  var copy2 = (value) => JSON.parse(JSON.stringify(value));
+  var copy3 = (value) => JSON.parse(JSON.stringify(value));
   var isBankSource = (tx) => (tx == null ? void 0 : tx.recordRole) === "bank-source";
   var sourceRecordKey = (tx) => tx.bankSourceId || (tx.importBatchId && tx.importTransactionId ? `${tx.importBatchId}:${tx.importTransactionId}` : tx.id);
   function bankSourceForImport(state2, batchId, rowId) {
@@ -998,13 +1390,13 @@
       if (row.possibleDuplicate && !row.identityDecision && !row.duplicate) continue;
       if (!source) {
         const first = legacy[0], bankSourceId = (first == null ? void 0 : first.bankSourceId) || row.bankSourceId || `bank-${(ref == null ? void 0 : ref.batchId) || batch.id}:${(ref == null ? void 0 : ref.rowId) || row.id}`;
-        const original3 = copy2(((_b = first == null ? void 0 : first.bankOriginal) == null ? void 0 : _b.bankDate) && first.bankOriginal.amount !== void 0 ? first.bankOriginal : row.bankOriginal), accountProfileId = (first == null ? void 0 : first.accountProfileId) || row.accountProfileId || batch.accountProfileId;
+        const original3 = copy3(((_b = first == null ? void 0 : first.bankOriginal) == null ? void 0 : _b.bankDate) && first.bankOriginal.amount !== void 0 ? first.bankOriginal : row.bankOriginal), accountProfileId = (first == null ? void 0 : first.accountProfileId) || row.accountProfileId || batch.accountProfileId;
         const accountContext = getTransactionAccountContext(first || { ...row, accountProfileId, accountOwner: row.accountOwner || batch.accountOwner }, { accountProfiles: state2.accountProfiles || [] });
         if (!accountContext) continue;
-        source = { id: `source-${bankSourceId}`, recordRole: "bank-source", bankSourceId, source: "csv", bankOriginal: original3, transactionDate: original3.bankDate, date: original3.bankDate, amount: Math.abs(original3.amount), description: original3.description, accountContext, accountOwner: accountContext, account: accountContext, accountProfileId, importBatchId: (ref == null ? void 0 : ref.batchId) || batch.id, importTransactionId: (ref == null ? void 0 : ref.rowId) || row.id, processingRowId: (first == null ? void 0 : first.importTransactionId) || (ref == null ? void 0 : ref.rowId) || row.id, importReferences: [], processingRevision: 0, processingStatus: "nakijken", batchLifecycle: "active" };
+        source = { id: `source-${bankSourceId}`, recordRole: "bank-source", bankSourceId, source: row.source === "bank-api" ? "bank-api" : "csv", sourceIdentityProof: copy3(row.sourceIdentityProof || null), bankOriginal: original3, transactionDate: original3.bankDate, date: original3.bankDate, amount: Math.abs(original3.amount), description: original3.description, accountContext, accountOwner: accountContext, account: accountContext, accountProfileId, importBatchId: (ref == null ? void 0 : ref.batchId) || batch.id, importTransactionId: (ref == null ? void 0 : ref.rowId) || row.id, processingRowId: (first == null ? void 0 : first.importTransactionId) || (ref == null ? void 0 : ref.rowId) || row.id, importReferences: [], processingRevision: 0, processingStatus: "nakijken", batchLifecycle: "active" };
         if (first) {
           source.importReferences.push({ batchId: first.importBatchId, rowId: first.importTransactionId });
-          source.approvedProcessing = copy2(first.processing || {});
+          source.approvedProcessing = copy3(first.processing || {});
           source.approvedProcessing.processedAmount = Math.round(legacy.reduce((sum2, tx) => sum2 + Math.abs(Number(tx.amount) || 0), 0) * 100) / 100;
           source.processingStatus = getTransactionProcessingStatus(first);
           source.approvalSource = first.approvalSource || "";
@@ -1034,13 +1426,13 @@
       return ((_a3 = row.bankOriginal) == null ? void 0 : _a3.valid) && !row.importError && !bankSourceForImport(state2, batch.id, row.id);
     }));
     if (missing.length) {
-      const projected = { ...state2, transactions: copy2(state2.transactions || []), manualTransactionReplacements: copy2(state2.manualTransactionReplacements || []) };
+      const projected = { ...state2, transactions: copy3(state2.transactions || []), manualTransactionReplacements: copy3(state2.manualTransactionReplacements || []) };
       for (const duplicates of [false, true]) for (const batch of missing) {
         const rows = (batch.rows || []).filter((row) => Boolean(row.duplicate) === duplicates && !bankSourceForImport(projected, batch.id, row.id));
         if (!rows.length) continue;
-        const previous = copy2(projected.transactions), relations = copy2(projected.manualTransactionReplacements);
+        const previous = copy3(projected.transactions), relations = copy3(projected.manualTransactionReplacements);
         try {
-          ensureImportBankSources(projected, { ...batch, rows: copy2(rows) });
+          ensureImportBankSources(projected, { ...batch, rows: copy3(rows) });
         } catch (e) {
           projected.transactions = previous;
           projected.manualTransactionReplacements = relations;
@@ -1053,7 +1445,7 @@
       const source = bankSourceForTransaction(state2, tx) || tx, key = sourceRecordKey(source);
       if (seen.has(key)) continue;
       seen.add(key);
-      const csv = getTransactionSource(source) === "csv", active2 = isBankSource(source) ? bankSourceActive(state2, source) : !["withdrawn", "deleted"].includes(source.batchLifecycle);
+      const csv = ["csv", "bank-api"].includes(getTransactionSource(source)), active2 = isBankSource(source) ? bankSourceActive(state2, source) : !["withdrawn", "deleted"].includes(source.batchLifecycle);
       if (!includeInactive && !active2) continue;
       if (!csv && (state2.manualTransactionReplacements || []).some((ref) => {
         var _a3;
@@ -1064,7 +1456,7 @@
       const incoming = ["inkomen", "salaris", "vakantiegeld", "nabetaling", "vergoeding", "belastingteruggave", "overige-inkomsten", "van-spaarrekening", "terugbetaling", "refund"].includes(source.transactionType || ((_c = source.approvedProcessing) == null ? void 0 : _c.transactionType)) || source.kind === "inkomen";
       const amount = (_f = (_e = (_d = source.bankOriginal) == null ? void 0 : _d.amount) != null ? _e : source.accountDelta) != null ? _f : Math.abs(Number(source.amount) || 0) * (incoming ? 1 : -1);
       const liveRef = (_g = source.importReferences) == null ? void 0 : _g.find((ref) => bankSourceActive(state2, { ...source, importReferences: [ref] }));
-      result2.push({ ...source, ...liveRef ? { importBatchId: liveRef.batchId, importTransactionId: liveRef.rowId } : {}, date: date2, transactionDate: date2, amount: Math.abs(amount), bankAmount: amount, accountContext: context, active: active2, category: ((_h = source.approvedProcessing) == null ? void 0 : _h.category) || source.category || "Nog te beoordelen", processing: copy2(source.approvedProcessing || source.processing || {}) });
+      result2.push({ ...source, ...liveRef ? { importBatchId: liveRef.batchId, importTransactionId: liveRef.rowId } : {}, date: date2, transactionDate: date2, amount: Math.abs(amount), bankAmount: amount, accountContext: context, active: active2, category: ((_h = source.approvedProcessing) == null ? void 0 : _h.category) || source.category || "Nog te beoordelen", processing: copy3(source.approvedProcessing || source.processing || {}) });
     }
     return result2;
   }
@@ -1072,17 +1464,17 @@
     const source = bankSourceForImport(state2, batch.id, row.id);
     if (!source) return;
     if (JSON.stringify(source.approvedProcessing) !== JSON.stringify(row.processing)) source.processingRevision = (source.processingRevision || 0) + 1;
-    source.approvedProcessing = copy2(row.processing);
+    source.approvedProcessing = copy3(row.processing);
     source.processingStatus = getTransactionProcessingStatus({ ...row, source: "csv" });
     source.approvalSource = row.approvalSource || "";
     source.approvedAt = row.approvedAt || "";
   }
 
   // src/core/balance-checkpoints.mjs
-  var copy3 = (value) => structuredClone(value);
-  var fail = (code, message) => Object.assign(new Error(message), { code });
-  var canonical = (value) => JSON.stringify(value, (_, item) => item && typeof item === "object" && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).sort().map((key) => [key, item[key]])) : item);
-  var same = (a, b) => canonical(a) === canonical(b);
+  var copy4 = (value) => structuredClone(value);
+  var fail2 = (code, message) => Object.assign(new Error(message), { code });
+  var canonical2 = (value) => JSON.stringify(value, (_, item) => item && typeof item === "object" && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).sort().map((key) => [key, item[key]])) : item);
+  var same = (a, b) => canonical2(a) === canonical2(b);
   var nextDay = (date2) => new Date(Date.UTC(Number(date2.slice(0, 4)), Number(date2.slice(5, 7)) - 1, Number(date2.slice(8, 10)) + 1)).toISOString().slice(0, 10);
   function balanceRequiredMonths(fromDate, toDate) {
     if (!validCalendarDate(fromDate) || !validCalendarDate(toDate) || fromDate > toDate) return [];
@@ -1136,7 +1528,7 @@
     const active2 = rows.filter((row) => !replaced.has(row.id) && validCheckpoint(row, scope));
     if (new Set(active2.map((row) => row.asOfDate)).size !== active2.length) issues.push("conflicting-checkpoint-revisions");
     const order = (a, b) => String(b.asOfDate).localeCompare(String(a.asOfDate)) || b.revision - a.revision || String(b.createdAt).localeCompare(String(a.createdAt)) || b.id.localeCompare(a.id);
-    return { rows: copy3(rows.sort(order)), active: copy3(active2.sort(order)), issues: [...new Set(issues)] };
+    return { rows: copy4(rows.sort(order)), active: copy4(active2.sort(order)), issues: [...new Set(issues)] };
   }
   function coverageFor(coverage, checkpoint, toDate, scope) {
     if (checkpoint.asOfDate === toDate) return { status: "complete", basis: "checkpoint-only" };
@@ -1150,13 +1542,15 @@
     return { status: cursor > toDate ? "complete" : valid.some((row) => row.toDate >= from && row.fromDate <= toDate) ? "partial" : "unknown", basis: "bank-evidence" };
   }
   function selectAccountBalance(state2, { accountProfileId, toDate, scope, imports = [], importsAvailable = true, coverage = [], checkpointId = null } = {}) {
-    var _a2, _b, _c;
+    var _a2, _b, _c, _d, _e;
     const reasons2 = [], add = (code, sourceId = "") => {
       if (!reasons2.some((row) => row.code === code && row.sourceId === sourceId)) reasons2.push({ code, sourceId });
     };
     const history = checkpointHistory(state2, accountProfileId, scope);
     history.issues.forEach((code) => add(code));
-    const checkpoint = history.active.find((row) => row.asOfDate <= toDate && (!checkpointId || row.id === checkpointId)) || null;
+    const manualCheckpoint = history.active.find((row) => row.asOfDate <= toDate && (!checkpointId || row.id === checkpointId)) || null;
+    const providerCheckpoint = providerBalanceAnchor(state2, accountProfileId, toDate, scope, checkpointId);
+    const checkpoint = providerCheckpoint && (!manualCheckpoint || providerCheckpoint.asOfDate >= manualCheckpoint.asOfDate) ? providerCheckpoint : manualCheckpoint;
     const result2 = {
       accountProfileId,
       toDate,
@@ -1202,10 +1596,16 @@
       add("imports-unavailable");
     }
     if (history.issues.length) result2.quality.storage = "incomplete";
-    const cov = coverageFor(coverage, checkpoint, toDate, scope);
+    if (checkpoint.source === "provider-observation") {
+      result2.boundary = checkpoint.boundary;
+      result2.observedAt = checkpoint.observedAt;
+      if (checkpoint.boundary === "timestamp") add("intraday-provider-balance");
+    }
+    const cov = coverageFor([...coverage, ...state2.bankCoverage || []], checkpoint, toDate, scope);
     result2.quality.coverage = cov.status;
     if (cov.status !== "complete") add(cov.status === "partial" ? "partial-bank-coverage" : "unknown-bank-coverage");
     const profile = profiles[0];
+    if (((_c = (_b = state2.bankSyncStatus) == null ? void 0 : _b[accountProfileId]) == null ? void 0 : _c.complete) === false) add("provider-sync-incomplete");
     const relevant = (row) => row.accountProfileId ? row.accountProfileId === accountProfileId : !getTransactionAccountContext(row, { accountProfiles: state2.accountProfiles }) || getTransactionAccountContext(row, { accountProfiles: state2.accountProfiles }) === profile.accountOwner;
     const within = (row) => {
       var _a3;
@@ -1223,7 +1623,7 @@
         if (row.bankSourceId) unusable.add(row.bankSourceId);
         add("possible-duplicate", batch.id + ":" + row.id);
       }
-      if (!candidate.accountProfileId || row.importError || !((_b = row.bankOriginal) == null ? void 0 : _b.valid))
+      if (!candidate.accountProfileId || row.importError || !((_d = row.bankOriginal) == null ? void 0 : _d.valid))
         add(!candidate.accountProfileId ? "unresolved-account-profile" : "invalid-bank-source", batch.id + ":" + row.id);
     }
     const selected = /* @__PURE__ */ new Map();
@@ -1279,7 +1679,7 @@
         add("possible-duplicate", key);
         continue;
       }
-      const original2 = row.bankOriginal, status2 = (_c = original2.bankStatus) != null ? _c : "booked";
+      const original2 = row.bankOriginal, status2 = (_e = original2.bankStatus) != null ? _e : "booked";
       if (!validCalendarDate(original2.bankDate) || !original2.valid || original2.currency !== "EUR" || !ref) {
         add("invalid-bank-source", key);
         continue;
@@ -1327,7 +1727,7 @@
       add("manual-transfer-unresolved", transfer.id || "");
     }
     if (result2.mutations.some((row) => row.status === "provisional")) add("awaiting-review");
-    const sourceIssues = reasons2.some((row) => !["unknown-bank-coverage", "partial-bank-coverage", "awaiting-review", "missing-period", "imports-unavailable"].includes(row.code));
+    const sourceIssues = reasons2.some((row) => !["unknown-bank-coverage", "partial-bank-coverage", "awaiting-review", "missing-period", "imports-unavailable", "intraday-provider-balance"].includes(row.code));
     result2.quality.bankSources = sourceIssues ? "uncertain" : result2.mutations.some((row) => row.status === "provisional") ? "provisional" : "confirmed";
     const amount = checkpoint.amountCents + result2.confirmedCents + result2.provisionalCents;
     if (!Number.isSafeInteger(amount)) {
@@ -1335,19 +1735,19 @@
       add("unsafe-balance-amount");
     }
     if (result2.quality.storage === "verified") result2.balanceCents = amount;
-    result2.status = result2.quality.storage === "incomplete" || sourceIssues ? "incomplete" : result2.quality.bankSources === "provisional" || cov.status !== "complete" ? "provisional" : "confirmed";
+    result2.status = result2.quality.storage === "incomplete" || sourceIssues ? "incomplete" : result2.quality.bankSources === "provisional" || cov.status !== "complete" || checkpoint.boundary === "timestamp" ? "provisional" : "confirmed";
     return result2;
   }
   function prepareBalanceCheckpoint(state2, command, options) {
     var _a2, _b;
     const { scope, today } = options;
-    if ((state2.accountProfiles || []).filter((row) => row.id === command.accountProfileId).length !== 1) throw fail("unresolved-account-profile", "Kies een bestaande fysieke rekening.");
-    if (state2.accountProfiles.find((row) => row.id === command.accountProfileId).status === "archived" && !command.supersedesId && !(state2.balanceCheckpoints || []).some((row) => row.operationId === command.operationId)) throw fail("account-archived", "Heractiveer de rekening voordat je een nieuw banksaldo invoert.");
+    if ((state2.accountProfiles || []).filter((row) => row.id === command.accountProfileId).length !== 1) throw fail2("unresolved-account-profile", "Kies een bestaande fysieke rekening.");
+    if (state2.accountProfiles.find((row) => row.id === command.accountProfileId).status === "archived" && !command.supersedesId && !(state2.balanceCheckpoints || []).some((row) => row.operationId === command.operationId)) throw fail2("account-archived", "Heractiveer de rekening voordat je een nieuw banksaldo invoert.");
     if (!validCalendarDate(today) || !validCalendarDate(command.asOfDate) || command.asOfDate > today)
-      throw fail("invalid-checkpoint-date", "Kies een geldige peildatum tot en met vandaag.");
-    if (!command.operationId || typeof command.operationId !== "string") throw fail("missing-operation-id", "De opslagactie mist een vaste identiteit.");
+      throw fail2("invalid-checkpoint-date", "Kies een geldige peildatum tot en met vandaag.");
+    if (!command.operationId || typeof command.operationId !== "string") throw fail2("missing-operation-id", "De opslagactie mist een vaste identiteit.");
     const history = checkpointHistory(state2, command.accountProfileId, scope);
-    if (history.issues.length) throw fail("checkpoint-history-conflict", "De ijkpunthistorie bevat een conflict. Bewaar de bestaande waarnemingen en controleer de synchronisatie.");
+    if (history.issues.length) throw fail2("checkpoint-history-conflict", "De ijkpunthistorie bevat een conflict. Bewaar de bestaande waarnemingen en controleer de synchronisatie.");
     const previous = command.supersedesId ? history.rows.find((row) => row.id === command.supersedesId) : null;
     const record = {
       version: 1,
@@ -1366,16 +1766,16 @@
       revision: previous ? previous.revision + 1 : 1,
       supersedesId: (previous == null ? void 0 : previous.id) || null
     };
-    if (!validCheckpoint(record, scope)) throw fail("invalid-checkpoint", "Vul een geldig banksaldo in hele eurocenten in en kies een bestaande rekening.");
+    if (!validCheckpoint(record, scope)) throw fail2("invalid-checkpoint", "Vul een geldig banksaldo in hele eurocenten in en kies een bestaande rekening.");
     const existing = (state2.balanceCheckpoints || []).find((row) => row.operationId === command.operationId);
     if (existing) {
-      if (!same(existing, record)) throw fail("operation-conflict", "Deze opslagactie is al gebruikt voor een andere waarneming.");
-      return { record: copy3(existing), noop: true };
+      if (!same(existing, record)) throw fail2("operation-conflict", "Deze opslagactie is al gebruikt voor een andere waarneming.");
+      return { record: copy4(existing), noop: true };
     }
     const sameDate = history.active.find((row) => row.asOfDate === command.asOfDate);
     if (command.supersedesId && (!previous || !history.active.some((row) => row.id === previous.id)))
-      throw fail("stale-checkpoint-revision", "Dit ijkpunt is intussen gewijzigd. Open de actuele waarneming opnieuw.");
-    if (sameDate && sameDate.id !== (previous == null ? void 0 : previous.id)) throw fail("checkpoint-date-exists", "Voor deze dag bestaat al een ander ijkpunt. Gebruik Corrigeren bij de juiste waarneming.");
+      throw fail2("stale-checkpoint-revision", "Dit ijkpunt is intussen gewijzigd. Open de actuele waarneming opnieuw.");
+    if (sameDate && sameDate.id !== (previous == null ? void 0 : previous.id)) throw fail2("checkpoint-date-exists", "Voor deze dag bestaat al een ander ijkpunt. Gebruik Corrigeren bij de juiste waarneming.");
     const projected = selectAccountBalance(state2, { ...options, accountProfileId: command.accountProfileId, toDate: command.asOfDate });
     const reconciliation = {
       expectedCents: projected.balanceCents,
@@ -1385,14 +1785,14 @@
       reasons: projected.reasons,
       previousCheckpointId: ((_b = projected.checkpoint) == null ? void 0 : _b.id) || null
     };
-    if (reconciliation.differenceCents !== null && !Number.isSafeInteger(reconciliation.differenceCents)) throw fail("unsafe-difference", "Het controleverschil is te groot om exact te bewaren.");
+    if (reconciliation.differenceCents !== null && !Number.isSafeInteger(reconciliation.differenceCents)) throw fail2("unsafe-difference", "Het controleverschil is te groot om exact te bewaren.");
     return { record, reconciliation, previewSignature: JSON.stringify([history.rows, projected, record]), noop: false };
   }
   function applyBalanceCheckpoint(state2, command, options) {
     const prepared = prepareBalanceCheckpoint(state2, command, options);
     if (prepared.noop) return prepared;
     if (!command.confirmed || command.previewSignature !== prepared.previewSignature)
-      throw fail("balance-confirmation-required", "Controleer de actuele vergelijking en bevestig de waarneming opnieuw.");
+      throw fail2("balance-confirmation-required", "Controleer de actuele vergelijking en bevestig de waarneming opnieuw.");
     state2.balanceCheckpoints = [...state2.balanceCheckpoints || [], prepared.record];
     return prepared;
   }
@@ -2059,7 +2459,7 @@
   }
 
   // src/core/transaction-engine.mjs
-  var copy4 = (value) => JSON.parse(JSON.stringify(value));
+  var copy5 = (value) => JSON.parse(JSON.stringify(value));
   var money = (value) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
   var cents2 = (value) => Math.round(Number(value) * 100);
   var incomeTypes = /* @__PURE__ */ new Set(["inkomen", "salaris", "vakantiegeld", "nabetaling", "vergoeding", "belastingteruggave", "overige-inkomsten"]);
@@ -2330,12 +2730,12 @@
       return item.active !== false && (item.manualTransactionId === manualId || ((_a3 = item.manualTransaction) == null ? void 0 : _a3.id) === manualId) && (item.importBatchId !== importId || item.importTransactionId !== row.id);
     })) throw new Error("Handmatige transactie is al vervangen.");
     state2.manualTransactionReplacements = state2.manualTransactionReplacements || [];
-    if (!existing) state2.manualTransactionReplacements.push({ id, manualTransactionId: manualId, manualTransaction: copy4(manual), importBatchId: importId, importTransactionId: row.id, active: true });
+    if (!existing) state2.manualTransactionReplacements.push({ id, manualTransactionId: manualId, manualTransaction: copy5(manual), importBatchId: importId, importTransactionId: row.id, active: true });
     if (existing) existing.active = true;
     const p = row.processing;
     for (const field of ["category", "budgetOwner", "transactionType", "fixedExpenseId", "fixedOccurrenceId", "fixedOccurrenceMonth", "savingsGoalId", "refundCategory", "refundMonth", "splits"]) {
       const value = (_c = (_b = (_a2 = manual.processing) == null ? void 0 : _a2[field]) != null ? _b : manual[field]) != null ? _c : field === "budgetOwner" ? getTransactionFinancialDestination(manual) : void 0;
-      if (value !== void 0) p[field] = copy4(value);
+      if (value !== void 0) p[field] = copy5(value);
     }
     p.manualMatchId = manualId;
     p.processedAmount = Math.abs(Number(row.bankOriginal.amount));
@@ -2631,6 +3031,8 @@
   var issue = (code, eventId = "", severity = "incomplete") => ({ code, eventId, severity });
   function liquidityReasonMessage(reason) {
     return {
+      "intraday-provider-balance": "Het beginsaldo is een geboekte bankstand op het vermelde tijdstip; de bankdag is nog niet afgesloten.",
+      "provider-sync-incomplete": "De laatste banksynchronisatie is onvolledig. Eerdere gegevens blijven behouden.",
       "missing-checkpoint": "Er is nog geen bruikbaar saldo-ijkpunt voor deze rekening.",
       "missing-period-opening": "Een beginsaldo vóór deze periode ontbreekt. De saldolijn begint bij het eerste bruikbare saldo-ijkpunt; eerdere saldi worden niet verzonnen.",
       "planning-basis": "Deze saldolijn is berekend uit de planning en beschikbare bankboekingen; dit is geen door de bank bevestigd historisch saldo.",
@@ -3024,11 +3426,11 @@
         continue;
       }
       reservationIds.add(row.id);
-      const covered = sum(events.filter((e) => e.status === "planned" && e.date > asOfDate && e.date <= horizon.endDate && e.amountCents < 0 && e.reservationId === row.id).map((e) => -e.amountCents));
+      const covered = sum(events.filter((e) => e.status === "planned" && (e.date > asOfDate || e.date === asOfDate && opening.boundary === "timestamp") && e.date <= horizon.endDate && e.amountCents < 0 && e.reservationId === row.id).map((e) => -e.amountCents));
       reservations.push({ ...row, coveredByConcreteCents: Math.min(row.amountCents, covered), amountCents: Math.max(0, row.amountCents - covered) });
     }
     const reserveCents = sum(reservations.filter((row) => row.reserveForDisplay !== false).map((row) => row.amountCents));
-    const dated = events.filter((row) => ["actual", "provisional", "planned"].includes(row.status) && row.accountProfileId === input.accountProfileId && row.date > asOfDate && row.date <= horizon.endDate);
+    const dated = events.filter((row) => ["actual", "provisional", "planned"].includes(row.status) && row.accountProfileId === input.accountProfileId && (row.date > asOfDate || row.date === asOfDate && row.status === "planned" && opening.boundary === "timestamp") && row.date <= horizon.endDate);
     const estimated = /* @__PURE__ */ new Map(), allocations = /* @__PURE__ */ new Map();
     const distribute = (row, fromDate = row.fromDate) => {
       const previous = allocations.get(row.id) || /* @__PURE__ */ new Map();
@@ -3059,12 +3461,13 @@
         if (input.displayStartDate && date2 < input.displayStartDate.slice(0, 7) + "-01") earlierEstimated = safe(earlierEstimated + (estimated.get(date2) || 0));
         const observation2 = observations.get(date2);
         if (observation2) {
-          const modeledCents = safe(bank - spent), amountCents = safe(observation2.amountCents - modeledCents);
+          const remainingPlans = observation2.boundary === "timestamp" ? sum(rows.filter((row) => row.status === "planned").map((row) => row.amountCents)) : 0;
+          const modeledCents = safe(bank - spent - remainingPlans), amountCents = safe(observation2.amountCents - modeledCents);
           const adjustment = event({ id: "checkpoint:" + observation2.id, accountProfileId: input.accountProfileId, date: date2, amountCents, type: "checkpoint", status: "observed", dateQuality: "confirmed", observedBalanceCents: observation2.amountCents, modeledBalanceCents: modeledCents });
           events.push(adjustment);
           rows.push(adjustment);
           mutationCents = safe(mutationCents + amountCents);
-          bank = observation2.amountCents;
+          bank = safe(observation2.amountCents + remainingPlans);
           spent = 0;
           earlierEstimated = 0;
           lastObservationMonth = date2.slice(0, 7);
@@ -3174,8 +3577,13 @@
       softSavings: guidance
     };
   }
+  function liquidityObservations(state2, accountProfileId, toDate, scope) {
+    const rows = new Map(checkpointHistory(state2, accountProfileId, scope).active.filter((row) => row.asOfDate <= toDate).map((row) => [row.asOfDate, row]));
+    for (const row of providerBalanceHistory(state2, accountProfileId, toDate, scope)) rows.set(row.asOfDate, row);
+    return [...rows.values()].sort((a, b) => b.asOfDate.localeCompare(a.asOfDate));
+  }
   function planningAnchor(state2, { accountProfileId, asOfDate, startDate, scope }) {
-    const history = checkpointHistory(state2, accountProfileId, scope).active.filter((row) => row.asOfDate <= asOfDate);
+    const history = liquidityObservations(state2, accountProfileId, asOfDate, scope);
     return history.find((row) => row.asOfDate < startDate) || history.filter((row) => row.asOfDate >= startDate && row.asOfDate <= asOfDate).at(-1) || null;
   }
   function selectDailyLiquidity(state2, options) {
@@ -3205,7 +3613,7 @@
       const input2 = buildLiquidityInput(state2, { ...options, asOfDate: origin, endDate, salaryOnly: false, planningBasis: true });
       input2.displayStartDate = startDate;
       input2.availabilityFromDate = availabilityFromDate;
-      input2.observations = checkpointHistory(state2, options.accountProfileId, options.scope).active.filter((row) => row.asOfDate > origin && row.asOfDate <= cutoff && row.asOfDate <= endDate);
+      input2.observations = liquidityObservations(state2, options.accountProfileId, cutoff, options.scope).filter((row) => row.asOfDate > origin && row.asOfDate <= endDate);
       for (const row of current.opening.reasons) input2.reasons.push(issue(row.code, row.sourceId, current.opening.status === "incomplete" || current.opening.status === "unknown" ? "incomplete" : "provisional"));
       if (!anchor || origin >= startDate) input2.reasons.push(issue("missing-period-opening"));
       input2.reservations = input2.reservations.map((row) => ({ ...row, reserveForDisplay: row.type !== "budget" || row.month >= startDate.slice(0, 7) }));
@@ -3280,7 +3688,7 @@
   }
 
   // src/ui/dashboard.mjs
-  var escape = (value) => String(value != null ? value : "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  var escape2 = (value) => String(value != null ? value : "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   var money2 = (cents5) => Number.isSafeInteger(cents5) ? new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR" }).format(cents5 / 100) : "—";
   var date = (value) => value ? new Intl.DateTimeFormat("nl-NL", { day: "numeric", month: "short", timeZone: "UTC" }).format(/* @__PURE__ */ new Date(value + "T12:00:00Z")) : "Datum onbekend";
   var status = (value) => ({ projected: "Prognose", confirmed: "Bevestigd", provisional: "Voorlopig", incomplete: "Onvolledig", unknown: "Onbekend", actual: "Werkelijk", planned: "Gepland" })[value] || "Onbekend";
@@ -3376,10 +3784,10 @@
   }
   var head = (title, action2 = "") => `<div class="p3-head"><h2>${title}</h2>${action2}</div>`;
   var action = (name, label = "Bekijk alles") => `<button type="button" class="p3-link" data-p3-action="${name}">${label}<span aria-hidden="true"> ›</span></button>`;
-  var meter = (value, label) => `<progress max="100" value="${Math.max(0, Math.min(100, value))}" aria-label="${escape(label)}"></progress>`;
+  var meter = (value, label) => `<progress max="100" value="${Math.max(0, Math.min(100, value))}" aria-label="${escape2(label)}"></progress>`;
   function paymentsHtml(p, label, canOpen = () => false) {
     const rows = paymentEvents(p);
-    return rows.map((e) => `<li${canOpen(e) ? "" : ' class="p3-payment"'}>${canOpen(e) ? `<button type="button" class="p3-payment p3-payment-button" data-p3-event="${escape(e.id)}">` : ""}<time datetime="${e.date}">${date(e.date)}</time><span class="p3-event-icon ${e.amountCents < 0 ? "out" : "in"}" aria-hidden="true">${e.amountCents < 0 ? "↗" : "↙"}</span><span class="p3-payment-copy"><strong>${escape(label(e))}</strong><small>${status(e.status)}${e.dateQuality === "estimated" ? " · Geschat" : ""}</small></span><strong class="${e.amountCents < 0 ? "" : "p3-positive"}">${e.amountCents > 0 ? "+ " : ""}${money2(e.amountCents)}</strong>${canOpen(e) ? "</button>" : ""}</li>`).join("") || '<li class="p3-empty">Geen toekomstige vaste betalingen of inkomsten binnen deze periode.</li>';
+    return rows.map((e) => `<li${canOpen(e) ? "" : ' class="p3-payment"'}>${canOpen(e) ? `<button type="button" class="p3-payment p3-payment-button" data-p3-event="${escape2(e.id)}">` : ""}<time datetime="${e.date}">${date(e.date)}</time><span class="p3-event-icon ${e.amountCents < 0 ? "out" : "in"}" aria-hidden="true">${e.amountCents < 0 ? "↗" : "↙"}</span><span class="p3-payment-copy"><strong>${escape2(label(e))}</strong><small>${status(e.status)}${e.dateQuality === "estimated" ? " · Geschat" : ""}</small></span><strong class="${e.amountCents < 0 ? "" : "p3-positive"}">${e.amountCents > 0 ? "+ " : ""}${money2(e.amountCents)}</strong>${canOpen(e) ? "</button>" : ""}</li>`).join("") || '<li class="p3-empty">Geen toekomstige vaste betalingen of inkomsten binnen deze periode.</li>';
   }
   function chartHtml(p, width = 720) {
     width = Math.max(210, width);
@@ -3412,21 +3820,21 @@
     const gap = unknown.length ? `<p class="p3-caption" data-p3-unknown-days>${date(unknown[0].date)} – ${date(unknown.at(-1).date)}: saldo onbekend. Een bruikbaar beginsaldo ontbreekt voor deze dagen; de lijn begint bij het eerste bekende saldo.</p>` : "";
     return `<div class="p3-chart">${gap}<svg viewBox="0 0 ${width} ${chartHeight}" role="group" aria-label="Verwachte saldo-ontwikkeling; selecteer een dag voor bedragen en gebeurtenissen">${known.length ? ticks : ""}${segment(segments.past, "history")}${segment(segments.future, "future")}${known.length ? `<line x1="${plotStart}" x2="${plotEnd}" y1="${y(p.bufferCents)}" y2="${y(p.bufferCents)}" class="p3-buffer-line"/>` : ""}${today}${markers}${labels2}</svg><div class="p3-chart-legend">${segments.past.length ? '<span class="p3-history-key"><i aria-hidden="true">━</i> Verstreken dagen</span>' : ""}<span>━ Vandaag en toekomst</span><span class="p3-income-key">● Inkomsten</span><span class="p3-expense-key">● Uitgaven</span><span>◇ Minimum</span><span>┄ Buffer ${money2(p.bufferCents)}</span></div><div class="p3-chart-controls"><label class="p3-day-select">Bekijk een dag <select data-p3-day aria-label="Dag in saldo-ontwikkeling">${days.map((d) => `<option value="${d.date}">${date(d.date)}${Number.isSafeInteger(d.expectedBalanceCents) ? "" : " · onbekend"}</option>`).join("")}</select></label><div class="p3-point-detail" data-p3-point-detail aria-live="polite"></div></div></div>`;
   }
-  var info = (key, title, content) => `<button type="button" class="p3-info-button" data-p3-info="${key}" aria-label="Uitleg over ${escape(title)}" aria-controls="p3-info-${key}" aria-expanded="false">ⓘ</button><div class="p3-info-popover" id="p3-info-${key}" popover="auto" role="dialog" aria-modal="false" aria-label="${escape(title)}" data-p3-info-panel="${key}"><div class="p3-info-heading"><strong>${title}</strong><button type="button" class="ghost small" data-p3-close-info="${key}" aria-label="Sluiten · uitleg over ${escape(title)}">Sluiten</button></div>${content}</div>`;
+  var info = (key, title, content) => `<button type="button" class="p3-info-button" data-p3-info="${key}" aria-label="Uitleg over ${escape2(title)}" aria-controls="p3-info-${key}" aria-expanded="false">ⓘ</button><div class="p3-info-popover" id="p3-info-${key}" popover="auto" role="dialog" aria-modal="false" aria-label="${escape2(title)}" data-p3-info-panel="${key}"><div class="p3-info-heading"><strong>${title}</strong><button type="button" class="ghost small" data-p3-close-info="${key}" aria-label="Sluiten · uitleg over ${escape2(title)}">Sluiten</button></div>${content}</div>`;
   var calculationHelp = (p) => {
     var _a2;
     return `<p>Dit is de maximale extra uitgave binnen de beoordelingsperiode zonder onder je veiligheidsbuffer te komen, na resterende verplichtingen en budgetten. Beoordeling: ${date(((_a2 = p.availability) == null ? void 0 : _a2.fromDate) || p.asOfDate)} tot en met ${date(p.horizon.endDate)}.</p><p>De grafiek kan ook verstreken dagen tonen. Gepland sparen is een streefdoel, geen extra harde aftrek. De spaardoelruimte volgt de verwachte kasruimte aan het maandeinde en de bestaande spaarplanning.</p>`;
   };
   function qualityHelp(p) {
     const reasons2 = explainLiquidityReasons(p);
-    return reasons2.length ? `<p>${status(p.status)}. De onderstaande punten zijn door de huidige prognose vastgesteld.</p>${reasons2.map((r) => `<section data-p3-reason="${escape(r.code)}"><strong>${escape(r.problem)}</strong><p>${escape(r.why)}</p><p><b>Wat kun je doen?</b> ${escape(r.solution)}</p>${action(r.action, r.action === "balance" ? "Saldo controleren" : r.action === "payments" ? "Betalingen bekijken" : r.action === "data" ? "Data & back-up openen" : r.action === "accounts" ? "Bankrekeningen openen" : r.action === "budgets" ? "Overzicht openen" : "Prognose instellen")}<details><summary>Technische details</summary><p>${escape(r.detail)} (${escape(r.code)})</p></details></section>`).join("")}` : `<p>${status(p.status)}. Er zijn voor deze prognose geen aanvullende oorzaken gemeld. Een prognose blijft een verwachting; bedragen en betaalmomenten kunnen veranderen.</p>`;
+    return reasons2.length ? `<p>${status(p.status)}. De onderstaande punten zijn door de huidige prognose vastgesteld.</p>${reasons2.map((r) => `<section data-p3-reason="${escape2(r.code)}"><strong>${escape2(r.problem)}</strong><p>${escape2(r.why)}</p><p><b>Wat kun je doen?</b> ${escape2(r.solution)}</p>${action(r.action, r.action === "balance" ? "Saldo controleren" : r.action === "payments" ? "Betalingen bekijken" : r.action === "data" ? "Data & back-up openen" : r.action === "accounts" ? "Bankrekeningen openen" : r.action === "budgets" ? "Overzicht openen" : "Prognose instellen")}<details><summary>Technische details</summary><p>${escape2(r.detail)} (${escape2(r.code)})</p></details></section>`).join("")}` : `<p>${status(p.status)}. Er zijn voor deze prognose geen aanvullende oorzaken gemeld. Een prognose blijft een verwachting; bedragen en betaalmomenten kunnen veranderen.</p>`;
   }
   function outlookHtml(p, profile, label, iconSvg2) {
     var _a2, _b, _c;
     if (!profile) return `<p class="p3-empty">Kies de primaire betaalrekening voor deze context. Er wordt geen willekeurige rekening gebruikt.</p>${action("accounts", "Rekening instellen")}`;
     if (!p) return '<p class="p3-empty" role="status">Vooruitblik laden…</p>';
     const v = liquidityView(p), balance = p.currentBalance || p.opening;
-    const kpi = (key, title, value, sub, icon, explanation, act = "") => `<article class="p3-kpi${key === "free" && v.free === 0 && v.minimum !== null && v.minimum < 0 ? " p3-no-room" : ""}">${act ? `<button type="button" class="ux-card-primary" data-p3-action="${act}" aria-label="${title} ${escape(value)} · ${act === "balance" ? "Saldo bijwerken" : "Buffer instellen"}"></button>` : ""}<span class="p3-kpi-icon" aria-hidden="true">${iconSvg2(icon)}</span><span class="p3-kpi-copy"><span class="p3-kpi-title"><span>${title}</span>${info(key, title, explanation)}</span><strong>${value}</strong><small>${sub}</small></span></article>`;
+    const kpi = (key, title, value, sub, icon, explanation, act = "") => `<article class="p3-kpi${key === "free" && v.free === 0 && v.minimum !== null && v.minimum < 0 ? " p3-no-room" : ""}">${act ? `<button type="button" class="ux-card-primary" data-p3-action="${act}" aria-label="${title} ${escape2(value)} · ${act === "balance" ? "Saldo bijwerken" : "Buffer instellen"}"></button>` : ""}<span class="p3-kpi-icon" aria-hidden="true">${iconSvg2(icon)}</span><span class="p3-kpi-copy"><span class="p3-kpi-title"><span>${title}</span>${info(key, title, explanation)}</span><strong>${value}</strong><small>${sub}</small></span></article>`;
     const warning = v.minimum !== null && v.minimum < v.buffer ? `<div class="p3-warning" role="status">${p.status !== "projected" ? `${status(p.status)} · ` : ""}Op ${date(v.minimumDate)} wordt ${money2(v.minimum)} verwacht. ${v.minimum < 0 ? "Dit is onder € 0. " : ""}Dat is ${money2(v.buffer - v.minimum)} onder je buffer van ${money2(v.buffer)}.</div>` : "";
     const saving = savingsNote(p), planned = ((_a2 = saving.match(/<span data-p3-savings-plan>.*?<\/span>/)) == null ? void 0 : _a2[0]) || "";
     const savingDetails = saving.replace(planned, "");
@@ -3435,7 +3843,7 @@
     const balanceSub = `${status(balance.status)}${balanceDate ? ` · Saldo van ${date(balanceDate)}` : ""} · Saldo bijwerken`;
     const reconciliations = (p.reconciliations || []).filter((r) => r.differenceCents !== null && r.differenceCents !== 0).map((r) => `<p class="p3-caption">Saldo-ijkpunt ${date(r.date)}: ${money2(r.observedCents)} · berekend ${money2(r.modeledCents)} · verschil ${money2(r.differenceCents)}. Vanaf deze dag loopt de berekening verder met het handmatig ingestelde saldo.</p>`).join("");
     const qualityActions = p.reasons.length ? `<div class="p3-quality-actions">${action("settings", p.reasons.some((r) => r.code === "missing-reliable-horizon") ? "Salarisdatum instellen" : "Prognose instellen")}${v.balance === null ? action("balance", "Saldo instellen") : ""}</div>` : "";
-    return `<div class="p3-kpis">${kpi("free", "Vrij na verplichtingen", money2(v.free), freeSub, "income", calculationHelp(p) + savingDetails)}${kpi("balance", p.horizon.endDate < p.asOfDate ? "Saldo op " + date(p.horizon.endDate) : "Huidig saldo", v.balance === null ? "Saldo onbekend" : money2(v.balance), balanceSub, "wallet", `<p>Dit is de rekeningstand op basis van je vastgelegde banksaldo en beschikbare bankboekingen. De saldodatum hoort bij het laatste bruikbare saldo-ijkpunt; dit is geen automatische bevestiging van je bank.</p>${qualityHelp(p)}`, "balance")}${kpi("minimum", "Laagste prognose", money2(v.minimum), `${date(v.minimumDate)} · ${status(p.status)}`, "chart", `<p>Het laagste berekende saldo binnen de gekozen periode. De datum en het bedrag komen uit dezelfde saldolijn.</p>${qualityHelp(p)}`)}${kpi("buffer", "Buffer", money2(v.buffer), "Buffer instellen", "shield", `<p>De buffer is de veiligheidsmarge die je op deze rekening wilt houden. Vrij na verplichtingen houdt rekening met deze marge. Je buffer is geen aparte bankboeking.</p>`, "settings")}</div>${warning}<div class="p3-outlook-footer"><span class="p3-account-name">Rekening: ${escape(profile.name)}</span>${qualityActions}${reconciliations}</div>`;
+    return `<div class="p3-kpis">${kpi("free", "Vrij na verplichtingen", money2(v.free), freeSub, "income", calculationHelp(p) + savingDetails)}${kpi("balance", p.horizon.endDate < p.asOfDate ? "Saldo op " + date(p.horizon.endDate) : "Huidig saldo", v.balance === null ? "Saldo onbekend" : money2(v.balance), balanceSub, "wallet", `<p>Dit is de rekeningstand op basis van je vastgelegde banksaldo en beschikbare bankboekingen. De saldodatum hoort bij het laatste bruikbare saldo-ijkpunt; dit is geen automatische bevestiging van je bank.</p>${qualityHelp(p)}`, "balance")}${kpi("minimum", "Laagste prognose", money2(v.minimum), `${date(v.minimumDate)} · ${status(p.status)}`, "chart", `<p>Het laagste berekende saldo binnen de gekozen periode. De datum en het bedrag komen uit dezelfde saldolijn.</p>${qualityHelp(p)}`)}${kpi("buffer", "Buffer", money2(v.buffer), "Buffer instellen", "shield", `<p>De buffer is de veiligheidsmarge die je op deze rekening wilt houden. Vrij na verplichtingen houdt rekening met deze marge. Je buffer is geen aparte bankboeking.</p>`, "settings")}</div>${warning}<div class="p3-outlook-footer"><span class="p3-account-name">Rekening: ${escape2(profile.name)}</span>${qualityActions}${reconciliations}</div>`;
   }
   function yearHtml(year, getMonth) {
     const v = yearView(year, getMonth), max = Math.max(1, ...v.months.filter((m) => !m.missing).flatMap((m) => [m.income, m.spent]));
@@ -3472,12 +3880,12 @@
     }
     function renderLower(root2) {
       const data = deps.summary(owner());
-      root2.querySelector("[data-p3-summary]").innerHTML = `<section class="p3-panel p3-budget">${head("Budgetten", action("budgets"))}<p class="p3-caption">${escape(deps.monthLabel())} · ${escape(deps.ownerLabel(owner()))}</p><div class="p3-budget-body"><div class="p3-ring" style="--progress:${Math.max(0, Math.min(100, data.budget ? data.used / data.budget * 100 : 0))}%"><strong>${deps.eur(data.used)}</strong><span>van ${deps.eur(data.budget)}</span></div><dl><dt>Besteed</dt><dd>${deps.eur(data.used)}</dd><dt>Resterend</dt><dd>${deps.eur(data.budget - data.used)}</dd></dl></div></section><section class="p3-panel p3-allowance">${head("Zakgeld", action("allowance"))}<p class="p3-caption">${escape(deps.monthLabel())} · Geplande verdeling</p>${data.retainedJointIncome ? `<p class="p3-caption" data-p3-retained-income>${deps.eur(data.retainedJointIncome)} inkomen blijft bij gezamenlijk en wordt niet als zakgeld verdeeld.</p>` : ""}${data.allowances.map((p) => {
+      root2.querySelector("[data-p3-summary]").innerHTML = `<section class="p3-panel p3-budget">${head("Budgetten", action("budgets"))}<p class="p3-caption">${escape2(deps.monthLabel())} · ${escape2(deps.ownerLabel(owner()))}</p><div class="p3-budget-body"><div class="p3-ring" style="--progress:${Math.max(0, Math.min(100, data.budget ? data.used / data.budget * 100 : 0))}%"><strong>${deps.eur(data.used)}</strong><span>van ${deps.eur(data.budget)}</span></div><dl><dt>Besteed</dt><dd>${deps.eur(data.used)}</dd><dt>Resterend</dt><dd>${deps.eur(data.budget - data.used)}</dd></dl></div></section><section class="p3-panel p3-allowance">${head("Zakgeld", action("allowance"))}<p class="p3-caption">${escape2(deps.monthLabel())} · Geplande verdeling</p>${data.retainedJointIncome ? `<p class="p3-caption" data-p3-retained-income>${deps.eur(data.retainedJointIncome)} inkomen blijft bij gezamenlijk en wordt niet als zakgeld verdeeld.</p>` : ""}${data.allowances.map((p) => {
         const share = allowanceShare(p.amount, data.allowanceDistribution);
-        return `<div class="p3-allowance-row"><strong>${escape(p.name)}</strong><span>${deps.eur(p.amount)} · ${share === null ? "Verdeling niet beschikbaar" : new Intl.NumberFormat("nl-NL", { maximumFractionDigits: 1 }).format(share) + "%"}</span>${share === null ? "" : meter(share, "Aandeel " + p.name)}</div>`;
-      }).join("")}</section><section class="p3-panel p3-goals">${head("Spaardoelen", action("goals"))}<p class="p3-caption">Huidige stand · planning ${escape(deps.monthLabel())}</p><div class="p3-goal-list">${data.goals.slice(0, 2).map((g) => {
+        return `<div class="p3-allowance-row"><strong>${escape2(p.name)}</strong><span>${deps.eur(p.amount)} · ${share === null ? "Verdeling niet beschikbaar" : new Intl.NumberFormat("nl-NL", { maximumFractionDigits: 1 }).format(share) + "%"}</span>${share === null ? "" : meter(share, "Aandeel " + p.name)}</div>`;
+      }).join("")}</section><section class="p3-panel p3-goals">${head("Spaardoelen", action("goals"))}<p class="p3-caption">Huidige stand · planning ${escape2(deps.monthLabel())}</p><div class="p3-goal-list">${data.goals.slice(0, 2).map((g) => {
         const target = Number(g.doel.doelbedrag) || 0, saved = Number(g.doel.algespaard) || 0, progress = target > 0 ? saved / target * 100 : 0;
-        return `<div class="p3-goal">${deps.goalIcon(g.doel)}<div><strong>${escape(g.doel.naam)}</strong><span>${deps.eur(saved)} / ${deps.eur(target)} · ${Math.round(progress)}%</span>${meter(progress, g.doel.naam)}</div></div>`;
+        return `<div class="p3-goal">${deps.goalIcon(g.doel)}<div><strong>${escape2(g.doel.naam)}</strong><span>${deps.eur(saved)} / ${deps.eur(target)} · ${Math.round(progress)}%</span>${meter(progress, g.doel.naam)}</div></div>`;
       }).join("") || '<p class="p3-empty">Nog geen spaardoelen in deze context.</p>'}</div></section>`;
       root2.querySelector("[data-p3-year-panel]").innerHTML = yearHtml(year, deps.getMonth);
     }
@@ -3500,7 +3908,7 @@
       }
       const rows = projection.events.filter((e) => d.eventIds.includes(e.id));
       const replaced = (e) => (e.replacedPlans || []).map((plan) => ` (planning ${money2(Math.abs(plan.amountCents))} vervangen)`).join("");
-      detail.innerHTML = `<div class="p3-detail-heading"><strong>${date(day)} ${day.slice(0, 4)}</strong><button type="button" class="ghost small" data-p3-close-detail aria-label="Sluiten · datumdetails">Sluiten</button></div><span>Berekend beginsaldo: ${money2(d.openingBalanceCents)}</span><ul>${rows.map((e) => `<li>${escape(e.type === "checkpoint" ? "Handmatig saldo-ijkpunt" : deps.eventLabel(e))}: <strong>${signed(e.amountCents)}</strong>${escape(replaced(e))} <span>(${e.type === "checkpoint" ? "Saldo ingesteld op " + money2(e.observedBalanceCents) : e.type === "bank" ? e.status === "provisional" ? "Voorlopig verwerkt · geboekt, nog nakijken" : "Werkelijk" : e.type === "fixed" ? "Geplande vaste last" : e.type === "allowance" || e.type === "internal-transfer" ? "Geplande interne overboeking" : "Geplande inkomsten"})</span></li>`).join("") || (d.estimatedBudgetCents ? "" : "<li>Geen mutaties</li>")}${d.estimatedBudgetCents ? `<li>Geschatte resterende budgetuitgaven: <strong>${signed(-d.estimatedBudgetCents)}</strong></li>` : ""}</ul><span>Totaal mutaties: ${signed(d.mutationCents)}</span><strong>Berekend eindsaldo: ${money2(d.expectedBalanceCents)}</strong><span>${d.checkpointId ? "Saldo-ijkpunt aan het einde van deze dag · beginsaldo onbekend" : "Berekend uit planning en beschikbare bankboekingen"} · ${status(projection.status)}</span>`;
+      detail.innerHTML = `<div class="p3-detail-heading"><strong>${date(day)} ${day.slice(0, 4)}</strong><button type="button" class="ghost small" data-p3-close-detail aria-label="Sluiten · datumdetails">Sluiten</button></div><span>Berekend beginsaldo: ${money2(d.openingBalanceCents)}</span><ul>${rows.map((e) => `<li>${escape2(e.type === "checkpoint" ? "Handmatig saldo-ijkpunt" : deps.eventLabel(e))}: <strong>${signed(e.amountCents)}</strong>${escape2(replaced(e))} <span>(${e.type === "checkpoint" ? "Saldo ingesteld op " + money2(e.observedBalanceCents) : e.type === "bank" ? e.status === "provisional" ? "Voorlopig verwerkt · geboekt, nog nakijken" : "Werkelijk" : e.type === "fixed" ? "Geplande vaste last" : e.type === "allowance" || e.type === "internal-transfer" ? "Geplande interne overboeking" : "Geplande inkomsten"})</span></li>`).join("") || (d.estimatedBudgetCents ? "" : "<li>Geen mutaties</li>")}${d.estimatedBudgetCents ? `<li>Geschatte resterende budgetuitgaven: <strong>${signed(-d.estimatedBudgetCents)}</strong></li>` : ""}</ul><span>Totaal mutaties: ${signed(d.mutationCents)}</span><strong>Berekend eindsaldo: ${money2(d.expectedBalanceCents)}</strong><span>${d.checkpointId ? "Saldo-ijkpunt aan het einde van deze dag · beginsaldo onbekend" : "Berekend uit planning en beschikbare bankboekingen"} · ${status(projection.status)}</span>`;
     }
     function chartDay(root2, e) {
       var _a2;
@@ -3577,7 +3985,7 @@
         root2.querySelector("[data-p3-payments]").innerHTML = paymentsHtml(p, deps.eventLabel, deps.canOpenEvent);
       } catch (e) {
         if (token !== generation || !root2.isConnected) return;
-        root2.querySelector("[data-p3-outlook]").innerHTML = `<p class="p3-empty" role="status">${escape(e.message)}</p>${action("settings", "Prognose instellen")}`;
+        root2.querySelector("[data-p3-outlook]").innerHTML = `<p class="p3-empty" role="status">${escape2(e.message)}</p>${action("settings", "Prognose instellen")}`;
         root2.querySelector("[data-p3-period]").textContent = forecastPeriod(null);
         root2.querySelector("[data-p3-chart]").innerHTML = chartHtml(null);
         root2.querySelector("[data-p3-payments]").innerHTML = '<li class="p3-empty">Betalingen konden niet worden geladen.</li>';
@@ -3798,12 +4206,12 @@
   var accountIsArchived = (profile) => (profile == null ? void 0 : profile.status) === "archived";
   var availableAccountProfiles = (profiles, current = "") => (profiles || []).filter((profile) => !accountIsArchived(profile) || profile.id === current);
   var same2 = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-  var fail2 = (code, message) => Object.assign(new Error(message), { code });
+  var fail3 = (code, message) => Object.assign(new Error(message), { code });
   function validDutchIban(value) {
-    const iban3 = normalizeAccountIban(value);
-    if (!/^NL\d{2}[A-Z]{4}\d{10}$/.test(iban3)) return false;
+    const iban4 = normalizeAccountIban(value);
+    if (!/^NL\d{2}[A-Z]{4}\d{10}$/.test(iban4)) return false;
     let remainder = 0;
-    for (const char of iban3.slice(4) + iban3.slice(0, 4)) {
+    for (const char of iban4.slice(4) + iban4.slice(0, 4)) {
       const digits = /[A-Z]/.test(char) ? String(char.charCodeAt(0) - 55) : char;
       for (const digit of digits) remainder = (remainder * 10 + Number(digit)) % 97;
     }
@@ -3822,31 +4230,31 @@
   }
   function validateProfile(profile, previous, profiles) {
     validateLiquiditySettings(profile, profiles);
-    if (typeof profile.id !== "string" || !profile.id || !String(profile.name || "").trim() || String(profile.name).length > 100) throw fail2("invalid-account-name", "Vul een herkenbare rekeningnaam van maximaal 100 tekens in.");
-    if (String(profile.bank || "").length > 100) throw fail2("invalid-account-bank", "Gebruik maximaal 100 tekens voor de banknaam.");
-    if (!ACCOUNT_OWNERS.includes(profile.accountOwner)) throw fail2("invalid-account-owner", "Kies Gezamenlijk, Dion of Dara als eigenaar.");
-    if ((!previous || profile.accountType !== previous.accountType) && !ACCOUNT_TYPES.includes(profile.accountType)) throw fail2("invalid-account-type", "Kies betaalrekening of spaarrekening.");
-    if ((!previous || profile.status !== previous.status) && !["active", "archived"].includes(profile.status)) throw fail2("invalid-account-status", "Kies een geldige rekeningstatus.");
+    if (typeof profile.id !== "string" || !profile.id || !String(profile.name || "").trim() || String(profile.name).length > 100) throw fail3("invalid-account-name", "Vul een herkenbare rekeningnaam van maximaal 100 tekens in.");
+    if (String(profile.bank || "").length > 100) throw fail3("invalid-account-bank", "Gebruik maximaal 100 tekens voor de banknaam.");
+    if (!ACCOUNT_OWNERS.includes(profile.accountOwner)) throw fail3("invalid-account-owner", "Kies Gezamenlijk, Dion of Dara als eigenaar.");
+    if ((!previous || profile.accountType !== previous.accountType) && !ACCOUNT_TYPES.includes(profile.accountType)) throw fail3("invalid-account-type", "Kies betaalrekening of spaarrekening.");
+    if ((!previous || profile.status !== previous.status) && !["active", "archived"].includes(profile.status)) throw fail3("invalid-account-status", "Kies een geldige rekeningstatus.");
     if (!previous || profile.identifier !== previous.identifier) {
-      if (!validDutchIban(profile.identifier)) throw fail2("invalid-iban", "Vul een geldig Nederlands IBAN in, inclusief de juiste controlecijfers.");
+      if (!validDutchIban(profile.identifier)) throw fail3("invalid-iban", "Vul een geldig Nederlands IBAN in, inclusief de juiste controlecijfers.");
       if (profiles.some((other) => other.id !== profile.id && normalizeAccountIban(other.identifier || other.iban) === normalizeAccountIban(profile.identifier)))
-        throw fail2("duplicate-iban", "Dit IBAN hoort al bij een rekening. Open die rekening of activeer haar opnieuw.");
+        throw fail3("duplicate-iban", "Dit IBAN hoort al bij een rekening. Open die rekening of activeer haar opnieuw.");
     }
   }
   function assertAccountProfileMutation(before, after, { imports = [] } = {}) {
     var _a2;
     const previous = new Map((before.accountProfiles || []).map((profile) => [profile.id, profile]));
     const next = after.accountProfiles || [];
-    if (new Set(next.map((profile) => profile.id)).size !== next.length) throw fail2("duplicate-account-id", "Een rekening-ID komt dubbel voor.");
-    for (const [id] of previous) if (!next.some((profile) => profile.id === id)) throw fail2("account-delete-blocked", "Archiveer de rekening; bestaande rekeningprofielen mogen niet worden verwijderd.");
+    if (new Set(next.map((profile) => profile.id)).size !== next.length) throw fail3("duplicate-account-id", "Een rekening-ID komt dubbel voor.");
+    for (const [id] of previous) if (!next.some((profile) => profile.id === id)) throw fail3("account-delete-blocked", "Archiveer de rekening; bestaande rekeningprofielen mogen niet worden verwijderd.");
     for (const profile of next) {
       const old = previous.get(profile.id);
       if (same2(old, profile)) continue;
       validateProfile(profile, old, next);
       if (old && (old.identifier !== profile.identifier || old.accountOwner !== profile.accountOwner || old.iban !== profile.iban)) {
         if (before.__finizePartialHistory && !((_a2 = before.__finizePeriodContext) == null ? void 0 : _a2.explicitFullHistory))
-          throw fail2("account-history-incomplete", "Laad eerst de volledige historie voordat je IBAN of eigenaar wijzigt.");
-        if (accountHasReferences(before, old, imports)) throw fail2("account-identity-in-use", "Deze rekening heeft historie of verwijzingen. IBAN en eigenaar blijven behouden. Voeg voor een andere bankrekening een nieuw profiel toe.");
+          throw fail3("account-history-incomplete", "Laad eerst de volledige historie voordat je IBAN of eigenaar wijzigt.");
+        if (accountHasReferences(before, old, imports)) throw fail3("account-identity-in-use", "Deze rekening heeft historie of verwijzingen. IBAN en eigenaar blijven behouden. Voeg voor een andere bankrekening een nieuw profiel toe.");
       }
     }
     const archived = new Set(next.filter(accountIsArchived).map((profile) => profile.id));
@@ -3856,20 +4264,20 @@
       if (!archived.has(row.accountProfileId)) continue;
       const old = oldTransactions.get(row.id);
       if (row.recordRole === "bank-source" ? !old || !approved(old) && approved(row) : !old && !(before.transactions || []).some((source) => source.recordRole === "bank-source" && source.bankSourceId === row.bankSourceId && approved(source)))
-        throw fail2("account-archived", "Heractiveer de rekening voordat je nieuwe transacties of bankmutaties toevoegt.");
+        throw fail3("account-archived", "Heractiveer de rekening voordat je nieuwe transacties of bankmutaties toevoegt.");
     }
   }
   function applyAccountProfileCommand(state2, command, { imports = [] } = {}) {
     var _a2, _b, _c;
-    if (typeof (command == null ? void 0 : command.operationId) !== "string" || !command.operationId || typeof command.id !== "string" || !command.id || !Number.isFinite(Date.parse(command.createdAt))) throw fail2("invalid-account-command", "De opslagactie mist een geldige identiteit of vastlegtijd. Open het formulier opnieuw.");
+    if (typeof (command == null ? void 0 : command.operationId) !== "string" || !command.operationId || typeof command.id !== "string" || !command.id || !Number.isFinite(Date.parse(command.createdAt))) throw fail3("invalid-account-command", "De opslagactie mist een geldige identiteit of vastlegtijd. Open het formulier opnieuw.");
     const profiles = state2.accountProfiles || [], old = profiles.find((profile2) => profile2.id === command.id);
     const signature2 = JSON.stringify([command.type, command.id, command.values || {}]);
     if ((old == null ? void 0 : old.lastAccountOperationId) === command.operationId) {
-      if (old.lastAccountOperationSignature !== signature2) throw fail2("account-operation-conflict", "Deze opslagactie is al voor andere rekeninggegevens gebruikt.");
+      if (old.lastAccountOperationSignature !== signature2) throw fail3("account-operation-conflict", "Deze opslagactie is al voor andere rekeninggegevens gebruikt.");
       return old;
     }
     if (command.type === "create" ? Boolean(old) : !old || !same2(old, command.expectedProfile))
-      throw fail2("account-profile-conflict", "De rekening is intussen gewijzigd. Open de actuele rekening opnieuw; je invoer blijft in dit formulier staan.");
+      throw fail3("account-profile-conflict", "De rekening is intussen gewijzigd. Open de actuele rekening opnieuw; je invoer blijft in dit formulier staan.");
     let profile;
     if (["create", "update"].includes(command.type)) {
       const values = command.values || {};
@@ -3891,7 +4299,7 @@
       const values = command.values || {};
       profile = { ...old, liquidity: { version: 1, primaryForOwner: values.primaryForOwner, bufferCents: values.bufferCents, salaryDays: structuredClone(values.salaryDays), allowanceDays: structuredClone((_c = (_b = values.allowanceDays) != null ? _b : (_a2 = old == null ? void 0 : old.liquidity) == null ? void 0 : _a2.allowanceDays) != null ? _c : {}) }, updatedAt: command.createdAt };
     } else if (["archive", "reactivate"].includes(command.type)) profile = { ...old, status: command.type === "archive" ? "archived" : "active", updatedAt: command.createdAt };
-    else throw fail2("invalid-account-command", "Deze rekeningactie wordt niet ondersteund.");
+    else throw fail3("invalid-account-command", "Deze rekeningactie wordt niet ondersteund.");
     profile.lastAccountOperationId = command.operationId;
     profile.lastAccountOperationSignature = signature2;
     const candidate = { ...state2, accountProfiles: old ? profiles.map((item) => item.id === old.id ? profile : item) : [...profiles, profile] };
@@ -3901,12 +4309,14 @@
   }
 
   // src/ui/account-balances.mjs
-  var escape2 = (value) => String(value != null ? value : "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
+  var escape3 = (value) => String(value != null ? value : "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
   var euro = (value) => value === null ? "Onbekend" : new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR" }).format(value / 100);
   var dateNL = (value) => /^\d{4}-\d{2}-\d{2}$/.test(value || "") ? value.split("-").reverse().join("-") : "Onbekend";
   var recordedAt = (value) => Number.isFinite(Date.parse(value)) ? new Intl.DateTimeFormat("nl-NL", { dateStyle: "short", timeStyle: "short" }).format(new Date(value)) : "Onbekend";
   var statusLabels = { confirmed: "Bevestigd", provisional: "Voorlopig", incomplete: "Onvolledig", unknown: "Onbekend" };
   var reasons = {
+    "intraday-provider-balance": "Dit is een geboekt providersaldo op het vermelde tijdstip, geen einde-dagijkpunt. Mutaties van die dag worden niet nogmaals opgeteld.",
+    "provider-sync-incomplete": "Niet alle providerpagina’s zijn opgehaald. Eerdere bankgegevens blijven behouden.",
     "missing-checkpoint": "Voer eerst een werkelijk banksaldo met peildatum in.",
     "awaiting-review": "Er staan bankmutaties bij Nakijken. Deze tellen voorlopig mee.",
     "unknown-bank-coverage": "Niet bevestigd dat alle bankmutaties sinds het ijkpunt zijn aangeleverd.",
@@ -3931,7 +4341,7 @@
     "invalid-balance-date": "De gevraagde datum is ongeldig."
   };
   function reasonMarkup(rows) {
-    return [...new Set(rows.map((row) => reasons[row.code] || "De rekeningstand is nog niet volledig controleerbaar."))].map((message) => `<li>${escape2(message)}</li>`).join("");
+    return [...new Set(rows.map((row) => reasons[row.code] || "De rekeningstand is nog niet volledig controleerbaar."))].map((message) => `<li>${escape3(message)}</li>`).join("");
   }
   function createAccountBalanceUI({ getState, getScope, getImports, commit, today, actor }) {
     const bound = /* @__PURE__ */ new WeakSet();
@@ -3959,13 +4369,13 @@
           const projection = selectAccountBalance(state2, { ...options(), accountProfileId: profile.id, toDate: today() });
           const history = checkpointHistory(state2, profile.id, getScope());
           const active2 = new Set(history.active.map((row) => row.id));
-          return `<article class="balance-account" data-balance-account="${escape2(profile.id)}"><div class="u4-receipt-head"><div><h4>${escape2(profile.name || profile.bank || "Bankrekening")}</h4><p class="hint balance-identifier">${escape2(profile.identifier || "")}</p></div><div><strong class="balance-amount" data-balance-value>${euro(projection.balanceCents)}</strong><span class="balance-status" data-balance-status>${statusLabels[projection.status]}</span></div></div>
-          <p class="hint">${projection.checkpoint ? `Vanaf ijkpunt ${dateNL(projection.checkpoint.asOfDate)} · ${euro(projection.openingCents)}` : "Nog geen saldo-ijkpunt."}</p>
+          return `<article class="balance-account" data-balance-account="${escape3(profile.id)}"><div class="u4-receipt-head"><div><h4>${escape3(profile.name || profile.bank || "Bankrekening")}</h4><p class="hint balance-identifier">${escape3(profile.identifier || "")}</p></div><div><strong class="balance-amount" data-balance-value>${euro(projection.balanceCents)}</strong><span class="balance-status" data-balance-status>${statusLabels[projection.status]}</span></div></div>
+          <p class="hint">${projection.checkpoint ? `${projection.checkpoint.source === "provider-observation" ? "Vanaf providersaldo" : "Vanaf ijkpunt"} ${dateNL(projection.checkpoint.asOfDate)}${projection.observedAt ? " · " + escape3(recordedAt(projection.observedAt)) : ""} · ${euro(projection.openingCents)}` : "Nog geen saldo-ijkpunt."}</p>
           <details class="balance-explanation"><summary>Controle en herkomst</summary><p>Bankbronnen: ${statusLabels[projection.quality.bankSources] || "Onzeker"}. Dekking: ${{ complete: "bekend compleet", partial: "gedeeltelijk", unknown: "onbekend" }[projection.quality.coverage]}. Opslag: ${projection.quality.storage === "verified" ? "gegevens beschikbaar" : "afhankelijkheden ontbreken"}.</p><ul>${reasonMarkup(projection.reasons)}</ul><p>Bevestigde mutaties: ${euro(projection.confirmedCents)} · Voorlopige mutaties: ${euro(projection.provisionalCents)}.</p></details>
           <div class="balance-actions"><button type="button" class="primary small" data-balance-add ${accountIsArchived(profile) ? "disabled" : ""}>${projection.checkpoint ? "Banksaldo bijwerken" : "Banksaldo invoeren"}</button>${accountIsArchived(profile) ? '<p class="hint">Heractiveer de rekening voor een nieuw banksaldo. Eerdere ijkpunten blijven raadpleegbaar en corrigeerbaar.</p>' : ""}</div>
           <details class="balance-history"><summary>Eerdere ijkpunten (${history.rows.length})</summary>${history.rows.map((row) => {
             var _a2, _b;
-            return `<div class="balance-history-row"><div><strong>${dateNL(row.asOfDate)} · ${euro(row.amountCents)}</strong><p class="hint">Revisie ${row.revision} · ${row.id === ((_a2 = projection.checkpoint) == null ? void 0 : _a2.id) ? "Huidig ijkpunt" : active2.has(row.id) ? "Eerder ijkpunt" : "Vervangen"}<br>Vastgelegd ${escape2(recordedAt(row.createdAt))}${row.actor && row.actor === actor() ? " · Door jou" : ""}${row.supersedesId ? `<br>Correctie van revisie ${((_b = history.rows.find((previous) => previous.id === row.supersedesId)) == null ? void 0 : _b.revision) || "?"}` : ""}${row.note ? `<br>${escape2(row.note)}` : ""}</p></div>${active2.has(row.id) ? `<button type="button" class="ghost small" data-balance-correct="${escape2(row.id)}">Corrigeren</button>` : ""}</div>`;
+            return `<div class="balance-history-row"><div><strong>${dateNL(row.asOfDate)} · ${euro(row.amountCents)}</strong><p class="hint">Revisie ${row.revision} · ${row.id === ((_a2 = projection.checkpoint) == null ? void 0 : _a2.id) ? "Huidig ijkpunt" : active2.has(row.id) ? "Eerder ijkpunt" : "Vervangen"}<br>Vastgelegd ${escape3(recordedAt(row.createdAt))}${row.actor && row.actor === actor() ? " · Door jou" : ""}${row.supersedesId ? `<br>Correctie van revisie ${((_b = history.rows.find((previous) => previous.id === row.supersedesId)) == null ? void 0 : _b.revision) || "?"}` : ""}${row.note ? `<br>${escape3(row.note)}` : ""}</p></div>${active2.has(row.id) ? `<button type="button" class="ghost small" data-balance-correct="${escape3(row.id)}">Corrigeren</button>` : ""}</div>`;
           }).join("") || '<p class="hint">Nog geen waarnemingen.</p>'}</details><div data-balance-editor></div></article>`;
         }).join("") : '<p class="hint">Nog geen rekeningprofiel. Gebruik de bestaande CSV-import om een rekeningprofiel te koppelen.</p>'}`;
       };
@@ -3983,7 +4393,7 @@
           let command = null, locked = false;
           editor.innerHTML = `<form class="balance-form" data-balance-form><h4>${old ? "Banksaldo corrigeren" : "Banksaldo invoeren"}</h4><p class="hint">Bedrag en peildatum gaan over het geboekte saldo aan het einde van die dag. Mutaties op die dag zitten er al in.</p>
           <div class="balance-fields"><label>Banksaldo (€)<input name="amount" data-balance-amount type="number" step="0.01" inputmode="decimal" required value="${old ? old.amountCents / 100 : ""}"></label><label>Peildatum<input name="date" data-balance-date type="date" required max="${today()}" value="${old ? old.asOfDate : today()}"></label></div>
-          <label>Toelichting (optioneel)<textarea name="note" data-balance-note rows="2" maxlength="1000">${escape2((old == null ? void 0 : old.note) || "")}</textarea></label>
+          <label>Toelichting (optioneel)<textarea name="note" data-balance-note rows="2" maxlength="1000">${escape3((old == null ? void 0 : old.note) || "")}</textarea></label>
           <p role="alert" data-balance-error></p><div data-balance-comparison aria-live="polite"></div><div class="balance-actions"><button type="submit" class="primary" data-balance-check>Controleer saldo</button><button type="button" class="primary" data-balance-confirm hidden>Bevestig banksaldo</button><button type="button" class="ghost" data-balance-cancel>Annuleren</button></div></form>`;
           const form = editor.querySelector("form"), error2 = form.querySelector("[data-balance-error]"), confirm2 = form.querySelector("[data-balance-confirm]");
           form.querySelector("[data-balance-amount]").focus();
@@ -4068,7 +4478,7 @@
           };
         } catch (e) {
           (_a2 = panel.querySelector("[data-balance-panel-error]")) == null ? void 0 : _a2.remove();
-          panel.insertAdjacentHTML("beforeend", `<p role="alert" data-balance-panel-error>${escape2(e.message)}</p>`);
+          panel.insertAdjacentHTML("beforeend", `<p role="alert" data-balance-panel-error>${escape3(e.message)}</p>`);
         }
       });
     }
@@ -4076,7 +4486,7 @@
   }
 
   // src/ui/liquidity-settings.mjs
-  var escape3 = (value) => String(value != null ? value : "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  var escape4 = (value) => String(value != null ? value : "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   var dayOptions = (day) => '<option value="">Niet ingesteld</option>' + [...Array.from({ length: 31 }, (_, i) => i + 1), "last"].map((value) => `<option value="${value}" ${value === day ? "selected" : ""}>${value === "last" ? "Laatste dag van de maand" : "Dag " + value}</option>`).join("");
   function receiptHtml({ kind = "salary", person = "dion", day = "" } = {}) {
     return `<fieldset data-income-receipt class="bank-account-fields"><legend>Geplande ontvangst</legend><label>Soort inkomsten<select data-income-kind><option value="salary" ${kind === "salary" ? "selected" : ""}>Salaris</option><option value="allowance" ${kind === "allowance" ? "selected" : ""}>Zakgeld</option></select></label><label>Van wie<select data-income-person>${["dion", "dara"].map((p) => `<option value="${p}" ${p === person ? "selected" : ""}>${p === "dion" ? "Dion" : "Dara"}</option>`).join("")}</select></label><label>Dag van de maand<select data-income-day ${kind === "salary" ? `name="salary-${person}"` : ""}>${dayOptions(day)}</select></label><button type="button" class="ghost" data-income-remove>Ontvangst verwijderen</button></fieldset>`;
@@ -4086,7 +4496,7 @@
     const receipts = ["salary", "allowance"].flatMap((kind) => Object.entries(config[kind === "salary" ? "salaryDays" : "allowanceDays"] || {}).map(([person, day]) => ({ kind, person, day })));
     if (!receipts.length) receipts.push({ person: joint ? "dion" : profile.accountOwner });
     return `<section class="card liquidity-settings"><h3>Dagelijkse prognose</h3><form data-liquidity-form class="bank-account-form">
- <label class="bank-account-archive-filter"><input type="checkbox" name="primaryForOwner" ${config.primaryForOwner ? "checked" : ""} ${profile.accountType !== "payment" ? "disabled" : ""}> Gebruik deze betaalrekening voor de maandplanning van ${joint ? "Gezamenlijk" : escape3(profile.accountOwner === "dion" ? "Dion" : "Dara")}</label>
+ <label class="bank-account-archive-filter"><input type="checkbox" name="primaryForOwner" ${config.primaryForOwner ? "checked" : ""} ${profile.accountType !== "payment" ? "disabled" : ""}> Gebruik deze betaalrekening voor de maandplanning van ${joint ? "Gezamenlijk" : escape4(profile.accountOwner === "dion" ? "Dion" : "Dara")}</label>
  <p class="hint">Deze keuze koppelt vaste lasten en budgetten zonder eigen rekeningkeuze aan deze fysieke rekening.</p>
  <label>Veiligheidsbuffer (€)<input name="buffer" type="number" min="0" step="0.01" required inputmode="decimal" value="${liquidityBuffer(profile) / 100}"></label>
  <div data-income-receipts>${receipts.map(receiptHtml).join("")}</div><button type="button" class="ghost" data-income-add>Ontvangst toevoegen</button>
@@ -4149,7 +4559,7 @@
   }
 
   // src/ui/bank-accounts.mjs
-  var escape4 = (value) => String(value != null ? value : "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
+  var escape5 = (value) => String(value != null ? value : "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
   var labels = { payment: "Betaalrekening", savings: "Spaarrekening" };
   var statuses = { confirmed: "Bevestigd", provisional: "Voorlopig", incomplete: "Onvolledig", unknown: "Onbekend" };
   var euro2 = (value) => value === null ? "Onbekend" : new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR" }).format(value / 100);
@@ -4167,6 +4577,7 @@
       return '<section class="bank-accounts" data-bank-accounts aria-label="Bankrekeningen"><p role="status">Bankrekeningen laden…</p></section>';
     }
     async function bind(container) {
+      var _a2, _b;
       const panel = container.querySelector("[data-bank-accounts]");
       if (!panel) return;
       const household = getScope();
@@ -4188,13 +4599,14 @@
         return;
       }
       if (profile) {
-        panel.innerHTML = `${overviewButton()}<div class="bank-accounts-heading"><h2>${escape4(profile.name)}</h2><span>${accountIsArchived(profile) ? "Gearchiveerd" : "Actief"}</span></div>
+        panel.innerHTML = `${overviewButton()}<div class="bank-accounts-heading"><h2>${escape5(profile.name)}</h2><span>${accountIsArchived(profile) ? "Gearchiveerd" : "Actief"}</span></div>
         <section class="card bank-account-details"><div class="card-head"><h3>Rekeninggegevens</h3></div><dl class="u6-settings-list">
-        <div><dt>Bank</dt><dd>${escape4(profile.bank || "Onbekend")}</dd></div><div><dt>IBAN / kenmerk</dt><dd>${escape4(readableIban(profile.identifier))}</dd></div>
-        <div><dt>Eigenaar</dt><dd>${escape4(ownerLabel2(profile.accountOwner))}</dd></div><div><dt>Type</dt><dd>${labels[profile.accountType] || "Nog niet ingesteld"}</dd></div></dl>
+        <div><dt>Bank</dt><dd>${escape5(profile.bank || "Onbekend")}</dd></div><div><dt>IBAN / kenmerk</dt><dd>${escape5(readableIban(profile.identifier))}</dd></div>
+        <div><dt>Eigenaar</dt><dd>${escape5(ownerLabel2(profile.accountOwner))}</dd></div><div><dt>Type</dt><dd>${labels[profile.accountType] || "Nog niet ingesteld"}</dd></div></dl>
         <div class="bank-account-actions"><button type="button" class="primary" data-account-edit>Rekening bewerken</button><button type="button" class="ghost" data-account-status>${accountIsArchived(profile) ? "Rekening heractiveren" : "Rekening archiveren"}</button></div>
         <p role="alert" data-account-error></p><div data-account-archive-confirm hidden><p>De rekening blijft met alle historie bewaard. Voor nieuwe imports en banksaldo’s moet je haar eerst heractiveren.</p><button type="button" class="primary" data-account-archive>Bevestig archiveren</button><button type="button" class="ghost" data-account-archive-cancel>Annuleren</button></div></section>
-        ${renderLiquiditySettings(profile)}${balances.render()}`;
+        ${renderLiquiditySettings(profile)}${((_a2 = globalThis.FinizeBank) == null ? void 0 : _a2.render(profile)) || ""}${balances.render()}`;
+        (_b = globalThis.FinizeBank) == null ? void 0 : _b.bind(panel, profile);
         panel.querySelector("[data-accounts-back]").onclick = () => open();
         panel.querySelector("[data-account-edit]").onclick = () => {
           editing = true;
@@ -4234,9 +4646,9 @@
       ${!profiles.length ? '<p class="hint">Nog geen actieve bankrekeningen. Voeg je eerste bankrekening toe.</p>' : ""}
       ${ACCOUNT_OWNERS.map((owner) => {
         const rows = profiles.filter((row) => row.accountOwner === owner);
-        return rows.length ? `<section class="bank-account-group"><h3>${escape4(ownerLabel2(owner))}</h3><div class="bank-account-list">${rows.map((row) => {
+        return rows.length ? `<section class="bank-account-group"><h3>${escape5(ownerLabel2(owner))}</h3><div class="bank-account-list">${rows.map((row) => {
           const projection = balances.project({ accountProfileId: row.id, imports: imports || [], importsAvailable: imports !== null });
-          return `<button type="button" class="card bank-account-row" data-account-open="${escape4(row.id)}"><span><strong>${escape4(row.name || "Bankrekening")}</strong><span>${escape4(row.bank || "Bank onbekend")} · ${escape4(maskedIban(row.identifier))}</span><span>${labels[row.accountType] || "Type nog niet ingesteld"} · ${accountIsArchived(row) ? "Gearchiveerd" : "Actief"}</span></span><span class="bank-account-row-balance"><strong>${euro2(projection.balanceCents)}</strong><span>${projection.checkpoint ? statuses[projection.status] : "Nog geen saldo-ijkpunt"}</span></span></button>`;
+          return `<button type="button" class="card bank-account-row" data-account-open="${escape5(row.id)}"><span><strong>${escape5(row.name || "Bankrekening")}</strong><span>${escape5(row.bank || "Bank onbekend")} · ${escape5(maskedIban(row.identifier))}</span><span>${labels[row.accountType] || "Type nog niet ingesteld"} · ${accountIsArchived(row) ? "Gearchiveerd" : "Actief"}</span></span><span class="bank-account-row-balance"><strong>${euro2(projection.balanceCents)}</strong><span>${projection.checkpoint ? statuses[projection.status] : "Nog geen saldo-ijkpunt"}</span></span></button>`;
         }).join("")}</div></section>` : "";
       }).join("")}`;
       panel.querySelector("[data-accounts-settings]").onclick = () => {
@@ -4256,12 +4668,12 @@
       bindConflicts();
     }
     function renderForm(panel, profile, ensureScope) {
-      const option = (value, label, current) => `<option value="${value}" ${value === current ? "selected" : ""}>${escape4(label)}</option>`;
+      const option = (value, label, current) => `<option value="${value}" ${value === current ? "selected" : ""}>${escape5(label)}</option>`;
       panel.innerHTML = `${overviewButton()}<section class="card bank-account-details"><h2>${profile ? "Rekening bewerken" : "Bankrekening toevoegen"}</h2>
       <form class="bank-account-form" data-account-form><div class="bank-account-fields">
-      <label>Rekeningnaam<input name="name" maxlength="100" required value="${escape4((profile == null ? void 0 : profile.name) || "")}"></label>
-      <label>Banknaam (optioneel)<input name="bank" maxlength="100" value="${escape4((profile == null ? void 0 : profile.bank) || "")}"></label>
-      <label class="bank-account-iban-field">IBAN<input name="identifier" required autocomplete="off" spellcheck="false" value="${escape4((profile == null ? void 0 : profile.identifier) || "")}"></label>
+      <label>Rekeningnaam<input name="name" maxlength="100" required value="${escape5((profile == null ? void 0 : profile.name) || "")}"></label>
+      <label>Banknaam (optioneel)<input name="bank" maxlength="100" value="${escape5((profile == null ? void 0 : profile.bank) || "")}"></label>
+      <label class="bank-account-iban-field">IBAN<input name="identifier" required autocomplete="off" spellcheck="false" value="${escape5((profile == null ? void 0 : profile.identifier) || "")}"></label>
       <label>Eigenaar<select name="accountOwner" required>${!profile ? '<option value="">Kies eigenaar</option>' : ""}${ACCOUNT_OWNERS.map((owner) => option(owner, ownerLabel2(owner), profile == null ? void 0 : profile.accountOwner)).join("")}</select></label>
       <label>Rekeningtype<select name="accountType" required>${!(profile == null ? void 0 : profile.accountType) ? '<option value="">Kies rekeningtype</option>' : ""}${Object.entries(labels).map(([type, label]) => option(type, label, profile == null ? void 0 : profile.accountType)).join("")}</select></label></div>
       <p class="hint">Wijzig een IBAN alleen om een invoerfout te herstellen. Een andere fysieke bankrekening voeg je als nieuwe rekening toe. Bij bestaande historie kunnen IBAN en eigenaar niet worden gewijzigd.</p>
@@ -4473,8 +4885,8 @@
 
   // src/storage/period-projections.mjs
   var PERIOD_PROJECTION_VERSION = 1;
-  var canonical2 = (value) => JSON.stringify(value, (_, item) => item && typeof item === "object" && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).sort().map((key) => [key, item[key]])) : item);
-  var digest = (value) => backupDigest(typeof value === "string" ? value : canonical2(value));
+  var canonical3 = (value) => JSON.stringify(value, (_, item) => item && typeof item === "object" && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).sort().map((key) => [key, item[key]])) : item);
+  var digest = (value) => backupDigest(typeof value === "string" ? value : canonical3(value));
   var storageError = (code, message) => Object.assign(new Error(message), { code, storageFailure: true });
   var validMonth2 = (month) => /^\d{4}-(0[1-9]|1[0-2])$/.test(month);
   var dimensions = ["accountCashflow", "externalHouseholdCashflow", "incomeImpact", "realExpense", "budgetImpact", "fixedRealization", "savingsDeposit", "savingsWithdrawal", "goalDelta", "savingsFunded", "unusedSavings", "refundCashflow", "advanceRepaymentEffect"];
@@ -4566,7 +4978,7 @@
     if (!document2 || document2.projectionVersion !== PERIOD_PROJECTION_VERSION || ((_a2 = head2.periodHashes) == null ? void 0 : _a2[document2.month]) !== await digest(document2)) throw storageError("period-incomplete", "De financiële periode ontbreekt of is niet geverifieerd. Ontbrekende historie is geen nul.");
     if (!globalDocument || head2.globalHash !== await digest(globalDocument)) throw storageError("period-incomplete", "De cumulatieve financiële projectie ontbreekt.");
     const actual = records.map((row) => ({ id: row.id, hash: row.hash })).sort((a, b) => a.id.localeCompare(b.id));
-    if (canonical2(actual) !== canonical2(document2.dependencies)) throw storageError("period-incomplete", "Een vereiste bankbron, effectregel of historische afhankelijkheid ontbreekt.");
+    if (canonical3(actual) !== canonical3(document2.dependencies)) throw storageError("period-incomplete", "Een vereiste bankbron, effectregel of historische afhankelijkheid ontbreekt.");
     for (const record of records) if (await digest(record.payload) !== record.hash) throw storageError("record-integrity", "Een financieel record heeft een afwijkende hash.");
     return { month: document2.month, epoch: head2.epoch, revision: head2.revision, verified: true, financials: JSON.parse(document2.payload), cumulative: JSON.parse(globalDocument.payload), records: structuredClone(records), recordCount: records.length, fullHistoryLoaded: false };
   }
@@ -4590,7 +5002,7 @@
   async function verifyRecordManifests(head2, records, manifests) {
     if (!head2.manifestHashes) throw storageError("manifest-missing", "Deze cloudversie vereist eerst een gecontroleerde manifestmigratie.");
     const computed = await recordManifests(records, Object.keys(head2.manifestHashes));
-    if (canonical2(computed.manifestHashes) !== canonical2(head2.manifestHashes)) throw storageError("record-integrity", "De recordmanifesten sluiten niet aan op de canonieke bronnen.");
+    if (canonical3(computed.manifestHashes) !== canonical3(head2.manifestHashes)) throw storageError("record-integrity", "De recordmanifesten sluiten niet aan op de canonieke bronnen.");
     for (const expected of computed.manifests) {
       const stored = manifests.find((row) => row.id === expected.id);
       if (!stored || await digest(stored) !== head2.manifestHashes[expected.id]) throw storageError("record-integrity", "Een geverifieerd recordmanifest ontbreekt.");
@@ -4638,16 +5050,16 @@
     for (const record of encoded.records) {
       const ordinal = ordinals.get(record.collection) || 0;
       ordinals.set(record.collection, ordinal + 1);
-      const payload = canonical2(record.value), chunks = parts(payload), key = await digest(record.id), source = rawSource(record.value), sourceHash = source ? await digest(source) : "";
+      const payload = canonical3(record.value), chunks = parts(payload), key = await digest(record.id), source = rawSource(record.value), sourceHash = source ? await digest(source) : "";
       const periods = record.collection === "transactions" ? months.filter((month) => dependencies.get(month).has(record.recordId)) : record.periods;
       for (let part = 0; part < chunks.length; part++) records.push({ id: key + "-" + part, logicalId: key, recordKey: record.id, collection: record.collection, recordId: record.recordId, kind: encoded.layout[record.collection].kind, ordinal, part, partCount: chunks.length, logicalHash: await digest(payload), payload: chunks[part], hash: await digest(chunks[part]), sourceHash, periods, removed: false });
     }
     const periodDocuments = [];
     for (const month of months) {
-      const selected = records.filter((row) => row.periods.includes(month)), payload = canonical2(periodFinancials(state2, month, options));
+      const selected = records.filter((row) => row.periods.includes(month)), payload = canonical3(periodFinancials(state2, month, options));
       periodDocuments.push({ id: month, month, projectionVersion: 1, payload, dependencies: selected.map((row) => ({ id: row.id, hash: row.hash })).sort((a, b) => a.id.localeCompare(b.id)) });
     }
-    const global = { id: "financial", projectionVersion: 1, payload: canonical2(cumulativeFinancials(state2)) };
+    const global = { id: "financial", projectionVersion: 1, payload: canonical3(cumulativeFinancials(state2)) };
     const layout = Object.fromEntries(Object.entries(encoded.layout).map(([key, value]) => [key, value.kind]));
     const settings = { id: "settings", dependencies: records.filter((row) => row.collection !== "transactions" && !row.collection.startsWith("@") && !row.periods.length).map((row) => ({ id: row.id, hash: row.hash })).sort((a, b) => a.id.localeCompare(b.id)) };
     return { records, periods: periodDocuments, global, settings, settingsHash: await digest(settings), ...await recordManifests(records), layout, stateHash: await digest(state2), importsHash: await digest(imports), recordCount: records.length, importCount: imports.length, periodHashes: Object.fromEntries(await Promise.all(periodDocuments.map(async (row) => [row.month, await digest(row)]))), globalHash: await digest(global) };
@@ -4694,9 +5106,9 @@
     for (const path of /* @__PURE__ */ new Set([...a.keys(), ...b.keys()])) {
       const before = a.get(path) || null, value = b.get(path) || null;
       if ((before == null ? void 0 : before.sourceHash) && value && before.sourceHash !== value.sourceHash) throw storageError("source-immutable", "Onveranderlijke bankbron of CSV-bron gewijzigd.");
-      if (canonical2(before) === canonical2(value)) continue;
+      if (canonical3(before) === canonical3(value)) continue;
       const after = value || { ...before, removed: true, periods: [] };
-      if (canonical2(before) === canonical2(after)) continue;
+      if (canonical3(before) === canonical3(after)) continue;
       result2.push({ id: path.replace("/", "_"), path, before, after });
     }
     return result2;
@@ -4941,8 +5353,8 @@
   }
 
   // src/storage/period-workspace.mjs
-  var same3 = (a, b) => canonical2(a) === canonical2(b);
-  var copy5 = (value) => structuredClone(value);
+  var same3 = (a, b) => canonical3(a) === canonical3(b);
+  var copy6 = (value) => structuredClone(value);
   var transactionGlobals = /* @__PURE__ */ new Set(["transactions", "meta", "spaardoelen", "savingsGoalLedger", "importSummaries", "activeImportId", "transactionReviewQueue", "recognitionRules", "advanceLedger", "advanceRepayments", "internalTransferPairs", "savingsCoverageAllocations", "manualTransactionReplacements", "monthRecords", "balanceCheckpoints", "__finizePartialHistory", "verifiedPeriods", "__finizePeriodContext"]);
   function workspaceNeedsFullHistory(before, after) {
     const ids = (value) => Object.values(value.spaardoelen || {}).flatMap((rows) => rows.map((row) => row.id)).sort();
@@ -4966,7 +5378,7 @@
   }
   function mergeWorkspaceIntent(before, after, expanded, { strict = true } = {}) {
     function merge(a, b, current, path) {
-      if (same3(a, b)) return copy5(current);
+      if (same3(a, b)) return copy6(current);
       const list2 = (value) => Array.isArray(value) && value.every((row) => typeof (row == null ? void 0 : row.id) === "string") && new Set(value.map((row) => row.id)).size === value.length;
       if (list2(a) && list2(b) && list2(current)) {
         const values = new Map(current.map((row) => [row.id, row])), old = new Map(a.map((row) => [row.id, row])), next = new Map(b.map((row) => [row.id, row]));
@@ -4979,7 +5391,7 @@
         return [...values.values()];
       }
       if (a && b && current && typeof a === "object" && typeof b === "object" && typeof current === "object" && !Array.isArray(a) && !Array.isArray(b) && !Array.isArray(current)) {
-        const result3 = copy5(current);
+        const result3 = copy6(current);
         for (const key of /* @__PURE__ */ new Set([...Object.keys(a), ...Object.keys(b)])) if (!same3(a[key], b[key])) {
           if (!(key in b)) {
             if (strict && !same3(current[key], a[key])) throw storageError("storage-conflict", "Een verwijderde afhankelijkheid wijzigde: " + path + "." + key);
@@ -4989,9 +5401,9 @@
         return result3;
       }
       if (strict && !same3(current, a)) throw storageError("storage-conflict", "Een afhankelijke waarde wijzigde tijdens voorbereiden: " + path);
-      return copy5(b);
+      return copy6(b);
     }
-    const result2 = copy5(expanded);
+    const result2 = copy6(expanded);
     for (const key of /* @__PURE__ */ new Set([...Object.keys(before), ...Object.keys(after)])) if (!["meta", "__finizePartialHistory", "verifiedPeriods", "__finizePeriodContext"].includes(key) && !same3(before[key], after[key])) {
       if (!(key in after)) delete result2[key];
       else result2[key] = merge(before[key], after[key], expanded[key], key);
@@ -4999,7 +5411,7 @@
     return result2;
   }
   function completeDependencyState(state2) {
-    const result2 = copy5(state2);
+    const result2 = copy6(state2);
     delete result2.__finizePartialHistory;
     delete result2.__finizePeriodContext;
     delete result2.verifiedPeriods;
@@ -5012,13 +5424,13 @@
     state2.__finizePartialHistory = true;
     state2.verifiedPeriods = proof.periods.map((row) => row.month);
     state2.meta.selectedMonth = selectedMonth;
-    state2.__finizePeriodContext = copy5(proof);
+    state2.__finizePeriodContext = copy6(proof);
     return state2;
   }
   function refreshWorkspaceTotals(before, next) {
     if (!next.__finizePartialHistory) return;
     assertWorkspaceMutation(before, next);
-    const a = cumulativeFinancials(completeDependencyState(before)), b = cumulativeFinancials(completeDependencyState(next)), result2 = copy5(before.__finizePeriodContext.localCumulative || JSON.parse(before.__finizePeriodContext.global.payload));
+    const a = cumulativeFinancials(completeDependencyState(before)), b = cumulativeFinancials(completeDependencyState(next)), result2 = copy6(before.__finizePeriodContext.localCumulative || JSON.parse(before.__finizePeriodContext.global.payload));
     for (const key of Object.keys(result2.totalsCents)) result2.totalsCents[key] += b.totalsCents[key] - a.totalsCents[key];
     for (const key of ["bankSourceCount", "approvedEffectCount"]) result2[key] += b[key] - a[key];
     result2.goals = b.goals;
@@ -5096,9 +5508,9 @@
       const values = await decodeRecordValues(records), layout = {};
       for (const [key, kind] of Object.entries(head2.layout)) if (!key.startsWith("@")) layout[key] = kind === "list" ? { kind, ids: values.filter((row) => row.collection === key).sort((a, b) => a.ordinal - b.ordinal).map((row) => row.recordId) } : { kind };
       const state2 = decodeHouseholdState({ storageVersion: 1, schemaVersion: 11, layout }, values);
-      const emptyPeriod = (month) => ({ id: month, month, projectionVersion: 1, dependencies: [], payload: canonical2(periodFinancials({ ...state2, transactions: [], savingsGoalLedger: state2.savingsGoalLedger.filter((row) => !row.month || row.month === month) }, month, { applicationProjection })) });
+      const emptyPeriod = (month) => ({ id: month, month, projectionVersion: 1, dependencies: [], payload: canonical3(periodFinancials({ ...state2, transactions: [], savingsGoalLedger: state2.savingsGoalLedger.filter((row) => !row.month || row.month === month) }, month, { applicationProjection })) });
       for (const month of emptyMonths) periods.push(emptyPeriod(month));
-      const proof = { epoch: head2.epoch, revision: head2.revision, head: copy5(head2), records, periods, global: globalDocument, settings, imports: [], explicitFullHistory };
+      const proof = { epoch: head2.epoch, revision: head2.revision, head: copy6(head2), records, periods, global: globalDocument, settings, imports: [], explicitFullHistory };
       proof.emptyPeriods = emptyMonths;
       proof.summaries = {};
       for (const year of new Set(months.map((month) => month.slice(0, 4)))) for (let i = 1; i <= 12; i++) {
@@ -5148,7 +5560,7 @@
       if (affected.some((month) => !state2.verifiedPeriods.includes(month))) throw storageError("dependency-required", "Niet alle wijzigingsafhankelijkheden zijn geladen.");
       const scratch = completeDependencyState(state2), oldState = completeDependencyState(before);
       const next = await buildRecordSnapshot(scratch, imports, { onlyPeriods: affected, applicationProjection });
-      const oldRecords = copy5(proof.records);
+      const oldRecords = copy6(proof.records);
       for (const batch of imports) for (const row of await importRecords(batch.id, c)) if (!oldRecords.some((old2) => old2.id === row.id)) oldRecords.push(row);
       const ordinals = new Map(oldRecords.map((row) => [row.logicalId, row.ordinal]));
       let ordinal = c.head.data.recordCount;
@@ -5160,13 +5572,13 @@
       }
       const old = { records: oldRecords, periods: proof.periods.filter((row) => affected.includes(row.month) && proof.head.periodHashes[row.month]), global: proof.global, settings: proof.settings };
       const changes = recordChanges(old, { ...next, manifests: [] });
-      const hashes = copy5(c.head.data.manifestHashes), buckets = /* @__PURE__ */ new Map();
+      const hashes = copy6(c.head.data.manifestHashes), buckets = /* @__PURE__ */ new Map();
       for (const change of changes.filter((row) => row.path.startsWith("records/"))) {
         const key = manifestBucket(change.after);
         if (!buckets.has(key)) {
           const stored = ((_a2 = await transport.get(c.root + "/manifests/" + key)) == null ? void 0 : _a2.data) || { id: key, entries: {} };
           if (hashes[key] && await digest(stored) !== hashes[key]) throw storageError("record-integrity", "Een gewijzigd recordmanifest wijkt af.");
-          buckets.set(key, { before: hashes[key] ? copy5(stored) : null, after: copy5(stored) });
+          buckets.set(key, { before: hashes[key] ? copy6(stored) : null, after: copy6(stored) });
         }
         const bucket = buckets.get(key);
         if (!change.before && !bucket.after.entries[change.after.id]) {
@@ -5189,7 +5601,7 @@
       for (const key of Object.keys(cumulative.totalsCents)) cumulative.totalsCents[key] += b.totalsCents[key] - a.totalsCents[key];
       for (const key of ["bankSourceCount", "approvedEffectCount"]) cumulative[key] += b[key] - a[key];
       cumulative.goals = b.goals;
-      const global = { id: "financial", projectionVersion: 1, payload: canonical2(cumulative) };
+      const global = { id: "financial", projectionVersion: 1, payload: canonical3(cumulative) };
       const globalChange = changes.find((row) => row.path === "globals/financial");
       if (globalChange) globalChange.after = global;
       else if (!same3(global, proof.global)) changes.push({ id: "globals_financial", path: "globals/financial", before: proof.global, after: global });
@@ -5983,13 +6395,13 @@
   var LOCAL_STORAGE_VERSION = 1;
   var connections = /* @__PURE__ */ new Map();
   var clone6 = (value) => structuredClone(value);
-  var fail3 = (code, message) => Object.assign(new Error(message), { code, storageFailure: true });
+  var fail4 = (code, message) => Object.assign(new Error(message), { code, storageFailure: true });
   var stores = ["imports", "journal", "syncQueue", "financialRecords", "financialHead", "operationReceipts", "financialOutbox", "periodCache"];
   function openHouseholdDatabase(scope = "legacy") {
     if (connections.has(scope)) return connections.get(scope);
     const opening = new Promise((resolve, reject) => {
       if (!globalThis.indexedDB) {
-        reject(fail3("storage-unavailable", "IndexedDB is niet beschikbaar."));
+        reject(fail4("storage-unavailable", "IndexedDB is niet beschikbaar."));
         return;
       }
       const request2 = indexedDB.open(scope === "legacy" ? "finize-imports-v1" : `finize-imports-v1-${scope}`, HOUSEHOLD_DATABASE_VERSION);
@@ -6005,11 +6417,11 @@
         const periods = request2.transaction.objectStore("periodCache");
         if (!periods.indexNames.contains("offline")) periods.createIndex("offline", "offline");
       };
-      request2.onerror = () => reject(request2.error || fail3("storage-unavailable", "Huishoudopslag openen mislukt."));
+      request2.onerror = () => reject(request2.error || fail4("storage-unavailable", "Huishoudopslag openen mislukt."));
       let blocked2 = false;
       request2.onblocked = () => {
         blocked2 = true;
-        reject(fail3("storage-blocked", "Sluit de andere Finize-tabbladen om de lokale opslag veilig te openen."));
+        reject(fail4("storage-blocked", "Sluit de andere Finize-tabbladen om de lokale opslag veilig te openen."));
       };
       request2.onsuccess = async () => {
         const db = request2.result;
@@ -6080,12 +6492,12 @@
     return { layout, records, reused, entries };
   }
   function decodeHouseholdState(head2, records) {
-    if ((head2 == null ? void 0 : head2.storageVersion) !== LOCAL_STORAGE_VERSION || head2.schemaVersion !== 11) throw fail3("storage-version", "Onbekende lokale opslagversie.");
+    if ((head2 == null ? void 0 : head2.storageVersion) !== LOCAL_STORAGE_VERSION || head2.schemaVersion !== 11) throw fail4("storage-version", "Onbekende lokale opslagversie.");
     const values = new Map(records.map((record) => [record.id, record.value])), state2 = {};
     for (const [collection, layout] of Object.entries(head2.layout)) {
       const read = (id) => {
         const key = JSON.stringify([collection, id]);
-        if (!values.has(key)) throw fail3("storage-integrity", "Een vereist financieel record ontbreekt: " + collection);
+        if (!values.has(key)) throw fail4("storage-integrity", "Een vereist financieel record ontbreekt: " + collection);
         return clone6(values.get(key));
       };
       state2[collection] = layout.kind === "list" ? layout.ids.map(read) : read("");
@@ -6101,7 +6513,7 @@
   function completed(transaction) {
     return new Promise((resolve, reject) => {
       transaction.oncomplete = () => resolve();
-      transaction.onerror = transaction.onabort = () => reject(transaction.error || fail3("storage-aborted", "De lokale opslagtransactie is afgebroken."));
+      transaction.onerror = transaction.onabort = () => reject(transaction.error || fail4("storage-aborted", "De lokale opslagtransactie is afgebroken."));
     });
   }
   async function financialSnapshot(transaction) {
@@ -6111,7 +6523,7 @@
     if (!head2.partialHistory) return { head: head2, records: await requestResult(records.getAll()) };
     const keys = Object.entries(head2.layout).flatMap(([collection, layout]) => (layout.kind === "list" ? layout.ids : [""]).map((id) => JSON.stringify([collection, id])));
     const selected = await Promise.all(keys.map((id) => requestResult(records.get(id))));
-    if (selected.some((row) => !row)) throw fail3("storage-integrity", "Een vereiste lokale periodeafhankelijkheid ontbreekt.");
+    if (selected.some((row) => !row)) throw fail4("storage-integrity", "Een vereiste lokale periodeafhankelijkheid ontbreekt.");
     return { head: head2, records: selected };
   }
   function createHouseholdStore(scope = "legacy", { verifySource = async () => {
@@ -6131,22 +6543,22 @@
       const db = await openHouseholdDatabase(scope), tx = db.transaction(["financialHead", "financialRecords"], "readonly"), done = completed(tx);
       const [{ head: head2, records }] = await Promise.all([financialSnapshot(tx), done]);
       if (!head2) return null;
-      if (!allowUnverified && !head2.verified) throw fail3("storage-migration", "De opslagmigratie moet eerst worden gecontroleerd.");
+      if (!allowUnverified && !head2.verified) throw fail4("storage-migration", "De opslagmigratie moet eerst worden gecontroleerd.");
       const state2 = decodeHouseholdState(head2, records);
-      if (await backupDigest(JSON.stringify(state2)) !== head2.sha256) throw fail3("storage-integrity", "De teruggelezen financiële opslag wijkt af. De oude opslag blijft behouden.");
+      if (await backupDigest(JSON.stringify(state2)) !== head2.sha256) throw fail4("storage-integrity", "De teruggelezen financiële opslag wijkt af. De oude opslag blijft behouden.");
       adoptBasis(head2, records);
       return state2;
     }
     async function commit(state2, { expectedHash = ((_a2) => (_a2 = cachedHead == null ? void 0 : cachedHead.sha256) != null ? _a2 : null)(), operationId = crypto.randomUUID(), importMutation = null, migration = null, queueCloud = true, cloudAcceptance = null, periodAcceptance = null, resolutionAcceptance = null, payloadPreparation = null } = {}) {
       var _a3, _b, _c, _d, _e, _f;
       await verifySource(migration || (cachedHead == null ? void 0 : cachedHead.migration));
-      if (cloudAcceptance && (importMutation || queueCloud)) throw fail3("storage-contract", "Een cloudontvangst accepteert geen parallelle lokale importbewerking.");
-      if (periodAcceptance && (!state2.__finizePartialHistory || queueCloud || importMutation || cloudAcceptance)) throw fail3("storage-contract", "Periodeontvangst gebruikt één gecontroleerde lokale commit zonder financiële heruitvoering.");
-      if (resolutionAcceptance && (!state2.__finizePartialHistory || !queueCloud || periodAcceptance || cloudAcceptance || importMutation)) throw fail3("storage-contract", "Conflictoplossing vereist één atomaire periodecommit met outbox.");
+      if (cloudAcceptance && (importMutation || queueCloud)) throw fail4("storage-contract", "Een cloudontvangst accepteert geen parallelle lokale importbewerking.");
+      if (periodAcceptance && (!state2.__finizePartialHistory || queueCloud || importMutation || cloudAcceptance)) throw fail4("storage-contract", "Periodeontvangst gebruikt één gecontroleerde lokale commit zonder financiële heruitvoering.");
+      if (resolutionAcceptance && (!state2.__finizePartialHistory || !queueCloud || periodAcceptance || cloudAcceptance || importMutation)) throw fail4("storage-contract", "Conflictoplossing vereist één atomaire periodecommit met outbox.");
       const durableBasis = cachedHead && clone6(cachedHead);
       if (payloadPreparation == null ? void 0 : payloadPreparation.binding) {
         const binding = payloadPreparation.binding;
-        if (binding.scope !== scope) throw fail3("household-scope", "De commitvoorbereiding hoort bij een ander huishouden.");
+        if (binding.scope !== scope) throw fail4("household-scope", "De commitvoorbereiding hoort bij een ander huishouden.");
         if (binding.sha256 !== (durableBasis == null ? void 0 : durableBasis.sha256) || binding.storageRevision !== (durableBasis == null ? void 0 : durableBasis.storageRevision) || binding.migration !== JSON.stringify((_a3 = durableBasis == null ? void 0 : durableBasis.migration) != null ? _a3 : null)) payloadPreparation = null;
       }
       const canReuse = expectedHash === ((_b = durableBasis == null ? void 0 : durableBasis.sha256) != null ? _b : null);
@@ -6177,26 +6589,26 @@
           }
         };
         tx.oncomplete = () => resolve();
-        tx.onerror = tx.onabort = () => reject(failure2 || tx.error || fail3("storage-aborted", "De lokale financiële commit is afgebroken."));
+        tx.onerror = tx.onabort = () => reject(failure2 || tx.error || fail4("storage-aborted", "De lokale financiële commit is afgebroken."));
         const heads = tx.objectStore("financialHead"), get = heads.get("current"), operation = tx.objectStore("operationReceipts").get(operationId);
         operation.onsuccess = () => {
           var _a4, _b2, _c2, _d2, _e2, _f2, _g, _h, _i, _j;
           if (((_a4 = get.result) == null ? void 0 : _a4.partialHistory) && !state2.__finizePartialHistory) {
-            abort(fail3("storage-contract", "Een periodeadministratie kan niet via het oude volledige-statecontract worden overschreven."));
+            abort(fail4("storage-contract", "Een periodeadministratie kan niet via het oude volledige-statecontract worden overschreven."));
             return;
           }
           if (get.result && !get.result.verified) {
-            abort(fail3("storage-migration", "Een ongecontroleerde migratiestand accepteert geen financiële wijzigingen."));
+            abort(fail4("storage-migration", "Een ongecontroleerde migratiestand accepteert geen financiële wijzigingen."));
             return;
           }
           const existing = operation.result;
           if (existing) {
             if (existing.sha256 !== sha256) {
-              abort(fail3("storage-operation-reused", "Dit operatie-ID is al gebruikt voor een andere financiële wijziging."));
+              abort(fail4("storage-operation-reused", "Dit operatie-ID is al gebruikt voor een andere financiële wijziging."));
               return;
             }
             if (((_b2 = get.result) == null ? void 0 : _b2.sha256) !== sha256) {
-              abort(fail3("storage-operation-committed", "Deze operatie is al bevestigd; lees eerst de nieuwere duurzame stand."));
+              abort(fail4("storage-operation-committed", "Deze operatie is al bevestigd; lees eerst de nieuwere duurzame stand."));
               return;
             }
             confirmedReceipt = existing;
@@ -6204,11 +6616,11 @@
             return;
           }
           if (!canReuse || ((_d2 = (_c2 = get.result) == null ? void 0 : _c2.sha256) != null ? _d2 : null) !== expectedHash) {
-            abort(fail3("storage-conflict", "De duurzame financiële stand is intussen gewijzigd. Herlaad de actuele stand; je invoer blijft behouden."));
+            abort(fail4("storage-conflict", "De duurzame financiële stand is intussen gewijzigd. Herlaad de actuele stand; je invoer blijft behouden."));
             return;
           }
           if (((_f2 = (_e2 = get.result) == null ? void 0 : _e2.storageRevision) != null ? _f2 : null) !== ((_g = durableBasis == null ? void 0 : durableBasis.storageRevision) != null ? _g : null) || JSON.stringify((_i = (_h = get.result) == null ? void 0 : _h.migration) != null ? _i : null) !== JSON.stringify((_j = durableBasis == null ? void 0 : durableBasis.migration) != null ? _j : null)) {
-            abort(fail3("storage-conflict", "De revisie of migratiebasis van de commitvoorbereiding is gewijzigd."));
+            abort(fail4("storage-conflict", "De revisie of migratiebasis van de commitvoorbereiding is gewijzigd."));
             return;
           }
           const publish = () => {
@@ -6226,7 +6638,7 @@
                 const journal = tx.objectStore("journal"), read2 = journal.get(resolutionAcceptance.id), outbox = tx.objectStore("financialOutbox"), all = outbox.getAll();
                 read2.onsuccess = () => {
                   if (!read2.result || read2.result.status !== "conflict" || read2.result.localHash !== expectedHash) {
-                    abort(fail3("storage-conflict", "De beoordeelde conflictstand is gewijzigd."));
+                    abort(fail4("storage-conflict", "De beoordeelde conflictstand is gewijzigd."));
                     return;
                   }
                   journal.put({ ...read2.result, resolution: { ...clone6(resolutionAcceptance.resolution), outcome: "pending" } });
@@ -6260,12 +6672,12 @@
             const imports2 = tx.objectStore("imports").getAll(), queue = tx.objectStore("syncQueue").getAll();
             queue.onsuccess = () => {
               try {
-                if (JSON.stringify(imports2.result) !== cloudAcceptance.expectedImportsSignature || queue.result.length) throw fail3("import-conflict", "Lokale importkeuzes wijzigden tijdens cloudontvangst.");
+                if (JSON.stringify(imports2.result) !== cloudAcceptance.expectedImportsSignature || queue.result.length) throw fail4("import-conflict", "Lokale importkeuzes wijzigden tijdens cloudontvangst.");
                 for (const old of imports2.result) {
                   const incoming = cloudAcceptance.imports.find((row) => row.id === old.id);
                   if (!incoming) {
                     if (cloudAcceptance.partial === true) continue;
-                    throw fail3("import-conflict", "Een lokale import ontbreekt in de externe stand.");
+                    throw fail4("import-conflict", "Een lokale import ontbreekt in de externe stand.");
                   }
                   assertOriginalBankDataUnchanged(old.rows, incoming.rows);
                 }
@@ -6284,8 +6696,8 @@
           read.onsuccess = () => {
             try {
               const old = read.result, expected = importMutation.previousBatch;
-              if ((Number(old == null ? void 0 : old.version) || 0) !== (Number(expected == null ? void 0 : expected.version) || 0) || String((old == null ? void 0 : old.operationId) || "") !== String((expected == null ? void 0 : expected.operationId) || "")) throw fail3("import-conflict", "De importrevisie is intussen gewijzigd.");
-              if ((old == null ? void 0 : old.lifecycle) === "deleted" && importMutation.batch.lifecycle !== "deleted") throw fail3("import-conflict", "De import is al verwijderd.");
+              if ((Number(old == null ? void 0 : old.version) || 0) !== (Number(expected == null ? void 0 : expected.version) || 0) || String((old == null ? void 0 : old.operationId) || "") !== String((expected == null ? void 0 : expected.operationId) || "")) throw fail4("import-conflict", "De importrevisie is intussen gewijzigd.");
+              if ((old == null ? void 0 : old.lifecycle) === "deleted" && importMutation.batch.lifecycle !== "deleted") throw fail4("import-conflict", "De import is al verwijderd.");
               assertOriginalBankDataUnchanged(old == null ? void 0 : old.rows, importMutation.batch.rows);
               publish();
             } catch (error2) {
@@ -6309,7 +6721,7 @@
       if (!state2) return null;
       await (verifySource2 == null ? void 0 : verifySource2(cachedHead.migration));
       if (cachedHead.verified) return state2;
-      if (((_a2 = cachedHead.migration) == null ? void 0 : _a2.retainedStores) && JSON.stringify(await retainedInventory()) !== JSON.stringify(cachedHead.migration.retainedStores)) throw fail3("storage-migration-conflict", "De bestaande import- of herstelopslag wijzigde tijdens migratie; beide kopieën blijven behouden.");
+      if (((_a2 = cachedHead.migration) == null ? void 0 : _a2.retainedStores) && JSON.stringify(await retainedInventory()) !== JSON.stringify(cachedHead.migration.retainedStores)) throw fail4("storage-migration-conflict", "De bestaande import- of herstelopslag wijzigde tijdens migratie; beide kopieën blijven behouden.");
       const hash = cachedHead.sha256, db = await openHouseholdDatabase(scope);
       await new Promise((resolve, reject) => {
         const tx = db.transaction("financialHead", "readwrite", { durability: "strict" }), store = tx.objectStore("financialHead"), read = store.get("current");
@@ -6317,7 +6729,7 @@
         read.onsuccess = () => {
           var _a3;
           if (((_a3 = read.result) == null ? void 0 : _a3.sha256) !== hash) {
-            failure2 = fail3("storage-conflict", "De migratiestand wijzigde tijdens controle.");
+            failure2 = fail4("storage-conflict", "De migratiestand wijzigde tijdens controle.");
             tx.abort();
             return;
           }
@@ -6364,7 +6776,7 @@
       const db = await openHouseholdDatabase(scope), tx = db.transaction(["financialHead", "financialRecords", "operationReceipts"], "readonly"), done = completed(tx);
       const [{ head: head2, records }, receipt] = await Promise.all([financialSnapshot(tx), requestResult(tx.objectStore("operationReceipts").get(id)), done]);
       const state2 = head2 ? decodeHouseholdState(head2, records) : null;
-      if (head2 && await backupDigest(JSON.stringify(state2)) !== head2.sha256) throw fail3("storage-integrity", "Het operatiebewijs heeft geen betrouwbare financiële stand.");
+      if (head2 && await backupDigest(JSON.stringify(state2)) !== head2.sha256) throw fail4("storage-integrity", "Het operatiebewijs heeft geen betrouwbare financiële stand.");
       adoptBasis(head2, records);
       return { state: state2, receipt: receipt || null };
     }
@@ -6388,15 +6800,15 @@
         return (await Promise.all([...new Set(rows.map((row) => row.conflictId).filter(Boolean))].map((id) => requestResult(tx.objectStore("journal").get(id))))).filter(Boolean);
       })();
       const [{ head: head2, records }, imports, outbox, receipts, journals, importQueue] = await Promise.all([financial, importsRead, pending, receiptsRead, journalsRead, queued, done]);
-      if (!(head2 == null ? void 0 : head2.verified)) throw fail3("storage-migration", "Synchronisatie vereist geverifieerde lokale opslag.");
+      if (!(head2 == null ? void 0 : head2.verified)) throw fail4("storage-migration", "Synchronisatie vereist geverifieerde lokale opslag.");
       const state2 = decodeHouseholdState(head2, records);
-      if (await backupDigest(JSON.stringify(state2)) !== head2.sha256) throw fail3("storage-integrity", "De lokale synchronisatiebasis heeft een afwijkende hash.");
+      if (await backupDigest(JSON.stringify(state2)) !== head2.sha256) throw fail4("storage-integrity", "De lokale synchronisatiebasis heeft een afwijkende hash.");
       const operations = outbox.filter((row) => ["pending", "conflict"].includes(row.status) && row.id !== "current").sort((a, b) => a.storageRevision - b.storageRevision);
       const pointer = outbox.find((row) => row.id === "current");
-      if (pointer && !operations.some((row) => row.id === pointer.operationId)) throw fail3("storage-integrity", "De synchronisatiewijzer mist een duurzaam operatiebewijs.");
+      if (pointer && !operations.some((row) => row.id === pointer.operationId)) throw fail4("storage-integrity", "De synchronisatiewijzer mist een duurzaam operatiebewijs.");
       for (const row of operations) {
         row.receipt = receipts.find((receipt) => receipt.id === row.id);
-        if (!row.receipt || row.receipt.sha256 !== row.sha256) throw fail3("storage-integrity", "Een lokaal operatiebewijs ontbreekt.");
+        if (!row.receipt || row.receipt.sha256 !== row.sha256) throw fail4("storage-integrity", "Een lokaal operatiebewijs ontbreekt.");
       }
       return { state: state2, imports, operations, head: head2, importQueue, conflicts: journals.filter((row) => row.operation === "record-cloud-conflict" && row.status === "conflict"), cloudBase: outbox.find((row) => row.id === "cloud-base") || null };
     }
@@ -6524,13 +6936,13 @@
   var CLOUD_STATE_FORMAT = "finize-json-chunks-v1";
   var CLOUD_CHUNK_BYTES = 24e4;
   var byteLength = (value) => new TextEncoder().encode(value).length;
-  var canonical3 = (value) => JSON.stringify(value, (_, item) => item && typeof item === "object" && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).sort().map((key) => [key, item[key]])) : item);
-  var fail4 = (message) => {
+  var canonical4 = (value) => JSON.stringify(value, (_, item) => item && typeof item === "object" && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).sort().map((key) => [key, item[key]])) : item);
+  var fail5 = (message) => {
     throw new Error(`Cloudstate-integriteit: ${message}`);
   };
   async function encodeCloudState(state2, generation, crypto2 = globalThis.crypto) {
     var _a2;
-    if (((_a2 = state2 == null ? void 0 : state2.meta) == null ? void 0 : _a2.schemaVersion) !== 11 || !/^[a-zA-Z0-9_-]{1,160}$/.test(generation)) fail4("schema/generation ongeldig");
+    if (((_a2 = state2 == null ? void 0 : state2.meta) == null ? void 0 : _a2.schemaVersion) !== 11 || !/^[a-zA-Z0-9_-]{1,160}$/.test(generation)) fail5("schema/generation ongeldig");
     const payload = JSON.stringify(state2), parts2 = [];
     let part = "", size = 0;
     for (const char of payload) {
@@ -6556,23 +6968,23 @@
   async function decodeCloudState(manifest, descriptor, chunks, crypto2 = globalThis.crypto) {
     var _a2;
     const id = manifest.activeGeneration;
-    if (manifest.stateFormat !== CLOUD_STATE_FORMAT || !(descriptor == null ? void 0 : descriptor.complete) || descriptor.generation !== id || descriptor.schema !== 11 || descriptor.stateFormat !== CLOUD_STATE_FORMAT || !Number.isSafeInteger(manifest.chunkCount) || manifest.chunkCount < 1 || manifest.chunkCount !== descriptor.chunkCount || chunks.length !== descriptor.chunkCount || manifest.totalSha256 !== descriptor.totalSha256 || manifest.totalByteLength !== descriptor.totalByteLength || canonical3(manifest.stateMeta) !== canonical3(descriptor.stateMeta)) fail4("generation/manifest niet compleet of onjuist");
+    if (manifest.stateFormat !== CLOUD_STATE_FORMAT || !(descriptor == null ? void 0 : descriptor.complete) || descriptor.generation !== id || descriptor.schema !== 11 || descriptor.stateFormat !== CLOUD_STATE_FORMAT || !Number.isSafeInteger(manifest.chunkCount) || manifest.chunkCount < 1 || manifest.chunkCount !== descriptor.chunkCount || chunks.length !== descriptor.chunkCount || manifest.totalSha256 !== descriptor.totalSha256 || manifest.totalByteLength !== descriptor.totalByteLength || canonical4(manifest.stateMeta) !== canonical4(descriptor.stateMeta)) fail5("generation/manifest niet compleet of onjuist");
     let total = 0;
     for (let sequence2 = 0; sequence2 < chunks.length; sequence2++) {
       const chunk = chunks[sequence2];
-      if (!chunk || chunk.generation !== id || chunk.sequence !== sequence2 || chunk.chunkCount !== chunks.length || typeof chunk.payload !== "string" || chunk.byteLength !== byteLength(chunk.payload) || chunk.byteLength > CLOUD_CHUNK_BYTES || chunk.sha256 !== await backupDigest(chunk.payload, crypto2)) fail4(`deel ${sequence2} ontbreekt of is corrupt`);
+      if (!chunk || chunk.generation !== id || chunk.sequence !== sequence2 || chunk.chunkCount !== chunks.length || typeof chunk.payload !== "string" || chunk.byteLength !== byteLength(chunk.payload) || chunk.byteLength > CLOUD_CHUNK_BYTES || chunk.sha256 !== await backupDigest(chunk.payload, crypto2)) fail5(`deel ${sequence2} ontbreekt of is corrupt`);
       total += chunk.byteLength;
-      if (chunk.cumulativeBytes !== total) fail4(`deel ${sequence2} volgorde/lengte ongeldig`);
+      if (chunk.cumulativeBytes !== total) fail5(`deel ${sequence2} volgorde/lengte ongeldig`);
     }
     const payload = chunks.map((chunk) => chunk.payload).join("");
-    if (total !== manifest.totalByteLength || await backupDigest(payload, crypto2) !== manifest.totalSha256) fail4("totale checksum/lengte ongeldig");
+    if (total !== manifest.totalByteLength || await backupDigest(payload, crypto2) !== manifest.totalSha256) fail5("totale checksum/lengte ongeldig");
     const state2 = JSON.parse(payload);
-    if (((_a2 = state2 == null ? void 0 : state2.meta) == null ? void 0 : _a2.schemaVersion) !== 11 || canonical3(state2.meta) !== canonical3(manifest.stateMeta)) fail4("state/schema/metadata ongeldig");
+    if (((_a2 = state2 == null ? void 0 : state2.meta) == null ? void 0 : _a2.schemaVersion) !== 11 || canonical4(state2.meta) !== canonical4(manifest.stateMeta)) fail5("state/schema/metadata ongeldig");
     return state2;
   }
   function cloudStateManifest(descriptor, { syncVersion, commitId, updatedAt, updatedBy }) {
     const { complete: complete3, generation, ...metadata } = descriptor;
-    if (!complete3) fail4("incomplete generation kan niet worden geactiveerd");
+    if (!complete3) fail5("incomplete generation kan niet worden geactiveerd");
     return { ...metadata, activeGeneration: generation, app: "finize", revision: Number(descriptor.stateMeta.revision) || 0, baseVersion: syncVersion - 1, syncVersion, commitId, updatedAt, updatedBy };
   }
   function createChunkedCloudStore(firestore, db, currentRef) {
@@ -6582,11 +6994,11 @@
     const read = (ref) => (firestore.getDocFromServer || firestore.getDoc)(ref);
     async function hydrate(documentData) {
       if (!(documentData == null ? void 0 : documentData.stateFormat)) return documentData;
-      if (documentData.stateFormat !== CLOUD_STATE_FORMAT) fail4("onbekend opslagformaat");
+      if (documentData.stateFormat !== CLOUD_STATE_FORMAT) fail5("onbekend opslagformaat");
       const descriptorSnapshot = await read(generationRef(documentData.activeGeneration));
-      if (!descriptorSnapshot.exists()) fail4("generation ontbreekt");
+      if (!descriptorSnapshot.exists()) fail5("generation ontbreekt");
       const descriptor = descriptorSnapshot.data();
-      if (!Number.isSafeInteger(descriptor.chunkCount) || descriptor.chunkCount < 1 || descriptor.chunkCount > 1e4) fail4("deelcount ongeldig");
+      if (!Number.isSafeInteger(descriptor.chunkCount) || descriptor.chunkCount < 1 || descriptor.chunkCount > 1e4) fail5("deelcount ongeldig");
       const chunks = [];
       for (let sequence2 = 0; sequence2 < descriptor.chunkCount; sequence2++) {
         const snapshot2 = await read(chunkRef(documentData.activeGeneration, sequence2));
@@ -6606,7 +7018,7 @@
         persisted.push(snapshot2.exists() ? snapshot2.data() : null);
       }
       const storedDescriptor = await read(generationRef(generation));
-      if (!storedDescriptor.exists() || canonical3({ ...storedDescriptor.data(), stateMeta: canonical3(storedDescriptor.data().stateMeta) }) !== canonical3({ ...encoded.descriptor, stateMeta: canonical3(encoded.descriptor.stateMeta) })) fail4("generationdescriptor gewijzigd");
+      if (!storedDescriptor.exists() || canonical4({ ...storedDescriptor.data(), stateMeta: canonical4(storedDescriptor.data().stateMeta) }) !== canonical4({ ...encoded.descriptor, stateMeta: canonical4(encoded.descriptor.stateMeta) })) fail5("generationdescriptor gewijzigd");
       await decodeCloudState(manifest, complete3, persisted);
       await firestore.updateDoc(generationRef(generation), { complete: true });
       const sealed = await read(generationRef(generation));
@@ -6617,7 +7029,7 @@
   }
 
   // src/storage/cloud-records.mjs
-  var same4 = (a, b) => canonical2(a) === canonical2(b);
+  var same4 = (a, b) => canonical3(a) === canonical3(b);
   var batches = (values) => Array.from({ length: Math.ceil(values.length / 8) }, (_, index) => values.slice(index * 8, index * 8 + 8));
   function createRecordCloudStore({ transport, householdId, applicationProjection, readLegacyImports } = {}) {
     const testTransport = (transport == null ? void 0 : transport.emulator) && /^demo-/.test(transport.emulator.projectId) && /^127\.0\.0\.1:\d+$/.test(transport.emulator.host);
@@ -6849,7 +7261,7 @@
   }
 
   // src/core/transaction-processing.mjs
-  var copy6 = (value) => JSON.parse(JSON.stringify(value));
+  var copy7 = (value) => JSON.parse(JSON.stringify(value));
   var money3 = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
   function applyFinancialCandidate(target, candidate) {
     if (Array.isArray(target) && Array.isArray(candidate)) {
@@ -6883,7 +7295,7 @@
     const goalIds = [...new Set((state2.savingsGoalLedger || []).filter((entry) => ids.has(entry.transactionId) && entry.source !== "planned").map((entry) => entry.goalId))];
     if (dryRun) return { transactionIds: [...ids], goalIds };
     if (header && getTransactionProcessingStatus(header) !== "nakijken") {
-      header.approvalHistory = [...header.approvalHistory || [], { approvalSource: header.approvalSource || "", approvedAt: header.approvedAt || "", status: getTransactionProcessingStatus(header), processing: copy6(header.approvedProcessing || {}) }];
+      header.approvalHistory = [...header.approvalHistory || [], { approvalSource: header.approvalSource || "", approvedAt: header.approvedAt || "", status: getTransactionProcessingStatus(header), processing: copy7(header.approvedProcessing || {}) }];
       header.processingStatus = "nakijken";
       header.reviewStatus = "nakijken";
       header.certainty = "nakijken";
@@ -6894,7 +7306,7 @@
     rows.forEach((tx) => {
       if (tx.processingStatus === "nakijken") return;
       tx.approvalHistory = tx.approvalHistory || [];
-      tx.approvalHistory.push({ approvalSource: tx.approvalSource || "", approvedAt: tx.approvedAt || "", certainty: tx.certainty || "", processing: copy6(tx.processing || {}) });
+      tx.approvalHistory.push({ approvalSource: tx.approvalSource || "", approvedAt: tx.approvedAt || "", certainty: tx.certainty || "", processing: copy7(tx.processing || {}) });
       tx.processingStatus = "nakijken";
       tx.reviewStatus = "nakijken";
       tx.certainty = "nakijken";
@@ -6925,7 +7337,7 @@
       entry.status = "heropend";
     });
     (state2.internalTransferPairs || []).filter((pair) => (pair.transactionIds || []).some((id) => ids.has(id))).forEach((pair) => {
-      if (["bevestigd", "confirmed", "uitgevoerd"].includes(pair.status)) pair.confirmationHistory = [...pair.confirmationHistory || [], { status: pair.status, transactionIds: copy6(pair.transactionIds) }];
+      if (["bevestigd", "confirmed", "uitgevoerd"].includes(pair.status)) pair.confirmationHistory = [...pair.confirmationHistory || [], { status: pair.status, transactionIds: copy7(pair.transactionIds) }];
       pair.status = "voorgesteld";
     });
     reconcileGoalSavedAmounts(state2, goalIds);
@@ -6942,10 +7354,10 @@
     state2.transactions = (state2.transactions || []).filter((tx) => !matches(tx));
     const next = newRows.map((tx) => {
       var _a3;
-      return { ...tx, ...((_a3 = oldById.get(tx.id)) == null ? void 0 : _a3.approvalHistory) ? { approvalHistory: copy6(oldById.get(tx.id).approvalHistory) } : {} };
+      return { ...tx, ...((_a3 = oldById.get(tx.id)) == null ? void 0 : _a3.approvalHistory) ? { approvalHistory: copy7(oldById.get(tx.id).approvalHistory) } : {} };
     });
-    if (next.length && sourceHistory.length) next[0].sourceApprovalHistory = copy6(sourceHistory);
-    state2.transactions.splice(insert, 0, ...copy6(next));
+    if (next.length && sourceHistory.length) next[0].sourceApprovalHistory = copy7(sourceHistory);
+    state2.transactions.splice(insert, 0, ...copy7(next));
     const replacementId = ((_a2 = next.find((tx) => tx.processingStatus === "goedgekeurd")) == null ? void 0 : _a2.id) || ((_b = next[0]) == null ? void 0 : _b.id);
     if (replacementId) (state2.internalTransferPairs || []).filter((pair) => (pair.transactionIds || []).some((id) => oldById.has(id))).forEach((pair) => {
       pair.transactionIds = [...new Set(pair.transactionIds.map((id) => oldById.has(id) ? replacementId : id))];
@@ -6975,7 +7387,7 @@
   }
   function reopenTransactionSource(state2, importId, rowId, options = {}) {
     if (!importId || !rowId) throw new Error("Een betrouwbare import- en bronverwijzing is vereist.");
-    const candidate = copy6(state2), result2 = reopenSourceInPlace(candidate, importId, rowId, { dryRun: false });
+    const candidate = copy7(state2), result2 = reopenSourceInPlace(candidate, importId, rowId, { dryRun: false });
     assertFinancialMutationSafe(state2, candidate);
     if (!options.dryRun) {
       const oldById = new Map((state2.transactions || []).map((tx) => [tx.id, tx]));
@@ -6992,7 +7404,7 @@
     return result2;
   }
   function replaceProcessedSourceRows(state2, importId, rowId, rows) {
-    const candidate = copy6(state2), result2 = replaceSourceInPlace(candidate, importId, rowId, rows);
+    const candidate = copy7(state2), result2 = replaceSourceInPlace(candidate, importId, rowId, rows);
     assertFinancialMutationSafe(state2, candidate);
     applyFinancialCandidate(state2, candidate);
     return result2;
@@ -7000,7 +7412,7 @@
   function commitProcessedSourceGroup(state2, importId, { reopenIds = [], replacements = [] } = {}, applyEffects = () => {
   }) {
     if (!importId) throw new Error("Een betrouwbare importverwijzing is vereist.");
-    const candidate = copy6(state2);
+    const candidate = copy7(state2);
     for (const id of reopenIds) reopenSourceInPlace(candidate, importId, id);
     for (const replacement of replacements) replaceSourceInPlace(candidate, importId, replacement.rowId, replacement.rows);
     applyEffects(candidate);
@@ -7055,7 +7467,7 @@
           matched.actualAmount = null;
           matched.status = "gepland";
         }
-        const history = [...old.processingHistory || [], copy6({ ...old, processingHistory: void 0 })];
+        const history = [...old.processingHistory || [], copy7({ ...old, processingHistory: void 0 })];
         Object.assign(old, next, { id: old.id, createdAt: old.createdAt || next.createdAt, processingHistory: history });
       } else state2.savingsGoalLedger.push(next);
       const planned = state2.savingsGoalLedger.find((entry) => entry.id === next.matchedContributionId);
@@ -7071,13 +7483,13 @@
   }
   function setSavingsCoverageAllocation(state2, allocation, { createdAt = "", updatedBy = "" } = {}) {
     if (!allocation.id) throw new Error("Een stabiel allocation-ID is vereist.");
-    const candidate = copy6(state2);
+    const candidate = copy7(state2);
     candidate.savingsCoverageAllocations = candidate.savingsCoverageAllocations || [];
     const existing = candidate.savingsCoverageAllocations.find((row) => row.id === allocation.id);
-    const next = { ...existing || {}, ...copy6(allocation), active: true, createdAt: (existing == null ? void 0 : existing.createdAt) || createdAt, updatedAt: createdAt, updatedBy };
+    const next = { ...existing || {}, ...copy7(allocation), active: true, createdAt: (existing == null ? void 0 : existing.createdAt) || createdAt, updatedAt: createdAt, updatedBy };
     validateSavingsCoverageAllocation(candidate, next);
     if (existing) {
-      next.history = [...existing.history || [], copy6({ ...existing, history: void 0 })];
+      next.history = [...existing.history || [], copy7({ ...existing, history: void 0 })];
       Object.assign(existing, next);
     } else candidate.savingsCoverageAllocations.push(next);
     assertFinancialMutationSafe(state2, candidate);
@@ -7085,9 +7497,9 @@
     return next;
   }
   function removeSavingsCoverageAllocation(state2, id, { updatedAt = "", updatedBy = "" } = {}) {
-    const candidate = copy6(state2), allocation = (candidate.savingsCoverageAllocations || []).find((row) => row.id === id);
+    const candidate = copy7(state2), allocation = (candidate.savingsCoverageAllocations || []).find((row) => row.id === id);
     if (!allocation) return;
-    allocation.history = [...allocation.history || [], copy6({ ...allocation, history: void 0 })];
+    allocation.history = [...allocation.history || [], copy7({ ...allocation, history: void 0 })];
     allocation.active = false;
     allocation.updatedAt = updatedAt;
     allocation.updatedBy = updatedBy;
@@ -7098,7 +7510,7 @@
     if (!id || !Number.isSafeInteger(Math.round(Number(amount) * 100)) || !Number.isFinite(Number(amount)) || Number(amount) < 0 || Math.abs(Number(amount) * 100 - Math.round(Number(amount) * 100)) > 1e-6) throw new Error("Vul een geldig niet-negatief saldo in gehele eurocenten in.");
     if (!allGoals(state2).some(({ goal }) => goal.id === goalId)) throw new Error("Spaardoel ontbreekt.");
     if ((state2.savingsGoalLedger || []).some((entry) => entry.id === id)) return;
-    const candidate = copy6(state2), before = calculateGoalSavedAmount(state2, goalId), difference = money3(Number(amount) - before);
+    const candidate = copy7(state2), before = calculateGoalSavedAmount(state2, goalId), difference = money3(Number(amount) - before);
     if (!difference) return;
     candidate.savingsGoalLedger = candidate.savingsGoalLedger || [];
     candidate.savingsGoalLedger.push({ id, goalId, month, plannedAmount: 0, actualAmount: null, effectiveAmount: difference, source: "manual-correction", transactionId: "", status: "uitgevoerd", active: true, balanceBefore: before, balanceAfter: money3(amount), note, createdAt, updatedAt: createdAt, updatedBy });
@@ -7165,11 +7577,11 @@
     assertFinancialMutationSafe(previous, candidate);
     const old = coverageAllocationStatus(previous), invalid = coverageAllocationStatus(candidate).find((row) => row.reason && row.reason !== "coverage-inactive-reference" && !old.some((was) => was.id === row.id && was.reason === row.reason));
     if (invalid) throw new Error(coverageMessage(invalid.reason));
-    for (const pair of candidate.internalTransferPairs || []) if (pair.active !== false && ["bevestigd", "confirmed", "uitgevoerd"].includes(pair.status) && (pair.transactionIds || []).includes(id)) confirmInternalTransferPair(copy6(candidate), pair.id);
+    for (const pair of candidate.internalTransferPairs || []) if (pair.active !== false && ["bevestigd", "confirmed", "uitgevoerd"].includes(pair.status) && (pair.transactionIds || []).includes(id)) confirmInternalTransferPair(copy7(candidate), pair.id);
   }
   function upsertManualFinancialTransaction(state2, tx, accountContext, options = {}) {
     var _a2, _b;
-    const previous = copy6(state2), existing = (state2.transactions || []).find((row) => row.id === tx.id), next = { ...copy6(existing || {}), ...copy6(tx) };
+    const previous = copy7(state2), existing = (state2.transactions || []).find((row) => row.id === tx.id), next = { ...copy7(existing || {}), ...copy7(tx) };
     if (Object.hasOwn(tx, "date") && Object.hasOwn(tx, "transactionDate") && tx.date !== tx.transactionDate) throw new Error("De handmatige transactiedatums spreken elkaar tegen.");
     if (Object.hasOwn(tx, "date")) next.transactionDate = tx.date;
     else if (Object.hasOwn(tx, "transactionDate")) next.date = tx.transactionDate;
@@ -7213,7 +7625,7 @@
     markManualTransaction(next, accountContext);
     next.account = accountContext;
     next.accountOwner = accountContext;
-    const candidate = copy6(state2);
+    const candidate = copy7(state2);
     candidate.transactions = candidate.transactions || [];
     const index = candidate.transactions.findIndex((row) => row.id === next.id);
     if (index >= 0) candidate.transactions[index] = next;
@@ -7225,7 +7637,7 @@
   }
 
   // src/storage/record-sync.mjs
-  var same5 = (a, b) => canonical2(a) === canonical2(b);
+  var same5 = (a, b) => canonical3(a) === canonical3(b);
   function conflictApprovalReview(value) {
     const local = new Map((value.local.transactions || []).map((row) => [row.id, row]));
     return (value.remote.transactions || []).filter((row) => getTransactionProcessingStatus(row) === "goedgekeurd" && !same5(row, local.get(row.id))).map((row) => ({ id: row.id, bankSourceId: row.bankSourceId || "", remote: row, local: local.get(row.id) || null }));
@@ -7651,7 +8063,7 @@
   }
 
   // src/import/import-sync-protocol.mjs
-  var copy7 = (value) => JSON.parse(JSON.stringify(value));
+  var copy8 = (value) => JSON.parse(JSON.stringify(value));
   var importVersion = (record) => Number.isSafeInteger(Number(record == null ? void 0 : record.version)) ? Number(record.version) : 0;
   function sameImportOperation(left, right) {
     return !!(left == null ? void 0 : left.operationId) && left.operationId === (right == null ? void 0 : right.operationId) && importVersion(left) === importVersion(right);
@@ -7697,15 +8109,15 @@
     return conflicts;
   }
   function mergeImportDetails(base, local, remote) {
-    if (remote.lifecycle === "deleted") return { record: copy7(remote), conflicts: [{ kind: "deleted", id: remote.id }] };
-    const result2 = copy7(remote), conflicts = [];
+    if (remote.lifecycle === "deleted") return { record: copy8(remote), conflicts: [{ kind: "deleted", id: remote.id }] };
+    const result2 = copy8(remote), conflicts = [];
     const old = new Map(((base == null ? void 0 : base.rows) || []).map((row) => [row.id, row])), rows = new Map((remote.rows || []).map((row) => [row.id, row]));
     if ((local.lifecycle || "active") !== ((base == null ? void 0 : base.lifecycle) || "active") && (remote.lifecycle || "active") !== ((base == null ? void 0 : base.lifecycle) || "active") && local.lifecycle !== remote.lifecycle) conflicts.push({ kind: "lifecycle", id: local.id });
     for (const row of local.rows || []) {
       if (signature(row) === signature(old.get(row.id))) continue;
       const cloud = rows.get(row.id);
       if (signature(cloud) !== signature(old.get(row.id)) && signature(row) !== signature(cloud)) conflicts.push({ kind: "source", id: row.id });
-      else rows.set(row.id, copy7(row));
+      else rows.set(row.id, copy8(row));
     }
     result2.rows = [...rows.values()];
     return { record: result2, conflicts };
@@ -7761,14 +8173,14 @@
     }
     const seen = /* @__PURE__ */ new Map();
     for (const row of result2) {
-      const iban3 = normalizeAccountIban(row.identifier || row.iban);
-      if (!iban3) continue;
-      if (seen.has(iban3) && !base.some((a) => a.id === row.id && normalizeAccountIban(a.identifier || a.iban) === iban3) && !base.some((a) => a.id === seen.get(iban3) && normalizeAccountIban(a.identifier || a.iban) === iban3)) conflict();
-      if (seen.has(iban3)) {
-        const oldMatches = base.filter((a) => normalizeAccountIban(a.identifier || a.iban) === iban3);
-        if (!oldMatches.some((a) => a.id === row.id) || !oldMatches.some((a) => a.id === seen.get(iban3))) conflict();
+      const iban4 = normalizeAccountIban(row.identifier || row.iban);
+      if (!iban4) continue;
+      if (seen.has(iban4) && !base.some((a) => a.id === row.id && normalizeAccountIban(a.identifier || a.iban) === iban4) && !base.some((a) => a.id === seen.get(iban4) && normalizeAccountIban(a.identifier || a.iban) === iban4)) conflict();
+      if (seen.has(iban4)) {
+        const oldMatches = base.filter((a) => normalizeAccountIban(a.identifier || a.iban) === iban4);
+        if (!oldMatches.some((a) => a.id === row.id) || !oldMatches.some((a) => a.id === seen.get(iban4))) conflict();
       }
-      seen.set(iban3, row.id);
+      seen.set(iban4, row.id);
     }
     try {
       for (const profile of result2) validateLiquiditySettings(profile, result2);
@@ -7795,9 +8207,9 @@
     }
   }
   function assertCheckpointHistoryPreserved(previous, next) {
-    const canonical4 = (value) => JSON.stringify(value, (_, item) => item && typeof item === "object" && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).sort().map((key) => [key, item[key]])) : item);
+    const canonical5 = (value) => JSON.stringify(value, (_, item) => item && typeof item === "object" && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).sort().map((key) => [key, item[key]])) : item);
     const rows = new Map((next.balanceCheckpoints || []).map((row) => [row.id, row]));
-    for (const row of previous.balanceCheckpoints || []) if (canonical4(rows.get(row.id)) !== canonical4(row))
+    for (const row of previous.balanceCheckpoints || []) if (canonical5(rows.get(row.id)) !== canonical5(row))
       throw Object.assign(new Error("De cloudstand mist een bestaande saldo-waarneming of heeft deze gewijzigd. De lokale historie blijft behouden."), { code: CLOUD_CONFLICT_CODE });
   }
   function cloudDocumentVersion(documentData) {
@@ -7891,24 +8303,44 @@
     return result2;
   }
   function rebaseLocalChanges(base, local, remote) {
+    const providerKey = ["bankBalanceObservations", "bankCoverage"].find((key) => [base, local, remote].some((value) => isPlainObject(value) && Object.hasOwn(value, key)));
+    if (providerKey) {
+      const rows = /* @__PURE__ */ new Map(), canonical5 = (value) => JSON.stringify(value, (_, item) => isPlainObject(item) ? Object.fromEntries(Object.keys(item).sort().map((key) => [key, item[key]])) : item);
+      for (const value of [base, remote, local]) {
+        if ((value == null ? void 0 : value[providerKey]) !== void 0 && !Array.isArray(value[providerKey])) throw Object.assign(new Error("Ongeldige bankherkomst; beide versies blijven behouden."), { code: CLOUD_CONFLICT_CODE });
+        for (const row of (value == null ? void 0 : value[providerKey]) || []) {
+          if (!(row == null ? void 0 : row.id) || rows.has(row.id) && canonical5(rows.get(row.id)) !== canonical5(row)) throw Object.assign(new Error("Bankherkomst is gewijzigd; beide versies blijven behouden."), { code: CLOUD_CONFLICT_CODE });
+          rows.set(row.id, copyValue(row));
+        }
+      }
+      const without = (value) => {
+        if (!isPlainObject(value)) return value;
+        const next = { ...value };
+        delete next[providerKey];
+        return next;
+      };
+      const result2 = rebaseLocalChanges(without(base), without(local), without(remote));
+      result2[providerKey] = [...rows.values()];
+      return result2;
+    }
     if ([base, local, remote].some((value) => isPlainObject(value) && Object.hasOwn(value, "accountProfiles"))) {
       const profiles = mergeAccountProfiles((base == null ? void 0 : base.accountProfiles) || [], (local == null ? void 0 : local.accountProfiles) || [], (remote == null ? void 0 : remote.accountProfiles) || []);
       const without = (value) => {
         if (!isPlainObject(value)) return value;
-        const copy10 = { ...value };
-        delete copy10.accountProfiles;
-        return copy10;
+        const copy11 = { ...value };
+        delete copy11.accountProfiles;
+        return copy11;
       };
       const result2 = rebaseLocalChanges(without(base), without(local), without(remote));
       result2.accountProfiles = profiles;
       return result2;
     }
     if ([base, local, remote].some((value) => isPlainObject(value) && Object.hasOwn(value, "balanceCheckpoints"))) {
-      const rows = /* @__PURE__ */ new Map(), canonical4 = (value) => JSON.stringify(value, (_, item) => isPlainObject(item) ? Object.fromEntries(Object.keys(item).sort().map((key) => [key, item[key]])) : item);
+      const rows = /* @__PURE__ */ new Map(), canonical5 = (value) => JSON.stringify(value, (_, item) => isPlainObject(item) ? Object.fromEntries(Object.keys(item).sort().map((key) => [key, item[key]])) : item);
       for (const value of [base, remote, local]) {
         if ((value == null ? void 0 : value.balanceCheckpoints) !== void 0 && !Array.isArray(value.balanceCheckpoints)) throw Object.assign(new Error("De saldo-ijkpunthistorie is ongeldig; beide standen blijven behouden."), { code: CLOUD_CONFLICT_CODE });
         for (const row of (value == null ? void 0 : value.balanceCheckpoints) || []) {
-          if (!(row == null ? void 0 : row.id) || rows.has(row.id) && canonical4(rows.get(row.id)) !== canonical4(row)) throw Object.assign(new Error("Een bestaande saldo-waarneming is gewijzigd; beide standen blijven behouden."), { code: CLOUD_CONFLICT_CODE });
+          if (!(row == null ? void 0 : row.id) || rows.has(row.id) && canonical5(rows.get(row.id)) !== canonical5(row)) throw Object.assign(new Error("Een bestaande saldo-waarneming is gewijzigd; beide standen blijven behouden."), { code: CLOUD_CONFLICT_CODE });
           rows.set(row.id, copyValue(row));
         }
       }
@@ -15523,6 +15955,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
     var _a2, _b;
     return ((_b = (_a2 = globalThis.FinizeAuth) == null ? void 0 : _a2.user) == null ? void 0 : _b.uid) || null;
   } });
+  window.FinizeBank = installBankConnection(window);
   window.FinizeAccounts = createBankAccountsUI({
     getState: () => state,
     getScope: () => CloudAdapter.importScope(),
@@ -15617,9 +16050,9 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
     schemaVersion: U2_SCHEMA_VERSION,
     calculateGroup: (goals, pot, today) => calcGroep(cloneState(goals), pot, new Date(today)),
     normalizeSubgoals: (goal) => {
-      const copy10 = cloneState(goal);
-      u2NormalizeChildren(copy10);
-      return copy10;
+      const copy11 = cloneState(goal);
+      u2NormalizeChildren(copy11);
+      return copy11;
     },
     historyKey: u2HistoryKey
   });
@@ -15738,8 +16171,8 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
   });
 
   // src/import/source-repair.mjs
-  var copy8 = (value) => JSON.parse(JSON.stringify(value));
-  var iban2 = (value) => String(value || "").replace(/\s/g, "").toUpperCase();
+  var copy9 = (value) => JSON.parse(JSON.stringify(value));
+  var iban3 = (value) => String(value || "").replace(/\s/g, "").toUpperCase();
   function inspectSourceAvailability(state2, tx, batch) {
     var _a2, _b;
     const issues = [];
@@ -15752,14 +16185,14 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
   function sourceRepairCandidates(state2, tx, rows) {
     var _a2, _b, _c, _d;
     const profile = (state2.accountProfiles || []).find((profile2) => profile2.id === tx.accountProfileId);
-    const identifier = iban2(((_a2 = tx.bankOriginal) == null ? void 0 : _a2.accountIdentifier) || (profile == null ? void 0 : profile.identifier));
+    const identifier = iban3(((_a2 = tx.bankOriginal) == null ? void 0 : _a2.accountIdentifier) || (profile == null ? void 0 : profile.identifier));
     if (!identifier) throw new Error("Het oorspronkelijke rekeningkenmerk ontbreekt. Herstel dit eerst vanuit een betrouwbare rekeningregistratie.");
     const related = (state2.transactions || []).filter((row) => !isBankSource(row) && (tx.bankSourceId ? row.bankSourceId === tx.bankSourceId : tx.importBatchId && tx.importTransactionId ? row.importBatchId === tx.importBatchId && row.importTransactionId === tx.importTransactionId : row.id === tx.id));
     const amount = (_c = (_b = tx.bankOriginal) == null ? void 0 : _b.amount) != null ? _c : related.reduce((sum2, row) => sum2 + Math.abs(Number(row.amount) || 0), 0) * (tx.kind === "inkomen" || ["van-spaarrekening", "terugbetaling", "refund"].includes(tx.transactionType) ? 1 : -1);
     const date2 = ((_d = tx.bankOriginal) == null ? void 0 : _d.bankDate) || tx.transactionDate || tx.date;
     return rows.filter((bank) => {
       var _a3, _b2;
-      return bank.valid && iban2(bank.accountIdentifier) === identifier && bank.bankDate === date2 && Math.round(Number(bank.amount) * 100) === Math.round(amount * 100) && (!((_a3 = tx.bankOriginal) == null ? void 0 : _a3.reference) || bank.reference === tx.bankOriginal.reference) && (!((_b2 = tx.bankOriginal) == null ? void 0 : _b2.counterpartyAccount) || iban2(bank.counterpartyAccount) === iban2(tx.bankOriginal.counterpartyAccount));
+      return bank.valid && iban3(bank.accountIdentifier) === identifier && bank.bankDate === date2 && Math.round(Number(bank.amount) * 100) === Math.round(amount * 100) && (!((_a3 = tx.bankOriginal) == null ? void 0 : _a3.reference) || bank.reference === tx.bankOriginal.reference) && (!((_b2 = tx.bankOriginal) == null ? void 0 : _b2.counterpartyAccount) || iban3(bank.counterpartyAccount) === iban3(tx.bankOriginal.counterpartyAccount));
     });
   }
   function planSourceRepair(state2, txId, batch, bank, { confirmed = false, operationId, timestamp, sourceIdentityProof } = {}) {
@@ -15768,33 +16201,33 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
     if (!tx) throw new Error("De oorspronkelijke transactie bestaat niet meer.");
     if (inspectSourceAvailability(state2, tx, batch).ok) throw new Error("Deze transactie heeft al een geldige bron. Herstel is niet nodig.");
     if (!confirmed || !sourceRepairCandidates(state2, tx, [bank]).length) throw new Error("Bevestig een overeenkomst met dezelfde rekening, bankdatum en hetzelfde bedrag.");
-    const candidate = copy8(state2), nextBatch = batch ? copy8(batch) : { id: tx.importBatchId || `recovery-${tx.id}`, rows: [], accountProfileId: tx.accountProfileId, accountOwner: getTransactionAccountContext(tx, { accountProfiles: state2.accountProfiles || [] }), lifecycle: tx.batchLifecycle || "active", status: "verwerkt", version: 0, summary: {}, fileName: "Herstelde oorspronkelijke CSV-bron" };
+    const candidate = copy9(state2), nextBatch = batch ? copy9(batch) : { id: tx.importBatchId || `recovery-${tx.id}`, rows: [], accountProfileId: tx.accountProfileId, accountOwner: getTransactionAccountContext(tx, { accountProfiles: state2.accountProfiles || [] }), lifecycle: tx.batchLifecycle || "active", status: "verwerkt", version: 0, summary: {}, fileName: "Herstelde oorspronkelijke CSV-bron" };
     const rowId = tx.importTransactionId || `recovery-row-${tx.id}`;
     const existing = bankSourceForImport(candidate, nextBatch.id, rowId);
     if (existing && existing.bankSourceId !== tx.bankSourceId) throw new Error("Deze importregel is al aan een andere bankbeweging gekoppeld.");
     const related = candidate.transactions.filter((row) => !isBankSource(row) && (tx.bankSourceId ? row.bankSourceId === tx.bankSourceId : tx.importBatchId && tx.importTransactionId ? row.importBatchId === tx.importBatchId && row.importTransactionId === tx.importTransactionId : row.id === tx.id));
-    const p = copy8(tx.approvedProcessing || tx.processing || {});
+    const p = copy9(tx.approvedProcessing || tx.processing || {});
     p.processedAmount = Math.round(related.reduce((sum2, row) => sum2 + Math.abs(Number(row.amount) || 0), 0) * 100) / 100;
     p.processingDate = p.processingDate || bank.bankDate;
     p.transactionType = p.transactionType || tx.transactionType || "uitgave";
     p.budgetOwner = p.budgetOwner || tx.budgetOwner || tx.financialFor;
     p.category = p.category || tx.category;
     p.include = p.include !== false;
-    if (related.length > 1 && !((_a2 = p.splits) == null ? void 0 : _a2.length)) p.splits = related.map((row) => ({ ...copy8(row.processing || {}), id: row.splitId || row.id, amount: Math.abs(Number(row.amount)), amountMode: "manual", transactionType: row.transactionType, category: row.category, budgetOwner: row.budgetOwner || row.financialFor }));
-    const original2 = copy8(tx.bankOriginal || bank);
+    if (related.length > 1 && !((_a2 = p.splits) == null ? void 0 : _a2.length)) p.splits = related.map((row) => ({ ...copy9(row.processing || {}), id: row.splitId || row.id, amount: Math.abs(Number(row.amount)), amountMode: "manual", transactionType: row.transactionType, category: row.category, budgetOwner: row.budgetOwner || row.financialFor }));
+    const original2 = copy9(tx.bankOriginal || bank);
     for (const field of ["bankDate", "amount", "accountIdentifier"]) if (original2[field] === void 0 || original2[field] === null || original2[field] === "") original2[field] = bank[field];
     original2.valid = true;
     const oldHeader = candidate.transactions.find((row) => isBankSource(row) && row.bankSourceId === tx.bankSourceId);
     if (oldHeader && (!((_b = oldHeader.bankOriginal) == null ? void 0 : _b.bankDate) || oldHeader.bankOriginal.amount === void 0 || oldHeader.bankOriginal.amount === null)) {
-      nextBatch.sourceRepairHistory = [...nextBatch.sourceRepairHistory || [], { operationId, timestamp, bankSourceId: oldHeader.bankSourceId, bankOriginal: copy8(oldHeader.bankOriginal) }];
+      nextBatch.sourceRepairHistory = [...nextBatch.sourceRepairHistory || [], { operationId, timestamp, bankSourceId: oldHeader.bankSourceId, bankOriginal: copy9(oldHeader.bankOriginal) }];
       candidate.transactions = candidate.transactions.filter((row) => row.id !== oldHeader.id);
     }
     related.forEach((row) => {
       row.importBatchId = nextBatch.id;
       row.importTransactionId = rowId;
-      if (!row.bankOriginal) row.bankOriginal = copy8(original2);
+      if (!row.bankOriginal) row.bankOriginal = copy9(original2);
     });
-    const recovered = { id: rowId, bankOriginal: original2, sourceIdentityProof: copy8(sourceIdentityProof || null), accountProfileId: tx.accountProfileId || nextBatch.accountProfileId, accountOwner: nextBatch.accountOwner, processing: p, processingStatus: getTransactionProcessingStatus(tx), certainty: "goedgekeurd", approvalSource: tx.approvalSource || "legacy-confirmed", approvedAt: tx.approvedAt || "", repairedAt: timestamp };
+    const recovered = { id: rowId, bankOriginal: original2, sourceIdentityProof: copy9(sourceIdentityProof || null), accountProfileId: tx.accountProfileId || nextBatch.accountProfileId, accountOwner: nextBatch.accountOwner, processing: p, processingStatus: getTransactionProcessingStatus(tx), certainty: "goedgekeurd", approvalSource: tx.approvalSource || "legacy-confirmed", approvedAt: tx.approvedAt || "", repairedAt: timestamp };
     nextBatch.rows = nextBatch.rows.filter((row) => row.id !== rowId).concat(recovered);
     nextBatch.version = Number(nextBatch.version || 0) + 1;
     nextBatch.operationId = operationId;
@@ -15808,7 +16241,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
       repairedHeader.id = `${repairedHeader.id}-repair-${operationId}`;
       repairedHeader.processingRevision = (oldHeader.processingRevision || 0) + 1;
       repairedHeader.importReferences = [...new Map([...oldHeader.importReferences || [], ...repairedHeader.importReferences].map((ref) => [`${ref.batchId}:${ref.rowId}`, ref])).values()];
-      if (oldHeader.approvedProcessing) repairedHeader.approvedProcessing = copy8(oldHeader.approvedProcessing);
+      if (oldHeader.approvedProcessing) repairedHeader.approvedProcessing = copy9(oldHeader.approvedProcessing);
     }
     const before = selectBankTransactions(state2).reduce((sum2, row) => sum2 + Math.round(row.bankAmount * 100), 0), after = selectBankTransactions(candidate).reduce((sum2, row) => sum2 + Math.round(row.bankAmount * 100), 0);
     if (before !== after) throw new Error("Deze herstelkoppeling zou het rekeningtotaal veranderen. Laat de bron eerst handmatig controleren.");
@@ -15886,7 +16319,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
   }
 
   // src/import/import-lifecycle.mjs
-  var copy9 = (value) => JSON.parse(JSON.stringify(value));
+  var copy10 = (value) => JSON.parse(JSON.stringify(value));
   var batchRows = (state2, id) => (state2.transactions || []).filter((tx) => {
     var _a2, _b;
     return !isBankSource(tx) && (tx.importBatchId === id || ((_b = (_a2 = bankSourceForTransaction(state2, tx)) == null ? void 0 : _a2.importReferences) == null ? void 0 : _b.some((ref) => ref.batchId === id)));
@@ -15911,7 +16344,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
     }
     return { counts, status: counts.onbekend || counts.nakijken ? counts.goedgekeurd || counts["niet-meetellen"] ? "gedeeltelijk" : "concept" : "verwerkt" };
   }
-  function fail5(message, code = "import-dependency") {
+  function fail6(message, code = "import-dependency") {
     const error2 = new Error(message);
     error2.code = code;
     throw error2;
@@ -15927,51 +16360,51 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
     }));
     for (const id of sourceIds) {
       const source = batch.rows.find((row) => row.id === id);
-      if (!source) fail5(`Importbron ${id} ontbreekt; herstel is geblokkeerd.`);
+      if (!source) fail6(`Importbron ${id} ontbreekt; herstel is geblokkeerd.`);
       const header = (next.transactions || []).find((tx) => isBankSource(tx) && tx.importReferences.some((ref) => ref.batchId === batch.id && ref.rowId === id));
       const check = validateRow((header == null ? void 0 : header.approvedProcessing) ? { ...source, processing: header.approvedProcessing } : source, next);
-      if (!check.ok) fail5(check.errors.map((e) => e.message).join(" "));
+      if (!check.ok) fail6(check.errors.map((e) => e.message).join(" "));
     }
     for (const tx of active2) {
-      if (!tx.importTransactionId || !tx.bankOriginal) fail5(`Betrouwbare bronidentiteit ontbreekt voor ${tx.id}.`);
-      if (!Number.isFinite(Number(tx.amount))) fail5(`Verwerkt bedrag ontbreekt voor ${tx.id}.`);
+      if (!tx.importTransactionId || !tx.bankOriginal) fail6(`Betrouwbare bronidentiteit ontbreekt voor ${tx.id}.`);
+      if (!Number.isFinite(Number(tx.amount))) fail6(`Verwerkt bedrag ontbreekt voor ${tx.id}.`);
     }
     const missing = coverageAllocationStatus(next).find((row) => row.reason === "coverage-missing-reference" && (ids.has(row.withdrawalTransactionId) || ids.has(row.expenseTransactionId)));
-    if (missing) fail5("Spaardekking verwijst naar een verwijderd endpoint. Herstel is geblokkeerd.");
+    if (missing) fail6("Spaardekking verwijst naar een verwijderd endpoint. Herstel is geblokkeerd.");
     for (const pair of next.internalTransferPairs || []) {
       if (pair.active === false || !["bevestigd", "confirmed", "uitgevoerd"].includes(pair.status)) continue;
       const old = (previous.internalTransferPairs || []).find((row) => row.id === pair.id);
-      if (JSON.stringify(old) !== JSON.stringify(pair)) confirmInternalTransferPair(copy9(next), pair.id);
+      if (JSON.stringify(old) !== JSON.stringify(pair)) confirmInternalTransferPair(copy10(next), pair.id);
     }
     const coverage = coverageAllocationStatus(next).find((row) => row.reason && !["coverage-inactive-reference"].includes(row.reason));
-    if (coverage && !coverageAllocationStatus(previous).some((old) => old.id === coverage.id && old.reason === coverage.reason)) fail5(`Spaardekking is ongeldig: ${coverage.reason}.`);
+    if (coverage && !coverageAllocationStatus(previous).some((old) => old.id === coverage.id && old.reason === coverage.reason)) fail6(`Spaardekking is ongeldig: ${coverage.reason}.`);
     for (const relation of next.manualTransactionReplacements || []) {
       if (relation.active === false) continue;
       const manualId = relation.manualTransactionId || ((_a2 = relation.manualTransaction) == null ? void 0 : _a2.id);
       if ((next.manualTransactionReplacements || []).filter((r) => {
         var _a3;
         return r.active !== false && (r.manualTransactionId || ((_a3 = r.manualTransaction) == null ? void 0 : _a3.id)) === manualId;
-      }).length > 1) fail5(`De handmatige transactie ${manualId} heeft twee actieve vervangingen.`);
+      }).length > 1) fail6(`De handmatige transactie ${manualId} heeft twee actieve vervangingen.`);
     }
     for (const repayment of next.advanceRepayments || []) {
       if (repayment.active === false || !ids.has(repayment.transactionId)) continue;
       const advance = (next.advanceLedger || []).find((row) => row.id === repayment.advanceId && row.active !== false);
-      if (!advance) fail5(`Voorschot ${repayment.advanceId} ontbreekt of is inactief.`);
+      if (!advance) fail6(`Voorschot ${repayment.advanceId} ontbreekt of is inactief.`);
     }
     return true;
   }
   function planImportCommand(state2, batch, intent, options = {}) {
     var _a2;
-    if (!(batch == null ? void 0 : batch.id) || !(intent == null ? void 0 : intent.operationId)) fail5("Batch-ID en operation-ID zijn vereist.");
-    const previous = copy9(state2), candidate = copy9(state2), nextBatch = copy9(batch), id = batch.id;
+    if (!(batch == null ? void 0 : batch.id) || !(intent == null ? void 0 : intent.operationId)) fail6("Batch-ID en operation-ID zijn vereist.");
+    const previous = copy10(state2), candidate = copy10(state2), nextBatch = copy10(batch), id = batch.id;
     const deletion = (candidate.importDeletionProofs || []).find((row) => row.id === id);
     if (deletion) {
-      if (intent.type === "delete") return { state: candidate, batch: copy9(deletion), noop: true };
-      fail5("Deze batch is permanent verwijderd.", "import-deleted");
+      if (intent.type === "delete") return { state: candidate, batch: copy10(deletion), noop: true };
+      fail6("Deze batch is permanent verwijderd.", "import-deleted");
     }
     const current = batchLifecycle(batch);
     if (intent.type === "withdraw" && current === "withdrawn" || intent.type === "restore" && current === "active") return { state: candidate, batch: nextBatch, noop: true };
-    if (!["withdraw", "restore", "delete"].includes(intent.type)) fail5("Onbekende batchactie.");
+    if (!["withdraw", "restore", "delete"].includes(intent.type)) fail6("Onbekende batchactie.");
     nextBatch.lifecycle = intent.type === "restore" ? "active" : "withdrawn";
     const summaryBefore = (candidate.importSummaries || []).find((row) => row.id === id);
     if (summaryBefore) {
@@ -15990,10 +16423,10 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
     if (rows.some((tx) => !tx.importTransactionId || !tx.bankOriginal) || rows.some((tx) => {
       var _a3;
       return !bankSourceForTransaction(candidate, tx) && !((_a3 = batch.rows) == null ? void 0 : _a3.some((row) => row.id === tx.importTransactionId));
-    })) fail5("Betrouwbare bronidentiteit ontbreekt; batchactie is geblokkeerd.");
+    })) fail6("Betrouwbare bronidentiteit ontbreekt; batchactie is geblokkeerd.");
     const ownAdvances = (candidate.advanceLedger || []).filter((row) => belongs(row, id, ids, retainedIds));
     for (const advance of ownAdvances) {
-      if ((candidate.advanceRepayments || []).some((row) => row.active !== false && row.advanceId === advance.id && !ids.has(row.transactionId)) || (advance.settlementTransferIds || []).length) fail5(`Voorschot ${advance.id} heeft onafhankelijke aflossingen/verrekeningen.`);
+      if ((candidate.advanceRepayments || []).some((row) => row.active !== false && row.advanceId === advance.id && !ids.has(row.transactionId)) || (advance.settlementTransferIds || []).length) fail6(`Voorschot ${advance.id} heeft onafhankelijke aflossingen/verrekeningen.`);
     }
     const restoring = intent.type === "restore";
     nextBatch.lifecycle = restoring ? "active" : "withdrawn";
@@ -16032,7 +16465,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
           advance.status = "open";
         }
       } else if (restoring && repayment.lifecycleWasActive) {
-        if (!advance || advance.active === false || Number(advance.outstandingAmount) < Number(repayment.amount)) fail5(`Aflossing ${repayment.id} kan niet volledig worden hersteld.`);
+        if (!advance || advance.active === false || Number(advance.outstandingAmount) < Number(repayment.amount)) fail6(`Aflossing ${repayment.id} kan niet volledig worden hersteld.`);
         advance.outstandingAmount = Math.round((Number(advance.outstandingAmount) - Number(repayment.amount)) * 100) / 100;
         advance.status = advance.outstandingAmount === 0 ? "voldaan" : "open";
         repayment.active = true;
@@ -17091,6 +17524,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
       updateDraftSummary(draft, { touch: false });
       return cloneState({
         id: draft.id,
+        channel: draft.channel || "csv",
         fileName: draft.fileName,
         accountProfileId: draft.accountProfileId,
         accountOwner: draft.accountOwner,
@@ -17118,6 +17552,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
       else target.importSummaries.unshift(summary);
       target.activeImportId = draft.status === "concept" ? draft.id : target.activeImportId === draft.id ? "" : target.activeImportId;
       ensureImportBankSources(target, draft);
+      applyProviderObservations(target, draft);
     }
     async function commitSummary(root2, draft) {
       if (!await root2.commitChange(() => applyImportSummary(root2.state, draft), { render: false, throwOnError: true })) throw new Error("Importsamenvatting kon niet worden opgeslagen.");
@@ -17133,15 +17568,15 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
       if (importVersion(left) !== importVersion(right)) return false;
       if ((left == null ? void 0 : left.operationId) || (right == null ? void 0 : right.operationId)) return sameImportOperation(left, right);
       const comparable = (value) => {
-        const copy10 = cloneState(value);
-        delete copy10.confirmedBatch;
-        delete copy10.syncConflict;
-        delete copy10.baseVersion;
-        for (const row of copy10.rows || []) {
+        const copy11 = cloneState(value);
+        delete copy11.confirmedBatch;
+        delete copy11.syncConflict;
+        delete copy11.baseVersion;
+        for (const row of copy11.rows || []) {
           delete row.bankSourceRevision;
           if (row.processing) delete row.processing.editorVersion;
         }
-        return JSON.stringify(copy10);
+        return JSON.stringify(copy11);
       };
       return comparable(left) === comparable(right);
     }
@@ -17709,7 +18144,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
             financialFor: part.budgetOwner,
             owner: part.budgetOwner,
             accountProfileId: sourceProfileId,
-            source: "csv",
+            source: row.source === "bank-api" ? "bank-api" : "csv",
             accountContext: sourceAccount,
             accountContextEvidence: "account-profile",
             processingStatus: part.include === false || type === "niet-meetellen" ? "niet-meetellen" : "goedgekeurd",

@@ -21,8 +21,9 @@ assert.match(html,/function bindDashboardAccordionKeyboard\(root\)/,'Centrale to
 assert.match(html,/\['Enter',' ','Spacebar'\]\.includes\(event\.key\)/,'Enter- en spatiebediening voor dashboardaccordeons ontbreekt');
 assert.doesNotMatch(html,/\$\{renderU3AdminPanel\(\)\}/,'Maandadministratie staat nog op het dashboard');
 assert.doesNotMatch(js,/accordion\.dataset\.dashboardAccordion='settlement'/,'Onderling te verrekenen staat nog op het dashboard');
-assert.match(html,/class="card dashboard-year-overview"/,'Direct jaaroverzicht ontbreekt');
-assert.match(html,/class="dashboard-year-table"/,'Jaaroverzicht is geen tabel');
+const dashboard=fs.readFileSync(path.join(__dirname,'..','src/ui/dashboard.mjs'),'utf8');
+assert.match(dashboard,/data-p3-year-panel/,'Direct jaaroverzicht ontbreekt');
+assert.match(dashboard,/class="p3-year-bars"/,'Jaaroverzicht mist de maandweergave');
 assert.match(css,/#u4ImportModalRoot/);
 assert.match(css,/u4-cloud-spinner/);
 assert.match(css,/min-height:calc\(100dvh - 150px\)/);

@@ -28,6 +28,7 @@ export function getTransactionAccountContext(tx, options) {
 }
 
 export function getTransactionSource(tx) {
+  if (tx?.bankOriginal?.provider === 'enablebanking' || tx?.source === 'bank-api') return 'bank-api';
   // Import evidence takes precedence over a contradictory manual marker.
   if (tx?.bankOriginal || tx?.importBatchId || tx?.sourceFile || tx?.rawData || tx?.importedAt) return 'csv';
   return ['manual', 'csv'].includes(tx?.source) ? tx.source : null;

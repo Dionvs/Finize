@@ -12,6 +12,7 @@ export function classifyCsvDuplicate(row,batch,existingBatches=[]){
       const sameFile=proof?.kind==='file-row'&&oldProof?.kind==='file-row'&&Number.isSafeInteger(proof.rowOrdinal)&&proof.rowOrdinal>0&&proof.rowOrdinal===oldProof.rowOrdinal&&((typeof batch.originalCsv==='string'&&batch.originalCsv===oldBatch.originalCsv)||(/^[a-f0-9]{64}$/.test(proof.fileDigest||'')&&proof.fileDigest===oldProof.fileDigest));
       const bankIdentity=proof?.kind==='bank-id'&&oldProof?.kind==='bank-id'&&typeof proof.authority==='string'&&proof.authority.trim()!==''&&typeof proof.id==='string'&&proof.id.trim()!==''&&proof.authority===oldProof.authority&&proof.id===oldProof.id;
       if(sameFields&&(sameFile||bankIdentity))return {duplicate:true,duplicateSource:{batchId:oldBatch.id,rowId:oldRow.id},reason:'proven-source-identity'};
+      if((oldRow.source==='bank-api'||row.source==='bank-api'||oldBatch.channel==='bank-api'||batch.channel==='bank-api')&&original(row).bankDate===original(oldRow).bankDate&&original(row).amount===original(oldRow).amount&&!sameFields)possible={duplicate:false,possibleDuplicate:{batchId:oldBatch.id,rowId:oldRow.id},reason:'cross-channel-identity-unproven'};
       if(sameFields)possible={duplicate:false,possibleDuplicate:{batchId:oldBatch.id,rowId:oldRow.id},reason:'equal-bank-fields'};
     }
   }

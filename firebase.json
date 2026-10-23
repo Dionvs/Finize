@@ -1,5 +1,23 @@
 {
   "firestore": {
     "rules": "firestore.rules"
-  }
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "finize-bank",
+      "predeploy": [
+        "node functions/build.mjs"
+      ],
+      "ignore": [
+        "node_modules*",
+        ".git",
+        "*.pem",
+        "*.key",
+        ".env*",
+        ".secret*",
+        "local-check.mjs"
+      ]
+    }
+  ]
 }

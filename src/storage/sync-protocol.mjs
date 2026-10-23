@@ -172,6 +172,22 @@ function rebaseIdArray(base, local, remote) {
 // daar opnieuw bovenop. Zo kan een vertraagde snapshot nooit een zojuist
 // ingevoerde wijziging terugdraaien en worden onaangeraakte cloudvelden behouden.
 export function rebaseLocalChanges(base, local, remote) {
+  // Provider evidence is optional and append-only, also across older clients.
+  const providerKey = ['bankBalanceObservations','bankCoverage'].find(key =>
+    [base,local,remote].some(value=>isPlainObject(value)&&Object.hasOwn(value,key)));
+  if(providerKey) {
+    const rows = new Map(), canonical=value=>JSON.stringify(value,(_,item)=>isPlainObject(item)?Object.fromEntries(Object.keys(item).sort().map(key=>[key,item[key]])):item);
+    for(const value of [base,remote,local]) {
+      if(value?.[providerKey]!==undefined&&!Array.isArray(value[providerKey]))throw Object.assign(new Error('Ongeldige bankherkomst; beide versies blijven behouden.'),{code:CLOUD_CONFLICT_CODE});
+      for(const row of value?.[providerKey]||[]) {
+        if(!row?.id || rows.has(row.id)&&canonical(rows.get(row.id))!==canonical(row))throw Object.assign(new Error('Bankherkomst is gewijzigd; beide versies blijven behouden.'),{code:CLOUD_CONFLICT_CODE});
+        rows.set(row.id,copyValue(row));
+      }
+    }
+    const without=value=>{if(!isPlainObject(value))return value;const next={...value};delete next[providerKey];return next;};
+    const result=rebaseLocalChanges(without(base),without(local),without(remote));
+    result[providerKey]=[...rows.values()];return result;
+  }
   if([base,local,remote].some(value=>isPlainObject(value)&&Object.hasOwn(value,'accountProfiles'))){
     const profiles=mergeAccountProfiles(base?.accountProfiles||[],local?.accountProfiles||[],remote?.accountProfiles||[]);
     const without=value=>{if(!isPlainObject(value))return value;const copy={...value};delete copy.accountProfiles;return copy;};

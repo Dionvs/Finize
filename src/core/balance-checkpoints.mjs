@@ -1,3 +1,4 @@
+import { providerBalanceAnchor } from './provider-balances.mjs';
 import { normalizeBankInput, decimalAmountToCents } from '../import/bank-input-contract.mjs';
 import { validCalendarDate } from '../import/import-identity.mjs';
 import { selectBankTransactions, sourceRecordKey } from './bank-sources.mjs';
@@ -71,7 +72,9 @@ export function selectAccountBalance(state, { accountProfileId, toDate, scope, i
   const reasons = [], add = (code, sourceId = '') => { if (!reasons.some(row => row.code === code && row.sourceId === sourceId)) reasons.push({ code, sourceId }); };
   const history = checkpointHistory(state, accountProfileId, scope);
   history.issues.forEach(code => add(code));
-  const checkpoint = history.active.find(row => row.asOfDate <= toDate && (!checkpointId || row.id === checkpointId)) || null;
+  const manualCheckpoint = history.active.find(row => row.asOfDate <= toDate && (!checkpointId || row.id === checkpointId)) || null;
+  const providerCheckpoint = providerBalanceAnchor(state, accountProfileId, toDate, scope, checkpointId);
+  const checkpoint = providerCheckpoint && (!manualCheckpoint || providerCheckpoint.asOfDate >= manualCheckpoint.asOfDate) ? providerCheckpoint : manualCheckpoint;
   const result = { accountProfileId, toDate, boundary: 'end-of-bank-day', checkpoint, openingCents: checkpoint?.amountCents ?? null,
     mutations: [], confirmedCents: 0, provisionalCents: 0, balanceCents: null, status: 'unknown',
     quality: { bankSources: 'confirmed', coverage: 'unknown', storage: 'verified' }, reasons };
@@ -84,10 +87,15 @@ export function selectAccountBalance(state, { accountProfileId, toDate, scope, i
   if (missing.length) { result.quality.storage = 'incomplete'; missing.forEach(month => add('missing-period', month)); }
   if (!importsAvailable) { result.quality.storage = 'incomplete'; add('imports-unavailable'); }
   if (history.issues.length) result.quality.storage = 'incomplete';
-  const cov = coverageFor(coverage, checkpoint, toDate, scope);
+  if (checkpoint.source === 'provider-observation') {
+    result.boundary = checkpoint.boundary; result.observedAt = checkpoint.observedAt;
+    if (checkpoint.boundary === 'timestamp') add('intraday-provider-balance');
+  }
+  const cov = coverageFor([...coverage, ...(state.bankCoverage || [])], checkpoint, toDate, scope);
   result.quality.coverage = cov.status;
   if (cov.status !== 'complete') add(cov.status === 'partial' ? 'partial-bank-coverage' : 'unknown-bank-coverage');
   const profile = profiles[0];
+  if(state.bankSyncStatus?.[accountProfileId]?.complete===false)add('provider-sync-incomplete');
   const relevant = row => row.accountProfileId ? row.accountProfileId === accountProfileId :
     !getTransactionAccountContext(row, { accountProfiles: state.accountProfiles }) || getTransactionAccountContext(row, { accountProfiles: state.accountProfiles }) === profile.accountOwner;
   const within = row => {
@@ -170,13 +178,13 @@ export function selectAccountBalance(state, { accountProfileId, toDate, scope, i
     add('manual-transfer-unresolved',transfer.id||'');
   }
   if (result.mutations.some(row => row.status === 'provisional')) add('awaiting-review');
-  const sourceIssues = reasons.some(row => !['unknown-bank-coverage','partial-bank-coverage','awaiting-review','missing-period','imports-unavailable'].includes(row.code));
+  const sourceIssues = reasons.some(row => !['unknown-bank-coverage','partial-bank-coverage','awaiting-review','missing-period','imports-unavailable','intraday-provider-balance'].includes(row.code));
   result.quality.bankSources = sourceIssues ? 'uncertain' : result.mutations.some(row => row.status === 'provisional') ? 'provisional' : 'confirmed';
   const amount = checkpoint.amountCents+result.confirmedCents+result.provisionalCents;
   if (!Number.isSafeInteger(amount)) { result.quality.storage = 'incomplete'; add('unsafe-balance-amount'); }
   if (result.quality.storage === 'verified') result.balanceCents = amount;
   result.status = result.quality.storage === 'incomplete' || sourceIssues ? 'incomplete' :
-    result.quality.bankSources === 'provisional' || cov.status !== 'complete' ? 'provisional' : 'confirmed';
+    result.quality.bankSources === 'provisional' || cov.status !== 'complete' || checkpoint.boundary === 'timestamp' ? 'provisional' : 'confirmed';
   return result;
 }
 

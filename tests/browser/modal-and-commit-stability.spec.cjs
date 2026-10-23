@@ -213,9 +213,9 @@ test('dashboard toont alleen het directe jaaroverzicht onderaan', async ({ page 
   await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   await expect(page.locator('#tab-dashboard')).not.toContainText('Maandadministratie');
   await expect(page.locator('#tab-dashboard')).not.toContainText('Onderling te verrekenen');
-  const year=page.locator('#tab-dashboard .dashboard-year-overview');
+  const year=page.locator('#tab-dashboard [data-p3-year-panel]');
   await expect(year).toBeVisible();
-  await expect(year.locator('tbody tr')).toHaveCount(12);
+  await expect(year.locator('.p3-year-bars > div')).toHaveCount(12);
   await expect(year.locator('details')).toHaveCount(0);
 });
 

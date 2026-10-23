@@ -1,3 +1,4 @@
+import { applyProviderObservations } from './enable-banking-adapter.mjs';
 import { isSavingsIncomeSource, savingsContributionCapacity } from '../core/savings-contributions.mjs';
 import { fixedCashDate } from '../core/liquidity-settings.mjs';
 import { profileSync, profileStart } from '../storage/performance.mjs';
@@ -761,7 +762,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
   function compactSummary(draft){
     updateDraftSummary(draft,{touch:false});
     return clone({
-      id:draft.id,fileName:draft.fileName,accountProfileId:draft.accountProfileId,accountOwner:draft.accountOwner,bank:draft.bank,status:draft.status,
+      id:draft.id,channel:draft.channel||'csv',fileName:draft.fileName,accountProfileId:draft.accountProfileId,accountOwner:draft.accountOwner,bank:draft.bank,status:draft.status,
       importDate:draft.createdAt,periodFrom:draft.periodFrom,periodTo:draft.periodTo,
       lifecycle:batchLifecycle(draft),version:Number(draft.version)||0,operationId:draft.operationId||'',newCount:draft.summary.newCount,duplicateCount:draft.summary.duplicateCount,uncategorizedCount:draft.summary.uncategorizedCount||0,
       totalIncome:draft.summary.totalIncome,totalExpenses:draft.summary.totalExpenses,updatedAt:draft.updatedAt
@@ -773,6 +774,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
     if(index>=0)target.importSummaries[index]={...target.importSummaries[index],...summary};else target.importSummaries.unshift(summary);
     target.activeImportId=draft.status==='concept'?draft.id:(target.activeImportId===draft.id?'':target.activeImportId);
     ensureImportBankSources(target,draft);
+    applyProviderObservations(target,draft);
   }
   async function commitSummary(root,draft){
     if(!await root.commitChange(()=>applyImportSummary(root.state,draft),{render:false,throwOnError:true}))throw new Error('Importsamenvatting kon niet worden opgeslagen.');
@@ -1181,7 +1183,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
           id:part.id,date:row.bankOriginal.bankDate,transactionDate:row.bankOriginal.bankDate,amount:round2(part.amount),description:row.bankOriginal.description,category:part.category||'Ongecategoriseerd',
           kind,transactionType:lineType,...(salary||{}),budgetItemId:part.budgetItemId,reviewStatus:'bevestigd',accountOwner:sourceAccount,budgetOwner:part.budgetOwner,
           account:sourceAccount,financialFor:part.budgetOwner,owner:part.budgetOwner,accountProfileId:sourceProfileId,
-          source:'csv',accountContext:sourceAccount,accountContextEvidence:'account-profile',
+          source:row.source==='bank-api'?'bank-api':'csv',accountContext:sourceAccount,accountContextEvidence:'account-profile',
           processingStatus:part.include===false||type==='niet-meetellen'?'niet-meetellen':'goedgekeurd',
           approvalSource:row.approvalSource,approvedAt:row.approvedAt,certainty:row.certainty,
           bankSourceId:bankSource?.bankSourceId,importBatchId:bankSource?.importBatchId||draft.id,importTransactionId:bankSource?.importTransactionId||row.id,splitId:part.splitId,bankOriginal:clone(bankSource?.bankOriginal||row.bankOriginal),sourceIdentityProof:clone(row.sourceIdentityProof||null),batchLifecycle:batchLifecycle(draft),
