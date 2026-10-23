@@ -54,7 +54,7 @@ test('P5b explicit disabled override blocks bank requests', async ({ page }) => 
   await expect(page.locator('[data-bank-status]')).toContainText('Nog niet geactiveerd');
 });
 
-test('P5b activated release only checks status and starts authorization after an explicit click', async ({ page }) => {
+for (const host of ['auth.enablebanking.com', 'tilisy.enablebanking.com']) test('P5b activated release only checks status and starts authorization after an explicit click: ' + host, async ({ page }) => {
   const calls = [];
   await page.route('https://europe-west4-financien-7dd43.cloudfunctions.net/enableBanking/**', async route => {
     const endpoint = new URL(route.request().url()).pathname.replace('/enableBanking', '');
@@ -62,9 +62,9 @@ test('P5b activated release only checks status and starts authorization after an
     expect(route.request().headers().authorization).toBe('Bearer synthetic-only');
     expect(JSON.parse(route.request().postData()).accountProfileId).toBe('joint');
     expect(['/status', '/auth/start']).toContain(endpoint);
-    await route.fulfill({ contentType: 'application/json', body: JSON.stringify(endpoint === '/status' ? { connected: false } : { url: 'https://auth.enablebanking.com/synthetic-consent' }) });
+    await route.fulfill({ contentType: 'application/json', body: JSON.stringify(endpoint === '/status' ? { connected: false } : { url: 'https://' + host + '/ais/start?synthetic=1' }) });
   });
-  await page.route('https://auth.enablebanking.com/synthetic-consent', route => route.fulfill({ contentType: 'text/html', body: '<h1>Synthetische banktoestemming</h1>' }));
+  await page.route('https://' + host + '/ais/start?synthetic=1', route => route.fulfill({ contentType: 'text/html', body: '<h1>Synthetische banktoestemming</h1>' }));
   await boot(page, 390, null);
   await expect(page.locator('[data-bank-status]')).toContainText('Geen geldige bankverbinding');
   await expect(page.locator('[data-bank-sync]')).toBeDisabled();

@@ -6,4 +6,5 @@ await mkdir(target, { recursive: true });
 for (const file of ['cloud-chunks.mjs', 'migration-backups.mjs']) {
   await copyFile(new URL('../src/storage/' + file, import.meta.url), new URL(file, target));
 }
-console.log('Bestaande opslagdecoder verpakt in ' + fileURLToPath(target));
+await copyFile(new URL('../src/import/bank-authorization-url.mjs', import.meta.url), new URL('bank-authorization-url.mjs', target));
+console.log('Bestaande opslagdecoder en gedeelde autorisatielinkcontrole verpakt in ' + fileURLToPath(target));

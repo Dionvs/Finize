@@ -92,6 +92,9 @@ export const enableBanking = onRequest({
     return res.json(await routes[req.path]());
   } catch (error) {
     // No request URL, body, bank response, authorization code or token in application logs.
+    const route = ['/auth/start', '/status', '/sync', '/disconnect', '/callback'].includes(req.path) ? req.path : 'unknown';
+    const errorCode = typeof error.code === 'string' && /^[A-Za-z_-]{1,80}$/.test(error.code) ? error.code : 'bank-unavailable';
+    console.warn(JSON.stringify({ event: 'finize-bank-request-failed', route, errorCode, status: error.status || 503 }));
     return res.status(error.status || 503).json({ error: error.code || 'bank-unavailable' });
   }
 });

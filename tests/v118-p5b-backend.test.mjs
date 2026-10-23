@@ -3,9 +3,10 @@ import assert from 'node:assert/strict';
 import { generateKeyPairSync, verify, createHash } from 'node:crypto';
 import { createBankService, providerJwt, createProviderClient } from '../functions/src/enable-banking.mjs';
 import { bankMetadataExpiry, bankMetadataDocument } from '../functions/src/bank-retention.mjs';
+import { bankAuthorizationUrl } from '../src/import/bank-authorization-url.mjs';
 
 const clock = Date.parse('2026-10-23T12:00:00Z');
-function setup() {
+function setup({ authUrl = 'https://auth.enablebanking.com/ais/start?synthetic=1' } = {}) {
   const records = new Map(), calls = [];
   let time = clock, exchangeHook = null, queue = Promise.resolve();
   const config = { enabled: true, applicationId: 'synthetic-app', uid: 'synthetic-user', email: 'synthetic@example.invalid', householdId: 'test-house',
@@ -29,7 +30,7 @@ function setup() {
     calls.push({ method, path, body, headers });
     if (path.startsWith('/aspsps')) return { aspsps: [{ name: 'ING', country: 'NL', psu_types: ['personal'], maximum_consent_validity: 86400,
       required_psu_headers:['Psu-Ip-Address','Psu-Accept'] }] };
-    if (path === '/auth') { stateValue = body.state; return { url: 'https://auth.enablebanking.com/ais/start?synthetic=1' }; }
+    if (path === '/auth') { stateValue = body.state; return { url: authUrl }; }
     if (path === '/sessions') {
       const result = { session_id: mode.startsWith('renewed')?'renewed-session':'synthetic-session', access: { valid_until: new Date(time + 86400000).toISOString() },
         accounts: [{ uid: mode.startsWith('renewed')?'account-2':'account-1', identification_hash: mode === 'wrong-account' ? 'not-allowed' : 'test-account-hash', account_id: { iban: config.iban } }] };
@@ -57,6 +58,19 @@ function setup() {
     advance: value => { time += value; }, onExchange: hook => { exchangeHook = hook; } };
 }
 const period = { accountProfileId: 'ing', fromDate: '2026-10-16', toDate: '2026-10-23' };
+
+test('documented authorization origins work; insecure, credential-bearing, lookalike and payment URLs fail closed', async () => {
+  for (const host of ['auth.enablebanking.com', 'tilisy.enablebanking.com']) {
+    const url = 'https://' + host + '/ais/start?sessionid=synthetic';
+    assert.equal(bankAuthorizationUrl(url), url);
+    assert.deepEqual(await setup({ authUrl: url }).service.start('good', 'ing'), { url });
+  }
+  for (const url of ['http://auth.enablebanking.com/ais/start', 'https://auth.enablebanking.com.evil.invalid/ais/start', 'https://evil.invalid/ais/start',
+    'https://user:password@tilisy.enablebanking.com/ais/start', 'https://tilisy.enablebanking.com:8443/ais/start', 'https://tilisy.enablebanking.com/pis/start', 'javascript:alert(1)', '/ais/start', null]) {
+    assert.equal(bankAuthorizationUrl(url), null);
+    await assert.rejects(setup({ authUrl: url }).service.start('good', 'ing'), error => error.code === 'invalid-authorization-url');
+  }
+});
 
 test('server-side JWT is RS256, short-lived and verifiable with synthetic public key', () => {
   const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });

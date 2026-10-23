@@ -1,4 +1,5 @@
 import { stageProviderSnapshot, providerBatchId } from '../import/enable-banking-adapter.mjs';
+import { bankAuthorizationUrl } from '../import/bank-authorization-url.mjs';
 
 export const BANK_BACKEND_URL = 'https://europe-west4-financien-7dd43.cloudfunctions.net/enableBanking';
 export const BANK_API_ENABLED = true; // Backend independently restricts access to the configured user and account.
@@ -108,9 +109,9 @@ export function installBankConnection(root, { enabled = BANK_API_ENABLED, baseUr
           status.textContent = 'Toestemmingspagina van ING openen via Enable Banking…';
           const result = await request('/auth/start', { accountProfileId: profile.id });
           sameScope();
-          const url = new URL(result.url);
-          if (url.protocol !== 'https:' || url.hostname !== 'auth.enablebanking.com') throw new Error('Ongeldige autorisatielink.');
-          root.location.assign(url.toString());
+          const url = bankAuthorizationUrl(result.url);
+          if (!url) throw new Error('Ongeldige autorisatielink.');
+          root.location.assign(url);
         } else if (button.hasAttribute('data-bank-disconnect')) {
           status.textContent = 'Banktoegang intrekken…';
           await request('/disconnect', { accountProfileId: profile.id });

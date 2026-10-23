@@ -1,4 +1,5 @@
 import { createHash, randomBytes, randomUUID, sign } from 'node:crypto';
+import { bankAuthorizationUrl } from '../shared/bank-authorization-url.mjs';
 
 export const failure = (code, status = 400) => Object.assign(new Error(code), { code, status });
 const hash = value => createHash('sha256').update(value).digest('hex');
@@ -119,9 +120,9 @@ export function createBankService({ config, store, verifyToken, readAssignment, 
         aspsp: { name: bank.name, country: 'NL' }, psu_type: 'personal', language: 'nl',
         psu_id: hash(user.uid), state, redirect_url: config.redirectUrl
       });
-      const url = new URL(result.url);
-      if (url.protocol !== 'https:' || url.hostname !== 'auth.enablebanking.com') throw failure('invalid-authorization-url', 502);
-      return { url: url.toString() };
+      const url = bankAuthorizationUrl(result.url);
+      if (!url) throw failure('invalid-authorization-url', 502);
+      return { url };
     },
     async callback({ state, code, error }) {
       settings();

@@ -1,5 +1,7 @@
 # V118-r8 — ING-bankkoppeling activeren
 
+**Vervolg:** r8 is gepubliceerd en gecontroleerd. Bij de eerste echte toestemmingsaanvraag bleek de provider een ander gedocumenteerd adres te retourneren; zie [r9-correctie](v118-r9-bankautorisatie-20261023.md).
+
 23 oktober 2026. Vervolg op de gecontroleerde backendupdate en actieve TTL-policy. De gebruiker heeft opdracht gegeven om de uitrol en inschakeling te beginnen. Deze release maakt de bestaande P5b-koppeling bereikbaar; alleen de ingestelde gebruiker en het ING-profiel Dion …7899 worden door de backend toegelaten. Een banktoestemming ontstaat pas wanneer de rekeninghouder de autorisatie doorloopt.
 
 ## Release-inhoud

@@ -22,15 +22,20 @@ assert.equal(enableBanking.__endpoint.platform, 'gcfv2');
 assert.equal(enableBanking.__endpoint.serviceAccountEmail, 'finize-bank@financien-7dd43.iam.gserviceaccount.com');
 assert.deepEqual(enableBanking.__endpoint.region, ['europe-west4']);
 assert.deepEqual(enableBanking.__endpoint.secretEnvironmentVariables.map(item => item.key), ['ENABLE_BANKING_PRIVATE_KEY']);
-for (const [label, method, path, origin, expected] of [
+const warnings = [], originalWarn = console.warn;
+console.warn = value => warnings.push(JSON.parse(value));
+try { for (const [label, method, path, origin, expected] of [
   ['origin', 'POST', '/sync', 'https://untrusted.invalid', 403],
   ['preflight', 'OPTIONS', '/sync', 'https://dionvs.github.io', 204],
-  ['token', 'POST', '/status', 'https://dionvs.github.io', 401]
+  ['token', 'POST', '/status', 'https://dionvs.github.io', 401],
+  ['private path', 'POST', '/never-log-me', 'https://dionvs.github.io', 401]
 ]) {
   let status;
-  const req = { method, path, body: {}, get: name => name === 'Origin' ? origin : undefined, is: () => true };
+  const req = { method, path, body: { privateProbe: 'never-log-me' }, get: name => name === 'Origin' ? origin : undefined, is: () => true };
   const res = { set() { return this; }, status(value) { status = value; return this; }, json() { return this; }, end() { return this; } };
   await enableBanking(req, res);
   assert.equal(status, expected, label);
-}
-console.log('Functions v2-entry en 3 HTTP-grenscontroles geslaagd; geen netwerkverzoeken.');
+} } finally { console.warn = originalWarn; }
+assert.deepEqual(warnings, ['/status', 'unknown'].map(route => ({ event: 'finize-bank-request-failed', route, errorCode: 'unauthenticated', status: 401 })));
+assert(!JSON.stringify(warnings).includes('never-log-me'));
+console.log('Functions v2-entry, 4 HTTP-grenzen en veilige foutdiagnostiek geslaagd; geen netwerkverzoeken.');

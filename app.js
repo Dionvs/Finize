@@ -970,6 +970,19 @@
     state2.bankSyncStatus = { ...state2.bankSyncStatus || {}, [batch.accountProfileId]: copy(batch.providerSync) };
   }
 
+  // src/import/bank-authorization-url.mjs
+  var origins = /* @__PURE__ */ new Set(["https://auth.enablebanking.com", "https://tilisy.enablebanking.com"]);
+  function bankAuthorizationUrl(value) {
+    if (typeof value !== "string") return null;
+    try {
+      const url = new URL(value);
+      if (!origins.has(url.origin) || url.username || url.password || url.pathname.replace(/\/$/, "") !== "/ais/start") return null;
+      return url.href;
+    } catch (e) {
+      return null;
+    }
+  }
+
   // src/ui/bank-connection.mjs
   var BANK_BACKEND_URL = "https://europe-west4-financien-7dd43.cloudfunctions.net/enableBanking";
   var BANK_API_ENABLED = true;
@@ -1088,9 +1101,9 @@
             status2.textContent = "Toestemmingspagina van ING openen via Enable Banking…";
             const result2 = await request2("/auth/start", { accountProfileId: profile.id });
             sameScope();
-            const url = new URL(result2.url);
-            if (url.protocol !== "https:" || url.hostname !== "auth.enablebanking.com") throw new Error("Ongeldige autorisatielink.");
-            root2.location.assign(url.toString());
+            const url = bankAuthorizationUrl(result2.url);
+            if (!url) throw new Error("Ongeldige autorisatielink.");
+            root2.location.assign(url);
           } else if (button.hasAttribute("data-bank-disconnect")) {
             status2.textContent = "Banktoegang intrekken…";
             await request2("/disconnect", { accountProfileId: profile.id });
