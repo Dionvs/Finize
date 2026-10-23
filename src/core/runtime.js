@@ -6743,6 +6743,7 @@ Object.assign(window,{
   bindBankImport,
   commitChange,
   DataAdapter,
+  downloadJson,
   getSelectedMonth,
   localSave,
   migrateBudgetState,

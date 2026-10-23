@@ -16172,6 +16172,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
     bindBankImport,
     commitChange,
     DataAdapter,
+    downloadJson,
     getSelectedMonth,
     localSave,
     migrateBudgetState,
@@ -19953,7 +19954,7 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
       const modal = ensureModalRoot();
       modal.innerHTML = `<div class="u4-import-modal"><header class="u4-modal-head"><h2>Synchronisatieconflicten</h2><button class="ghost" data-u4-close>Sluiten</button></header><main class="u4-modal-body">${[...UI.conflicts.values()].map((conflict) => {
         var _a2, _b, _c;
-        return `<div class="u4-receipt"><strong>${esc(((_a2 = conflict.localChoice) == null ? void 0 : _a2.fileName) || conflict.importId)}</strong>${conflict.importId === "account-profiles" ? `<p>Beide rekeningversies zijn bewaard. De lokale stand blijft actief totdat je een keuze maakt. Historie en ontbrekende rekeningen worden behouden.</p><details><summary>Lokale rekeninggegevens</summary><ul>${accountPreview(conflict.localChoice)}</ul></details><details><summary>Cloudrekeninggegevens</summary><ul>${accountPreview(conflict.cloudChoice)}</ul></details>` : "<p>Cloudstand blijft actief. Lokale keuze is veilig opgeslagen.</p>"}<button class="ghost small" data-u4-resolve="${escAttr(conflict.importId)}" data-choice="cloud">${conflict.importId === "account-profiles" ? "Cloudrekeninggegevens gebruiken" : "Cloudstand behouden"}</button>${conflict.importId === "account-profiles" || ((_b = conflict.localChoice) == null ? void 0 : _b.rows) || ((_c = conflict.localChoice) == null ? void 0 : _c.lifecycle) === "deleted" ? `<button class="primary small" data-u4-resolve="${escAttr(conflict.importId)}" data-choice="local">Lokale keuze opnieuw toetsen</button>` : '<p class="u4-muted">De lokale snapshot is bewaard. Beoordeel de betrokken imports afzonderlijk.</p>'}</div>`;
+        return `<div class="u4-receipt"><strong>${esc(((_a2 = conflict.localChoice) == null ? void 0 : _a2.fileName) || conflict.importId)}</strong>${conflict.importId === "account-profiles" ? `<p>Beide rekeningversies zijn bewaard. De lokale stand blijft actief totdat je een keuze maakt. Historie en ontbrekende rekeningen worden behouden.</p><details><summary>Lokale rekeninggegevens</summary><ul>${accountPreview(conflict.localChoice)}</ul></details><details><summary>Cloudrekeninggegevens</summary><ul>${accountPreview(conflict.cloudChoice)}</ul></details>` : "<p>Cloudstand blijft actief. Lokale keuze is veilig opgeslagen.</p>"}<button class="ghost small" data-u4-export-conflict="${escAttr(conflict.importId)}">Beide versies downloaden</button><button class="ghost small" data-u4-resolve="${escAttr(conflict.importId)}" data-choice="cloud">${conflict.importId === "account-profiles" ? "Cloudrekeninggegevens gebruiken" : "Cloudstand behouden"}</button>${conflict.importId === "account-profiles" || ((_b = conflict.localChoice) == null ? void 0 : _b.rows) || ((_c = conflict.localChoice) == null ? void 0 : _c.lifecycle) === "deleted" ? `<button class="primary small" data-u4-resolve="${escAttr(conflict.importId)}" data-choice="local">Lokale keuze opnieuw toetsen</button>` : '<p class="u4-muted">De lokale snapshot is bewaard. Beoordeel de betrokken imports afzonderlijk.</p>'}</div>`;
       }).join("") || "<p>Geen openstaande synchronisatieconflicten.</p>"}</main></div>`;
       modal.classList.add("open");
       modal.querySelector("[data-u4-close]").onclick = closeDraft;
@@ -19966,6 +19967,19 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
         } catch (error2) {
           button.disabled = false;
           alert(error2.message);
+        }
+      });
+      modal.querySelectorAll("[data-u4-export-conflict]").forEach((button) => button.onclick = async () => {
+        button.disabled = true;
+        try {
+          const conflict = await ImportStore.getJournal(`conflict-${button.dataset.u4ExportConflict}`);
+          if (!conflict) throw new Error("Dit conflict is niet meer beschikbaar. Heropen het overzicht.");
+          const date2 = (/* @__PURE__ */ new Date()).toISOString();
+          root2.downloadJson(`finize-conflict-${String(conflict.importId).replace(/[^a-zA-Z0-9_-]/g, "_")}-${date2.slice(0, 10)}.json`, { version: 1, exportedAt: date2, conflict });
+        } catch (error2) {
+          alert(error2.message);
+        } finally {
+          button.disabled = false;
         }
       });
     }

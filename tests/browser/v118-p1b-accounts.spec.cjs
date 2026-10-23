@@ -71,6 +71,30 @@ test('P1b directe schrijfroutes blokkeren IBAN en eigenaar met ijkpunthistorie',
   const result=await page.evaluate(async()=>{const before=JSON.stringify(state);const command=async values=>{const p=structuredClone(state.accountProfiles[0]);try{await FinizeAccountsSave({type:'update',id:p.id,expectedProfile:p,values:{...p,...values},operationId:crypto.randomUUID(),createdAt:new Date().toISOString()});}catch(error){return error.code;}};return {iban:await command({identifier:'NL20INGB0001234567'}),owner:await command({accountOwner:'dion'}),unchanged:before===JSON.stringify(state)};});
   expect(result).toEqual({iban:'account-identity-in-use',owner:'account-identity-in-use',unchanged:true});
 });
+
+test('Conflictbackup bewaart beide versies zonder keuzes of financiën te wijzigen',async({page})=>{
+  await boot(page,320);
+  const before=await page.evaluate(async()=>{
+    const local=structuredClone(state),cloud=structuredClone(state);
+    local.transactions=[{id:'conflict-example',description:'Veilig bewaarde lokale keuze',amount:12}];
+    cloud.transactions=[{id:'conflict-example',description:'Cloudkeuze',amount:15}];
+    await FinizeImportSync.preserveConflict({id:'compact-state',state:local},{id:'compact-state',state:cloud},[{kind:'snapshot'}]);
+    FinizeUpdate4.openConflicts();
+    return {state:JSON.stringify(state),journal:await FinizeUpdate4.importStore.getJournal('conflict-compact-state')};
+  });
+  const downloaded=page.waitForEvent('download');
+  await page.getByRole('button',{name:'Beide versies downloaden',exact:true}).click();
+  const download=await downloaded;
+  const exported=JSON.parse(fs.readFileSync(await download.path(),'utf8'));
+  expect(download.suggestedFilename()).toMatch(/^finize-conflict-compact-state-\d{4}-\d{2}-\d{2}\.json$/);
+  expect(exported.conflict).toEqual(before.journal);
+  expect(await page.evaluate(()=>JSON.stringify(state))).toBe(before.state);
+  expect(await page.evaluate(async()=>await FinizeUpdate4.importStore.getJournal('conflict-compact-state'))).toEqual(before.journal);
+  await expect(page.getByRole('button',{name:'Cloudstand behouden',exact:true})).toBeVisible();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1)).toBe(false);
+  await page.reload();await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
+  expect(await page.evaluate(async()=>await FinizeUpdate4.importStore.getJournal('conflict-compact-state'))).toEqual(before.journal);
+});
 test('P1b profiel vanuit echte CSV-invoer gebruikt hetzelfde centrale register',async({page})=>{
   await boot(page);await page.evaluate(()=>openBankImportForOwner('gezamenlijk'));
   await page.locator('[data-u4-file]').setInputFiles({name:'rekening.csv',mimeType:'text/csv',buffer:Buffer.from(`Datum;Omschrijving;Rekening;Bedrag\n2026-10-11;Boodschappen;${IBAN};-10.00`)});
