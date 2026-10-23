@@ -1,0 +1,13 @@
+# V118-r11 — bank bijwerken vanuit Huidig saldo
+
+23 oktober 2026. De gekoppelde rekening kon alleen via Instellingen en rekeningdetails worden bijgewerkt. Het dashboard krijgt daarom in de kaart **Huidig saldo** de knoppen **Bank bijwerken** en **Nakijken**, met het laatste ophaalmoment eronder.
+
+De compacte bediening hergebruikt de bestaande bankcontroller: dezelfde statuscontrole, dezelfde rekening- en huishoudcontext, dezelfde ophaalroute en dezelfde importverwerking. Zij wordt alleen getoond voor een actieve rekening die eerder via de bank is bijgewerkt, zolang de functie is ingeschakeld. De knop wordt pas actief na een actuele verbindingscontrole. Openen en wisselen van dashboardcontext halen geen bankmutaties op. Tijdens een actie zijn de bankknoppen geblokkeerd; na een herbouw van het dashboard worden ook nieuwe knoppen weer vrijgegeven. Afgekoppelde bediening wordt uit de verzameling verwijderd. Een verlopen verbinding blijft zichtbaar en kan via de bestaande rekeningdetails worden hersteld.
+
+De datum onder het bedrag vermeldt nu **Berekend t/m [datum]**. Voorheen stond hier de datum van het saldo-ijkpunt, hoewel latere geboekte mutaties al meetelden. De uitleg noemt het oorspronkelijke ijkpunt en de berekendatum apart. Het bedrag, de kwaliteitsstatus en de voorwaarden voor bevestiging worden niet gewijzigd. Ongekoppelde rekeningen behouden hun bestaande handmatige saldoactie.
+
+Er worden geen transacties automatisch goedgekeurd. Backend, IAM, banktoestemming, prognoseberekeningen en financiële modellen blijven ongewijzigd. Publicatie gebruikt de bestaande Pages-route met cacheversie `118-r11`.
+
+Gerichte controle: dashboardbediening op 320, 390 en 1440 pixels, juiste peildatum en herkomst, geen automatisch ophalen, blokkade tijdens ophalen, dezelfde rekening in de aanvraag, geen duplicaten of automatische financiële verwerking, bestaande review, verlopen verbinding, ongekoppelde context en uitgeschakelde functie. Ook de bestaande bank- en dashboardgevallen worden gecontroleerd. Synthetische screenshots blijven buiten de repository. Voor publicatie worden syntax, reproduceerbaarheid, Node-controles en PWA/cache/upgrade gecontroleerd; daarna de exacte Pages-commit, openbare bestanden en werkelijke dashboardbediening.
+
+Vóór publicatie geslaagd: alle 73 reguliere Node-testbestanden; na de laatste tekst-/formaatcorrectie alle 19 dashboardselectorgevallen opnieuw; 45 verschillende gerichte browsergevallen in de dashboard-, bank-, P7- en r4-upgradereeksen. De finale bank-/P7-/upgrade-uitvoering heeft 31 gevallen zonder fouten of overslagen. Screenshots op 320 en 1440 pixels zijn visueel gecontroleerd. Syntax, reproduceerbare bundel en controle op privéconfiguratie in de publicatie zijn geslaagd.

@@ -3357,6 +3357,8 @@ function renderDashboard(){
     profiles:()=>state.accountProfiles||[],personalRole:()=>update6AccountContext().role,
     today:localTransactionToday,month:getSelectedMonth,monthLabel:()=>monthLabel(getSelectedMonth()),ownerLabel,eur,
     project:options=>window.FinizeLiquidity.project(options),balance:openBankAccountDetails,
+    bankMarkup:profile=>window.FinizeBank?.render(profile,{compact:true})||'',
+    bindBank:(panel,profile)=>window.FinizeBank?.bind(panel,profile),
     settings:id=>window.FinizeLiquidity.openSettings(id),getMonth:getMonthFinancialResult,
     goalIcon:goalImageIcon,iconSvg,
     canOpenEvent:event=>event.type==='bank'?state.transactions.some(tx=>sourceRecordKey(tx)===event.sourceId):!!event.planningSourceId&&event.month===getSelectedMonth(),

@@ -1006,6 +1006,13 @@
     const local = ["127.0.0.1", "localhost"].includes((_a2 = root2.location) == null ? void 0 : _a2.hostname) && target.hostname === "127.0.0.1" && target.protocol === "http:";
     if (!local && (target.origin !== production.origin || target.pathname !== production.pathname || target.protocol !== "https:")) throw new Error("Ongeldige bankbackend.");
     let busy2 = false;
+    const panels = /* @__PURE__ */ new Map();
+    function refreshControls() {
+      for (const [element, update2] of panels) {
+        if (!element.isConnected) panels.delete(element);
+        else update2();
+      }
+    }
     async function request2(route, payload) {
       var _a3;
       if (!enabled2) throw new Error("backend-not-configured");
@@ -1035,7 +1042,12 @@
       const at = new Date(sync == null ? void 0 : sync.fetchedAt);
       return sync && Number.isFinite(at.getTime()) ? " Laatst opgehaald: " + new Intl.DateTimeFormat("nl-NL", { dateStyle: "short", timeStyle: "short" }).format(at) + (sync.complete ? "." : " · onvolledig.") : "";
     }
-    function render2(profile) {
+    function render2(profile, { compact = false } = {}) {
+      var _a3, _b;
+      if (compact) {
+        if (!enabled2 || profile.status === "archived" || !((_b = (_a3 = root2.state) == null ? void 0 : _a3.bankSyncStatus) == null ? void 0 : _b[profile.id])) return "";
+        return '<span class="p3-bank-update" data-bank-connection="' + escape(profile.id) + '" data-bank-compact><span class="p3-bank-actions"><button type="button" class="primary small" data-bank-sync disabled>Bank bijwerken</button><button type="button" class="ghost small" data-bank-review>Nakijken</button></span><small role="status" aria-live="polite" data-bank-status>Verbinding controleren…</small></span>';
+      }
       const disabled = !enabled2 || profile.status === "archived" ? "disabled" : "";
       const status2 = !enabled2 ? "Nog niet geactiveerd. De bestaande administratie blijft beschikbaar." : profile.status === "archived" ? "Deze rekening is gearchiveerd. De historie blijft beschikbaar." : "Verbinding controleren…";
       return '<section class="balance-panel" data-bank-connection="' + escape(profile.id) + '" aria-label="ING-bankkoppeling"><h3>ING-bankkoppeling</h3><p>Geboekte bankmutaties tellen direct mee voor de rekeningstand. Financiële verwerking bevestig je bij Nakijken.</p><p role="status" aria-live="polite" data-bank-status>' + status2 + '</p><div class="balance-actions"><button type="button" class="ghost" data-bank-authorize ' + disabled + '>Banktoegang autoriseren</button><button type="button" class="primary" data-bank-sync disabled>Bank bijwerken</button><button type="button" class="ghost" data-bank-review>Nakijken</button><button type="button" class="ghost" data-bank-disconnect ' + disabled + ">Banktoegang intrekken</button></div></section>";
@@ -1054,6 +1066,7 @@
       if (!element || element.dataset.bound) return;
       element.dataset.bound = "true";
       const householdId = root2.CloudAdapter.importScope(), status2 = element.querySelector("[data-bank-status]");
+      const compact = element.hasAttribute("data-bank-compact");
       let connected = false, checking = false;
       const eligible = enabled2 && profile.status !== "archived";
       const sameScope = () => {
@@ -1062,6 +1075,7 @@
       const controls = () => element.querySelectorAll("button").forEach((item) => {
         item.disabled = busy2 || checking && !item.hasAttribute("data-bank-review") || !eligible && !item.hasAttribute("data-bank-review") || item.hasAttribute("data-bank-sync") && !connected;
       });
+      panels.set(element, controls);
       const failureMessage = (error2) => messages[error2.code || error2.message] || (error2.name === "AbortError" ? "De bank reageert niet op tijd. Probeer het opnieuw." : "De actie is niet afgerond. Controleer je verbinding en probeer opnieuw.");
       async function checkConnection() {
         if (!eligible) return;
@@ -1071,13 +1085,13 @@
           const result2 = await request2("/status", { accountProfileId: profile.id });
           sameScope();
           connected = result2.connected === true;
-          status2.textContent = (connected ? "Verbonden. Je kunt de bank handmatig bijwerken." : "Geen geldige bankverbinding. Geef toestemming bij ING om deze rekening te koppelen.") + (result2.revocationPending ? " Eerdere banktoegang is nog niet volledig ingetrokken. Kies Banktoegang intrekken om het opnieuw te proberen." : "") + lastSync(profile);
+          status2.textContent = (connected ? compact ? "" : "Verbonden. Je kunt de bank handmatig bijwerken." : "Geen geldige bankverbinding. Geef toestemming bij ING om deze rekening te koppelen.") + (result2.revocationPending ? " Eerdere banktoegang is nog niet volledig ingetrokken. Kies Banktoegang intrekken om het opnieuw te proberen." : "") + lastSync(profile);
         } catch (error2) {
           connected = false;
           status2.textContent = failureMessage(error2) + lastSync(profile);
         } finally {
           checking = false;
-          controls();
+          refreshControls();
         }
       }
       void checkConnection();
@@ -1086,9 +1100,7 @@
         const button = event2.target.closest("button");
         if (!button || button.disabled || busy2 || checking && !button.hasAttribute("data-bank-review")) return;
         busy2 = true;
-        element.querySelectorAll("button").forEach((item) => {
-          item.disabled = true;
-        });
+        refreshControls();
         try {
           sameScope();
           if (button.hasAttribute("data-bank-review")) {
@@ -1125,7 +1137,7 @@
           status2.textContent = button.hasAttribute("data-bank-disconnect") ? "Het intrekken is nog niet bevestigd. Probeer Banktoegang intrekken opnieuw. Je financiële historie blijft behouden." : failureMessage(error2);
         } finally {
           busy2 = false;
-          controls();
+          refreshControls();
         }
       });
     }
@@ -3842,21 +3854,21 @@
     const reasons2 = explainLiquidityReasons(p);
     return reasons2.length ? `<p>${status(p.status)}. De onderstaande punten zijn door de huidige prognose vastgesteld.</p>${reasons2.map((r) => `<section data-p3-reason="${escape2(r.code)}"><strong>${escape2(r.problem)}</strong><p>${escape2(r.why)}</p><p><b>Wat kun je doen?</b> ${escape2(r.solution)}</p>${action(r.action, r.action === "balance" ? "Saldo controleren" : r.action === "payments" ? "Betalingen bekijken" : r.action === "data" ? "Data & back-up openen" : r.action === "accounts" ? "Bankrekeningen openen" : r.action === "budgets" ? "Overzicht openen" : "Prognose instellen")}<details><summary>Technische details</summary><p>${escape2(r.detail)} (${escape2(r.code)})</p></details></section>`).join("")}` : `<p>${status(p.status)}. Er zijn voor deze prognose geen aanvullende oorzaken gemeld. Een prognose blijft een verwachting; bedragen en betaalmomenten kunnen veranderen.</p>`;
   }
-  function outlookHtml(p, profile, label, iconSvg2) {
+  function outlookHtml(p, profile, label, iconSvg2, bankMarkup = "") {
     var _a2, _b, _c;
     if (!profile) return `<p class="p3-empty">Kies de primaire betaalrekening voor deze context. Er wordt geen willekeurige rekening gebruikt.</p>${action("accounts", "Rekening instellen")}`;
     if (!p) return '<p class="p3-empty" role="status">Vooruitblik laden…</p>';
     const v = liquidityView(p), balance = p.currentBalance || p.opening;
-    const kpi = (key, title, value, sub, icon, explanation, act = "") => `<article class="p3-kpi${key === "free" && v.free === 0 && v.minimum !== null && v.minimum < 0 ? " p3-no-room" : ""}">${act ? `<button type="button" class="ux-card-primary" data-p3-action="${act}" aria-label="${title} ${escape2(value)} · ${act === "balance" ? "Saldo bijwerken" : "Buffer instellen"}"></button>` : ""}<span class="p3-kpi-icon" aria-hidden="true">${iconSvg2(icon)}</span><span class="p3-kpi-copy"><span class="p3-kpi-title"><span>${title}</span>${info(key, title, explanation)}</span><strong>${value}</strong><small>${sub}</small></span></article>`;
+    const kpi = (key, title, value, sub, icon, explanation, act = "") => `<article class="p3-kpi${key === "free" && v.free === 0 && v.minimum !== null && v.minimum < 0 ? " p3-no-room" : ""}">${act ? `<button type="button" class="ux-card-primary" data-p3-action="${act}" aria-label="${title} ${escape2(value)} · ${act === "balance" ? "Saldo bijwerken" : "Buffer instellen"}"></button>` : ""}<span class="p3-kpi-icon" aria-hidden="true">${iconSvg2(icon)}</span><span class="p3-kpi-copy"><span class="p3-kpi-title"><span>${title}</span>${info(key, title, explanation)}</span><strong>${value}</strong><small>${sub}</small>${key === "balance" ? bankMarkup : ""}</span></article>`;
     const warning = v.minimum !== null && v.minimum < v.buffer ? `<div class="p3-warning" role="status">${p.status !== "projected" ? `${status(p.status)} · ` : ""}Op ${date(v.minimumDate)} wordt ${money2(v.minimum)} verwacht. ${v.minimum < 0 ? "Dit is onder € 0. " : ""}Dat is ${money2(v.buffer - v.minimum)} onder je buffer van ${money2(v.buffer)}.</div>` : "";
     const saving = savingsNote(p), planned = ((_a2 = saving.match(/<span data-p3-savings-plan>.*?<\/span>/)) == null ? void 0 : _a2[0]) || "";
     const savingDetails = saving.replace(planned, "");
     const freeSub = `${v.free === 0 ? `Geen bestedingsruimte${v.indicative ? " · Indicatie" : ""}<br>` : v.indicative && v.free !== null ? "Indicatie<br>" : ""}${planned}${((_b = p.softSavings) == null ? void 0 : _b.warning) ? "<span data-p3-savings-alert>Let op: extra uitgaven kunnen je spaardoel verlagen.</span>" : ""}`;
     const balanceDate = (_c = balance.checkpoint) == null ? void 0 : _c.asOfDate;
-    const balanceSub = `${status(balance.status)}${balanceDate ? ` · Saldo van ${date(balanceDate)}` : ""} · Saldo bijwerken`;
+    const balanceSub = `${status(balance.status)}${balanceDate ? ` · Berekend t/m ${date(balance.toDate || p.asOfDate)}` : ""}${bankMarkup ? "" : " · Saldo bijwerken"}`;
     const reconciliations = (p.reconciliations || []).filter((r) => r.differenceCents !== null && r.differenceCents !== 0).map((r) => `<p class="p3-caption">Saldo-ijkpunt ${date(r.date)}: ${money2(r.observedCents)} · berekend ${money2(r.modeledCents)} · verschil ${money2(r.differenceCents)}. Vanaf deze dag loopt de berekening verder met het handmatig ingestelde saldo.</p>`).join("");
     const qualityActions = p.reasons.length ? `<div class="p3-quality-actions">${action("settings", p.reasons.some((r) => r.code === "missing-reliable-horizon") ? "Salarisdatum instellen" : "Prognose instellen")}${v.balance === null ? action("balance", "Saldo instellen") : ""}</div>` : "";
-    return `<div class="p3-kpis">${kpi("free", "Vrij na verplichtingen", money2(v.free), freeSub, "income", calculationHelp(p) + savingDetails)}${kpi("balance", p.horizon.endDate < p.asOfDate ? "Saldo op " + date(p.horizon.endDate) : "Huidig saldo", v.balance === null ? "Saldo onbekend" : money2(v.balance), balanceSub, "wallet", `<p>Dit is de rekeningstand op basis van je vastgelegde banksaldo en beschikbare bankboekingen. De saldodatum hoort bij het laatste bruikbare saldo-ijkpunt; dit is geen automatische bevestiging van je bank.</p>${qualityHelp(p)}`, "balance")}${kpi("minimum", "Laagste prognose", money2(v.minimum), `${date(v.minimumDate)} · ${status(p.status)}`, "chart", `<p>Het laagste berekende saldo binnen de gekozen periode. De datum en het bedrag komen uit dezelfde saldolijn.</p>${qualityHelp(p)}`)}${kpi("buffer", "Buffer", money2(v.buffer), "Buffer instellen", "shield", `<p>De buffer is de veiligheidsmarge die je op deze rekening wilt houden. Vrij na verplichtingen houdt rekening met deze marge. Je buffer is geen aparte bankboeking.</p>`, "settings")}</div>${warning}<div class="p3-outlook-footer"><span class="p3-account-name">Rekening: ${escape2(profile.name)}</span>${qualityActions}${reconciliations}</div>`;
+    return `<div class="p3-kpis">${kpi("free", "Vrij na verplichtingen", money2(v.free), freeSub, "income", calculationHelp(p) + savingDetails)}${kpi("balance", p.horizon.endDate < p.asOfDate ? "Saldo op " + date(p.horizon.endDate) : "Huidig saldo", v.balance === null ? "Saldo onbekend" : money2(v.balance), balanceSub, "wallet", `<p>Dit is de rekeningstand op basis van je vastgelegde banksaldo en beschikbare bankboekingen. ${balanceDate ? `Het startpunt is het saldo-ijkpunt van ${date(balanceDate)}. Daarna tellen beschikbare bankboekingen mee tot en met ${date(balance.toDate || p.asOfDate)}.` : ""} Dit is geen automatische bevestiging van je bank.</p>${qualityHelp(p)}`, "balance")}${kpi("minimum", "Laagste prognose", money2(v.minimum), `${date(v.minimumDate)} · ${status(p.status)}`, "chart", `<p>Het laagste berekende saldo binnen de gekozen periode. De datum en het bedrag komen uit dezelfde saldolijn.</p>${qualityHelp(p)}`)}${kpi("buffer", "Buffer", money2(v.buffer), "Buffer instellen", "shield", `<p>De buffer is de veiligheidsmarge die je op deze rekening wilt houden. Vrij na verplichtingen houdt rekening met deze marge. Je buffer is geen aparte bankboeking.</p>`, "settings")}</div>${warning}<div class="p3-outlook-footer"><span class="p3-account-name">Rekening: ${escape2(profile.name)}</span>${qualityActions}${reconciliations}</div>`;
   }
   function yearHtml(year, getMonth) {
     const v = yearView(year, getMonth), max = Math.max(1, ...v.months.filter((m) => !m.missing).flatMap((m) => [m.income, m.spent]));
@@ -3973,6 +3985,7 @@
       } else window.addEventListener("resize", schedule, { signal: controller.signal });
     }
     async function load(root2) {
+      var _a2, _b;
       const token = ++generation;
       projection = null;
       const profile = primaryAccount(deps.profiles(), owner());
@@ -3992,7 +4005,8 @@
         const p = await deps.project({ accountProfileId: profile.id, asOfDate: deps.today(), ...period });
         if (token !== generation || !root2.isConnected) return;
         projection = p;
-        root2.querySelector("[data-p3-outlook]").innerHTML = outlookHtml(p, profile, deps.eventLabel, deps.iconSvg);
+        root2.querySelector("[data-p3-outlook]").innerHTML = outlookHtml(p, profile, deps.eventLabel, deps.iconSvg, ((_a2 = deps.bankMarkup) == null ? void 0 : _a2.call(deps, profile)) || "");
+        (_b = deps.bindBank) == null ? void 0 : _b.call(deps, root2.querySelector("[data-p3-outlook]"), profile);
         root2.querySelector("[data-p3-period]").textContent = forecastPeriod(p);
         drawChart(root2, true);
         root2.querySelector("[data-p3-payments]").innerHTML = paymentsHtml(p, deps.eventLabel, deps.canOpenEvent);
@@ -12226,6 +12240,14 @@
       eur,
       project: (options) => window.FinizeLiquidity.project(options),
       balance: openBankAccountDetails,
+      bankMarkup: (profile) => {
+        var _a2;
+        return ((_a2 = window.FinizeBank) == null ? void 0 : _a2.render(profile, { compact: true })) || "";
+      },
+      bindBank: (panel, profile) => {
+        var _a2;
+        return (_a2 = window.FinizeBank) == null ? void 0 : _a2.bind(panel, profile);
+      },
       settings: (id) => window.FinizeLiquidity.openSettings(id),
       getMonth: getMonthFinancialResult,
       goalIcon: goalImageIcon,

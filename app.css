@@ -6390,6 +6390,10 @@ body.v4-app .value.is-negative{color:var(--red) !important}
 .p3-kpi:nth-child(2) .p3-kpi-icon{background:var(--warm);color:var(--text-dim)}
 .p3-kpi:nth-child(3) .p3-kpi-icon{background:var(--red-bg);color:var(--red)}
 .p3-kpi-copy{display:grid;gap:5px;min-width:0}
+.p3-bank-update{position:relative;z-index:2;display:grid;gap:7px;margin-top:7px}
+.p3-bank-actions{display:flex;flex-wrap:wrap;gap:6px}
+.p3-bank-actions button{min-height:44px;white-space:normal}
+.p3-bank-update small{font-size:12px;line-height:1.4}
 .p3-kpi-copy>span{font-size:12px;line-height:1.3}
 .p3-kpi strong{font-size:clamp(18px,1.7vw,25px);line-height:1.2;font-weight:750;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .p3-kpi small{font-size:12px;line-height:1.5;color:var(--text-dim);overflow-wrap:break-word}

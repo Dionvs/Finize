@@ -52,6 +52,64 @@ test('P5b explicit disabled override blocks bank requests', async ({ page }) => 
   await boot(page, 390, false);
   await expect(page.locator('[data-bank-sync]')).toBeDisabled();
   await expect(page.locator('[data-bank-status]')).toContainText('Nog niet geactiveerd');
+  await page.evaluate(async()=>{await commitChange(s=>{
+    s.accountProfiles[0].liquidity={version:1,primaryForOwner:true,bufferCents:0,salaryDays:{dion:25}};
+    s.bankSyncStatus={joint:{fetchedAt:'2026-10-23T12:00:00Z',complete:true}};
+  },{render:false});});
+  await page.locator('[data-tab="dashboard"]:visible').first().click();
+  await expect(page.locator('[data-bank-compact]')).toHaveCount(0);
+});
+
+for (const width of [320,390,1440]) test('P5b dashboard bankknop, peildatum en herhalen ' + width, async ({page},info) => {
+  const snapshot=await boot(page,width);
+  await page.evaluate(async()=>{await commitChange(s=>{s.accountProfiles[0].liquidity={version:1,primaryForOwner:true,bufferCents:0,salaryDays:{dion:25}};},{render:false});});
+  await page.locator('[data-bank-sync]').click();
+  await expect(page.locator('[data-balance-value]')).toContainText('990,00');
+  const calls=[];page.on('request',r=>{if(r.url().endsWith('/bank/sync'))calls.push(JSON.parse(r.postData()));});
+  await page.locator('[data-tab="dashboard"]:visible').first().click();
+  const quick=page.locator('[data-bank-compact]'),card=page.locator('.p3-kpi').nth(1);
+  await expect(quick.locator('[data-bank-sync]')).toBeEnabled();
+  expect(calls).toEqual([]);
+  await expect(card).toContainText('Berekend t/m 23 okt');
+  await expect(card).not.toContainText('Saldo van 20 okt');
+  await card.locator('[data-p3-info="balance"]').click();
+  await expect(card.locator('[data-p3-info-panel="balance"]')).toContainText('saldo-ijkpunt van 20 okt');
+  await page.keyboard.press('Escape');
+  let release;
+  await page.route('http://127.0.0.1:4999/bank/sync',async route=>{
+    await new Promise(resolve=>release=resolve);
+    await route.fulfill({contentType:'application/json',body:JSON.stringify(snapshot)});
+  });
+  await quick.locator('[data-bank-sync]').click();
+  await expect(quick.locator('[data-bank-sync]')).toBeDisabled();
+  await expect(quick.locator('[data-bank-status]')).toContainText('ophalen');
+  expect(calls.length).toBe(1);expect(calls[0].accountProfileId).toBe('joint');
+  release();
+  await expect(page.locator('[data-bank-compact] [data-bank-sync]')).toBeEnabled();
+  expect(await page.evaluate(()=>state.transactions.filter(x=>x.recordRole==='bank-source').length)).toBe(1);
+  expect(await page.evaluate(()=>FinizeTransactions.total('realExpense',{month:'2026-10'}))).toBe(0);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+  await page.screenshot({path:info.outputPath('dashboard-bank-bijwerken.png'),fullPage:true});
+  await page.locator('[data-bank-compact] [data-bank-review]').click();
+  await expect(page.locator('[data-u4-row]')).toHaveCount(1);
+  await expect(page.locator('[data-u4-row] .u4-status')).toHaveText('Nakijken');
+});
+
+test('P5b dashboard verlopen verbinding en ongekoppelde context halen niets op',async({page})=>{
+  await boot(page);
+  await page.evaluate(async()=>{await commitChange(s=>{s.accountProfiles[0].liquidity={version:1,primaryForOwner:true,bufferCents:0,salaryDays:{dion:25}};},{render:false});});
+  await page.locator('[data-bank-sync]').click();
+  await expect(page.locator('[data-balance-value]')).toContainText('990,00');
+  await page.route('http://127.0.0.1:4999/bank/status',r=>r.fulfill({contentType:'application/json',body:JSON.stringify({connected:false})}));
+  const before=await page.evaluate(()=>JSON.stringify(state)),calls=[];
+  page.on('request',r=>{if(r.url().endsWith('/bank/sync'))calls.push(r.url());});
+  await page.locator('[data-tab="dashboard"]:visible').first().click();
+  await expect(page.locator('[data-bank-compact] [data-bank-status]')).toContainText('Geen geldige bankverbinding');
+  await expect(page.locator('[data-bank-compact] [data-bank-sync]')).toBeDisabled();
+  await expect(page.locator('[data-bank-compact] [data-bank-review]')).toBeEnabled();
+  await page.locator('[data-p3-context="persoonlijk"]').click();
+  await expect(page.locator('[data-bank-compact]')).toHaveCount(0);
+  expect(calls).toEqual([]);expect(await page.evaluate(()=>JSON.stringify(state))).toBe(before);
 });
 
 for (const host of ['auth.enablebanking.com', 'tilisy.enablebanking.com']) test('P5b activated release only checks status and starts authorization after an explicit click: ' + host, async ({ page }) => {

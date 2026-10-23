@@ -23,6 +23,12 @@ export function installBankConnection(root, { enabled = BANK_API_ENABLED, baseUr
   const local = ['127.0.0.1', 'localhost'].includes(root.location?.hostname) && target.hostname === '127.0.0.1' && target.protocol === 'http:';
   if (!local && (target.origin !== production.origin || target.pathname !== production.pathname || target.protocol !== 'https:')) throw new Error('Ongeldige bankbackend.');
   let busy = false;
+  const panels = new Map();
+  function refreshControls() {
+    for (const [element, update] of panels) {
+      if (!element.isConnected) panels.delete(element); else update();
+    }
+  }
   async function request(route, payload) {
     if (!enabled) throw new Error('backend-not-configured');
     const user = root.FinizeAuth?.user;
@@ -46,7 +52,14 @@ export function installBankConnection(root, { enabled = BANK_API_ENABLED, baseUr
     const at = new Date(sync?.fetchedAt);
     return sync && Number.isFinite(at.getTime()) ? ' Laatst opgehaald: ' + new Intl.DateTimeFormat('nl-NL', { dateStyle: 'short', timeStyle: 'short' }).format(at) + (sync.complete ? '.' : ' · onvolledig.') : '';
   }
-  function render(profile) {
+  function render(profile, { compact = false } = {}) {
+    if (compact) {
+      if (!enabled || profile.status === 'archived' || !root.state?.bankSyncStatus?.[profile.id]) return '';
+      return '<span class="p3-bank-update" data-bank-connection="' + escape(profile.id) + '" data-bank-compact>' +
+        '<span class="p3-bank-actions"><button type="button" class="primary small" data-bank-sync disabled>Bank bijwerken</button>' +
+        '<button type="button" class="ghost small" data-bank-review>Nakijken</button></span>' +
+        '<small role="status" aria-live="polite" data-bank-status>Verbinding controleren…</small></span>';
+    }
     const disabled = !enabled || profile.status === 'archived' ? 'disabled' : '';
     const status = !enabled ? 'Nog niet geactiveerd. De bestaande administratie blijft beschikbaar.' :
       profile.status === 'archived' ? 'Deze rekening is gearchiveerd. De historie blijft beschikbaar.' : 'Verbinding controleren…';
@@ -72,12 +85,14 @@ export function installBankConnection(root, { enabled = BANK_API_ENABLED, baseUr
     if (!element || element.dataset.bound) return;
     element.dataset.bound = 'true';
     const householdId = root.CloudAdapter.importScope(), status = element.querySelector('[data-bank-status]');
+    const compact = element.hasAttribute('data-bank-compact');
     let connected = false, checking = false;
     const eligible = enabled && profile.status !== 'archived';
     const sameScope = () => { if (root.CloudAdapter.importScope() !== householdId) throw Object.assign(new Error('scope-changed'), { code: 'scope-changed' }); };
     const controls = () => element.querySelectorAll('button').forEach(item => {
       item.disabled = busy || (checking && !item.hasAttribute('data-bank-review')) || (!eligible && !item.hasAttribute('data-bank-review')) || (item.hasAttribute('data-bank-sync') && !connected);
     });
+    panels.set(element, controls);
     const failureMessage = error => messages[error.code || error.message] || (error.name === 'AbortError' ? 'De bank reageert niet op tijd. Probeer het opnieuw.' : 'De actie is niet afgerond. Controleer je verbinding en probeer opnieuw.');
     async function checkConnection() {
       if (!eligible) return;
@@ -86,17 +101,17 @@ export function installBankConnection(root, { enabled = BANK_API_ENABLED, baseUr
         const result = await request('/status', { accountProfileId: profile.id });
         sameScope();
         connected = result.connected === true;
-        status.textContent = (connected ? 'Verbonden. Je kunt de bank handmatig bijwerken.' : 'Geen geldige bankverbinding. Geef toestemming bij ING om deze rekening te koppelen.') +
+        status.textContent = (connected ? (compact ? '' : 'Verbonden. Je kunt de bank handmatig bijwerken.') : 'Geen geldige bankverbinding. Geef toestemming bij ING om deze rekening te koppelen.') +
           (result.revocationPending ? ' Eerdere banktoegang is nog niet volledig ingetrokken. Kies Banktoegang intrekken om het opnieuw te proberen.' : '') + lastSync(profile);
       } catch (error) {
         connected = false; status.textContent = failureMessage(error) + lastSync(profile);
-      } finally { checking = false; controls(); }
+      } finally { checking = false; refreshControls(); }
     }
     void checkConnection();
     element.addEventListener('click', async event => {
       const button = event.target.closest('button');
       if (!button || button.disabled || busy || (checking && !button.hasAttribute('data-bank-review'))) return;
-      busy = true; element.querySelectorAll('button').forEach(item => { item.disabled = true; });
+      busy = true; refreshControls();
       try {
         sameScope();
         if (button.hasAttribute('data-bank-review')) {
@@ -131,7 +146,7 @@ export function installBankConnection(root, { enabled = BANK_API_ENABLED, baseUr
         status.textContent = button.hasAttribute('data-bank-disconnect') ? 'Het intrekken is nog niet bevestigd. Probeer Banktoegang intrekken opnieuw. Je financiële historie blijft behouden.' : failureMessage(error);
       } finally {
         busy = false;
-        controls();
+        refreshControls();
       }
     });
   }
