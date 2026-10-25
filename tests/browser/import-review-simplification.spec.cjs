@@ -1,6 +1,12 @@
 const {expect,test}=require('@playwright/test');
 
 async function openReview(page){
+  const seed={...require('../fixtures/v50-visual-state.json'),...require('../helpers/package5-fixture.cjs').state()};
+  seed.meta.selectedMonth='2026-08';seed.monthRecords={};
+  seed.accountProfiles=[{id:'joint',name:'Gezamenlijk',identifier:'NL01JOINT',accountOwner:'gezamenlijk'},{id:'dion-account',name:'Dion',identifier:'NL01DION',accountOwner:'dion'},{id:'dara-account',name:'Dara',identifier:'NL01DARA',accountOwner:'dara'}];
+  await page.clock.setFixedTime(new Date('2026-08-25T12:00:00Z'));
+  await page.route('https://**',route=>route.abort());
+  await page.addInitScript(value=>{if(!localStorage.getItem('finize-budget-planner-v1'))localStorage.setItem('finize-budget-planner-v1',JSON.stringify(value));},seed);
   await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   await page.evaluate(()=>{
     state.accountProfiles=[

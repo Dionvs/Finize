@@ -1,12 +1,16 @@
 const {test,expect}=require('@playwright/test');
 const fs=require('node:fs'),path=require('node:path');
 const fixture=JSON.parse(fs.readFileSync(path.join(__dirname,'../fixtures/v50-visual-state.json'),'utf8'));
+const {state:validState}=require('../helpers/package5-fixture.cjs');
 
 for(const width of [390,1440])for(const changed of [false,true])test(`legacy history cloud refresh ${changed?'protects a real concurrent local edit':'opens an unchanged local copy'} ${width}px`,async({page})=>{
   const errors=[];page.on('pageerror',error=>errors.push(error.message));
   await page.setViewportSize({width,height:900});
+  await page.clock.setFixedTime(new Date('2026-10-25T12:00:00Z'));
   await page.route('**/*',route=>new URL(route.request().url()).hostname==='127.0.0.1'?route.continue():route.abort());
-  await page.addInitScript(input=>localStorage.setItem('finize-budget-planner-v1',JSON.stringify(input)),fixture);
+  const seed={...fixture,...validState()};seed.meta.selectedMonth='2026-10';seed.monthRecords={};
+  seed.accountProfiles=[{id:'history-dion',name:'Dion testrekening',identifier:'NL01TEST',accountOwner:'dion'}];
+  await page.addInitScript(input=>localStorage.setItem('finize-budget-planner-v1',JSON.stringify(input)),seed);
   await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   const before=await page.evaluate(async()=>{
     const u=FinizeUpdate4Runtime,copy=value=>JSON.parse(JSON.stringify(value));
@@ -14,7 +18,7 @@ for(const width of [390,1440])for(const changed of [false,true])test(`legacy his
     const local=u.createImportDraft({id:'history-september',text:'Datum;Omschrijving;Rekening;Bedrag\n2026-09-17;Historische septemberregel;NL01TEST;-10',profiles,existingImports:[],entryOwner:'dion'});
     local.status='verwerkt';delete local.version;delete local.operationId;
     await u.ImportStore.putImport(local);
-    await commitChange(()=>{state.accountProfiles=profiles;state.importSummaries=[u.compactSummary(local)];},{render:false});
+    if(!await commitChange(()=>{state.importSummaries=[u.compactSummary(local)];},{render:false,throwOnError:true}))throw Error('History test fixture must commit before exercising refresh');
     const cloudRecord={...copy(local),version:1,operationId:'cloud-history-1'},envelope=u.buildCloudImportEnvelope(cloudRecord);
     const cloud=CloudAdapter;cloud.db={};cloud.isConnected=()=>true;
     cloud.importRef=id=>'imports/'+id;cloud.importChunkRef=(id,chunk)=>'imports/'+id+'/chunks/'+chunk;

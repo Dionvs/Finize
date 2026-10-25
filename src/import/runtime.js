@@ -345,6 +345,42 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
     return {record:cloud,source:'cloud'};
   }
 
+  async function resolveProviderImportBase(root,id){
+    const scope=ImportStore.scope;
+    const assertScope=()=>{if(ImportStore.scope!==scope)throw cloudImportError('import-conflict','Het huishouden wijzigde tijdens het lezen van de bankimport.');};
+    await recoverJournal(root,{importId:id});assertScope();
+    const local=await ImportStore.getImport(id);assertScope();
+    const reference=(root.state.importSummaries||[]).find(item=>item.id===id);
+    const referenced=Boolean(reference||(root.state.transactions||[]).some(source=>source.importBatchId===id||source.importReferences?.some(ref=>ref.batchId===id)));
+    if(!local&&!referenced&&!root.CloudAdapter?.isConnected?.())return null;
+    try{
+      const result=await resolveImportDetails(id,{
+        localRead:async()=>local,cloudRead:importId=>fetchImportFromCloud(root,importId),
+        refresh:root.CloudAdapter?.isConnected?.()===true||Number(reference?.version||0)>importVersion(local),
+        localWrite:async remote=>{
+          assertScope();
+          // Restoring details is safe only when the financial head already names this version.
+          // A newer external approval first needs the existing full cloud-sync protocol.
+          const current=(root.state.importSummaries||[]).find(item=>item.id===id);
+          if(!current||Number(current.version||0)!==importVersion(remote)||String(current.operationId||'')!==String(remote.operationId||''))throw cloudImportError('import-conflict','De cloudimport is gewijzigd. Synchroniseer eerst de administratie; bestaande keuzes blijven behouden.');
+          const latest=await ImportStore.getImport(id);assertScope();
+          if(Boolean(local)!==Boolean(latest)||local&&!sameEditorBase(local,latest))throw cloudImportError('import-conflict','De lokale bankimport is intussen gewijzigd.');
+          await ImportStore.putImport(remote);
+        },
+        pendingRead:async importId=>(await ImportStore.listSync()).some(row=>row.importId===importId),
+        pendingBaseMatches:root.CloudAdapter?.recordSession?.pendingImportBaseMatches,
+        onConflict:(local,remote)=>preserveImportConflict(root,local,remote)
+      });
+      assertScope();
+      if(result.source==='conflict'||Number(reference?.version||0)>importVersion(result.record))throw cloudImportError('import-conflict','De bankimport vereist eerst controle van de bestaande cloudstand.');
+      return result.record;
+    }catch(error){
+      assertScope();
+      if(error.code==='cloud-missing'&&!local&&!referenced)return null;
+      throw error;
+    }
+  }
+
   function normalizeText(value){
     return String(value||'').toLocaleLowerCase('nl-NL').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim().replace(/\s+/g,' ');
   }
@@ -453,9 +489,16 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
   }
 
   function organizationName(description){
-    return normalizeText(description)
-      .replace(/\b(pasvolgnr|betaalautomaat|incasso|ideal|sepa|europese|betaling|kenmerk|omschrijving)\b.*$/,'')
-      .replace(/\b\d{3,}\b.*$/,'').trim();
+    const organization=normalizeText(description)
+      .replace(/\b(pasvolgnr|betaalautomaat|incasso|ideal|sepa|europese|betaling|kenmerk|omschrijving)\b.*$/,'').trim();
+    // Controlled complete names only. Unknown businesses retain their own name.
+    const aliases={
+      'ah to go rotterdam':'ah to go',
+      'jumbo middelburg':'jumbo','jumbo vlissingen':'jumbo','jumbo foodmarkt':'jumbo',
+      'ah middelburg':'albert heijn','ah vlissingen':'albert heijn'
+    };
+    if(Object.hasOwn(aliases,organization))return aliases[organization];
+    return organization.replace(/\b\d{3,}\b.*$/,'').trim();
   }
 
   function proposeType(original,profiles=[]){
@@ -480,7 +523,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
     const levels=[
       ['counterparty',rule=>counterpart&&normalizeIban(rule.value)===counterpart],
       ['description',rule=>description&&normalizeText(rule.value)===description],
-      ['organization',rule=>organization&&normalizeText(rule.value)===organization],
+      ['organization',rule=>organization&&organizationName(rule.value)===organization],
       ['keyword',rule=>description&&description.includes(normalizeText(rule.value))],
       ['prediction',rule=>description&&description.includes(normalizeText(rule.value))]
     ];
@@ -732,6 +775,14 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
   }
 
   const UI={draft:null,visibleRows:60,root:null,conflicts:new Map()};
+  const importViewMonths=new WeakMap();
+  function selectedImportMonth(root){return String(root.state.meta?.selectedMonth||'').slice(0,7);}
+  function importViewRows(draft,month=importViewMonths.get(draft)||''){
+    return (draft.rows||[]).filter(row=>!month||String(row.bankOriginal?.bankDate||'').slice(0,7)===month);
+  }
+  function importViewSummary(draft,month){
+    const view={rows:importViewRows(draft,month)};return updateDraftSummary(view,{touch:false});
+  }
   const ImportPerformance={pending:new Map(),chains:new Map(),syncPromise:null,syncRequested:false,syncDiagnostics:[],diagnosticSignature:''};
   function esc(value){return String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));}
   function escAttr(value){return esc(value).replace(/`/g,'&#96;').replace(/[\u0000-\u001f\u007f]/g,'');}
@@ -1525,10 +1576,10 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
     }
     const modal=ensureModalRoot();modal.innerHTML='<div class="u4-import-modal"><header class="u4-modal-head"><h2>Import verwerkt</h2><button class="ghost" data-u4-close>Sluiten</button></header><main class="u4-modal-body">Goedgekeurde bronnen zijn afzonderlijk verwerkt. Openstaande bronnen blijven via de importhistorie bereikbaar.</main></div>';modal.querySelector('[data-u4-close]').addEventListener('click',()=>{closeDraft();root.renderActiveTab();});return true;
   }
-  function renderReceipt(root,summary){
+  function renderReceipt(root,summary,month=''){
     const profile=(root.state.accountProfiles||[]).find(item=>item.id===summary.accountProfileId);
     const accountTitle=profileDisplayLabel(profile||{name:summary.bank||'Rekening'});
-    return `<article class="u4-receipt" data-u4-open-receipt="${esc(summary.id)}"><div class="u4-receipt-head"><div><strong>${esc(accountTitle)}</strong></div><span class="u4-status ${esc(summary.status)}">${esc(summary.status)}</span></div><div class="u4-muted">${Number(summary.newCount)||0} transacties · ${Number(summary.duplicateCount)||0} duplicaten · ${euro(summary.totalExpenses)} uitgaven</div></article>`;
+    return `<article class="u4-receipt" data-u4-open-receipt="${esc(summary.id)}" data-u4-view-month="${escAttr(month)}"><div class="u4-receipt-head"><div><strong>${esc(accountTitle)}</strong></div><span class="u4-status ${esc(summary.status)}">${esc(summary.status)}</span></div><div class="u4-muted" data-u4-receipt-totals>${month?'Maandtotalen laden…':`${Number(summary.newCount)||0} transacties · ${Number(summary.duplicateCount)||0} duplicaten · ${euro(summary.totalExpenses)} uitgaven`}</div></article>`;
   }
   function summaryMonth(summary){return String(summary.periodFrom||summary.importDate||summary.updatedAt||'').slice(0,7);}
   function summaryIncludesMonth(summary,month){
@@ -1562,8 +1613,8 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
         <button type="button" class="ghost small" data-u4-manage-rules>Herkenningsregels</button>
       </div>
       ${UI.conflicts.size?`<div class="u4-original">${UI.conflicts.size} synchronisatieconflict(en). Cloudstand behouden; lokale keuzes veilig bewaard.<button type="button" class="ghost small" data-u4-conflicts>Keuzes bekijken</button></div>`:''}
-      ${current?`<button type="button" class="u4-concept-banner" data-u4-open-concept="${esc(current.id)}"><strong>Bankimport nog niet verwerkt</strong><br>${Number(current.newCount)||0} transacties klaar om te controleren</button>`:'<p class="hint">ING wordt automatisch herkend. Andere CSV-bestanden kunnen via kolomherkenning worden ingelezen.</p>'}
-      <div class="u4-import-receipts">${selectedSummaries.map(summary=>renderReceipt(root,summary)).join('')||`<div class="u4-empty">Geen imports in ${esc(importMonthLabel(selectedMonth))}.</div>`}</div>
+      ${current&&summaryIncludesMonth(current,selectedMonth)?`<button type="button" class="u4-concept-banner" data-u4-open-concept="${esc(current.id)}"><strong>Bankimport nog niet verwerkt</strong><br>Transacties in ${esc(importMonthLabel(selectedMonth))} controleren</button>`:'<p class="hint">ING wordt automatisch herkend. Andere CSV-bestanden kunnen via kolomherkenning worden ingelezen.</p>'}
+      <div class="u4-import-receipts">${selectedSummaries.map(summary=>renderReceipt(root,summary,selectedMonth)).join('')||`<div class="u4-empty">Geen imports in ${esc(importMonthLabel(selectedMonth))}.</div>`}</div>
       ${summaries.length?'<button type="button" class="ghost small" data-u4-all-imports>Alle imports bekijken</button>':''}
     </div>`;
   }
@@ -1662,7 +1713,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
     const description=String(original?.rawDescription||original?.description||'');
     return {
       account:normalizeIban(original?.counterpartyAccount),
-      organization:compactText(original?.organization||original?.counterpartyName||organizationName(description)),
+      organization:organizationName(original?.organization||original?.counterpartyName||description),
       description:compactText(description)
     };
   }
@@ -1670,7 +1721,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
     const src=source.bankOriginal||{};
     const sourceDirection=Number(src.amount)>=0?'in':'out';
     const sourceIdentity=matchIdentity(src);
-    return draft.rows.filter(row=>row!==source&&!isExplicitlyApproved(row)&&row.bankOriginal?.valid&&!row.duplicate).map(row=>{
+    return importViewRows(draft).filter(row=>row!==source&&!isExplicitlyApproved(row)&&row.bankOriginal?.valid&&!row.duplicate).map(row=>{
       const original=row.bankOriginal||{};
       if((Number(original.amount)>=0?'in':'out')!==sourceDirection)return null;
       const identity=matchIdentity(original);
@@ -1696,7 +1747,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
     const month=line.fixedOccurrenceMonth||String(row.bankOriginal.bankDate).slice(0,7);
     const attr=split?'data-u4-split-field':'data-u4-field';
     const occurrences=/^\d{4}-(0[1-9]|1[0-2])$/.test(month)?plannedOccurrences(resolveFixedExpensesForMonth(root.state,month),month).filter(item=>item.itemId===line.fixedExpenseId):[];
-    return `<label>Geplande maand<input type="month" ${attr}="fixedOccurrenceMonth" value="${esc(month)}"></label><label>Betaalmoment<select ${attr}="fixedOccurrenceId"><option value="">Kies expliciet een betaalmoment</option>${occurrences.map(item=>option(item.id,`${displayDate(item.date)} · ${item.naam} · ${euro(item.amount)}`,line.fixedOccurrenceId||'')).join('')}</select></label>`;
+    return `<label>Geplande maand<input type="month" ${attr}="fixedOccurrenceMonth" value="${esc(month)}"></label><label>Betaalmoment<select ${attr}="fixedOccurrenceId"><option value="">Kies expliciet een betaalmoment</option>${occurrences.map(item=>option(item.id,`${displayDate(item.date)} · ${item.naam} · ${euro(item.amount)}`,line.fixedOccurrenceId||'')).join('')}</select></label><span class="u4-muted">Koppel het juiste betaalmoment. Na goedkeuring telt het werkelijk betaalde bedrag voor dit moment. De toekomstige planning blijft behouden bij Planning niet aanpassen.</span>`;
   }
   function splitHtml(root,row,split,index){
     const p=row.processing,family=transactionFamily(p),month=split.refundMonth||row.bankOriginal.bankDate.slice(0,7),owner=split.budgetOwner||p.budgetOwner;
@@ -1716,10 +1767,11 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
   }
   function sourceConfirmationFields(root,draft,row){
     const candidates=(root.state.transactions||[]).filter(tx=>tx.source==='manual'&&getTransactionAccountContext(tx,{accountProfiles:root.state.accountProfiles})===row.accountOwner&&!(root.state.manualTransactionReplacements||[]).some(replacement=>replacement.active!==false&&replacement.manualTransaction?.id===tx.id));
-    return candidates.length?`<label class="wide">Handmatige registratie vervangen<select data-u4-replacement-choice><option value="">Geen vervanging</option>${candidates.map(tx=>option(tx.id,`${Math.abs(Math.abs(Number(tx.amount))-Math.abs(Number(row.bankOriginal.amount)))<.005&&daysBetween(tx.date,row.bankOriginal.bankDate)<=3?'Mogelijke match · ':''}${displayDate(tx.date)} · ${tx.description||tx.category} · ${euro(tx.amount)}`,'')).join('')}</select></label><button type="button" class="ghost small" data-u4-confirm-replacement>Bevestig vervanging → Nakijken</button>`:'';
+    return candidates.length?`<label class="wide">Handmatige registratie vervangen<select data-u4-replacement-choice><option value="">Geen vervanging</option>${candidates.map(tx=>option(tx.id,`${Math.abs(Math.abs(Number(tx.amount))-Math.abs(Number(row.bankOriginal.amount)))<.005&&daysBetween(tx.date,row.bankOriginal.bankDate)<=3?'Mogelijke match · ':''}${displayDate(tx.date)} · ${tx.description||tx.category} · ${euro(tx.amount)}`,'')).join('')}</select></label><button type="button" class="ghost small" data-u4-confirm-replacement>Bevestig vervanging → Nakijken</button><span class="u4-muted">Bevestig alleen als dit dezelfde betaling is. Een gelijk bedrag en een nabije datum zijn op zichzelf geen bewijs. De oorspronkelijke handmatige registratie blijft bewaard.</span>`:'';
   }
   function pairConfirmationFields(root,draft){
-    const ids=new Set((root.state.transactions||[]).filter(tx=>tx.importBatchId===draft.id).map(tx=>tx.id));
+    const rowIds=new Set((draft.rows||[]).map(row=>row.id));
+    const ids=new Set((root.state.transactions||[]).filter(tx=>tx.importBatchId===draft.id&&rowIds.has(tx.importTransactionId)).map(tx=>tx.id));
     const pairs=(root.state.internalTransferPairs||[]).filter(pair=>(pair.transactionIds||[]).some(id=>ids.has(id)));
     return pairs.length?`<details class="u4-section"><summary><span>Interne transferparen</span><span>${pairs.length}</span></summary><div class="u4-section-list">${pairs.map(pair=>`<div class="u4-receipt"><span>${euro(pair.amount)} · ${esc(pair.status)}${pair.status==='voorgesteld'?' · buiten externe huishoudtotalen, nog onbevestigd':''}</span>${pair.status==='voorgesteld'?`<button type="button" class="ghost small" data-u4-confirm-pair="${escAttr(pair.id)}">Bevestig transferpaar</button>`:''}</div>`).join('')}</div></details>`:'';
   }
@@ -1771,7 +1823,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
       const category=p.fixedExpenseId||p.transactionType==='vaste-last'?'Vaste lasten':p.category;
       return `<div class="u4-dependent-grid"><label>Categorie<select data-u4-field="category">${categoryOptions(root,p.budgetOwner,category,String(p.processingDate||row.bankOriginal?.bankDate).slice(0,7))}</select></label>${category==='Vaste lasten'?`<label>Vaste last<select data-u4-field="fixedExpenseId">${fixedOptions(root,p.budgetOwner,p.fixedExpenseId,p.fixedOccurrenceMonth||String(row.bankOriginal?.bankDate).slice(0,7))}</select></label>${occurrenceFields(root,row,p)}`:''}</div>`;
     }
-    if(family==='inkomen')return `<div class="u4-dependent-grid"><label>Soort inkomen<select data-u4-field="transactionType">${INCOME_TYPES.map(type=>option(type,TYPE_GROUPS[1].items.find(item=>item[0]===type)?.[1]||type,p.transactionType)).join('')}</select></label>${p.transactionType!=='salaris'?`<label class="u2-checkbox"><input type="checkbox" data-u4-field="meetellenVoorVerdeling" ${p.meetellenVoorVerdeling!==false?'checked':''}> Meetellen voor zakgeldverdeling</label><span class="u4-muted">Uitgevinkt blijft dit inkomen bij gezamenlijk, bijvoorbeeld om te sparen. Een spaarinleg telt één keer mee.</span>`:''}${p.transactionType==='salaris'?`<label>Salaris van<select data-u4-field="salaryPersonId"><option value="">Kies Dion of Dara</option>${['dion','dara'].map(person=>option(person,ownerLabel(person),p.salaryPersonId||'')).join('')}</select></label><span class="u4-muted">Salarismaand ${esc(originalSalaryMonth(row))}. Een voorstel wordt pas definitief na Opslaan en verwerken.</span>`:''}</div>`;
+    if(family==='inkomen')return `<div class="u4-dependent-grid"><label>Soort inkomen<select data-u4-field="transactionType">${INCOME_TYPES.map(type=>option(type,TYPE_GROUPS[1].items.find(item=>item[0]===type)?.[1]||type,p.transactionType)).join('')}</select></label>${p.transactionType!=='salaris'?`<label class="u2-checkbox"><input type="checkbox" data-u4-field="meetellenVoorVerdeling" ${p.meetellenVoorVerdeling!==false?'checked':''}> Meetellen voor zakgeldverdeling</label><span class="u4-muted">Uitgevinkt blijft dit inkomen bij gezamenlijk, bijvoorbeeld om te sparen. Een spaarinleg telt één keer mee.</span>`:''}${p.transactionType==='salaris'?`<label>Salaris van<select data-u4-field="salaryPersonId"><option value="">Kies Dion of Dara</option>${['dion','dara'].map(person=>option(person,ownerLabel(person),p.salaryPersonId||'')).join('')}</select></label><span class="u4-muted">Salarismaand ${esc(originalSalaryMonth(row))}. Na goedkeuring vervangt deze ontvangst de salarisplanning van de gekozen persoon. Een eerdere handmatige ontvangst vervang je apart via Meer opties.</span>`:''}</div>`;
     if(family==='sparen')return `<div class="u4-dependent-grid"><label>Spaarbeweging<select data-u4-field="transactionType">${option('sparen','Naar spaardoel',p.transactionType)}${option('naar-spaarrekening','Naar spaarrekening',p.transactionType)}${option('van-spaarrekening','Van spaarrekening',p.transactionType)}</select></label><label>Spaardoel<select data-u4-field="savingsGoalId">${goalOptions(root,p.savingsGoalId)}</select></label>${['sparen','naar-spaarrekening'].includes(p.transactionType)?savingsContributionFields(root,row):''}${p.transactionType==='van-spaarrekening'&&!p.splits?.length?`<label>Budgetcorrectie (optioneel)<select data-u4-field="withdrawalBudgetCategory"><option value="">Zonder budgetcorrectie</option>${categoryOptions(root,p.budgetOwner,p.withdrawalBudgetCategory,row.bankOriginal.bankDate.slice(0,7))}</select></label>`:''}</div>`;
     if(family==='overboeking')return `${incomingContributionFields(root,row)}<div class="u4-dependent-grid"><label>Soort overboeking<select data-u4-field="transactionType">${TYPE_GROUPS[2].items.filter(item=>TRANSFER_TYPES.includes(item[0])).map(([type,label])=>option(type,label,p.transactionType)).join('')}</select></label></div>${transferFieldsHtml(root,row)}`;
     if(family==='zakgeld')return '<p class="u4-dependent-hint">Kies Dion of Dara bij Budgeteigenaar.</p>';
@@ -1918,23 +1970,26 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
   function renderDraftModal(root,draft){return profileSync('ui.importRender',()=>renderDraftModalMeasured(root,draft));}
   function renderDraftModalMeasured(root,draft){
     editorSession(draft);
+    if(!importViewMonths.has(draft))importViewMonths.set(draft,selectedImportMonth(root));
     updateDraftSummary(draft,{touch:false});
     const isConcept=draft.status==='concept';
     const canCorrect=draft.status==='verwerkt'||draft.status==='correctie-nodig';
-    const active=draft.rows.filter(row=>row.bankOriginal.valid&&!row.importError&&!row.duplicate);
+    const month=importViewMonths.get(draft),viewRows=importViewRows(draft),summary=importViewSummary(draft,month);
+    const undated=(draft.rows||[]).filter(row=>!parseDate(row.bankOriginal?.bankDate)).length;
+    const active=viewRows.filter(row=>row.bankOriginal.valid&&!row.importError&&!row.duplicate);
     const unknown=active.filter(row=>importReviewState(row)==='onbekend').slice(0,UI.visibleRows);
     const review=active.filter(row=>importReviewState(row)==='nakijken').slice(0,UI.visibleRows);
     const approved=active.filter(row=>['goedgekeurd','niet-meetellen'].includes(importReviewState(row))).slice(0,UI.visibleRows);
     const modal=ensureModalRoot();
     modal.innerHTML=`<div class="u4-import-modal" role="dialog" aria-modal="true" aria-label="Bankimport controleren">
       <header class="u4-modal-head"><div><h2>${isConcept?'Bankimport controleren':'Importdetails'}</h2><p>${esc(draft.fileName)} · ${esc(draft.bank)} · ${esc(displayDate(draft.periodFrom)||'—')} t/m ${esc(displayDate(draft.periodTo)||'—')} · ${esc(draft.status)}</p></div><button type="button" class="ghost" data-u4-close>Sluiten</button></header>
-      <main class="u4-modal-body"><p class="u4-muted" data-u4-local-notice>Wijzigingen blijven een lokaal concept. Alleen Opslaan en verwerken vervangt de goedgekeurde verwerking. Sluiten bewaart je concept; Annuleren verwijdert het concept.</p><button type="button" class="ghost small" data-u4-approve-selection ${batchLifecycle(draft)!=='active'?'disabled':''}>Geselecteerde regels goedkeuren</button>${draft.syncConflict?`<div class="u4-original">Synchronisatieconflict: de cloudstand blijft behouden. De lokale keuze is veilig bewaard.<button class="ghost small" data-u4-conflict-cloud>Cloudstand behouden</button><button class="primary small" data-u4-conflict-local>Lokale verwerking opnieuw nakijken</button></div>`:''}${isConcept?profileEditor(root,draft)+bulkEditor(root,draft):''}
-        <div class="u4-import-summary"><div><span>Nieuw</span><strong>${draft.summary.newCount}</strong></div><div><span>Duplicaten</span><strong>${draft.summary.duplicateCount}</strong></div><div><span>Inkomsten</span><strong>${euro(draft.summary.totalIncome)}</strong></div><div><span>Uitgaven</span><strong>${euro(draft.summary.totalExpenses)}</strong></div></div>
-        <details class="u4-section u4-section-unknown" ${draft.summary.unknownCount?'open':''}><summary><span>Onbekend</span><span>${draft.summary.unknownCount}</span></summary><div class="u4-section-list">${unknown.map(row=>rowHtml(root,row)).join('')||'<div class="u4-empty">Alle transacties zijn herkend.</div>'}</div></details>
-        <details class="u4-section u4-section-review" ${draft.summary.unknownCount?'':'open'}><summary><span>Nakijken</span><span>${draft.summary.reviewCount}</span></summary><div class="u4-section-list">${review.map(row=>rowHtml(root,row)).join('')||'<div class="u4-empty">Geen herkende transacties om na te kijken.</div>'}</div></details>
-        <details class="u4-section u4-section-approved"><summary><span>Goedgekeurd</span><span>${draft.summary.approvedCount}</span></summary><div class="u4-section-list">${approved.map(row=>rowHtml(root,row)).join('')||'<div class="u4-empty">Nog geen transacties expliciet goedgekeurd.</div>'}</div></details>
-        ${draft.summary.duplicateCount?`<details class="u4-section"><summary><span>Eerder geïmporteerd — overgeslagen</span><span>${draft.summary.duplicateCount}</span></summary><div class="u4-section-list">${draft.rows.filter(row=>row.duplicate).map(row=>`<div class="u4-original">${esc(displayDate(row.bankOriginal.bankDate))} · ${esc(row.bankOriginal.description)} · ${euro(row.bankOriginal.amount)}</div>`).join('')}</div></details>`:''}
-      ${draft.rows.some(row=>row.importError)?`<details class="u4-section" open><summary>Importfouten</summary>${draft.rows.filter(row=>row.importError).map(row=>`<div class="u4-original">${esc(row.importError.message)} · bronregel ${row.bankOriginal.lineNumber}</div>`).join('')}</details>`:''}${draft.rows.some(row=>row.possibleDuplicate)?'<p class="u4-muted">Gelijke bankvelden gevonden: mogelijke duplicaten zijn niet automatisch overgeslagen.</p>':''}${pairConfirmationFields(root,draft)}</main>
+      <main class="u4-modal-body"><label>Transacties bekijken<select data-u4-view-month>${option('','Alle maanden',month)}${[...new Set([selectedImportMonth(root),...draft.rows.map(row=>String(row.bankOriginal?.bankDate||'').slice(0,7))])].filter(value=>/^\d{4}-\d{2}$/.test(value)).sort().map(value=>option(value,importMonthLabel(value),month)).join('')}</select></label><p class="u4-muted" data-u4-month-context>${month?esc(importMonthLabel(month)):'Alle maanden · selectie over de volledige import'}</p>${month&&undated?`<p class="u4-error" role="status" data-u4-undated>${undated} bronregel(s) zonder geldige bankdatum. Bekijk deze via Alle maanden; controleer eerst de datum.</p>`:''}<p class="u4-muted" data-u4-local-notice>Wijzigingen blijven een lokaal concept. Alleen Opslaan en verwerken vervangt de goedgekeurde verwerking. Sluiten bewaart je concept; Annuleren verwijdert het concept.</p><button type="button" class="ghost small" data-u4-approve-selection ${batchLifecycle(draft)!=='active'?'disabled':''}>Geselecteerde regels goedkeuren</button>${draft.syncConflict?`<div class="u4-original">Synchronisatieconflict: de cloudstand blijft behouden. De lokale keuze is veilig bewaard.<button class="ghost small" data-u4-conflict-cloud>Cloudstand behouden</button><button class="primary small" data-u4-conflict-local>Lokale verwerking opnieuw nakijken</button></div>`:''}${isConcept?profileEditor(root,draft)+bulkEditor(root,draft):''}
+        <div class="u4-import-summary"><div><span>Nieuw</span><strong>${summary.newCount}</strong></div><div><span>Duplicaten</span><strong>${summary.duplicateCount}</strong></div><div><span>Inkomsten</span><strong>${euro(summary.totalIncome)}</strong></div><div><span>Uitgaven</span><strong>${euro(summary.totalExpenses)}</strong></div></div>
+        <details class="u4-section u4-section-unknown" ${summary.unknownCount?'open':''}><summary><span>Onbekend</span><span>${summary.unknownCount}</span></summary><div class="u4-section-list">${unknown.map(row=>rowHtml(root,row)).join('')||'<div class="u4-empty">Alle transacties zijn herkend.</div>'}</div></details>
+        <details class="u4-section u4-section-review" ${summary.unknownCount?'':'open'}><summary><span>Nakijken</span><span>${summary.reviewCount}</span></summary><div class="u4-section-list">${review.map(row=>rowHtml(root,row)).join('')||'<div class="u4-empty">Geen herkende transacties om na te kijken.</div>'}</div></details>
+        <details class="u4-section u4-section-approved"><summary><span>Goedgekeurd</span><span>${summary.approvedCount}</span></summary><div class="u4-section-list">${approved.map(row=>rowHtml(root,row)).join('')||'<div class="u4-empty">Nog geen transacties expliciet goedgekeurd.</div>'}</div></details>
+        ${summary.duplicateCount?`<details class="u4-section"><summary><span>Eerder geïmporteerd — overgeslagen</span><span>${summary.duplicateCount}</span></summary><div class="u4-section-list">${viewRows.filter(row=>row.duplicate).map(row=>`<div class="u4-original">${esc(displayDate(row.bankOriginal.bankDate))} · ${esc(row.bankOriginal.description)} · ${euro(row.bankOriginal.amount)}</div>`).join('')}</div></details>`:''}
+      ${viewRows.some(row=>row.importError)?`<details class="u4-section" open><summary>Importfouten</summary>${viewRows.filter(row=>row.importError).map(row=>`<div class="u4-original">${esc(row.importError.message)} · bronregel ${row.bankOriginal.lineNumber}</div>`).join('')}</details>`:''}${viewRows.some(row=>row.possibleDuplicate)?'<p class="u4-muted">Gelijke bankvelden gevonden: mogelijke duplicaten zijn niet automatisch overgeslagen.</p>':''}${pairConfirmationFields(root,{...draft,rows:viewRows})}</main>
       <footer class="u4-modal-actions"><span class="u4-muted" data-u4-save-status>Goedkeuring vraagt altijd een expliciete keuze per bron of geselecteerde groep. ${batchLifecycle(draft)==='withdrawn'?'Deze batch is teruggetrokken.':''}</span><button type="button" class="ghost" data-u4-cancel-concept>Annuleren</button><button type="button" class="ghost" data-u4-save-concept>Concept opslaan</button>${batchLifecycle(draft)==='withdrawn'?'<button type="button" class="primary" data-u4-restore>Herstellen</button>':'<button type="button" class="danger-ghost" data-u4-withdraw>Terugtrekken</button>'}<button type="button" class="danger-ghost" data-u4-delete-batch>Verwijderen</button>${batchLifecycle(draft)==='active'?'<button type="button" class="primary" data-u4-process>Goedgekeurde verwerken</button>':''}</footer>
     </div>`;
     modal.classList.add('open');
@@ -1947,7 +2002,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
     if(error?.code==='cloud-offline')return 'Deze import staat niet lokaal en de cloud is nu niet bereikbaar. Controleer de verbinding en probeer opnieuw.';
     return `De import kon niet worden geopend: ${error?.message||error}`;
   }
-  function renderCloudImportState(root,id,error=null){
+  function renderCloudImportState(root,id,error=null,month=selectedImportMonth(root)){
     const modal=ensureModalRoot();
     const summary=(root.state.importSummaries||[]).find(item=>String(item.id)===String(id));
     const canDiscard=String(root.state.activeImportId||'')===String(id)&&summary?.status==='concept';
@@ -1957,7 +2012,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
     </div>`;
     modal.classList.add('open');
     modal.querySelector('[data-u4-close]')?.addEventListener('click',closeDraft);
-    modal.querySelector('[data-u4-cloud-retry]')?.addEventListener('click',()=>openDraft(root,id));
+    modal.querySelector('[data-u4-cloud-retry]')?.addEventListener('click',()=>openDraft(root,id,{month}));
     modal.querySelector('[data-u4-discard-concept]')?.addEventListener('click',async event=>{
       if(!confirm('Dit onverwerkte importconcept verwijderen? De financiële administratie en verwerkte imports blijven behouden.'))return;
       event.currentTarget.disabled=true;
@@ -1971,29 +2026,35 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
       }
     });
   }
-  async function openDraft(root,id){
+  async function openDraft(root,id,{month=selectedImportMonth(root),rowId=''}={}){
     const request=UI.openSequence=(UI.openSequence||0)+1,sessionAtStart=ImportEditors.get(String(id)),revisionAtStart=sessionAtStart?.revision,baseAtStart=sessionAtStart?clone(sessionAtStart.base):null;
     let local;
     try{await recoverJournal(root,{importId:id});local=await ImportStore.getImport(id);}
-    catch(error){renderCloudImportState(root,id,error);return null;}
-    if(!local)renderCloudImportState(root,id);
+    catch(error){if(request===UI.openSequence)renderCloudImportState(root,id,error,month);return null;}
+    if(request!==UI.openSequence)return null;
+    if(!local)renderCloudImportState(root,id,null,month);
     try{
       const resolved=await resolveImportDetails(id,{
         localRead:async()=>local,
         cloudRead:importId=>fetchImportFromCloud(root,importId),
         localWrite:async record=>{const latest=await ImportStore.getImport(id);if(local&&latest&&!sameEditorBase(local,latest))throw cloudImportError('import-conflict','Een nieuwere lokale importkeuze blijft behouden.');return ImportStore.putImport(record);},refresh:root.CloudAdapter?.isConnected?.()===true,pendingRead:async id=>(await ImportStore.listSync()).some(row=>row.importId===id),pendingBaseMatches:root.CloudAdapter?.recordSession?.pendingImportBaseMatches,onConflict:(local,remote)=>preserveImportConflict(root,local,remote)
       });
-      if(resolved.record.lifecycle==='deleted'){closeDraft();return resolved.record;}
       if(request!==UI.openSequence||sessionAtStart&&(sessionAtStart.revision!==revisionAtStart||sessionAtStart.committing||!sameEditorBase(sessionAtStart.base,baseAtStart)))return sessionAtStart?.draft||UI.draft;
+      if(resolved.record.lifecycle==='deleted'){closeDraft();return resolved.record;}
       resolved.record.syncConflict=(await ImportStore.getJournal(`conflict-${id}`))?.status==='conflict';
-      UI.draft=await beginImportEditor(root,resolved.record);renderDraftModal(root,UI.draft);
+      if(request!==UI.openSequence)return null;
+      const opened=await beginImportEditor(root,resolved.record);
+      if(request!==UI.openSequence)return null;
+      UI.draft=opened;
+      const focusRow=rowId&&UI.draft.rows.find(row=>row.id===rowId);
+      importViewMonths.set(UI.draft,focusRow?String(focusRow.bankOriginal?.bankDate||'').slice(0,7):month);renderDraftModal(root,UI.draft);
       return UI.draft;
     }catch(error){
-      renderCloudImportState(root,id,error);
+      if(request===UI.openSequence)renderCloudImportState(root,id,error,month);
       return null;
     }
   }
-  function closeDraft(){const modal=document.getElementById('u4ImportModalRoot');modal?.classList.remove('open');}
+  function closeDraft(){UI.openSequence=(UI.openSequence||0)+1;const modal=document.getElementById('u4ImportModalRoot');modal?.classList.remove('open');}
   async function applyProfile(root,draft,modal){
     const selected=modal.querySelector('[data-u4-profile-select]').value;
     let profile=root.state.accountProfiles.find(item=>item.id===selected);
@@ -2050,6 +2111,11 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
   function bindDraftModal(root,draft,modal){
     UI.root=root;
     UI.draft=draft;
+    modal.querySelector('[data-u4-view-month]')?.addEventListener('change',async event=>{
+      const select=event.currentTarget,month=select.value;select.disabled=true;
+      try{await persistLocalImportEditor(root,draft);if(!select.isConnected||UI.draft!==draft)return;importViewMonths.set(draft,month);renderDraftModal(root,draft);}
+      catch(error){select.disabled=false;select.value=importViewMonths.get(draft);updateImportSaveStatus('Maand niet gewisseld: opslaan mislukt.',true);}
+    });
     modal.querySelector('[data-u4-close]')?.addEventListener('click',async event=>{
       const button=event.currentTarget,opening=UI.openSequence;button.disabled=true;
       updateImportSaveStatus('Laatste lokale wijzigingen opslaan…');
@@ -2156,7 +2222,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
           chosen.identityDecision=decision;if(decision==='same'){chosen.duplicateSource=clone(row.possibleDuplicate);chosen.duplicate=true;}
           await persistImportDraftImmediate(root,base);
           await ImportStore.deleteJournal(`editor-draft-${draft.id}`);ImportEditors.delete(String(draft.id));
-          const current=await openDraft(root,draft.id);
+          const current=await openDraft(root,draft.id,{month:importViewMonths.get(draft)??selectedImportMonth(root)});
           for(const item of current.rows){const edited=local.rows.find(old=>old.id===item.id);if(edited&&(item.id!==row.id||decision==='distinct')){item.processing=clone(edited.processing);if(!isExplicitlyApproved(edited))reopenForReview(item);}}
           await persistLocalImportEditor(root,current);renderDraftModal(root,current);
         }catch(error){alert(error.message);}
@@ -2184,7 +2250,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
         const scope=modal.querySelector('[data-u4-bulk-scope]')?.value||'review';const owner=modal.querySelector('[data-u4-bulk-owner]')?.value||'';const category=modal.querySelector('[data-u4-bulk-category]')?.value||'';const type=modal.querySelector('[data-u4-bulk-type]')?.value||'';
         if(!owner&&!category&&!type){alert('Kies minimaal één veld om aan te passen.');return;}
         const selectedIds=new Set([...modal.querySelectorAll('[data-u4-select-approval]:checked')].map(input=>input.dataset.u4SelectApproval));
-        const targets=draft.rows.filter(item=>item.bankOriginal?.valid&&!item.duplicate&&!isExplicitlyApproved(item)&&(scope==='all'||(scope==='selected'&&selectedIds.has(item.id))||(scope==='review'&&importReviewState(item)==='nakijken')||(scope==='unknown'&&importReviewState(item)==='onbekend')||(scope==='uncategorized'&&(!item.processing.category||item.processing.category==='Ongecategoriseerd'))));
+        const targets=importViewRows(draft).filter(item=>item.bankOriginal?.valid&&!item.duplicate&&!isExplicitlyApproved(item)&&(scope==='all'||(scope==='selected'&&selectedIds.has(item.id))||(scope==='review'&&importReviewState(item)==='nakijken')||(scope==='unknown'&&importReviewState(item)==='onbekend')||(scope==='uncategorized'&&(!item.processing.category||item.processing.category==='Ongecategoriseerd'))));
         if(!targets.length){alert('Geen transacties binnen deze selectie.');return;}
         if(!confirm(`${targets.length} transacties aanpassen?`))return;
         targets.forEach(item=>{if(owner)item.processing.budgetOwner=owner;if(type)setProcessingType(item.processing,type);if(category){applyBulkCategory(draft,[item.id],category);if(category==='Vaste lasten'){setProcessingType(item.processing,'vaste-last');selectFixedOccurrence(root,item,item.processing);}}reopenForReview(item);});
@@ -2220,7 +2286,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
         }
         return;
       }
-      if(event.target.closest('[data-u4-conflict-cloud],[data-u4-conflict-local]')){try{await resolveImportConflict(root,draft.id,event.target.closest('[data-u4-conflict-local]')?'local':'cloud');await openDraft(root,draft.id);}catch(error){alert(error.message);}return;}
+      if(event.target.closest('[data-u4-conflict-cloud],[data-u4-conflict-local]')){try{await resolveImportConflict(root,draft.id,event.target.closest('[data-u4-conflict-local]')?'local':'cloud');await openDraft(root,draft.id,{month:importViewMonths.get(draft)??selectedImportMonth(root)});}catch(error){alert(error.message);}return;}
       if(event.target.closest('[data-u4-withdraw],[data-u4-restore],[data-u4-delete-batch]')){const type=event.target.closest('[data-u4-delete-batch]')?'delete':event.target.closest('[data-u4-restore]')?'restore':'withdraw';if(type==='delete'&&!confirm('Deze batch permanent verwijderen? Alleen technisch verwijderbewijs blijft bewaard.'))return;try{await sessionWrite(draft);const stored=await ImportStore.getImport(draft.id);const result=await commitImportCommand(root,stored||draft,{type});applyFinancialCandidate(draft,clone(result.batch));ImportEditors.delete(String(draft.id));if(type==='delete')closeDraft();else renderDraftModal(root,draft);root.renderActiveTab();}catch(error){alert(error.message);}return;}
       if(event.target.closest('[data-u4-process]')){
         if(typeof root.FinizeUpdate4Process!=='function'){alert('De verwerkingslaag wordt in de volgende fase geactiveerd. Het concept blijft bewaard.');return;}
@@ -2235,6 +2301,19 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
     });
   }
   function bindImportPanel(rootElement,root,owner=''){
+    const viewMonth=selectedImportMonth(root),scope=ImportStore.scope;
+    rootElement.querySelectorAll('[data-u4-open-receipt][data-u4-view-month]').forEach(async element=>{
+      const id=element.dataset.u4OpenReceipt,totals=element.querySelector('[data-u4-receipt-totals]');
+      try{
+        const reference=(root.state.importSummaries||[]).find(row=>row.id===id);
+        let record=await ImportStore.getImport(id);
+        if(!record||Number(record.version||0)<Number(reference?.version||0))record=await fetchImportFromCloud(root,id);
+        if(!element.isConnected||scope!==ImportStore.scope)return;
+        if(!importViewRows(record,viewMonth).length){element.remove();return;}
+        const summary=importViewSummary(record,viewMonth);
+        totals.textContent=`${summary.newCount} transacties · ${summary.duplicateCount} duplicaten · ${euro(summary.totalExpenses)} uitgaven · ${importMonthLabel(viewMonth)}`;
+      }catch{if(element.isConnected&&scope===ImportStore.scope)totals.textContent='Maandtotalen nog niet beschikbaar. Open de importdetails.';}
+    });
     rootElement.querySelector('[data-u4-bank-accounts]')?.addEventListener('click',()=>root.openBankAccountDetails());
     rootElement.querySelector('[data-u4-conflicts]')?.addEventListener('click',()=>renderImportConflicts(root));
     rootElement.querySelector('[data-u4-file]')?.addEventListener('change',event=>{
@@ -2263,7 +2342,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
   function renderImportHistory(root,owner=''){
     const modal=ensureModalRoot();const allSummaries=[...(root.state.importSummaries||[]),...[...UI.conflicts.values()].filter(c=>c.localChoice?.rows&&!(root.state.importSummaries||[]).some(s=>s.id===c.importId)).map(c=>({...compactSummary(c.localChoice),status:'synchronisatieconflict'}))].sort((a,b)=>String(b.updatedAt||b.importDate).localeCompare(String(a.updatedAt||a.importDate)));const summaries=owner?allSummaries.filter(summary=>importSummaryOwner(root,summary)===owner):allSummaries;
     modal.innerHTML=`<div class="u4-import-modal"><header class="u4-modal-head"><h2>Alle imports</h2><button class="ghost" data-u4-close>Sluiten</button></header><main class="u4-modal-body"><div class="u4-import-history">${renderImportHistoryGroups(root,summaries)||'<div class="u4-empty">Nog geen imports.</div>'}</div></main></div>`;
-    modal.classList.add('open');modal.querySelector('[data-u4-close]').addEventListener('click',closeDraft);modal.querySelectorAll('[data-u4-open-receipt]').forEach(item=>item.addEventListener('click',()=>openDraft(root,item.dataset.u4OpenReceipt)));
+    modal.classList.add('open');modal.querySelector('[data-u4-close]').addEventListener('click',closeDraft);modal.querySelectorAll('[data-u4-open-receipt]').forEach(item=>item.addEventListener('click',()=>openDraft(root,item.dataset.u4OpenReceipt,{month:''})));
   }
   function openBankImportForOwner(root,owner){
     if(!OWNERS.includes(owner))return;
@@ -2713,7 +2792,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
     if(!batch&&batchId){try{batch=await fetchImportFromCloud(root,batchId);}catch{}}
     const check=inspectSourceAvailability(root.state,{...tx,importBatchId:batchId,importTransactionId:rowId},batch);
     if(check.ok){
-      const draft=await openDraft(root,batchId),modal=ensureModalRoot();
+      const draft=await openDraft(root,batchId,{rowId}),modal=ensureModalRoot();
       const row=findDraftRowElement(modal,rowId);
       if(row){const section=row.closest('details.u4-section');if(section)section.open=true;const details=row.querySelector('details');if(details)details.open=true;row.scrollIntoView({block:'nearest'});}
       return draft;
@@ -2736,7 +2815,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
   function install(root){
     if(!root?.state)return;
     ImportStore.setScope(root.CloudAdapter?.importScope?.()||'legacy');ImportStore.legacyReferences=new Set((root.state.importSummaries||[]).map(row=>String(row.id)));
-    root.FinizeImportSync={get pendingDiagnostics(){return clone(ImportPerformance.syncDiagnostics);},onCloudAccepted:async()=>{if(root.CloudAdapter?.conflict)return;const queued=await ImportStore.listSync();if(queued.length)flushImportSync(root);},beforeInitialRemote:remote=>preservePendingImportsBeforeRemote(root,remote),prepareCloudSnapshot:snapshot=>stageImportCloudWrites(root,snapshot),setScope:()=>{ImportStore.setScope(root.CloudAdapter?.importScope?.()||'legacy');ImportStore.legacyReferences=new Set((root.state.importSummaries||[]).map(row=>String(row.id)));},findConflicts:findImportConflicts,preserveConflict:(local,remote,conflicts)=>preserveImportConflict(root,local,remote,conflicts),refresh:()=>{const session=UI.draft&&ImportEditors.get(String(UI.draft.id));if(UI.draft&&!session?.revision&&!session?.committing&&!ImportPerformance.pending.has(UI.draft.id)&&!ImportPerformance.chains.has(UI.draft.id))openDraft(root,UI.draft.id);}};
+    root.FinizeImportSync={get pendingDiagnostics(){return clone(ImportPerformance.syncDiagnostics);},onCloudAccepted:async()=>{if(root.CloudAdapter?.conflict)return;const queued=await ImportStore.listSync();if(queued.length)flushImportSync(root);},beforeInitialRemote:remote=>preservePendingImportsBeforeRemote(root,remote),prepareCloudSnapshot:snapshot=>stageImportCloudWrites(root,snapshot),setScope:()=>{ImportStore.setScope(root.CloudAdapter?.importScope?.()||'legacy');ImportStore.legacyReferences=new Set((root.state.importSummaries||[]).map(row=>String(row.id)));},findConflicts:findImportConflicts,preserveConflict:(local,remote,conflicts)=>preserveImportConflict(root,local,remote,conflicts),refresh:()=>{const session=UI.draft&&ImportEditors.get(String(UI.draft.id));if(UI.draft&&!session?.revision&&!session?.committing&&!ImportPerformance.pending.has(UI.draft.id)&&!ImportPerformance.chains.has(UI.draft.id))openDraft(root,UI.draft.id,{month:importViewMonths.get(UI.draft)??selectedImportMonth(root)});}};
     // The core load route has already migrated and validated the complete state.
     const validation=validateCore(root.state);
     if(!validation.ok){console.error('Update 4 migratie ongeldig',validation.errors);return;}
@@ -2757,7 +2836,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
       reconcileActiveImportReference,
       discardImportConcept,
       openTransactionSource:id=>openTransactionSource(root,id),
-      openImportDetails:async(id,rowId='')=>{const draft=await openDraft(root,id);if(rowId){const modal=ensureModalRoot(),row=[...modal.querySelectorAll('[data-u4-row]')].find(node=>node.dataset.u4Row===rowId);if(row){row.closest('.u4-section')?.setAttribute('open','');row.scrollIntoView({block:'center'});}}return draft;},
+      openImportDetails:async(id,rowId='',options={})=>{const draft=await openDraft(root,id,{...options,rowId});if(rowId){const modal=ensureModalRoot(),row=[...modal.querySelectorAll('[data-u4-row]')].find(node=>node.dataset.u4Row===rowId);if(row){row.closest('.u4-section')?.setAttribute('open','');row.scrollIntoView({block:'center'});}}return draft;},
       openConflicts:()=>renderImportConflicts(root),
       parseBankCsv,
       createImportDraft,
@@ -2795,7 +2874,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
       });
   }
 
-  return {applySuggestionAlternative,applyBulkCategory,copiedProcessing,suggestionHtml,approveSelectedSources,inspectSourceAvailability,sourceRepairCandidates,planSourceRepair,commitSourceRepair,openTransactionSource,addProcessingSplit,removeProcessingSplit,redistributeProcessing,splitDifference,getTransactionAccountContext,getTransactionSource,getTransactionProcessingStatus,isTransactionFinanciallyActive,getTransactionOriginalBankData,beginImportEditor,persistLocalImportEditor,commitImportEditor,setProcessingType,selectFixedOccurrence,SCHEMA_VERSION,CLOUD_STORAGE_VERSION,CLOUD_READ_CONCURRENCY,OWNERS,IMPORT_STATUSES,normalizeIban,normalizeRule,normalizeTransaction,normalizeCore,validateCore,calculateGoalSavedAmount,reconcileGoalSavedAmounts,chunkRows,canonicalValue,rowsChecksum,buildCloudImportEnvelope,assembleCloudImport,mapWithConcurrency,classifyCloudError,fetchImportFromCloud,resolveImportDetails,reconcileActiveImportReference,deleteCloudImportBestEffort,discardImportConcept,rowProcessingValidation,reopenStoredSource,approveStoredSource,normalizeText,matchIdentity,matchCandidates,detectDelimiter,parseDelimited,parseDate,parseAmount,detectFormat,inferMapping,hashText,fingerprint,organizationName,proposeType,recognitionProposal,fixedAmountAt,fixedRecognition,isExplicitlyApproved,importReviewState,markExplicitlyApproved,classifyOriginal,parseBankCsv,findProfile,createImportDraft,updateDraftSummary,compactSummary,validateDraft,transactionKind,expenseImpact,financialRows,advanceForTransaction,savingsForTransaction,detectInternalPairs,directionalBalances,proposeRepaymentAllocations,planImportCommand,commitImportCommand,deriveBatchReviewStatus,stageImportCloudWrites,preserveImportConflict,resolveImportConflict,preservePendingImportsBeforeRemote,planImportEffects,applyImportPlan,learnedRecognitionRules,rememberRecognitionRules,effectManifest,undoImportEffects,transactionFamily,applyTransactionFamily,ImportStore,persistImportDraft,scheduleImportDraftPersist,flushScheduledImportDraft,queueImportSync,flushImportSync,recoverJournal,install,round2,uid,clone,testRenderDraftModal:renderDraftModal};
+  return {resolveProviderImportBase,applySuggestionAlternative,applyBulkCategory,copiedProcessing,suggestionHtml,approveSelectedSources,inspectSourceAvailability,sourceRepairCandidates,planSourceRepair,commitSourceRepair,openTransactionSource,addProcessingSplit,removeProcessingSplit,redistributeProcessing,splitDifference,getTransactionAccountContext,getTransactionSource,getTransactionProcessingStatus,isTransactionFinanciallyActive,getTransactionOriginalBankData,beginImportEditor,persistLocalImportEditor,commitImportEditor,setProcessingType,selectFixedOccurrence,SCHEMA_VERSION,CLOUD_STORAGE_VERSION,CLOUD_READ_CONCURRENCY,OWNERS,IMPORT_STATUSES,normalizeIban,normalizeRule,normalizeTransaction,normalizeCore,validateCore,calculateGoalSavedAmount,reconcileGoalSavedAmounts,chunkRows,canonicalValue,rowsChecksum,buildCloudImportEnvelope,assembleCloudImport,mapWithConcurrency,classifyCloudError,fetchImportFromCloud,resolveImportDetails,reconcileActiveImportReference,deleteCloudImportBestEffort,discardImportConcept,rowProcessingValidation,reopenStoredSource,approveStoredSource,normalizeText,matchIdentity,matchCandidates,detectDelimiter,parseDelimited,parseDate,parseAmount,detectFormat,inferMapping,hashText,fingerprint,organizationName,proposeType,recognitionProposal,fixedAmountAt,fixedRecognition,isExplicitlyApproved,importReviewState,markExplicitlyApproved,classifyOriginal,parseBankCsv,findProfile,createImportDraft,updateDraftSummary,compactSummary,validateDraft,transactionKind,expenseImpact,financialRows,advanceForTransaction,savingsForTransaction,detectInternalPairs,directionalBalances,proposeRepaymentAllocations,planImportCommand,commitImportCommand,deriveBatchReviewStatus,stageImportCloudWrites,preserveImportConflict,resolveImportConflict,preservePendingImportsBeforeRemote,planImportEffects,applyImportPlan,learnedRecognitionRules,rememberRecognitionRules,effectManifest,undoImportEffects,transactionFamily,applyTransactionFamily,ImportStore,persistImportDraft,scheduleImportDraftPersist,flushScheduledImportDraft,queueImportSync,flushImportSync,recoverJournal,install,round2,uid,clone,testRenderDraftModal:renderDraftModal};
 });
 
 const FinizeImportRuntime=globalThis.FinizeUpdate4Runtime;

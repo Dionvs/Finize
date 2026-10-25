@@ -1,0 +1,88 @@
+{
+  "date": "2026-10-25",
+  "release": "118-r13",
+  "baseline": "e9f3dbd1203bfd3f91c24c1c3f9ef6ed979b9791",
+  "scope": "targeted audit remediation; no full repository suite",
+  "tests": {
+    "node": {
+      "passed": 189,
+      "failed": 0,
+      "newCases": 11
+    },
+    "browser": {
+      "passed": 45,
+      "failed": 0,
+      "widths": [
+        320,
+        390,
+        430,
+        1440
+      ],
+      "data": "synthetic isolated local only",
+      "cloud": "existing record transport with simulated HTTP responses; no production cloud write",
+      "pwa": "r12 to r13, offline, rollback, financial/import/journal preservation"
+    },
+    "generated": "byte-reproducible",
+    "syntax": "passed",
+    "css": "passed; pre-existing undefined --line token",
+    "diffCheck": "passed",
+    "uiDetector": []
+  },
+  "productionFiles": [
+    {
+      "path": "src/import/runtime.js",
+      "sha256": "27abee2e1302b37c8e8bd0ea9328c61e579db7024733530155ab801cb6565b16"
+    },
+    {
+      "path": "src/ui/bank-connection.mjs",
+      "sha256": "0c8b2ff6a17160a4a585ee0d615166ff169184dc632edeab902dbfd7c5fbe294"
+    },
+    {
+      "path": "app.js",
+      "sha256": "1d61014c5b9721de06571b3e3540431ccee2698a538a40f115ecfe114d358a86"
+    },
+    {
+      "path": "index.html",
+      "sha256": "fd43b638390379400c5c5ceb693bff0be6607ab74833331dce6a7d6002b25f39"
+    },
+    {
+      "path": "service-worker.js",
+      "sha256": "1125ae9d05207078369e62c786df27e41f8be2c81887d1768fb31d38f5f2bf02"
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "src/core/transaction-engine.mjs",
+      "sha256": "ba40966be7e5908d00d7127f0471aec2ece8c4c9de8e4e2b1c611f0b8c665ecd",
+      "unchanged": true
+    },
+    {
+      "path": "src/import/enable-banking-adapter.mjs",
+      "sha256": "af2b5fcee525b7bac9f389e6a5bcb1b25a11fe17821490a487c1c6912d4a8b7e",
+      "unchanged": true
+    },
+    {
+      "path": "functions/src/bank-profile.mjs",
+      "sha256": "be9ab71257f3929a2cc87e454e25868459e6b09a5335c36a4328e9fa0f8daa4d",
+      "unchanged": true
+    },
+    {
+      "path": "firestore.rules",
+      "sha256": "aecdd19b3aac909a0761883d63bf5cde983fe495ff1c9414e4227c4379578d92",
+      "unchanged": true
+    }
+  ],
+  "publication": {
+    "authorizedBy": "user explicit conditional authorization in this chat",
+    "productionDataModified": false,
+    "bankSyncStarted": false,
+    "backendOrRulesDeployed": false
+  },
+  "limitations": [
+    "Production sync and bulk failure causes remain unproven",
+    "No production transaction repair",
+    "No independent reviewer execution of diff",
+    "No full repository-wide regression or live banking test"
+  ],
+  "localEvidence": "backups/audit-herstel-20261025"
+}

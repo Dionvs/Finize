@@ -216,6 +216,34 @@ for (const width of [390, 1440]) test('P5b ' + width + ' direct cash, existing r
   expect(await page.locator('[data-bank-connection]').evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
   expect(errors).toEqual([]);
 });
+for (const phase of ['request','response','staging','storage']) test('audit bank failure distinguishes '+phase+' without exposing raw details', async ({page}) => {
+ const snapshot=await boot(page);
+ if(phase==='request')await page.route('http://127.0.0.1:4999/bank/sync',route=>route.abort());
+ if(phase==='response')await page.route('http://127.0.0.1:4999/bank/sync',route=>route.fulfill({contentType:'application/json',body:'invalid'}));
+ if(phase==='storage')await page.evaluate(()=>{FinizeUpdate4Runtime.persistImportDraft=async()=>{throw new Error('private-bank-payload-do-not-display');};});
+ if(phase==='staging'){
+  await page.locator('[data-bank-sync]').click();await expect(page.locator('[data-balance-value]')).toContainText('990,00');
+  snapshot.transactions[0].remittance_information=['Changed provider description'];
+ }
+ const before=await page.evaluate(()=>JSON.stringify(state.transactions));
+ await page.locator('[data-bank-sync]').click();
+ await expect.poll(()=>page.evaluate(()=>FinizeBank.lastFailure?.phase)).toBe(phase);
+ expect(await page.locator('[data-bank-status]').textContent()).not.toContain('private-bank-payload');
+ expect(await page.evaluate(()=>JSON.stringify(state.transactions))).toBe(before);
+ if(phase==='staging')expect(await page.evaluate(()=>FinizeBank.lastFailure.code)).toBe('provider-identity-conflict');
+});
+test('audit a concurrent import revision after staging stops without overwriting the newer choice',async({page})=>{
+ await boot(page);await page.locator('[data-bank-sync]').click();await expect(page.locator('[data-balance-value]')).toContainText('990,00');
+ await page.locator('[data-bank-review]').click();await page.locator('[data-u4-row]').first().locator('[data-u4-approve]').click();
+ await expect(page.locator('[data-u4-group-result]')).toContainText('1 van 1');await page.locator('[data-u4-close]').click();await page.evaluate(()=>openBankAccountDetails('joint'));
+ const before=await page.evaluate(()=>JSON.stringify(state.transactions));
+ await page.evaluate(()=>{const runtime=FinizeUpdate4Runtime,save=runtime.persistImportDraft;runtime.persistImportDraft=async(root,batch)=>{const current=await runtime.ImportStore.getImport(batch.id);current.version++;current.operationId='concurrent-test';current.rows[0].processing.note='newer local choice';await runtime.ImportStore.putImport(current);return save(root,batch);};});
+ await page.locator('[data-bank-sync]').click();await expect.poll(()=>page.evaluate(()=>FinizeBank.lastFailure?.code)).toBe('import-conflict');
+ expect(await page.evaluate(()=>JSON.stringify(state.transactions))).toBe(before);
+ expect(await page.evaluate(async()=>{const batch=(await FinizeUpdate4Runtime.ImportStore.listImports()).find(row=>row.channel==='bank-api');return batch.rows[0].processing.note;})).toBe('newer local choice');
+ expect(await page.evaluate(async()=>{const batch=(await FinizeUpdate4Runtime.ImportStore.listImports()).find(row=>row.channel==='bank-api');return batch.rows[0].approvalSource;})).toBe('manual');
+});
+
 test('P5b timestamp balance does not double count and missing pages remain visible', async ({ page }) => {
   const snapshot = await boot(page, 390, true, true);
   snapshot.complete = false; snapshot.issue = 'transactions-incomplete';

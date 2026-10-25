@@ -15,6 +15,8 @@ const messages = {
   'no-bank-transactions': 'Nog geen banktransacties opgehaald. Bestaande CSV-imports blijven beschikbaar bij Importeren.',
   'synchronization-busy': 'Deze rekening wordt al bijgewerkt. Probeer het straks opnieuw.',
   'provider-identity-conflict': 'Afwijkende gegevens voor dezelfde bankidentiteit. Bestaande gegevens blijven behouden.',
+  'import-conflict': 'De import is intussen gewijzigd. Synchroniseer eerst de administratie en open daarna de actuele import. Bestaande keuzes blijven behouden.',
+  'cloud-missing': 'De bestaande bankimport ontbreekt in de cloud. Er zijn geen nieuwe bankgegevens verwerkt. Laat de opslag controleren.',
   'provider-unavailable': 'De bank is tijdelijk niet bereikbaar. Bestaande gegevens blijven behouden.',
   'provider-access-blocked': 'Deze rekening is nog niet vrijgegeven voor deze Enable Banking-app. Voor een andere rekeninghouder zijn eigen toestemming en passende providertoegang vereist.',
   'bank-registry-migration-required': 'De bestaande bankverbinding moet eerst veilig door de beheerder worden overgezet. Autoriseer niet opnieuw.',
@@ -35,6 +37,13 @@ export function installBankConnection(root, { enabled = BANK_API_ENABLED, baseUr
   if (!local && (target.origin !== production.origin || target.pathname !== production.pathname || target.protocol !== 'https:')) throw new Error('Ongeldige bankbackend.');
   const busyAccounts = new Set();
   const panels = new Map();
+  let lastFailure = null;
+  const phaseNames = { authorization: 'Aanmelding controleren', request: 'Bankgegevens ophalen', response: 'Bankantwoord lezen',
+    'import-read': 'Bestaande import lezen', staging: 'Bankgegevens vergelijken', storage: 'Import opslaan' };
+  const inPhase = async (phase, action) => {
+    try { return await action(); }
+    catch (error) { throw Object.assign(error instanceof Error ? error : new Error('bank-unavailable'), { bankPhase: phase }); }
+  };
   function refreshControls() {
     for (const [element, update] of panels) {
       if (!element.isConnected) panels.delete(element); else update();
@@ -47,14 +56,15 @@ export function installBankConnection(root, { enabled = BANK_API_ENABLED, baseUr
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), route === '/sync' ? 190000 : 65000);
     try {
-    const response = await root.fetch(baseUrl + route, {
+    const token = await inPhase('authorization', () => user.getIdToken());
+    const response = await inPhase('request', () => root.fetch(baseUrl + route, {
       method: 'POST', cache: 'no-store', redirect: 'error',
       signal: controller.signal,
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + await user.getIdToken() },
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
       body: JSON.stringify(payload)
-    });
-    const data = await response.json();
-    if (!response.ok) throw Object.assign(new Error(data.error || 'provider-unavailable'), { code: data.error });
+    }));
+    const data = await inPhase('response', () => response.json());
+    if (!response.ok) throw Object.assign(new Error('bank-unavailable'), { code: data.error, bankPhase: 'request', httpStatus: response.status });
     return data;
     } finally { clearTimeout(timer); }
   }
@@ -84,12 +94,13 @@ export function installBankConnection(root, { enabled = BANK_API_ENABLED, baseUr
   }
   async function ingest(snapshot, householdId, expectedProfileId = snapshot.accountProfileId) {
     if (snapshot.accountProfileId !== expectedProfileId) throw Object.assign(new Error('wrong-provider-account'), {code:'wrong-provider-account'});
-    const runtime = root.FinizeUpdate4Runtime, imports = await runtime.ImportStore.listImports();
+    const runtime = root.FinizeUpdate4Runtime;
     if (root.CloudAdapter.importScope() !== householdId || snapshot.householdId !== householdId) throw new Error('Het huishouden is gewijzigd.');
     const id = providerBatchId(snapshot.accountProfileId, snapshot.account.identificationHash);
-    const previous = imports.find(batch => batch.id === id);
-    const batch = stageProviderSnapshot(snapshot, root.state, previous, imports, runtime.classifyOriginal);
-    await runtime.persistImportDraft(root, batch);
+    const previous = await inPhase('import-read', () => runtime.resolveProviderImportBase(root, id));
+    const imports = await inPhase('import-read', () => runtime.ImportStore.listImports());
+    const batch = await inPhase('staging', () => stageProviderSnapshot(snapshot, root.state, previous, imports, runtime.classifyOriginal));
+    await inPhase('storage', () => runtime.persistImportDraft(root, batch));
     return batch;
   }
   function bind(panel, profile) {
@@ -107,7 +118,15 @@ export function installBankConnection(root, { enabled = BANK_API_ENABLED, baseUr
         (activationBlocked && (item.hasAttribute('data-bank-authorize') || item.hasAttribute('data-bank-sync'))) || (item.hasAttribute('data-bank-sync') && !connected);
     });
     panels.set(element, controls);
-    const failureMessage = error => messages[error.code || error.message] || (error.name === 'AbortError' ? 'De bank reageert niet op tijd. Probeer het opnieuw.' : 'De actie is niet afgerond. Controleer je verbinding en probeer opnieuw.');
+    const failureMessage = error => {
+      const rawCode = error.code || error.message;
+      const code = Object.hasOwn(messages, rawCode) ? rawCode : 'bank-unavailable';
+      const phase = Object.hasOwn(phaseNames, error.bankPhase) ? error.bankPhase : null;
+      // Deliberately retain only allowlisted diagnostics, never bank payloads or raw errors.
+      lastFailure = { phase, code, httpStatus: Number.isInteger(error.httpStatus) && error.httpStatus >= 400 && error.httpStatus <= 599 ? error.httpStatus : null };
+      const message = messages[code] || (error.name === 'AbortError' ? 'De bank reageert niet op tijd. Probeer het opnieuw.' : 'De actie is niet afgerond. Controleer je verbinding en probeer opnieuw.');
+      return message + (phase ? ' Stap: ' + phaseNames[phase] + '.' : '');
+    };
     async function checkConnection() {
       if (!eligible) return;
       checking = true; controls();
@@ -164,6 +183,7 @@ export function installBankConnection(root, { enabled = BANK_API_ENABLED, baseUr
           await request(bootstrapAvailable?'/bootstrap/disconnect':'/disconnect', { accountProfileId: profile.id });
           sameScope(); connected = false; status.textContent = 'Banktoegang ingetrokken. Je financiële historie blijft behouden.';
         } else if (button.hasAttribute('data-bank-sync')) {
+          lastFailure = null;
           status.textContent = 'Bankgegevens ophalen…';
           const toDate = new Date().toISOString().slice(0, 10);
           const fromDate = new Date(Date.parse(toDate) - 30 * 86400000).toISOString().slice(0, 10);
@@ -182,5 +202,5 @@ export function installBankConnection(root, { enabled = BANK_API_ENABLED, baseUr
       }
     });
   }
-  return { render, bind, ingest };
+  return { render, bind, ingest, get lastFailure() { return lastFailure && { ...lastFailure }; } };
 }
