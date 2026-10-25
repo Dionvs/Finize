@@ -1,5 +1,6 @@
 import { createHash, randomBytes, randomUUID, sign } from 'node:crypto';
 import { bankAuthorizationUrl } from '../shared/bank-authorization-url.mjs';
+import { parseBankRegistry, createAccountMetadataStore, assertRegistryAdopted } from './bank-registry.mjs';
 
 export const failure = (code, status = 400) => Object.assign(new Error(code), { code, status });
 const hash = value => createHash('sha256').update(value).digest('hex');
@@ -28,7 +29,7 @@ export async function checkProviderConfiguration({ config, provider }) {
 }
 
 // Store operations must be atomic. Only this service may read its private collection.
-export function createBankService({ config, store, verifyToken, readAssignment, readProfile, provider, verifyIdentity = async () => false, now = () => Date.now() }) {
+export function createSingleBankService({ config, store, verifyToken, readAssignment, readProfile, provider, verifyIdentity = async () => false, now = () => Date.now() }) {
   function settings() {
     if (!config.enabled || !config.applicationId || !config.uid || !config.householdId || !config.accountProfileId ||
         !/^NL\d{2}INGB\d{10}$/.test(iban(config.iban)) || !config.redirectUrl?.startsWith('https://') ||
@@ -37,12 +38,15 @@ export function createBankService({ config, store, verifyToken, readAssignment, 
   async function authorize(token, profileId) {
     settings();
     const user = await verifyToken(token);
-    if (!user || user.uid !== config.uid || user.email_verified !== true) throw failure('forbidden-user', 403);
+    if (!user || user.uid !== config.uid || user.email_verified !== true || user.email?.toLowerCase() !== config.email.toLowerCase() ||
+        !await verifyIdentity(user.uid, config.email)) throw failure('forbidden-user', 403);
     const assignment = await readAssignment(user.email);
     if (assignment?.householdId !== config.householdId) throw failure('forbidden-household', 403);
+    if (config.actorRole && assignment?.role !== config.actorRole) throw failure('forbidden-user', 403);
     if (profileId !== config.accountProfileId) throw failure('forbidden-account', 403);
     const profile = await readProfile(config.householdId, config.accountProfileId);
-    if (!profile || profile.status === 'archived' || iban(profile.identifier || profile.iban) !== iban(config.iban)) throw failure('account-profile-mismatch', 403);
+    if (!profile || profile.status === 'archived' || config.accountOwner && profile.accountOwner !== config.accountOwner ||
+        iban(profile.identifier || profile.iban) !== iban(config.iban)) throw failure('account-profile-mismatch', 403);
     return user;
   }
   const accountMatches = account => typeof account.identification_hash === 'string' && account.identification_hash.length > 0 &&
@@ -68,6 +72,7 @@ export function createBankService({ config, store, verifyToken, readAssignment, 
   const retirement = session => ({ sessionId: session.sessionId, validUntil: session.validUntil || null, revokePending: true });
   async function revokeRetired(key, session) {
     try {
+      await store.assertSession?.(session);
       if (!Number.isFinite(Date.parse(session.validUntil)) || Date.parse(session.validUntil) > now()) {
         try { await provider('DELETE', '/sessions/' + encodeURIComponent(session.sessionId)); }
         catch (error) { if (error.code !== 'reauthorization-required') throw error; }
@@ -78,6 +83,10 @@ export function createBankService({ config, store, verifyToken, readAssignment, 
   }
   async function retireRejected(session) {
     if (!session.sessionId) return;
+    // A failed reauthorization must not revoke the already working consent,
+    // even if a provider unexpectedly returns that very same session ID.
+    const active = await store.get('connection');
+    if (active?.sessionId === session.sessionId && !active.disabled) return;
     const key = retiredKey(session.sessionId);
     // Persist before the remote request; a crash must not lose the revoke retry.
     await store.set(key, retirement(session));
@@ -86,6 +95,7 @@ export function createBankService({ config, store, verifyToken, readAssignment, 
   async function current() {
     const session = await store.transaction(async tx => {
       const existing = await tx.get('connection'), binding = await tx.get('account-binding'), control = await tx.get('connection-control');
+      if (existing && (!scope(existing) || !existing.accountHash)) throw failure('account-identity-changed', 403);
       if (!existing || existing.disabled || !scope(existing) || !existing.accountHash ||
           !Number.isFinite(Date.parse(existing.validUntil)) || Date.parse(existing.validUntil) <= now() ||
           (existing.revocationVersion || 0) !== generation(control)) throw failure('reauthorization-required', 409);
@@ -94,18 +104,20 @@ export function createBankService({ config, store, verifyToken, readAssignment, 
       if (existing.retentionVersion !== 1) tx.set('connection', { ...existing, retentionVersion: 1 });
       return existing;
     });
+    await store.assertSession?.(session);
     const status = await provider('GET', '/sessions/' + encodeURIComponent(session.sessionId));
     if (status.status !== 'AUTHORIZED' || !Number.isFinite(Date.parse(status.access?.valid_until)) || Date.parse(status.access.valid_until) <= now() ||
         !status.accounts?.includes(session.accountUid)) throw failure('reauthorization-required', 409);
     const account = status.accounts_data?.find(row => row.uid === session.accountUid);
     if (!account || !(account.identification_hashes || [account.identification_hash]).includes(session.accountHash)) throw failure('account-identity-changed', 403);
-    return session;
+    return { ...session, validUntil: new Date(Math.min(Date.parse(session.validUntil), Date.parse(status.access.valid_until))).toISOString() };
   }
   const publicStatus = session => ({
     connected: !!session, accountProfileId: config.accountProfileId,
     validUntil: session?.validUntil || null, backendReady: true
   });
   return {
+    authorizeAccess: authorize,
     async start(token, profileId) {
       if (profileId !== config.accountProfileId) throw failure('forbidden-account', 403);
       const user = await authorize(token, profileId);
@@ -114,7 +126,9 @@ export function createBankService({ config, store, verifyToken, readAssignment, 
       if (!bank || !Number.isFinite(bank.maximum_consent_validity) || bank.maximum_consent_validity <= 0) throw failure('unsupported-ing-connector', 409);
       const state = randomBytes(32).toString('base64url');
       const revocationVersion = generation(await store.get('connection-control'));
-      await store.set('state-' + hash(state), { uid: user.uid, householdId: config.householdId, accountProfileId: profileId, revocationVersion, requiredPsuHeaders: bank.required_psu_headers || [], expiresAt: now() + 600000, used: false });
+      await store.set('state-' + hash(state), { uid: user.uid, householdId: config.householdId, accountProfileId: profileId,
+        purpose: config.authorizationPurpose || 'bank-connection', ibanHash: hash(iban(config.iban)),
+        revocationVersion, requiredPsuHeaders: bank.required_psu_headers || [], expiresAt: now() + 600000, used: false });
       const result = await provider('POST', '/auth', {
         access: { valid_until: new Date(now() + Math.min(bank.maximum_consent_validity, 180 * 86400) * 1000).toISOString(), accounts: [{ iban: iban(config.iban) }], balances: true, transactions: true },
         aspsp: { name: bank.name, country: 'NL' }, psu_type: 'personal', language: 'nl',
@@ -130,6 +144,8 @@ export function createBankService({ config, store, verifyToken, readAssignment, 
       // Claim before exchange; retries never reuse a code after an uncertain response.
       const pending = await store.update('state-' + hash(state), value => {
         if (!value || value.used || value.expiresAt <= now() || value.uid !== config.uid ||
+            (value.purpose || 'bank-connection') !== (config.authorizationPurpose || 'bank-connection') ||
+            value.ibanHash && value.ibanHash !== hash(iban(config.iban)) ||
             value.householdId !== config.householdId || value.accountProfileId !== config.accountProfileId) throw failure('invalid-state', 403);
         return { ...value, used: true };
       });
@@ -137,22 +153,31 @@ export function createBankService({ config, store, verifyToken, readAssignment, 
       await authorizeAfterCallback(pending);
       if ((pending.revocationVersion || 0) !== generation(await store.get('connection-control'))) throw failure('authorization-changed', 403);
       const result = await provider('POST', '/sessions', { code });
+      // A provider session may expose several accounts. Never adopt or revoke a
+      // session already owned by another Finize connection, even on a rejected callback.
       const accounts = (result.accounts || []).filter(accountMatches);
+      await store.claimSession?.({ sessionId: result.session_id, validUntil: result.access?.valid_until,
+        accountHashes: accounts.length === 1 ? [accounts[0].identification_hash, ...(accounts[0].identification_hashes || [])] : [] });
       if (accounts.length !== 1 || !result.session_id || !Number.isFinite(Date.parse(result.access?.valid_until)) ||
           Date.parse(result.access.valid_until) <= now()) {
         await retireRejected({ sessionId: result.session_id, validUntil: result.access?.valid_until });
         throw failure('allowed-account-not-returned', 403);
       }
+      try { await store.verifyProviderSession?.(result, accounts[0]); }
+      catch (error) { await retireRejected({ sessionId: result.session_id, validUntil: result.access.valid_until }); throw error; }
       let previous;
       try {
         previous = await store.transaction(async tx => {
           const old = await tx.get('connection'), binding = await tx.get('account-binding'), control = await tx.get('connection-control');
           const retired = await tx.get(retiredKey(result.session_id));
+          const owner = await tx.getSessionOwner?.(result.session_id, accounts[0].identification_hash);
+          if (tx.getSessionOwner && !scope(owner)) throw failure('session-account-conflict', 403);
           if ((pending.revocationVersion || 0) !== generation(control)) throw failure('authorization-changed', 403);
           const accountHash = bindingIdentity(binding, old) || accounts[0].identification_hash;
           if (retired?.revokePending || !(accounts[0].identification_hashes || [accounts[0].identification_hash]).includes(accountHash)) throw failure('account-identity-changed', 403);
           if (!binding) tx.set('account-binding', bindingRecord(accountHash));
           if (old?.sessionId && old.sessionId !== result.session_id) tx.set(retiredKey(old.sessionId), retirement(old));
+          tx.setSessionOwner?.({ sessionId: result.session_id, validUntil: result.access.valid_until });
           tx.set('connection', { uid: pending.uid, householdId: pending.householdId, accountProfileId: pending.accountProfileId,
             sessionId: result.session_id, accountUid: accounts[0].uid, accountHash, revocationVersion: pending.revocationVersion || 0,
             retentionVersion: 1, requiredPsuHeaders: pending.requiredPsuHeaders || [], validUntil: result.access.valid_until });
@@ -171,6 +196,7 @@ export function createBankService({ config, store, verifyToken, readAssignment, 
       try { result = publicStatus(await current()); }
       catch (error) { if (['reauthorization-required', 'EXPIRED_SESSION', 'EXPIREDSESSION'].includes(error.code)) result = { ...publicStatus(null), reauthorize: true }; else throw error; }
       const active = await store.get('connection');
+      result.lastSuccessfulSync = (await store.get('sync-status'))?.lastSuccessfulSync || null;
       result.revocationPending = !!(active?.disabled && active.sessionId) || (await store.listRetired(1)).length > 0;
       return result;
     },
@@ -212,8 +238,11 @@ export function createBankService({ config, store, verifyToken, readAssignment, 
         await authorize(token, accountProfileId);
         const active = await store.get('connection');
         if (active?.disabled || active?.sessionId !== session.sessionId) throw failure('connection-changed', 409);
+        const fetchedAt = new Date(now()).toISOString();
+        await store.update('sync-status', old => ({ lastAttemptAt: fetchedAt, complete, issue,
+          lastSuccessfulSync: complete ? { fetchedAt } : old?.lastSuccessfulSync || null }));
         return { version: 1, runId: lockId, householdId: config.householdId, accountProfileId,
-          account: { iban: iban(config.iban), identificationHash: session.accountHash }, fetchedAt: new Date(now()).toISOString(),
+          account: { iban: iban(config.iban), identificationHash: session.accountHash }, fetchedAt,
           fromDate, toDate, complete, issue, balances: balances.balances || [], transactions };
       } finally {
         await store.update('sync-lock', old => old?.id === lockId ? { ...old, until: 0 } : old);
@@ -248,9 +277,50 @@ export function createBankService({ config, store, verifyToken, readAssignment, 
   async function authorizeAfterCallback(pending) {
     const assignment = await readAssignment(config.email);
     const profile = await readProfile(config.householdId, config.accountProfileId);
-    if (!await verifyIdentity(pending.uid) || pending.uid !== config.uid || assignment?.householdId !== config.householdId ||
+    if (!await verifyIdentity(pending.uid, config.email) || pending.uid !== config.uid || assignment?.householdId !== config.householdId ||
+        config.actorRole && assignment?.role !== config.actorRole || config.accountOwner && profile?.accountOwner !== config.accountOwner ||
         !profile || profile.status === 'archived' || iban(profile.identifier || profile.iban) !== iban(config.iban)) throw failure('authorization-changed', 403);
   }
+}
+
+export function createBankService(dependencies) {
+  const { config, store } = dependencies, registry = parseBankRegistry(config);
+  if (!registry) return createSingleBankService(dependencies);
+  const entries = new Map(registry.accounts.map(entry => [entry.accountProfileId, entry]));
+  const services = new Map(registry.accounts.map(entry => [entry.accountProfileId, createSingleBankService({ ...dependencies,
+    config: { ...config, ...entry, enabled: config.enabled, accountOwner: entry.owner },
+    store: createAccountMetadataStore(store, entry, config.accountProfileId) })]));
+  const blocked = entry => !entry.enabled || !entry.providerLinked || registry.providerMode === 'restricted' && entry.uid !== registry.controlPanelUid;
+  async function admitted(entry) {
+    const identity = await assertRegistryAdopted(store, config);
+    if (entry.accountProfileId !== config.accountProfileId && entry.accountHash === identity.accountHash) throw failure('duplicate-bank-registry-identity', 403);
+  }
+  async function selected(token, profileId, permitBlocked = false) {
+    const entry = entries.get(profileId), service = services.get(profileId);
+    if (!service) { await dependencies.verifyToken(token); throw failure('forbidden-account', 403); }
+    await service.authorizeAccess(token, profileId);
+    await admitted(entry);
+    if (!permitBlocked && blocked(entry)) throw failure('provider-access-blocked', 403);
+    return { entry, service };
+  }
+  return {
+    async start(token, profileId) { return (await selected(token, profileId)).service.start(token, profileId); },
+    async sync(token, body, headers) { return (await selected(token, body.accountProfileId)).service.sync(token, body, headers); },
+    async status(token, profileId) {
+      const { entry, service } = await selected(token, profileId, true);
+      if (blocked(entry)) return { connected: false, accountProfileId: profileId, backendReady: true, activationBlocked: true, blockedReason: 'provider-access-blocked' };
+      return service.status(token, profileId);
+    },
+    async disconnect(token, profileId) { return (await selected(token, profileId, true)).service.disconnect(token, profileId); },
+    async callback(input) {
+      if (typeof input.state !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(input.state)) throw failure('invalid-state', 403);
+      const pending = await store.get('state-' + hash(input.state)), entry = entries.get(pending?.accountProfileId);
+      if (!entry || pending.uid !== entry.uid || pending.householdId !== entry.householdId) throw failure('invalid-state', 403);
+      await admitted(entry);
+      if (blocked(entry)) throw failure('provider-access-blocked', 403);
+      return services.get(entry.accountProfileId).callback(input);
+    }
+  };
 }
 
 export function createProviderClient({ applicationId, privateKey, fetchImpl = fetch, now = () => Date.now() }) {

@@ -1,0 +1,56 @@
+{
+  "projectId": "example-project-do-not-use",
+  "enabled": true,
+  "applicationId": "example-application-id",
+  "uid": "example-uid-dion",
+  "email": "dion@example.invalid",
+  "householdId": "example-household",
+  "accountProfileId": "example-dion",
+  "iban": "NL28INGB0000000001",
+  "accountHash": "",
+  "aspspName": "ING",
+  "redirectUrl": "https://backend.example.invalid/callback",
+  "registry": {
+    "version": 1,
+    "providerMode": "restricted",
+    "controlPanelUid": "example-uid-dion",
+    "accounts": [
+      {
+        "owner": "dion",
+        "actorRole": "dion",
+        "accountProfileId": "example-dion",
+        "uid": "example-uid-dion",
+        "email": "dion@example.invalid",
+        "householdId": "example-household",
+        "iban": "NL28INGB0000000001",
+        "accountHash": "",
+        "enabled": true,
+        "providerLinked": true
+      },
+      {
+        "owner": "gezamenlijk",
+        "actorRole": "dion",
+        "accountProfileId": "example-gezamenlijk",
+        "uid": "example-uid-dion",
+        "email": "dion@example.invalid",
+        "householdId": "example-household",
+        "iban": "NL98INGB0000000002",
+        "accountHash": "example-linked-joint-hash",
+        "enabled": false,
+        "providerLinked": false
+      },
+      {
+        "owner": "dara",
+        "actorRole": "dara",
+        "accountProfileId": "example-dara",
+        "uid": "example-uid-dara",
+        "email": "dara@example.invalid",
+        "householdId": "example-household",
+        "iban": "NL71INGB0000000003",
+        "accountHash": "",
+        "enabled": false,
+        "providerLinked": false
+      }
+    ]
+  }
+}

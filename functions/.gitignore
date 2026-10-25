@@ -4,5 +4,6 @@ node_modules/
 *.pem
 *.key
 shared/
+bank-registry.private*.json
 *-debug.log
 node_modules.incomplete-p5b/

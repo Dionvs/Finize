@@ -2,15 +2,17 @@ const DAY = 86400000;
 export const BANK_TTL_FIELD = 'finizeBankExpiresAt';
 const time = value => Number.isSafeInteger(value) && value > 0 && value <= 8640000000000000 - 7 * DAY ? value : null;
 const sessionEnd = value => typeof value === 'string' ? time(Date.parse(value)) : null;
-const temporaryKey = key => key === 'connection' || key === 'sync-lock' || /^(state|retired)-[a-f0-9]{64}$/.test(key);
+const baseKey = key => key.replace(/^account-[a-f0-9]{64}-/, '');
+const temporaryKey = key => ['connection', 'sync-lock', 'bootstrap-candidate', 'bootstrap-lock'].includes(key) || /^(state|retired|bootstrap-retired|session-owner)-[a-f0-9]{64}$/.test(key);
 
 // Deadlines depend on original validity, never on status reads or retry time.
 export function bankMetadataExpiry(key, value, now) {
+  key = baseKey(key);
   if (!temporaryKey(key)) return null;
   if (value === null) return time(now) === null ? null : now + DAY;
   if (key.startsWith('state-')) return time(value?.expiresAt) === null ? null : value.expiresAt + DAY;
-  if (key === 'sync-lock') return time(value?.expiresAt) === null ? null : value.expiresAt + DAY;
-  if (key === 'connection' && value?.retentionVersion !== 1) return null; // Preserve unmigrated legacy identity.
+  if (['sync-lock', 'bootstrap-lock'].includes(key)) return time(value?.expiresAt) === null ? null : value.expiresAt + DAY;
+  if (['connection','bootstrap-candidate'].includes(key) && value?.retentionVersion !== 1) return null; // Preserve unmigrated legacy identity.
   const end = sessionEnd(value?.validUntil);
   return end === null ? null : end + 7 * DAY;
 }
@@ -24,7 +26,7 @@ export function bankMetadataDocument(key, value, { now, timestamp }) {
 export function createBankMetadataStore({ db, Timestamp, FieldPath, now = Date.now }) {
   const collection = db.collection('finizeBankPrivate/ing/metadata');
   const ref = key => {
-    if (!/^(?:connection|account-binding|connection-control|sync-lock|(?:state|retired)-[a-f0-9]{64})$/.test(key)) throw new Error('invalid-bank-metadata-key');
+    if (!/^(?:(?:account-[a-f0-9]{64}-)?(?:connection|account-binding|connection-control|sync-lock|sync-status|retired-[a-f0-9]{64}|bootstrap-(?:candidate|identity|control|lock|promotion|retired-[a-f0-9]{64}))|state-[a-f0-9]{64}|session-owner-[a-f0-9]{64}|registry-control)$/.test(key)) throw new Error('invalid-bank-metadata-key');
     return collection.doc(key);
   };
   const document = (key, value) => bankMetadataDocument(key, value, { now: now(), timestamp: value => Timestamp.fromMillis(value) });
@@ -44,9 +46,10 @@ export function createBankMetadataStore({ db, Timestamp, FieldPath, now = Date.n
         return value;
       });
     },
-    async listRetired(limit = 6) {
+    async listRetired(limit = 6, prefix = 'retired-') {
+      if (!/^(?:account-[a-f0-9]{64}-)?(?:bootstrap-)?retired-$/.test(prefix)) throw new Error('invalid-bank-metadata-key');
       const snapshot = await collection.where('value.revokePending', '==', true).orderBy(FieldPath.documentId())
-        .startAt('retired-').endAt('retired-\uf8ff').limit(limit).get();
+        .startAt(prefix).endAt(prefix+'\uf8ff').limit(limit).get();
       return snapshot.docs.map(doc => ({ key: doc.id, value: doc.data().value }));
     }
   };
