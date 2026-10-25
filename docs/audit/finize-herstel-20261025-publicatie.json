@@ -1,0 +1,75 @@
+{
+  "version": "118-r13",
+  "commit": "e984e549d59dc4ced94f20bea95fb8029fa9bab2",
+  "assets": [
+    {
+      "name": "index.html",
+      "status": 200,
+      "sha256": "d9fda1ae8bfc5350bb536318b147cae4fa3c7eb0ae04cf321cc245147101af2d"
+    },
+    {
+      "name": "app.js",
+      "status": 200,
+      "sha256": "1d61014c5b9721de06571b3e3540431ccee2698a538a40f115ecfe114d358a86"
+    },
+    {
+      "name": "app.css",
+      "status": 200,
+      "sha256": "992ca943d6294b462ab851e5ab808c8b7d6084f7fa9f90f4014916b6e04da285"
+    },
+    {
+      "name": "service-worker.js",
+      "status": 200,
+      "sha256": "9d13a57ed2bb6b6de9b495887b507748426ac93575dbf8a58129dd7c27efa997"
+    },
+    {
+      "name": "manifest.json",
+      "status": 200,
+      "sha256": "00cbaa9a122b7a02219bdf7bedd7b1824e6e744a4b430201e7a8e6585726e239"
+    },
+    {
+      "name": "icons/icon-192.png",
+      "status": 200,
+      "sha256": "7a804e24cd03a592ac480b107567783388ae1de7b8eef2820299d6addbc85af5"
+    },
+    {
+      "name": "finize-logo.png",
+      "status": 200,
+      "sha256": "b0d5e979f9bea750fa2a2bb25a0514033b64738caec987039b680886c0d66e88"
+    }
+  ],
+  "checks": [
+    {
+      "width": 320,
+      "blockedSdkShell": "authentication remains blocked with explicit startup message",
+      "functionalContext": "existing synthetic auth test driver, isolated scoped local storage",
+      "approvedEffectsAfterReload": 2,
+      "pageErrors": [],
+      "blockedExternalOrigins": [
+        "https://www.gstatic.com"
+      ]
+    },
+    {
+      "width": 390,
+      "blockedSdkShell": "authentication remains blocked with explicit startup message",
+      "functionalContext": "existing synthetic auth test driver, isolated scoped local storage",
+      "approvedEffectsAfterReload": 2,
+      "pageErrors": [],
+      "blockedExternalOrigins": [
+        "https://www.gstatic.com"
+      ]
+    },
+    {
+      "width": 1440,
+      "blockedSdkShell": "authentication remains blocked with explicit startup message",
+      "functionalContext": "existing synthetic auth test driver, isolated scoped local storage",
+      "approvedEffectsAfterReload": 2,
+      "pageErrors": [],
+      "blockedExternalOrigins": [
+        "https://www.gstatic.com"
+      ]
+    }
+  ],
+  "productionDataWrites": 0,
+  "syntheticLocalOnly": true
+}
