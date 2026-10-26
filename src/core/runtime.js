@@ -6610,7 +6610,7 @@ window.FinizeLiquidity=Object.freeze({
     }
     const imports=await window.FinizeUpdate4.importStore.listImports();
     if(scope!==CloudAdapter.importScope())throw new Error('Het huishouden is gewijzigd. Open de prognose opnieuw.');
-    const select=()=>selectDailyLiquidity(state,{...options,imports,monthlyForecast:(_,month)=>monthlyFinancialForecast(month),scope:{householdId:scope,accountProfiles:state.accountProfiles||[]}});
+    const select=()=>{const result=selectDailyLiquidity(state,{...options,imports,monthlyForecast:(_,month)=>monthlyFinancialForecast(month),scope:{householdId:scope,accountProfiles:state.accountProfiles||[]}});return options.withFinancialBasis?{...result,financialBasis:DataAdapter.store().head?.sha256}:result;};
     let result=select();
     if(state.__finizePartialHistory && CloudAdapter.recordSession && result.requiredMonths.some(month=>!state.verifiedPeriods?.includes(month))){
       await CloudAdapter.recordSession.openMonth(state.meta.selectedMonth,{additionalMonths:result.requiredMonths});

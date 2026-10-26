@@ -3273,7 +3273,7 @@
     const end = validCalendarDate(periodEnd) ? periodEnd : monthEnd(nextPlanningMonth(asOfDate.slice(0, 7)));
     return balanceRequiredMonths(startDate && checkpoint ? shiftLiquidityDay(checkpoint.asOfDate, 1) : (checkpoint == null ? void 0 : checkpoint.asOfDate) || startDate || asOfDate, end);
   }
-  function buildLiquidityInput(state2, { accountProfileId, asOfDate, endDate, scope, imports = [], importsAvailable = true, coverage = [], monthlyForecast = financialForecastForMonth, salaryOnly = false, planningBasis = false } = {}) {
+  function buildLiquidityInput(state2, { accountProfileId, asOfDate, endDate, scope, imports = [], importsAvailable = true, coverage = [], monthlyForecast = financialForecastForMonth, salaryOnly = false, planningBasis = false, incomeOnly = false, includeReceipt = false } = {}) {
     var _a2, _b, _c, _d, _e, _f;
     if (!validCalendarDate(asOfDate) || endDate !== void 0 && (!validCalendarDate(endDate) || endDate < asOfDate)) throw new Error("Kies geldige prognosedatums; de einddatum mag niet vóór de berekendatum liggen.");
     if (!planningBasis && endDate && balanceRequiredMonths(asOfDate, endDate).length > 24) throw new Error("Kies een prognose van maximaal 24 kalendermaanden.");
@@ -3295,26 +3295,35 @@
     if (!endDate) {
       let month = asOfDate.slice(0, 7);
       for (let i = 0; i < 13 && !receipt; i++, month = nextPlanningMonth(month)) {
-        const salaries = salaryPlans(state2, month).flatMap((row) => {
-          if (!replaced.has(row.id)) return [row];
-          return projections.filter((p) => replaced.get(row.id).has(sourceRecordKey(p.transaction)) && p.transaction.accountProfileId === accountProfileId).filter((p) => {
+        let allowances = [];
+        if (incomeOnly && (profile == null ? void 0 : profile.accountOwner) !== "gezamenlijk") {
+          try {
+            allowances = allowancePlans(state2, month, monthlyForecast(state2, month), projections);
+          } catch (e) {
+            reasons2.push(issue("financial-planning-unavailable", month));
+          }
+        }
+        const salaries = [...salaryPlans(state2, month), ...allowances].flatMap((row) => {
+          const keys = /* @__PURE__ */ new Set([...replaced.get(row.id) || [], ...row.replacedBy]);
+          if (!keys.size) return [row];
+          return projections.filter((p) => keys.has(sourceRecordKey(p.transaction)) && p.transaction.accountProfileId === accountProfileId).filter((p) => {
             var _a3, _b2;
             return ((_a3 = p.transaction.bankOriginal) == null ? void 0 : _a3.valid) && p.transaction.bankOriginal.currency === "EUR" && ((_b2 = p.transaction.bankOriginal.bankStatus) != null ? _b2 : "booked") === "booked" && validCalendarDate(p.transaction.bankOriginal.bankDate);
-          }).map((p) => ({ ...row, accountProfileId, date: p.transaction.bankOriginal.bankDate, dateQuality: "confirmed" }));
+          }).map((p) => ({ ...row, accountProfileId, date: p.transaction.bankOriginal.bankDate, dateQuality: "confirmed", replacedBy: [] }));
         });
         receipt = [...salaries, ...transfers.filter((row) => {
           var _a3;
-          return !salaryOnly && (profile == null ? void 0 : profile.accountOwner) !== "gezamenlijk" && row.amountCents > 0 && ((_a3 = row.date) == null ? void 0 : _a3.slice(0, 7)) === month && !(state2.internalTransfers || []).some((t) => {
+          return !incomeOnly && !salaryOnly && (profile == null ? void 0 : profile.accountOwner) !== "gezamenlijk" && row.amountCents > 0 && ((_a3 = row.date) == null ? void 0 : _a3.slice(0, 7)) === month && !(state2.internalTransfers || []).some((t) => {
             var _a4, _b2, _c2;
             return t.id === row.transferId && ((_a4 = t.type) == null ? void 0 : _a4.startsWith("zakgeld-")) && ((_c2 = (_b2 = profile == null ? void 0 : profile.liquidity) == null ? void 0 : _b2.allowanceDays) == null ? void 0 : _c2[profile.accountOwner]);
           });
-        })].filter((row) => row.accountProfileId === accountProfileId && row.date > asOfDate && !row.replacedBy.length).sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id))[0] || null;
+        })].filter((row) => row.amountCents > 0 && row.accountProfileId === accountProfileId && row.date > asOfDate && !row.replacedBy.length).sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id))[0] || null;
       }
     }
-    const allowanceDay = !salaryOnly && (profile == null ? void 0 : profile.accountOwner) !== "gezamenlijk" && ((_b = (_a2 = profile == null ? void 0 : profile.liquidity) == null ? void 0 : _a2.allowanceDays) == null ? void 0 : _b[profile.accountOwner]);
+    const allowanceDay = !incomeOnly && !salaryOnly && (profile == null ? void 0 : profile.accountOwner) !== "gezamenlijk" && ((_b = (_a2 = profile == null ? void 0 : profile.liquidity) == null ? void 0 : _a2.allowanceDays) == null ? void 0 : _b[profile.accountOwner]);
     const allowanceWindow = allowanceDay ? monthEnd(monthlyPaymentDate(asOfDate.slice(0, 7), allowanceDay) > asOfDate ? asOfDate.slice(0, 7) : nextPlanningMonth(asOfDate.slice(0, 7))) : null;
-    const horizonEnd2 = endDate || (receipt ? shiftLiquidityDay(receipt.date, -1) : allowanceWindow);
-    const horizon = { kind: endDate ? "manual" : receipt ? "next-receipt" : allowanceWindow ? "allowance-window" : "next-receipt", endDate: horizonEnd2, receiptDate: (receipt == null ? void 0 : receipt.date) || null, receiptId: (receipt == null ? void 0 : receipt.id) || null, boundary: !receipt ? "end-of-day" : "end-of-previous-day" };
+    const horizonEnd2 = endDate || (receipt ? includeReceipt ? receipt.date : shiftLiquidityDay(receipt.date, -1) : allowanceWindow);
+    const horizon = { kind: endDate ? "manual" : receipt ? "next-receipt" : allowanceWindow ? "allowance-window" : "next-receipt", endDate: horizonEnd2, receiptDate: (receipt == null ? void 0 : receipt.date) || null, receiptId: (receipt == null ? void 0 : receipt.id) || null, boundary: endDate || includeReceipt || !receipt ? "end-of-day" : "end-of-previous-day" };
     if (!horizonEnd2) reasons2.push(issue("missing-reliable-horizon"));
     const requiredMonths = liquidityRequiredMonths(state2, { accountProfileId, asOfDate, endDate: horizonEnd2 || asOfDate, scope }).filter((month) => !planningBasis || month >= shiftLiquidityDay(asOfDate, 1).slice(0, 7));
     for (const month of requiredMonths) if (state2.__finizePartialHistory && !((_c = state2.verifiedPeriods) == null ? void 0 : _c.includes(month))) reasons2.push(issue("missing-period", month));
@@ -3645,7 +3654,22 @@
     return { hard, softIds };
   }
   function withAvailability(projection, input, fromDate, goalInputFor) {
-    const { hard, softIds } = hardAvailability(projection, input, fromDate);
+    var _a2, _b, _c;
+    let { hard, softIds } = hardAvailability(projection, input, fromDate);
+    if (input.incomeKpis) {
+      const opening = hard.opening.balanceCents;
+      const points = opening === null || !hard.horizon.endDate ? [] : [{ date: fromDate, expectedBalanceCents: opening }, ...hard.days.filter((row) => row.date >= fromDate)];
+      const minimum = points.reduce((best, row) => !best || row.expectedBalanceCents < best.expectedBalanceCents ? row : best, null);
+      const value = (_a2 = minimum == null ? void 0 : minimum.expectedBalanceCents) != null ? _a2 : null, free = value === null ? null : Math.max(0, safe(value - hard.bufferCents));
+      hard = {
+        ...hard,
+        minimumBalanceCents: value,
+        minimumDate: (_b = minimum == null ? void 0 : minimum.date) != null ? _b : null,
+        freeAfterObligationsCents: hard.status === "projected" ? free : null,
+        indicativeFreeAfterObligationsCents: free,
+        availability: { ...hard.availability, minimumCents: value, minimumDate: (_c = minimum == null ? void 0 : minimum.date) != null ? _c : null }
+      };
+    }
     let goalProjection = hard;
     const end = hard.horizon.endDate;
     if (end && end !== monthEnd(end.slice(0, 7)) && hard.savingsPlans.some((row) => row.amountCents > 0) && goalInputFor) {
@@ -3655,6 +3679,7 @@
     const guidance = savingsGuidance(goalProjection, hard.indicativeFreeAfterObligationsCents);
     return {
       ...projection,
+      ...input.incomeKpis ? { minimumBalanceCents: hard.minimumBalanceCents, minimumDate: hard.minimumDate } : {},
       freeAfterObligationsCents: hard.freeAfterObligationsCents,
       indicativeFreeAfterObligationsCents: hard.indicativeFreeAfterObligationsCents,
       availability: { ...hard.availability, excludedSavingsPlanIds: [...softIds] },
@@ -3672,6 +3697,11 @@
   }
   function selectDailyLiquidity(state2, options) {
     var _a2;
+    if (options.incomeKpis) {
+      const input2 = buildLiquidityInput(state2, { ...options, endDate: void 0, incomeOnly: true, salaryOnly: false, includeReceipt: false });
+      input2.incomeKpis = true;
+      return withAvailability(projectDailyLiquidity(input2), input2, options.asOfDate, (endDate) => buildLiquidityInput(state2, { ...options, endDate, incomeOnly: true, salaryOnly: false, includeReceipt: false }));
+    }
     if (!options.startDate) {
       const input2 = buildLiquidityInput(state2, options);
       return withAvailability(projectDailyLiquidity(input2), input2, options.asOfDate, (endDate) => buildLiquidityInput(state2, { ...options, endDate, salaryOnly: false }));
@@ -3786,7 +3816,7 @@
     const dated = (value) => new Intl.DateTimeFormat("nl-NL", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(/* @__PURE__ */ new Date(value + "T12:00:00Z"));
     const start = p.displayStartDate || p.asOfDate;
     const from = start.slice(0, 4) === p.horizon.endDate.slice(0, 4) ? date(start) : dated(start);
-    return `${from} – ${dated(p.horizon.endDate)} · ${p.horizon.kind === "allowance-window" ? "Zakgeldprognose tot einde maand" : ["manual", "month-limit"].includes(p.horizon.kind) ? "Einddatum inbegrepen" : "Tot vóór volgend salaris"}`;
+    return `${from} – ${dated(p.horizon.endDate)} · ${p.horizon.kind === "allowance-window" ? "Zakgeldprognose tot einde maand" : ["manual", "month-limit"].includes(p.horizon.kind) ? "Einddatum inbegrepen" : p.horizon.boundary === "end-of-day" ? "Tot volgend salaris · Einddatum inbegrepen" : "Tot vóór volgend salaris"}`;
   }
   function pointMeaning(events, isMinimum) {
     const income = events.some((e) => e.amountCents > 0), expense = events.some((e) => e.amountCents < 0);
@@ -3809,7 +3839,7 @@
     const startDate = filter === "month" ? first : anchor;
     if (filter === "custom" && (!/^\d{4}-\d{2}-\d{2}$/.test(custom) || custom < startDate || custom > last || (/* @__PURE__ */ new Date(custom + "T12:00:00Z")).toISOString().slice(0, 10) !== custom)) throw new Error("Kies een einddatum binnen de geselecteerde maand, vanaf " + date(startDate) + ".");
     const endDate = filter === "salary" ? void 0 : filter === "month" ? last : filter === "custom" ? custom : [horizonEnd(filter, anchor), last].sort()[0];
-    return { startDate, endDate, salaryOnly: filter === "salary", horizonReferenceDate: anchor, horizonLimitDate: last, minDate: anchor, maxDate: last };
+    return { startDate, endDate, salaryOnly: false, incomeOnly: filter === "salary", includeReceipt: filter === "salary", horizonReferenceDate: anchor, horizonLimitDate: filter === "salary" ? void 0 : last, minDate: anchor, maxDate: last };
   }
   function chartDays(p) {
     var _a2;
@@ -3876,7 +3906,7 @@
   function chartHtml(p, width = 720) {
     width = Math.max(210, width);
     const plotStart = 76, plotEnd = width - 24;
-    if (p && !p.horizon.endDate) return '<p class="p3-empty">Een betrouwbare volgende salarisdatum ontbreekt. Kies een andere periode of stel salaris in bij Bankrekeningen.</p>';
+    if (p && !p.horizon.endDate) return '<p class="p3-empty">Een betrouwbaar volgend salaris- of zakgeldmoment ontbreekt. Kies een andere periode of controleer de inkomensplanning bij Bankrekeningen.</p>';
     if (!p) return '<p class="p3-empty">Een bruikbaar beginsaldo ontbreekt. Stel een saldo-ijkpunt in.</p>';
     const days = chartDays(p), known = days.filter((d) => Number.isSafeInteger(d.expectedBalanceCents)), values = known.map((d) => d.expectedBalanceCents), lo = Math.min(0, p.bufferCents, ...values), hi = Math.max(p.bufferCents, ...values, 100), range = hi - lo || 1;
     const chartHeight = width >= 440 ? 205 : 245, baseline = chartHeight - 40;
@@ -3907,7 +3937,7 @@
   var info = (key, title, content) => `<button type="button" class="p3-info-button" data-p3-info="${key}" aria-label="Uitleg over ${escape2(title)}" aria-controls="p3-info-${key}" aria-expanded="false">ⓘ</button><div class="p3-info-popover" id="p3-info-${key}" popover="auto" role="dialog" aria-modal="false" aria-label="${escape2(title)}" data-p3-info-panel="${key}"><div class="p3-info-heading"><strong>${title}</strong><button type="button" class="ghost small" data-p3-close-info="${key}" aria-label="Sluiten · uitleg over ${escape2(title)}">Sluiten</button></div>${content}</div>`;
   var calculationHelp = (p) => {
     var _a2;
-    return `<p>Dit is de maximale extra uitgave binnen de beoordelingsperiode zonder onder je veiligheidsbuffer te komen, na resterende verplichtingen en budgetten. Beoordeling: ${date(((_a2 = p.availability) == null ? void 0 : _a2.fromDate) || p.asOfDate)} tot en met ${date(p.horizon.endDate)}.</p><p>De grafiek kan ook verstreken dagen tonen. Gepland sparen is een streefdoel, geen extra harde aftrek. De spaardoelruimte volgt de verwachte kasruimte aan het maandeinde en de bestaande spaarplanning.</p>`;
+    return `<p>Dit is de berekende ruimte boven je buffer tot vlak vóór de volgende salaris- of zakgeldontvangst. De buffer wordt één keer afgetrokken van het laagste verwachte saldo. De grafiekperiode verandert deze beoordelingsperiode niet. Beoordeling: ${date(((_a2 = p.availability) == null ? void 0 : _a2.fromDate) || p.asOfDate)} tot en met ${date(p.horizon.endDate)}.</p><p>De grafiek kan ook verstreken dagen tonen. Gepland sparen is een streefdoel, geen extra harde aftrek. De spaardoelruimte volgt de verwachte kasruimte aan het maandeinde en de bestaande spaarplanning.</p>`;
   };
   function qualityHelp(p) {
     const reasons2 = explainLiquidityReasons(p);
@@ -3927,7 +3957,7 @@
     const balanceSub = `${status(balance.status)}${balanceDate ? ` · Berekend t/m ${date(balance.toDate || p.asOfDate)}` : ""}${bankMarkup ? "" : " · Saldo bijwerken"}`;
     const reconciliations = (p.reconciliations || []).filter((r) => r.differenceCents !== null && r.differenceCents !== 0).map((r) => `<p class="p3-caption">Saldo-ijkpunt ${date(r.date)}: ${money2(r.observedCents)} · berekend ${money2(r.modeledCents)} · verschil ${money2(r.differenceCents)}. Vanaf deze dag loopt de berekening verder met het handmatig ingestelde saldo.</p>`).join("");
     const qualityActions = p.reasons.length ? `<div class="p3-quality-actions">${action("settings", p.reasons.some((r) => r.code === "missing-reliable-horizon") ? "Salarisdatum instellen" : "Prognose instellen")}${v.balance === null ? action("balance", "Saldo instellen") : ""}</div>` : "";
-    return `<div class="p3-kpis">${kpi("free", "Vrij na verplichtingen", money2(v.free), freeSub, "income", calculationHelp(p) + savingDetails)}${kpi("balance", p.horizon.endDate < p.asOfDate ? "Saldo op " + date(p.horizon.endDate) : "Huidig saldo", v.balance === null ? "Saldo onbekend" : money2(v.balance), balanceSub, "wallet", `<p>Dit is de rekeningstand op basis van je vastgelegde banksaldo en beschikbare bankboekingen. ${balanceDate ? `Het startpunt is het saldo-ijkpunt van ${date(balanceDate)}. Daarna tellen beschikbare bankboekingen mee tot en met ${date(balance.toDate || p.asOfDate)}.` : ""} Dit is geen automatische bevestiging van je bank.</p>${qualityHelp(p)}`, "balance")}${kpi("minimum", "Laagste prognose", money2(v.minimum), `${date(v.minimumDate)} · ${status(p.status)}`, "chart", `<p>Het laagste berekende saldo binnen de gekozen periode. De datum en het bedrag komen uit dezelfde saldolijn.</p>${qualityHelp(p)}`)}${kpi("buffer", "Buffer", money2(v.buffer), "Buffer instellen", "shield", `<p>De buffer is de veiligheidsmarge die je op deze rekening wilt houden. Vrij na verplichtingen houdt rekening met deze marge. Je buffer is geen aparte bankboeking.</p>`, "settings")}</div>${warning}<div class="p3-outlook-footer"><span class="p3-account-name">Rekening: ${escape2(profile.name)}</span>${qualityActions}${reconciliations}</div>`;
+    return `<div class="p3-kpis">${kpi("free", "Vrij na verplichtingen", money2(v.free), freeSub, "income", calculationHelp(p) + savingDetails)}${kpi("balance", p.horizon.endDate < p.asOfDate ? "Saldo op " + date(p.horizon.endDate) : "Huidig saldo", v.balance === null ? "Saldo onbekend" : money2(v.balance), balanceSub, "wallet", `<p>Dit is de rekeningstand op basis van je vastgelegde banksaldo en beschikbare bankboekingen. ${balanceDate ? `Het startpunt is het saldo-ijkpunt van ${date(balanceDate)}. Daarna tellen beschikbare bankboekingen mee tot en met ${date(balance.toDate || p.asOfDate)}.` : ""} Dit is geen automatische bevestiging van je bank.</p>${qualityHelp(p)}`, "balance")}${kpi("minimum", "Laagste prognose", money2(v.minimum), `${date(v.minimumDate)} · ${status(p.status)}`, "chart", `<p>Het laagste verwachte saldo vanaf vandaag tot vlak vóór je volgende salaris- of zakgeldontvangst, inclusief je huidige saldo. Deze KPI verandert niet wanneer je de grafiekperiode wisselt.</p>${qualityHelp(p)}`)}${kpi("buffer", "Buffer", money2(v.buffer), "Buffer instellen", "shield", `<p>De buffer is de veiligheidsmarge die je op deze rekening wilt houden. Vrij na verplichtingen houdt rekening met deze marge. Je buffer is geen aparte bankboeking.</p>`, "settings")}</div>${warning}<div class="p3-outlook-footer"><span class="p3-account-name">Rekening: ${escape2(profile.name)}</span>${qualityActions}${reconciliations}</div>`;
   }
   function yearHtml(year, getMonth) {
     const v = yearView(year, getMonth), max = Math.max(1, ...v.months.filter((m) => !m.missing).flatMap((m) => [m.income, m.spent]));
@@ -4043,7 +4073,7 @@
         chartObserver.observe(root2.querySelector("[data-p3-chart]"));
       } else window.addEventListener("resize", schedule, { signal: controller.signal });
     }
-    async function load(root2) {
+    async function load(root2, retry = 0) {
       var _a2, _b;
       const token = ++generation;
       projection = null;
@@ -4060,11 +4090,17 @@
         return;
       }
       try {
-        const period = dashboardPeriod({ month: deps.month(), today: deps.today(), filter, custom });
-        const p = await deps.project({ accountProfileId: profile.id, asOfDate: deps.today(), ...period });
+        const asOfDate = deps.today(), period = dashboardPeriod({ month: deps.month(), today: asOfDate, filter, custom });
+        const kpis = await deps.project({ accountProfileId: profile.id, asOfDate, incomeKpis: true, withFinancialBasis: true });
         if (token !== generation || !root2.isConnected) return;
+        const p = await deps.project({ accountProfileId: profile.id, asOfDate, withFinancialBasis: true, ...period });
+        if (token !== generation || !root2.isConnected) return;
+        if (kpis.financialBasis !== p.financialBasis) {
+          if (retry < 1) return load(root2, retry + 1);
+          throw new Error("De gegevens wijzigden tijdens het berekenen. Open het dashboard opnieuw.");
+        }
         projection = p;
-        root2.querySelector("[data-p3-outlook]").innerHTML = outlookHtml(p, profile, deps.eventLabel, deps.iconSvg, ((_a2 = deps.bankMarkup) == null ? void 0 : _a2.call(deps, profile)) || "");
+        root2.querySelector("[data-p3-outlook]").innerHTML = outlookHtml(kpis, profile, deps.eventLabel, deps.iconSvg, ((_a2 = deps.bankMarkup) == null ? void 0 : _a2.call(deps, profile)) || "");
         (_b = deps.bindBank) == null ? void 0 : _b.call(deps, root2.querySelector("[data-p3-outlook]"), profile);
         root2.querySelector("[data-p3-period]").textContent = forecastPeriod(p);
         drawChart(root2, true);
@@ -16102,7 +16138,11 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
       }
       const imports = await window.FinizeUpdate4.importStore.listImports();
       if (scope !== CloudAdapter.importScope()) throw new Error("Het huishouden is gewijzigd. Open de prognose opnieuw.");
-      const select = () => selectDailyLiquidity(state, { ...options, imports, monthlyForecast: (_, month) => monthlyFinancialForecast(month), scope: { householdId: scope, accountProfiles: state.accountProfiles || [] } });
+      const select = () => {
+        var _a2;
+        const result3 = selectDailyLiquidity(state, { ...options, imports, monthlyForecast: (_, month) => monthlyFinancialForecast(month), scope: { householdId: scope, accountProfiles: state.accountProfiles || [] } });
+        return options.withFinancialBasis ? { ...result3, financialBasis: (_a2 = DataAdapter.store().head) == null ? void 0 : _a2.sha256 } : result3;
+      };
       let result2 = select();
       if (state.__finizePartialHistory && CloudAdapter.recordSession && result2.requiredMonths.some((month) => {
         var _a2;

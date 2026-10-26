@@ -152,7 +152,7 @@ export function liquidityRequiredMonths(state,{accountProfileId,asOfDate,endDate
 }
 
 /** Adds physical cash timing to the existing financial selectors. Never persists or changes state. */
-export function buildLiquidityInput(state,{accountProfileId,asOfDate,endDate,scope,imports=[],importsAvailable=true,coverage=[],monthlyForecast=financialForecastForMonth,salaryOnly=false,planningBasis=false}={}) {
+export function buildLiquidityInput(state,{accountProfileId,asOfDate,endDate,scope,imports=[],importsAvailable=true,coverage=[],monthlyForecast=financialForecastForMonth,salaryOnly=false,planningBasis=false,incomeOnly=false,includeReceipt=false}={}) {
   if (!validCalendarDate(asOfDate) || endDate !== undefined && (!validCalendarDate(endDate) || endDate < asOfDate)) throw new Error('Kies geldige prognosedatums; de einddatum mag niet vóór de berekendatum liggen.');
   if (!planningBasis && endDate && balanceRequiredMonths(asOfDate,endDate).length > 24) throw new Error('Kies een prognose van maximaal 24 kalendermaanden.');
   const reasons=[],events=[],reservations=[],savingsPlans=[];
@@ -170,23 +170,29 @@ export function buildLiquidityInput(state,{accountProfileId,asOfDate,endDate,sco
   if (!endDate) {
     let month=asOfDate.slice(0,7);
     for (let i=0;i<13&&!receipt;i++,month=nextPlanningMonth(month)) {
-      const salaries=salaryPlans(state,month).flatMap(row=>{
-        if(!replaced.has(row.id))return [row];
+      let allowances=[];
+      if(incomeOnly&&profile?.accountOwner!=='gezamenlijk'){
+        try{allowances=allowancePlans(state,month,monthlyForecast(state,month),projections);}
+        catch{reasons.push(issue('financial-planning-unavailable',month));}
+      }
+      const salaries=[...salaryPlans(state,month),...allowances].flatMap(row=>{
+        const keys=new Set([...(replaced.get(row.id)||[]),...row.replacedBy]);
+        if(!keys.size)return [row];
         // Historical as-of projections may already contain a later real receipt.
         // Its proven bank date replaces the planned date as the horizon boundary.
-        return projections.filter(p=>replaced.get(row.id).has(sourceRecordKey(p.transaction))&&p.transaction.accountProfileId===accountProfileId)
+        return projections.filter(p=>keys.has(sourceRecordKey(p.transaction))&&p.transaction.accountProfileId===accountProfileId)
           .filter(p=>p.transaction.bankOriginal?.valid&&p.transaction.bankOriginal.currency==='EUR'&&(p.transaction.bankOriginal.bankStatus??'booked')==='booked'&&validCalendarDate(p.transaction.bankOriginal.bankDate))
-          .map(p=>({...row,accountProfileId,date:p.transaction.bankOriginal.bankDate,dateQuality:'confirmed'}));
+          .map(p=>({...row,accountProfileId,date:p.transaction.bankOriginal.bankDate,dateQuality:'confirmed',replacedBy:[]}));
       });
-      receipt=[...salaries,...transfers.filter(row=>!salaryOnly&&profile?.accountOwner!=='gezamenlijk'&&row.amountCents>0&&row.date?.slice(0,7)===month&&!(state.internalTransfers || []).some(t=>t.id===row.transferId&&t.type?.startsWith('zakgeld-')&&profile?.liquidity?.allowanceDays?.[profile.accountOwner]))]
-        .filter(row=>row.accountProfileId===accountProfileId&&row.date>asOfDate&&!row.replacedBy.length)
+      receipt=[...salaries,...transfers.filter(row=>!incomeOnly&&!salaryOnly&&profile?.accountOwner!=='gezamenlijk'&&row.amountCents>0&&row.date?.slice(0,7)===month&&!(state.internalTransfers || []).some(t=>t.id===row.transferId&&t.type?.startsWith('zakgeld-')&&profile?.liquidity?.allowanceDays?.[profile.accountOwner]))]
+        .filter(row=>row.amountCents>0&&row.accountProfileId===accountProfileId&&row.date>asOfDate&&!row.replacedBy.length)
         .sort((a,b)=>a.date.localeCompare(b.date)||a.id.localeCompare(b.id))[0] || null;
     }
   }
-  const allowanceDay=!salaryOnly&&profile?.accountOwner!=='gezamenlijk'&&profile?.liquidity?.allowanceDays?.[profile.accountOwner];
+  const allowanceDay=!incomeOnly&&!salaryOnly&&profile?.accountOwner!=='gezamenlijk'&&profile?.liquidity?.allowanceDays?.[profile.accountOwner];
   const allowanceWindow=allowanceDay ? monthEnd(monthlyPaymentDate(asOfDate.slice(0,7),allowanceDay)>asOfDate?asOfDate.slice(0,7):nextPlanningMonth(asOfDate.slice(0,7))) : null;
-  const horizonEnd=endDate || (receipt ? shiftLiquidityDay(receipt.date,-1) : allowanceWindow);
-  const horizon={kind:endDate?'manual':receipt?'next-receipt':allowanceWindow?'allowance-window':'next-receipt',endDate:horizonEnd,receiptDate:receipt?.date || null,receiptId:receipt?.id || null,boundary:!receipt?'end-of-day':'end-of-previous-day'};
+  const horizonEnd=endDate || (receipt ? includeReceipt?receipt.date:shiftLiquidityDay(receipt.date,-1) : allowanceWindow);
+  const horizon={kind:endDate?'manual':receipt?'next-receipt':allowanceWindow?'allowance-window':'next-receipt',endDate:horizonEnd,receiptDate:receipt?.date || null,receiptId:receipt?.id || null,boundary:endDate||includeReceipt||!receipt?'end-of-day':'end-of-previous-day'};
   if (!horizonEnd) reasons.push(issue('missing-reliable-horizon'));
   const requiredMonths=liquidityRequiredMonths(state,{accountProfileId,asOfDate,endDate:horizonEnd || asOfDate,scope}).filter(month=>!planningBasis||month>=shiftLiquidityDay(asOfDate,1).slice(0,7));
   for (const month of requiredMonths) if(state.__finizePartialHistory&&!state.verifiedPeriods?.includes(month)) reasons.push(issue('missing-period',month));
@@ -401,7 +407,16 @@ function hardAvailability(projection,input,fromDate) {
   return {hard,softIds};
 }
 function withAvailability(projection,input,fromDate,goalInputFor) {
-  const {hard,softIds}=hardAvailability(projection,input,fromDate);
+  let {hard,softIds}=hardAvailability(projection,input,fromDate);
+  if(input.incomeKpis){
+    const opening=hard.opening.balanceCents;
+    const points=opening===null||!hard.horizon.endDate?[]:[{date:fromDate,expectedBalanceCents:opening},...hard.days.filter(row=>row.date>=fromDate)];
+    const minimum=points.reduce((best,row)=>!best||row.expectedBalanceCents<best.expectedBalanceCents?row:best,null);
+    const value=minimum?.expectedBalanceCents??null,free=value===null?null:Math.max(0,safe(value-hard.bufferCents));
+    hard={...hard,minimumBalanceCents:value,minimumDate:minimum?.date??null,
+      freeAfterObligationsCents:hard.status==='projected'?free:null,indicativeFreeAfterObligationsCents:free,
+      availability:{...hard.availability,minimumCents:value,minimumDate:minimum?.date??null}};
+  }
   let goalProjection=hard;
   const end=hard.horizon.endDate;
   // A monthly goal needs its month-end cash outlook, even when the graph and
@@ -411,7 +426,7 @@ function withAvailability(projection,input,fromDate,goalInputFor) {
     goalProjection=hardAvailability({...projectDailyLiquidity(goalInput),currentBalance:projection.currentBalance},goalInput,fromDate).hard;
   }
   const guidance=savingsGuidance(goalProjection,hard.indicativeFreeAfterObligationsCents);
-  return {...projection,freeAfterObligationsCents:hard.freeAfterObligationsCents,indicativeFreeAfterObligationsCents:hard.indicativeFreeAfterObligationsCents,
+  return {...projection,...(input.incomeKpis?{minimumBalanceCents:hard.minimumBalanceCents,minimumDate:hard.minimumDate}:{}),freeAfterObligationsCents:hard.freeAfterObligationsCents,indicativeFreeAfterObligationsCents:hard.indicativeFreeAfterObligationsCents,
     availability:{...hard.availability,excludedSavingsPlanIds:[...softIds]},softSavings:guidance};
 }
 function liquidityObservations(state,accountProfileId,toDate,scope) {
@@ -424,6 +439,11 @@ function planningAnchor(state,{accountProfileId,asOfDate,startDate,scope}) {
   return history.find(row=>row.asOfDate<startDate) || history.filter(row=>row.asOfDate>=startDate&&row.asOfDate<=asOfDate).at(-1) || null;
 }
 export function selectDailyLiquidity(state, options) {
+  if(options.incomeKpis){
+    const input=buildLiquidityInput(state,{...options,endDate:undefined,incomeOnly:true,salaryOnly:false,includeReceipt:false});
+    input.incomeKpis=true;
+    return withAvailability(projectDailyLiquidity(input),input,options.asOfDate,endDate=>buildLiquidityInput(state,{...options,endDate,incomeOnly:true,salaryOnly:false,includeReceipt:false}));
+  }
   if(!options.startDate){const input=buildLiquidityInput(state,options);return withAvailability(projectDailyLiquidity(input),input,options.asOfDate,endDate=>buildLiquidityInput(state,{...options,endDate,salaryOnly:false}));}
   const {startDate,asOfDate}=options;
   if(!validCalendarDate(startDate)||!validCalendarDate(asOfDate)||options.endDate!==undefined&&(!validCalendarDate(options.endDate)||options.endDate<startDate))throw new Error('Kies een geldige begin- en einddatum voor de prognose.');
