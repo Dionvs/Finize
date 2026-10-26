@@ -34,3 +34,29 @@ Vóór publicatie is een uitsluitend-lezen vergelijking vastgelegd: financiële 
 GitHub Pages gebruikt de bestaande bron `main` en pad `/`, buildtype legacy. De bronversie op GitHub is vóór vrijgave gecontroleerd tegen de lokale uitgangsbasis. Publicatie volgt pas na de definitieve technische ChatGPT-review en de reeds door Dion gegeven voorwaardelijke toestemming. Daarna volgen deploymentstatus, publieke assethashes en geïsoleerde synthetische browsertests.
 
 Dit verslag bewijst geen geslaagde echte banksynchronisatie. De gebruiker moet de nieuwe bundel later zelf in Finize bevestigen; oude verwijderde goedkeuringen worden niet automatisch hersteld.
+
+## Fase C/D — vrijgave en publieke nacontrole
+
+ChatGPT gaf expliciet technisch GO voor push van de gecontroleerde branch, fast-forward van main en publicatie via de bestaande Pages-configuratie. De volledige reviewreactie is gelezen. De reviewer baseerde zich op het aangeleverde bewijs en heeft code/tests niet onafhankelijk uitgevoerd. Dion had de voorwaardelijke publicatietoestemming rechtstreeks gegeven.
+
+Gepubliceerd codecommit: `7eef6088287e87c57e4f99bb762dfe7b54041c48`. Herstelbranch is gepusht; main is zonder force-push vanaf de opnieuw gecontroleerde uitgangscommit `28025c6d09c685e1517ef31d3548bcb02b1b3cdf` vooruitgezet. [Pages-run 40325889786](https://github.com/Dionvs/Finize/actions/runs/40325889786) eindigde completed/success; Pages meldt built op exact dit commit, zonder buildfout.
+
+Alle zeven publieke assets retourneren HTTP 200 en hun SHA-256 is exact gelijk aan het bijbehorende Git-object:
+
+| Asset | SHA-256 |
+|---|---|
+| index.html | 8dc0f9de03a2232a89131974b5ae223f50fb42cf61820caa513df8c214c59e4f |
+| app.js | d0050b67f1cc0433f4a0366f4956d99f61822a3e6fa1c50098ad99b0702e6229 |
+| app.css | 992ca943d6294b462ab851e5ab808c8b7d6084f7fa9f90f4014916b6e04da285 |
+| service-worker.js | d48439f9f8ac003e6892c53e0c78f9ca8f75e281c23104a29530fd6e950cf129 |
+| manifest.json | 00cbaa9a122b7a02219bdf7bedd7b1824e6e744a4b430201e7a8e6585726e239 |
+| icons/icon-192.png | 7a804e24cd03a592ac480b107567783388ae1de7b8eef2820299d6addbc85af5 |
+| finize-logo.png | b0d5e979f9bea750fa2a2bb25a0514033b64738caec987039b680886c0d66e88 |
+
+Geïsoleerde publieke browserproeven op 320/390/430 px slagen zonder paginastoringen of horizontale overloop. Externe requests zijn geblokkeerd. Zonder SDK blijft de normale inlogpoort veilig gesloten met de bestaande foutmelding. Functionele controles gebruiken uitsluitend de bestaande expliciete synthetische authdriver en lokale, afzonderlijk gescopeerde proefgegevens; dit bewijst geen werkende productieauthenticatie.
+
+De daadwerkelijke gepubliceerde bundel bewaart twee synthetische CSV-goedkeuringen na herladen. Daarnaast is de volledige lokale bankroute op de publieke bundel gecontroleerd: eerste import, verwijderen, hervatting zonder bevestiging geweigerd, expliciet bevestigde afzonderlijke generatie en herhaalde import met stabiele ID en één rij. De nieuwe rij blijft Nakijken zonder goedkeuring; de oorspronkelijke tombstone en beide CSV-effecten blijven gelijk. Geen echte bank- of cloudrequest uitgevoerd.
+
+Na publicatie zijn het financiële manifest, alle 24 geselecteerde importheaderprojecties en de twee permanente rekeningbindingsprojecties opnieuw uitsluitend gelezen. Hun hashes en aantallen zijn exact gelijk aan de nulmeting (`matchesBefore: true`). Dit is een controle van deze concrete projecties; er is geen algemene claim over alle mogelijke externe wijzigingen. De uitgevoerde handelingen bevatten geen Firestore-write, bank-API-call, autorisatie of sessiewijziging.
+
+ChatGPT gaf na deze nacontrole afsluitend technisch GO: publicatie succesvol afgerond, geen resterende technische releaseblokkade op basis van het aangeleverde verslag. De echte banksynchronisatie blijft uitdrukkelijk ongevalideerd. Dit afsluitende verslag verandert geen broncode of release-assets.
