@@ -278,7 +278,7 @@ export function buildLiquidityInput(state,{accountProfileId,asOfDate,endDate,sco
         const id='budget:'+owner+':'+month+':'+budget.id;
         if (!account) reasons.push(issue('unresolved-budget-account',id));
         reservations.push({id,accountProfileId:account,type:'budget',month,budgetItemId:budget.id,owner,plannedCents,usedCents,amountCents,
-          fromDate:month===asOfDate.slice(0,7)?shiftLiquidityDay(asOfDate,1):month+'-01',toDate:last<monthEnd(month)?last:monthEnd(month),dateQuality:'estimated'});
+          fromDate:month===asOfDate.slice(0,7)?shiftLiquidityDay(asOfDate,1):month+'-01',toDate:planningBasis&&last<monthEnd(month)?last:monthEnd(month),dateQuality:'estimated'});
       }
       const forecast=monthlyForecast(state.__finizePartialHistory?{...state,__finizePartialHistory:false}:state,month);
       for(const row of allowancePlans(state,month,forecast,projections)) addPlan(row);
@@ -480,5 +480,37 @@ export function selectDailyLiquidity(state, options) {
   const reconciliations=result.events.filter(row=>row.type==='checkpoint'&&row.date>=startDate&&row.date<=horizon.endDate).map(row=>{
     return {checkpointId:row.id.slice('checkpoint:'.length),date:row.date,observedCents:row.observedBalanceCents,modeledCents:row.modeledBalanceCents,differenceCents:row.amountCents};
   });
-  return withAvailability({...result,asOfDate,calculationStartDate:origin,currentBalance:current.opening,displayStartDate:startDate,historyComplete:!!anchor&&origin<startDate,reconciliations},input,availabilityFromDate,inputFor);
+  const history=withAvailability({...result,asOfDate,calculationStartDate:origin,currentBalance:current.opening,displayStartDate:startDate,historyComplete:!!anchor&&origin<startDate,reconciliations},input,availabilityFromDate,inputFor);
+  if(!options.currentCashBasis||!horizon.endDate||horizon.endDate<asOfDate)return history;
+  // History may contain reconstructed plans. It must never seed tomorrow's cash.
+  // Future days use the same observed P1 basis and forward calculation as the KPIs.
+  const forwardInputFor=endDate=>{
+    const next=buildLiquidityInput(state,{...options,asOfDate,endDate,salaryOnly:false});
+    next.availabilityFromDate=availabilityFromDate;
+    next.reservations=next.reservations.map(row=>({...row,reserveForDisplay:row.type!=='budget'||row.month>=startDate.slice(0,7)}));
+    next.savingsPlans=next.savingsPlans.filter(row=>row.month>=startDate.slice(0,7));
+    return next;
+  };
+  const forwardInput=forwardInputFor(horizon.endDate);forwardInput.horizon=horizon;
+  const forward=withAvailability(projectDailyLiquidity(forwardInput),forwardInput,availabilityFromDate,forwardInputFor);
+  for(const row of forward.events.filter(row=>row.type==='bank'))row.replacedPlans=forward.events.filter(plan=>plan.status==='replaced'&&plan.replacedBy.includes(row.sourceId)).map(plan=>({id:plan.id,type:plan.type,amountCents:plan.amountCents,date:plan.date,planningSourceId:plan.planningSourceId,person:plan.person}));
+  const days=[...history.days.filter(row=>row.date<asOfDate),...forward.days.filter(row=>row.date>=startDate)];
+  // Presentation only: explain the join from historical model to current cash.
+  // This object never enters the input, financial events, checkpoints or storage.
+  const previous=days.filter(row=>row.date<asOfDate).at(-1),todayIndex=days.findIndex(row=>row.date===asOfDate),basisEvents=[];
+  if(previous&&todayIndex>=0&&Number.isSafeInteger(previous.expectedBalanceCents)&&Number.isSafeInteger(forward.opening.balanceCents)){
+    const delta=forward.opening.balanceCents-previous.expectedBalanceCents;
+    if(delta){
+      const id='view-balance-basis:'+options.accountProfileId+':'+asOfDate;
+      basisEvents.push({id,type:'balance-basis',status:'presentation',date:asOfDate,accountProfileId:options.accountProfileId,amountCents:delta});
+      const day=days[todayIndex];
+      days[todayIndex]={...day,openingBalanceCents:previous.expectedBalanceCents,mutationCents:day.mutationCents+delta,eventIds:[id,...day.eventIds]};
+    }
+  }
+  const minimum=days.reduce((best,row)=>!best||row.expectedBalanceCents<best.expectedBalanceCents?row:best,null);
+  return {...forward,asOfDate,calculationStartDate:asOfDate,currentBalance:forward.opening,displayStartDate:startDate,historyComplete:history.historyComplete,
+    days,events:[...history.events.filter(row=>row.date&&row.date<asOfDate),...basisEvents,...forward.events.filter(row=>!row.date||row.date>=asOfDate)],
+    requiredMonths:[...new Set([...history.requiredMonths,...forward.requiredMonths])].sort(),reconciliations:history.reconciliations.filter(row=>row.date<asOfDate),
+    minimumBalanceCents:minimum?.expectedBalanceCents??null,minimumDate:minimum?.date??null,
+    firstShortfallDate:days.find(row=>row.expectedBalanceCents<0)?.date??null,firstBufferBreachDate:days.find(row=>row.expectedBalanceCents<forward.bufferCents)?.date??null};
 }

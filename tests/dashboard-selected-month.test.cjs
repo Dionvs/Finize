@@ -44,7 +44,7 @@ test('ontbrekend historisch beginsaldo blijft onbekend en tekent toch de gehele 
 test('latere saldowaarneming verzint geen eerste dertien oktoberdagen',()=>{
  const p=project(fixture(),'2026-10'),days=chartDays(p);
  assert.equal(days.length,31);assert(days.slice(0,13).every(d=>d.expectedBalanceCents===null));
- assert.equal(days[13].expectedBalanceCents,43478);assert.equal(days[13].openingBalanceCents,null);
+ assert.equal(days[13].expectedBalanceCents,43478);assert.equal(days[13].openingBalanceCents,43478);
  assert.equal(p.minimumBalanceCents,43478);assert.equal(p.historyComplete,false);
 });
 test('waarneming na vandaag wordt niet gebruikt als opening voor een toekomstige maand',()=>{
