@@ -139,3 +139,9 @@ Testgrens expliciet: met bewust geblokkeerde externe Firebase-SDK blijft de publ
 De afsluitende documentatiecommit voegt uitsluitend dit publicatiebewijs toe; de geteste runtime-assets blijven ongewijzigd. Geen nieuwe volledige testcampagne nodig voor deze documentatie. Het publicatieverslag is via computerbesturing naar ChatGPT gestuurd voor afsluitende controle.
 
 Afsluitende ChatGPT-review volledig gelezen: **akkoord met afbakening en eindoplevering** op basis van het verslag. Synthetische UI-controle is expliciet geen bewijs voor echte productieauthenticatie/cloud/banksync. Reviewer stemt in met uitsluitend documentatiebewijs toevoegen en vraagt daarna nogmaals Pages-status en de zeven publieke hashes te controleren.
+
+## Aanvulling V118-r16 — prognose en persoonlijk spaarbedrag
+
+Het vervolg op r15 is apart onderzocht en beoordeeld: actuele prognosekaart en toekomstige grafiek delen nu dezelfde P1-saldobasis; budgetspreiding hangt niet van het grafiekfilter af. De persoonlijke kaart volgt zichtbaar inkomen inclusief teruggaven minus vaste lasten minus gebruikt budget. Een expliciete keuze kopieert het actuele maandbedrag eenmalig naar de bestaande spaarplanning; handmatige invoer blijft mogelijk.
+
+Volledig diagnose-, review-, test- en publicatiebewijs: [V118-r16-verslag](docs/audit/finize-prognose-maand-sparen-r16-20261026.md). Release `a2940e3`, 79 Node-bestanden en 96+3 browsergevallen geslaagd; Pages succesvol, zeven assethashes gelijk, negen geïsoleerde publieke synthetische proeven geslaagd. Uitsluitend gecontroleerde productiehashes gelijk vóór/na; geen productiegegevens- of echte bankactie. Het oudere desktopscenario met de vervangen dashboardstructuur faalt ook op r15 en blijft afzonderlijk gedocumenteerd.

@@ -41,3 +41,18 @@ De gecombineerde browser-/PWA-eindcontrole en publicatiecontrole worden hieronde
 - Mobiele resultaten daadwerkelijk geopend en gecontroleerd. Publicatie vereist het definitieve technische akkoord; daarna pas branchcommits, Pages en openbare controles.
 
 ChatGPT gaf definitief technisch GO voor gecontroleerde publicatie op basis van het gedeelde verslag (geen onafhankelijk uitgevoerde volledige code-/testrun). Voorwaarden: alleen beoordeelde diff, afzonderlijke sourcecommits, origin/main exact op uitgangscommit, fast-forward zonder force, bestaande Pages-configuratie, zeven identieke publieke SHA-256's, geïsoleerde publieke functieproeven en uitsluitend lezende vergelijking van de vastgelegde manifest-/header-/bindinghashes. Bij afwijking stoppen, geen automatische gegevensreparatie.
+
+## Publicatie en openbare nacontrole
+
+- Sourcecommits: `e71a7d2` (prognose) en `be3f3ca` (persoonlijk maandbedrag/spaarkopie). Release: `a2940e351d59be4cd5b1243b6c165c897f8aedc7`.
+- Herstelbranch gepusht; `origin/main` vóór merge exact `bfd406e`. Fast-forward zonder force. Bestaande Pages-run [40344788596](https://github.com/Dionvs/Finize/actions/runs/40344788596): succesvol.
+- Zeven publieke bestanden HTTP 200, SHA-256 exact gelijk aan de release: index.html, app.js, app.css, service-worker.js, manifest.json, icon-192.png en finize-logo.png.
+- Drie geïsoleerde openbare browserproeven (320/390/430 px): CSV-goedkeuring en herladen, synthetische bankgoedkeuring, regel leren, verwijderen, expliciet bevestigde nieuwe generatie en herhalen; tombstone/regels/bronbewijs behouden.
+- Zes aanvullende openbare functieproeven: dezelfde drie breedtes, telkens actuele prognose/dagdetail gelijk en persoonlijke maandformule met expliciete spaarbedragkopie duurzaam na herladen.
+- Alle externe origins geblokkeerd, waaronder Firebase/bank; bestaande expliciete synthetische auth-testdriver en aparte lokale browsercontexten gebruikt. De getoonde cloud-/authstatus is daardoor geen test van echte cloudbeschikbaarheid. Geen echte banksynchronisatie uitgevoerd of bewezen.
+- Uitsluitend lezende vergelijking vóór/na: financieel manifest, 25 importheaders en twee permanente rekeningbindingen exact gelijke hashes. Nul Firestore-writes en nul echte bank-API-acties. Deze controle betreft de genoemde gegevens en is geen algemene onafhankelijke audit van iedere productiecollectie.
+- Openbare synthetische screenshots geopend. De werkelijke toekomstige saldi blijven afhankelijk van de aanwezige bankinformatie, planning en kwaliteitsstatus; een geslaagde synthetische test bewijst geen echte banksynchronisatie.
+
+Privacyveilig bewijs staat in `finize-release-r16-public-20261026.json`. Lokale testlogs en synthetische screenshots zijn beschikbaar in `.cache/r16-*`. De oude desktopstructuurtest blijft een afzonderlijk testonderhoudspunt en is niet als r16-regressie of als geslaagd gepresenteerd.
+
+ChatGPT beoordeelde ook het publicatiebewijs en gaf technisch GO voor definitieve afsluiting, met een uitsluitend documentaire closeoutcommit en daarna nogmaals Pages-/assethashcontrole. Echte banksynchronisatie en echte cloudwerking zijn met deze geïsoleerde proeven niet bewezen.

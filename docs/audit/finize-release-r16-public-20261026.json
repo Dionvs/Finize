@@ -1,0 +1,136 @@
+{
+  "version": "118-r16",
+  "releaseCommit": "a2940e351d59be4cd5b1243b6c165c897f8aedc7",
+  "pagesRun": 40344788596,
+  "assets": [
+    {
+      "name": "index.html",
+      "status": 200,
+      "sha256": "be6f877ff46f9d93c49693dfcc48aab2eb6f20e775606ee2b0303aa8c6c1e05d"
+    },
+    {
+      "name": "app.js",
+      "status": 200,
+      "sha256": "d958cab2b9dddd5e25715d52d487c40436d3ffec02013c0d7528e8bb477fafca"
+    },
+    {
+      "name": "app.css",
+      "status": 200,
+      "sha256": "992ca943d6294b462ab851e5ab808c8b7d6084f7fa9f90f4014916b6e04da285"
+    },
+    {
+      "name": "service-worker.js",
+      "status": 200,
+      "sha256": "4cc05857edd23d5d5bda6c67fc983ef30f322749bf38ce69731e450148e819f0"
+    },
+    {
+      "name": "manifest.json",
+      "status": 200,
+      "sha256": "00cbaa9a122b7a02219bdf7bedd7b1824e6e744a4b430201e7a8e6585726e239"
+    },
+    {
+      "name": "icons/icon-192.png",
+      "status": 200,
+      "sha256": "7a804e24cd03a592ac480b107567783388ae1de7b8eef2820299d6addbc85af5"
+    },
+    {
+      "name": "finize-logo.png",
+      "status": 200,
+      "sha256": "b0d5e979f9bea750fa2a2bb25a0514033b64738caec987039b680886c0d66e88"
+    }
+  ],
+  "publicBankChecks": [
+    {
+      "width": 320,
+      "bankCheck": {
+        "refused": "bank-import-deleted",
+        "separate": true,
+        "stable": true,
+        "rows": 1,
+        "review": "nakijken",
+        "approval": "",
+        "tombstonePreserved": true,
+        "rulesPreserved": true,
+        "approvedCsvEffects": 2
+      },
+      "pageErrors": []
+    },
+    {
+      "width": 390,
+      "bankCheck": {
+        "refused": "bank-import-deleted",
+        "separate": true,
+        "stable": true,
+        "rows": 1,
+        "review": "nakijken",
+        "approval": "",
+        "tombstonePreserved": true,
+        "rulesPreserved": true,
+        "approvedCsvEffects": 2
+      },
+      "pageErrors": []
+    },
+    {
+      "width": 430,
+      "bankCheck": {
+        "refused": "bank-import-deleted",
+        "separate": true,
+        "stable": true,
+        "rows": 1,
+        "review": "nakijken",
+        "approval": "",
+        "tombstonePreserved": true,
+        "rulesPreserved": true,
+        "approvedCsvEffects": 2
+      },
+      "pageErrors": []
+    }
+  ],
+  "publicFeatures": {
+    "checks": [
+      {
+        "width": 320,
+        "mode": "forecast",
+        "passed": true
+      },
+      {
+        "width": 320,
+        "mode": "personal",
+        "passed": true
+      },
+      {
+        "width": 390,
+        "mode": "forecast",
+        "passed": true
+      },
+      {
+        "width": 390,
+        "mode": "personal",
+        "passed": true
+      },
+      {
+        "width": 430,
+        "mode": "forecast",
+        "passed": true
+      },
+      {
+        "width": 430,
+        "mode": "personal",
+        "passed": true
+      }
+    ],
+    "productionDataWrites": 0,
+    "syntheticLocalOnly": true,
+    "externalOriginsBlocked": true
+  },
+  "readOnlyPreservation": {
+    "financialManifestSha256": "b0a21db262173d47143bee12548be3efd796b5d718ec001424331981258d2148",
+    "importHeadersSha256": "761d733e7bb1083a0ffbb53000c809cbf20b13d7ea14b4d97f564cf02b415966",
+    "importCount": 25,
+    "permanentBindingsSha256": "1dba53256c918e84376ccce5fc7d90f1bfa2110aa3cb1588b385392e42f3b908",
+    "bindingCount": 2,
+    "firestoreWrites": 0,
+    "bankApiCalls": 0,
+    "matchesBefore": true
+  }
+}
