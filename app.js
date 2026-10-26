@@ -793,18 +793,33 @@
     if ((actual == null ? void 0 : actual.lifecycle) !== "deleted" || actual.id !== expected.id || actual.version !== expected.version || actual.operationId !== expected.operationId) fail("import-conflict");
   }
   function references(value, id) {
-    if (typeof value === "string") return value === id || value.includes(id + ":");
+    if (typeof value === "string") {
+      const replacement = value.match(/^replacement-(bank-api-[a-f0-9]{32}(?:-g[a-f0-9]{32})?)-/);
+      return value === id || value.includes(id + ":") || (replacement == null ? void 0 : replacement[1]) === id;
+    }
     if (!value || typeof value !== "object") return false;
-    return Object.entries(value).some(([key, child]) => key !== "importDeletionProofs" && references(child, id));
+    return Object.values(value).some((child) => references(child, id));
+  }
+  function ruleReferences(rule, id) {
+    const origin = rule == null ? void 0 : rule.provenance;
+    const timestamp = origin == null ? void 0 : origin.approvedAt;
+    const validTime = typeof timestamp === "string" && /^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(timestamp) && validCalendarDate(timestamp.slice(0, 10)) && Number.isFinite(Date.parse(timestamp));
+    const historical = (origin == null ? void 0 : origin.kind) === "manual-approval" && typeof origin.sourceRowId === "string" && origin.sourceRowId.trim() && origin.sourceRowId === origin.sourceRowId.trim() && validTime && Object.keys(origin).every((key) => ["kind", "sourceRowId", "importBatchId", "approvedAt"].includes(key));
+    if (!historical) return references(rule, id);
+    return Object.entries(rule).some(([key, value]) => key === "provenance" ? Object.entries(value).some(([field, child]) => !(field === "importBatchId" && child === id) && references(child, id)) : references(value, id));
+  }
+  function financialReferences(state2, id, { ruleOrigins = false } = {}) {
+    if (!state2 || typeof state2 !== "object") return references(state2, id);
+    return Object.entries(state2).some(([key, value]) => key === "importDeletionProofs" ? false : ruleOrigins && key === "recognitionRules" && Array.isArray(value) ? value.some((rule) => ruleReferences(rule, id)) : references(value, id));
   }
   function assertProviderRestartState(state2, deletion, { journals = [], queue = [] } = {}) {
     const proof = bankImportDeletionProof(deletion), stored = (state2.importDeletionProofs || []).filter((row) => row.id === proof.id);
     if (stored.length !== 1) fail("bank-import-restart-blocked");
     assertProviderRestartParent(proof, stored[0]);
-    if (references(state2, proof.id)) fail("bank-import-restart-blocked");
+    if (financialReferences(state2, proof.id, { ruleOrigins: true })) fail("bank-import-restart-blocked");
     if (journals.some((entry) => {
       var _a2;
-      return ["pending", "conflict", "uncertain"].includes(entry.status) && (entry.importId === proof.id || references(entry.candidate, proof.id) || references((_a2 = entry.localChoice) == null ? void 0 : _a2.state, proof.id));
+      return ["pending", "conflict", "uncertain"].includes(entry.status) && (entry.importId === proof.id || financialReferences(entry.candidate, proof.id) || financialReferences((_a2 = entry.localChoice) == null ? void 0 : _a2.state, proof.id));
     })) fail("bank-import-restart-blocked");
     if (queue.some((entry) => (entry.importId || entry.id) === proof.id && (entry.version !== proof.version || entry.operationId !== proof.operationId))) fail("bank-import-restart-blocked");
     return proof;

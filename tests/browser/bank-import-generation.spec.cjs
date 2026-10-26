@@ -12,9 +12,11 @@ async function boot(page){
   const personal=await FinizeBank.ingest(bankSnapshot('personal'),CloudAdapter.importScope());
   await FinizeUpdate4Runtime.commitImportCommand(window,personal,{type:'source-approve',rowId:personal.rows[0].id});
   const joint=await FinizeBank.ingest(bankSnapshot('joint'),CloudAdapter.importScope());
+  await FinizeUpdate4Runtime.commitImportCommand(window,joint,{type:'source-approve',rowId:joint.rows[0].id});
   await FinizeUpdate4Runtime.commitImportCommand(window,joint,{type:'delete'});
   window.deletedId=joint.id;window.remoteBankImports.set(joint.id,await FinizeUpdate4Runtime.ImportStore.getImport(joint.id));
-  window.originalBankState=JSON.stringify(state);window.originalDeletion=JSON.stringify(await FinizeUpdate4Runtime.ImportStore.getImport(joint.id));
+  if(!state.recognitionRules.some(rule=>rule.provenance?.importBatchId===joint.id))throw Error('Synthetic approval must retain its learned rule after deletion');
+  window.originalBankState=JSON.stringify(state);window.originalRules=JSON.stringify(state.recognitionRules);window.originalDeletion=JSON.stringify(await FinizeUpdate4Runtime.ImportStore.getImport(joint.id));
  });
 }
 async function configure(page){await page.evaluate(async()=>{
@@ -33,7 +35,7 @@ test('deleted second account needs explicit confirmation; cancellation preserves
 test('confirmed generation survives repeat and reload without duplicate sources or loss of personal approval',async({page})=>{
  await boot(page);const before=await page.evaluate(()=>state.transactions.filter(t=>t.accountProfileId==='personal'));
  const first=await page.evaluate(async()=>{window.newBankBatch=await FinizeBank.ingest(bankSnapshot('joint'),CloudAdapter.importScope(),'joint',{confirmRestart:()=>true});return newBankBatch;});
- expect(first.id).not.toBe(first.providerRestartFrom.id);expect(first.rows[0].approvalSource).toBe('');expect(first.rows[0].processingStatus).toBe('nakijken');
+ expect(first.id).not.toBe(first.providerRestartFrom.id);expect(first.rows[0].approvalSource).toBe('');expect(first.rows[0].processingStatus).toBe('nakijken');expect(await page.evaluate(()=>JSON.stringify(state.recognitionRules)===originalRules)).toBe(true);
  await page.evaluate(async()=>{const again=await FinizeBank.ingest(bankSnapshot('joint'),CloudAdapter.importScope());if(again.id!==newBankBatch.id)throw Error('unstable generation');});
  expect(await page.evaluate(()=>state.transactions.filter(t=>t.accountProfileId==='personal'))).toEqual(before);
  const rootId=first.providerRestartFrom.id;await page.reload();await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);await configure(page);
@@ -42,6 +44,14 @@ test('confirmed generation survives repeat and reload without duplicate sources 
 });
 test('financial change while confirmation is open rejects stale consent without a new generation',async({page})=>{
  await boot(page);const result=await page.evaluate(async()=>{try{await FinizeBank.ingest(bankSnapshot('joint'),CloudAdapter.importScope(),'joint',{confirmRestart:async()=>{await commitChange(s=>{s.meta.syntheticConsentRace=true;},{render:false,throwOnError:true});return true;}});}catch(e){return {code:e.code,count:(await FinizeUpdate4Runtime.ImportStore.listImports()).length};}});expect(result).toEqual({code:'import-conflict',count:2});
+});
+test('explicit approval in the new generation survives another bank update without replaying old approvals',async({page})=>{
+ await boot(page);const result=await page.evaluate(async()=>{
+  const batch=await FinizeBank.ingest(bankSnapshot('joint'),CloudAdapter.importScope(),'joint',{confirmRestart:()=>true});
+  await FinizeUpdate4Runtime.commitImportCommand(window,batch,{type:'source-approve',rowId:batch.rows[0].id});
+  const before=JSON.stringify(state.transactions),again=await FinizeBank.ingest(bankSnapshot('joint'),CloudAdapter.importScope());
+  return {same:JSON.stringify(state.transactions)===before,id:again.id,original:batch.id,approved:again.rows[0].approvalSource,transactions:state.transactions.filter(t=>t.recordRole!=='bank-source').length,tombstone:JSON.stringify(await FinizeUpdate4Runtime.ImportStore.getImport(deletedId))===originalDeletion};
+ });expect(result.same).toBe(true);expect(result.id).toBe(result.original);expect(result.approved).toBe('manual');expect(result.transactions).toBe(2);expect(result.tombstone).toBe(true);
 });
 test('parallel confirmations create at most one stable generation',async({page})=>{
  await boot(page);const result=await page.evaluate(async()=>{const outcomes=await Promise.allSettled([1,2].map(()=>FinizeBank.ingest(bankSnapshot('joint'),CloudAdapter.importScope(),'joint',{confirmRestart:()=>true})));const active=(await FinizeUpdate4Runtime.ImportStore.listImports()).filter(b=>b.providerRestartFrom);return {success:outcomes.filter(x=>x.status==='fulfilled').length,active:active.length,ids:active.map(x=>x.id),sources:state.transactions.filter(t=>t.recordRole==='bank-source').length};});expect(result.success).toBeGreaterThan(0);expect(result.active).toBe(1);expect(result.sources).toBe(2);
