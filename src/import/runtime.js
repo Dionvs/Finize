@@ -1,6 +1,7 @@
 import { applyProviderObservations } from './enable-banking-adapter.mjs';
 import { assertProviderRestartState, assertProviderRestartParent } from './bank-import-generation.mjs';
 import { isSavingsIncomeSource, savingsContributionCapacity } from '../core/savings-contributions.mjs';
+import { savingsLinkProposals } from '../core/savings-link-proposals.mjs';
 import { fixedCashDate } from '../core/liquidity-settings.mjs';
 import { profileSync, profileStart } from '../storage/performance.mjs';
 import { availableAccountProfiles, accountIsArchived } from '../core/account-profiles.mjs';
@@ -1817,12 +1818,21 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
     if(Number(row.bankOriginal.amount)<=0||!['interne-overboeking','extra-bijdrage'].includes(p.transactionType))return '';
     return `<div class="u4-dependent-grid"><label>Inleg bestaand geld voor spaardoel (optioneel)<select data-u4-field="contributionGoalId">${goalOptions(root,p.contributionGoalId||'')}</select></label>${p.contributionGoalId?`<label>Inlegbedrag<input type="number" min="0.01" step="0.01" data-u4-field="contributionAmount" value="${Number(p.contributionAmount)||0}"></label><span class="u4-muted">Geen inkomen of extra zakgeld. Koppel na goedkeuring de daadwerkelijke spaarboeking aan deze inleg. Alleen die spaarboeking verhoogt het spaardoel.</span>`:''}</div>`;
   }
+  const dismissedSavingsProposals=new WeakSet();
+  function savingsProposalsFor(root,row,projections=selectTransactionProjections(root.state)){
+    const p=row.processing;
+    if(p.splits?.length||p.savingsContributionId)return [];
+    return savingsLinkProposals(projections,{transactionType:p.transactionType,month:row.bankOriginal.bankDate.slice(0,7),owner:p.budgetOwner,goalId:p.savingsGoalId,amountCents:Math.round(Number(p.processedAmount)*100),excludeTransactionId:projections.find(t=>t.transaction.importTransactionId===row.id)?.id});
+  }
   function savingsContributionFields(root,row){
     const p=row.processing,month=row.bankOriginal.bankDate.slice(0,7);
-    const sources=selectTransactionProjections(root.state).filter(t=>t.active&&t.effects.accountCashflow>0&&t.calendarMonth===month&&t.financialFor===p.budgetOwner&&(isSavingsIncomeSource(t)||['interne-overboeking','extra-bijdrage'].includes(t.transactionType)&&t.transaction.processing?.contributionGoalId===p.savingsGoalId));
+    const projections=selectTransactionProjections(root.state);
+    const sources=projections.filter(t=>t.active&&t.effects.accountCashflow>0&&t.calendarMonth===month&&t.financialFor===p.budgetOwner&&(isSavingsIncomeSource(t)||['interne-overboeking','extra-bijdrage'].includes(t.transactionType)&&t.transaction.processing?.contributionGoalId===p.savingsGoalId));
     const selected=sources.find(t=>t.id===p.savingsContributionId);
     const missing=p.savingsContributionId&&!selected;
-    return `<label>Gekoppelde inleg of inkomen<select data-u4-field="savingsContributionId"><option value="">Geen koppeling</option>${missing?option(p.savingsContributionId,'Gekoppelde inleg niet beschikbaar',p.savingsContributionId):''}${sources.map(t=>option(t.id,`${t.transaction.description||(isSavingsIncomeSource(t)?'Inkomen':'Interne inleg')} · ${euro(savingsContributionCapacity(t)/100)}`,p.savingsContributionId||'')).join('')}</select></label>${p.savingsContributionId?`<label>Gekoppeld bedrag<input type="number" min="0.01" step="0.01" data-u4-field="savingsContributionAmount" value="${Number(p.savingsContributionAmount)||0}"></label><span class="u4-muted">${isSavingsIncomeSource(selected)?'Administratieve koppeling: inkomen, maandruimte en spaarbedrag veranderen hierdoor niet.':'Dit deel komt uit bestaand eigen geld en wordt niet van Over deze maand afgetrokken.'} De volledige spaarboeking blijft meetellen voor het spaardoel.</span>`:''}`;
+    const proposals=dismissedSavingsProposals.has(row)?[]:savingsProposalsFor(root,row,projections);
+    const proposalHtml=proposals.length?`<div class="u4-dependent-grid" data-u4-savings-proposals><strong>Hoort deze spaarstorting bij een ontvangst?</strong><span class="u4-muted">Het koppelbare bedrag komt overeen. Controleer de ontvangst en bevestig de koppeling; deze wordt pas bij goedkeuring verwerkt.</span>${proposals.map(({source:t,remainingCents})=>`<div><span>${esc(isSavingsIncomeSource(t)?'Inkomen':'Interne ontvangst')} · ${esc(t.transaction.bankOriginal?.bankDate||t.transaction.date)} · ${esc(t.transaction.description||'Ontvangst')} · ${euro(t.amount)}${Math.round(t.amount*100)!==remainingCents?' · nog koppelbaar '+euro(remainingCents/100):''}</span><button type="button" class="ghost small" data-u4-link-saving="${esc(t.id)}">Koppelen</button></div>`).join('')}<button type="button" class="ghost small" data-u4-dismiss-saving>Niet koppelen</button></div>`:'';
+    return `<label>Gekoppelde inleg of inkomen<select data-u4-field="savingsContributionId"><option value="">Geen koppeling</option>${missing?option(p.savingsContributionId,'Gekoppelde inleg niet beschikbaar',p.savingsContributionId):''}${sources.map(t=>option(t.id,`${t.transaction.description||(isSavingsIncomeSource(t)?'Inkomen':'Interne inleg')} · ${euro(savingsContributionCapacity(t)/100)}`,p.savingsContributionId||'')).join('')}</select></label>${p.savingsContributionId?`<label>Gekoppeld bedrag<input type="number" min="0.01" step="0.01" data-u4-field="savingsContributionAmount" value="${Number(p.savingsContributionAmount)||0}"></label><span class="u4-muted">${isSavingsIncomeSource(selected)?'Administratieve koppeling: inkomen, maandruimte en spaarbedrag veranderen hierdoor niet.':'Dit deel komt uit bestaand eigen geld en wordt niet van Over deze maand afgetrokken.'} De volledige spaarboeking blijft meetellen voor het spaardoel.</span>`:''}${proposalHtml}`;
   }
   function dependentFieldsHtml(root,row){
     const p=row.processing;const family=transactionFamily(p);
@@ -2222,6 +2232,20 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
       const coverage=event.target.closest('[data-u4-coverage]');if(coverage){modal.classList.remove('open');window.FinizeTransactions?.openCoverage(coverage.dataset.u4Coverage);return;}
       root=UI.root;draft=UI.draft;modal=ensureModalRoot();
       const container=event.target.closest('[data-u4-row]');const row=container?draft.rows.find(item=>item.id===container.dataset.u4Row):null;
+      const dismissSaving=event.target.closest('[data-u4-dismiss-saving]');
+      if(dismissSaving&&row){dismissedSavingsProposals.add(row);renderDraftRowCard(root,draft,modal,row.id);return;}
+      const linkSaving=event.target.closest('[data-u4-link-saving]');
+      if(linkSaving&&row){
+        if(batchLifecycle(draft)!=='active')return;
+        const proposal=savingsProposalsFor(root,row).find(p=>p.source.id===linkSaving.dataset.u4LinkSaving);
+        if(!proposal){alert('Deze ontvangst is intussen gewijzigd of al gekoppeld. Controleer de actuele verwerking.');renderDraftRowCard(root,draft,modal,row.id);return;}
+        if(isExplicitlyApproved(row)||sourceIsActive(root,draft,row))markEditorRowChanged(row);
+        row.processing.savingsContributionId=proposal.source.id;row.processing.savingsContributionAmount=proposal.remainingCents/100;row.processing.editorVersion=113;
+        renderDraftRowCard(root,draft,modal,row.id);
+        updateImportSaveStatus('Koppeling lokaal bewaren; nog niet financieel verwerkt…');
+        try{await persistLocalImportEditor(root,draft);updateImportSaveStatus('Koppeling lokaal bewaard; keur de spaarboeking goed om deze te verwerken.');}catch(error){updateImportSaveStatus('Koppeling niet lokaal bewaard. Probeer opnieuw.',true);alert(error.message);}
+        return;
+      }
       if(event.target.closest('[data-u4-cancel-concept]')){await sessionWrite(draft);await ImportStore.deleteJournal(`editor-draft-${draft.id}`);ImportEditors.delete(String(draft.id));closeDraft();return;}
       const identity=event.target.closest('[data-u4-identity]');if(identity&&row){
         try{

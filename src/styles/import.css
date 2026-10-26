@@ -273,3 +273,4 @@
 .u4-suggestion label{display:grid;gap:6px;min-width:0}
 .u4-suggestion select{width:100%;min-width:0;max-width:100%;font-size:16px;min-height:44px}
 .u4-suggestion[data-suggestion-status=conflict]>strong{color:var(--red)}
+.u4-dependent-grid [data-u4-savings-proposals]{grid-column:1/-1;overflow-wrap:anywhere}
