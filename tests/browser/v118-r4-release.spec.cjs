@@ -9,10 +9,10 @@ const { state: fixture } = require('../helpers/package5-fixture.cjs');
 test.use({ serviceWorkers: 'allow' });
 test.setTimeout(90000);
 
-test('V118-r15 naar r16, offline en terugrollen behouden financiën, planning, imports en lokale opslag', async ({ page, context }) => {
+test('V118-r16 naar r17, offline en terugrollen behouden financiën, planning, imports en lokale opslag', async ({ page, context }) => {
   const root = path.resolve(__dirname, '../..');
   const oldFiles = new Map(['index.html', 'app.js', 'app.css', 'service-worker.js'].map(name =>
-    [name, execFileSync('git', ['show', `bfd406ebe2bd605866aa04429873852a19db7057:${name}`], { cwd: root, maxBuffer: 20 * 1024 * 1024 })]));
+    [name, execFileSync('git', ['show', `34cae739fe0ca438b9954a45a8e61833afefe489:${name}`], { cwd: root, maxBuffer: 20 * 1024 * 1024 })]));
   let old = true;
   const server = http.createServer((request, response) => {
     const name = new URL(request.url, 'http://localhost').pathname.slice(1) || 'index.html';
@@ -54,7 +54,7 @@ test('V118-r15 naar r16, offline en terugrollen behouden financiën, planning, i
     await page.evaluate(() => navigator.serviceWorker.ready);
     await page.reload();
     await page.waitForFunction(() => window.__finizeBootstrap?.rendered);
-    expect(await page.evaluate(() => caches.keys())).toContain('finize-v118-r15');
+    expect(await page.evaluate(() => caches.keys())).toContain('finize-v118-r16');
     await page.evaluate(() => FinizeManual.save({ id: 'r4-manual', date: '2026-10-03', amount: 12.34, transactionType: 'uitgave', category: 'Kleding', description: 'Synthetic release transaction' }, 'gezamenlijk'));
     await page.evaluate(() => openBankAccountDetails(state.accountProfiles[0].id));
     await page.locator('[data-balance-add]').click();
@@ -78,31 +78,31 @@ test('V118-r15 naar r16, offline en terugrollen behouden financiën, planning, i
     expect(before.months['2026-08'].snapshot).toEqual({ income: 123, expenses: 55 });
     old = false;
     await page.evaluate(async () => (await navigator.serviceWorker.getRegistration()).update());
-    await expect.poll(() => page.evaluate(() => caches.keys())).toContain('finize-v118-r16');
+    await expect.poll(() => page.evaluate(() => caches.keys())).toContain('finize-v118-r17');
     // The new cache exists during install; wait for activation/cleanup as well.
-    await expect.poll(() => page.evaluate(() => caches.keys())).not.toContain('finize-v118-r15');
+    await expect.poll(() => page.evaluate(() => caches.keys())).not.toContain('finize-v118-r16');
     await page.reload();
     await page.waitForFunction(() => window.__finizeBootstrap?.rendered);
     expect(await snapshot()).toEqual(before);
-    expect(await page.locator('script[src*="app.js"]').getAttribute('src')).toContain('118-r16');
+    expect(await page.locator('script[src*="app.js"]').getAttribute('src')).toContain('118-r17');
     const keys = await page.evaluate(() => caches.keys());
-    expect(keys).not.toContain('finize-v118-r15');
+    expect(keys).not.toContain('finize-v118-r16');
     expect(keys).not.toContain('finize-obsolete-r4');
     expect(keys).toContain('other-app-r4');
     await context.setOffline(true);
     await page.reload();
     await page.waitForFunction(() => window.__finizeBootstrap?.rendered);
     expect(await snapshot()).toEqual(before);
-    expect(await page.locator('script[src*="app.js"]').getAttribute('src')).toContain('118-r16');
+    expect(await page.locator('script[src*="app.js"]').getAttribute('src')).toContain('118-r17');
     await context.setOffline(false);
     old = true;
     await page.evaluate(async () => (await navigator.serviceWorker.getRegistration()).update());
-    await expect.poll(() => page.evaluate(() => caches.keys())).toContain('finize-v118-r15');
-    await expect.poll(() => page.evaluate(() => caches.keys())).not.toContain('finize-v118-r16');
+    await expect.poll(() => page.evaluate(() => caches.keys())).toContain('finize-v118-r16');
+    await expect.poll(() => page.evaluate(() => caches.keys())).not.toContain('finize-v118-r17');
     await page.reload();
     await page.waitForFunction(() => window.__finizeBootstrap?.rendered);
     expect(await snapshot()).toEqual(before);
-    expect(await page.locator('script[src*="app.js"]').getAttribute('src')).toContain('118-r15');
+    expect(await page.locator('script[src*="app.js"]').getAttribute('src')).toContain('118-r16');
     expect(errors).toEqual([]);
   } finally {
     await context.setOffline(false);

@@ -5797,6 +5797,7 @@ button.icon-only-finize{width:34px;height:34px;padding:0!important;border-radius
 .u4-suggestion label{display:grid;gap:6px;min-width:0}
 .u4-suggestion select{width:100%;min-width:0;max-width:100%;font-size:16px;min-height:44px}
 .u4-suggestion[data-suggestion-status=conflict]>strong{color:var(--red)}
+.u4-dependent-grid [data-u4-savings-proposals]{grid-column:1/-1;overflow-wrap:anywhere}
 
 /* Finize bron: tablet.css */
 /* Update 5: uitsluitend tablet- en desktop-presentatie. Mobiel onder 768px blijft leidend. */
@@ -6390,6 +6391,7 @@ body.v4-app .value.is-negative{color:var(--red) !important}
 .p3-kpi:nth-child(2) .p3-kpi-icon{background:var(--warm);color:var(--text-dim)}
 .p3-kpi:nth-child(3) .p3-kpi-icon{background:var(--red-bg);color:var(--red)}
 .p3-kpi-copy{display:grid;gap:5px;min-width:0}
+.p3-kpi:first-child .p3-kpi-copy>small{display:grid;gap:6px}
 .p3-bank-update{position:relative;z-index:2;display:grid;gap:7px;margin-top:7px}
 .p3-bank-actions{display:flex;flex-wrap:wrap;gap:6px}
 .p3-bank-actions button{min-height:44px;white-space:normal}

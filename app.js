@@ -3355,7 +3355,8 @@
     }
     return result2;
   }
-  function liquidityRequiredMonths(state2, { accountProfileId, asOfDate, endDate, startDate, horizonLimitDate, scope } = {}) {
+  function liquidityRequiredMonths(state2, { accountProfileId, asOfDate, endDate, startDate, horizonLimitDate, scope, monthEndSavingsMonth } = {}) {
+    if (monthEndSavingsMonth && /^\d{4}-(0[1-9]|1[0-2])$/.test(monthEndSavingsMonth)) endDate = monthEnd(nextPlanningMonth(nextPlanningMonth(monthEndSavingsMonth)));
     if (!validCalendarDate(asOfDate)) return [];
     const periodEnd = endDate || horizonLimitDate;
     const cutoff = periodEnd && periodEnd < asOfDate ? periodEnd : asOfDate;
@@ -3788,6 +3789,11 @@
   }
   function selectDailyLiquidity(state2, options) {
     var _a2, _b, _c, _d, _e, _f, _g;
+    if (options.monthEndSavingsMonth) {
+      const { monthEndSavingsMonth, ...base } = options;
+      const result3 = selectDailyLiquidity(state2, base), monthEndSavings = selectMonthEndSavings(state2, { ...base, month: monthEndSavingsMonth });
+      return { ...result3, monthEndSavings, requiredMonths: [.../* @__PURE__ */ new Set([...result3.requiredMonths, ...monthEndSavings.requiredMonths])].sort() };
+    }
     if (options.incomeKpis) {
       const input2 = buildLiquidityInput(state2, { ...options, endDate: void 0, incomeOnly: true, salaryOnly: false, includeReceipt: false });
       input2.incomeKpis = true;
@@ -3876,6 +3882,40 @@
       firstBufferBreachDate: (_g = (_f = days.find((row) => row.expectedBalanceCents < forward.bufferCents)) == null ? void 0 : _f.date) != null ? _g : null
     };
   }
+  function selectMonthEndSavings(state2, options) {
+    const { month, asOfDate, accountProfileId } = options;
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month) || !validCalendarDate(asOfDate)) throw new Error("Kies een geldige maand voor de spaarprognose.");
+    const transferDate = monthEnd(month), nextMonth = nextPlanningMonth(month), nextMonthEnd = monthEnd(nextMonth);
+    const empty = { month, transferDate, nextMonth, assessmentEndDate: nextMonthEnd, status: "unknown", safeCents: null, indicativeCents: null, expectedEndBalanceCents: null, requiredOpeningCents: null, minimumCumulativeCents: null, plannedCents: null, extraCents: null, requiredMonths: [], reasons: [] };
+    if (transferDate < asOfDate) return { ...empty, reasons: [issue("past-saving-date")] };
+    const bound = monthEnd(nextPlanningMonth(nextMonth));
+    const guard = buildLiquidityInput(state2, { ...options, asOfDate: nextMonthEnd, endDate: void 0, incomeOnly: true, salaryOnly: false, includeReceipt: true });
+    const guardEnd = guard.horizon.receiptDate;
+    const reliableGuard = !!guardEnd && guardEnd <= bound;
+    const assessmentEndDate = reliableGuard ? guardEnd : nextMonthEnd;
+    const input = buildLiquidityInput(state2, { ...options, endDate: assessmentEndDate, salaryOnly: false });
+    const profile = (state2.accountProfiles || []).find((p) => p.id === accountProfileId);
+    const monthlyTransfers = (state2.internalTransfers || []).filter((t) => t.month === month && t.type === (profile == null ? void 0 : profile.accountOwner) + "-sparen" && (t.sourceClosingId || t.closureId) && ["gepland", "planned", "concept", "nog-te-verwerken"].includes(t.status));
+    const candidateTransferId = options.savingsTransferId || (monthlyTransfers.length === 1 ? monthlyTransfers[0].id : null);
+    const candidateIds = new Set(input.events.filter((e) => e.isSavingsPlan && e.status !== "replaced" && e.transferId === candidateTransferId && e.month === month && e.amountCents < 0).map((e) => e.id));
+    const normalized = { ...input, events: input.events.filter((e) => !candidateIds.has(e.id)), reservations: input.reservations.filter((r) => !candidateIds.has(r.id.replace(/^undated:/, ""))), reasons: input.reasons.filter((r) => !candidateIds.has(r.eventId)) };
+    const projection = projectDailyLiquidity(normalized);
+    const reasons2 = [...projection.reasons, ...!reliableGuard ? [issue("missing-saving-horizon")] : []];
+    const selected = projection.days.find((d) => d.date === transferDate);
+    const plannedCents = sum(input.savingsPlans.filter((p) => p.month === month && p.owner === (profile == null ? void 0 : profile.accountOwner)).map((p) => p.amountCents));
+    const remainingPlannedCents = sum(input.savingsPlans.filter((p) => p.month === month && p.owner === (profile == null ? void 0 : profile.accountOwner)).map((p) => Math.max(0, safe(p.amountCents - p.realizedCents))));
+    if (monthlyTransfers.length > 1 && !options.savingsTransferId) reasons2.push(issue("ambiguous-saving-plan"));
+    const base = { ...empty, assessmentEndDate, bufferCents: input.bufferCents, plannedCents, remainingPlannedCents, requiredMonths: input.requiredMonths, reasons: reasons2 };
+    const blocked2 = !selected || projection.opening.balanceCents === null || reasons2.some((r) => r.severity === "incomplete" || ["unknown-cash-date", "partial-bank-coverage", "unknown-bank-coverage", "missing-checkpoint"].includes(r.code));
+    if (blocked2) return { ...base, status: selected ? "incomplete" : "unknown" };
+    const end = selected.expectedBalanceCents;
+    const future = projection.days.filter((d) => d.date > transferDate);
+    const minimumCumulativeCents = Math.min(0, ...future.map((d) => safe(d.expectedBalanceCents - end)));
+    const requiredOpeningCents = safe(input.bufferCents - minimumCumulativeCents);
+    const amount = Math.max(0, safe(end - requiredOpeningCents));
+    const status2 = reasons2.length ? "provisional" : "projected";
+    return { ...base, status: status2, expectedEndBalanceCents: end, minimumCumulativeCents, requiredOpeningCents, safeCents: status2 === "projected" ? amount : null, indicativeCents: amount, extraCents: Math.max(0, safe(amount - remainingPlannedCents)), shortfallCents: Math.max(0, safe(remainingPlannedCents - amount)) };
+  }
 
   // src/ui/liquidity-explanations.mjs
   var explanations = {
@@ -3883,6 +3923,9 @@
     "missing-period-opening": ["Een beginsaldo vóór de gekozen periode ontbreekt.", "De lijn kan pas beginnen bij het eerste bruikbare saldo. Eerdere saldi blijven onbekend.", "Vul een eerder banksaldo met bijbehorende datum in.", "balance"],
     "missing-reliable-horizon": ["Een betrouwbare volgende ontvangstdatum ontbreekt.", "Finize kan daardoor het einde van deze prognoseperiode niet bepalen.", "Stel een ontvangstdatum in of kies een eigen einddatum.", "settings"],
     "unknown-cash-date": ["Een betaaldatum ontbreekt of een geplande betaling staat nog open.", "De plaats van deze betaling in het saldoverloop is onzeker.", "Controleer de betaalmomenten en de verwerking van de betreffende betaling.", "payments"],
+    "missing-saving-horizon": ["De periode na maandultimo kan niet volledig worden beoordeeld.", "Een volgende salaris- of zakgeldontvangst ontbreekt voor de controle van de vroege verplichtingen daarna.", "Controleer de bestaande inkomensplanning en betaaldagen.", "accounts"],
+    "past-saving-date": ["De geselecteerde maandultimo is al verstreken.", "Een nieuwe overboeking op een verstreken dag kan niet uit het huidige saldo worden voorspeld.", "Kies de huidige of een toekomstige maand.", "settings"],
+    "ambiguous-saving-plan": ["Er zijn meerdere maandspaarplannen voor deze periode.", "Het is niet duidelijk welke overboeking de te berekenen inleg is.", "Controleer de afzonderlijke overboekingsplannen.", "payments"],
     "unresolved-account-profile": ["Bij een betaling is de bankrekening niet duidelijk.", "Finize kan deze betaling niet betrouwbaar aan deze rekening toewijzen.", "Controleer de rekeningkeuze bij de betaling en je bankrekeningen.", "accounts"],
     "unresolved-budget-account": ["Een budget heeft geen betaalrekening.", "De bijbehorende uitgaven kunnen niet betrouwbaar aan deze rekening worden toegewezen.", "Controleer de primaire betaalrekening en de rekeningkeuze van je budget.", "settings"],
     "joint-primary-account-not-selected": ["De primaire gezamenlijke betaalrekening ontbreekt.", "De gezamenlijke planning en buffer kunnen niet aan één rekening worden gekoppeld.", "Kies de primaire gezamenlijke betaalrekening.", "accounts"],
@@ -4066,12 +4109,15 @@
     return `<div class="p3-chart">${gap}<svg viewBox="0 0 ${width} ${chartHeight}" role="group" aria-label="Verwachte saldo-ontwikkeling; selecteer een dag voor bedragen en gebeurtenissen">${known.length ? ticks : ""}${segment(segments.past, "history")}${segment(segments.future, "future")}${known.length ? `<line x1="${plotStart}" x2="${plotEnd}" y1="${y(p.bufferCents)}" y2="${y(p.bufferCents)}" class="p3-buffer-line"/>` : ""}${today}${markers}${labels2}</svg><div class="p3-chart-legend">${segments.past.length ? '<span class="p3-history-key"><i aria-hidden="true">━</i> Verstreken dagen</span>' : ""}<span>━ Vandaag en toekomst</span><span class="p3-income-key">● Inkomsten</span><span class="p3-expense-key">● Uitgaven</span><span>◇ Minimum</span><span>┄ Buffer ${money2(p.bufferCents)}</span></div><div class="p3-chart-controls"><label class="p3-day-select">Bekijk een dag <select data-p3-day aria-label="Dag in saldo-ontwikkeling">${days.map((d) => `<option value="${d.date}">${date(d.date)}${Number.isSafeInteger(d.expectedBalanceCents) ? "" : " · onbekend"}</option>`).join("")}</select></label><div class="p3-point-detail" data-p3-point-detail aria-live="polite"></div></div></div>`;
   }
   var info = (key, title, content) => `<button type="button" class="p3-info-button" data-p3-info="${key}" aria-label="Uitleg over ${escape2(title)}" aria-controls="p3-info-${key}" aria-expanded="false">ⓘ</button><div class="p3-info-popover" id="p3-info-${key}" popover="auto" role="dialog" aria-modal="false" aria-label="${escape2(title)}" data-p3-info-panel="${key}"><div class="p3-info-heading"><strong>${title}</strong><button type="button" class="ghost small" data-p3-close-info="${key}" aria-label="Sluiten · uitleg over ${escape2(title)}">Sluiten</button></div>${content}</div>`;
+  var savingDate = (value) => value ? new Intl.DateTimeFormat("nl-NL", { day: "numeric", month: "long", timeZone: "UTC" }).format(/* @__PURE__ */ new Date(value + "T12:00:00Z")) : "maandultimo";
   var calculationHelp = (p) => {
     var _a2;
-    return `<p>Dit is de berekende ruimte boven je buffer tot vlak vóór de volgende salaris- of zakgeldontvangst. De buffer wordt één keer afgetrokken van het laagste verwachte saldo. De grafiekperiode verandert deze beoordelingsperiode niet. Beoordeling: ${date(((_a2 = p.availability) == null ? void 0 : _a2.fromDate) || p.asOfDate)} tot en met ${date(p.horizon.endDate)}.</p><p>De grafiek kan ook verstreken dagen tonen. Gepland sparen is een streefdoel, geen extra harde aftrek. De spaardoelruimte volgt de verwachte kasruimte aan het maandeinde en de bestaande spaarplanning.</p>`;
+    const s = p.monthEndSavings;
+    return s ? `<p>Het maximaal over te boeken bedrag op ${savingDate(s.transferDate)}. Dit is geen geld dat vandaag vrij besteedbaar is.</p><p>Verwacht eindsaldo: ${money2(s.expectedEndBalanceCents)}<br>Nodig vanaf volgende maand: ${money2(s.requiredOpeningCents)}<br>Inclusief permanente buffer: ${money2((_a2 = s.bufferCents) != null ? _a2 : p.bufferCents)}.</p><p>De hele volgende maand telt mee, plus de periode tot en met de eerstvolgende salaris- of zakgeldontvangst daarna (${date(s.assessmentEndDate)}). De bestaande spaarreservering wordt niet opnieuw afgetrokken of automatisch gewijzigd.</p>` : "";
   };
   function qualityHelp(p) {
-    const reasons2 = explainLiquidityReasons(p);
+    var _a2;
+    const reasons2 = explainLiquidityReasons({ ...p, reasons: [...p.reasons, ...((_a2 = p.monthEndSavings) == null ? void 0 : _a2.reasons) || []] });
     return reasons2.length ? `<p>${status(p.status)}. De onderstaande punten zijn door de huidige prognose vastgesteld.</p>${reasons2.map((r) => `<section data-p3-reason="${escape2(r.code)}"><strong>${escape2(r.problem)}</strong><p>${escape2(r.why)}</p><p><b>Wat kun je doen?</b> ${escape2(r.solution)}</p>${action(r.action, r.action === "balance" ? "Saldo controleren" : r.action === "payments" ? "Betalingen bekijken" : r.action === "data" ? "Data & back-up openen" : r.action === "accounts" ? "Bankrekeningen openen" : r.action === "budgets" ? "Overzicht openen" : "Prognose instellen")}<details><summary>Technische details</summary><p>${escape2(r.detail)} (${escape2(r.code)})</p></details></section>`).join("")}` : `<p>${status(p.status)}. Er zijn voor deze prognose geen aanvullende oorzaken gemeld. Een prognose blijft een verwachting; bedragen en betaalmomenten kunnen veranderen.</p>`;
   }
   function outlookHtml(p, profile, label, iconSvg2, bankMarkup = "") {
@@ -4079,16 +4125,17 @@
     if (!profile) return `<p class="p3-empty">Kies de primaire betaalrekening voor deze context. Er wordt geen willekeurige rekening gebruikt.</p>${action("accounts", "Rekening instellen")}`;
     if (!p) return '<p class="p3-empty" role="status">Vooruitblik laden…</p>';
     const v = liquidityView(p), balance = p.currentBalance || p.opening;
-    const kpi = (key, title, value, sub, icon, explanation, act = "") => `<article class="p3-kpi${key === "free" && v.free === 0 && v.minimum !== null && v.minimum < 0 ? " p3-no-room" : ""}">${act ? `<button type="button" class="ux-card-primary" data-p3-action="${act}" aria-label="${title} ${escape2(value)} · ${act === "balance" ? "Saldo bijwerken" : "Buffer instellen"}"></button>` : ""}<span class="p3-kpi-icon" aria-hidden="true">${iconSvg2(icon)}</span><span class="p3-kpi-copy"><span class="p3-kpi-title"><span>${title}</span>${info(key, title, explanation)}</span><strong>${value}</strong><small>${sub}</small>${key === "balance" ? bankMarkup : ""}</span></article>`;
+    const kpi = (key, title, value, sub, icon, explanation, act = "") => `<article class="p3-kpi${key === "free" && amount === 0 && (saving == null ? void 0 : saving.shortfallCents) > 0 ? " p3-no-room" : ""}">${act ? `<button type="button" class="ux-card-primary" data-p3-action="${act}" aria-label="${title} ${escape2(value)} · ${act === "balance" ? "Saldo bijwerken" : "Buffer instellen"}"></button>` : ""}<span class="p3-kpi-icon" aria-hidden="true">${iconSvg2(icon)}</span><span class="p3-kpi-copy"><span class="p3-kpi-title"><span>${title}</span>${info(key, title, explanation)}</span><strong>${value}</strong><small>${sub}</small>${key === "balance" ? bankMarkup : ""}</span></article>`;
     const warning = v.minimum !== null && v.minimum < v.buffer ? `<div class="p3-warning" role="status">${p.status !== "projected" ? `${status(p.status)} · ` : ""}Op ${date(v.minimumDate)} wordt ${money2(v.minimum)} verwacht. ${v.minimum < 0 ? "Dit is onder € 0. " : ""}Dat is ${money2(v.buffer - v.minimum)} onder je buffer van ${money2(v.buffer)}.</div>` : "";
-    const saving = savingsNote(p), planned = ((_a2 = saving.match(/<span data-p3-savings-plan>.*?<\/span>/)) == null ? void 0 : _a2[0]) || "";
-    const savingDetails = saving.replace(planned, "");
-    const freeSub = `${v.free === 0 ? `Geen bestedingsruimte${v.indicative ? " · Indicatie" : ""}<br>` : v.indicative && v.free !== null ? "Indicatie<br>" : ""}${planned}${((_b = p.softSavings) == null ? void 0 : _b.warning) ? "<span data-p3-savings-alert>Let op: extra uitgaven kunnen je spaardoel verlagen.</span>" : ""}`;
+    const saving = p.monthEndSavings, amount = (_b = (_a2 = saving == null ? void 0 : saving.safeCents) != null ? _a2 : saving == null ? void 0 : saving.indicativeCents) != null ? _b : null;
+    const savingTitle = "Veilig te sparen op " + savingDate(saving == null ? void 0 : saving.transferDate);
+    const freeSub = `${amount === null ? "Onvolledige prognose · bedrag niet vast te stellen" : saving.status === "provisional" ? "Indicatie" : ""}<span data-p3-savings-plan>Gepland sparen: ${money2(saving == null ? void 0 : saving.plannedCents)}</span>${(saving == null ? void 0 : saving.remainingPlannedCents) !== (saving == null ? void 0 : saving.plannedCents) ? `<span>Nog uit te voeren: ${money2(saving == null ? void 0 : saving.remainingPlannedCents)}</span>` : ""}${amount === null ? "" : `<span data-p3-savings-extra>Extra ruimte: ${money2(saving.extraCents)}</span>${saving.shortfallCents ? `<span data-p3-savings-shortfall>Tekort voor geplande inleg: ${money2(saving.shortfallCents)}</span>` : ""}<span>${amount < saving.remainingPlannedCents ? "De geplande inleg past niet volledig binnen de prognose." : "Na overboeking blijft volgens de prognose voldoende saldo over, inclusief de buffer van " + money2(v.buffer) + "."}</span>`}`;
+    const savingsWarning = amount === null ? '<div class="p3-warning" role="status">Onvolledige spaarprognose. Controleer de saldobasis en betaalmomenten; een veilig spaarbedrag is nog niet vast te stellen.</div>' : "";
     const balanceDate = (_c = balance.checkpoint) == null ? void 0 : _c.asOfDate;
     const balanceSub = `${status(balance.status)}${balanceDate ? ` · Berekend t/m ${date(balance.toDate || p.asOfDate)}` : ""}${bankMarkup ? "" : " · Saldo bijwerken"}`;
     const reconciliations = (p.reconciliations || []).filter((r) => r.differenceCents !== null && r.differenceCents !== 0).map((r) => `<p class="p3-caption">Saldo-ijkpunt ${date(r.date)}: ${money2(r.observedCents)} · berekend ${money2(r.modeledCents)} · verschil ${money2(r.differenceCents)}. Vanaf deze dag loopt de berekening verder met het handmatig ingestelde saldo.</p>`).join("");
     const qualityActions = p.reasons.length ? `<div class="p3-quality-actions">${action("settings", p.reasons.some((r) => r.code === "missing-reliable-horizon") ? "Salarisdatum instellen" : "Prognose instellen")}${v.balance === null ? action("balance", "Saldo instellen") : ""}</div>` : "";
-    return `<div class="p3-kpis">${kpi("free", "Vrij na verplichtingen", money2(v.free), freeSub, "income", calculationHelp(p) + savingDetails)}${kpi("balance", p.horizon.endDate < p.asOfDate ? "Saldo op " + date(p.horizon.endDate) : "Huidig saldo", v.balance === null ? "Saldo onbekend" : money2(v.balance), balanceSub, "wallet", `<p>Dit is de rekeningstand op basis van je vastgelegde banksaldo en beschikbare bankboekingen. ${balanceDate ? `Het startpunt is het saldo-ijkpunt van ${date(balanceDate)}. Daarna tellen beschikbare bankboekingen mee tot en met ${date(balance.toDate || p.asOfDate)}.` : ""} Dit is geen automatische bevestiging van je bank.</p>${qualityHelp(p)}`, "balance")}${kpi("minimum", "Laagste prognose", money2(v.minimum), `${date(v.minimumDate)} · ${status(p.status)}`, "chart", `<p>Het laagste verwachte saldo vanaf vandaag tot vlak vóór je volgende salaris- of zakgeldontvangst, inclusief je huidige saldo. Deze KPI verandert niet wanneer je de grafiekperiode wisselt.</p>${qualityHelp(p)}`)}${kpi("buffer", "Buffer", money2(v.buffer), "Buffer instellen", "shield", `<p>De buffer is de veiligheidsmarge die je op deze rekening wilt houden. Vrij na verplichtingen houdt rekening met deze marge. Je buffer is geen aparte bankboeking.</p>`, "settings")}</div>${warning}<div class="p3-outlook-footer"><span class="p3-account-name">Rekening: ${escape2(profile.name)}</span>${qualityActions}${reconciliations}</div>`;
+    return `<div class="p3-kpis">${kpi("free", savingTitle, amount === null ? "—" : money2(amount), freeSub, "income", calculationHelp(p) + qualityHelp(p))}${kpi("balance", p.horizon.endDate < p.asOfDate ? "Saldo op " + date(p.horizon.endDate) : "Huidig saldo", v.balance === null ? "Saldo onbekend" : money2(v.balance), balanceSub, "wallet", `<p>Dit is de rekeningstand op basis van je vastgelegde banksaldo en beschikbare bankboekingen. ${balanceDate ? `Het startpunt is het saldo-ijkpunt van ${date(balanceDate)}. Daarna tellen beschikbare bankboekingen mee tot en met ${date(balance.toDate || p.asOfDate)}.` : ""} Dit is geen automatische bevestiging van je bank.</p>${qualityHelp(p)}`, "balance")}${kpi("minimum", "Laagste prognose", money2(v.minimum), `${date(v.minimumDate)} · ${status(p.status)}`, "chart", `<p>Het laagste verwachte saldo vanaf vandaag tot vlak vóór je volgende salaris- of zakgeldontvangst, inclusief je huidige saldo. Deze KPI verandert niet wanneer je de grafiekperiode wisselt.</p>${qualityHelp(p)}`)}${kpi("buffer", "Buffer", money2(v.buffer), "Buffer instellen", "shield", `<p>De buffer is de veiligheidsmarge die je op deze rekening wilt houden. Veilig te sparen op maandultimo beschermt deze marge. Je buffer is geen aparte bankboeking.</p>`, "settings")}</div>${warning}${savingsWarning}<div class="p3-outlook-footer"><span class="p3-account-name">Rekening: ${escape2(profile.name)}</span>${qualityActions}${reconciliations}</div>`;
   }
   function yearHtml(year, getMonth) {
     const v = yearView(year, getMonth), max = Math.max(1, ...v.months.filter((m) => !m.missing).flatMap((m) => [m.income, m.spent]));
@@ -4222,7 +4269,7 @@
       }
       try {
         const asOfDate = deps.today(), period = dashboardPeriod({ month: deps.month(), today: asOfDate, filter, custom });
-        const kpis = await deps.project({ accountProfileId: profile.id, asOfDate, incomeKpis: true, withFinancialBasis: true });
+        const kpis = await deps.project({ accountProfileId: profile.id, asOfDate, incomeKpis: true, monthEndSavingsMonth: deps.month(), withFinancialBasis: true });
         if (token !== generation || !root2.isConnected) return;
         const p = await deps.project({ accountProfileId: profile.id, asOfDate, withFinancialBasis: true, ...period });
         if (token !== generation || !root2.isConnected) return;
@@ -16488,6 +16535,20 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
     __finizeInstallUpdate4Hooks: installUpdate4Hooks
   });
 
+  // src/core/savings-link-proposals.mjs
+  function savingsLinkProposals(projections, { transactionType, month, owner, goalId, amountCents, excludeTransactionId } = {}) {
+    if (!["sparen", "naar-spaarrekening"].includes(transactionType) || !goalId || !Number.isSafeInteger(amountCents) || amountCents <= 0) return [];
+    const claims = /* @__PURE__ */ new Map();
+    for (const p of projections) if (p.active && p.id !== excludeTransactionId && p.savingsContribution) {
+      const c = p.savingsContribution;
+      claims.set(c.sourceId, (claims.get(c.sourceId) || 0) + c.amountCents);
+    }
+    return projections.filter((p) => {
+      var _a2;
+      return p.active && p.calendarMonth === month && p.financialFor === owner && p.effects.accountCashflow > 0 && (isSavingsIncomeSource(p) || ["interne-overboeking", "extra-bijdrage"].includes(p.transactionType) && ((_a2 = p.transaction.processing) == null ? void 0 : _a2.contributionGoalId) === goalId);
+    }).map((p) => ({ source: p, remainingCents: savingsContributionCapacity(p) - (claims.get(p.id) || 0) })).filter((p) => Number.isSafeInteger(p.remainingCents) && p.remainingCents === amountCents).sort((a, b) => String(a.source.transaction.date || "").localeCompare(String(b.source.transaction.date || "")) || a.source.id.localeCompare(b.source.id));
+  }
+
   // src/import/source-repair.mjs
   var copy9 = (value) => JSON.parse(JSON.stringify(value));
   var iban3 = (value) => String(value || "").replace(/\s/g, "").toUpperCase();
@@ -19366,15 +19427,28 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
       if (Number(row.bankOriginal.amount) <= 0 || !["interne-overboeking", "extra-bijdrage"].includes(p.transactionType)) return "";
       return `<div class="u4-dependent-grid"><label>Inleg bestaand geld voor spaardoel (optioneel)<select data-u4-field="contributionGoalId">${goalOptions(root2, p.contributionGoalId || "")}</select></label>${p.contributionGoalId ? `<label>Inlegbedrag<input type="number" min="0.01" step="0.01" data-u4-field="contributionAmount" value="${Number(p.contributionAmount) || 0}"></label><span class="u4-muted">Geen inkomen of extra zakgeld. Koppel na goedkeuring de daadwerkelijke spaarboeking aan deze inleg. Alleen die spaarboeking verhoogt het spaardoel.</span>` : ""}</div>`;
     }
+    const dismissedSavingsProposals = /* @__PURE__ */ new WeakSet();
+    function savingsProposalsFor(root2, row, projections = selectTransactionProjections(root2.state)) {
+      var _a2, _b;
+      const p = row.processing;
+      if (((_a2 = p.splits) == null ? void 0 : _a2.length) || p.savingsContributionId) return [];
+      return savingsLinkProposals(projections, { transactionType: p.transactionType, month: row.bankOriginal.bankDate.slice(0, 7), owner: p.budgetOwner, goalId: p.savingsGoalId, amountCents: Math.round(Number(p.processedAmount) * 100), excludeTransactionId: (_b = projections.find((t) => t.transaction.importTransactionId === row.id)) == null ? void 0 : _b.id });
+    }
     function savingsContributionFields(root2, row) {
       const p = row.processing, month = row.bankOriginal.bankDate.slice(0, 7);
-      const sources = selectTransactionProjections(root2.state).filter((t) => {
+      const projections = selectTransactionProjections(root2.state);
+      const sources = projections.filter((t) => {
         var _a2;
         return t.active && t.effects.accountCashflow > 0 && t.calendarMonth === month && t.financialFor === p.budgetOwner && (isSavingsIncomeSource(t) || ["interne-overboeking", "extra-bijdrage"].includes(t.transactionType) && ((_a2 = t.transaction.processing) == null ? void 0 : _a2.contributionGoalId) === p.savingsGoalId);
       });
       const selected = sources.find((t) => t.id === p.savingsContributionId);
       const missing = p.savingsContributionId && !selected;
-      return `<label>Gekoppelde inleg of inkomen<select data-u4-field="savingsContributionId"><option value="">Geen koppeling</option>${missing ? option(p.savingsContributionId, "Gekoppelde inleg niet beschikbaar", p.savingsContributionId) : ""}${sources.map((t) => option(t.id, `${t.transaction.description || (isSavingsIncomeSource(t) ? "Inkomen" : "Interne inleg")} · ${euro3(savingsContributionCapacity(t) / 100)}`, p.savingsContributionId || "")).join("")}</select></label>${p.savingsContributionId ? `<label>Gekoppeld bedrag<input type="number" min="0.01" step="0.01" data-u4-field="savingsContributionAmount" value="${Number(p.savingsContributionAmount) || 0}"></label><span class="u4-muted">${isSavingsIncomeSource(selected) ? "Administratieve koppeling: inkomen, maandruimte en spaarbedrag veranderen hierdoor niet." : "Dit deel komt uit bestaand eigen geld en wordt niet van Over deze maand afgetrokken."} De volledige spaarboeking blijft meetellen voor het spaardoel.</span>` : ""}`;
+      const proposals = dismissedSavingsProposals.has(row) ? [] : savingsProposalsFor(root2, row, projections);
+      const proposalHtml = proposals.length ? `<div class="u4-dependent-grid" data-u4-savings-proposals><strong>Hoort deze spaarstorting bij een ontvangst?</strong><span class="u4-muted">Het koppelbare bedrag komt overeen. Controleer de ontvangst en bevestig de koppeling; deze wordt pas bij goedkeuring verwerkt.</span>${proposals.map(({ source: t, remainingCents }) => {
+        var _a2;
+        return `<div><span>${esc(isSavingsIncomeSource(t) ? "Inkomen" : "Interne ontvangst")} · ${esc(((_a2 = t.transaction.bankOriginal) == null ? void 0 : _a2.bankDate) || t.transaction.date)} · ${esc(t.transaction.description || "Ontvangst")} · ${euro3(t.amount)}${Math.round(t.amount * 100) !== remainingCents ? " · nog koppelbaar " + euro3(remainingCents / 100) : ""}</span><button type="button" class="ghost small" data-u4-link-saving="${esc(t.id)}">Koppelen</button></div>`;
+      }).join("")}<button type="button" class="ghost small" data-u4-dismiss-saving>Niet koppelen</button></div>` : "";
+      return `<label>Gekoppelde inleg of inkomen<select data-u4-field="savingsContributionId"><option value="">Geen koppeling</option>${missing ? option(p.savingsContributionId, "Gekoppelde inleg niet beschikbaar", p.savingsContributionId) : ""}${sources.map((t) => option(t.id, `${t.transaction.description || (isSavingsIncomeSource(t) ? "Inkomen" : "Interne inleg")} · ${euro3(savingsContributionCapacity(t) / 100)}`, p.savingsContributionId || "")).join("")}</select></label>${p.savingsContributionId ? `<label>Gekoppeld bedrag<input type="number" min="0.01" step="0.01" data-u4-field="savingsContributionAmount" value="${Number(p.savingsContributionAmount) || 0}"></label><span class="u4-muted">${isSavingsIncomeSource(selected) ? "Administratieve koppeling: inkomen, maandruimte en spaarbedrag veranderen hierdoor niet." : "Dit deel komt uit bestaand eigen geld en wordt niet van Over deze maand afgetrokken."} De volledige spaarboeking blijft meetellen voor het spaardoel.</span>` : ""}${proposalHtml}`;
     }
     function dependentFieldsHtml(root2, row) {
       var _a2, _b, _c, _d;
@@ -19996,6 +20070,36 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
         modal = ensureModalRoot();
         const container = event2.target.closest("[data-u4-row]");
         const row = container ? draft.rows.find((item) => item.id === container.dataset.u4Row) : null;
+        const dismissSaving = event2.target.closest("[data-u4-dismiss-saving]");
+        if (dismissSaving && row) {
+          dismissedSavingsProposals.add(row);
+          renderDraftRowCard(root2, draft, modal, row.id);
+          return;
+        }
+        const linkSaving = event2.target.closest("[data-u4-link-saving]");
+        if (linkSaving && row) {
+          if (batchLifecycle(draft) !== "active") return;
+          const proposal = savingsProposalsFor(root2, row).find((p) => p.source.id === linkSaving.dataset.u4LinkSaving);
+          if (!proposal) {
+            alert("Deze ontvangst is intussen gewijzigd of al gekoppeld. Controleer de actuele verwerking.");
+            renderDraftRowCard(root2, draft, modal, row.id);
+            return;
+          }
+          if (isExplicitlyApproved(row) || sourceIsActive(root2, draft, row)) markEditorRowChanged(row);
+          row.processing.savingsContributionId = proposal.source.id;
+          row.processing.savingsContributionAmount = proposal.remainingCents / 100;
+          row.processing.editorVersion = 113;
+          renderDraftRowCard(root2, draft, modal, row.id);
+          updateImportSaveStatus("Koppeling lokaal bewaren; nog niet financieel verwerkt…");
+          try {
+            await persistLocalImportEditor(root2, draft);
+            updateImportSaveStatus("Koppeling lokaal bewaard; keur de spaarboeking goed om deze te verwerken.");
+          } catch (error2) {
+            updateImportSaveStatus("Koppeling niet lokaal bewaard. Probeer opnieuw.", true);
+            alert(error2.message);
+          }
+          return;
+        }
         if (event2.target.closest("[data-u4-cancel-concept]")) {
           await sessionWrite(draft);
           await ImportStore.deleteJournal(`editor-draft-${draft.id}`);
