@@ -147,7 +147,8 @@ export function liquidityRequiredMonths(state,{accountProfileId,asOfDate,endDate
   const periodEnd=endDate || horizonLimitDate;
   const cutoff=periodEnd&&periodEnd<asOfDate?periodEnd:asOfDate;
   const checkpoint = startDate ? planningAnchor(state,{accountProfileId,asOfDate:cutoff,startDate,scope}) : checkpointHistory(state,accountProfileId,scope).active.find(row => row.asOfDate <= asOfDate);
-  const end = validCalendarDate(periodEnd) ? periodEnd : monthEnd(nextPlanningMonth(asOfDate.slice(0,7)));
+  const planningReference=startDate&&startDate>asOfDate?startDate:asOfDate;
+  const end = validCalendarDate(periodEnd) ? periodEnd : monthEnd(nextPlanningMonth(planningReference.slice(0,7)));
   return balanceRequiredMonths(startDate&&checkpoint?shiftLiquidityDay(checkpoint.asOfDate,1):checkpoint?.asOfDate || startDate || asOfDate,end);
 }
 

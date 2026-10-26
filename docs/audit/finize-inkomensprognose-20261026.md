@@ -24,3 +24,7 @@ Bewijsbestanden staan lokaal in `backups/bank-en-inkomensprognose-20261026/`; di
 ChatGPT, gesprek “Septembertransacties controleren”, keurde het minimale voorstel vooraf goed. De technische eindreview gaf akkoord voor een afzonderlijke lokale commit, onder voorwaarde van dezelfde peildatum/financiële basis en het slagen van de 28 browsertests. Beide voorwaarden zijn gecontroleerd. Geen merge- of publicatieakkoord voor de combinatie is hiermee verondersteld.
 
 Geen productiegegevens, bankverbinding, backend of financiële brongegevens zijn door deze werkzaamheden gewijzigd.
+
+## Aanvullende brede controle
+
+De volledige Node-run (76 testbestanden) bracht drie oude salarisgrafiekverwachtingen aan het licht die nog uitgingen van een exclusieve einddag en een maandlimiet. Die verwachtingen volgen nu de gevraagde inclusieve inkomensdag. Daarnaast is de opslagperiodeaanvraag voor een verre toekomstige grafiekmaand hersteld: laden tot de maand na de latere van vandaag en de zichtbare startdatum. Dit verandert geen financiële brongegevens of KPI-periode. De volledige Node-run slaagt na deze correctie; de gecombineerde browser- en releasecontrole volgt afzonderlijk. Het gegenereerde bestand wordt bij de gecombineerde build gecontroleerd.

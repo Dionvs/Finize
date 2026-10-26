@@ -63,22 +63,22 @@ test('korte filters blijven binnen de maand; andere maanden beginnen op de eerst
  assert.throws(()=>dashboardPeriod({month:'2026-11',today:'2026-10-14',filter:'custom',custom:'2026-12-01'}),/geselecteerde maand/);
  assert.throws(()=>dashboardPeriod({month:'2026-10',today:'2026-10-14',filter:'custom',custom:'2026-10-13'}),/geselecteerde maand/);
 });
-test('volgend salaris blijft rekeninggebonden, eerlijk bij ontbreken en begrensd op de maand',()=>{
+test('volgend salaris blijft rekeninggebonden, eerlijk bij ontbreken en toont het inkomensmoment ook over de maandgrens',()=>{
  const s=fixture();assert.equal(project(s,'2026-11','2026-10-14','salary').horizon.endDate,null);
  s.incomeDefaultsHistory.dion[0].salary=1000;s.accountProfiles[0].liquidity.salaryDays={dion:25};
- const p=project(s,'2026-11','2026-10-14','salary');assert.equal(p.horizon.endDate,'2026-11-24');assert.equal(p.days[0].date,'2026-11-01');
- const late=project(s,'2026-10','2026-10-30','salary');assert.equal(late.horizon.endDate,'2026-10-31');assert.equal(late.horizon.kind,'month-limit');
+ const p=project(s,'2026-11','2026-10-14','salary');assert.equal(p.horizon.endDate,'2026-11-25');assert.equal(p.days[0].date,'2026-11-01');
+ const late=project(s,'2026-10','2026-10-30','salary');assert.equal(late.horizon.endDate,'2026-11-25');assert.equal(late.horizon.kind,'next-receipt');
 });
 test('vereiste historische opslagperioden negeren een later ijkpunt',()=>{
  const s=fixture();assert.deepEqual(liquidityRequiredMonths(s,{accountProfileId:'joint',asOfDate:'2026-10-14',startDate:'2026-09-01',endDate:'2026-09-30',scope:scope(s)}),['2026-09']);
 });
 test('historisch salarisfilter gebruikt geen ijkpunt na zijn kortere horizon',()=>{
  const s=fixture('2026-09-30',50000);s.incomeDefaultsHistory.dion[0].salary=1000;s.accountProfiles[0].liquidity.salaryDays={dion:25};
- const p=project(s,'2026-09','2026-10-14','salary');assert.equal(p.horizon.endDate,'2026-09-24');assert.equal(p.days.length,0);
- assert.equal(p.currentBalance.balanceCents,null);assert.equal(chartDays(p).length,24);
+ const p=project(s,'2026-09','2026-10-14','salary');assert.equal(p.horizon.endDate,'2026-09-25');assert.equal(p.days.length,0);
+ assert.equal(p.currentBalance.balanceCents,null);assert.equal(chartDays(p).length,25);
 });
 test('salarisfilter laadt alle tussenmaanden tot de gekozen toekomstige maand',()=>{
- const s=fixture();assert.deepEqual(liquidityRequiredMonths(s,{accountProfileId:'joint',asOfDate:'2026-10-14',scope:scope(s),...dashboardPeriod({month:'2027-02',today:'2026-10-14',filter:'salary'})}),['2026-10','2026-11','2026-12','2027-01','2027-02']);
+ const s=fixture();assert.deepEqual(liquidityRequiredMonths(s,{accountProfileId:'joint',asOfDate:'2026-10-14',scope:scope(s),...dashboardPeriod({month:'2027-02',today:'2026-10-14',filter:'salary'})}),['2026-10','2026-11','2026-12','2027-01','2027-02','2027-03']);
 });
 test('eerdere tekorten en ijkpuntcorrecties komen niet in het minimum of de footer van november',()=>{
  const s=fixture('2026-09-30',5000);checkpoint(s,'2026-10-14',43478);const p=project(s,'2026-11');
