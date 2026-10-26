@@ -10037,12 +10037,34 @@
     var _a2, _b;
     return owner === "gezamenlijk" ? "Gezamenlijk" : ((_b = (_a2 = state.personen) == null ? void 0 : _a2[owner]) == null ? void 0 : _b.naam) || (owner === "dion" ? "Dion" : "Dara");
   }
+  function fixedPaymentProgress(owner, month = getSelectedMonth()) {
+    const categories = /* @__PURE__ */ new Map(), actuals = /* @__PURE__ */ new Map();
+    for (const p of selectTransactionProjections(state, { month, dimension: "fixed" })) actuals.set(p.fixedOccurrenceId, round22((actuals.get(p.fixedOccurrenceId) || 0) + p.effects.fixedRealization));
+    for (const occurrence of u3FixedOccurrences(month).filter((row) => row.financialFor === owner)) {
+      const actual = { actual: actuals.get(occurrence.id) || 0, planned: Number(occurrence.amount) || 0 }, category = normalizeCategoryName(occurrence.categorie);
+      const row = categories.get(category) || { paid: 0, planned: 0 };
+      row.paid = round22(row.paid + actual.actual);
+      row.planned = round22(row.planned + actual.planned);
+      categories.set(category, row);
+    }
+    return { categories };
+  }
+  function fixedPaymentAmounts(row) {
+    return `${eur(row.paid)} / ${eur(row.planned)}`;
+  }
+  function fixedPaymentTrack(row, label) {
+    const percent = row.planned > 0 ? Math.round(row.paid / row.planned * 100) : null, fill = percent === null ? 0 : Math.max(0, Math.min(100, percent));
+    return `<div class="progress-track fixed-payment-track" role="progressbar" aria-label="${attrSafe(label)} betaald" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${fill}" aria-valuetext="${attrSafe(fixedPaymentAmounts(row))} betaald van gepland${percent === null ? "" : ", " + percent + "%"}"><div class="progress-fill" style="width:${fill}%"></div><span class="fixed-payment-percent">${percent === null ? "—" : percent + "%"}</span></div>`;
+  }
+  function fixedPaymentCategoryRows(progress) {
+    return [...progress.categories].sort((a, b) => b[1].planned - a[1].planned).map(([category, row]) => `<div class="progress-item" data-fixed-payment-category="${attrSafe(category)}"><div class="progress-item-icon tone-green">${iconSvg(jointFixedCategoryIconName(category))}</div><div class="progress-top"><strong>${textSafe(category)}</strong><span title="Betaald / gepland">${fixedPaymentAmounts(row)}</span></div>${fixedPaymentTrack(row, category)}</div>`).join("");
+  }
   function renderJointFixedCostsCardHead(owner = "gezamenlijk", options = {}) {
     const name = ownerLabel(owner);
     const editAction = `data-u3-open="planning" data-u3-planning-owner="${owner}" aria-label="Vaste lasten van ${textSafe(name)} wijzigen"`;
     return `<div class="card-head joint-fixed-card-head">
     <div class="card-head-title">${iconBadge(dashboardSectionIconName("Vaste lasten verdeling"), "green", "card-head-icon")}<h2>${owner === "gezamenlijk" ? "Vaste lasten verdeling" : `${name} vaste lasten`}</h2><button type="button" class="joint-fixed-edit-btn" ${editAction}>${iconSvg("receipt")}</button></div>
-  </div>`;
+  </div><p class="fixed-payment-legend hint">Betaald / gepland</p>`;
   }
   function renderJointVariableCostsCardHead(owner = "gezamenlijk") {
     const name = ownerLabel(owner);
@@ -12664,19 +12686,7 @@
     }).join("") || '<p class="hint">Nog geen budgetten.</p>'}</div>`;
   }
   function renderFixedCostsOverviewCard(owner, data, total) {
-    const fixedByCategory = {};
-    ((data == null ? void 0 : data.vasteLasten) || []).forEach((row) => {
-      const category = normalizeCategoryName(row.categorie);
-      fixedByCategory[category] = round22((fixedByCategory[category] || 0) + effectiveBedrag(row));
-    });
-    const rows = Object.entries(fixedByCategory).sort((a, b) => b[1] - a[1]).map(([category, amount]) => {
-      const ratio = total > 0 ? Math.min(1, amount / total) : 0;
-      return `<div class="progress-item">
-        <div class="progress-item-icon tone-green">${iconSvg(jointFixedCategoryIconName(category))}</div>
-        <div class="progress-top"><strong>${textSafe(category)}</strong><span>${eur(amount)} · ${pct(ratio)}</span></div>
-        <div class="progress-track"><div class="progress-fill" style="width:${Math.round(ratio * 100)}%"></div></div>
-      </div>`;
-    }).join("");
+    const rows = fixedPaymentCategoryRows(fixedPaymentProgress(owner));
     return `<div class="card span-12 u5-fixed-costs-overview">
     ${renderJointFixedCostsCardHead(owner, { planning: true })}
     <div class="u5-fixed-costs-overview-list">${rows || '<p class="hint">Nog geen vaste lasten.</p>'}</div>
@@ -14347,19 +14357,8 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
       </div>
     </button>`);
     }
-    const vasteByCat = {};
-    (scenarioData.gezamenlijk.vasteLasten || []).forEach((row) => {
-      const cat = normalizeCategoryName(row.categorie);
-      vasteByCat[cat] = round22((vasteByCat[cat] || 0) + effectiveBedrag(row));
-    });
-    const vasteEntriesSorted = Object.entries(vasteByCat).sort((a, b) => b[1] - a[1]);
-    const vasteRows = vasteEntriesSorted.map(([cat, amount]) => {
-      const ratio = r.overigeVasteLastenTotaal > 0 ? amount / r.overigeVasteLastenTotaal : 0;
-      return `<div class="progress-item">
-      <div class="progress-item-icon tone-green">${iconSvg(jointFixedCategoryIconName(cat))}</div><div class="progress-top"><strong>${cat}</strong><span>${eur(amount)} · ${pct(ratio)}</span></div>
-      <div class="progress-track"><div class="progress-fill" style="width:${Math.round(ratio * 100)}%"></div></div>
-    </div>`;
-    }).join("");
+    const fixedProgress = fixedPaymentProgress("gezamenlijk");
+    const vasteRows = fixedPaymentCategoryRows(fixedProgress);
     return `<div class="mobile-kpi-grid v4-mobile-only-grid joint-first-row" aria-label="Gezamenlijk rij 1">
     <button type="button" class="mobile-kpi-card joint-kpi-card joint-total-income-card" data-open-income-overview="gezamenlijk" aria-label="Inkomensoverzicht gezamenlijk inkomen" aria-haspopup="dialog">
       <div class="mobile-kpi-top">
@@ -14426,15 +14425,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
     const personalIncome = personalIncomeOverview(owner, person.zakgeld);
     const remainingThisMonth = personalMonthRemaining({ income: personalIncome.total, fixed: person.persoonlijkeVasteLasten, usedBudget: person.variabeleUitgaven });
     const variableRows = ownerVariableBudgetRows(owner, data);
-    const fixed = {};
-    (data.vasteLasten || []).forEach((row) => {
-      const cat = normalizeCategoryName(row.categorie);
-      fixed[cat] = round22((fixed[cat] || 0) + effectiveBedrag(row));
-    });
-    const fixedRows = Object.entries(fixed).sort((a, b) => b[1] - a[1]).map(([cat, amount]) => {
-      const ratio = person.persoonlijkeVasteLasten > 0 ? amount / person.persoonlijkeVasteLasten : 0;
-      return `<div class="progress-item"><div class="progress-item-icon tone-green">${iconSvg(jointFixedCategoryIconName(cat))}</div><div class="progress-top"><strong>${cat}</strong><span>${eur(amount)} · ${pct(ratio)}</span></div><div class="progress-track"><div class="progress-fill" style="width:${Math.round(ratio * 100)}%"></div></div></div>`;
-    }).join("");
+    const fixedProgress = fixedPaymentProgress(owner), fixedRows = fixedPaymentCategoryRows(fixedProgress);
     const variableBudget = sumBedrag(data.variabel || []);
     const variablePct = variableBudget > 0 ? Math.min(100, Math.round(person.variabeleUitgaven / variableBudget * 100)) : 0;
     return `<div class="mobile-kpi-grid v4-mobile-only-grid joint-first-row" aria-label="${name} rij 1">

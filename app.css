@@ -6607,3 +6607,9 @@ body.v4-app #goalEditDelete{color:var(--text-dim)}
 .p3-year-chart .p3-chart-legend i{display:inline-block;width:8px;height:8px;font-size:0}
 .p3-year-chart [tabindex]:focus-visible{outline:2px solid var(--navy-bright);outline-offset:2px}
 @supports not selector(:popover-open){.p3-info-popover{display:none}.p3-info-popover[data-open=true]{display:block}}
+
+/* Fixed payments reuse the budget bars; percentages describe paid / planned. */
+body.v4-app .progress-track.fixed-payment-track,
+body.v4-app[data-real-active-tab] .joint-fixed-category-card .progress-track.fixed-payment-track{position:relative;height:18px!important;min-width:0}
+.fixed-payment-percent{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);min-width:38px;border-radius:7px;background:var(--card);color:var(--text);font-size:10px;font-weight:700;line-height:14px;text-align:center}
+body.v4-app .fixed-payment-legend{margin:0 0 8px;font-size:11px;line-height:1.2;color:var(--text-dim)}
