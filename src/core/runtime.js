@@ -1,4 +1,5 @@
 import { installBankConnection } from '../ui/bank-connection.mjs';
+import { personalMonthRemaining } from './personal-month-summary.mjs';
 import { fixedPaymentDay } from './liquidity-settings.mjs';
 import { createDashboard } from '../ui/dashboard.mjs';
 import { profileSync, profileStart } from '../storage/performance.mjs';
@@ -3606,7 +3607,7 @@ function renderPersonOrJoint(tabId, key, label){
   const jointIncome = isJoint ? dashboardIncomeBreakdown(getSelectedMonth()) : null;
   const jointVisibleIncome = isJoint ? jointIncome.total : 0;
   const jointAllowance = isJoint ? round2(r.dion.zakgeld + r.dara.zakgeld) : 0;
-  const remainingThisMonth = r.forecast.owners[key].available;
+  const remainingThisMonth = isJoint?r.forecast.owners[key].available:personalMonthRemaining({income:personalIncome.total,fixed:rr.persoonlijkeVasteLasten,usedBudget:rr.variabeleUitgaven});
 
   const jointKpis = isJoint ? `
     <div class="overview-kpi-row">
@@ -3619,7 +3620,7 @@ function renderPersonOrJoint(tabId, key, label){
     <div class="overview-kpi-row">
       ${personalKpiVisible(key,'income')?renderIconKpi('€','green','Totaal inkomen', eur(personalIncome.total), renderPersonalIncomeSources(personalIncome,key), {valueClass:personalIncome.total<0?'value neg':'value pos',kpiId:'income'}):''}
       ${personalKpiVisible(key,'fixed')?renderIconKpi('▤','blue','Vaste lasten', eur(rr.persoonlijkeVasteLasten), 'Klik om te wijzigen', {valueClass: rr.persoonlijkeVasteLasten>0?'value neg':'value pos', openFixedOwner:key,kpiId:'fixed'}):''}
-      ${personalKpiVisible(key,'saving')?renderIconKpi('◎','green','Over deze maand', eur(remainingThisMonth), 'Na vaste lasten, gebruikt budget en spaargeld', {valueClass:remainingThisMonth<0?'value neg':'value pos',kpiId:'saving'}):''}
+      ${personalKpiVisible(key,'saving')?renderIconKpi('◎','green','Over deze maand', eur(remainingThisMonth), 'Inkomen en teruggaven − vaste lasten − gebruikt budget', {valueClass:remainingThisMonth<0?'value neg':'value pos',kpiId:'saving'}):''}
       ${personalKpiVisible(key,'variable')?renderIconKpi('▥','blue','Variabel gebruikt', `${eur(variableUsed)} / ${eur(variableBudget)}`, `<span class="overview-budget-track" style="--used-pct:${variablePct}%"></span>`,{kpiId:'variable'}):''}
     </div>` : '';
   const incomeManage = !isJoint ? `
@@ -4622,43 +4623,43 @@ function openPersonalSavingEditModal(owner){
   const modal=document.getElementById('incomeEditModal');
   const month=getSelectedMonth();
   const result=calcScenario(state)[owner];
-  const automatic=round2(Number(result.automatischBeschikbaarVoorSparen)||0);
+  const income=personalIncomeOverview(owner,result.zakgeld,month);
+  const remaining=personalMonthRemaining({income:income.total,fixed:result.persoonlijkeVasteLasten,usedBudget:result.variabeleUitgaven});
+  const suggested=Math.max(0,remaining);
   const monthOverrides=isPlainObject(state.monthlySavingOverrides?.[month])?state.monthlySavingOverrides[month]:{};
   const hasOverride=Object.prototype.hasOwnProperty.call(monthOverrides,owner);
-  const current=hasOverride?round2(Number(monthOverrides[owner])||0):automatic;
+  const current=hasOverride?round2(Number(monthOverrides[owner])||0):result.beschikbaarVoorSparen;
   const name=ownerLabel(owner);
   modal.innerHTML=`
     <div class="modal income-sheet" role="dialog" aria-modal="true" aria-label="Spaargeld van ${textSafe(name)} aanpassen">
       <div class="income-sheet-handle"></div>
       <div class="card-head"><h2>${textSafe(name)} sparen</h2><button class="danger-ghost" id="btnClosePersonalSaving" aria-label="Sluiten">&times;</button></div>
       <div class="income-sheet-meta"><span>${textSafe(name)}</span><span>${monthLabel(month)}</span></div>
-      <div class="income-sheet-readonly"><span>Automatisch berekend</span><strong>${eur(automatic)}</strong></div>
-      <label class="income-sheet-field">Eigen spaarbedrag voor deze maand
+      <div class="income-sheet-readonly"><span>Over deze maand</span><strong>${eur(remaining)}</strong></div>
+      <p class="hint">${eur(income.total)} inkomen en teruggaven − ${eur(result.persoonlijkeVasteLasten)} vaste lasten − ${eur(result.variabeleUitgaven)} gebruikt budget.</p>
+      <label class="income-sheet-field">Handmatig spaarbedrag voor deze maand
         <input id="personalSavingInput" type="number" step="0.01" inputmode="decimal" value="${current}">
       </label>
-      <p class="hint">Dit bedrag overschrijft alleen in ${monthLabel(month)} de automatische berekening. Inkomen en zakgeldverdeling veranderen hierdoor niet.</p>
+      <p class="hint">Gebruik Over deze maand neemt het huidige bedrag eenmalig over voor ${monthLabel(month)}. Bij een tekort wordt dit € 0,00. Latere transacties passen het opgeslagen spaarbedrag niet automatisch aan. Inkomen en zakgeldverdeling blijven gelijk.</p>
       <div class="modal-actions">
-        <button class="ghost" id="btnUseAutomaticSaving">Automatisch gebruiken</button>
+        <button class="ghost" id="btnUseAutomaticSaving">Gebruik Over deze maand</button>
         <button class="ghost" id="btnCancelPersonalSaving">Annuleren</button>
         <button class="primary" id="btnSavePersonalSaving">Opslaan</button>
       </div>
     </div>`;
   modal.classList.add('open');
   const close=()=>{modal.classList.remove('open');modal.innerHTML='';};
-  const removeOverride=async ()=>{
+  const useRemaining=async ()=>{
     const saved=await commitChange(()=>{
       assertMonthMutationAllowed(month);
-      if(isPlainObject(state.monthlySavingOverrides?.[month])){
-        delete state.monthlySavingOverrides[month][owner];
-        if(!Object.keys(state.monthlySavingOverrides[month]).length)delete state.monthlySavingOverrides[month];
-      }
+      setSavingsPlanForMonth(state,owner,month,suggested);
     },{render:false});
     if(!saved)return;
-    close();renderActiveTab();showQuickToast('Automatisch sparen hersteld');
+    close();renderActiveTab();showQuickToast('Over deze maand als spaarbedrag opgeslagen');
   };
   document.getElementById('btnClosePersonalSaving').addEventListener('click',close);
   document.getElementById('btnCancelPersonalSaving').addEventListener('click',close);
-  document.getElementById('btnUseAutomaticSaving').addEventListener('click',removeOverride);
+  document.getElementById('btnUseAutomaticSaving').addEventListener('click',useRemaining);
   bindModalBackdrop(modal,close);
   document.getElementById('btnSavePersonalSaving').addEventListener('click',async ()=>{
     const value=bankAmount(document.getElementById('personalSavingInput').value);
@@ -4970,6 +4971,7 @@ function renderPersonalFirstRow(owner){
   const data = getMonthlyScenarioData()[owner];
   const name = ownerLabel(owner);
   const personalIncome=personalIncomeOverview(owner,person.zakgeld);
+  const remainingThisMonth=personalMonthRemaining({income:personalIncome.total,fixed:person.persoonlijkeVasteLasten,usedBudget:person.variabeleUitgaven});
   const variableRows = ownerVariableBudgetRows(owner,data);
   const fixed={}; (data.vasteLasten||[]).forEach(row=>{ const cat=normalizeCategoryName(row.categorie); fixed[cat]=round2((fixed[cat]||0)+effectiveBedrag(row)); });
   const fixedRows=Object.entries(fixed).sort((a,b)=>b[1]-a[1]).map(([cat,amount])=>{ const ratio=person.persoonlijkeVasteLasten>0?amount/person.persoonlijkeVasteLasten:0; return `<div class="progress-item"><div class="progress-item-icon tone-green">${iconSvg(jointFixedCategoryIconName(cat))}</div><div class="progress-top"><strong>${cat}</strong><span>${eur(amount)} · ${pct(ratio)}</span></div><div class="progress-track"><div class="progress-fill" style="width:${Math.round(ratio*100)}%"></div></div></div>`; }).join('');
@@ -4977,7 +4979,7 @@ function renderPersonalFirstRow(owner){
   return `<div class="mobile-kpi-grid v4-mobile-only-grid joint-first-row" aria-label="${name} rij 1">
     ${personalKpiVisible(owner,'income')?`<div class="mobile-kpi-card joint-kpi-card joint-total-income-card ux-action-card" data-personal-kpi-mobile="income" data-open-income-overview="${owner}"><button type="button" class="ux-card-primary" aria-label="Totaal inkomen ${eur(personalIncome.total)} · Inkomensoverzicht ${textSafe(name)}" aria-haspopup="dialog"></button><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg('allowance')}</span></div><div class="mobile-kpi-label">Totaal inkomen</div><div class="mobile-kpi-value ${personalIncome.total<0?'value neg':'value pos'}">${eur(personalIncome.total)}</div>${renderPersonalIncomeSources(personalIncome,owner)}</div>`:''}
     <div class="mobile-kpi-card joint-kpi-card joint-fixed-costs-card"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg('wallet')}</span></div><div class="mobile-kpi-label">Vaste lasten</div><div class="mobile-kpi-value value neg">${eur(person.persoonlijkeVasteLasten)}</div><div class="mobile-kpi-edit-hint-placeholder">.</div></div>
-    ${personalKpiVisible(owner,'saving')?`<div class="mobile-kpi-card joint-kpi-card joint-saving-card" data-personal-kpi-mobile="saving"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg('piggy')}</span></div><div class="mobile-kpi-label">Over deze maand</div><div class="mobile-kpi-value ${r.forecast.owners[owner].available<0?'value neg':'value pos'}">${eur(r.forecast.owners[owner].available)}</div><div class="mobile-kpi-edit-hint">Na vaste lasten, gebruikt budget en spaargeld</div></div>`:''}
+    ${personalKpiVisible(owner,'saving')?`<div class="mobile-kpi-card joint-kpi-card joint-saving-card" data-personal-kpi-mobile="saving"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg('piggy')}</span></div><div class="mobile-kpi-label">Over deze maand</div><div class="mobile-kpi-value ${remainingThisMonth<0?'value neg':'value pos'}">${eur(remainingThisMonth)}</div><div class="mobile-kpi-edit-hint">Inkomen en teruggaven − vaste lasten − gebruikt budget</div></div>`:''}
     <div class="mobile-kpi-card joint-kpi-card static joint-variable-card"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg('chart')}</span></div><div class="mobile-kpi-label">Variabel gebruikt</div><div class="mobile-kpi-value mobile-kpi-value-budget neu">${eur(person.variabeleUitgaven)} / ${eur(variableBudget)}</div><div class="mobile-kpi-budget-track" style="--used-pct:${variablePct}%" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${variablePct}" aria-label="${textSafe(name)} variabel budget gebruikt"></div></div>
   </div>
   <div class="card joint-fullwidth-card joint-fixed-category-card v4-mobile-only-block">${renderJointFixedCostsCardHead(owner)}<div class="joint-fixed-category-body">${fixedRows || '<p class="hint">Nog geen vaste lasten.</p>'}</div></div>

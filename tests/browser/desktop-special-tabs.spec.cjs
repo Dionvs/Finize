@@ -47,7 +47,7 @@ test('desktop spaardoelen en data back-up renderen volledig', async ({ page }) =
   const personalSavingDialog = page.getByRole('dialog', { name: 'Spaargeld van Dion aanpassen' });
   await expect(personalSavingDialog.getByText('Automatisch berekend')).toBeVisible();
   await expect(personalSavingDialog.getByRole('spinbutton', { name: 'Eigen spaarbedrag voor deze maand' })).toBeVisible();
-  await expect(personalSavingDialog.getByRole('button', { name: 'Automatisch gebruiken' })).toBeVisible();
+  await expect(personalSavingDialog.getByRole('button', { name: 'Gebruik Over deze maand' })).toBeVisible();
   await personalSavingDialog.getByRole('button', { name: 'Annuleren' }).click();
   await expect(page.locator('.overview-kpi-row [data-u3-planning-owner="dion"]')).toBeVisible();
   await expect(page.locator('#tab-dion .u5-joint-activity-row')).toHaveCount(1);
