@@ -14,8 +14,8 @@ async function boot(page,width=390,checkpoint=true){
 }
 for(const width of [1440,390,320])test(`P3 ${width}px echte P2 waarden, layout, screenshot en navigatie`,async({page})=>{
  const errors=[];page.on('pageerror',e=>errors.push(e.message));await boot(page,width);
- const result=await page.evaluate(async()=>{const p=await FinizeLiquidity.project({accountProfileId:'p3-joint',asOfDate:'2026-10-14',incomeKpis:true});return {free:p.freeAfterObligationsCents??p.indicativeFreeAfterObligationsCents,balance:p.opening.balanceCents,min:p.minimumBalanceCents,buffer:p.bufferCents,goal:p.savingsGoalCents};});
- const eur=n=>new Intl.NumberFormat('nl-NL',{style:'currency',currency:'EUR'}).format(n/100);
+ const result=await page.evaluate(async()=>{const p=await FinizeLiquidity.project({accountProfileId:'p3-joint',asOfDate:'2026-10-14',incomeKpis:true,monthEndSavingsMonth:'2026-10'});return {free:p.monthEndSavings.safeCents??p.monthEndSavings.indicativeCents,balance:p.opening.balanceCents,min:p.minimumBalanceCents,buffer:p.bufferCents,goal:p.monthEndSavings.plannedCents};});
+ const eur=n=>n===null?'—':new Intl.NumberFormat('nl-NL',{style:'currency',currency:'EUR'}).format(n/100);
  const cards=page.locator('.p3-kpi');await expect(cards).toHaveCount(4);await expect(cards.nth(0)).toContainText(eur(result.free));await expect(cards.nth(0)).toContainText('Gepland sparen: '+eur(result.goal));await expect(cards.nth(1)).toContainText(eur(result.balance));await expect(cards.nth(2)).toContainText(eur(result.min));await expect(cards.nth(3)).toContainText(eur(result.buffer));
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  const boxes=await cards.evaluateAll(nodes=>nodes.map(n=>{const r=n.getBoundingClientRect();return {x:r.x,y:r.y};}));expect(boxes[0].y).toBe(boxes[1].y);if(width<768){expect(boxes[2].y).toBeGreaterThan(boxes[0].y);await expect(page.locator('.p3-year-chart')).toBeHidden();}else{expect(boxes[2].y).toBe(boxes[0].y);await expect(page.locator('.p3-year-chart')).toBeVisible();}
@@ -54,7 +54,7 @@ test('P3 budgetten zakgeld en jaarcijfers zijn exact bestaande maandprojecties',
  await page.locator('[data-p3-event]').first().click();await expect(page.locator('#incomeEditModal')).toContainText('Vaste lasten');
 });
 test('P3 negatieve prognose meldt onzekerheid; ontbrekende salarisdatum heeft instellingsactie',async({page})=>{
- await boot(page);await page.evaluate(()=>{state.balanceCheckpoints[0].amountCents=10000;document.querySelector('#tabs [data-tab="dashboard"]').click();});await expect(page.locator('.p3-warning')).toContainText('onder € 0');await expect(page.locator('.p3-warning')).toContainText('Onvolledig');await expect(page.locator('.p3-kpi').nth(2)).toContainText('-');
+ await boot(page);await page.evaluate(()=>{state.balanceCheckpoints[0].amountCents=10000;document.querySelector('#tabs [data-tab="dashboard"]').click();});await expect(page.locator('.p3-warning').first()).toContainText('onder € 0');await expect(page.locator('.p3-warning').first()).toContainText('Onvolledig');await expect(page.locator('.p3-kpi').nth(2)).toContainText('-');
  await page.evaluate(()=>{state.accountProfiles[0].liquidity.salaryDays={};document.querySelector('#tabs [data-tab="dashboard"]').click();});await expect(page.locator('[data-p3-action="settings"]').last()).toContainText('Salarisdatum instellen');await page.locator('[data-p3-action="settings"]').last().click();await expect(page.locator('[name="salary-dion"]')).toBeVisible();
 });
 test('P3 herstel aandelen gezamenlijk Dion Dara en ongewijzigde bedragen en state',async({page})=>{

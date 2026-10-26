@@ -29,6 +29,7 @@
 .p3-kpi:nth-child(2) .p3-kpi-icon{background:var(--warm);color:var(--text-dim)}
 .p3-kpi:nth-child(3) .p3-kpi-icon{background:var(--red-bg);color:var(--red)}
 .p3-kpi-copy{display:grid;gap:5px;min-width:0}
+.p3-kpi:first-child .p3-kpi-copy>small{display:grid;gap:6px}
 .p3-bank-update{position:relative;z-index:2;display:grid;gap:7px;margin-top:7px}
 .p3-bank-actions{display:flex;flex-wrap:wrap;gap:6px}
 .p3-bank-actions button{min-height:44px;white-space:normal}
