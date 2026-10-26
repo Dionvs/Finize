@@ -769,26 +769,67 @@
     return !conflict && x.amountCents === y.amountCents && x.transactionDate === y.transactionDate ? result2("possible-duplicate", "matching-facts-without-shared-identity") : result2("distinct", "different-facts");
   }
 
+  // src/import/bank-import-generation.mjs
+  var fail = (code) => {
+    throw Object.assign(new Error(code), { code });
+  };
+  function bankImportDeletionProof(value) {
+    if ((value == null ? void 0 : value.lifecycle) !== "deleted" || typeof value.id !== "string" || !Number.isSafeInteger(value.version) || value.version < 1 || typeof value.operationId !== "string" || !value.operationId) fail("bank-import-restart-blocked");
+    return { id: value.id, version: value.version, operationId: value.operationId, lifecycle: "deleted" };
+  }
+  function nextProviderBatchId(rootId, deletion) {
+    const proof = bankImportDeletionProof(deletion);
+    if (!/^bank-api-[a-f0-9]{32}$/.test(rootId) || proof.id !== rootId && !new RegExp("^" + rootId + "-g[a-f0-9]{32}$").test(proof.id)) fail("bank-import-restart-blocked");
+    return rootId + "-g" + csvFileDigest(JSON.stringify([proof.id, proof.version, proof.operationId])).slice(0, 32);
+  }
+  function providerImportIdentity(rootId, previous, restartFrom = null) {
+    const parent = restartFrom || (previous == null ? void 0 : previous.providerRestartFrom);
+    const id = parent ? nextProviderBatchId(rootId, parent) : rootId;
+    if (previous && (previous.id !== id || parent && previous.providerRootId !== rootId)) fail("provider-batch-conflict");
+    if (restartFrom && previous) fail("provider-batch-conflict");
+    return { id, ...parent ? { providerRootId: rootId, providerRestartFrom: bankImportDeletionProof(parent) } : {} };
+  }
+  function assertProviderRestartParent(expected, actual) {
+    if ((actual == null ? void 0 : actual.lifecycle) !== "deleted" || actual.id !== expected.id || actual.version !== expected.version || actual.operationId !== expected.operationId) fail("import-conflict");
+  }
+  function references(value, id) {
+    if (typeof value === "string") return value === id || value.includes(id + ":");
+    if (!value || typeof value !== "object") return false;
+    return Object.entries(value).some(([key, child]) => key !== "importDeletionProofs" && references(child, id));
+  }
+  function assertProviderRestartState(state2, deletion, { journals = [], queue = [] } = {}) {
+    const proof = bankImportDeletionProof(deletion), stored = (state2.importDeletionProofs || []).filter((row) => row.id === proof.id);
+    if (stored.length !== 1) fail("bank-import-restart-blocked");
+    assertProviderRestartParent(proof, stored[0]);
+    if (references(state2, proof.id)) fail("bank-import-restart-blocked");
+    if (journals.some((entry) => {
+      var _a2;
+      return ["pending", "conflict", "uncertain"].includes(entry.status) && (entry.importId === proof.id || references(entry.candidate, proof.id) || references((_a2 = entry.localChoice) == null ? void 0 : _a2.state, proof.id));
+    })) fail("bank-import-restart-blocked");
+    if (queue.some((entry) => (entry.importId || entry.id) === proof.id && (entry.version !== proof.version || entry.operationId !== proof.operationId))) fail("bank-import-restart-blocked");
+    return proof;
+  }
+
   // src/import/enable-banking-adapter.mjs
   var copy = (value) => structuredClone(value);
-  var fail = (code) => {
+  var fail2 = (code) => {
     throw Object.assign(new Error(code), { code });
   };
   var authority = "enablebanking:ING:NL";
   var iban = (value) => String(value || "").replace(/\s/g, "").toUpperCase();
   var canonical = (value) => JSON.stringify(value, (_, item) => item && typeof item === "object" && !Array.isArray(item) ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b))) : item);
   function providerAmountCents(value) {
-    if (typeof value !== "string" || !/^-?\d+(?:\.\d{1,2})?$/.test(value)) fail("invalid-provider-amount");
+    if (typeof value !== "string" || !/^-?\d+(?:\.\d{1,2})?$/.test(value)) fail2("invalid-provider-amount");
     const negative = value.startsWith("-"), [integer, fraction = ""] = value.replace(/^-/, "").split(".");
     const cents5 = Number(integer) * 100 + Number(fraction.padEnd(2, "0"));
-    if (!Number.isSafeInteger(cents5)) fail("unsafe-provider-amount");
+    if (!Number.isSafeInteger(cents5)) fail2("unsafe-provider-amount");
     return negative ? -cents5 : cents5;
   }
   var providerBatchId = (profileId, accountHash) => "bank-api-" + csvFileDigest(JSON.stringify([profileId, accountHash])).slice(0, 32);
   function normalizeProviderTransaction(raw, snapshot2, scope) {
     var _a2, _b, _c, _d, _e, _f;
     const cents5 = providerAmountCents((_a2 = raw.transaction_amount) == null ? void 0 : _a2.amount);
-    if (!["CRDT", "DBIT"].includes(raw.credit_debit_indicator) || cents5 < 0) fail("invalid-credit-debit-indicator");
+    if (!["CRDT", "DBIT"].includes(raw.credit_debit_indicator) || cents5 < 0) fail2("invalid-credit-debit-indicator");
     const amountCents = raw.credit_debit_indicator === "DBIT" ? -cents5 : cents5;
     const booked = raw.status === "BOOK";
     const description = (raw.remittance_information || []).filter((value) => typeof value === "string").join(" ").trim() || ((_b = raw.creditor) == null ? void 0 : _b.name) || ((_c = raw.debtor) == null ? void 0 : _c.name) || "Banktransactie";
@@ -843,15 +884,15 @@
       return normalized.ok ? { id: input.identity.id, ...normalized.record } : { id: "unusable-balance-" + index, unusable: true, raw: copy(raw), errors: normalized.errors };
     });
   }
-  function stageProviderSnapshot(snapshot2, state2, previous, imports, classify) {
+  function stageProviderSnapshot(snapshot2, state2, previous, imports, classify, restartFrom = null) {
     var _a2, _b, _c, _d;
     const scope = { householdId: snapshot2.householdId, accountProfiles: state2.accountProfiles || [] };
     const profiles = scope.accountProfiles.filter((row) => row.id === snapshot2.accountProfileId);
-    if (snapshot2.version !== 1 || profiles.length !== 1 || profiles[0].status === "archived" || !((_a2 = snapshot2.account) == null ? void 0 : _a2.identificationHash) || iban(profiles[0].identifier || profiles[0].iban) !== iban(snapshot2.account.iban) || !Array.isArray(snapshot2.transactions) || !validCalendarDate(snapshot2.fromDate) || !validCalendarDate(snapshot2.toDate) || !Number.isFinite(Date.parse(snapshot2.fetchedAt))) fail("invalid-provider-snapshot");
-    const profile = profiles[0], id = providerBatchId(profile.id, snapshot2.account.identificationHash);
-    if (previous && (previous.id !== id || previous.channel !== "bank-api" || ["deleted", "withdrawn"].includes(previous.lifecycle))) fail("provider-batch-conflict");
+    if (snapshot2.version !== 1 || profiles.length !== 1 || profiles[0].status === "archived" || !((_a2 = snapshot2.account) == null ? void 0 : _a2.identificationHash) || iban(profiles[0].identifier || profiles[0].iban) !== iban(snapshot2.account.iban) || !Array.isArray(snapshot2.transactions) || !validCalendarDate(snapshot2.fromDate) || !validCalendarDate(snapshot2.toDate) || !Number.isFinite(Date.parse(snapshot2.fetchedAt))) fail2("invalid-provider-snapshot");
+    const profile = profiles[0], identity = providerImportIdentity(providerBatchId(profile.id, snapshot2.account.identificationHash), previous, restartFrom), id = identity.id;
+    if (previous && (previous.id !== id || previous.channel !== "bank-api" || ["deleted", "withdrawn"].includes(previous.lifecycle))) fail2("provider-batch-conflict");
     const batch = previous ? copy(previous) : {
-      id,
+      ...identity,
       channel: "bank-api",
       provider: "enablebanking",
       fileName: "ING-bankkoppeling",
@@ -869,17 +910,17 @@
     const seen = /* @__PURE__ */ new Map(), rows = new Map(batch.rows.map((row) => [row.id, row]));
     for (const raw of snapshot2.transactions) {
       const normalized = normalizeProviderTransaction(raw, snapshot2, scope);
-      if (!normalized.ok) fail("invalid-provider-transaction");
+      if (!normalized.ok) fail2("invalid-provider-transaction");
       const input = normalized.record;
       if (normalized.disposition !== "ready") continue;
-      if (!input.facts.bookingDate) fail("missing-provider-booking-date");
+      if (!input.facts.bookingDate) fail2("missing-provider-booking-date");
       const key = ((_b = input.identity) == null ? void 0 : _b.id) || canonical(raw);
       const occurrence = (seen.get(key) || 0) + 1;
       seen.set(key, occurrence);
       const rowId = "api-row-" + csvFileDigest(key + (input.identity ? "" : ":" + occurrence));
       const old = rows.get(rowId);
       if (old) {
-        if (canonical(old.providerInput.facts) !== canonical(input.facts)) fail("provider-identity-conflict");
+        if (canonical(old.providerInput.facts) !== canonical(input.facts)) fail2("provider-identity-conflict");
         continue;
       }
       const f = input.facts;
@@ -923,7 +964,7 @@
           const result2 = other.providerInput ? { ok: true, record: other.providerInput } : normalizeCsvBankInput(other, existing, scope);
           const sameBasicFacts = ((_c = other.bankOriginal) == null ? void 0 : _c.bankDate) === original2.bankDate && ((_d = other.bankOriginal) == null ? void 0 : _d.amount) === original2.amount;
           const comparison = result2.ok ? compareBankInputs(input, result2.record, scope) : null;
-          if ((comparison == null ? void 0 : comparison.status) === "identity-conflict") fail("provider-identity-conflict");
+          if ((comparison == null ? void 0 : comparison.status) === "identity-conflict") fail2("provider-identity-conflict");
           if ((comparison == null ? void 0 : comparison.status) === "same-source") {
             row.duplicate = true;
             row.duplicateSource = { batchId: existing.id, rowId: other.id };
@@ -953,7 +994,7 @@
       facts: { fromDate: snapshot2.fromDate, toDate: snapshot2.toDate, completeness: "partial", basis: "provider-assertion" },
       provenance: { payload: { allPagesFetched: snapshot2.complete === true, issue: snapshot2.issue || null }, fetchedAt: snapshot2.fetchedAt }
     }, scope);
-    if (!coverage.ok) fail("invalid-provider-coverage");
+    if (!coverage.ok) fail2("invalid-provider-coverage");
     batch.providerCoverage = { id: coverage.record.identity.id, ...coverage.record };
     batch.providerSync = { fetchedAt: snapshot2.fetchedAt, complete: snapshot2.complete === true, issue: snapshot2.issue || null };
     return batch;
@@ -988,6 +1029,10 @@
   var BANK_API_ENABLED = true;
   var escape = (value) => String(value != null ? value : "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
   var messages = {
+    "provider-batch-conflict": "De bankimport hoort niet bij de verwachte actieve bundel. Bestaande gegevens blijven behouden.",
+    "bank-import-deleted": "De eerdere bankimport is verwijderd. Een nieuwe importbundel vereist jouw bevestiging.",
+    "bank-import-restart-cancelled": "Geen nieuwe importbundel gestart. Het verwijderbewijs blijft behouden.",
+    "bank-import-restart-blocked": "Een nieuwe importbundel kan nog niet veilig starten. Synchroniseer eerst de administratie en laat bestaande verwijzingen controleren.",
     "backend-not-configured": "De bankkoppeling is nog niet geactiveerd.",
     "reauthorization-required": "Banktoegang is verlopen. Autoriseer de rekening opnieuw.",
     "forbidden-user": "Deze bankkoppeling is niet beschikbaar voor jouw aanmelding. Gebruik de geverifieerde aanmelding van de toegestane rekeninghouder.",
@@ -1082,14 +1127,37 @@
       const status2 = !enabled2 ? "Nog niet geactiveerd. De bestaande administratie blijft beschikbaar." : profile.status === "archived" ? "Deze rekening is gearchiveerd. De historie blijft beschikbaar." : "Verbinding controleren…";
       return '<section class="balance-panel" data-bank-connection="' + escape(profile.id) + '" aria-label="ING-bankkoppeling"><h3>ING-bankkoppeling</h3><p>Geboekte bankmutaties tellen direct mee voor de rekeningstand. Financiële verwerking bevestig je bij Nakijken.</p><p role="status" aria-live="polite" data-bank-status>' + status2 + '</p><div class="balance-actions"><button type="button" class="ghost" data-bank-authorize ' + disabled + '>Banktoegang autoriseren</button><button type="button" class="primary" data-bank-sync disabled>Bank bijwerken</button><button type="button" class="ghost" data-bank-review>Nakijken</button><button type="button" class="ghost" data-bank-disconnect ' + disabled + ">Banktoegang intrekken</button></div></section>";
     }
-    async function ingest(snapshot2, householdId, expectedProfileId = snapshot2.accountProfileId) {
+    async function ingest(snapshot2, householdId, expectedProfileId = snapshot2.accountProfileId, { confirmRestart = null } = {}) {
       if (snapshot2.accountProfileId !== expectedProfileId) throw Object.assign(new Error("wrong-provider-account"), { code: "wrong-provider-account" });
       const runtime = root2.FinizeUpdate4Runtime;
       if (root2.CloudAdapter.importScope() !== householdId || snapshot2.householdId !== householdId) throw new Error("Het huishouden is gewijzigd.");
       const id = providerBatchId(snapshot2.accountProfileId, snapshot2.account.identificationHash);
-      const previous = await inPhase("import-read", () => runtime.resolveProviderImportBase(root2, id));
+      const resolve = async () => {
+        var _a3, _b, _c;
+        let previous = await runtime.resolveProviderImportBase(root2, id), restartFrom = null;
+        for (let depth = 0; (previous == null ? void 0 : previous.lifecycle) === "deleted"; depth++) {
+          if (depth >= 16) throw Object.assign(new Error("bank-import-restart-blocked"), { code: "bank-import-restart-blocked" });
+          if (!((_b = (_a3 = root2.CloudAdapter) == null ? void 0 : _a3.isConnected) == null ? void 0 : _b.call(_a3)) || root2.CloudAdapter.conflict || root2.CloudAdapter.initialSyncComplete === false || !((_c = root2.DataAdapter) == null ? void 0 : _c.supportsAtomicImports) || root2.state.__finizePartialHistory) throw Object.assign(new Error("bank-import-restart-blocked"), { code: "bank-import-restart-blocked" });
+          assertProviderRestartState(root2.state, previous);
+          assertProviderRestartParent(previous, await runtime.fetchImportFromCloud(root2, previous.id));
+          restartFrom = previous;
+          previous = await runtime.resolveProviderImportBase(root2, nextProviderBatchId(id, previous));
+        }
+        if (previous) restartFrom = null;
+        return { previous, restartFrom };
+      };
+      let base = await inPhase("import-read", resolve);
+      if (base.restartFrom) {
+        if (!confirmRestart) throw Object.assign(new Error("bank-import-deleted"), { code: "bank-import-deleted", bankPhase: "staging" });
+        const proof = JSON.stringify(base.restartFrom), basis = root2.DataAdapter.commitBaseSignature();
+        if (await confirmRestart() !== true) throw Object.assign(new Error("bank-import-restart-cancelled"), { code: "bank-import-restart-cancelled", bankPhase: "staging" });
+        if (root2.CloudAdapter.importScope() !== householdId || root2.DataAdapter.commitBaseSignature() !== basis) throw Object.assign(new Error("import-conflict"), { code: "import-conflict" });
+        base = await inPhase("import-read", resolve);
+        if (!base.restartFrom || JSON.stringify(base.restartFrom) !== proof) throw Object.assign(new Error("import-conflict"), { code: "import-conflict" });
+      }
       const imports = await inPhase("import-read", () => runtime.ImportStore.listImports());
-      const batch = await inPhase("staging", () => stageProviderSnapshot(snapshot2, root2.state, previous, imports, runtime.classifyOriginal));
+      if (root2.CloudAdapter.importScope() !== householdId) throw Object.assign(new Error("scope-changed"), { code: "scope-changed" });
+      const batch = await inPhase("staging", () => stageProviderSnapshot(snapshot2, root2.state, base.previous, imports, runtime.classifyOriginal, base.restartFrom));
       await inPhase("storage", () => runtime.persistImportDraft(root2, batch));
       return batch;
     }
@@ -1155,7 +1223,7 @@
           if (button.hasAttribute("data-bank-review")) {
             const imports = await root2.FinizeUpdate4Runtime.ImportStore.listImports();
             sameScope();
-            const batch = imports.find((item) => item.channel === "bank-api" && item.accountProfileId === profile.id);
+            const batch = imports.find((item) => item.channel === "bank-api" && item.accountProfileId === profile.id && !["deleted", "withdrawn"].includes(item.lifecycle));
             if (!batch) throw Object.assign(new Error("no-bank-transactions"), { code: "no-bank-transactions" });
             await root2.FinizeUpdate4.openImportDetails(batch.id);
           } else if (button.hasAttribute("data-bank-authorize")) {
@@ -1185,7 +1253,7 @@
             const fromDate = new Date(Date.parse(toDate) - 30 * 864e5).toISOString().slice(0, 10);
             const snapshot2 = await request2("/sync", { accountProfileId: profile.id, fromDate, toDate });
             sameScope();
-            await ingest(snapshot2, householdId, profile.id);
+            await ingest(snapshot2, householdId, profile.id, { confirmRestart: () => root2.confirm("De eerdere bankimport is bewust verwijderd. Wil je een nieuwe importbundel starten? Het oude verwijderbewijs blijft bewaard. Nieuwe transacties staan opnieuw bij Nakijken en zijn niet goedgekeurd.") });
             status2.textContent = snapshot2.complete ? "Bank bijgewerkt. Financiële verwerking staat klaar bij Nakijken." : "Gedeeltelijk opgehaald. Eerdere transacties blijven behouden; probeer later opnieuw.";
             (_a3 = root2.renderActiveTab) == null ? void 0 : _a3.call(root2);
           }
@@ -1228,34 +1296,34 @@
   function validateLiquiditySettings(profile, profiles) {
     const value = profile.liquidity;
     if (value === void 0) return;
-    const fail7 = (message) => {
+    const fail8 = (message) => {
       throw Object.assign(new Error(message), { code: "invalid-liquidity-settings" });
     };
     if (!value || value.version !== 1 || typeof value.primaryForOwner !== "boolean" || !Number.isSafeInteger(value.bufferCents) || value.bufferCents < 0)
-      fail7("Vul een niet-negatieve veiligheidsbuffer in hele eurocenten in.");
-    if (value.primaryForOwner && profile.accountType !== "payment") fail7("Kies een betaalrekening voor de maandplanning.");
+      fail8("Vul een niet-negatieve veiligheidsbuffer in hele eurocenten in.");
+    if (value.primaryForOwner && profile.accountType !== "payment") fail8("Kies een betaalrekening voor de maandplanning.");
     if (value.primaryForOwner && profiles.some((p) => {
       var _a2;
       return p.id !== profile.id && p.accountOwner === profile.accountOwner && ((_a2 = p.liquidity) == null ? void 0 : _a2.primaryForOwner);
     }))
-      fail7("Er is al een rekening voor deze maandplanning. Schakel die keuze daar eerst uit.");
+      fail8("Er is al een rekening voor deze maandplanning. Schakel die keuze daar eerst uit.");
     if (profile.accountOwner === "gezamenlijk" && !value.primaryForOwner && value.bufferCents !== 0)
-      fail7("De gezamenlijke buffer hoort alleen bij de primaire gezamenlijke betaalrekening.");
-    if (!value.salaryDays || typeof value.salaryDays !== "object" || Array.isArray(value.salaryDays)) fail7("Controleer de salarisbetaaldagen.");
+      fail8("De gezamenlijke buffer hoort alleen bij de primaire gezamenlijke betaalrekening.");
+    if (!value.salaryDays || typeof value.salaryDays !== "object" || Array.isArray(value.salaryDays)) fail8("Controleer de salarisbetaaldagen.");
     for (const [person, day] of Object.entries(value.salaryDays)) {
-      if (!["dion", "dara"].includes(person) || !validPaymentDay(day)) fail7("Kies voor salaris een dag van 1 tot en met 31, de laatste dag, of laat het veld leeg.");
+      if (!["dion", "dara"].includes(person) || !validPaymentDay(day)) fail8("Kies voor salaris een dag van 1 tot en met 31, de laatste dag, of laat het veld leeg.");
       if (profiles.some((p) => {
         var _a2, _b;
         return p.id !== profile.id && ((_b = (_a2 = p.liquidity) == null ? void 0 : _a2.salaryDays) == null ? void 0 : _b[person]);
-      })) fail7("Dit salaris is al aan een andere rekening gekoppeld. Verwijder die betaaldag daar eerst.");
+      })) fail8("Dit salaris is al aan een andere rekening gekoppeld. Verwijder die betaaldag daar eerst.");
     }
-    if (value.allowanceDays !== void 0 && (!value.allowanceDays || typeof value.allowanceDays !== "object" || Array.isArray(value.allowanceDays))) fail7("Controleer de zakgeldbetaaldagen.");
+    if (value.allowanceDays !== void 0 && (!value.allowanceDays || typeof value.allowanceDays !== "object" || Array.isArray(value.allowanceDays))) fail8("Controleer de zakgeldbetaaldagen.");
     for (const [person, day] of Object.entries(value.allowanceDays || {})) {
-      if (!["dion", "dara"].includes(person) || profile.accountOwner !== person || profile.accountType !== "payment" || !validPaymentDay(day)) fail7("Koppel zakgeld aan de persoonlijke betaalrekening van de juiste eigenaar en kies een afschrijfdag.");
+      if (!["dion", "dara"].includes(person) || profile.accountOwner !== person || profile.accountType !== "payment" || !validPaymentDay(day)) fail8("Koppel zakgeld aan de persoonlijke betaalrekening van de juiste eigenaar en kies een afschrijfdag.");
       if (profiles.some((p) => {
         var _a2, _b;
         return p.id !== profile.id && ((_b = (_a2 = p.liquidity) == null ? void 0 : _a2.allowanceDays) == null ? void 0 : _b[person]);
-      })) fail7("Dit zakgeld is al aan een andere rekening gekoppeld. Verwijder die betaaldag daar eerst.");
+      })) fail8("Dit zakgeld is al aan een andere rekening gekoppeld. Verwijder die betaaldag daar eerst.");
     }
   }
 
@@ -1556,7 +1624,7 @@
 
   // src/core/balance-checkpoints.mjs
   var copy4 = (value) => structuredClone(value);
-  var fail2 = (code, message) => Object.assign(new Error(message), { code });
+  var fail3 = (code, message) => Object.assign(new Error(message), { code });
   var canonical2 = (value) => JSON.stringify(value, (_, item) => item && typeof item === "object" && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).sort().map((key) => [key, item[key]])) : item);
   var same = (a, b) => canonical2(a) === canonical2(b);
   var nextDay = (date2) => new Date(Date.UTC(Number(date2.slice(0, 4)), Number(date2.slice(5, 7)) - 1, Number(date2.slice(8, 10)) + 1)).toISOString().slice(0, 10);
@@ -1697,10 +1765,10 @@
       return !validCalendarDate(date2) || date2 > checkpoint.asOfDate && date2 <= toDate;
     };
     const activeImports = imports.filter((batch) => !["withdrawn", "deleted"].includes(batch.lifecycle) && batch.status !== "teruggedraaid" && !(state2.importDeletionProofs || []).some((proof) => proof.id === batch.id) && (state2.importSummaries || []).some((summary) => summary.id === batch.id));
-    const unusable = /* @__PURE__ */ new Set(), references = /* @__PURE__ */ new Map();
+    const unusable = /* @__PURE__ */ new Set(), references2 = /* @__PURE__ */ new Map();
     for (const batch of activeImports) for (const row of batch.rows || []) {
       const candidate = { ...row, accountProfileId: row.accountProfileId || batch.accountProfileId, accountOwner: row.accountOwner || batch.accountOwner };
-      references.set(batch.id + ":" + row.id, candidate);
+      references2.set(batch.id + ":" + row.id, candidate);
       if (!relevant(candidate) || !within(candidate) || row.duplicate) continue;
       if (row.possibleDuplicate && !row.identityDecision) {
         unusable.add(batch.id + ":" + row.id);
@@ -1740,7 +1808,7 @@
       registerProof(row, key);
     }
     for (const [key, row] of selected) for (const ref of row.importReferences || [{ batchId: row.importBatchId, rowId: row.importTransactionId }]) {
-      const original2 = references.get(ref.batchId + ":" + ref.rowId);
+      const original2 = references2.get(ref.batchId + ":" + ref.rowId);
       if (original2) registerProof(original2, key);
     }
     for (const row of state2.transactions || []) if (relevant(row) && within(row) && conflicts.has(sourceRecordKey(row))) add("conflicting-bank-source", sourceRecordKey(row));
@@ -1776,7 +1844,7 @@
         add("possible-duplicate", key);
         continue;
       }
-      const evidenceRows = (row.importReferences || [{ batchId: row.importBatchId, rowId: row.importTransactionId }]).map((item) => references.get(item.batchId + ":" + item.rowId)).filter(Boolean);
+      const evidenceRows = (row.importReferences || [{ batchId: row.importBatchId, rowId: row.importTransactionId }]).map((item) => references2.get(item.batchId + ":" + item.rowId)).filter(Boolean);
       if (evidenceRows.some((item) => {
         var _a3, _b2;
         return item.accountProfileId !== row.accountProfileId || ((_a3 = item.bankOriginal) == null ? void 0 : _a3.bankDate) !== original2.bankDate || ((_b2 = item.bankOriginal) == null ? void 0 : _b2.amount) !== original2.amount;
@@ -1825,13 +1893,13 @@
   function prepareBalanceCheckpoint(state2, command, options) {
     var _a2, _b;
     const { scope, today } = options;
-    if ((state2.accountProfiles || []).filter((row) => row.id === command.accountProfileId).length !== 1) throw fail2("unresolved-account-profile", "Kies een bestaande fysieke rekening.");
-    if (state2.accountProfiles.find((row) => row.id === command.accountProfileId).status === "archived" && !command.supersedesId && !(state2.balanceCheckpoints || []).some((row) => row.operationId === command.operationId)) throw fail2("account-archived", "Heractiveer de rekening voordat je een nieuw banksaldo invoert.");
+    if ((state2.accountProfiles || []).filter((row) => row.id === command.accountProfileId).length !== 1) throw fail3("unresolved-account-profile", "Kies een bestaande fysieke rekening.");
+    if (state2.accountProfiles.find((row) => row.id === command.accountProfileId).status === "archived" && !command.supersedesId && !(state2.balanceCheckpoints || []).some((row) => row.operationId === command.operationId)) throw fail3("account-archived", "Heractiveer de rekening voordat je een nieuw banksaldo invoert.");
     if (!validCalendarDate(today) || !validCalendarDate(command.asOfDate) || command.asOfDate > today)
-      throw fail2("invalid-checkpoint-date", "Kies een geldige peildatum tot en met vandaag.");
-    if (!command.operationId || typeof command.operationId !== "string") throw fail2("missing-operation-id", "De opslagactie mist een vaste identiteit.");
+      throw fail3("invalid-checkpoint-date", "Kies een geldige peildatum tot en met vandaag.");
+    if (!command.operationId || typeof command.operationId !== "string") throw fail3("missing-operation-id", "De opslagactie mist een vaste identiteit.");
     const history = checkpointHistory(state2, command.accountProfileId, scope);
-    if (history.issues.length) throw fail2("checkpoint-history-conflict", "De ijkpunthistorie bevat een conflict. Bewaar de bestaande waarnemingen en controleer de synchronisatie.");
+    if (history.issues.length) throw fail3("checkpoint-history-conflict", "De ijkpunthistorie bevat een conflict. Bewaar de bestaande waarnemingen en controleer de synchronisatie.");
     const previous = command.supersedesId ? history.rows.find((row) => row.id === command.supersedesId) : null;
     const record = {
       version: 1,
@@ -1850,16 +1918,16 @@
       revision: previous ? previous.revision + 1 : 1,
       supersedesId: (previous == null ? void 0 : previous.id) || null
     };
-    if (!validCheckpoint(record, scope)) throw fail2("invalid-checkpoint", "Vul een geldig banksaldo in hele eurocenten in en kies een bestaande rekening.");
+    if (!validCheckpoint(record, scope)) throw fail3("invalid-checkpoint", "Vul een geldig banksaldo in hele eurocenten in en kies een bestaande rekening.");
     const existing = (state2.balanceCheckpoints || []).find((row) => row.operationId === command.operationId);
     if (existing) {
-      if (!same(existing, record)) throw fail2("operation-conflict", "Deze opslagactie is al gebruikt voor een andere waarneming.");
+      if (!same(existing, record)) throw fail3("operation-conflict", "Deze opslagactie is al gebruikt voor een andere waarneming.");
       return { record: copy4(existing), noop: true };
     }
     const sameDate = history.active.find((row) => row.asOfDate === command.asOfDate);
     if (command.supersedesId && (!previous || !history.active.some((row) => row.id === previous.id)))
-      throw fail2("stale-checkpoint-revision", "Dit ijkpunt is intussen gewijzigd. Open de actuele waarneming opnieuw.");
-    if (sameDate && sameDate.id !== (previous == null ? void 0 : previous.id)) throw fail2("checkpoint-date-exists", "Voor deze dag bestaat al een ander ijkpunt. Gebruik Corrigeren bij de juiste waarneming.");
+      throw fail3("stale-checkpoint-revision", "Dit ijkpunt is intussen gewijzigd. Open de actuele waarneming opnieuw.");
+    if (sameDate && sameDate.id !== (previous == null ? void 0 : previous.id)) throw fail3("checkpoint-date-exists", "Voor deze dag bestaat al een ander ijkpunt. Gebruik Corrigeren bij de juiste waarneming.");
     const projected = selectAccountBalance(state2, { ...options, accountProfileId: command.accountProfileId, toDate: command.asOfDate });
     const reconciliation = {
       expectedCents: projected.balanceCents,
@@ -1869,14 +1937,14 @@
       reasons: projected.reasons,
       previousCheckpointId: ((_b = projected.checkpoint) == null ? void 0 : _b.id) || null
     };
-    if (reconciliation.differenceCents !== null && !Number.isSafeInteger(reconciliation.differenceCents)) throw fail2("unsafe-difference", "Het controleverschil is te groot om exact te bewaren.");
+    if (reconciliation.differenceCents !== null && !Number.isSafeInteger(reconciliation.differenceCents)) throw fail3("unsafe-difference", "Het controleverschil is te groot om exact te bewaren.");
     return { record, reconciliation, previewSignature: JSON.stringify([history.rows, projected, record]), noop: false };
   }
   function applyBalanceCheckpoint(state2, command, options) {
     const prepared = prepareBalanceCheckpoint(state2, command, options);
     if (prepared.noop) return prepared;
     if (!command.confirmed || command.previewSignature !== prepared.previewSignature)
-      throw fail2("balance-confirmation-required", "Controleer de actuele vergelijking en bevestig de waarneming opnieuw.");
+      throw fail3("balance-confirmation-required", "Controleer de actuele vergelijking en bevestig de waarneming opnieuw.");
     state2.balanceCheckpoints = [...state2.balanceCheckpoints || [], prepared.record];
     return prepared;
   }
@@ -3270,7 +3338,8 @@
     const periodEnd = endDate || horizonLimitDate;
     const cutoff = periodEnd && periodEnd < asOfDate ? periodEnd : asOfDate;
     const checkpoint = startDate ? planningAnchor(state2, { accountProfileId, asOfDate: cutoff, startDate, scope }) : checkpointHistory(state2, accountProfileId, scope).active.find((row) => row.asOfDate <= asOfDate);
-    const end = validCalendarDate(periodEnd) ? periodEnd : monthEnd(nextPlanningMonth(asOfDate.slice(0, 7)));
+    const planningReference = startDate && startDate > asOfDate ? startDate : asOfDate;
+    const end = validCalendarDate(periodEnd) ? periodEnd : monthEnd(nextPlanningMonth(planningReference.slice(0, 7)));
     return balanceRequiredMonths(startDate && checkpoint ? shiftLiquidityDay(checkpoint.asOfDate, 1) : (checkpoint == null ? void 0 : checkpoint.asOfDate) || startDate || asOfDate, end);
   }
   function buildLiquidityInput(state2, { accountProfileId, asOfDate, endDate, scope, imports = [], importsAvailable = true, coverage = [], monthlyForecast = financialForecastForMonth, salaryOnly = false, planningBasis = false, incomeOnly = false, includeReceipt = false } = {}) {
@@ -4328,7 +4397,7 @@
   var accountIsArchived = (profile) => (profile == null ? void 0 : profile.status) === "archived";
   var availableAccountProfiles = (profiles, current = "") => (profiles || []).filter((profile) => !accountIsArchived(profile) || profile.id === current);
   var same2 = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-  var fail3 = (code, message) => Object.assign(new Error(message), { code });
+  var fail4 = (code, message) => Object.assign(new Error(message), { code });
   function validDutchIban(value) {
     const iban4 = normalizeAccountIban(value);
     if (!/^NL\d{2}[A-Z]{4}\d{10}$/.test(iban4)) return false;
@@ -4352,31 +4421,31 @@
   }
   function validateProfile(profile, previous, profiles) {
     validateLiquiditySettings(profile, profiles);
-    if (typeof profile.id !== "string" || !profile.id || !String(profile.name || "").trim() || String(profile.name).length > 100) throw fail3("invalid-account-name", "Vul een herkenbare rekeningnaam van maximaal 100 tekens in.");
-    if (String(profile.bank || "").length > 100) throw fail3("invalid-account-bank", "Gebruik maximaal 100 tekens voor de banknaam.");
-    if (!ACCOUNT_OWNERS.includes(profile.accountOwner)) throw fail3("invalid-account-owner", "Kies Gezamenlijk, Dion of Dara als eigenaar.");
-    if ((!previous || profile.accountType !== previous.accountType) && !ACCOUNT_TYPES.includes(profile.accountType)) throw fail3("invalid-account-type", "Kies betaalrekening of spaarrekening.");
-    if ((!previous || profile.status !== previous.status) && !["active", "archived"].includes(profile.status)) throw fail3("invalid-account-status", "Kies een geldige rekeningstatus.");
+    if (typeof profile.id !== "string" || !profile.id || !String(profile.name || "").trim() || String(profile.name).length > 100) throw fail4("invalid-account-name", "Vul een herkenbare rekeningnaam van maximaal 100 tekens in.");
+    if (String(profile.bank || "").length > 100) throw fail4("invalid-account-bank", "Gebruik maximaal 100 tekens voor de banknaam.");
+    if (!ACCOUNT_OWNERS.includes(profile.accountOwner)) throw fail4("invalid-account-owner", "Kies Gezamenlijk, Dion of Dara als eigenaar.");
+    if ((!previous || profile.accountType !== previous.accountType) && !ACCOUNT_TYPES.includes(profile.accountType)) throw fail4("invalid-account-type", "Kies betaalrekening of spaarrekening.");
+    if ((!previous || profile.status !== previous.status) && !["active", "archived"].includes(profile.status)) throw fail4("invalid-account-status", "Kies een geldige rekeningstatus.");
     if (!previous || profile.identifier !== previous.identifier) {
-      if (!validDutchIban(profile.identifier)) throw fail3("invalid-iban", "Vul een geldig Nederlands IBAN in, inclusief de juiste controlecijfers.");
+      if (!validDutchIban(profile.identifier)) throw fail4("invalid-iban", "Vul een geldig Nederlands IBAN in, inclusief de juiste controlecijfers.");
       if (profiles.some((other) => other.id !== profile.id && normalizeAccountIban(other.identifier || other.iban) === normalizeAccountIban(profile.identifier)))
-        throw fail3("duplicate-iban", "Dit IBAN hoort al bij een rekening. Open die rekening of activeer haar opnieuw.");
+        throw fail4("duplicate-iban", "Dit IBAN hoort al bij een rekening. Open die rekening of activeer haar opnieuw.");
     }
   }
   function assertAccountProfileMutation(before, after, { imports = [] } = {}) {
     var _a2;
     const previous = new Map((before.accountProfiles || []).map((profile) => [profile.id, profile]));
     const next = after.accountProfiles || [];
-    if (new Set(next.map((profile) => profile.id)).size !== next.length) throw fail3("duplicate-account-id", "Een rekening-ID komt dubbel voor.");
-    for (const [id] of previous) if (!next.some((profile) => profile.id === id)) throw fail3("account-delete-blocked", "Archiveer de rekening; bestaande rekeningprofielen mogen niet worden verwijderd.");
+    if (new Set(next.map((profile) => profile.id)).size !== next.length) throw fail4("duplicate-account-id", "Een rekening-ID komt dubbel voor.");
+    for (const [id] of previous) if (!next.some((profile) => profile.id === id)) throw fail4("account-delete-blocked", "Archiveer de rekening; bestaande rekeningprofielen mogen niet worden verwijderd.");
     for (const profile of next) {
       const old = previous.get(profile.id);
       if (same2(old, profile)) continue;
       validateProfile(profile, old, next);
       if (old && (old.identifier !== profile.identifier || old.accountOwner !== profile.accountOwner || old.iban !== profile.iban)) {
         if (before.__finizePartialHistory && !((_a2 = before.__finizePeriodContext) == null ? void 0 : _a2.explicitFullHistory))
-          throw fail3("account-history-incomplete", "Laad eerst de volledige historie voordat je IBAN of eigenaar wijzigt.");
-        if (accountHasReferences(before, old, imports)) throw fail3("account-identity-in-use", "Deze rekening heeft historie of verwijzingen. IBAN en eigenaar blijven behouden. Voeg voor een andere bankrekening een nieuw profiel toe.");
+          throw fail4("account-history-incomplete", "Laad eerst de volledige historie voordat je IBAN of eigenaar wijzigt.");
+        if (accountHasReferences(before, old, imports)) throw fail4("account-identity-in-use", "Deze rekening heeft historie of verwijzingen. IBAN en eigenaar blijven behouden. Voeg voor een andere bankrekening een nieuw profiel toe.");
       }
     }
     const archived = new Set(next.filter(accountIsArchived).map((profile) => profile.id));
@@ -4386,20 +4455,20 @@
       if (!archived.has(row.accountProfileId)) continue;
       const old = oldTransactions.get(row.id);
       if (row.recordRole === "bank-source" ? !old || !approved(old) && approved(row) : !old && !(before.transactions || []).some((source) => source.recordRole === "bank-source" && source.bankSourceId === row.bankSourceId && approved(source)))
-        throw fail3("account-archived", "Heractiveer de rekening voordat je nieuwe transacties of bankmutaties toevoegt.");
+        throw fail4("account-archived", "Heractiveer de rekening voordat je nieuwe transacties of bankmutaties toevoegt.");
     }
   }
   function applyAccountProfileCommand(state2, command, { imports = [] } = {}) {
     var _a2, _b, _c;
-    if (typeof (command == null ? void 0 : command.operationId) !== "string" || !command.operationId || typeof command.id !== "string" || !command.id || !Number.isFinite(Date.parse(command.createdAt))) throw fail3("invalid-account-command", "De opslagactie mist een geldige identiteit of vastlegtijd. Open het formulier opnieuw.");
+    if (typeof (command == null ? void 0 : command.operationId) !== "string" || !command.operationId || typeof command.id !== "string" || !command.id || !Number.isFinite(Date.parse(command.createdAt))) throw fail4("invalid-account-command", "De opslagactie mist een geldige identiteit of vastlegtijd. Open het formulier opnieuw.");
     const profiles = state2.accountProfiles || [], old = profiles.find((profile2) => profile2.id === command.id);
     const signature2 = JSON.stringify([command.type, command.id, command.values || {}]);
     if ((old == null ? void 0 : old.lastAccountOperationId) === command.operationId) {
-      if (old.lastAccountOperationSignature !== signature2) throw fail3("account-operation-conflict", "Deze opslagactie is al voor andere rekeninggegevens gebruikt.");
+      if (old.lastAccountOperationSignature !== signature2) throw fail4("account-operation-conflict", "Deze opslagactie is al voor andere rekeninggegevens gebruikt.");
       return old;
     }
     if (command.type === "create" ? Boolean(old) : !old || !same2(old, command.expectedProfile))
-      throw fail3("account-profile-conflict", "De rekening is intussen gewijzigd. Open de actuele rekening opnieuw; je invoer blijft in dit formulier staan.");
+      throw fail4("account-profile-conflict", "De rekening is intussen gewijzigd. Open de actuele rekening opnieuw; je invoer blijft in dit formulier staan.");
     let profile;
     if (["create", "update"].includes(command.type)) {
       const values = command.values || {};
@@ -4421,7 +4490,7 @@
       const values = command.values || {};
       profile = { ...old, liquidity: { version: 1, primaryForOwner: values.primaryForOwner, bufferCents: values.bufferCents, salaryDays: structuredClone(values.salaryDays), allowanceDays: structuredClone((_c = (_b = values.allowanceDays) != null ? _b : (_a2 = old == null ? void 0 : old.liquidity) == null ? void 0 : _a2.allowanceDays) != null ? _c : {}) }, updatedAt: command.createdAt };
     } else if (["archive", "reactivate"].includes(command.type)) profile = { ...old, status: command.type === "archive" ? "archived" : "active", updatedAt: command.createdAt };
-    else throw fail3("invalid-account-command", "Deze rekeningactie wordt niet ondersteund.");
+    else throw fail4("invalid-account-command", "Deze rekeningactie wordt niet ondersteund.");
     profile.lastAccountOperationId = command.operationId;
     profile.lastAccountOperationSignature = signature2;
     const candidate = { ...state2, accountProfiles: old ? profiles.map((item) => item.id === old.id ? profile : item) : [...profiles, profile] };
@@ -5162,6 +5231,10 @@
   async function buildRecordSnapshot(state2, imports = [], options = {}) {
     var _a2;
     if (((_a2 = state2 == null ? void 0 : state2.meta) == null ? void 0 : _a2.schemaVersion) !== 11 || state2.__finizePartialHistory) throw storageError("incomplete-state", "Publicatie vereist een bewezen complete financiële basis.");
+    for (const batch of imports) if (batch.providerRestartFrom) {
+      assertProviderRestartParent(batch.providerRestartFrom, imports.find((parent) => parent.id === batch.providerRestartFrom.id));
+      assertProviderRestartParent(batch.providerRestartFrom, (state2.importDeletionProofs || []).find((parent) => parent.id === batch.providerRestartFrom.id));
+    }
     const expanded = clone2(state2);
     expanded["@imports"] = imports.map((batch) => {
       const { rows, ...header } = clone2(batch);
@@ -6394,18 +6467,18 @@
       for (const [name, rows] of Object.entries(physical)) if (name !== PAYLOAD_STORE) for (const row of rows) roots[category(name, row)].push(row);
       const used = /* @__PURE__ */ new Set(), reachableBytes = {}, ownershipOrder = ["activeFinancialRecords", "offlinePeriods", "openCsvImports", "syncOutbox", "operationReceipts", "conflictsAndRecovery", "protectedMigrationCopies", "historicalCsvImports", "replaceablePeriodCache", "storageMetadata"];
       for (const name of ownershipOrder) {
-        const references = /* @__PURE__ */ new Set();
+        const references2 = /* @__PURE__ */ new Set();
         const visit = (hash) => {
-          if (references.has(hash)) return;
-          references.add(hash);
+          if (references2.has(hash)) return;
+          references2.add(hash);
           const part = parts2.get(hash);
           if (!part) throw error("storage-payload-integrity", "Een opslagafhankelijkheid ontbreekt.");
           for (const child of payloadReferences(JSON.parse(part.payload))) visit(child);
         };
         for (const row of roots[name]) for (const hash of payloadReferences(row)) visit(hash);
         categories[name] = size(roots[name]);
-        reachableBytes[name] = categories[name] + [...references].reduce((sum2, hash) => sum2 + storageBytes(parts2.get(hash)), 0);
-        for (const hash of references) if (!used.has(hash)) {
+        reachableBytes[name] = categories[name] + [...references2].reduce((sum2, hash) => sum2 + storageBytes(parts2.get(hash)), 0);
+        for (const hash of references2) if (!used.has(hash)) {
           used.add(hash);
           categories[name] += storageBytes(parts2.get(hash));
         }
@@ -6517,13 +6590,13 @@
   var LOCAL_STORAGE_VERSION = 1;
   var connections = /* @__PURE__ */ new Map();
   var clone6 = (value) => structuredClone(value);
-  var fail4 = (code, message) => Object.assign(new Error(message), { code, storageFailure: true });
+  var fail5 = (code, message) => Object.assign(new Error(message), { code, storageFailure: true });
   var stores = ["imports", "journal", "syncQueue", "financialRecords", "financialHead", "operationReceipts", "financialOutbox", "periodCache"];
   function openHouseholdDatabase(scope = "legacy") {
     if (connections.has(scope)) return connections.get(scope);
     const opening = new Promise((resolve, reject) => {
       if (!globalThis.indexedDB) {
-        reject(fail4("storage-unavailable", "IndexedDB is niet beschikbaar."));
+        reject(fail5("storage-unavailable", "IndexedDB is niet beschikbaar."));
         return;
       }
       const request2 = indexedDB.open(scope === "legacy" ? "finize-imports-v1" : `finize-imports-v1-${scope}`, HOUSEHOLD_DATABASE_VERSION);
@@ -6539,11 +6612,11 @@
         const periods = request2.transaction.objectStore("periodCache");
         if (!periods.indexNames.contains("offline")) periods.createIndex("offline", "offline");
       };
-      request2.onerror = () => reject(request2.error || fail4("storage-unavailable", "Huishoudopslag openen mislukt."));
+      request2.onerror = () => reject(request2.error || fail5("storage-unavailable", "Huishoudopslag openen mislukt."));
       let blocked2 = false;
       request2.onblocked = () => {
         blocked2 = true;
-        reject(fail4("storage-blocked", "Sluit de andere Finize-tabbladen om de lokale opslag veilig te openen."));
+        reject(fail5("storage-blocked", "Sluit de andere Finize-tabbladen om de lokale opslag veilig te openen."));
       };
       request2.onsuccess = async () => {
         const db = request2.result;
@@ -6614,12 +6687,12 @@
     return { layout, records, reused, entries };
   }
   function decodeHouseholdState(head2, records) {
-    if ((head2 == null ? void 0 : head2.storageVersion) !== LOCAL_STORAGE_VERSION || head2.schemaVersion !== 11) throw fail4("storage-version", "Onbekende lokale opslagversie.");
+    if ((head2 == null ? void 0 : head2.storageVersion) !== LOCAL_STORAGE_VERSION || head2.schemaVersion !== 11) throw fail5("storage-version", "Onbekende lokale opslagversie.");
     const values = new Map(records.map((record) => [record.id, record.value])), state2 = {};
     for (const [collection, layout] of Object.entries(head2.layout)) {
       const read = (id) => {
         const key = JSON.stringify([collection, id]);
-        if (!values.has(key)) throw fail4("storage-integrity", "Een vereist financieel record ontbreekt: " + collection);
+        if (!values.has(key)) throw fail5("storage-integrity", "Een vereist financieel record ontbreekt: " + collection);
         return clone6(values.get(key));
       };
       state2[collection] = layout.kind === "list" ? layout.ids.map(read) : read("");
@@ -6635,7 +6708,7 @@
   function completed(transaction) {
     return new Promise((resolve, reject) => {
       transaction.oncomplete = () => resolve();
-      transaction.onerror = transaction.onabort = () => reject(transaction.error || fail4("storage-aborted", "De lokale opslagtransactie is afgebroken."));
+      transaction.onerror = transaction.onabort = () => reject(transaction.error || fail5("storage-aborted", "De lokale opslagtransactie is afgebroken."));
     });
   }
   async function financialSnapshot(transaction) {
@@ -6645,7 +6718,7 @@
     if (!head2.partialHistory) return { head: head2, records: await requestResult(records.getAll()) };
     const keys = Object.entries(head2.layout).flatMap(([collection, layout]) => (layout.kind === "list" ? layout.ids : [""]).map((id) => JSON.stringify([collection, id])));
     const selected = await Promise.all(keys.map((id) => requestResult(records.get(id))));
-    if (selected.some((row) => !row)) throw fail4("storage-integrity", "Een vereiste lokale periodeafhankelijkheid ontbreekt.");
+    if (selected.some((row) => !row)) throw fail5("storage-integrity", "Een vereiste lokale periodeafhankelijkheid ontbreekt.");
     return { head: head2, records: selected };
   }
   function createHouseholdStore(scope = "legacy", { verifySource = async () => {
@@ -6665,22 +6738,22 @@
       const db = await openHouseholdDatabase(scope), tx = db.transaction(["financialHead", "financialRecords"], "readonly"), done = completed(tx);
       const [{ head: head2, records }] = await Promise.all([financialSnapshot(tx), done]);
       if (!head2) return null;
-      if (!allowUnverified && !head2.verified) throw fail4("storage-migration", "De opslagmigratie moet eerst worden gecontroleerd.");
+      if (!allowUnverified && !head2.verified) throw fail5("storage-migration", "De opslagmigratie moet eerst worden gecontroleerd.");
       const state2 = decodeHouseholdState(head2, records);
-      if (await backupDigest(JSON.stringify(state2)) !== head2.sha256) throw fail4("storage-integrity", "De teruggelezen financiële opslag wijkt af. De oude opslag blijft behouden.");
+      if (await backupDigest(JSON.stringify(state2)) !== head2.sha256) throw fail5("storage-integrity", "De teruggelezen financiële opslag wijkt af. De oude opslag blijft behouden.");
       adoptBasis(head2, records);
       return state2;
     }
     async function commit(state2, { expectedHash = ((_a2) => (_a2 = cachedHead == null ? void 0 : cachedHead.sha256) != null ? _a2 : null)(), operationId = crypto.randomUUID(), importMutation = null, migration = null, queueCloud = true, cloudAcceptance = null, periodAcceptance = null, resolutionAcceptance = null, payloadPreparation = null } = {}) {
       var _a3, _b, _c, _d, _e, _f;
       await verifySource(migration || (cachedHead == null ? void 0 : cachedHead.migration));
-      if (cloudAcceptance && (importMutation || queueCloud)) throw fail4("storage-contract", "Een cloudontvangst accepteert geen parallelle lokale importbewerking.");
-      if (periodAcceptance && (!state2.__finizePartialHistory || queueCloud || importMutation || cloudAcceptance)) throw fail4("storage-contract", "Periodeontvangst gebruikt één gecontroleerde lokale commit zonder financiële heruitvoering.");
-      if (resolutionAcceptance && (!state2.__finizePartialHistory || !queueCloud || periodAcceptance || cloudAcceptance || importMutation)) throw fail4("storage-contract", "Conflictoplossing vereist één atomaire periodecommit met outbox.");
+      if (cloudAcceptance && (importMutation || queueCloud)) throw fail5("storage-contract", "Een cloudontvangst accepteert geen parallelle lokale importbewerking.");
+      if (periodAcceptance && (!state2.__finizePartialHistory || queueCloud || importMutation || cloudAcceptance)) throw fail5("storage-contract", "Periodeontvangst gebruikt één gecontroleerde lokale commit zonder financiële heruitvoering.");
+      if (resolutionAcceptance && (!state2.__finizePartialHistory || !queueCloud || periodAcceptance || cloudAcceptance || importMutation)) throw fail5("storage-contract", "Conflictoplossing vereist één atomaire periodecommit met outbox.");
       const durableBasis = cachedHead && clone6(cachedHead);
       if (payloadPreparation == null ? void 0 : payloadPreparation.binding) {
         const binding = payloadPreparation.binding;
-        if (binding.scope !== scope) throw fail4("household-scope", "De commitvoorbereiding hoort bij een ander huishouden.");
+        if (binding.scope !== scope) throw fail5("household-scope", "De commitvoorbereiding hoort bij een ander huishouden.");
         if (binding.sha256 !== (durableBasis == null ? void 0 : durableBasis.sha256) || binding.storageRevision !== (durableBasis == null ? void 0 : durableBasis.storageRevision) || binding.migration !== JSON.stringify((_a3 = durableBasis == null ? void 0 : durableBasis.migration) != null ? _a3 : null)) payloadPreparation = null;
       }
       const canReuse = expectedHash === ((_b = durableBasis == null ? void 0 : durableBasis.sha256) != null ? _b : null);
@@ -6711,26 +6784,26 @@
           }
         };
         tx.oncomplete = () => resolve();
-        tx.onerror = tx.onabort = () => reject(failure2 || tx.error || fail4("storage-aborted", "De lokale financiële commit is afgebroken."));
+        tx.onerror = tx.onabort = () => reject(failure2 || tx.error || fail5("storage-aborted", "De lokale financiële commit is afgebroken."));
         const heads = tx.objectStore("financialHead"), get = heads.get("current"), operation = tx.objectStore("operationReceipts").get(operationId);
         operation.onsuccess = () => {
           var _a4, _b2, _c2, _d2, _e2, _f2, _g, _h, _i, _j;
           if (((_a4 = get.result) == null ? void 0 : _a4.partialHistory) && !state2.__finizePartialHistory) {
-            abort(fail4("storage-contract", "Een periodeadministratie kan niet via het oude volledige-statecontract worden overschreven."));
+            abort(fail5("storage-contract", "Een periodeadministratie kan niet via het oude volledige-statecontract worden overschreven."));
             return;
           }
           if (get.result && !get.result.verified) {
-            abort(fail4("storage-migration", "Een ongecontroleerde migratiestand accepteert geen financiële wijzigingen."));
+            abort(fail5("storage-migration", "Een ongecontroleerde migratiestand accepteert geen financiële wijzigingen."));
             return;
           }
           const existing = operation.result;
           if (existing) {
             if (existing.sha256 !== sha256) {
-              abort(fail4("storage-operation-reused", "Dit operatie-ID is al gebruikt voor een andere financiële wijziging."));
+              abort(fail5("storage-operation-reused", "Dit operatie-ID is al gebruikt voor een andere financiële wijziging."));
               return;
             }
             if (((_b2 = get.result) == null ? void 0 : _b2.sha256) !== sha256) {
-              abort(fail4("storage-operation-committed", "Deze operatie is al bevestigd; lees eerst de nieuwere duurzame stand."));
+              abort(fail5("storage-operation-committed", "Deze operatie is al bevestigd; lees eerst de nieuwere duurzame stand."));
               return;
             }
             confirmedReceipt = existing;
@@ -6738,11 +6811,11 @@
             return;
           }
           if (!canReuse || ((_d2 = (_c2 = get.result) == null ? void 0 : _c2.sha256) != null ? _d2 : null) !== expectedHash) {
-            abort(fail4("storage-conflict", "De duurzame financiële stand is intussen gewijzigd. Herlaad de actuele stand; je invoer blijft behouden."));
+            abort(fail5("storage-conflict", "De duurzame financiële stand is intussen gewijzigd. Herlaad de actuele stand; je invoer blijft behouden."));
             return;
           }
           if (((_f2 = (_e2 = get.result) == null ? void 0 : _e2.storageRevision) != null ? _f2 : null) !== ((_g = durableBasis == null ? void 0 : durableBasis.storageRevision) != null ? _g : null) || JSON.stringify((_i = (_h = get.result) == null ? void 0 : _h.migration) != null ? _i : null) !== JSON.stringify((_j = durableBasis == null ? void 0 : durableBasis.migration) != null ? _j : null)) {
-            abort(fail4("storage-conflict", "De revisie of migratiebasis van de commitvoorbereiding is gewijzigd."));
+            abort(fail5("storage-conflict", "De revisie of migratiebasis van de commitvoorbereiding is gewijzigd."));
             return;
           }
           const publish = () => {
@@ -6760,7 +6833,7 @@
                 const journal = tx.objectStore("journal"), read2 = journal.get(resolutionAcceptance.id), outbox = tx.objectStore("financialOutbox"), all = outbox.getAll();
                 read2.onsuccess = () => {
                   if (!read2.result || read2.result.status !== "conflict" || read2.result.localHash !== expectedHash) {
-                    abort(fail4("storage-conflict", "De beoordeelde conflictstand is gewijzigd."));
+                    abort(fail5("storage-conflict", "De beoordeelde conflictstand is gewijzigd."));
                     return;
                   }
                   journal.put({ ...read2.result, resolution: { ...clone6(resolutionAcceptance.resolution), outcome: "pending" } });
@@ -6794,12 +6867,12 @@
             const imports2 = tx.objectStore("imports").getAll(), queue = tx.objectStore("syncQueue").getAll();
             queue.onsuccess = () => {
               try {
-                if (JSON.stringify(imports2.result) !== cloudAcceptance.expectedImportsSignature || queue.result.length) throw fail4("import-conflict", "Lokale importkeuzes wijzigden tijdens cloudontvangst.");
+                if (JSON.stringify(imports2.result) !== cloudAcceptance.expectedImportsSignature || queue.result.length) throw fail5("import-conflict", "Lokale importkeuzes wijzigden tijdens cloudontvangst.");
                 for (const old of imports2.result) {
                   const incoming = cloudAcceptance.imports.find((row) => row.id === old.id);
                   if (!incoming) {
                     if (cloudAcceptance.partial === true) continue;
-                    throw fail4("import-conflict", "Een lokale import ontbreekt in de externe stand.");
+                    throw fail5("import-conflict", "Een lokale import ontbreekt in de externe stand.");
                   }
                   assertOriginalBankDataUnchanged(old.rows, incoming.rows);
                 }
@@ -6818,9 +6891,26 @@
           read.onsuccess = () => {
             try {
               const old = read.result, expected = importMutation.previousBatch;
-              if ((Number(old == null ? void 0 : old.version) || 0) !== (Number(expected == null ? void 0 : expected.version) || 0) || String((old == null ? void 0 : old.operationId) || "") !== String((expected == null ? void 0 : expected.operationId) || "")) throw fail4("import-conflict", "De importrevisie is intussen gewijzigd.");
-              if ((old == null ? void 0 : old.lifecycle) === "deleted" && importMutation.batch.lifecycle !== "deleted") throw fail4("import-conflict", "De import is al verwijderd.");
+              if ((Number(old == null ? void 0 : old.version) || 0) !== (Number(expected == null ? void 0 : expected.version) || 0) || String((old == null ? void 0 : old.operationId) || "") !== String((expected == null ? void 0 : expected.operationId) || "")) throw fail5("import-conflict", "De importrevisie is intussen gewijzigd.");
+              if ((old == null ? void 0 : old.lifecycle) === "deleted" && importMutation.batch.lifecycle !== "deleted") throw fail5("import-conflict", "De import is al verwijderd.");
               assertOriginalBankDataUnchanged(old == null ? void 0 : old.rows, importMutation.batch.rows);
+              if (importMutation.batch.providerRestartFrom && !old) {
+                if (importMutation.batch.householdId !== scope) throw fail5("household-scope", "De nieuwe bankimport hoort bij een ander huishouden.");
+                const proof = importMutation.batch.providerRestartFrom;
+                const parent = imports.get(proof.id), financial = tx.objectStore("financialRecords").getAll(), journals = tx.objectStore("journal").getAll(), queue = tx.objectStore("syncQueue").getAll();
+                queue.onsuccess = () => {
+                  var _a5;
+                  try {
+                    if ((_a5 = get.result) == null ? void 0 : _a5.partialHistory) throw fail5("bank-import-restart-blocked", "Volledige historie is vereist voor een nieuwe importbundel.");
+                    assertProviderRestartParent(proof, parent.result);
+                    assertProviderRestartState(decodeHouseholdState(get.result, financial.result), proof, { journals: journals.result.filter((row) => row.id !== operationId), queue: queue.result });
+                    publish();
+                  } catch (error2) {
+                    abort(error2);
+                  }
+                };
+                return;
+              }
               publish();
             } catch (error2) {
               abort(error2);
@@ -6843,7 +6933,7 @@
       if (!state2) return null;
       await (verifySource2 == null ? void 0 : verifySource2(cachedHead.migration));
       if (cachedHead.verified) return state2;
-      if (((_a2 = cachedHead.migration) == null ? void 0 : _a2.retainedStores) && JSON.stringify(await retainedInventory()) !== JSON.stringify(cachedHead.migration.retainedStores)) throw fail4("storage-migration-conflict", "De bestaande import- of herstelopslag wijzigde tijdens migratie; beide kopieën blijven behouden.");
+      if (((_a2 = cachedHead.migration) == null ? void 0 : _a2.retainedStores) && JSON.stringify(await retainedInventory()) !== JSON.stringify(cachedHead.migration.retainedStores)) throw fail5("storage-migration-conflict", "De bestaande import- of herstelopslag wijzigde tijdens migratie; beide kopieën blijven behouden.");
       const hash = cachedHead.sha256, db = await openHouseholdDatabase(scope);
       await new Promise((resolve, reject) => {
         const tx = db.transaction("financialHead", "readwrite", { durability: "strict" }), store = tx.objectStore("financialHead"), read = store.get("current");
@@ -6851,7 +6941,7 @@
         read.onsuccess = () => {
           var _a3;
           if (((_a3 = read.result) == null ? void 0 : _a3.sha256) !== hash) {
-            failure2 = fail4("storage-conflict", "De migratiestand wijzigde tijdens controle.");
+            failure2 = fail5("storage-conflict", "De migratiestand wijzigde tijdens controle.");
             tx.abort();
             return;
           }
@@ -6898,7 +6988,7 @@
       const db = await openHouseholdDatabase(scope), tx = db.transaction(["financialHead", "financialRecords", "operationReceipts"], "readonly"), done = completed(tx);
       const [{ head: head2, records }, receipt] = await Promise.all([financialSnapshot(tx), requestResult(tx.objectStore("operationReceipts").get(id)), done]);
       const state2 = head2 ? decodeHouseholdState(head2, records) : null;
-      if (head2 && await backupDigest(JSON.stringify(state2)) !== head2.sha256) throw fail4("storage-integrity", "Het operatiebewijs heeft geen betrouwbare financiële stand.");
+      if (head2 && await backupDigest(JSON.stringify(state2)) !== head2.sha256) throw fail5("storage-integrity", "Het operatiebewijs heeft geen betrouwbare financiële stand.");
       adoptBasis(head2, records);
       return { state: state2, receipt: receipt || null };
     }
@@ -6922,15 +7012,15 @@
         return (await Promise.all([...new Set(rows.map((row) => row.conflictId).filter(Boolean))].map((id) => requestResult(tx.objectStore("journal").get(id))))).filter(Boolean);
       })();
       const [{ head: head2, records }, imports, outbox, receipts, journals, importQueue] = await Promise.all([financial, importsRead, pending, receiptsRead, journalsRead, queued, done]);
-      if (!(head2 == null ? void 0 : head2.verified)) throw fail4("storage-migration", "Synchronisatie vereist geverifieerde lokale opslag.");
+      if (!(head2 == null ? void 0 : head2.verified)) throw fail5("storage-migration", "Synchronisatie vereist geverifieerde lokale opslag.");
       const state2 = decodeHouseholdState(head2, records);
-      if (await backupDigest(JSON.stringify(state2)) !== head2.sha256) throw fail4("storage-integrity", "De lokale synchronisatiebasis heeft een afwijkende hash.");
+      if (await backupDigest(JSON.stringify(state2)) !== head2.sha256) throw fail5("storage-integrity", "De lokale synchronisatiebasis heeft een afwijkende hash.");
       const operations = outbox.filter((row) => ["pending", "conflict"].includes(row.status) && row.id !== "current").sort((a, b) => a.storageRevision - b.storageRevision);
       const pointer = outbox.find((row) => row.id === "current");
-      if (pointer && !operations.some((row) => row.id === pointer.operationId)) throw fail4("storage-integrity", "De synchronisatiewijzer mist een duurzaam operatiebewijs.");
+      if (pointer && !operations.some((row) => row.id === pointer.operationId)) throw fail5("storage-integrity", "De synchronisatiewijzer mist een duurzaam operatiebewijs.");
       for (const row of operations) {
         row.receipt = receipts.find((receipt) => receipt.id === row.id);
-        if (!row.receipt || row.receipt.sha256 !== row.sha256) throw fail4("storage-integrity", "Een lokaal operatiebewijs ontbreekt.");
+        if (!row.receipt || row.receipt.sha256 !== row.sha256) throw fail5("storage-integrity", "Een lokaal operatiebewijs ontbreekt.");
       }
       return { state: state2, imports, operations, head: head2, importQueue, conflicts: journals.filter((row) => row.operation === "record-cloud-conflict" && row.status === "conflict"), cloudBase: outbox.find((row) => row.id === "cloud-base") || null };
     }
@@ -7059,12 +7149,12 @@
   var CLOUD_CHUNK_BYTES = 24e4;
   var byteLength = (value) => new TextEncoder().encode(value).length;
   var canonical4 = (value) => JSON.stringify(value, (_, item) => item && typeof item === "object" && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).sort().map((key) => [key, item[key]])) : item);
-  var fail5 = (message) => {
+  var fail6 = (message) => {
     throw new Error(`Cloudstate-integriteit: ${message}`);
   };
   async function encodeCloudState(state2, generation, crypto2 = globalThis.crypto) {
     var _a2;
-    if (((_a2 = state2 == null ? void 0 : state2.meta) == null ? void 0 : _a2.schemaVersion) !== 11 || !/^[a-zA-Z0-9_-]{1,160}$/.test(generation)) fail5("schema/generation ongeldig");
+    if (((_a2 = state2 == null ? void 0 : state2.meta) == null ? void 0 : _a2.schemaVersion) !== 11 || !/^[a-zA-Z0-9_-]{1,160}$/.test(generation)) fail6("schema/generation ongeldig");
     const payload = JSON.stringify(state2), parts2 = [];
     let part = "", size = 0;
     for (const char of payload) {
@@ -7090,23 +7180,23 @@
   async function decodeCloudState(manifest, descriptor, chunks, crypto2 = globalThis.crypto) {
     var _a2;
     const id = manifest.activeGeneration;
-    if (manifest.stateFormat !== CLOUD_STATE_FORMAT || !(descriptor == null ? void 0 : descriptor.complete) || descriptor.generation !== id || descriptor.schema !== 11 || descriptor.stateFormat !== CLOUD_STATE_FORMAT || !Number.isSafeInteger(manifest.chunkCount) || manifest.chunkCount < 1 || manifest.chunkCount !== descriptor.chunkCount || chunks.length !== descriptor.chunkCount || manifest.totalSha256 !== descriptor.totalSha256 || manifest.totalByteLength !== descriptor.totalByteLength || canonical4(manifest.stateMeta) !== canonical4(descriptor.stateMeta)) fail5("generation/manifest niet compleet of onjuist");
+    if (manifest.stateFormat !== CLOUD_STATE_FORMAT || !(descriptor == null ? void 0 : descriptor.complete) || descriptor.generation !== id || descriptor.schema !== 11 || descriptor.stateFormat !== CLOUD_STATE_FORMAT || !Number.isSafeInteger(manifest.chunkCount) || manifest.chunkCount < 1 || manifest.chunkCount !== descriptor.chunkCount || chunks.length !== descriptor.chunkCount || manifest.totalSha256 !== descriptor.totalSha256 || manifest.totalByteLength !== descriptor.totalByteLength || canonical4(manifest.stateMeta) !== canonical4(descriptor.stateMeta)) fail6("generation/manifest niet compleet of onjuist");
     let total = 0;
     for (let sequence2 = 0; sequence2 < chunks.length; sequence2++) {
       const chunk = chunks[sequence2];
-      if (!chunk || chunk.generation !== id || chunk.sequence !== sequence2 || chunk.chunkCount !== chunks.length || typeof chunk.payload !== "string" || chunk.byteLength !== byteLength(chunk.payload) || chunk.byteLength > CLOUD_CHUNK_BYTES || chunk.sha256 !== await backupDigest(chunk.payload, crypto2)) fail5(`deel ${sequence2} ontbreekt of is corrupt`);
+      if (!chunk || chunk.generation !== id || chunk.sequence !== sequence2 || chunk.chunkCount !== chunks.length || typeof chunk.payload !== "string" || chunk.byteLength !== byteLength(chunk.payload) || chunk.byteLength > CLOUD_CHUNK_BYTES || chunk.sha256 !== await backupDigest(chunk.payload, crypto2)) fail6(`deel ${sequence2} ontbreekt of is corrupt`);
       total += chunk.byteLength;
-      if (chunk.cumulativeBytes !== total) fail5(`deel ${sequence2} volgorde/lengte ongeldig`);
+      if (chunk.cumulativeBytes !== total) fail6(`deel ${sequence2} volgorde/lengte ongeldig`);
     }
     const payload = chunks.map((chunk) => chunk.payload).join("");
-    if (total !== manifest.totalByteLength || await backupDigest(payload, crypto2) !== manifest.totalSha256) fail5("totale checksum/lengte ongeldig");
+    if (total !== manifest.totalByteLength || await backupDigest(payload, crypto2) !== manifest.totalSha256) fail6("totale checksum/lengte ongeldig");
     const state2 = JSON.parse(payload);
-    if (((_a2 = state2 == null ? void 0 : state2.meta) == null ? void 0 : _a2.schemaVersion) !== 11 || canonical4(state2.meta) !== canonical4(manifest.stateMeta)) fail5("state/schema/metadata ongeldig");
+    if (((_a2 = state2 == null ? void 0 : state2.meta) == null ? void 0 : _a2.schemaVersion) !== 11 || canonical4(state2.meta) !== canonical4(manifest.stateMeta)) fail6("state/schema/metadata ongeldig");
     return state2;
   }
   function cloudStateManifest(descriptor, { syncVersion, commitId, updatedAt, updatedBy }) {
     const { complete: complete3, generation, ...metadata } = descriptor;
-    if (!complete3) fail5("incomplete generation kan niet worden geactiveerd");
+    if (!complete3) fail6("incomplete generation kan niet worden geactiveerd");
     return { ...metadata, activeGeneration: generation, app: "finize", revision: Number(descriptor.stateMeta.revision) || 0, baseVersion: syncVersion - 1, syncVersion, commitId, updatedAt, updatedBy };
   }
   function createChunkedCloudStore(firestore, db, currentRef) {
@@ -7116,11 +7206,11 @@
     const read = (ref) => (firestore.getDocFromServer || firestore.getDoc)(ref);
     async function hydrate(documentData) {
       if (!(documentData == null ? void 0 : documentData.stateFormat)) return documentData;
-      if (documentData.stateFormat !== CLOUD_STATE_FORMAT) fail5("onbekend opslagformaat");
+      if (documentData.stateFormat !== CLOUD_STATE_FORMAT) fail6("onbekend opslagformaat");
       const descriptorSnapshot = await read(generationRef(documentData.activeGeneration));
-      if (!descriptorSnapshot.exists()) fail5("generation ontbreekt");
+      if (!descriptorSnapshot.exists()) fail6("generation ontbreekt");
       const descriptor = descriptorSnapshot.data();
-      if (!Number.isSafeInteger(descriptor.chunkCount) || descriptor.chunkCount < 1 || descriptor.chunkCount > 1e4) fail5("deelcount ongeldig");
+      if (!Number.isSafeInteger(descriptor.chunkCount) || descriptor.chunkCount < 1 || descriptor.chunkCount > 1e4) fail6("deelcount ongeldig");
       const chunks = [];
       for (let sequence2 = 0; sequence2 < descriptor.chunkCount; sequence2++) {
         const snapshot2 = await read(chunkRef(documentData.activeGeneration, sequence2));
@@ -7140,7 +7230,7 @@
         persisted.push(snapshot2.exists() ? snapshot2.data() : null);
       }
       const storedDescriptor = await read(generationRef(generation));
-      if (!storedDescriptor.exists() || canonical4({ ...storedDescriptor.data(), stateMeta: canonical4(storedDescriptor.data().stateMeta) }) !== canonical4({ ...encoded.descriptor, stateMeta: canonical4(encoded.descriptor.stateMeta) })) fail5("generationdescriptor gewijzigd");
+      if (!storedDescriptor.exists() || canonical4({ ...storedDescriptor.data(), stateMeta: canonical4(storedDescriptor.data().stateMeta) }) !== canonical4({ ...encoded.descriptor, stateMeta: canonical4(encoded.descriptor.stateMeta) })) fail6("generationdescriptor gewijzigd");
       await decodeCloudState(manifest, complete3, persisted);
       await firestore.updateDoc(generationRef(generation), { complete: true });
       const sealed = await read(generationRef(generation));
@@ -7385,13 +7475,44 @@
   // src/core/transaction-processing.mjs
   var copy7 = (value) => JSON.parse(JSON.stringify(value));
   var money3 = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
-  function applyFinancialCandidate(target, candidate) {
+  function sameSourceTree(left, right, seenLeft = /* @__PURE__ */ new WeakSet(), seenRight = /* @__PURE__ */ new WeakSet()) {
+    if (!left || !right || typeof left !== "object" || typeof right !== "object") return Object.is(left, right) && !["function", "symbol", "bigint"].includes(typeof left);
+    if (Array.isArray(left) !== Array.isArray(right)) return false;
+    const plain3 = (value) => Array.isArray(value) || [Object.prototype, null].includes(Object.getPrototypeOf(value));
+    if (!plain3(left) || !plain3(right) || seenLeft.has(left) || seenRight.has(right)) throw Object.assign(new Error("Onveranderlijke bron heeft een niet-ondersteunde structuur."), { code: "source-integrity" });
+    seenLeft.add(left);
+    seenRight.add(right);
+    const keys = Reflect.ownKeys(left), other = Reflect.ownKeys(right);
+    const equal2 = keys.length === other.length && keys.every((key) => Object.hasOwn(right, key) && sameSourceTree(left[key], right[key], seenLeft, seenRight));
+    seenLeft.delete(left);
+    seenRight.delete(right);
+    return equal2;
+  }
+  function assertFrozenSourcesUnchanged(target, candidate, visiting = /* @__PURE__ */ new WeakSet()) {
+    if (!target || typeof target !== "object") return;
+    if (visiting.has(target)) throw Object.assign(new Error("Cyclische bronstructuur is niet toegestaan."), { code: "source-integrity" });
+    if (Object.isFrozen(target)) {
+      if (!sameSourceTree(target, candidate)) throw Object.assign(new Error("Onveranderlijke brongegevens wijken af. Bestaande gegevens blijven behouden."), { code: "source-integrity" });
+      return;
+    }
+    visiting.add(target);
+    const ids = Array.isArray(target) ? new Map(target.filter((row) => row == null ? void 0 : row.id).map((row) => [row.id, row])) : null;
+    for (const [key, value] of Object.entries(candidate || {})) {
+      const old = ids && (value == null ? void 0 : value.id) ? ids.get(value.id) : target[key];
+      if (old && typeof old === "object" && (Object.isFrozen(old) || value && typeof value === "object")) assertFrozenSourcesUnchanged(old, value, visiting);
+    }
+    for (const key of Object.keys(target)) if (!Object.hasOwn(candidate || {}, key) && target[key] && typeof target[key] === "object" && Object.isFrozen(target[key])) throw Object.assign(new Error("Onveranderlijke brongegevens mogen niet worden verwijderd."), { code: "source-integrity" });
+    visiting.delete(target);
+  }
+  function applyFinancialCandidate(target, candidate, checked = false) {
+    if (!checked) assertFrozenSourcesUnchanged(target, candidate);
+    if (Object.isFrozen(target)) return target;
     if (Array.isArray(target) && Array.isArray(candidate)) {
       const ids = new Map(target.filter((row) => row && typeof row === "object" && row.id).map((row) => [row.id, row]));
       const rows = candidate.map((row, index) => {
         const old = (row == null ? void 0 : row.id) ? ids.get(row.id) : target[index];
         if (old && row && typeof old === "object" && typeof row === "object" && Array.isArray(old) === Array.isArray(row)) {
-          applyFinancialCandidate(old, row);
+          applyFinancialCandidate(old, row, true);
           return old;
         }
         return row;
@@ -7402,7 +7523,7 @@
     for (const key of Object.keys(target)) if (!(key in candidate)) delete target[key];
     for (const [key, value] of Object.entries(candidate)) {
       const old = target[key];
-      if (old && value && typeof old === "object" && typeof value === "object" && Array.isArray(old) === Array.isArray(value)) applyFinancialCandidate(old, value);
+      if (old && value && typeof old === "object" && typeof value === "object" && Array.isArray(old) === Array.isArray(value)) applyFinancialCandidate(old, value, true);
       else target[key] = value;
     }
     return target;
@@ -16479,7 +16600,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
     }
     return { counts, status: counts.onbekend || counts.nakijken ? counts.goedgekeurd || counts["niet-meetellen"] ? "gedeeltelijk" : "concept" : "verwerkt" };
   }
-  function fail6(message, code = "import-dependency") {
+  function fail7(message, code = "import-dependency") {
     const error2 = new Error(message);
     error2.code = code;
     throw error2;
@@ -16495,51 +16616,51 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
     }));
     for (const id of sourceIds) {
       const source = batch.rows.find((row) => row.id === id);
-      if (!source) fail6(`Importbron ${id} ontbreekt; herstel is geblokkeerd.`);
+      if (!source) fail7(`Importbron ${id} ontbreekt; herstel is geblokkeerd.`);
       const header = (next.transactions || []).find((tx) => isBankSource(tx) && tx.importReferences.some((ref) => ref.batchId === batch.id && ref.rowId === id));
       const check = validateRow((header == null ? void 0 : header.approvedProcessing) ? { ...source, processing: header.approvedProcessing } : source, next);
-      if (!check.ok) fail6(check.errors.map((e) => e.message).join(" "));
+      if (!check.ok) fail7(check.errors.map((e) => e.message).join(" "));
     }
     for (const tx of active2) {
-      if (!tx.importTransactionId || !tx.bankOriginal) fail6(`Betrouwbare bronidentiteit ontbreekt voor ${tx.id}.`);
-      if (!Number.isFinite(Number(tx.amount))) fail6(`Verwerkt bedrag ontbreekt voor ${tx.id}.`);
+      if (!tx.importTransactionId || !tx.bankOriginal) fail7(`Betrouwbare bronidentiteit ontbreekt voor ${tx.id}.`);
+      if (!Number.isFinite(Number(tx.amount))) fail7(`Verwerkt bedrag ontbreekt voor ${tx.id}.`);
     }
     const missing = coverageAllocationStatus(next).find((row) => row.reason === "coverage-missing-reference" && (ids.has(row.withdrawalTransactionId) || ids.has(row.expenseTransactionId)));
-    if (missing) fail6("Spaardekking verwijst naar een verwijderd endpoint. Herstel is geblokkeerd.");
+    if (missing) fail7("Spaardekking verwijst naar een verwijderd endpoint. Herstel is geblokkeerd.");
     for (const pair of next.internalTransferPairs || []) {
       if (pair.active === false || !["bevestigd", "confirmed", "uitgevoerd"].includes(pair.status)) continue;
       const old = (previous.internalTransferPairs || []).find((row) => row.id === pair.id);
       if (JSON.stringify(old) !== JSON.stringify(pair)) confirmInternalTransferPair(copy10(next), pair.id);
     }
     const coverage = coverageAllocationStatus(next).find((row) => row.reason && !["coverage-inactive-reference"].includes(row.reason));
-    if (coverage && !coverageAllocationStatus(previous).some((old) => old.id === coverage.id && old.reason === coverage.reason)) fail6(`Spaardekking is ongeldig: ${coverage.reason}.`);
+    if (coverage && !coverageAllocationStatus(previous).some((old) => old.id === coverage.id && old.reason === coverage.reason)) fail7(`Spaardekking is ongeldig: ${coverage.reason}.`);
     for (const relation of next.manualTransactionReplacements || []) {
       if (relation.active === false) continue;
       const manualId = relation.manualTransactionId || ((_a2 = relation.manualTransaction) == null ? void 0 : _a2.id);
       if ((next.manualTransactionReplacements || []).filter((r) => {
         var _a3;
         return r.active !== false && (r.manualTransactionId || ((_a3 = r.manualTransaction) == null ? void 0 : _a3.id)) === manualId;
-      }).length > 1) fail6(`De handmatige transactie ${manualId} heeft twee actieve vervangingen.`);
+      }).length > 1) fail7(`De handmatige transactie ${manualId} heeft twee actieve vervangingen.`);
     }
     for (const repayment of next.advanceRepayments || []) {
       if (repayment.active === false || !ids.has(repayment.transactionId)) continue;
       const advance = (next.advanceLedger || []).find((row) => row.id === repayment.advanceId && row.active !== false);
-      if (!advance) fail6(`Voorschot ${repayment.advanceId} ontbreekt of is inactief.`);
+      if (!advance) fail7(`Voorschot ${repayment.advanceId} ontbreekt of is inactief.`);
     }
     return true;
   }
   function planImportCommand(state2, batch, intent, options = {}) {
     var _a2;
-    if (!(batch == null ? void 0 : batch.id) || !(intent == null ? void 0 : intent.operationId)) fail6("Batch-ID en operation-ID zijn vereist.");
+    if (!(batch == null ? void 0 : batch.id) || !(intent == null ? void 0 : intent.operationId)) fail7("Batch-ID en operation-ID zijn vereist.");
     const previous = copy10(state2), candidate = copy10(state2), nextBatch = copy10(batch), id = batch.id;
     const deletion = (candidate.importDeletionProofs || []).find((row) => row.id === id);
     if (deletion) {
       if (intent.type === "delete") return { state: candidate, batch: copy10(deletion), noop: true };
-      fail6("Deze batch is permanent verwijderd.", "import-deleted");
+      fail7("Deze batch is permanent verwijderd.", "import-deleted");
     }
     const current = batchLifecycle(batch);
     if (intent.type === "withdraw" && current === "withdrawn" || intent.type === "restore" && current === "active") return { state: candidate, batch: nextBatch, noop: true };
-    if (!["withdraw", "restore", "delete"].includes(intent.type)) fail6("Onbekende batchactie.");
+    if (!["withdraw", "restore", "delete"].includes(intent.type)) fail7("Onbekende batchactie.");
     nextBatch.lifecycle = intent.type === "restore" ? "active" : "withdrawn";
     const summaryBefore = (candidate.importSummaries || []).find((row) => row.id === id);
     if (summaryBefore) {
@@ -16558,10 +16679,10 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
     if (rows.some((tx) => !tx.importTransactionId || !tx.bankOriginal) || rows.some((tx) => {
       var _a3;
       return !bankSourceForTransaction(candidate, tx) && !((_a3 = batch.rows) == null ? void 0 : _a3.some((row) => row.id === tx.importTransactionId));
-    })) fail6("Betrouwbare bronidentiteit ontbreekt; batchactie is geblokkeerd.");
+    })) fail7("Betrouwbare bronidentiteit ontbreekt; batchactie is geblokkeerd.");
     const ownAdvances = (candidate.advanceLedger || []).filter((row) => belongs(row, id, ids, retainedIds));
     for (const advance of ownAdvances) {
-      if ((candidate.advanceRepayments || []).some((row) => row.active !== false && row.advanceId === advance.id && !ids.has(row.transactionId)) || (advance.settlementTransferIds || []).length) fail6(`Voorschot ${advance.id} heeft onafhankelijke aflossingen/verrekeningen.`);
+      if ((candidate.advanceRepayments || []).some((row) => row.active !== false && row.advanceId === advance.id && !ids.has(row.transactionId)) || (advance.settlementTransferIds || []).length) fail7(`Voorschot ${advance.id} heeft onafhankelijke aflossingen/verrekeningen.`);
     }
     const restoring = intent.type === "restore";
     nextBatch.lifecycle = restoring ? "active" : "withdrawn";
@@ -16600,7 +16721,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
           advance.status = "open";
         }
       } else if (restoring && repayment.lifecycleWasActive) {
-        if (!advance || advance.active === false || Number(advance.outstandingAmount) < Number(repayment.amount)) fail6(`Aflossing ${repayment.id} kan niet volledig worden hersteld.`);
+        if (!advance || advance.active === false || Number(advance.outstandingAmount) < Number(repayment.amount)) fail7(`Aflossing ${repayment.id} kan niet volledig worden hersteld.`);
         advance.outstandingAmount = Math.round((Number(advance.outstandingAmount) - Number(repayment.amount)) * 100) / 100;
         advance.status = advance.outstandingAmount === 0 ? "voldaan" : "open";
         repayment.active = true;
@@ -17172,7 +17293,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
       assertScope();
       const local = await ImportStore.getImport(id);
       assertScope();
-      const reference = (root2.state.importSummaries || []).find((item) => item.id === id);
+      const reference = (root2.state.importSummaries || []).find((item) => item.id === id) || (root2.state.importDeletionProofs || []).find((item) => item.id === id);
       const referenced = Boolean(reference || (root2.state.transactions || []).some((source) => {
         var _a3;
         return source.importBatchId === id || ((_a3 = source.importReferences) == null ? void 0 : _a3.some((ref) => ref.batchId === id));
@@ -17185,7 +17306,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
           refresh: ((_d = (_c = root2.CloudAdapter) == null ? void 0 : _c.isConnected) == null ? void 0 : _d.call(_c)) === true || Number((reference == null ? void 0 : reference.version) || 0) > importVersion(local),
           localWrite: async (remote) => {
             assertScope();
-            const current = (root2.state.importSummaries || []).find((item) => item.id === id);
+            const current = (root2.state.importSummaries || []).find((item) => item.id === id) || (remote.lifecycle === "deleted" ? (root2.state.importDeletionProofs || []).find((item) => item.id === id) : null);
             if (!current || Number(current.version || 0) !== importVersion(remote) || String(current.operationId || "") !== String(remote.operationId || "")) throw cloudImportError("import-conflict", "De cloudimport is gewijzigd. Synchroniseer eerst de administratie; bestaande keuzes blijven behouden.");
             const latest2 = await ImportStore.getImport(id);
             assertScope();
@@ -17945,15 +18066,22 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
       if (isExplicitlyApproved(row)) reopenForReview(row);
     }
     function persistImportDraftImmediate(root2, draft, { syncCloud = true, updateSummary = true } = {}) {
+      var _a2, _b;
       if (!plain3(draft) || !draft.id) return Promise.reject(new Error("Importconcept mist een geldig ID."));
       const id = String(draft.id);
+      const restartScope = draft.providerRestartFrom ? (_b = (_a2 = root2.CloudAdapter) == null ? void 0 : _a2.importScope) == null ? void 0 : _b.call(_a2) : null;
       const previous = ImportPerformance.chains.get(id) || Promise.resolve();
       const operation = previous.catch(() => {
       }).then(async () => {
-        var _a2, _b, _c, _d, _e, _f, _g;
+        var _a3, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
         if (updateSummary) updateDraftSummary(draft, { touch: false });
         else draft.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
         const stored = await ImportStore.getImport(id);
+        if (draft.providerRestartFrom && !stored) {
+          if (draft.householdId !== restartScope || ImportStore.scope !== restartScope || ((_b2 = (_a3 = root2.CloudAdapter) == null ? void 0 : _a3.importScope) == null ? void 0 : _b2.call(_a3)) !== restartScope || !((_c = root2.DataAdapter) == null ? void 0 : _c.supportsAtomicImports) || !((_e = (_d = root2.CloudAdapter) == null ? void 0 : _d.isConnected) == null ? void 0 : _e.call(_d)) || root2.CloudAdapter.conflict || root2.state.__finizePartialHistory) throw cloudImportError("bank-import-restart-blocked", "Nieuwe bankimport vereist gecontroleerde atomaire opslag en een volledige cloudbasis.");
+          assertProviderRestartState(root2.state, draft.providerRestartFrom, { journals: await ImportStore.listJournal(), queue: await ImportStore.listSync() });
+          assertProviderRestartParent(draft.providerRestartFrom, await ImportStore.getImport(draft.providerRestartFrom.id));
+        }
         if (!stored && accountIsArchived((root2.state.accountProfiles || []).find((profile) => profile.id === draft.accountProfileId))) throw new Error("Heractiveer de rekening voordat je een nieuwe import opslaat.");
         if (stored) {
           const left = cloneState(stored), right = cloneState(draft);
@@ -17967,14 +18095,14 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
         }
         if (stored && draft.version !== void 0 && importVersion(stored) !== importVersion(draft)) throw cloudImportError("import-conflict", "Deze import is intussen gewijzigd. Heropen de actuele importdetails.");
         draft.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
-        draft.baseVersion = Number((_c = (_b = (_a2 = stored == null ? void 0 : stored.baseVersion) != null ? _a2 : draft.baseVersion) != null ? _b : draft.version) != null ? _c : 0);
+        draft.baseVersion = Number((_h = (_g = (_f = stored == null ? void 0 : stored.baseVersion) != null ? _f : draft.baseVersion) != null ? _g : draft.version) != null ? _h : 0);
         draft.version = importVersion(stored || draft) + 1;
         draft.operationId = uid2("import-op");
         const baseSignature = JSON.stringify(root2.state), candidate = cloneState(root2.state);
         applyImportSummary(candidate, draft);
         const previousQueue = (await ImportStore.listSync()).find((item) => item.importId === id);
         const scope = ImportStore.scope;
-        const journal = { id: draft.operationId, importId: id, operation: "import-command", commitContractVersion: 1, durableBaseSignature: (_f = (_e = (_d = root2.DataAdapter) == null ? void 0 : _d.commitBaseSignature) == null ? void 0 : _e.call(_d)) != null ? _f : JSON.stringify(root2.state), status: "pending", intent: { type: "draft-save", operationId: draft.operationId }, baseSignature, candidate, batch: cloneState(draft), previousBatch: stored ? cloneState(stored) : null, previousQueue };
+        const journal = { id: draft.operationId, importId: id, operation: "import-command", commitContractVersion: 1, durableBaseSignature: (_k = (_j = (_i = root2.DataAdapter) == null ? void 0 : _i.commitBaseSignature) == null ? void 0 : _j.call(_i)) != null ? _k : JSON.stringify(root2.state), status: "pending", intent: { type: "draft-save", operationId: draft.operationId }, baseSignature, candidate, batch: cloneState(draft), previousBatch: stored ? cloneState(stored) : null, previousQueue };
         await ImportStore.putJournal(journal);
         if (JSON.stringify(root2.state) !== baseSignature) {
           journal.status = "conflict";
@@ -17984,8 +18112,9 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
         }
         let detailsWritten = false;
         try {
-          if ((_g = root2.DataAdapter) == null ? void 0 : _g.supportsAtomicImports) {
+          if ((_l = root2.DataAdapter) == null ? void 0 : _l.supportsAtomicImports) {
             if (ImportStore.scope !== scope) throw new Error("Het huishouden is tijdens opslaan gewijzigd.");
+            if (draft.providerRestartFrom && (scope !== restartScope || ((_n = (_m = root2.CloudAdapter) == null ? void 0 : _m.importScope) == null ? void 0 : _n.call(_m)) !== restartScope)) throw cloudImportError("import-conflict", "Het huishouden is tijdens de bevestigde bankimport gewijzigd.");
             const ok = await root2.commitChange(() => applyFinancialCandidate(root2.state, candidate), { render: false, throwOnError: true, operationId: journal.id, importMutation: { batch: cloneState(draft), previousBatch: stored ? cloneState(stored) : null, journal, queue: { ...pendingQueueReceipt(draft), queuedAt: (/* @__PURE__ */ new Date()).toISOString(), attempts: 0 } } });
             if (!ok) throw new Error("De atomaire importopslag is afgewezen.");
             ImportStore.bankReadCache.set(id, cloneState(draft));
@@ -20636,6 +20765,10 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
         async readAndValidate(transaction) {
           const snapshots = [];
           for (const stage of stages) snapshots.push(await transaction.get(stage.ref));
+          for (const stage of stages) if (stage.record.providerRestartFrom) {
+            const parent = await transaction.get(cloudImportRef(cloud, firestore, stage.record.providerRestartFrom.id));
+            assertProviderRestartParent(stage.record.providerRestartFrom, parent.exists() ? parent.data() : null);
+          }
           for (let i = 0; i < stages.length; i++) {
             const stage = stages[i], remote = snapshots[i].exists() ? snapshots[i].data() : null;
             try {

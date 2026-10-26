@@ -2,6 +2,7 @@ import { profileSync, profileStart, profileCount } from './performance.mjs';
 import { backupDigest } from './migration-backups.mjs';
 import { assertOriginalBankDataUnchanged } from '../core/transaction-model.mjs';
 import { getTransactionFinancialMonth } from '../core/transaction-engine.mjs';
+import { assertProviderRestartState, assertProviderRestartParent } from '../import/bank-import-generation.mjs';
 import { createPeriodCache } from './period-cache.mjs';
 import { PAYLOAD_STORE, PAYLOAD_PROTECTION, REPRESENTATION_META, REPRESENTATION_BACKUP, REPRESENTATION_STAGE, migratePayloadRepresentation, payloadDatabase, preparationSignature } from './payload-parts.mjs';
 
@@ -218,7 +219,20 @@ export function createHouseholdStore(scope='legacy',{verifySource=async()=>{}}={
             const old=read.result,expected=importMutation.previousBatch;
             if((Number(old?.version)||0)!==(Number(expected?.version)||0)||String(old?.operationId||'')!==String(expected?.operationId||''))throw fail('import-conflict','De importrevisie is intussen gewijzigd.');
             if(old?.lifecycle==='deleted'&&importMutation.batch.lifecycle!=='deleted')throw fail('import-conflict','De import is al verwijderd.');
-            assertOriginalBankDataUnchanged(old?.rows,importMutation.batch.rows);publish();
+            assertOriginalBankDataUnchanged(old?.rows,importMutation.batch.rows);
+            if(importMutation.batch.providerRestartFrom&&!old){
+              if(importMutation.batch.householdId!==scope)throw fail('household-scope','De nieuwe bankimport hoort bij een ander huishouden.');
+              const proof=importMutation.batch.providerRestartFrom;
+              const parent=imports.get(proof.id),financial=tx.objectStore('financialRecords').getAll(),journals=tx.objectStore('journal').getAll(),queue=tx.objectStore('syncQueue').getAll();
+              queue.onsuccess=()=>{try{
+                if(get.result?.partialHistory)throw fail('bank-import-restart-blocked','Volledige historie is vereist voor een nieuwe importbundel.');
+                assertProviderRestartParent(proof,parent.result);
+                assertProviderRestartState(decodeHouseholdState(get.result,financial.result),proof,{journals:journals.result.filter(row=>row.id!==operationId),queue:queue.result});
+                publish();
+              }catch(error){abort(error);}};
+              return;
+            }
+            publish();
           }catch(error){abort(error);}
         };
       };

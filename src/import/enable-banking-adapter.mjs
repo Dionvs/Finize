@@ -1,5 +1,6 @@
 import { normalizeBankInput, compareBankInputs, normalizeCsvBankInput } from './bank-input-contract.mjs';
 import { csvFileDigest, validCalendarDate } from './import-identity.mjs';
+import { providerImportIdentity } from './bank-import-generation.mjs';
 
 const copy = value => structuredClone(value);
 const fail = code => { throw Object.assign(new Error(code), { code }); };
@@ -56,17 +57,17 @@ export function normalizeProviderBalances(snapshot, scope) {
 }
 
 /** Stages original provider records for the existing editor; never approves or posts. */
-export function stageProviderSnapshot(snapshot, state, previous, imports, classify) {
+export function stageProviderSnapshot(snapshot, state, previous, imports, classify, restartFrom = null) {
   const scope = { householdId: snapshot.householdId, accountProfiles: state.accountProfiles || [] };
   const profiles = scope.accountProfiles.filter(row => row.id === snapshot.accountProfileId);
   if (snapshot.version !== 1 || profiles.length !== 1 || profiles[0].status === 'archived' ||
       !snapshot.account?.identificationHash || iban(profiles[0].identifier || profiles[0].iban) !== iban(snapshot.account.iban) ||
       !Array.isArray(snapshot.transactions) || !validCalendarDate(snapshot.fromDate) || !validCalendarDate(snapshot.toDate) ||
       !Number.isFinite(Date.parse(snapshot.fetchedAt))) fail('invalid-provider-snapshot');
-  const profile = profiles[0], id = providerBatchId(profile.id, snapshot.account.identificationHash);
+  const profile = profiles[0], identity = providerImportIdentity(providerBatchId(profile.id, snapshot.account.identificationHash), previous, restartFrom), id = identity.id;
   if (previous && (previous.id !== id || previous.channel !== 'bank-api' || ['deleted', 'withdrawn'].includes(previous.lifecycle))) fail('provider-batch-conflict');
   const batch = previous ? copy(previous) : {
-    id, channel: 'bank-api', provider: 'enablebanking', fileName: 'ING-bankkoppeling', format: 'bank-api', bank: 'ING',
+    ...identity, channel: 'bank-api', provider: 'enablebanking', fileName: 'ING-bankkoppeling', format: 'bank-api', bank: 'ING',
     householdId: scope.householdId, accountProfileId: profile.id, accountOwner: profile.accountOwner,
     lifecycle: 'active', version: 0, status: 'concept', rows: [], createdAt: snapshot.fetchedAt
   };

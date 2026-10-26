@@ -1,10 +1,15 @@
 import { stageProviderSnapshot, providerBatchId } from '../import/enable-banking-adapter.mjs';
 import { bankAuthorizationUrl } from '../import/bank-authorization-url.mjs';
+import { nextProviderBatchId, assertProviderRestartState, assertProviderRestartParent } from '../import/bank-import-generation.mjs';
 
 export const BANK_BACKEND_URL = 'https://europe-west4-financien-7dd43.cloudfunctions.net/enableBanking';
 export const BANK_API_ENABLED = true; // Backend independently restricts access to the configured user and account.
 const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const messages = {
+  'provider-batch-conflict': 'De bankimport hoort niet bij de verwachte actieve bundel. Bestaande gegevens blijven behouden.',
+  'bank-import-deleted': 'De eerdere bankimport is verwijderd. Een nieuwe importbundel vereist jouw bevestiging.',
+  'bank-import-restart-cancelled': 'Geen nieuwe importbundel gestart. Het verwijderbewijs blijft behouden.',
+  'bank-import-restart-blocked': 'Een nieuwe importbundel kan nog niet veilig starten. Synchroniseer eerst de administratie en laat bestaande verwijzingen controleren.',
   'backend-not-configured': 'De bankkoppeling is nog niet geactiveerd.',
   'reauthorization-required': 'Banktoegang is verlopen. Autoriseer de rekening opnieuw.',
   'forbidden-user': 'Deze bankkoppeling is niet beschikbaar voor jouw aanmelding. Gebruik de geverifieerde aanmelding van de toegestane rekeninghouder.',
@@ -92,14 +97,37 @@ export function installBankConnection(root, { enabled = BANK_API_ENABLED, baseUr
       '<button type="button" class="ghost" data-bank-review>Nakijken</button>' +
       '<button type="button" class="ghost" data-bank-disconnect ' + disabled + '>Banktoegang intrekken</button></div></section>';
   }
-  async function ingest(snapshot, householdId, expectedProfileId = snapshot.accountProfileId) {
+  async function ingest(snapshot, householdId, expectedProfileId = snapshot.accountProfileId, { confirmRestart = null } = {}) {
     if (snapshot.accountProfileId !== expectedProfileId) throw Object.assign(new Error('wrong-provider-account'), {code:'wrong-provider-account'});
     const runtime = root.FinizeUpdate4Runtime;
     if (root.CloudAdapter.importScope() !== householdId || snapshot.householdId !== householdId) throw new Error('Het huishouden is gewijzigd.');
     const id = providerBatchId(snapshot.accountProfileId, snapshot.account.identificationHash);
-    const previous = await inPhase('import-read', () => runtime.resolveProviderImportBase(root, id));
+    const resolve = async () => {
+      let previous = await runtime.resolveProviderImportBase(root, id), restartFrom = null;
+      for (let depth = 0; previous?.lifecycle === 'deleted'; depth++) {
+        if (depth >= 16) throw Object.assign(new Error('bank-import-restart-blocked'), { code: 'bank-import-restart-blocked' });
+        if (!root.CloudAdapter?.isConnected?.() || root.CloudAdapter.conflict || root.CloudAdapter.initialSyncComplete === false || !root.DataAdapter?.supportsAtomicImports || root.state.__finizePartialHistory) throw Object.assign(new Error('bank-import-restart-blocked'), { code: 'bank-import-restart-blocked' });
+        assertProviderRestartState(root.state, previous);
+        // A local tombstone or an offline fallback cannot authorize a new generation.
+        assertProviderRestartParent(previous, await runtime.fetchImportFromCloud(root, previous.id));
+        restartFrom = previous;
+        previous = await runtime.resolveProviderImportBase(root, nextProviderBatchId(id, previous));
+      }
+      if (previous) restartFrom = null;
+      return { previous, restartFrom };
+    };
+    let base = await inPhase('import-read', resolve);
+    if (base.restartFrom) {
+      if (!confirmRestart) throw Object.assign(new Error('bank-import-deleted'), { code: 'bank-import-deleted', bankPhase: 'staging' });
+      const proof = JSON.stringify(base.restartFrom), basis = root.DataAdapter.commitBaseSignature();
+      if (await confirmRestart() !== true) throw Object.assign(new Error('bank-import-restart-cancelled'), { code: 'bank-import-restart-cancelled', bankPhase: 'staging' });
+      if (root.CloudAdapter.importScope() !== householdId || root.DataAdapter.commitBaseSignature() !== basis) throw Object.assign(new Error('import-conflict'), { code: 'import-conflict' });
+      base = await inPhase('import-read', resolve);
+      if (!base.restartFrom || JSON.stringify(base.restartFrom) !== proof) throw Object.assign(new Error('import-conflict'), { code: 'import-conflict' });
+    }
     const imports = await inPhase('import-read', () => runtime.ImportStore.listImports());
-    const batch = await inPhase('staging', () => stageProviderSnapshot(snapshot, root.state, previous, imports, runtime.classifyOriginal));
+    if(root.CloudAdapter.importScope()!==householdId)throw Object.assign(new Error('scope-changed'),{code:'scope-changed'});
+    const batch = await inPhase('staging', () => stageProviderSnapshot(snapshot, root.state, base.previous, imports, runtime.classifyOriginal, base.restartFrom));
     await inPhase('storage', () => runtime.persistImportDraft(root, batch));
     return batch;
   }
@@ -164,7 +192,7 @@ export function installBankConnection(root, { enabled = BANK_API_ENABLED, baseUr
         if (button.hasAttribute('data-bank-review')) {
           const imports = await root.FinizeUpdate4Runtime.ImportStore.listImports();
           sameScope();
-          const batch = imports.find(item => item.channel === 'bank-api' && item.accountProfileId === profile.id);
+          const batch = imports.find(item => item.channel === 'bank-api' && item.accountProfileId === profile.id && !['deleted', 'withdrawn'].includes(item.lifecycle));
           if (!batch) throw Object.assign(new Error('no-bank-transactions'), { code: 'no-bank-transactions' });
           await root.FinizeUpdate4.openImportDetails(batch.id);
         } else if (button.hasAttribute('data-bank-authorize')) {
@@ -189,7 +217,7 @@ export function installBankConnection(root, { enabled = BANK_API_ENABLED, baseUr
           const fromDate = new Date(Date.parse(toDate) - 30 * 86400000).toISOString().slice(0, 10);
           const snapshot = await request('/sync', { accountProfileId: profile.id, fromDate, toDate });
           sameScope();
-          await ingest(snapshot, householdId, profile.id);
+          await ingest(snapshot, householdId, profile.id, { confirmRestart: () => root.confirm('De eerdere bankimport is bewust verwijderd. Wil je een nieuwe importbundel starten? Het oude verwijderbewijs blijft bewaard. Nieuwe transacties staan opnieuw bij Nakijken en zijn niet goedgekeurd.') });
           status.textContent = snapshot.complete ? 'Bank bijgewerkt. Financiële verwerking staat klaar bij Nakijken.' : 'Gedeeltelijk opgehaald. Eerdere transacties blijven behouden; probeer later opnieuw.';
           root.renderActiveTab?.();
         }

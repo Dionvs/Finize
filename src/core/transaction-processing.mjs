@@ -9,13 +9,42 @@ import { calculateGoalSavedAmount, allGoals, reconcileGoalSavedAmounts } from '.
 const copy=value=>JSON.parse(JSON.stringify(value));
 const money=value=>Math.round((Number(value)+Number.EPSILON)*100)/100;
 // Adopt a validated clone while retaining objects held by existing editor callbacks.
-export function applyFinancialCandidate(target,candidate){
+function sameSourceTree(left,right,seenLeft=new WeakSet(),seenRight=new WeakSet()){
+  if(!left||!right||typeof left!=='object'||typeof right!=='object')return Object.is(left,right)&&!['function','symbol','bigint'].includes(typeof left);
+  if(Array.isArray(left)!==Array.isArray(right))return false;
+  const plain=value=>Array.isArray(value)||[Object.prototype,null].includes(Object.getPrototypeOf(value));
+  if(!plain(left)||!plain(right)||seenLeft.has(left)||seenRight.has(right))throw Object.assign(new Error('Onveranderlijke bron heeft een niet-ondersteunde structuur.'),{code:'source-integrity'});
+  seenLeft.add(left);seenRight.add(right);
+  const keys=Reflect.ownKeys(left),other=Reflect.ownKeys(right);
+  const equal=keys.length===other.length&&keys.every(key=>Object.hasOwn(right,key)&&sameSourceTree(left[key],right[key],seenLeft,seenRight));
+  seenLeft.delete(left);seenRight.delete(right);return equal;
+}
+function assertFrozenSourcesUnchanged(target,candidate,visiting=new WeakSet()){
+  if(!target||typeof target!=='object')return;
+  if(visiting.has(target))throw Object.assign(new Error('Cyclische bronstructuur is niet toegestaan.'),{code:'source-integrity'});
+  if(Object.isFrozen(target)){
+    if(!sameSourceTree(target,candidate))throw Object.assign(new Error('Onveranderlijke brongegevens wijken af. Bestaande gegevens blijven behouden.'),{code:'source-integrity'});
+    return;
+  }
+  visiting.add(target);
+  const ids=Array.isArray(target)?new Map(target.filter(row=>row?.id).map(row=>[row.id,row])):null;
+  for(const [key,value]of Object.entries(candidate||{})){
+    const old=ids&&value?.id?ids.get(value.id):target[key];
+    if(old&&typeof old==='object'&&(Object.isFrozen(old)||value&&typeof value==='object'))assertFrozenSourcesUnchanged(old,value,visiting);
+  }
+  for(const key of Object.keys(target))if(!Object.hasOwn(candidate||{},key)&&target[key]&&typeof target[key]==='object'&&Object.isFrozen(target[key]))throw Object.assign(new Error('Onveranderlijke brongegevens mogen niet worden verwijderd.'),{code:'source-integrity'});
+  visiting.delete(target);
+}
+export function applyFinancialCandidate(target,candidate,checked=false){
+  // Validate before any adoption: also finds a frozen nested remittance array.
+  if(!checked)assertFrozenSourcesUnchanged(target,candidate);
+  if(Object.isFrozen(target))return target;
   if(Array.isArray(target)&&Array.isArray(candidate)){
     const ids=new Map(target.filter(row=>row&&typeof row==='object'&&row.id).map(row=>[row.id,row]));
-    const rows=candidate.map((row,index)=>{const old=row?.id?ids.get(row.id):target[index];if(old&&row&&typeof old==='object'&&typeof row==='object'&&Array.isArray(old)===Array.isArray(row)){applyFinancialCandidate(old,row);return old;}return row;});target.splice(0,target.length,...rows);return target;
+    const rows=candidate.map((row,index)=>{const old=row?.id?ids.get(row.id):target[index];if(old&&row&&typeof old==='object'&&typeof row==='object'&&Array.isArray(old)===Array.isArray(row)){applyFinancialCandidate(old,row,true);return old;}return row;});target.splice(0,target.length,...rows);return target;
   }
   for(const key of Object.keys(target))if(!(key in candidate))delete target[key];
-  for(const [key,value] of Object.entries(candidate)){const old=target[key];if(old&&value&&typeof old==='object'&&typeof value==='object'&&Array.isArray(old)===Array.isArray(value))applyFinancialCandidate(old,value);else target[key]=value;}
+  for(const [key,value] of Object.entries(candidate)){const old=target[key];if(old&&value&&typeof old==='object'&&typeof value==='object'&&Array.isArray(old)===Array.isArray(value))applyFinancialCandidate(old,value,true);else target[key]=value;}
   return target;
 }
 // Explicit source commands only: never called by a render, normalize or migration.

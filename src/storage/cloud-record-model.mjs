@@ -1,6 +1,7 @@
 import { encodeHouseholdState, decodeHouseholdState } from './household-store.mjs';
 import { canonical, digest, storageError, financialPeriods, transactionPeriodDependencies, periodFinancials, cumulativeFinancials } from './period-projections.mjs';
 import { recordManifests } from './record-manifest.mjs';
+import { assertProviderRestartParent } from '../import/bank-import-generation.mjs';
 export const RECORD_STORAGE_VERSION=2;
 export const MAX_RECORD_PAYLOAD=180000;
 export const clone=value=>structuredClone(value);
@@ -10,6 +11,10 @@ const rawSource=value=>value?.bankOriginal??(value?.originalCsv!==undefined?{ori
 
 export async function buildRecordSnapshot(state,imports=[],options={}){
   if(state?.meta?.schemaVersion!==11||state.__finizePartialHistory)throw storageError('incomplete-state','Publicatie vereist een bewezen complete financiële basis.');
+  for(const batch of imports)if(batch.providerRestartFrom){
+    assertProviderRestartParent(batch.providerRestartFrom,imports.find(parent=>parent.id===batch.providerRestartFrom.id));
+    assertProviderRestartParent(batch.providerRestartFrom,(state.importDeletionProofs||[]).find(parent=>parent.id===batch.providerRestartFrom.id));
+  }
   const expanded=clone(state);expanded['@imports']=imports.map(batch=>{const {rows,...header}=clone(batch);expanded['@rows:'+batch.id]=rows||[];return header;});
   const encoded=encodeHouseholdState(expanded),months=options.onlyPeriods||financialPeriods(state,options.periods),dependencies=transactionPeriodDependencies(state,months),records=[],ordinals=new Map();
   for(const record of encoded.records){

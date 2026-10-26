@@ -1,4 +1,5 @@
 import { applyProviderObservations } from './enable-banking-adapter.mjs';
+import { assertProviderRestartState, assertProviderRestartParent } from './bank-import-generation.mjs';
 import { isSavingsIncomeSource, savingsContributionCapacity } from '../core/savings-contributions.mjs';
 import { fixedCashDate } from '../core/liquidity-settings.mjs';
 import { profileSync, profileStart } from '../storage/performance.mjs';
@@ -350,7 +351,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
     const assertScope=()=>{if(ImportStore.scope!==scope)throw cloudImportError('import-conflict','Het huishouden wijzigde tijdens het lezen van de bankimport.');};
     await recoverJournal(root,{importId:id});assertScope();
     const local=await ImportStore.getImport(id);assertScope();
-    const reference=(root.state.importSummaries||[]).find(item=>item.id===id);
+    const reference=(root.state.importSummaries||[]).find(item=>item.id===id)||(root.state.importDeletionProofs||[]).find(item=>item.id===id);
     const referenced=Boolean(reference||(root.state.transactions||[]).some(source=>source.importBatchId===id||source.importReferences?.some(ref=>ref.batchId===id)));
     if(!local&&!referenced&&!root.CloudAdapter?.isConnected?.())return null;
     try{
@@ -361,7 +362,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
           assertScope();
           // Restoring details is safe only when the financial head already names this version.
           // A newer external approval first needs the existing full cloud-sync protocol.
-          const current=(root.state.importSummaries||[]).find(item=>item.id===id);
+          const current=(root.state.importSummaries||[]).find(item=>item.id===id)||(remote.lifecycle==='deleted'?(root.state.importDeletionProofs||[]).find(item=>item.id===id):null);
           if(!current||Number(current.version||0)!==importVersion(remote)||String(current.operationId||'')!==String(remote.operationId||''))throw cloudImportError('import-conflict','De cloudimport is gewijzigd. Synchroniseer eerst de administratie; bestaande keuzes blijven behouden.');
           const latest=await ImportStore.getImport(id);assertScope();
           if(Boolean(local)!==Boolean(latest)||local&&!sameEditorBase(local,latest))throw cloudImportError('import-conflict','De lokale bankimport is intussen gewijzigd.');
@@ -940,11 +941,17 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
   function persistImportDraftImmediate(root,draft,{syncCloud=true,updateSummary=true}={}){
     if(!plain(draft)||!draft.id)return Promise.reject(new Error('Importconcept mist een geldig ID.'));
     const id=String(draft.id);
+    const restartScope=draft.providerRestartFrom?root.CloudAdapter?.importScope?.():null;
     const previous=ImportPerformance.chains.get(id)||Promise.resolve();
     const operation=previous.catch(()=>{}).then(async()=>{
       if(updateSummary)updateDraftSummary(draft,{touch:false});
       else draft.updatedAt=new Date().toISOString();
       const stored=await ImportStore.getImport(id);
+      if(draft.providerRestartFrom&&!stored){
+        if(draft.householdId!==restartScope||ImportStore.scope!==restartScope||root.CloudAdapter?.importScope?.()!==restartScope||!root.DataAdapter?.supportsAtomicImports||!root.CloudAdapter?.isConnected?.()||root.CloudAdapter.conflict||root.state.__finizePartialHistory)throw cloudImportError('bank-import-restart-blocked','Nieuwe bankimport vereist gecontroleerde atomaire opslag en een volledige cloudbasis.');
+        assertProviderRestartState(root.state,draft.providerRestartFrom,{journals:await ImportStore.listJournal(),queue:await ImportStore.listSync()});
+        assertProviderRestartParent(draft.providerRestartFrom,await ImportStore.getImport(draft.providerRestartFrom.id));
+      }
       if(!stored && accountIsArchived((root.state.accountProfiles||[]).find(profile=>profile.id===draft.accountProfileId)))throw new Error('Heractiveer de rekening voordat je een nieuwe import opslaat.');
       if(stored){const left=clone(stored),right=clone(draft);for(const value of [left,right]){delete value.confirmedBatch;delete value.syncConflict;delete value.updatedAt;delete value.baseVersion;}if(draft.operationId&&JSON.stringify(left)===JSON.stringify(right))return draft;}
       if(stored&&draft.version!==undefined&&importVersion(stored)!==importVersion(draft))throw cloudImportError('import-conflict','Deze import is intussen gewijzigd. Heropen de actuele importdetails.');
@@ -959,6 +966,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
       try{
         if(root.DataAdapter?.supportsAtomicImports){
           if(ImportStore.scope!==scope)throw new Error('Het huishouden is tijdens opslaan gewijzigd.');
+          if(draft.providerRestartFrom&&(scope!==restartScope||root.CloudAdapter?.importScope?.()!==restartScope))throw cloudImportError('import-conflict','Het huishouden is tijdens de bevestigde bankimport gewijzigd.');
           const ok=await root.commitChange(()=>applyFinancialCandidate(root.state,candidate),{render:false,throwOnError:true,operationId:journal.id,importMutation:{batch:clone(draft),previousBatch:stored?clone(stored):null,journal,queue:{...pendingQueueReceipt(draft),queuedAt:new Date().toISOString(),attempts:0}}});
           if(!ok)throw new Error('De atomaire importopslag is afgewezen.');
           ImportStore.bankReadCache.set(id,clone(draft));
@@ -2655,6 +2663,11 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
       stages,
       async readAndValidate(transaction){
         const snapshots=[];for(const stage of stages)snapshots.push(await transaction.get(stage.ref));
+        // Parent tombstone and target CAS share the financial-head transaction.
+        for(const stage of stages)if(stage.record.providerRestartFrom){
+          const parent=await transaction.get(cloudImportRef(cloud,firestore,stage.record.providerRestartFrom.id));
+          assertProviderRestartParent(stage.record.providerRestartFrom,parent.exists()?parent.data():null);
+        }
         for(let i=0;i<stages.length;i++){
           const stage=stages[i],remote=snapshots[i].exists()?snapshots[i].data():null;
           try{stage.echo=assertImportBase(remote,stage.record)==='echo';}catch(error){error.importConflict={local:stage.record,remote};throw error;}
