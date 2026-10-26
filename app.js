@@ -1286,6 +1286,13 @@
     } };
   }
 
+  // src/core/personal-month-summary.mjs
+  function personalMonthRemaining({ income, fixed, usedBudget }) {
+    const cents5 = decimalAmountToCents(income) - decimalAmountToCents(fixed) - decimalAmountToCents(usedBudget);
+    if (!Number.isSafeInteger(cents5)) throw new Error("Maandbedrag valt buiten het exacte centbereik.");
+    return cents5 / 100;
+  }
+
   // src/core/liquidity-settings.mjs
   var validPaymentDay = (day) => day === "last" || Number.isInteger(day) && day >= 1 && day <= 31;
   function monthlyPaymentDate(month, day) {
@@ -3557,7 +3564,7 @@
             usedCents,
             amountCents,
             fromDate: month === asOfDate.slice(0, 7) ? shiftLiquidityDay(asOfDate, 1) : month + "-01",
-            toDate: last < monthEnd(month) ? last : monthEnd(month),
+            toDate: planningBasis && last < monthEnd(month) ? last : monthEnd(month),
             dateQuality: "estimated"
           });
         }
@@ -3780,7 +3787,7 @@
     return history.find((row) => row.asOfDate < startDate) || history.filter((row) => row.asOfDate >= startDate && row.asOfDate <= asOfDate).at(-1) || null;
   }
   function selectDailyLiquidity(state2, options) {
-    var _a2;
+    var _a2, _b, _c, _d, _e, _f, _g;
     if (options.incomeKpis) {
       const input2 = buildLiquidityInput(state2, { ...options, endDate: void 0, incomeOnly: true, salaryOnly: false, includeReceipt: false });
       input2.incomeKpis = true;
@@ -3827,7 +3834,47 @@
     const reconciliations = result2.events.filter((row) => row.type === "checkpoint" && row.date >= startDate && row.date <= horizon.endDate).map((row) => {
       return { checkpointId: row.id.slice("checkpoint:".length), date: row.date, observedCents: row.observedBalanceCents, modeledCents: row.modeledBalanceCents, differenceCents: row.amountCents };
     });
-    return withAvailability({ ...result2, asOfDate, calculationStartDate: origin, currentBalance: current.opening, displayStartDate: startDate, historyComplete: !!anchor && origin < startDate, reconciliations }, input, availabilityFromDate, inputFor);
+    const history = withAvailability({ ...result2, asOfDate, calculationStartDate: origin, currentBalance: current.opening, displayStartDate: startDate, historyComplete: !!anchor && origin < startDate, reconciliations }, input, availabilityFromDate, inputFor);
+    if (!options.currentCashBasis || !horizon.endDate || horizon.endDate < asOfDate) return history;
+    const forwardInputFor = (endDate) => {
+      const next = buildLiquidityInput(state2, { ...options, asOfDate, endDate, salaryOnly: false });
+      next.availabilityFromDate = availabilityFromDate;
+      next.reservations = next.reservations.map((row) => ({ ...row, reserveForDisplay: row.type !== "budget" || row.month >= startDate.slice(0, 7) }));
+      next.savingsPlans = next.savingsPlans.filter((row) => row.month >= startDate.slice(0, 7));
+      return next;
+    };
+    const forwardInput = forwardInputFor(horizon.endDate);
+    forwardInput.horizon = horizon;
+    const forward = withAvailability(projectDailyLiquidity(forwardInput), forwardInput, availabilityFromDate, forwardInputFor);
+    for (const row of forward.events.filter((row2) => row2.type === "bank")) row.replacedPlans = forward.events.filter((plan) => plan.status === "replaced" && plan.replacedBy.includes(row.sourceId)).map((plan) => ({ id: plan.id, type: plan.type, amountCents: plan.amountCents, date: plan.date, planningSourceId: plan.planningSourceId, person: plan.person }));
+    const days = [...history.days.filter((row) => row.date < asOfDate), ...forward.days.filter((row) => row.date >= startDate)];
+    const previous = days.filter((row) => row.date < asOfDate).at(-1), todayIndex = days.findIndex((row) => row.date === asOfDate), basisEvents = [];
+    if (previous && todayIndex >= 0 && Number.isSafeInteger(previous.expectedBalanceCents) && Number.isSafeInteger(forward.opening.balanceCents)) {
+      const delta = forward.opening.balanceCents - previous.expectedBalanceCents;
+      if (delta) {
+        const id = "view-balance-basis:" + options.accountProfileId + ":" + asOfDate;
+        basisEvents.push({ id, type: "balance-basis", status: "presentation", date: asOfDate, accountProfileId: options.accountProfileId, amountCents: delta });
+        const day = days[todayIndex];
+        days[todayIndex] = { ...day, openingBalanceCents: previous.expectedBalanceCents, mutationCents: day.mutationCents + delta, eventIds: [id, ...day.eventIds] };
+      }
+    }
+    const minimum = days.reduce((best, row) => !best || row.expectedBalanceCents < best.expectedBalanceCents ? row : best, null);
+    return {
+      ...forward,
+      asOfDate,
+      calculationStartDate: asOfDate,
+      currentBalance: forward.opening,
+      displayStartDate: startDate,
+      historyComplete: history.historyComplete,
+      days,
+      events: [...history.events.filter((row) => row.date && row.date < asOfDate), ...basisEvents, ...forward.events.filter((row) => !row.date || row.date >= asOfDate)],
+      requiredMonths: [.../* @__PURE__ */ new Set([...history.requiredMonths, ...forward.requiredMonths])].sort(),
+      reconciliations: history.reconciliations.filter((row) => row.date < asOfDate),
+      minimumBalanceCents: (_b = minimum == null ? void 0 : minimum.expectedBalanceCents) != null ? _b : null,
+      minimumDate: (_c = minimum == null ? void 0 : minimum.date) != null ? _c : null,
+      firstShortfallDate: (_e = (_d = days.find((row) => row.expectedBalanceCents < 0)) == null ? void 0 : _d.date) != null ? _e : null,
+      firstBufferBreachDate: (_g = (_f = days.find((row) => row.expectedBalanceCents < forward.bufferCents)) == null ? void 0 : _f.date) != null ? _g : null
+    };
   }
 
   // src/ui/liquidity-explanations.mjs
@@ -3923,7 +3970,7 @@
     const startDate = filter === "month" ? first : anchor;
     if (filter === "custom" && (!/^\d{4}-\d{2}-\d{2}$/.test(custom) || custom < startDate || custom > last || (/* @__PURE__ */ new Date(custom + "T12:00:00Z")).toISOString().slice(0, 10) !== custom)) throw new Error("Kies een einddatum binnen de geselecteerde maand, vanaf " + date(startDate) + ".");
     const endDate = filter === "salary" ? void 0 : filter === "month" ? last : filter === "custom" ? custom : [horizonEnd(filter, anchor), last].sort()[0];
-    return { startDate, endDate, salaryOnly: false, incomeOnly: filter === "salary", includeReceipt: filter === "salary", horizonReferenceDate: anchor, horizonLimitDate: filter === "salary" ? void 0 : last, minDate: anchor, maxDate: last };
+    return { startDate, endDate, currentCashBasis: true, salaryOnly: false, incomeOnly: filter === "salary", includeReceipt: filter === "salary", horizonReferenceDate: anchor, horizonLimitDate: filter === "salary" ? void 0 : last, minDate: anchor, maxDate: last };
   }
   function chartDays(p) {
     var _a2;
@@ -4106,7 +4153,7 @@
       }
       const rows = projection.events.filter((e) => d.eventIds.includes(e.id));
       const replaced = (e) => (e.replacedPlans || []).map((plan) => ` (planning ${money2(Math.abs(plan.amountCents))} vervangen)`).join("");
-      detail.innerHTML = `<div class="p3-detail-heading"><strong>${date(day)} ${day.slice(0, 4)}</strong><button type="button" class="ghost small" data-p3-close-detail aria-label="Sluiten · datumdetails">Sluiten</button></div><span>Berekend beginsaldo: ${money2(d.openingBalanceCents)}</span><ul>${rows.map((e) => `<li>${escape2(e.type === "checkpoint" ? "Handmatig saldo-ijkpunt" : deps.eventLabel(e))}: <strong>${signed(e.amountCents)}</strong>${escape2(replaced(e))} <span>(${e.type === "checkpoint" ? "Saldo ingesteld op " + money2(e.observedBalanceCents) : e.type === "bank" ? e.status === "provisional" ? "Voorlopig verwerkt · geboekt, nog nakijken" : "Werkelijk" : e.type === "fixed" ? "Geplande vaste last" : e.type === "allowance" || e.type === "internal-transfer" ? "Geplande interne overboeking" : "Geplande inkomsten"})</span></li>`).join("") || (d.estimatedBudgetCents ? "" : "<li>Geen mutaties</li>")}${d.estimatedBudgetCents ? `<li>Geschatte resterende budgetuitgaven: <strong>${signed(-d.estimatedBudgetCents)}</strong></li>` : ""}</ul><span>Totaal mutaties: ${signed(d.mutationCents)}</span><strong>Berekend eindsaldo: ${money2(d.expectedBalanceCents)}</strong><span>${d.checkpointId ? "Saldo-ijkpunt aan het einde van deze dag · beginsaldo onbekend" : "Berekend uit planning en beschikbare bankboekingen"} · ${status(projection.status)}</span>`;
+      detail.innerHTML = `<div class="p3-detail-heading"><strong>${date(day)} ${day.slice(0, 4)}</strong><button type="button" class="ghost small" data-p3-close-detail aria-label="Sluiten · datumdetails">Sluiten</button></div><span>Berekend beginsaldo: ${money2(d.openingBalanceCents)}</span><ul>${rows.map((e) => `<li>${escape2(e.type === "balance-basis" ? "Actuele saldobasis" : e.type === "checkpoint" ? "Handmatig saldo-ijkpunt" : deps.eventLabel(e))}: <strong>${signed(e.amountCents)}</strong>${escape2(replaced(e))} <span>(${e.type === "balance-basis" ? "Aansluiting van historisch model op actueel saldo · alleen in deze grafiek" : e.type === "checkpoint" ? "Saldo ingesteld op " + money2(e.observedBalanceCents) : e.type === "bank" ? e.status === "provisional" ? "Voorlopig verwerkt · geboekt, nog nakijken" : "Werkelijk" : e.type === "fixed" ? "Geplande vaste last" : e.type === "allowance" || e.type === "internal-transfer" ? "Geplande interne overboeking" : "Geplande inkomsten"})</span></li>`).join("") || (d.estimatedBudgetCents ? "" : "<li>Geen mutaties</li>")}${d.estimatedBudgetCents ? `<li>Geschatte resterende budgetuitgaven: <strong>${signed(-d.estimatedBudgetCents)}</strong></li>` : ""}</ul><span>Totaal mutaties: ${signed(d.mutationCents)}</span><strong>Berekend eindsaldo: ${money2(d.expectedBalanceCents)}</strong><span>${d.checkpointId ? "Saldo-ijkpunt aan het einde van deze dag · beginsaldo onbekend" : "Berekend uit planning en beschikbare bankboekingen"} · ${status(projection.status)}</span>`;
     }
     function chartDay(root2, e) {
       var _a2;
@@ -12724,7 +12771,7 @@
     const jointIncome = isJoint ? dashboardIncomeBreakdown(getSelectedMonth()) : null;
     const jointVisibleIncome = isJoint ? jointIncome.total : 0;
     const jointAllowance = isJoint ? round22(r.dion.zakgeld + r.dara.zakgeld) : 0;
-    const remainingThisMonth = r.forecast.owners[key].available;
+    const remainingThisMonth = isJoint ? r.forecast.owners[key].available : personalMonthRemaining({ income: personalIncome.total, fixed: rr.persoonlijkeVasteLasten, usedBudget: rr.variabeleUitgaven });
     const jointKpis = isJoint ? `
     <div class="overview-kpi-row">
       ${renderIconKpi("€", "green", "Totaal gezamenlijk inkomen", eur(jointVisibleIncome), renderIncomeSources(jointIncome), { valueClass: jointVisibleIncome < 0 ? "value neg" : "value pos" })}
@@ -12736,7 +12783,7 @@
     <div class="overview-kpi-row">
       ${personalKpiVisible(key, "income") ? renderIconKpi("€", "green", "Totaal inkomen", eur(personalIncome.total), renderPersonalIncomeSources(personalIncome, key), { valueClass: personalIncome.total < 0 ? "value neg" : "value pos", kpiId: "income" }) : ""}
       ${personalKpiVisible(key, "fixed") ? renderIconKpi("▤", "blue", "Vaste lasten", eur(rr.persoonlijkeVasteLasten), "Klik om te wijzigen", { valueClass: rr.persoonlijkeVasteLasten > 0 ? "value neg" : "value pos", openFixedOwner: key, kpiId: "fixed" }) : ""}
-      ${personalKpiVisible(key, "saving") ? renderIconKpi("◎", "green", "Over deze maand", eur(remainingThisMonth), "Na vaste lasten, gebruikt budget en spaargeld", { valueClass: remainingThisMonth < 0 ? "value neg" : "value pos", kpiId: "saving" }) : ""}
+      ${personalKpiVisible(key, "saving") ? renderIconKpi("◎", "green", "Over deze maand", eur(remainingThisMonth), "Inkomen en teruggaven − vaste lasten − gebruikt budget", { valueClass: remainingThisMonth < 0 ? "value neg" : "value pos", kpiId: "saving" }) : ""}
       ${personalKpiVisible(key, "variable") ? renderIconKpi("▥", "blue", "Variabel gebruikt", `${eur(variableUsed)} / ${eur(variableBudget)}`, `<span class="overview-budget-track" style="--used-pct:${variablePct}%"></span>`, { kpiId: "variable" }) : ""}
     </div>` : "";
     const incomeManage = !isJoint ? `
@@ -13961,23 +14008,26 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
     const modal = document.getElementById("incomeEditModal");
     const month = getSelectedMonth();
     const result2 = calcScenario(state)[owner];
-    const automatic = round22(Number(result2.automatischBeschikbaarVoorSparen) || 0);
+    const income = personalIncomeOverview(owner, result2.zakgeld, month);
+    const remaining = personalMonthRemaining({ income: income.total, fixed: result2.persoonlijkeVasteLasten, usedBudget: result2.variabeleUitgaven });
+    const suggested = Math.max(0, remaining);
     const monthOverrides = isPlainObject2((_a2 = state.monthlySavingOverrides) == null ? void 0 : _a2[month]) ? state.monthlySavingOverrides[month] : {};
     const hasOverride = Object.prototype.hasOwnProperty.call(monthOverrides, owner);
-    const current = hasOverride ? round22(Number(monthOverrides[owner]) || 0) : automatic;
+    const current = hasOverride ? round22(Number(monthOverrides[owner]) || 0) : result2.beschikbaarVoorSparen;
     const name = ownerLabel(owner);
     modal.innerHTML = `
     <div class="modal income-sheet" role="dialog" aria-modal="true" aria-label="Spaargeld van ${textSafe(name)} aanpassen">
       <div class="income-sheet-handle"></div>
       <div class="card-head"><h2>${textSafe(name)} sparen</h2><button class="danger-ghost" id="btnClosePersonalSaving" aria-label="Sluiten">&times;</button></div>
       <div class="income-sheet-meta"><span>${textSafe(name)}</span><span>${monthLabel(month)}</span></div>
-      <div class="income-sheet-readonly"><span>Automatisch berekend</span><strong>${eur(automatic)}</strong></div>
-      <label class="income-sheet-field">Eigen spaarbedrag voor deze maand
+      <div class="income-sheet-readonly"><span>Over deze maand</span><strong>${eur(remaining)}</strong></div>
+      <p class="hint">${eur(income.total)} inkomen en teruggaven − ${eur(result2.persoonlijkeVasteLasten)} vaste lasten − ${eur(result2.variabeleUitgaven)} gebruikt budget.</p>
+      <label class="income-sheet-field">Handmatig spaarbedrag voor deze maand
         <input id="personalSavingInput" type="number" step="0.01" inputmode="decimal" value="${current}">
       </label>
-      <p class="hint">Dit bedrag overschrijft alleen in ${monthLabel(month)} de automatische berekening. Inkomen en zakgeldverdeling veranderen hierdoor niet.</p>
+      <p class="hint">Gebruik Over deze maand neemt het huidige bedrag eenmalig over voor ${monthLabel(month)}. Bij een tekort wordt dit € 0,00. Latere transacties passen het opgeslagen spaarbedrag niet automatisch aan. Inkomen en zakgeldverdeling blijven gelijk.</p>
       <div class="modal-actions">
-        <button class="ghost" id="btnUseAutomaticSaving">Automatisch gebruiken</button>
+        <button class="ghost" id="btnUseAutomaticSaving">Gebruik Over deze maand</button>
         <button class="ghost" id="btnCancelPersonalSaving">Annuleren</button>
         <button class="primary" id="btnSavePersonalSaving">Opslaan</button>
       </div>
@@ -13987,23 +14037,19 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
       modal.classList.remove("open");
       modal.innerHTML = "";
     };
-    const removeOverride = async () => {
+    const useRemaining = async () => {
       const saved = await commitChange(() => {
-        var _a3;
         assertMonthMutationAllowed(month);
-        if (isPlainObject2((_a3 = state.monthlySavingOverrides) == null ? void 0 : _a3[month])) {
-          delete state.monthlySavingOverrides[month][owner];
-          if (!Object.keys(state.monthlySavingOverrides[month]).length) delete state.monthlySavingOverrides[month];
-        }
+        setSavingsPlanForMonth(state, owner, month, suggested);
       }, { render: false });
       if (!saved) return;
       close();
       renderActiveTab();
-      showQuickToast("Automatisch sparen hersteld");
+      showQuickToast("Over deze maand als spaarbedrag opgeslagen");
     };
     document.getElementById("btnClosePersonalSaving").addEventListener("click", close);
     document.getElementById("btnCancelPersonalSaving").addEventListener("click", close);
-    document.getElementById("btnUseAutomaticSaving").addEventListener("click", removeOverride);
+    document.getElementById("btnUseAutomaticSaving").addEventListener("click", useRemaining);
     bindModalBackdrop(modal, close);
     document.getElementById("btnSavePersonalSaving").addEventListener("click", async () => {
       const value = bankAmount(document.getElementById("personalSavingInput").value);
@@ -14331,6 +14377,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
     const data = getMonthlyScenarioData()[owner];
     const name = ownerLabel(owner);
     const personalIncome = personalIncomeOverview(owner, person.zakgeld);
+    const remainingThisMonth = personalMonthRemaining({ income: personalIncome.total, fixed: person.persoonlijkeVasteLasten, usedBudget: person.variabeleUitgaven });
     const variableRows = ownerVariableBudgetRows(owner, data);
     const fixed = {};
     (data.vasteLasten || []).forEach((row) => {
@@ -14346,7 +14393,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
     return `<div class="mobile-kpi-grid v4-mobile-only-grid joint-first-row" aria-label="${name} rij 1">
     ${personalKpiVisible(owner, "income") ? `<div class="mobile-kpi-card joint-kpi-card joint-total-income-card ux-action-card" data-personal-kpi-mobile="income" data-open-income-overview="${owner}"><button type="button" class="ux-card-primary" aria-label="Totaal inkomen ${eur(personalIncome.total)} · Inkomensoverzicht ${textSafe(name)}" aria-haspopup="dialog"></button><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg("allowance")}</span></div><div class="mobile-kpi-label">Totaal inkomen</div><div class="mobile-kpi-value ${personalIncome.total < 0 ? "value neg" : "value pos"}">${eur(personalIncome.total)}</div>${renderPersonalIncomeSources(personalIncome, owner)}</div>` : ""}
     <div class="mobile-kpi-card joint-kpi-card joint-fixed-costs-card"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg("wallet")}</span></div><div class="mobile-kpi-label">Vaste lasten</div><div class="mobile-kpi-value value neg">${eur(person.persoonlijkeVasteLasten)}</div><div class="mobile-kpi-edit-hint-placeholder">.</div></div>
-    ${personalKpiVisible(owner, "saving") ? `<div class="mobile-kpi-card joint-kpi-card joint-saving-card" data-personal-kpi-mobile="saving"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg("piggy")}</span></div><div class="mobile-kpi-label">Over deze maand</div><div class="mobile-kpi-value ${r.forecast.owners[owner].available < 0 ? "value neg" : "value pos"}">${eur(r.forecast.owners[owner].available)}</div><div class="mobile-kpi-edit-hint">Na vaste lasten, gebruikt budget en spaargeld</div></div>` : ""}
+    ${personalKpiVisible(owner, "saving") ? `<div class="mobile-kpi-card joint-kpi-card joint-saving-card" data-personal-kpi-mobile="saving"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg("piggy")}</span></div><div class="mobile-kpi-label">Over deze maand</div><div class="mobile-kpi-value ${remainingThisMonth < 0 ? "value neg" : "value pos"}">${eur(remainingThisMonth)}</div><div class="mobile-kpi-edit-hint">Inkomen en teruggaven − vaste lasten − gebruikt budget</div></div>` : ""}
     <div class="mobile-kpi-card joint-kpi-card static joint-variable-card"><div class="mobile-kpi-top"><span class="mobile-kpi-icon tone-green">${iconSvg("chart")}</span></div><div class="mobile-kpi-label">Variabel gebruikt</div><div class="mobile-kpi-value mobile-kpi-value-budget neu">${eur(person.variabeleUitgaven)} / ${eur(variableBudget)}</div><div class="mobile-kpi-budget-track" style="--used-pct:${variablePct}%" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${variablePct}" aria-label="${textSafe(name)} variabel budget gebruikt"></div></div>
   </div>
   <div class="card joint-fullwidth-card joint-fixed-category-card v4-mobile-only-block">${renderJointFixedCostsCardHead(owner)}<div class="joint-fixed-category-body">${fixedRows || '<p class="hint">Nog geen vaste lasten.</p>'}</div></div>

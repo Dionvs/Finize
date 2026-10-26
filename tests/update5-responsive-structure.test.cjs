@@ -13,7 +13,7 @@ const sw = fs.readFileSync(path.join(root, 'service-worker.js'), 'utf8');
 
 assert.match(markup, /app\.css/);
 assert.match(markup, /app\.js/);
-assert.match(sw, /finize-v118-r15/);
+assert.match(sw, /finize-v118-r16/);
 assert.match(js, /createDashboard/);
 assert.match(sw, /\.\/app\.css/);
 assert.match(sw, /\.\/app\.js/);
@@ -27,7 +27,7 @@ assert.match(html, /r\.forecast\.owners\[key\]\.available/);
 assert.match(html, /dashboardIncomeBreakdown\(getSelectedMonth\(\)\)\.total/);
 assert.doesNotMatch(html, /renderManageSection\('Sparen'/);
 assert.match(html, /function openPersonalSavingEditModal\(owner\)/);
-assert.match(html, /Automatisch gebruiken/);
+assert.match(html, /Gebruik Over deze maand/);
 assert.match(dashboard, /Vrij na verplichtingen/);
 assert.match(dashboard, /Geplande verdeling/);
 assert.match(html, /data-u3-open="planning" data-u3-planning-owner="\$\{(?:owner|opts\.openFixedOwner)\}" aria-label="Vaste lasten van/);
