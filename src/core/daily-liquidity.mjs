@@ -160,6 +160,10 @@ export function buildLiquidityInput(state,{accountProfileId,asOfDate,endDate,sco
   const reasons=[],events=[],reservations=[],savingsPlans=[];
   const profile = (state.accountProfiles || []).find(p => p.id === accountProfileId);
   const opening = selectAccountBalance(state,{accountProfileId,toDate:asOfDate,scope,imports,importsAvailable,coverage});
+  // Rolling an older observation forward through available bank rows does not
+  // confirm that today's bank day has closed. Unmatched plans for today remain
+  // on today's expected cash line; an explicit end-of-day observation does not.
+  const includeAsOfPlans=!!opening.checkpoint&&(opening.boundary==='timestamp'||opening.checkpoint.asOfDate<asOfDate);
   opening.reasons.forEach(row => reasons.push(issue(row.code,row.sourceId,opening.status==='incomplete'||opening.status==='unknown'?'incomplete':'provisional')));
   let projections=[];
   try { projections = selectDependencyProjections(state,{includeInactive:true}); }
@@ -241,7 +245,7 @@ export function buildLiquidityInput(state,{accountProfileId,asOfDate,endDate,sco
       reasons.push(issue('unconfirmed-transfer-plan',row.id));return;
     }
     if (!row.accountProfileId) { row.warnings.push('unresolved-account-profile'); reasons.push(issue('unresolved-account-profile',row.id)); }
-    if (row.date && row.date<=asOfDate) { row.warnings.push('overdue-unmatched-plan'); row.plannedDate=row.date;row.date=null; }
+    if (row.date && (row.date<asOfDate||row.date===asOfDate&&!includeAsOfPlans)) { row.warnings.push('overdue-unmatched-plan'); row.plannedDate=row.date;row.date=null; }
     if (!row.date) {
       row.warnings.push('unknown-cash-date');reasons.push(issue('unknown-cash-date',row.id,row.amountCents>0?'provisional':'incomplete'));
       // Positive undated income never increases spending capacity. Debits remain reserved.
@@ -302,7 +306,7 @@ export function buildLiquidityInput(state,{accountProfileId,asOfDate,endDate,sco
     addPlan(row);
   }
   if (profile?.accountOwner==='gezamenlijk'&&!physicalAccount(state,null,'gezamenlijk')) reasons.push(issue('joint-primary-account-not-selected'));
-  return {accountProfileId,asOfDate,opening,horizon,events,reservations,savingsPlans,bufferCents:liquidityBuffer(profile),requiredMonths,reasons};
+  return {accountProfileId,asOfDate,opening,includeAsOfPlans,horizon,events,reservations,savingsPlans,bufferCents:liquidityBuffer(profile),requiredMonths,reasons};
 }
 
 /** Pure cent arithmetic. Reservations have one identity and one deduction, with a separate estimated day distribution. */
@@ -319,11 +323,11 @@ export function projectDailyLiquidity(input) {
     if(!row.id || !Number.isSafeInteger(row.amountCents) || row.amountCents<0) throw new Error('Een prognosereservering mist een geldig ID of niet-negatief centbedrag.');
     if(reservationIds.has(row.id)) {reasons.push(issue('duplicate-reservation',row.id));continue;}
     reservationIds.add(row.id);
-    const covered=sum(events.filter(e=>e.status==='planned'&&(e.date>asOfDate||e.date===asOfDate&&opening.boundary==='timestamp')&&e.date<=horizon.endDate&&e.amountCents<0&&e.reservationId===row.id).map(e=>-e.amountCents));
+    const covered=sum(events.filter(e=>e.status==='planned'&&(e.date>asOfDate||e.date===asOfDate&&(input.includeAsOfPlans||opening.boundary==='timestamp'))&&e.date<=horizon.endDate&&e.amountCents<0&&e.reservationId===row.id).map(e=>-e.amountCents));
     reservations.push({...row,coveredByConcreteCents:Math.min(row.amountCents,covered),amountCents:Math.max(0,row.amountCents-covered)});
   }
   const reserveCents=sum(reservations.filter(row=>row.reserveForDisplay!==false).map(row=>row.amountCents));
-  const dated=events.filter(row=>['actual','provisional','planned'].includes(row.status)&&row.accountProfileId===input.accountProfileId&&(row.date>asOfDate||row.date===asOfDate&&row.status==='planned'&&opening.boundary==='timestamp')&&row.date<=horizon.endDate);
+  const dated=events.filter(row=>['actual','provisional','planned'].includes(row.status)&&row.accountProfileId===input.accountProfileId&&(row.date>asOfDate||row.date===asOfDate&&row.status==='planned'&&(input.includeAsOfPlans||opening.boundary==='timestamp'))&&row.date<=horizon.endDate);
   const estimated=new Map(),allocations=new Map();
   const distribute=(row,fromDate=row.fromDate)=>{
     const previous=allocations.get(row.id) || new Map();

@@ -57,8 +57,16 @@ body.v4-app #goalEditDelete{color:var(--text-dim)}
 .p3-year-chart [tabindex]:focus-visible{outline:2px solid var(--navy-bright);outline-offset:2px}
 @supports not selector(:popover-open){.p3-info-popover{display:none}.p3-info-popover[data-open=true]{display:block}}
 
-/* Fixed payments reuse the budget bars; percentages describe paid / planned. */
-body.v4-app .progress-track.fixed-payment-track,
-body.v4-app[data-real-active-tab] .joint-fixed-category-card .progress-track.fixed-payment-track{position:relative;height:18px!important;min-width:0}
-.fixed-payment-percent{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);min-width:38px;border-radius:7px;background:var(--card);color:var(--text);font-size:10px;font-weight:700;line-height:14px;text-align:center}
-body.v4-app .fixed-payment-legend{margin:0 0 8px;font-size:11px;line-height:1.2;color:var(--text-dim)}
+/* Payment progress belongs to the total KPI; categories retain their cost share. */
+body.v4-app .fixed-payment-kpi{display:block;min-width:0;font-weight:600}
+body.v4-app .fixed-payment-amounts{display:flex;flex-wrap:wrap;gap:2px 4px;font-size:14px;line-height:1.25}
+body.v4-app .fixed-payment-label{display:block;margin:3px 0 5px;font-size:10px;font-weight:400;line-height:1.2;color:var(--text-dim)}
+body.v4-app .fixed-payment-kpi .fixed-payment-track{position:relative;height:14px!important;min-width:0;margin:0}
+.fixed-payment-percent{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);min-width:28px;border-radius:6px;background:var(--card);color:var(--text);font-size:9px;font-weight:700;line-height:12px;text-align:center}
+@media(max-width:600px){body.v4-app .fixed-payment-amounts{font-size:12px}body.v4-app .fixed-payment-label{font-size:9px}}
+@media(max-width:700px){
+  body.v4-app[data-real-active-tab] .wrap .mobile-kpi-card.joint-fixed-costs-card{display:flex!important;flex-direction:column!important;aspect-ratio:auto!important;height:auto!important;min-height:142px!important;gap:0!important}
+  body.v4-app[data-real-active-tab] .wrap .joint-fixed-costs-card .mobile-kpi-label{min-height:0!important;margin:0 0 5px!important}
+  body.v4-app[data-real-active-tab] .wrap .joint-fixed-costs-card .mobile-kpi-value{align-self:stretch!important;margin:0!important;white-space:normal!important;overflow:visible!important}
+  body.v4-app[data-real-active-tab] .wrap .joint-fixed-costs-card .mobile-kpi-edit-hint-placeholder{display:none!important}
+}
