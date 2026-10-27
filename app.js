@@ -3356,7 +3356,7 @@
     return result2;
   }
   function liquidityRequiredMonths(state2, { accountProfileId, asOfDate, endDate, startDate, horizonLimitDate, scope, monthEndSavingsMonth } = {}) {
-    if (monthEndSavingsMonth && /^\d{4}-(0[1-9]|1[0-2])$/.test(monthEndSavingsMonth)) endDate = monthEnd(nextPlanningMonth(nextPlanningMonth(monthEndSavingsMonth)));
+    if (monthEndSavingsMonth && /^\d{4}-(0[1-9]|1[0-2])$/.test(monthEndSavingsMonth)) endDate = monthEnd(nextPlanningMonth(monthEndSavingsMonth));
     if (!validCalendarDate(asOfDate)) return [];
     const periodEnd = endDate || horizonLimitDate;
     const cutoff = periodEnd && periodEnd < asOfDate ? periodEnd : asOfDate;
@@ -3896,11 +3896,7 @@
     const transferDate = monthEnd(month), nextMonth = nextPlanningMonth(month), nextMonthEnd = monthEnd(nextMonth);
     const empty = { month, transferDate, nextMonth, assessmentEndDate: nextMonthEnd, status: "unknown", safeCents: null, indicativeCents: null, expectedEndBalanceCents: null, requiredOpeningCents: null, minimumCumulativeCents: null, plannedCents: null, extraCents: null, requiredMonths: [], reasons: [] };
     if (transferDate < asOfDate) return { ...empty, reasons: [issue("past-saving-date")] };
-    const bound = monthEnd(nextPlanningMonth(nextMonth));
-    const guard = buildLiquidityInput(state2, { ...options, asOfDate: nextMonthEnd, endDate: void 0, incomeOnly: true, salaryOnly: false, includeReceipt: true });
-    const guardEnd = guard.horizon.receiptDate;
-    const reliableGuard = !!guardEnd && guardEnd <= bound;
-    const assessmentEndDate = reliableGuard ? guardEnd : nextMonthEnd;
+    const assessmentEndDate = nextMonthEnd;
     const input = buildLiquidityInput(state2, { ...options, endDate: assessmentEndDate, salaryOnly: false });
     const profile = (state2.accountProfiles || []).find((p) => p.id === accountProfileId);
     const monthlyTransfers = (state2.internalTransfers || []).filter((t) => t.month === month && t.type === (profile == null ? void 0 : profile.accountOwner) + "-sparen" && (t.sourceClosingId || t.closureId) && ["gepland", "planned", "concept", "nog-te-verwerken"].includes(t.status));
@@ -3909,16 +3905,15 @@
     const boundedIds = new Set(input.reservations.filter((r) => r.type === "undated-obligation" && validCalendarDate(r.deadlineDate)).map((r) => r.id.replace(/^undated:/, "")));
     const normalized = {
       ...input,
-      bufferCents: (profile == null ? void 0 : profile.accountOwner) === "gezamenlijk" ? Math.max(2e4, input.bufferCents) : input.bufferCents,
+      bufferCents: 2e4,
       events: input.events.filter((e) => !candidateIds.has(e.id)),
       reservations: input.reservations.filter((r) => !candidateIds.has(r.id.replace(/^undated:/, ""))),
       reasons: input.reasons.filter((r) => !candidateIds.has(r.eventId) && !(r.code === "unknown-cash-date" && boundedIds.has(r.eventId)))
     };
     const projection = projectDailyLiquidity(normalized);
-    const reasons2 = [...projection.reasons, ...!reliableGuard ? [issue("missing-saving-horizon")] : []];
-    let budgetReservedCents = 0;
+    const reasons2 = [...projection.reasons];
     const protectionDays = projection.days.map((day) => {
-      budgetReservedCents = safe(budgetReservedCents + day.estimatedBudgetCents);
+      const budgetReservedCents = sum(projection.reservations.filter((r) => r.type === "budget" && monthEnd(r.month) <= day.date).map((r) => r.amountCents));
       const undatedReservedCents = sum(projection.reservations.filter((r) => r.type === "undated-obligation" && (!r.month || r.month <= day.date.slice(0, 7) || r.deadlineDate <= day.date)).map((r) => r.amountCents));
       return {
         date: day.date,
@@ -4140,7 +4135,7 @@
   var calculationHelp = (p) => {
     var _a2;
     const s = p.monthEndSavings;
-    return s ? `<p>Het maximaal over te boeken bedrag op ${savingDate(s.transferDate)}. Dit is geen geld dat vandaag vrij besteedbaar is.</p><p>De berekening gebruikt het vastgelegde saldo en de aanwezige transacties. Werk zelf je bank bij op de laatste dag van de maand. Onbevestigde bankdekking is informatief en houdt het bedrag niet tegen.</p><p>Verwacht eindsaldo: ${money2(s.expectedEndBalanceCents)}<br>Nodig vanaf volgende maand: ${money2(s.requiredOpeningCents)}<br>Inclusief permanente buffer: ${money2((_a2 = s.bufferCents) != null ? _a2 : p.bufferCents)}.</p><p>De hele volgende maand telt mee, plus de periode tot en met de eerstvolgende salaris- of zakgeldontvangst daarna (${date(s.assessmentEndDate)}). Het resterende variabele maandbudget wordt dagelijks gespreid en is op maandultimo volledig verwerkt. In de laatste, gedeeltelijk gecontroleerde maand tellen alleen de dagen tot en met de genoemde einddatum mee. De rest van die maand is hiermee niet als gedekt aangetoond; bereken opnieuw met actuele gegevens voordat je later geld overboekt. Concrete budgetbetalingen verlagen de nog te spreiden pot en tellen niet dubbel mee. Gepland sparen en Extra ruimte zijn alleen een vergelijking; de bestaande planning wordt niet automatisch gewijzigd.</p>` : "";
+    return s ? `<p>Het maximaal over te boeken bedrag op ${savingDate(s.transferDate)}. Dit is geen geld dat vandaag vrij besteedbaar is.</p><p>De berekening gebruikt het vastgelegde saldo en de aanwezige transacties. Werk zelf je bank bij op de laatste dag van de maand. Onbevestigde bankdekking is informatief en houdt het bedrag niet tegen.</p><p>Verwacht eindsaldo: ${money2(s.expectedEndBalanceCents)}<br>Nodig vanaf volgende maand: ${money2(s.requiredOpeningCents)}<br>Inclusief permanente buffer: ${money2((_a2 = s.bufferCents) != null ? _a2 : p.bufferCents)}.</p><p>Alleen de volledige volgende kalendermaand telt mee (tot en met ${date(s.assessmentEndDate)}). Salarissen en vaste lasten tellen op hun ingestelde betaaldatums. Het volledige resterende variabele maandbudget wordt alleen op de laatste kalenderdag afgetrokken. Concrete budgetbetalingen verlagen de resterende pot en tellen niet dubbel mee. De simulatie begint bij € 0; het benodigde beginsaldo is € 200 min de laagste cumulatieve kasstroom (inclusief het startpunt € 0). Veilig te sparen is het verwachte eindsaldo min dit beginsaldo, met minimaal € 0. De buffer telt precies één keer mee. De dagelijkse budgetspreiding voor Laagste prognose blijft ongewijzigd. Gepland sparen en Extra ruimte zijn alleen een vergelijking; de bestaande planning wordt niet automatisch gewijzigd.</p>` : "";
   };
   function qualityHelp(p) {
     var _a2;

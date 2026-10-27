@@ -4,16 +4,16 @@ const {selectMonthEndSavings,selectDailyLiquidity,buildLiquidityInput,projectDai
 const {financialForecastForMonth}=require('../src/core/transaction-engine.mjs');
 const project=s=>selectMonthEndSavings(s,options(s));
 test('2750 end balance minus 2000 required opening = 750, including a 500 goal exactly once',()=>{
- const s=fixture(),before=structuredClone(s),p=project(s);assert.equal(p.status,'projected');assert.equal(p.transferDate,'2026-10-31');assert.equal(p.expectedEndBalanceCents,275000);assert.equal(p.minimumCumulativeCents,-180000);assert.equal(p.requiredOpeningCents,200000);assert.equal(p.safeCents,75000);assert.equal(p.plannedCents,50000);assert.equal(p.extraCents,25000);assert.equal(p.assessmentEndDate,'2026-12-05');assert.deepEqual(s,before);
+ const s=fixture(),before=structuredClone(s),p=project(s);assert.equal(p.status,'projected');assert.equal(p.transferDate,'2026-10-31');assert.equal(p.expectedEndBalanceCents,275000);assert.equal(p.minimumCumulativeCents,-180000);assert.equal(p.requiredOpeningCents,200000);assert.equal(p.safeCents,75000);assert.equal(p.plannedCents,50000);assert.equal(p.extraCents,25000);assert.equal(p.assessmentEndDate,'2026-11-30');assert.deepEqual(s,before);
 });
 test('full next month includes second income on24 and expenses after that receipt',()=>{
- const s=fixture({late:2400}),p=project(s);assert.equal(p.minimumCumulativeCents,-300000);s.recurringFixedExpenses[1].bedrag=4000;s.recurringFixedExpenses[1].amountHistory[0].amount=4000;const q=project(s);assert(q.requiredOpeningCents>p.requiredOpeningCents);assert.equal(q.safeCents,0);
+ const s=fixture({late:2400}),p=project(s);assert.equal(p.minimumCumulativeCents,-180000);s.recurringFixedExpenses[1].bedrag=4000;s.recurringFixedExpenses[1].amountHistory[0].amount=4000;const q=project(s);assert(q.requiredOpeningCents>p.requiredOpeningCents);assert.equal(q.safeCents,0);
 });
-test('early following-month obligations cannot be hidden beyond the next calendar month',()=>{
- const s=fixture({late:2400}),p=project(s);assert.equal(p.requiredOpeningCents,320000);assert.equal(p.safeCents,0);assert.equal(p.assessmentEndDate,'2026-12-05');
+test('only next calendar month is assessed; early December obligations are excluded',()=>{
+ const s=fixture({late:2400}),p=project(s);assert.equal(p.requiredOpeningCents,200000);assert.equal(p.safeCents,75000);assert.equal(p.assessmentEndDate,'2026-11-30');
 });
-test('buffer uses account setting once, including exact equality and zero capacity',()=>{
- let s=fixture({balance:200000});assert.equal(project(s).safeCents,0);s=fixture({balance:210000,buffer:30000});assert.equal(project(s).requiredOpeningCents,210000);assert.equal(project(s).safeCents,0);s=fixture({balance:220000,buffer:30000});assert.equal(project(s).safeCents,10000);
+test('savings buffer is exactly 200 once, independently of the daily graph setting',()=>{
+ let s=fixture({balance:200000});assert.equal(project(s).safeCents,0);s=fixture({balance:210000,buffer:30000});assert.equal(project(s).requiredOpeningCents,200000);assert.equal(project(s).safeCents,10000);s=fixture({balance:220000,buffer:30000});assert.equal(project(s).safeCents,20000);
 });
 test('selected month goal changes the comparison only, never cash capacity or allowances',()=>{
  const s=fixture(),p=project(s),f=financialForecastForMonth(s,'2026-10');s.monthlySavingOverrides={'2026-10':{gezamenlijk:700}};const q=project(s);assert.equal(p.safeCents,q.safeCents);assert.equal(q.plannedCents,70000);assert.equal(q.extraCents,5000);assert.equal(financialForecastForMonth(s,'2026-10').household.income,f.household.income);
@@ -25,7 +25,7 @@ test('unknown payment date in the assessed months blocks the savings amount',()=
  const s=fixture();delete s.recurringFixedExpenses[0].afschrijfdag;const p=project(s);assert.equal(p.status,'incomplete');assert.equal(p.indicativeCents,null);assert(p.reasons.some(r=>r.code==='unknown-cash-date'));
 });
 test('missing income timing or incomplete periods never manufactures a reliable horizon',()=>{
- const s=fixture();s.accountProfiles[0].liquidity.salaryDays={};assert.equal(project(s).safeCents,null);assert(project(s).reasons.some(r=>r.code==='missing-saving-horizon'));
+ const s=fixture();s.accountProfiles[0].liquidity.salaryDays={};assert.equal(project(s).safeCents,null);assert(project(s).reasons.some(r=>r.code==='unknown-cash-date'));
 });
 for(const [asOf,expected]of [['2024-02-15','2024-02-29'],['2025-02-15','2025-02-28'],['2026-04-15','2026-04-30'],['2026-12-15','2026-12-31']])test('calendar boundary '+expected,()=>{
  const s=fixture({asOf}),p=project(s);assert.equal(p.transferDate,expected);assert.equal(p.safeCents,75000);
@@ -34,10 +34,10 @@ test('past selected month is unknown, not a saving suggestion from current cash'
  const s=fixture(),p=selectMonthEndSavings(s,{...options(s),month:'2026-09'});assert.equal(p.safeCents,null);assert(p.reasons.some(r=>r.code==='past-saving-date'));
 });
 test('existing next-income KPI and graph contracts remain unchanged when adding savings calculation',()=>{
- const s=fixture(),o={...options(s),incomeKpis:true},a=selectDailyLiquidity(s,o),b=selectDailyLiquidity(s,{...o,monthEndSavingsMonth:'2026-10'});assert.deepEqual(b.days,a.days);assert.equal(b.minimumBalanceCents,a.minimumBalanceCents);assert.equal(b.bufferCents,a.bufferCents);assert.equal(b.monthEndSavings.safeCents,75000);assert(b.requiredMonths.includes('2026-12'));
+ const s=fixture(),o={...options(s),incomeKpis:true},a=selectDailyLiquidity(s,o),b=selectDailyLiquidity(s,{...o,monthEndSavingsMonth:'2026-10'});assert.deepEqual(b.days,a.days);assert.equal(b.minimumBalanceCents,a.minimumBalanceCents);assert.equal(b.bufferCents,a.bufferCents);assert.equal(b.monthEndSavings.safeCents,75000);assert(b.requiredMonths.includes('2026-11'));assert(!b.requiredMonths.includes('2026-12'));
 });
 test('a proposed current-month savings transfer is not subtracted before solving its maximum',()=>{
- const s=fixture();s.accountProfiles.push({id:'saving',accountOwner:'gezamenlijk',accountType:'savings'});s.internalTransfers=[{id:'proposed',sourceClosingId:'closing-Oct',type:'gezamenlijk-sparen',status:'gepland',sourceAccountProfileId:'joint',targetAccountProfileId:'saving',plannedDate:'2026-10-31',month:'2026-10',plannedAmount:500}];assert.equal(project(s).safeCents,75000);s.internalTransfers[0].plannedDate='2026-11-30';s.internalTransfers[0].month='2026-11';s.internalTransfers[0].plannedAmount=2000;assert(project(s).safeCents<75000);
+ const s=fixture();s.accountProfiles.push({id:'saving',accountOwner:'gezamenlijk',accountType:'savings'});s.internalTransfers=[{id:'proposed',sourceClosingId:'closing-Oct',type:'gezamenlijk-sparen',status:'gepland',sourceAccountProfileId:'joint',targetAccountProfileId:'saving',plannedDate:'2026-10-31',month:'2026-10',plannedAmount:500}];assert.equal(project(s).safeCents,75000);s.internalTransfers[0].plannedDate='2026-11-30';s.internalTransfers[0].month='2026-11';s.internalTransfers[0].plannedAmount=3000;assert(project(s).safeCents<75000);
 });
 
 function reference(asOf,balance,month,tax=false){

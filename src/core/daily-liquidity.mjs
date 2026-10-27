@@ -143,7 +143,7 @@ function allowancePlans(state,month,forecast,projections) {
 
 /** Required periods are explicit. The caller can load these through the existing period session. */
 export function liquidityRequiredMonths(state,{accountProfileId,asOfDate,endDate,startDate,horizonLimitDate,scope,monthEndSavingsMonth}={}) {
-  if(monthEndSavingsMonth&&/^\d{4}-(0[1-9]|1[0-2])$/.test(monthEndSavingsMonth))endDate=monthEnd(nextPlanningMonth(nextPlanningMonth(monthEndSavingsMonth)));
+  if(monthEndSavingsMonth&&/^\d{4}-(0[1-9]|1[0-2])$/.test(monthEndSavingsMonth))endDate=monthEnd(nextPlanningMonth(monthEndSavingsMonth));
   if (!validCalendarDate(asOfDate)) return [];
   const periodEnd=endDate || horizonLimitDate;
   const cutoff=periodEnd&&periodEnd<asOfDate?periodEnd:asOfDate;
@@ -532,9 +532,8 @@ export function selectDailyLiquidity(state, options) {
     firstShortfallDate:days.find(row=>row.expectedBalanceCents<0)?.date??null,firstBufferBreachDate:days.find(row=>row.expectedBalanceCents<forward.bufferCents)?.date??null};
 }
 
-/** Uses P2's concrete cash and cumulative daily budget estimates exactly once.
- * Full months consume their whole remaining pot; a partial guard consumes only
- * its assessed days. It does not establish coverage beyond assessmentEndDate.
+/** Uses P2's concrete cash, with each remaining budget pot deducted at month-end.
+ * Only the complete next calendar month determines the required opening balance.
  * A deadline protects an undated debit without inventing a bank payment day. */
 export function selectMonthEndSavings(state,options){
   const {month,asOfDate,accountProfileId}=options;
@@ -542,11 +541,7 @@ export function selectMonthEndSavings(state,options){
   const transferDate=monthEnd(month),nextMonth=nextPlanningMonth(month),nextMonthEnd=monthEnd(nextMonth);
   const empty={month,transferDate,nextMonth,assessmentEndDate:nextMonthEnd,status:'unknown',safeCents:null,indicativeCents:null,expectedEndBalanceCents:null,requiredOpeningCents:null,minimumCumulativeCents:null,plannedCents:null,extraCents:null,requiredMonths:[],reasons:[]};
   if(transferDate<asOfDate)return {...empty,reasons:[issue('past-saving-date')]};
-  const bound=monthEnd(nextPlanningMonth(nextMonth));
-  const guard=buildLiquidityInput(state,{...options,asOfDate:nextMonthEnd,endDate:undefined,incomeOnly:true,salaryOnly:false,includeReceipt:true});
-  const guardEnd=guard.horizon.receiptDate;
-  const reliableGuard=!!guardEnd&&guardEnd<=bound;
-  const assessmentEndDate=reliableGuard?guardEnd:nextMonthEnd;
+  const assessmentEndDate=nextMonthEnd;
   const input=buildLiquidityInput(state,{...options,endDate:assessmentEndDate,salaryOnly:false});
   // The selected month's proposed saving is the amount being solved for. Actual
   // bank movements remain intact; explicitly dated later savings still count.
@@ -555,14 +550,15 @@ export function selectMonthEndSavings(state,options){
   const candidateTransferId=options.savingsTransferId||(monthlyTransfers.length===1?monthlyTransfers[0].id:null);
   const candidateIds=new Set(input.events.filter(e=>e.isSavingsPlan&&e.status!=='replaced'&&e.transferId===candidateTransferId&&e.month===month&&e.amountCents<0).map(e=>e.id));
   const boundedIds=new Set(input.reservations.filter(r=>r.type==='undated-obligation'&&validCalendarDate(r.deadlineDate)).map(r=>r.id.replace(/^undated:/,'')));
-  const normalized={...input,bufferCents:profile?.accountOwner==='gezamenlijk'?Math.max(20000,input.bufferCents):input.bufferCents,
+  const normalized={...input,bufferCents:20000,
     events:input.events.filter(e=>!candidateIds.has(e.id)),reservations:input.reservations.filter(r=>!candidateIds.has(r.id.replace(/^undated:/,''))),
     reasons:input.reasons.filter(r=>!candidateIds.has(r.eventId)&&!(r.code==='unknown-cash-date'&&boundedIds.has(r.eventId)))};
   const projection=projectDailyLiquidity(normalized);
-  const reasons=[...projection.reasons,...(!reliableGuard?[issue('missing-saving-horizon')]:[])];
-  let budgetReservedCents=0;
+  const reasons=[...projection.reasons];
   const protectionDays=projection.days.map(day=>{
-    budgetReservedCents=safe(budgetReservedCents+day.estimatedBudgetCents);
+    // Concrete budget payments already affect cash and reduce these remaining
+    // pots in P2. Deduct each remainder once, on its last calendar day only.
+    const budgetReservedCents=sum(projection.reservations.filter(r=>r.type==='budget'&&monthEnd(r.month)<=day.date).map(r=>r.amountCents));
     const undatedReservedCents=sum(projection.reservations.filter(r=>r.type==='undated-obligation'&&(!r.month||r.month<=day.date.slice(0,7)||r.deadlineDate<=day.date)).map(r=>r.amountCents));
     return {date:day.date,cashBalanceCents:day.cashBalanceCents,budgetReservedCents,undatedReservedCents,
       protectedBalanceCents:safe(day.cashBalanceCents-budgetReservedCents-undatedReservedCents)};
@@ -578,6 +574,8 @@ export function selectMonthEndSavings(state,options){
   if(blocked)return {...base,status:selected?'incomplete':'unknown'};
   const end=selected.protectedBalanceCents;
   const future=protectionDays.filter(d=>d.date>transferDate);
+  // Rebase next month's cashflow at zero, including the zero starting point.
+  // The fixed 200-euro buffer is added once, after finding the daily minimum.
   const minimumCumulativeCents=Math.min(0,...future.map(d=>safe(d.protectedBalanceCents-end)));
   const requiredOpeningCents=safe(normalized.bufferCents-minimumCumulativeCents);
   const amount=Math.max(0,safe(end-requiredOpeningCents));

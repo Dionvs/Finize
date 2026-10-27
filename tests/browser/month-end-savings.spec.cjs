@@ -8,7 +8,9 @@ for(const width of [320,390,430,1440])test('month-end savings replaces first KPI
  await card.locator('[data-p3-info="free"]').click();await expect(page.locator('#p3-info-free')).toContainText('geen geld dat vandaag vrij besteedbaar is');await expect(page.locator('#p3-info-free')).toContainText('Nodig vanaf volgende maand: € 2.000,00');await page.locator('[data-p3-close-info="free"]').click();await expect(page.locator('#p3-info-free')).not.toBeVisible();expect(await page.evaluate(()=>JSON.stringify(state))).toBe(before);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);expect(errors).toEqual([]);await page.screenshot({path:info.outputPath('month-end-'+width+'.png')});
 });
 test('future shortage and incomplete data are explicit instead of showing old spending capacity',async({page})=>{
- await boot(page,390,{late:2400});await expect(page.locator('.p3-kpi').first()).toContainText('€ 0,00');await expect(page.locator('[data-p3-savings-extra]')).toContainText('€ 0,00');await expect(page.locator('[data-p3-savings-shortfall]')).toHaveCount(0);await expect(page.locator('.p3-kpi').nth(2)).toContainText('950,00');
+ // November-only shortage: -1800 + 2000 + 1000 - 4000 = -2800;
+ // required 3000 exceeds the 2750 opening. No December guard is needed.
+ await boot(page,390,{late:4000});await expect(page.locator('.p3-kpi').first()).toContainText('€ 0,00');await expect(page.locator('[data-p3-savings-extra]')).toContainText('€ 0,00');await expect(page.locator('[data-p3-savings-shortfall]')).toHaveCount(0);await expect(page.locator('.p3-kpi').nth(2)).toContainText('950,00');
  await page.evaluate(()=>{state.recurringFixedExpenses[0].afschrijfdag='';renderActiveTab();});await expect(page.locator('.p3-kpi').first().locator('.p3-kpi-copy>strong')).toHaveText('—');await expect(page.locator('[data-p3-outlook]')).toContainText('Onvolledige spaarprognose');
  await expect(page.locator('[data-p3-savings-extra]')).toHaveCount(0);await expect(page.locator('[data-p3-savings-plan]')).toContainText('€ 500,00');
 });
