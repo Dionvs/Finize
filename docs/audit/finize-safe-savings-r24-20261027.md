@@ -43,4 +43,14 @@ Geen productiegegevens gewijzigd of voor deze afronding uitgelezen. Geen banken 
 
 De volledige definitieve Node-run slaagt: **86 bestanden en 1.113 geregistreerde testgevallen**, plus de bestaande directe bestandsasserties. Alle **53 relevante browsergevallen slagen** zonder mislukte of overgeslagen gevallen, inclusief r23→r24-upgrade, offline en terugrol met behoud van financiële state en IndexedDB-bewijs. De dertien specifieke formule-/afsluitingsgevallen maken deel uit van deze telling.
 
-JavaScript-syntax, CSS, reproduceerbare build en diffcontrole slagen; uitsluitend de bestaande CSS-tokenmelding `--line`. Geen inhoudelijke CSS-diff. Het volledige r23-verificatieverslag blijft bewaard als historische tussenstap; deze versie is de uiteindelijke afronding. Commit, Pages en openbare nacontrole worden na uitvoering hieronder vastgelegd.
+JavaScript-syntax, CSS, reproduceerbare build en diffcontrole slagen; uitsluitend de bestaande CSS-tokenmelding `--line`. Geen inhoudelijke CSS-diff. Het volledige r23-verificatieverslag blijft bewaard als historische tussenstap; deze versie is de uiteindelijke afronding.
+
+## Commit en openbare nacontrole
+
+Implementatiecommit: `275c787a9991b3a4ed9d74d42147dc94104d42bb`, gepusht op de werkbranch en via fast-forward opgenomen in `main`. **V118-r24 staat live** op [Finize](https://dionvs.github.io/Finize/). [Pages-run 40541720898](https://github.com/Dionvs/Finize/actions/runs/40541720898) is geslaagd. De bestaande Pages-configuratie is behouden.
+
+Zeven publieke bestanden geven HTTP 200 en zijn SHA-256-identiek aan de implementatiecommit. Twaalf aanvullende openbare browserproeven slagen: drie synthetische scenario's op 320/390/430/1440 px. Iedere proef controleert alle dertig volgende-maanddagen, einddatum 30 november, geen decembergegevens, één €200-buffer en een minimum van exact €200 na de maximale spaaroverboeking. De drie capaciteiten zijn €950, €6.850 en €8.000; in het derde geval is de budgetbescherming van de al bevestigde oktoberafsluiting nul. Het novemberbudget blijft intact.
+
+Gepland sparen naar €600 wijzigen beïnvloedt de capaciteit niet. Geen horizontale overloop of paginafouten; het openbare mobiele afsluitingsresultaat is daadwerkelijk geopend en visueel gecontroleerd. Alle externe origins en niet-leesverzoeken zijn in deze tijdelijke testcontexten geblokkeerd. De auth-testdriver en financiële invoer zijn synthetisch: geen echte cloud-/auth-/bankwerking geclaimd en nul productiegegevenswrites of echte bank-API-acties.
+
+[Machineleesbaar publicatiebewijs](finize-safe-savings-r24-public-20261027.json). De documentaire closeout wijzigt uitsluitend dit verslag en dat bewijs; financiële broncode en runtime blijven gelijk aan de implementatiecommit.

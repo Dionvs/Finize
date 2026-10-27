@@ -1,0 +1,324 @@
+{
+  "schemaVersion": 1,
+  "release": "V118-r24",
+  "date": "2026-10-27",
+  "implementationCommit": "275c787a9991b3a4ed9d74d42147dc94104d42bb",
+  "workBranch": "codex/v118-safe-savings-final",
+  "releaseBranch": "main",
+  "pages": {
+    "runId": 40541720898,
+    "conclusion": "success",
+    "url": "https://github.com/Dionvs/Finize/actions/runs/40541720898"
+  },
+  "validation": {
+    "nodeFilesPassed": 86,
+    "registeredNodeCasesPassed": 1113,
+    "exactFormulaAndClosingCasesPassed": 13,
+    "localBrowserPassed": 53,
+    "localBrowserFailed": 0,
+    "localBrowserSkipped": 0,
+    "syntax": true,
+    "css": true,
+    "knownUndefinedCssTokens": [
+      "--line"
+    ],
+    "generatedRuntimeReproducible": true,
+    "diffCheck": true
+  },
+  "hashes": {
+    "commit": "275c787a9991b3a4ed9d74d42147dc94104d42bb",
+    "checks": [
+      {
+        "file": "index.html",
+        "status": 200,
+        "expectedSha256": "a3a57961474d702076f0753d714a7789a97fea649f3e45b0b991ceb71e471951",
+        "publicSha256": "a3a57961474d702076f0753d714a7789a97fea649f3e45b0b991ceb71e471951",
+        "equal": true
+      },
+      {
+        "file": "app.js",
+        "status": 200,
+        "expectedSha256": "9ced0f57b904bad6260e2fdadf80bdf4194ee9f38afa7d677a7ed3bfb258486b",
+        "publicSha256": "9ced0f57b904bad6260e2fdadf80bdf4194ee9f38afa7d677a7ed3bfb258486b",
+        "equal": true
+      },
+      {
+        "file": "app.css",
+        "status": 200,
+        "expectedSha256": "0fee0c04132df2ad75fbf6b1b5c4cf74452c6e8f9436f40585cf4b0bb58b1252",
+        "publicSha256": "0fee0c04132df2ad75fbf6b1b5c4cf74452c6e8f9436f40585cf4b0bb58b1252",
+        "equal": true
+      },
+      {
+        "file": "service-worker.js",
+        "status": 200,
+        "expectedSha256": "bba2cde9ed5cf54137a72bed04ec6e4df28597a7a7714aaeb4f78385bab7c4c5",
+        "publicSha256": "bba2cde9ed5cf54137a72bed04ec6e4df28597a7a7714aaeb4f78385bab7c4c5",
+        "equal": true
+      },
+      {
+        "file": "manifest.json",
+        "status": 200,
+        "expectedSha256": "00cbaa9a122b7a02219bdf7bedd7b1824e6e744a4b430201e7a8e6585726e239",
+        "publicSha256": "00cbaa9a122b7a02219bdf7bedd7b1824e6e744a4b430201e7a8e6585726e239",
+        "equal": true
+      },
+      {
+        "file": "icons/icon-192.png",
+        "status": 200,
+        "expectedSha256": "7a804e24cd03a592ac480b107567783388ae1de7b8eef2820299d6addbc85af5",
+        "publicSha256": "7a804e24cd03a592ac480b107567783388ae1de7b8eef2820299d6addbc85af5",
+        "equal": true
+      },
+      {
+        "file": "finize-logo.png",
+        "status": 200,
+        "expectedSha256": "b0d5e979f9bea750fa2a2bb25a0514033b64738caec987039b680886c0d66e88",
+        "publicSha256": "b0d5e979f9bea750fa2a2bb25a0514033b64738caec987039b680886c0d66e88",
+        "equal": true
+      }
+    ]
+  },
+  "publicBrowser": {
+    "checks": [
+      {
+        "width": 320,
+        "mode": "950-example",
+        "end": 300000,
+        "needed": 205000,
+        "safe": 95000,
+        "min": -185000,
+        "through": "2026-11-30",
+        "days": 30,
+        "lowestAfter": 20000,
+        "required": [
+          "2026-10",
+          "2026-11"
+        ],
+        "currentBudgetProtected": 0,
+        "planIndependent": true,
+        "noOverflow": true,
+        "noPageErrors": true
+      },
+      {
+        "width": 320,
+        "mode": "budget-month-end",
+        "end": 885000,
+        "needed": 200000,
+        "safe": 685000,
+        "min": -180000,
+        "through": "2026-11-30",
+        "days": 30,
+        "lowestAfter": 20000,
+        "required": [
+          "2026-10",
+          "2026-11"
+        ],
+        "currentBudgetProtected": 115000,
+        "planIndependent": true,
+        "noOverflow": true,
+        "noPageErrors": true
+      },
+      {
+        "width": 320,
+        "mode": "confirmed-close",
+        "end": 1000000,
+        "needed": 200000,
+        "safe": 800000,
+        "min": -180000,
+        "through": "2026-11-30",
+        "days": 30,
+        "lowestAfter": 20000,
+        "required": [
+          "2026-10",
+          "2026-11"
+        ],
+        "currentBudgetProtected": 0,
+        "planIndependent": true,
+        "noOverflow": true,
+        "noPageErrors": true
+      },
+      {
+        "width": 390,
+        "mode": "950-example",
+        "end": 300000,
+        "needed": 205000,
+        "safe": 95000,
+        "min": -185000,
+        "through": "2026-11-30",
+        "days": 30,
+        "lowestAfter": 20000,
+        "required": [
+          "2026-10",
+          "2026-11"
+        ],
+        "currentBudgetProtected": 0,
+        "planIndependent": true,
+        "noOverflow": true,
+        "noPageErrors": true
+      },
+      {
+        "width": 390,
+        "mode": "budget-month-end",
+        "end": 885000,
+        "needed": 200000,
+        "safe": 685000,
+        "min": -180000,
+        "through": "2026-11-30",
+        "days": 30,
+        "lowestAfter": 20000,
+        "required": [
+          "2026-10",
+          "2026-11"
+        ],
+        "currentBudgetProtected": 115000,
+        "planIndependent": true,
+        "noOverflow": true,
+        "noPageErrors": true
+      },
+      {
+        "width": 390,
+        "mode": "confirmed-close",
+        "end": 1000000,
+        "needed": 200000,
+        "safe": 800000,
+        "min": -180000,
+        "through": "2026-11-30",
+        "days": 30,
+        "lowestAfter": 20000,
+        "required": [
+          "2026-10",
+          "2026-11"
+        ],
+        "currentBudgetProtected": 0,
+        "planIndependent": true,
+        "noOverflow": true,
+        "noPageErrors": true
+      },
+      {
+        "width": 430,
+        "mode": "950-example",
+        "end": 300000,
+        "needed": 205000,
+        "safe": 95000,
+        "min": -185000,
+        "through": "2026-11-30",
+        "days": 30,
+        "lowestAfter": 20000,
+        "required": [
+          "2026-10",
+          "2026-11"
+        ],
+        "currentBudgetProtected": 0,
+        "planIndependent": true,
+        "noOverflow": true,
+        "noPageErrors": true
+      },
+      {
+        "width": 430,
+        "mode": "budget-month-end",
+        "end": 885000,
+        "needed": 200000,
+        "safe": 685000,
+        "min": -180000,
+        "through": "2026-11-30",
+        "days": 30,
+        "lowestAfter": 20000,
+        "required": [
+          "2026-10",
+          "2026-11"
+        ],
+        "currentBudgetProtected": 115000,
+        "planIndependent": true,
+        "noOverflow": true,
+        "noPageErrors": true
+      },
+      {
+        "width": 430,
+        "mode": "confirmed-close",
+        "end": 1000000,
+        "needed": 200000,
+        "safe": 800000,
+        "min": -180000,
+        "through": "2026-11-30",
+        "days": 30,
+        "lowestAfter": 20000,
+        "required": [
+          "2026-10",
+          "2026-11"
+        ],
+        "currentBudgetProtected": 0,
+        "planIndependent": true,
+        "noOverflow": true,
+        "noPageErrors": true
+      },
+      {
+        "width": 1440,
+        "mode": "950-example",
+        "end": 300000,
+        "needed": 205000,
+        "safe": 95000,
+        "min": -185000,
+        "through": "2026-11-30",
+        "days": 30,
+        "lowestAfter": 20000,
+        "required": [
+          "2026-10",
+          "2026-11"
+        ],
+        "currentBudgetProtected": 0,
+        "planIndependent": true,
+        "noOverflow": true,
+        "noPageErrors": true
+      },
+      {
+        "width": 1440,
+        "mode": "budget-month-end",
+        "end": 885000,
+        "needed": 200000,
+        "safe": 685000,
+        "min": -180000,
+        "through": "2026-11-30",
+        "days": 30,
+        "lowestAfter": 20000,
+        "required": [
+          "2026-10",
+          "2026-11"
+        ],
+        "currentBudgetProtected": 115000,
+        "planIndependent": true,
+        "noOverflow": true,
+        "noPageErrors": true
+      },
+      {
+        "width": 1440,
+        "mode": "confirmed-close",
+        "end": 1000000,
+        "needed": 200000,
+        "safe": 800000,
+        "min": -180000,
+        "through": "2026-11-30",
+        "days": 30,
+        "lowestAfter": 20000,
+        "required": [
+          "2026-10",
+          "2026-11"
+        ],
+        "currentBudgetProtected": 0,
+        "planIndependent": true,
+        "noOverflow": true,
+        "noPageErrors": true
+      }
+    ],
+    "syntheticOnly": true,
+    "externalOriginsAndNonReadRequestsBlocked": true,
+    "productionFinancialWrites": 0,
+    "realBankApiCalls": 0
+  },
+  "scope": {
+    "financialProductionDataRead": false,
+    "productionFinancialWrites": 0,
+    "realBankApiCalls": 0,
+    "financialExamples": "synthetic only"
+  }
+}
