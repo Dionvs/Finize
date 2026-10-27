@@ -532,8 +532,9 @@ export function selectDailyLiquidity(state, options) {
     firstShortfallDate:days.find(row=>row.expectedBalanceCents<0)?.date??null,firstBufferBreachDate:days.find(row=>row.expectedBalanceCents<forward.bufferCents)?.date??null};
 }
 
-/** Uses P2's actual/concrete cash once. Budget estimates are replaced by a full
- * monthly envelope from the first day of that month, carried through the guard.
+/** Uses P2's concrete cash and cumulative daily budget estimates exactly once.
+ * Full months consume their whole remaining pot; a partial guard consumes only
+ * its assessed days. It does not establish coverage beyond assessmentEndDate.
  * A deadline protects an undated debit without inventing a bank payment day. */
 export function selectMonthEndSavings(state,options){
   const {month,asOfDate,accountProfileId}=options;
@@ -559,8 +560,9 @@ export function selectMonthEndSavings(state,options){
     reasons:input.reasons.filter(r=>!candidateIds.has(r.eventId)&&!(r.code==='unknown-cash-date'&&boundedIds.has(r.eventId)))};
   const projection=projectDailyLiquidity(normalized);
   const reasons=[...projection.reasons,...(!reliableGuard?[issue('missing-saving-horizon')]:[])];
+  let budgetReservedCents=0;
   const protectionDays=projection.days.map(day=>{
-    const budgetReservedCents=sum(projection.reservations.filter(r=>r.type==='budget'&&r.month<=day.date.slice(0,7)).map(r=>r.amountCents));
+    budgetReservedCents=safe(budgetReservedCents+day.estimatedBudgetCents);
     const undatedReservedCents=sum(projection.reservations.filter(r=>r.type==='undated-obligation'&&(!r.month||r.month<=day.date.slice(0,7)||r.deadlineDate<=day.date)).map(r=>r.amountCents));
     return {date:day.date,cashBalanceCents:day.cashBalanceCents,budgetReservedCents,undatedReservedCents,
       protectedBalanceCents:safe(day.cashBalanceCents-budgetReservedCents-undatedReservedCents)};

@@ -3916,8 +3916,9 @@
     };
     const projection = projectDailyLiquidity(normalized);
     const reasons2 = [...projection.reasons, ...!reliableGuard ? [issue("missing-saving-horizon")] : []];
+    let budgetReservedCents = 0;
     const protectionDays = projection.days.map((day) => {
-      const budgetReservedCents = sum(projection.reservations.filter((r) => r.type === "budget" && r.month <= day.date.slice(0, 7)).map((r) => r.amountCents));
+      budgetReservedCents = safe(budgetReservedCents + day.estimatedBudgetCents);
       const undatedReservedCents = sum(projection.reservations.filter((r) => r.type === "undated-obligation" && (!r.month || r.month <= day.date.slice(0, 7) || r.deadlineDate <= day.date)).map((r) => r.amountCents));
       return {
         date: day.date,
@@ -4139,7 +4140,7 @@
   var calculationHelp = (p) => {
     var _a2;
     const s = p.monthEndSavings;
-    return s ? `<p>Het maximaal over te boeken bedrag op ${savingDate(s.transferDate)}. Dit is geen geld dat vandaag vrij besteedbaar is.</p><p>De berekening gebruikt het vastgelegde saldo en de aanwezige transacties. Werk zelf je bank bij op de laatste dag van de maand. Onbevestigde bankdekking is informatief en houdt het bedrag niet tegen.</p><p>Verwacht eindsaldo: ${money2(s.expectedEndBalanceCents)}<br>Nodig vanaf volgende maand: ${money2(s.requiredOpeningCents)}<br>Inclusief permanente buffer: ${money2((_a2 = s.bufferCents) != null ? _a2 : p.bufferCents)}.</p><p>De hele volgende maand telt mee, plus de periode tot en met de eerstvolgende salaris- of zakgeldontvangst daarna (${date(s.assessmentEndDate)}). De volledige resterende budgetpot wordt vanaf het begin van iedere betrokken maand beschermd, ook in de maand van die ontvangst. De dagelijkse budgetschatting wordt hier niet daarnaast afgetrokken. Gepland sparen en Extra ruimte zijn alleen een vergelijking; de bestaande planning wordt niet automatisch gewijzigd.</p>` : "";
+    return s ? `<p>Het maximaal over te boeken bedrag op ${savingDate(s.transferDate)}. Dit is geen geld dat vandaag vrij besteedbaar is.</p><p>De berekening gebruikt het vastgelegde saldo en de aanwezige transacties. Werk zelf je bank bij op de laatste dag van de maand. Onbevestigde bankdekking is informatief en houdt het bedrag niet tegen.</p><p>Verwacht eindsaldo: ${money2(s.expectedEndBalanceCents)}<br>Nodig vanaf volgende maand: ${money2(s.requiredOpeningCents)}<br>Inclusief permanente buffer: ${money2((_a2 = s.bufferCents) != null ? _a2 : p.bufferCents)}.</p><p>De hele volgende maand telt mee, plus de periode tot en met de eerstvolgende salaris- of zakgeldontvangst daarna (${date(s.assessmentEndDate)}). Het resterende variabele maandbudget wordt dagelijks gespreid en is op maandultimo volledig verwerkt. In de laatste, gedeeltelijk gecontroleerde maand tellen alleen de dagen tot en met de genoemde einddatum mee. De rest van die maand is hiermee niet als gedekt aangetoond; bereken opnieuw met actuele gegevens voordat je later geld overboekt. Concrete budgetbetalingen verlagen de nog te spreiden pot en tellen niet dubbel mee. Gepland sparen en Extra ruimte zijn alleen een vergelijking; de bestaande planning wordt niet automatisch gewijzigd.</p>` : "";
   };
   function qualityHelp(p) {
     var _a2;

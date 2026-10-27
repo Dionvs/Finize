@@ -31,20 +31,22 @@ test('D: same cent allocation, five-category 153.40 becomes one-pot 153.36 for N
  assert.equal(p.days.filter(d=>d.date>'2026-10-26'&&d.date<'2026-11-01').reduce((n,d)=>n+d.estimatedBudgetCents,0),3546);
  assert.deepEqual(p.days.filter(d=>d.date>='2026-11-01').map(d=>d.estimatedBudgetCents),[3834,3834,3834,3834]);
 });
-test('E/F: protect full monthly envelopes before late salaries, carry each once and retain 200 on every day',()=>{
+test('E/F revised: daily monthly envelopes carry each cent once and retain 200 on every assessed day',()=>{
  const s=budgets(fixture({balance:1000000})),p=saving(s);
- assert.equal(p.expectedEndBalanceCents,885000);assert.equal(p.requiredOpeningCents,320000);assert.equal(p.safeCents,565000);
- // Oct 8850; Nov 1: -1800 -1150 => 5900; Nov 5 +2000;
- // Nov 24 +1000; Nov 25 -100; Dec 1 -1800 -1150 => 5850; Dec 5 +2000.
- const nov=p.protectionDays.find(d=>d.date==='2026-11-01');assert.equal(nov.budgetReservedCents,230000);assert.equal(nov.protectedBalanceCents,590000);
- const dec=p.protectionDays.find(d=>d.date==='2026-12-01');assert.equal(dec.budgetReservedCents,345000);assert.equal(dec.protectedBalanceCents,585000);
+ assert.equal(p.expectedEndBalanceCents,885000);assert.equal(p.requiredOpeningCents,219840);assert.equal(p.safeCents,665160);
+ // October is fully consumed at month-end. Nov 1 adds only 38.34;
+ // Dec 1 adds only 37.10. Minimum is Dec 4, before the next salary.
+ const nov=p.protectionDays.find(d=>d.date==='2026-11-01');assert.equal(nov.budgetReservedCents,118834);assert.equal(nov.protectedBalanceCents,701166);
+ const dec=p.protectionDays.find(d=>d.date==='2026-12-01');assert.equal(dec.budgetReservedCents,233710);assert.equal(dec.protectedBalanceCents,696290);
  for(const d of p.protectionDays.filter(d=>d.date>=p.transferDate))assert(d.protectedBalanceCents-p.safeCents>=20000,d.date);
  const lowest=p.protectionDays.filter(d=>d.date>=p.transferDate).reduce((a,b)=>a.protectedBalanceCents<b.protectedBalanceCents?a:b);assert.equal(lowest.protectedBalanceCents-p.safeCents,20000);
  const q=projectDailyLiquidity(input(s,'2026-12-05'));assert(q.days.at(-1).estimatedBudgetCents>0);assert.equal(q.days.at(-1).cashBalanceCents,p.protectionDays.at(-1).cashBalanceCents);
 });
-test('E: future actual budget purchase plus remaining envelope count exactly once',()=>{
+test('E revised: future actual budget purchase plus remaining daily envelope count exactly once',()=>{
  const s=budgets(fixture({balance:1000000})),a=saving(s);expense(s,100,0,'2026-11-02');const b=saving(s);
- assert.equal(b.safeCents,a.safeCents);assert.equal(b.protectionDays.at(-1).cashBalanceCents,a.protectionDays.at(-1).cashBalanceCents-10000);
+ // Same complete-month total; earlier real spending changes the minimum.
+ assert.equal(a.safeCents,665160);assert.equal(b.safeCents,661000);assert.equal(b.protectionDays.find(d=>d.date==='2026-11-30').protectedBalanceCents,a.protectionDays.find(d=>d.date==='2026-11-30').protectedBalanceCents);
+ assert.equal(b.protectionDays.at(-1).cashBalanceCents,a.protectionDays.at(-1).cashBalanceCents-10000);
  assert.equal(b.protectionDays.at(-1).budgetReservedCents,a.protectionDays.at(-1).budgetReservedCents-10000);
 });
 function undated(s,bounded=true){
