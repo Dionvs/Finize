@@ -1,0 +1,114 @@
+{
+  "implementationCommit": "45e508d462c0721ba2806035e93a45a6601d06e7",
+  "workBranch": "codex/v118-budgettiming",
+  "releaseBranch": "main",
+  "release": "V118-r22",
+  "pagesRun": "https://github.com/Dionvs/Finize/actions/runs/40497707186",
+  "pagesConclusion": "success",
+  "publicUrl": "https://dionvs.github.io/Finize/",
+  "hashes": {
+    "commit": "45e508d462c0721ba2806035e93a45a6601d06e7",
+    "checks": [
+      {
+        "file": "index.html",
+        "status": 200,
+        "expectedSha256": "0172a505ed059c74409e4453ec5707f1fdf70caa74808ebff1643b8985f9c28d",
+        "publicSha256": "0172a505ed059c74409e4453ec5707f1fdf70caa74808ebff1643b8985f9c28d",
+        "equal": true
+      },
+      {
+        "file": "app.js",
+        "status": 200,
+        "expectedSha256": "a3ab0c322f17c1306a61738e58cc4540b1efc3b04ff8e79a60b866e8fca82492",
+        "publicSha256": "a3ab0c322f17c1306a61738e58cc4540b1efc3b04ff8e79a60b866e8fca82492",
+        "equal": true
+      },
+      {
+        "file": "app.css",
+        "status": 200,
+        "expectedSha256": "0fee0c04132df2ad75fbf6b1b5c4cf74452c6e8f9436f40585cf4b0bb58b1252",
+        "publicSha256": "0fee0c04132df2ad75fbf6b1b5c4cf74452c6e8f9436f40585cf4b0bb58b1252",
+        "equal": true
+      },
+      {
+        "file": "service-worker.js",
+        "status": 200,
+        "expectedSha256": "c8dcd3889ca9ad38ce478c9f98b67e8b272c55d9054ddc151cfb798a4c284d12",
+        "publicSha256": "c8dcd3889ca9ad38ce478c9f98b67e8b272c55d9054ddc151cfb798a4c284d12",
+        "equal": true
+      },
+      {
+        "file": "manifest.json",
+        "status": 200,
+        "expectedSha256": "00cbaa9a122b7a02219bdf7bedd7b1824e6e744a4b430201e7a8e6585726e239",
+        "publicSha256": "00cbaa9a122b7a02219bdf7bedd7b1824e6e744a4b430201e7a8e6585726e239",
+        "equal": true
+      },
+      {
+        "file": "icons/icon-192.png",
+        "status": 200,
+        "expectedSha256": "7a804e24cd03a592ac480b107567783388ae1de7b8eef2820299d6addbc85af5",
+        "publicSha256": "7a804e24cd03a592ac480b107567783388ae1de7b8eef2820299d6addbc85af5",
+        "equal": true
+      },
+      {
+        "file": "finize-logo.png",
+        "status": 200,
+        "expectedSha256": "b0d5e979f9bea750fa2a2bb25a0514033b64738caec987039b680886c0d66e88",
+        "publicSha256": "b0d5e979f9bea750fa2a2bb25a0514033b64738caec987039b680886c0d66e88",
+        "equal": true
+      }
+    ]
+  },
+  "browser": {
+    "checks": [
+      {
+        "width": 320,
+        "safeCents": 665160,
+        "planIndependent": true,
+        "boundedHorizonExplanation": true,
+        "coverageAdvisory": true,
+        "missingDatesBlock": true,
+        "noOverflow": true,
+        "noPageErrors": true
+      },
+      {
+        "width": 390,
+        "safeCents": 665160,
+        "planIndependent": true,
+        "boundedHorizonExplanation": true,
+        "coverageAdvisory": true,
+        "missingDatesBlock": true,
+        "noOverflow": true,
+        "noPageErrors": true
+      },
+      {
+        "width": 430,
+        "safeCents": 665160,
+        "planIndependent": true,
+        "boundedHorizonExplanation": true,
+        "coverageAdvisory": true,
+        "missingDatesBlock": true,
+        "noOverflow": true,
+        "noPageErrors": true
+      },
+      {
+        "width": 1440,
+        "safeCents": 665160,
+        "planIndependent": true,
+        "boundedHorizonExplanation": true,
+        "coverageAdvisory": true,
+        "missingDatesBlock": true,
+        "noOverflow": true,
+        "noPageErrors": true
+      }
+    ],
+    "syntheticOnly": true,
+    "productionWrites": 0,
+    "bankApiCalls": 0,
+    "externalOriginsAndNonReadRequestsBlocked": true
+  },
+  "nodeTestFiles": 85,
+  "focusedNodeCases": 44,
+  "localBrowserCases": 55
+}

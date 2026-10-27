@@ -108,4 +108,12 @@ node node_modules/@playwright/test/cli.js test tests/browser/month-end-budget-ti
 
 De upgradeproef vereist de r21-shell uit commit `7a6c48d` in `.cache/budgettiming-previous-shell`; deze fixture was aanwezig bij de uitgevoerde releasecontrole. Zonder fixture meldt die test expliciet een skip. De vergelijkingsgenerator haalt uitsluitend Git-bronnen op en schrijft lokaal; geen bank- of cloudtoegang.
 
-Browser- en publicatiestatus worden hieronder na afronding vastgelegd. Er zijn nul productie-Firestorewijzigingen, nul echte banksynchronisaties en geen wijzigingen aan bestaande transacties, budgetbedragen, financiële eigenaren, betaalafspraken, rekeningen of koppelingen uitgevoerd.
+Er zijn nul productie-Firestorewijzigingen, nul echte banksynchronisaties en geen wijzigingen aan bestaande transacties, budgetbedragen, financiële eigenaren, betaalafspraken, rekeningen of koppelingen uitgevoerd.
+
+## Commit en publicatiestatus
+
+Implementatiecommit: `45e508d462c0721ba2806035e93a45a6601d06e7`. Branch `codex/v118-budgettiming` is gepusht en via fast-forward opgenomen in `main`. Release **V118-r22** staat live op [GitHub Pages](https://dionvs.github.io/Finize/). [Pages-run 40497707186](https://github.com/Dionvs/Finize/actions/runs/40497707186) is geslaagd.
+
+Zeven openbare bestanden geven HTTP 200 en zijn SHA-256-identiek aan de implementatiecommit, inclusief app.js, index.html en service-worker.js. De CSS is byte-identiek aan r21. Vier aanvullende openbare browserproeven op 320/390/430/1440 px slagen: €6.651,60 capaciteit, onafhankelijk spaarplan, expliciete horizonbegrenzing, voorlopige bankdekking, blokkade bij ontbrekende betaaldatum, geen voortgangsteksten, geen horizontale overloop en geen paginafouten. De openbare mobiele screenshot is geopend.
+
+Deze proeven gebruiken uitsluitend synthetische lokale accountgegevens. Alle externe origins en alle niet-leesverzoeken zijn geblokkeerd. Geen echte authenticatie-, cloud- of banksynchronisatieclaim. [Machineleesbaar publicatiebewijs](finize-budgettiming-r22-public-20261027.json). Dit bewijs en de definitieve rapportstatus worden als afzonderlijke documentatiecommit gepubliceerd; de geteste financiële bron en runtime blijven ongewijzigd.
