@@ -1,0 +1,132 @@
+{
+  "release": "V118-r19",
+  "date": "2026-10-27",
+  "implementationCommit": "7fc20db19cd0ed9638bbd3c669946d973cc84bb8",
+  "implementationBranch": "codex/v118-liquiditeit-spaarcapaciteit",
+  "mergedInto": "main",
+  "pages": {
+    "runId": 40462549359,
+    "conclusion": "success",
+    "url": "https://github.com/Dionvs/Finize/actions/runs/40462549359"
+  },
+  "tests": {
+    "nodeFilesPassed": 82,
+    "newRegressionCasesPassed": 18,
+    "finalFocusedBrowserPassed": 46,
+    "finalFocusedBrowserFailed": 0,
+    "finalFocusedBrowserSkipped": 0,
+    "additionalP7BrowserPassed": 14,
+    "olderP4BrowserFailures": 11,
+    "distinctOlderScenarioFamiliesReproducedOnUnmodifiedR18": 6,
+    "syntax": true,
+    "css": true,
+    "knownCssUndefinedTokens": [
+      "--line"
+    ],
+    "reproducibleBuild": true,
+    "diffCheck": true,
+    "uiDetectorFindings": []
+  },
+  "assets": [
+    {
+      "file": "index.html",
+      "status": 200,
+      "expectedSha256": "1b745250061704dd6e9fb90e9179dd674b33733fdfc2d6db8f3330f02344274c",
+      "publicSha256": "1b745250061704dd6e9fb90e9179dd674b33733fdfc2d6db8f3330f02344274c",
+      "equal": true
+    },
+    {
+      "file": "app.js",
+      "status": 200,
+      "expectedSha256": "c760e293bde7b3632816766560ba569cf0e021e61a7d1c8660db88196d6e63dd",
+      "publicSha256": "c760e293bde7b3632816766560ba569cf0e021e61a7d1c8660db88196d6e63dd",
+      "equal": true
+    },
+    {
+      "file": "app.css",
+      "status": 200,
+      "expectedSha256": "26d97aa5f47bb45c25e01b5e2391801ecc5f6f8158effd9193152eeb6f03466a",
+      "publicSha256": "26d97aa5f47bb45c25e01b5e2391801ecc5f6f8158effd9193152eeb6f03466a",
+      "equal": true
+    },
+    {
+      "file": "service-worker.js",
+      "status": 200,
+      "expectedSha256": "072dc065283fe7ba84afa3f4deebc9d70930472a999b2852cdf86b04cdd8f610",
+      "publicSha256": "072dc065283fe7ba84afa3f4deebc9d70930472a999b2852cdf86b04cdd8f610",
+      "equal": true
+    },
+    {
+      "file": "manifest.json",
+      "status": 200,
+      "expectedSha256": "00cbaa9a122b7a02219bdf7bedd7b1824e6e744a4b430201e7a8e6585726e239",
+      "publicSha256": "00cbaa9a122b7a02219bdf7bedd7b1824e6e744a4b430201e7a8e6585726e239",
+      "equal": true
+    },
+    {
+      "file": "icons/icon-192.png",
+      "status": 200,
+      "expectedSha256": "7a804e24cd03a592ac480b107567783388ae1de7b8eef2820299d6addbc85af5",
+      "publicSha256": "7a804e24cd03a592ac480b107567783388ae1de7b8eef2820299d6addbc85af5",
+      "equal": true
+    },
+    {
+      "file": "finize-logo.png",
+      "status": 200,
+      "expectedSha256": "b0d5e979f9bea750fa2a2bb25a0514033b64738caec987039b680886c0d66e88",
+      "publicSha256": "b0d5e979f9bea750fa2a2bb25a0514033b64738caec987039b680886c0d66e88",
+      "equal": true
+    }
+  ],
+  "publicBrowser": {
+    "checks": [
+      {
+        "width": 320,
+        "capacity750": true,
+        "plan600CapacityUnchanged": true,
+        "incompleteSuppressesAmounts": true,
+        "noProgressTexts": true,
+        "noOverflow": true,
+        "noPageErrors": true
+      },
+      {
+        "width": 390,
+        "capacity750": true,
+        "plan600CapacityUnchanged": true,
+        "incompleteSuppressesAmounts": true,
+        "noProgressTexts": true,
+        "noOverflow": true,
+        "noPageErrors": true
+      },
+      {
+        "width": 430,
+        "capacity750": true,
+        "plan600CapacityUnchanged": true,
+        "incompleteSuppressesAmounts": true,
+        "noProgressTexts": true,
+        "noOverflow": true,
+        "noPageErrors": true
+      },
+      {
+        "width": 1440,
+        "capacity750": true,
+        "plan600CapacityUnchanged": true,
+        "incompleteSuppressesAmounts": true,
+        "noProgressTexts": true,
+        "noOverflow": true,
+        "noPageErrors": true
+      }
+    ],
+    "syntheticLocalOnly": true,
+    "externalOriginsBlocked": true,
+    "productionDataWrites": 0,
+    "realBankApiCalls": 0
+  },
+  "scope": {
+    "productionFinancialDataRead": false,
+    "productionFinancialDataWrites": 0,
+    "realBankApiCalls": 0,
+    "sourceOfFinancialExamples": "synthetic fixtures and user supplied diagnostic totals",
+    "actualProductionForecastConfirmed": false
+  }
+}
