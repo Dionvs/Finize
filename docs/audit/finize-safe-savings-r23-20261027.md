@@ -61,4 +61,12 @@ Geen productie-Firestore, bankkoppelingen, echte transacties of andere financië
 
 ## Publicatie
 
-Implementatiecommit, Pages-status en openbare nacontrole worden na afronding toegevoegd. De broncode wordt alleen gepubliceerd na de hierboven genoemde controles; eventuele aanvullende closeoutwijzigingen betreffen uitsluitend dit verslag en het publicatiebewijs.
+Implementatiecommit: `e4032d143202b50ae3029acc5dcf9cc236b38aac`. De werkbranch is gepusht en zonder force via fast-forward opgenomen in `main`. **V118-r23 staat live** op [Finize](https://dionvs.github.io/Finize/). [GitHub Pages-run 40539878622](https://github.com/Dionvs/Finize/actions/runs/40539878622) is geslaagd.
+
+Zeven openbare bestanden geven HTTP 200 en zijn SHA-256-identiek aan de implementatiecommit: index.html, app.js, app.css, service-worker.js, manifest.json, icons/icon-192.png en finize-logo.png. De CSS is ongewijzigd ten opzichte van r22.
+
+Acht openbare synthetische browserproeven slagen: twee scenario's op 320/390/430/1440 px. De €950- en €6.850-uitkomsten worden op de daadwerkelijk gepubliceerde runtime gecontroleerd; beide simulaties tellen dertig novemberdagen, stoppen op 30 november, vragen geen decembergegevens op en houden na de maximale spaaroverboeking een minimum van precies €200. Een wijziging van Gepland sparen naar €600 verandert de capaciteit niet. Geen horizontale overloop of paginafouten. De openbare mobiele en desktopscreenshots zijn daadwerkelijk geopend.
+
+Alle externe origins en alle niet-leesverzoeken zijn tijdens de openbare proeven geblokkeerd. De tijdelijke browsercontexten gebruiken uitsluitend synthetische lokale gegevens en de bestaande auth-testdriver. Dit bewijst geen echte authenticatie, cloudverbinding of bankwerking. Geen productiegegevenswrites of bank-API-acties.
+
+[Machineleesbaar publicatiebewijs](finize-safe-savings-r23-public-20261027.json). Alleen dit verslag en het bewijs worden na de implementatie als documentaire closeoutcommit toegevoegd; de geteste financiële broncode en runtime blijven gelijk.
