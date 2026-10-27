@@ -32,3 +32,11 @@ test('3000 end balance leaves 950 safe savings and at least 200 on every next-mo
  await card.locator('[data-p3-info="free"]').click();await expect(page.locator('#p3-info-free')).toContainText('2.050,00');
  expect(await page.evaluate(()=>JSON.stringify(state))).toBe(before);
 });
+
+test('confirmed month-end bank cash is not reduced by the unused budget of the closed month',async({page})=>{
+ const {fixture}=require('../helpers/month-end-savings.cjs'),s=fixture({asOf:'2026-10-31',balance:1000000});s.budgetDefaultsHistory=timingFixture().budgetDefaultsHistory;
+ await page.clock.setFixedTime(new Date('2026-10-31T12:00:00Z'));await page.route('https://**',r=>r.abort());await page.addInitScript(seed=>localStorage.setItem('finize-budget-planner-v1',JSON.stringify(seed)),{...visual,...s});
+ await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);const card=page.locator('.p3-kpi').first();await expect(card.locator('.p3-kpi-copy>strong')).toHaveText('€ 8.000,00');
+ const p=await page.evaluate(async()=>(await FinizeLiquidity.project({accountProfileId:'joint',asOfDate:'2026-10-31',incomeKpis:true,monthEndSavingsMonth:'2026-10'})).monthEndSavings);
+ expect(p.expectedEndBalanceCents).toBe(1000000);expect(p.requiredOpeningCents).toBe(200000);expect(p.protectionDays[0].budgetReservedCents).toBe(0);expect(p.protectionDays.at(-1).budgetReservedCents).toBe(115000);
+});

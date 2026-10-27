@@ -72,3 +72,14 @@ test('configured salary day changes required opening; graph day spread and setti
  const earlier=saving(s);assert.equal(earlier.minimumCumulativeCents,-5000);assert.equal(earlier.requiredOpeningCents,25000);
  assert(earlier.safeCents>p.monthEndSavings.safeCents);
 });
+
+test('confirmed month-end cash releases unspent current budget: 100 less spent means 100 more savings, without changing next month',()=>{
+ const project=spent=>{const s=variable(fixture({asOf:'2026-10-31',balance:1000000-spent*100}),1150);if(spent)purchase(s,{amount:spent,date:'2026-10-03'});const before=structuredClone(s),p=saving(s);assert.deepEqual(s,before);return p;};
+ const a=project(0),b=project(100);assert.equal(a.expectedEndBalanceCents,1000000);assert.equal(b.expectedEndBalanceCents,990000);assert.equal(a.requiredOpeningCents,200000);assert.equal(b.requiredOpeningCents,200000);assert.equal(a.safeCents,800000);assert.equal(b.safeCents,790000);
+ assert.equal(a.safeCents-b.safeCents,10000);assert.equal(a.expectedEndBalanceCents-a.safeCents,b.expectedEndBalanceCents-b.safeCents);
+ for(const p of [a,b]){assert.equal(p.protectionDays[0].budgetReservedCents,0);assert.equal(p.protectionDays.at(-1).budgetReservedCents,115000);for(const d of p.protectionDays.filter(d=>d.date>p.transferDate))assert(d.protectedBalanceCents-p.safeCents>=20000,d.date);}
+});
+
+test('a balance carried forward from yesterday is not silently treated as a confirmed month-end close',()=>{
+ const s=variable(fixture({asOf:'2026-10-31',balance:1000000}),1150);s.balanceCheckpoints[0].asOfDate='2026-10-30';const p=selectMonthEndSavings(s,{...options(s),asOfDate:'2026-10-31'});assert.equal(p.expectedEndBalanceCents,885000);assert.equal(p.indicativeCents,685000);assert.equal(p.protectionDays[0].budgetReservedCents,115000);
+});

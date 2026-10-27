@@ -555,10 +555,13 @@ export function selectMonthEndSavings(state,options){
     reasons:input.reasons.filter(r=>!candidateIds.has(r.eventId)&&!(r.code==='unknown-cash-date'&&boundedIds.has(r.eventId)))};
   const projection=projectDailyLiquidity(normalized);
   const reasons=[...projection.reasons];
+  // A confirmed closing balance already contains the whole bank day. Unspent
+  // budget from that closed month remains cash; it is not a future payment.
+  const closedOpeningMonth=input.opening.boundary==='end-of-bank-day'&&input.opening.checkpoint?.asOfDate===asOfDate&&asOfDate===monthEnd(asOfDate.slice(0,7))?asOfDate.slice(0,7):null;
   const protectionDays=projection.days.map(day=>{
     // Concrete budget payments already affect cash and reduce these remaining
     // pots in P2. Deduct each remainder once, on its last calendar day only.
-    const budgetReservedCents=sum(projection.reservations.filter(r=>r.type==='budget'&&monthEnd(r.month)<=day.date).map(r=>r.amountCents));
+    const budgetReservedCents=sum(projection.reservations.filter(r=>r.type==='budget'&&r.month!==closedOpeningMonth&&monthEnd(r.month)<=day.date).map(r=>r.amountCents));
     const undatedReservedCents=sum(projection.reservations.filter(r=>r.type==='undated-obligation'&&(!r.month||r.month<=day.date.slice(0,7)||r.deadlineDate<=day.date)).map(r=>r.amountCents));
     return {date:day.date,cashBalanceCents:day.cashBalanceCents,budgetReservedCents,undatedReservedCents,
       protectedBalanceCents:safe(day.cashBalanceCents-budgetReservedCents-undatedReservedCents)};

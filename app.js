@@ -3891,6 +3891,7 @@
     };
   }
   function selectMonthEndSavings(state2, options) {
+    var _a2;
     const { month, asOfDate, accountProfileId } = options;
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month) || !validCalendarDate(asOfDate)) throw new Error("Kies een geldige maand voor de spaarprognose.");
     const transferDate = monthEnd(month), nextMonth = nextPlanningMonth(month), nextMonthEnd = monthEnd(nextMonth);
@@ -3912,8 +3913,9 @@
     };
     const projection = projectDailyLiquidity(normalized);
     const reasons2 = [...projection.reasons];
+    const closedOpeningMonth = input.opening.boundary === "end-of-bank-day" && ((_a2 = input.opening.checkpoint) == null ? void 0 : _a2.asOfDate) === asOfDate && asOfDate === monthEnd(asOfDate.slice(0, 7)) ? asOfDate.slice(0, 7) : null;
     const protectionDays = projection.days.map((day) => {
-      const budgetReservedCents = sum(projection.reservations.filter((r) => r.type === "budget" && monthEnd(r.month) <= day.date).map((r) => r.amountCents));
+      const budgetReservedCents = sum(projection.reservations.filter((r) => r.type === "budget" && r.month !== closedOpeningMonth && monthEnd(r.month) <= day.date).map((r) => r.amountCents));
       const undatedReservedCents = sum(projection.reservations.filter((r) => r.type === "undated-obligation" && (!r.month || r.month <= day.date.slice(0, 7) || r.deadlineDate <= day.date)).map((r) => r.amountCents));
       return {
         date: day.date,
