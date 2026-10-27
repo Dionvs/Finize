@@ -18,8 +18,8 @@ test('an explicit end-of-day checkpoint for today does not replay the unproved p
 test('a still-unmatched plan from yesterday remains undated/incomplete; no fictitious payment day is assigned',()=>{
  const s=setup();s.recurringFixedExpenses[0].afschrijfdag=26;const p=selectDailyLiquidity(s,opts(s));const e=p.events.find(e=>e.type==='fixed');assert.equal(e.date,null);assert.equal(e.plannedDate,'2026-10-26');assert.equal(p.minimumBalanceCents,275000);assert.equal(p.status,'incomplete');
 });
-test('the savings assessment includes current-day obligations but still blocks unknown bank coverage',()=>{
- const s=setup(),a=selectMonthEndSavings(s,{...opts(s),month:'2026-10'});assert.equal(a.safeCents,null);assert(a.reasons.some(r=>r.code==='unknown-bank-coverage'));assert(!a.reasons.some(r=>r.code==='unknown-cash-date'));assert.equal(a.protectionDays.find(d=>d.date==='2026-10-31').protectedBalanceCents,265000);
+test('the savings assessment includes current-day obligations and treats unknown coverage as advisory',()=>{
+ const s=setup(),a=selectMonthEndSavings(s,{...opts(s),month:'2026-10'});assert.equal(a.safeCents,null);assert.equal(a.status,'provisional');assert.equal(a.indicativeCents,245000);assert(a.reasons.some(r=>r.code==='unknown-bank-coverage'));assert(!a.reasons.some(r=>r.code==='unknown-cash-date'));assert.equal(a.protectionDays.find(d=>d.date==='2026-10-31').protectedBalanceCents,265000);
 });
 test('complete evidenced bank coverage allows the same current-day obligation to be assessed without a fictitious date gap',()=>{
  const s=setup(),coverage=[{version:1,recordType:'coverage',householdId:'legacy',accountProfileId:'joint',channel:'bank-api',authority:'test',identity:null,facts:{fromDate:'2026-10-27',toDate:'2026-10-27',completeness:'complete',basis:'provider-assertion'},provenance:{payload:{confirmed:true}}}];

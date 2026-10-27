@@ -569,7 +569,10 @@ export function selectMonthEndSavings(state,options){
   const plannedCents=sum(input.savingsPlans.filter(p=>p.month===month&&p.owner===profile?.accountOwner).map(p=>p.amountCents));
   if(monthlyTransfers.length>1&&!options.savingsTransferId)reasons.push(issue('ambiguous-saving-plan'));
   const base={...empty,assessmentEndDate,bufferCents:normalized.bufferCents,plannedCents,requiredMonths:input.requiredMonths,reasons,protectionDays};
-  const blocked=!selected||projection.opening.balanceCents===null||reasons.some(r=>r.severity==='incomplete'||['unknown-cash-date','partial-bank-coverage','unknown-bank-coverage','missing-checkpoint'].includes(r.code));
+  // Coverage is advisory: the user updates the bank at month-end. Calculate
+  // from the available balance/transactions without claiming complete coverage.
+  const coverageAdvisories=new Set(['partial-bank-coverage','unknown-bank-coverage']);
+  const blocked=!selected||projection.opening.balanceCents===null||reasons.some(r=>!coverageAdvisories.has(r.code)&&(r.severity==='incomplete'||['unknown-cash-date','missing-checkpoint'].includes(r.code)));
   if(blocked)return {...base,status:selected?'incomplete':'unknown'};
   const end=selected.protectedBalanceCents;
   const future=protectionDays.filter(d=>d.date>transferDate);

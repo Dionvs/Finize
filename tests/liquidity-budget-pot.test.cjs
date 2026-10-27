@@ -72,8 +72,8 @@ test('H/I: full plan is comparison only: 750/500/250, 750/600/150, 300/500/0',()
  s.monthlySavingOverrides={'2026-10':{gezamenlijk:600}};const b=saving(s);assert.equal(b.safeCents,75000);assert.equal(b.extraCents,15000);assert.deepEqual(a.protectionDays,b.protectionDays);assert.equal(financialForecastForMonth(s,'2026-10').household.income,before.household.income);
  const c=saving(fixture({balance:230000}));assert.equal(c.safeCents,30000);assert.equal(c.plannedCents,50000);assert.equal(c.extraCents,0);
 });
-test('J: partial bank coverage never produces capacity or extra space',()=>{
- const s=fixture();s.balanceCheckpoints[0].asOfDate='2026-10-20';const p=selectMonthEndSavings(s,{...options(s),asOfDate:'2026-10-26'});assert.equal(p.safeCents,null);assert.equal(p.indicativeCents,null);assert.equal(p.extraCents,null);assert.equal(p.plannedCents,50000);
+test('J revised: unconfirmed coverage shows the amount from available cash and keeps the coverage reason',()=>{
+ const s=fixture();s.balanceCheckpoints[0].asOfDate='2026-10-20';const p=selectMonthEndSavings(s,{...options(s),asOfDate:'2026-10-26'});assert.equal(p.safeCents,null);assert.equal(p.status,'provisional');assert.equal(p.indicativeCents,75000);assert.equal(p.extraCents,25000);assert.equal(p.plannedCents,50000);assert(p.reasons.some(r=>r.code==='unknown-bank-coverage'));
 });
 test('M: owner and physical account are separate pots, including actual spending on another account',()=>{
  const s=budgets(fixture(),[600,150]);s.accountProfiles.push({id:'second',identifier:'NL02SECOND',accountOwner:'gezamenlijk',accountType:'payment',status:'active'});

@@ -17,3 +17,10 @@ test('only informative plan changes: 750/600/150; plan above capacity: 300/500/0
  const card=page.locator('.p3-kpi').first();await expect(card.locator('.p3-kpi-copy>strong')).toHaveText('€ 750,00');await expect(card.locator('[data-p3-savings-plan]')).toContainText('€ 600,00');await expect(card.locator('[data-p3-savings-extra]')).toContainText('€ 150,00');
  await page.evaluate(()=>{state.monthlySavingOverrides={};state.balanceCheckpoints[0].amountCents=230000;renderActiveTab();});await expect(card.locator('.p3-kpi-copy>strong')).toHaveText('€ 300,00');await expect(card.locator('[data-p3-savings-plan]')).toContainText('€ 500,00');await expect(card.locator('[data-p3-savings-extra]')).toContainText('€ 0,00');
 });
+for(const width of [320,390,430,1440])test('coverage is advisory while unavailable payment dates still block the amount '+width,async({page},info)=>{
+ await boot(page,width);await page.evaluate(()=>{state.balanceCheckpoints[0].asOfDate='2026-10-20';renderActiveTab();});const card=page.locator('.p3-kpi').first();
+ await expect(card.locator('.p3-kpi-copy>strong')).toHaveText('€ 750,00');await expect(card.locator('[data-p3-savings-extra]')).toContainText('€ 250,00');await expect(page.locator('[data-p3-outlook]')).not.toContainText('Onvolledige spaarprognose');
+ await card.locator('[data-p3-info="free"]').click();await expect(page.locator('#p3-info-free')).toContainText('Werk zelf je bank bij op de laatste dag van de maand');await expect(page.locator('#p3-info-free')).toContainText('Niet bevestigd');await page.locator('[data-p3-close-info="free"]').click();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);await page.screenshot({path:info.outputPath('coverage-advisory-'+width+'.png')});
+ await page.evaluate(()=>{state.recurringFixedExpenses[0].afschrijfdag='';renderActiveTab();});await expect(card.locator('.p3-kpi-copy>strong')).toHaveText('—');await expect(card.locator('[data-p3-savings-extra]')).toHaveCount(0);await expect(card.locator('[data-p3-savings-plan]')).toContainText('€ 500,00');
+});

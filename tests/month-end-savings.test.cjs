@@ -18,8 +18,8 @@ test('buffer uses account setting once, including exact equality and zero capaci
 test('selected month goal changes the comparison only, never cash capacity or allowances',()=>{
  const s=fixture(),p=project(s),f=financialForecastForMonth(s,'2026-10');s.monthlySavingOverrides={'2026-10':{gezamenlijk:700}};const q=project(s);assert.equal(p.safeCents,q.safeCents);assert.equal(q.plannedCents,70000);assert.equal(q.extraCents,5000);assert.equal(financialForecastForMonth(s,'2026-10').household.income,f.household.income);
 });
-test('missing checkpoint or bank coverage never produces a safe claim',()=>{
- const s=fixture();s.balanceCheckpoints=[];assert.equal(project(s).indicativeCents,null);const t=fixture();t.balanceCheckpoints[0].asOfDate='2026-10-20';assert.equal(selectMonthEndSavings(t,{...options(t),asOfDate:'2026-10-26'}).indicativeCents,null);
+test('missing checkpoint blocks the amount; unknown coverage remains advisory for available cash',()=>{
+ const s=fixture();s.balanceCheckpoints=[];assert.equal(project(s).indicativeCents,null);const t=fixture();t.balanceCheckpoints[0].asOfDate='2026-10-20';const p=selectMonthEndSavings(t,{...options(t),asOfDate:'2026-10-26'});assert.equal(p.indicativeCents,75000);assert.equal(p.status,'provisional');assert(p.reasons.some(r=>r.code==='unknown-bank-coverage'));
 });
 test('unknown payment date in the assessed months blocks the savings amount',()=>{
  const s=fixture();delete s.recurringFixedExpenses[0].afschrijfdag;const p=project(s);assert.equal(p.status,'incomplete');assert.equal(p.indicativeCents,null);assert(p.reasons.some(r=>r.code==='unknown-cash-date'));
