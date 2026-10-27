@@ -78,13 +78,13 @@ test('V118-r17 naar r18, offline en terugrollen behouden financiën, planning, i
     expect(before.months['2026-08'].snapshot).toEqual({ income: 123, expenses: 55 });
     old = false;
     await page.evaluate(async () => (await navigator.serviceWorker.getRegistration()).update());
-    await expect.poll(() => page.evaluate(() => caches.keys())).toContain('finize-v118-r18');
+    await expect.poll(() => page.evaluate(() => caches.keys())).toContain('finize-v118-r19');
     // The new cache exists during install; wait for activation/cleanup as well.
     await expect.poll(() => page.evaluate(() => caches.keys())).not.toContain('finize-v118-r17');
     await page.reload();
     await page.waitForFunction(() => window.__finizeBootstrap?.rendered);
     expect(await snapshot()).toEqual(before);
-    expect(await page.locator('script[src*="app.js"]').getAttribute('src')).toContain('118-r18');
+    expect(await page.locator('script[src*="app.js"]').getAttribute('src')).toContain('118-r19');
     const keys = await page.evaluate(() => caches.keys());
     expect(keys).not.toContain('finize-v118-r17');
     expect(keys).not.toContain('finize-obsolete-r4');
@@ -93,12 +93,12 @@ test('V118-r17 naar r18, offline en terugrollen behouden financiën, planning, i
     await page.reload();
     await page.waitForFunction(() => window.__finizeBootstrap?.rendered);
     expect(await snapshot()).toEqual(before);
-    expect(await page.locator('script[src*="app.js"]').getAttribute('src')).toContain('118-r18');
+    expect(await page.locator('script[src*="app.js"]').getAttribute('src')).toContain('118-r19');
     await context.setOffline(false);
     old = true;
     await page.evaluate(async () => (await navigator.serviceWorker.getRegistration()).update());
     await expect.poll(() => page.evaluate(() => caches.keys())).toContain('finize-v118-r17');
-    await expect.poll(() => page.evaluate(() => caches.keys())).not.toContain('finize-v118-r18');
+    await expect.poll(() => page.evaluate(() => caches.keys())).not.toContain('finize-v118-r19');
     await page.reload();
     await page.waitForFunction(() => window.__finizeBootstrap?.rendered);
     expect(await snapshot()).toEqual(before);

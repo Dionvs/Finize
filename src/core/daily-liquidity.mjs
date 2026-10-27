@@ -258,7 +258,10 @@ export function buildLiquidityInput(state,{accountProfileId,asOfDate,endDate,sco
         const cashDate=fixedCashDate(occurrence);
         const date=validCalendarDate(cashDate)?cashDate:null;
         addPlan(event({id:'fixed:'+occurrence.id,occurrenceId:occurrence.id,planningSourceId:source.id,month,accountProfileId:physicalAccount(state,source.accountProfileId || occurrence.account,occurrence.account),
-          amountCents:-cents(occurrence.amount),date,type:'fixed',dateQuality:date?'explicitly-planned':'unknown'}));
+          amountCents:-cents(occurrence.amount),date,type:'fixed',
+          // An explicit occurrence deadline is a bound, never a bank cash date.
+          deadlineDate:validCalendarDate(source.paymentDeadlines?.[occurrence.id])?source.paymentDeadlines[occurrence.id]:null,
+          dateQuality:date?'explicitly-planned':'unknown'}));
       }
       for (const occurrence of plannedOccurrences(resolveIncomeSourcesForMonth(state,month).filter(row=>row.legacyKind!=='salary'),month)) {
         const source=occurrence.source, explicit=source.cashDates?.[occurrence.id] || source.paymentDate;
@@ -269,18 +272,22 @@ export function buildLiquidityInput(state,{accountProfileId,asOfDate,endDate,sco
       // Read the existing financial meaning, including historical budget/refund/savings contracts.
       // Future bank rows after the horizon must not consume this horizon's budget reservation.
       const budgetState={...state,__finizePartialHistory:false,transactions:(state.transactions || []).filter(tx=>String(tx.bankOriginal?.bankDate || tx.date || '')<=last)};
+      const budgetPots=new Map();
       for (const owner of owners) for (const budget of resolveVariableBudgetsForMonth(state,month,owner)) {
         const account=physicalAccount(state,budget.accountProfileId,owner);
         if (account && account!==accountProfileId) continue;
         const plannedCents=cents(Number(budget.bedrag || 0));
-        const usedCents=cents(budgetActual(budgetState,month,owner,budget.post || budget.categorie,budget.id));
-        const amountCents=Math.max(0,safe(plannedCents-usedCents));
-        if (!amountCents) continue;
-        const id='budget:'+owner+':'+month+':'+budget.id;
+        const usedCents=cents(budgetActual(budgetState,month,owner,budget.post || budget.categorie,budget.id,{
+          acceptProjection:p=>physicalAccount(state,p.transaction.accountProfileId || p.accountContext,p.accountContext)===account
+        }));
+        const id='budget:'+owner+':'+month+':'+(account || 'unresolved');
         if (!account) reasons.push(issue('unresolved-budget-account',id));
-        reservations.push({id,accountProfileId:account,type:'budget',month,budgetItemId:budget.id,owner,plannedCents,usedCents,amountCents,
-          fromDate:month===asOfDate.slice(0,7)?shiftLiquidityDay(asOfDate,1):month+'-01',toDate:planningBasis&&last<monthEnd(month)?last:monthEnd(month),dateQuality:'estimated'});
+        const pot=budgetPots.get(id) || {id,accountProfileId:account,type:'budget',month,budgetItemIds:[],owner,plannedCents:0,usedCents:0,
+          fromDate:month===asOfDate.slice(0,7)?shiftLiquidityDay(asOfDate,1):month+'-01',toDate:planningBasis&&last<monthEnd(month)?last:monthEnd(month),dateQuality:'estimated'};
+        pot.plannedCents=safe(pot.plannedCents+plannedCents);pot.usedCents=safe(pot.usedCents+usedCents);pot.budgetItemIds.push(budget.id);
+        budgetPots.set(id,pot);
       }
+      for(const pot of budgetPots.values())reservations.push({...pot,amountCents:Math.max(0,safe(pot.plannedCents-pot.usedCents))});
       const forecast=monthlyForecast(state.__finizePartialHistory?{...state,__finizePartialHistory:false}:state,month);
       for(const row of allowancePlans(state,month,forecast,projections)) addPlan(row);
       for(const owner of owners) if(physicalAccount(state,null,owner)===accountProfileId) {
@@ -521,9 +528,9 @@ export function selectDailyLiquidity(state, options) {
     firstShortfallDate:days.find(row=>row.expectedBalanceCents<0)?.date??null,firstBufferBreachDate:days.find(row=>row.expectedBalanceCents<forward.bufferCents)?.date??null};
 }
 
-/** Uses the existing cash events and daily engine; never changes a plan or state.
- * Subtracting the month-end balance from each later point is exactly the same
- * normalized future cashflow with a fictional opening of zero. */
+/** Uses P2's actual/concrete cash once. Budget estimates are replaced by a full
+ * monthly envelope from the first day of that month, carried through the guard.
+ * A deadline protects an undated debit without inventing a bank payment day. */
 export function selectMonthEndSavings(state,options){
   const {month,asOfDate,accountProfileId}=options;
   if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)||!validCalendarDate(asOfDate))throw new Error('Kies een geldige maand voor de spaarprognose.');
@@ -542,21 +549,29 @@ export function selectMonthEndSavings(state,options){
   const monthlyTransfers=(state.internalTransfers||[]).filter(t=>t.month===month&&t.type===profile?.accountOwner+'-sparen'&&(t.sourceClosingId||t.closureId)&&['gepland','planned','concept','nog-te-verwerken'].includes(t.status));
   const candidateTransferId=options.savingsTransferId||(monthlyTransfers.length===1?monthlyTransfers[0].id:null);
   const candidateIds=new Set(input.events.filter(e=>e.isSavingsPlan&&e.status!=='replaced'&&e.transferId===candidateTransferId&&e.month===month&&e.amountCents<0).map(e=>e.id));
-  const normalized={...input,events:input.events.filter(e=>!candidateIds.has(e.id)),reservations:input.reservations.filter(r=>!candidateIds.has(r.id.replace(/^undated:/,''))),reasons:input.reasons.filter(r=>!candidateIds.has(r.eventId))};
+  const boundedIds=new Set(input.reservations.filter(r=>r.type==='undated-obligation'&&validCalendarDate(r.deadlineDate)).map(r=>r.id.replace(/^undated:/,'')));
+  const normalized={...input,bufferCents:profile?.accountOwner==='gezamenlijk'?Math.max(20000,input.bufferCents):input.bufferCents,
+    events:input.events.filter(e=>!candidateIds.has(e.id)),reservations:input.reservations.filter(r=>!candidateIds.has(r.id.replace(/^undated:/,''))),
+    reasons:input.reasons.filter(r=>!candidateIds.has(r.eventId)&&!(r.code==='unknown-cash-date'&&boundedIds.has(r.eventId)))};
   const projection=projectDailyLiquidity(normalized);
   const reasons=[...projection.reasons,...(!reliableGuard?[issue('missing-saving-horizon')]:[])];
-  const selected=projection.days.find(d=>d.date===transferDate);
+  const protectionDays=projection.days.map(day=>{
+    const budgetReservedCents=sum(projection.reservations.filter(r=>r.type==='budget'&&r.month<=day.date.slice(0,7)).map(r=>r.amountCents));
+    const undatedReservedCents=sum(projection.reservations.filter(r=>r.type==='undated-obligation'&&(!r.month||r.month<=day.date.slice(0,7)||r.deadlineDate<=day.date)).map(r=>r.amountCents));
+    return {date:day.date,cashBalanceCents:day.cashBalanceCents,budgetReservedCents,undatedReservedCents,
+      protectedBalanceCents:safe(day.cashBalanceCents-budgetReservedCents-undatedReservedCents)};
+  });
+  const selected=protectionDays.find(d=>d.date===transferDate);
   const plannedCents=sum(input.savingsPlans.filter(p=>p.month===month&&p.owner===profile?.accountOwner).map(p=>p.amountCents));
-  const remainingPlannedCents=sum(input.savingsPlans.filter(p=>p.month===month&&p.owner===profile?.accountOwner).map(p=>Math.max(0,safe(p.amountCents-p.realizedCents))));
   if(monthlyTransfers.length>1&&!options.savingsTransferId)reasons.push(issue('ambiguous-saving-plan'));
-  const base={...empty,assessmentEndDate,bufferCents:input.bufferCents,plannedCents,remainingPlannedCents,requiredMonths:input.requiredMonths,reasons};
+  const base={...empty,assessmentEndDate,bufferCents:normalized.bufferCents,plannedCents,requiredMonths:input.requiredMonths,reasons,protectionDays};
   const blocked=!selected||projection.opening.balanceCents===null||reasons.some(r=>r.severity==='incomplete'||['unknown-cash-date','partial-bank-coverage','unknown-bank-coverage','missing-checkpoint'].includes(r.code));
   if(blocked)return {...base,status:selected?'incomplete':'unknown'};
-  const end=selected.expectedBalanceCents;
-  const future=projection.days.filter(d=>d.date>transferDate);
-  const minimumCumulativeCents=Math.min(0,...future.map(d=>safe(d.expectedBalanceCents-end)));
-  const requiredOpeningCents=safe(input.bufferCents-minimumCumulativeCents);
+  const end=selected.protectedBalanceCents;
+  const future=protectionDays.filter(d=>d.date>transferDate);
+  const minimumCumulativeCents=Math.min(0,...future.map(d=>safe(d.protectedBalanceCents-end)));
+  const requiredOpeningCents=safe(normalized.bufferCents-minimumCumulativeCents);
   const amount=Math.max(0,safe(end-requiredOpeningCents));
   const status=reasons.length?'provisional':'projected';
-  return {...base,status,expectedEndBalanceCents:end,minimumCumulativeCents,requiredOpeningCents,safeCents:status==='projected'?amount:null,indicativeCents:amount,extraCents:Math.max(0,safe(amount-remainingPlannedCents)),shortfallCents:Math.max(0,safe(remainingPlannedCents-amount))};
+  return {...base,status,expectedEndBalanceCents:end,minimumCumulativeCents,requiredOpeningCents,safeCents:status==='projected'?amount:null,indicativeCents:amount,extraCents:Math.max(0,safe(amount-plannedCents))};
 }

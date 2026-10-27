@@ -119,8 +119,8 @@ export function sumTransactionEffects(state,dimension,options={}) {
 export function categoryActuals(state,month,owner) {
   const result={};selectTransactionProjections(state,{month,dimension:'budget'}).forEach(p=>{const category=p.effects.refundCorrection?p.refundCategory:p.category;if((!owner||p.financialFor===owner)&&p.effects.budgetImpact&&!p.directBudgetAllocations?.length)result[category]=money((result[category]||0)+p.effects.budgetImpact);(p.directBudgetAllocations||[]).filter(a=>!owner||(a.budgetOwner||p.financialFor)===owner).forEach(a=>{result[a.category]=money((result[a.category]||0)-a.amount);});});return result;
 }
-export function budgetActual(state,month,owner,category,budgetItemId=''){
-  return money(selectTransactionProjections(state,{month,dimension:'budget'}).reduce((sum,p)=>{
+export function budgetActual(state,month,owner,category,budgetItemId='',{acceptProjection=()=>true}={}){
+  return money(selectTransactionProjections(state,{month,dimension:'budget'}).filter(acceptProjection).reduce((sum,p)=>{
     const label=p.effects.refundCorrection?p.refundCategory:p.category;
     const id=p.effects.refundCorrection?'':p.budgetItemId;
     let amount=p.financialFor===owner&&!p.directBudgetAllocations?.length&&budgetAssignmentMatches(state,month,owner,{category:label,budgetItemId:id},category,budgetItemId)?p.effects.budgetImpact:0;

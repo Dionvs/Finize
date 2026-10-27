@@ -2789,8 +2789,8 @@
     });
     return result2;
   }
-  function budgetActual(state2, month, owner, category, budgetItemId = "") {
-    return money(selectTransactionProjections(state2, { month, dimension: "budget" }).reduce((sum2, p) => {
+  function budgetActual(state2, month, owner, category, budgetItemId = "", { acceptProjection = () => true } = {}) {
+    return money(selectTransactionProjections(state2, { month, dimension: "budget" }).filter(acceptProjection).reduce((sum2, p) => {
       var _a2;
       const label = p.effects.refundCorrection ? p.refundCategory : p.category;
       const id = p.effects.refundCorrection ? "" : p.budgetItemId;
@@ -3366,7 +3366,7 @@
     return balanceRequiredMonths(startDate && checkpoint ? shiftLiquidityDay(checkpoint.asOfDate, 1) : (checkpoint == null ? void 0 : checkpoint.asOfDate) || startDate || asOfDate, end);
   }
   function buildLiquidityInput(state2, { accountProfileId, asOfDate, endDate, scope, imports = [], importsAvailable = true, coverage = [], monthlyForecast = financialForecastForMonth, salaryOnly = false, planningBasis = false, incomeOnly = false, includeReceipt = false } = {}) {
-    var _a2, _b, _c, _d, _e, _f;
+    var _a2, _b, _c, _d, _e, _f, _g;
     if (!validCalendarDate(asOfDate) || endDate !== void 0 && (!validCalendarDate(endDate) || endDate < asOfDate)) throw new Error("Kies geldige prognosedatums; de einddatum mag niet vóór de berekendatum liggen.");
     if (!planningBasis && endDate && balanceRequiredMonths(asOfDate, endDate).length > 24) throw new Error("Kies een prognose van maximaal 24 kalendermaanden.");
     const reasons2 = [], events = [], reservations = [], savingsPlans = [];
@@ -3523,11 +3523,13 @@
             amountCents: -cents3(occurrence.amount),
             date: date2,
             type: "fixed",
+            // An explicit occurrence deadline is a bound, never a bank cash date.
+            deadlineDate: validCalendarDate((_f = source.paymentDeadlines) == null ? void 0 : _f[occurrence.id]) ? source.paymentDeadlines[occurrence.id] : null,
             dateQuality: date2 ? "explicitly-planned" : "unknown"
           }));
         }
         for (const occurrence of u3PlannedOccurrences(resolveIncomeSourcesForMonth(state2, month).filter((row) => row.legacyKind !== "salary"), month)) {
-          const source = occurrence.source, explicit = ((_f = source.cashDates) == null ? void 0 : _f[occurrence.id]) || source.paymentDate;
+          const source = occurrence.source, explicit = ((_g = source.cashDates) == null ? void 0 : _g[occurrence.id]) || source.paymentDate;
           const date2 = validCalendarDate(explicit) ? explicit : source.planningProvenance === "versioned-properties" ? occurrence.date : null;
           addPlan(event({
             id: "income:" + occurrence.id,
@@ -3545,30 +3547,35 @@
           var _a3;
           return String(((_a3 = tx.bankOriginal) == null ? void 0 : _a3.bankDate) || tx.date || "") <= last;
         }) };
+        const budgetPots = /* @__PURE__ */ new Map();
         for (const owner of owners2) for (const budget of resolveVariableBudgetsForMonth(state2, month, owner)) {
           const account = physicalAccount(state2, budget.accountProfileId, owner);
           if (account && account !== accountProfileId) continue;
           const plannedCents = cents3(Number(budget.bedrag || 0));
-          const usedCents = cents3(budgetActual(budgetState, month, owner, budget.post || budget.categorie, budget.id));
-          const amountCents = Math.max(0, safe(plannedCents - usedCents));
-          if (!amountCents) continue;
-          const id = "budget:" + owner + ":" + month + ":" + budget.id;
+          const usedCents = cents3(budgetActual(budgetState, month, owner, budget.post || budget.categorie, budget.id, {
+            acceptProjection: (p) => physicalAccount(state2, p.transaction.accountProfileId || p.accountContext, p.accountContext) === account
+          }));
+          const id = "budget:" + owner + ":" + month + ":" + (account || "unresolved");
           if (!account) reasons2.push(issue("unresolved-budget-account", id));
-          reservations.push({
+          const pot = budgetPots.get(id) || {
             id,
             accountProfileId: account,
             type: "budget",
             month,
-            budgetItemId: budget.id,
+            budgetItemIds: [],
             owner,
-            plannedCents,
-            usedCents,
-            amountCents,
+            plannedCents: 0,
+            usedCents: 0,
             fromDate: month === asOfDate.slice(0, 7) ? shiftLiquidityDay(asOfDate, 1) : month + "-01",
             toDate: planningBasis && last < monthEnd(month) ? last : monthEnd(month),
             dateQuality: "estimated"
-          });
+          };
+          pot.plannedCents = safe(pot.plannedCents + plannedCents);
+          pot.usedCents = safe(pot.usedCents + usedCents);
+          pot.budgetItemIds.push(budget.id);
+          budgetPots.set(id, pot);
         }
+        for (const pot of budgetPots.values()) reservations.push({ ...pot, amountCents: Math.max(0, safe(pot.plannedCents - pot.usedCents)) });
         const forecast = monthlyForecast(state2.__finizePartialHistory ? { ...state2, __finizePartialHistory: false } : state2, month);
         for (const row of allowancePlans(state2, month, forecast, projections)) addPlan(row);
         for (const owner of owners2) if (physicalAccount(state2, null, owner) === accountProfileId) {
@@ -3898,23 +3905,40 @@
     const monthlyTransfers = (state2.internalTransfers || []).filter((t) => t.month === month && t.type === (profile == null ? void 0 : profile.accountOwner) + "-sparen" && (t.sourceClosingId || t.closureId) && ["gepland", "planned", "concept", "nog-te-verwerken"].includes(t.status));
     const candidateTransferId = options.savingsTransferId || (monthlyTransfers.length === 1 ? monthlyTransfers[0].id : null);
     const candidateIds = new Set(input.events.filter((e) => e.isSavingsPlan && e.status !== "replaced" && e.transferId === candidateTransferId && e.month === month && e.amountCents < 0).map((e) => e.id));
-    const normalized = { ...input, events: input.events.filter((e) => !candidateIds.has(e.id)), reservations: input.reservations.filter((r) => !candidateIds.has(r.id.replace(/^undated:/, ""))), reasons: input.reasons.filter((r) => !candidateIds.has(r.eventId)) };
+    const boundedIds = new Set(input.reservations.filter((r) => r.type === "undated-obligation" && validCalendarDate(r.deadlineDate)).map((r) => r.id.replace(/^undated:/, "")));
+    const normalized = {
+      ...input,
+      bufferCents: (profile == null ? void 0 : profile.accountOwner) === "gezamenlijk" ? Math.max(2e4, input.bufferCents) : input.bufferCents,
+      events: input.events.filter((e) => !candidateIds.has(e.id)),
+      reservations: input.reservations.filter((r) => !candidateIds.has(r.id.replace(/^undated:/, ""))),
+      reasons: input.reasons.filter((r) => !candidateIds.has(r.eventId) && !(r.code === "unknown-cash-date" && boundedIds.has(r.eventId)))
+    };
     const projection = projectDailyLiquidity(normalized);
     const reasons2 = [...projection.reasons, ...!reliableGuard ? [issue("missing-saving-horizon")] : []];
-    const selected = projection.days.find((d) => d.date === transferDate);
+    const protectionDays = projection.days.map((day) => {
+      const budgetReservedCents = sum(projection.reservations.filter((r) => r.type === "budget" && r.month <= day.date.slice(0, 7)).map((r) => r.amountCents));
+      const undatedReservedCents = sum(projection.reservations.filter((r) => r.type === "undated-obligation" && (!r.month || r.month <= day.date.slice(0, 7) || r.deadlineDate <= day.date)).map((r) => r.amountCents));
+      return {
+        date: day.date,
+        cashBalanceCents: day.cashBalanceCents,
+        budgetReservedCents,
+        undatedReservedCents,
+        protectedBalanceCents: safe(day.cashBalanceCents - budgetReservedCents - undatedReservedCents)
+      };
+    });
+    const selected = protectionDays.find((d) => d.date === transferDate);
     const plannedCents = sum(input.savingsPlans.filter((p) => p.month === month && p.owner === (profile == null ? void 0 : profile.accountOwner)).map((p) => p.amountCents));
-    const remainingPlannedCents = sum(input.savingsPlans.filter((p) => p.month === month && p.owner === (profile == null ? void 0 : profile.accountOwner)).map((p) => Math.max(0, safe(p.amountCents - p.realizedCents))));
     if (monthlyTransfers.length > 1 && !options.savingsTransferId) reasons2.push(issue("ambiguous-saving-plan"));
-    const base = { ...empty, assessmentEndDate, bufferCents: input.bufferCents, plannedCents, remainingPlannedCents, requiredMonths: input.requiredMonths, reasons: reasons2 };
+    const base = { ...empty, assessmentEndDate, bufferCents: normalized.bufferCents, plannedCents, requiredMonths: input.requiredMonths, reasons: reasons2, protectionDays };
     const blocked2 = !selected || projection.opening.balanceCents === null || reasons2.some((r) => r.severity === "incomplete" || ["unknown-cash-date", "partial-bank-coverage", "unknown-bank-coverage", "missing-checkpoint"].includes(r.code));
     if (blocked2) return { ...base, status: selected ? "incomplete" : "unknown" };
-    const end = selected.expectedBalanceCents;
-    const future = projection.days.filter((d) => d.date > transferDate);
-    const minimumCumulativeCents = Math.min(0, ...future.map((d) => safe(d.expectedBalanceCents - end)));
-    const requiredOpeningCents = safe(input.bufferCents - minimumCumulativeCents);
+    const end = selected.protectedBalanceCents;
+    const future = protectionDays.filter((d) => d.date > transferDate);
+    const minimumCumulativeCents = Math.min(0, ...future.map((d) => safe(d.protectedBalanceCents - end)));
+    const requiredOpeningCents = safe(normalized.bufferCents - minimumCumulativeCents);
     const amount = Math.max(0, safe(end - requiredOpeningCents));
     const status2 = reasons2.length ? "provisional" : "projected";
-    return { ...base, status: status2, expectedEndBalanceCents: end, minimumCumulativeCents, requiredOpeningCents, safeCents: status2 === "projected" ? amount : null, indicativeCents: amount, extraCents: Math.max(0, safe(amount - remainingPlannedCents)), shortfallCents: Math.max(0, safe(remainingPlannedCents - amount)) };
+    return { ...base, status: status2, expectedEndBalanceCents: end, minimumCumulativeCents, requiredOpeningCents, safeCents: status2 === "projected" ? amount : null, indicativeCents: amount, extraCents: Math.max(0, safe(amount - plannedCents)) };
   }
 
   // src/ui/liquidity-explanations.mjs
@@ -4113,7 +4137,7 @@
   var calculationHelp = (p) => {
     var _a2;
     const s = p.monthEndSavings;
-    return s ? `<p>Het maximaal over te boeken bedrag op ${savingDate(s.transferDate)}. Dit is geen geld dat vandaag vrij besteedbaar is.</p><p>Verwacht eindsaldo: ${money2(s.expectedEndBalanceCents)}<br>Nodig vanaf volgende maand: ${money2(s.requiredOpeningCents)}<br>Inclusief permanente buffer: ${money2((_a2 = s.bufferCents) != null ? _a2 : p.bufferCents)}.</p><p>De hele volgende maand telt mee, plus de periode tot en met de eerstvolgende salaris- of zakgeldontvangst daarna (${date(s.assessmentEndDate)}). De bestaande spaarreservering wordt niet opnieuw afgetrokken of automatisch gewijzigd.</p>` : "";
+    return s ? `<p>Het maximaal over te boeken bedrag op ${savingDate(s.transferDate)}. Dit is geen geld dat vandaag vrij besteedbaar is.</p><p>Verwacht eindsaldo: ${money2(s.expectedEndBalanceCents)}<br>Nodig vanaf volgende maand: ${money2(s.requiredOpeningCents)}<br>Inclusief permanente buffer: ${money2((_a2 = s.bufferCents) != null ? _a2 : p.bufferCents)}.</p><p>De hele volgende maand telt mee, plus de periode tot en met de eerstvolgende salaris- of zakgeldontvangst daarna (${date(s.assessmentEndDate)}). De volledige resterende budgetpot wordt vanaf het begin van iedere betrokken maand beschermd, ook in de maand van die ontvangst. De dagelijkse budgetschatting wordt hier niet daarnaast afgetrokken. Gepland sparen en Extra ruimte zijn alleen een vergelijking; de bestaande planning wordt niet automatisch gewijzigd.</p>` : "";
   };
   function qualityHelp(p) {
     var _a2;
@@ -4125,11 +4149,11 @@
     if (!profile) return `<p class="p3-empty">Kies de primaire betaalrekening voor deze context. Er wordt geen willekeurige rekening gebruikt.</p>${action("accounts", "Rekening instellen")}`;
     if (!p) return '<p class="p3-empty" role="status">Vooruitblik laden…</p>';
     const v = liquidityView(p), balance = p.currentBalance || p.opening;
-    const kpi = (key, title, value, sub, icon, explanation, act = "") => `<article class="p3-kpi${key === "free" && amount === 0 && (saving == null ? void 0 : saving.shortfallCents) > 0 ? " p3-no-room" : ""}">${act ? `<button type="button" class="ux-card-primary" data-p3-action="${act}" aria-label="${title} ${escape2(value)} · ${act === "balance" ? "Saldo bijwerken" : "Buffer instellen"}"></button>` : ""}<span class="p3-kpi-icon" aria-hidden="true">${iconSvg2(icon)}</span><span class="p3-kpi-copy"><span class="p3-kpi-title"><span>${title}</span>${info(key, title, explanation)}</span><strong>${value}</strong><small>${sub}</small>${key === "balance" ? bankMarkup : ""}</span></article>`;
+    const kpi = (key, title, value, sub, icon, explanation, act = "") => `<article class="p3-kpi">${act ? `<button type="button" class="ux-card-primary" data-p3-action="${act}" aria-label="${title} ${escape2(value)} · ${act === "balance" ? "Saldo bijwerken" : "Buffer instellen"}"></button>` : ""}<span class="p3-kpi-icon" aria-hidden="true">${iconSvg2(icon)}</span><span class="p3-kpi-copy"><span class="p3-kpi-title"><span>${title}</span>${info(key, title, explanation)}</span><strong>${value}</strong><small>${sub}</small>${key === "balance" ? bankMarkup : ""}</span></article>`;
     const warning = v.minimum !== null && v.minimum < v.buffer ? `<div class="p3-warning" role="status">${p.status !== "projected" ? `${status(p.status)} · ` : ""}Op ${date(v.minimumDate)} wordt ${money2(v.minimum)} verwacht. ${v.minimum < 0 ? "Dit is onder € 0. " : ""}Dat is ${money2(v.buffer - v.minimum)} onder je buffer van ${money2(v.buffer)}.</div>` : "";
     const saving = p.monthEndSavings, amount = (_b = (_a2 = saving == null ? void 0 : saving.safeCents) != null ? _a2 : saving == null ? void 0 : saving.indicativeCents) != null ? _b : null;
     const savingTitle = "Veilig te sparen op " + savingDate(saving == null ? void 0 : saving.transferDate);
-    const freeSub = `${amount === null ? "Onvolledige prognose · bedrag niet vast te stellen" : saving.status === "provisional" ? "Indicatie" : ""}<span data-p3-savings-plan>Gepland sparen: ${money2(saving == null ? void 0 : saving.plannedCents)}</span>${(saving == null ? void 0 : saving.remainingPlannedCents) !== (saving == null ? void 0 : saving.plannedCents) ? `<span>Nog uit te voeren: ${money2(saving == null ? void 0 : saving.remainingPlannedCents)}</span>` : ""}${amount === null ? "" : `<span data-p3-savings-extra>Extra ruimte: ${money2(saving.extraCents)}</span>${saving.shortfallCents ? `<span data-p3-savings-shortfall>Tekort voor geplande inleg: ${money2(saving.shortfallCents)}</span>` : ""}<span>${amount < saving.remainingPlannedCents ? "De geplande inleg past niet volledig binnen de prognose." : "Na overboeking blijft volgens de prognose voldoende saldo over, inclusief de buffer van " + money2(v.buffer) + "."}</span>`}`;
+    const freeSub = `${amount === null ? "Onvolledige prognose · bedrag niet vast te stellen" : saving.status === "provisional" ? "Indicatie" : ""}<span data-p3-savings-plan>Gepland sparen: ${money2(saving == null ? void 0 : saving.plannedCents)}</span>${amount === null ? "" : `<span data-p3-savings-extra>Extra ruimte: ${money2(saving.extraCents)}</span>`}`;
     const savingsWarning = amount === null ? '<div class="p3-warning" role="status">Onvolledige spaarprognose. Controleer de saldobasis en betaalmomenten; een veilig spaarbedrag is nog niet vast te stellen.</div>' : "";
     const balanceDate = (_c = balance.checkpoint) == null ? void 0 : _c.asOfDate;
     const balanceSub = `${status(balance.status)}${balanceDate ? ` · Berekend t/m ${date(balance.toDate || p.asOfDate)}` : ""}${bankMarkup ? "" : " · Saldo bijwerken"}`;

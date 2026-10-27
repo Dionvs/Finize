@@ -55,8 +55,8 @@ test('user reference: October700, November1500, December minimum200',()=>{
  const dec=reference('2026-11-30',200000,'2026-12'),input=buildLiquidityInput(dec,{...options(dec),endDate:'2026-12-31'}),p=projectDailyLiquidity(input);assert.equal(p.minimumBalanceCents,20000);assert.equal(p.days.at(-1).expectedBalanceCents,250000);
 });
 
-test('executed savings stay in bank cash and reduce only the existing remaining plan comparison',()=>{
- const s=fixture({balance:225000}),h=require('./helpers/package5-fixture.cjs'),r=h.row('already-saved','sparen',-500,{savingsGoalId:'goal'});r.bankOriginal.currency='EUR';h.materialize(s,[r],'already-saved');const before=structuredClone(s),p=project(s);assert.equal(p.expectedEndBalanceCents,225000);assert.equal(p.safeCents,25000);assert.equal(p.plannedCents,50000);assert.equal(p.remainingPlannedCents,0);assert.equal(p.extraCents,25000);assert.deepEqual(s,before);
+test('executed savings stay in bank cash; the comparison uses the full informational plan',()=>{
+ const s=fixture({balance:225000}),h=require('./helpers/package5-fixture.cjs'),r=h.row('already-saved','sparen',-500,{savingsGoalId:'goal'});r.bankOriginal.currency='EUR';h.materialize(s,[r],'already-saved');const before=structuredClone(s),p=project(s);assert.equal(p.expectedEndBalanceCents,225000);assert.equal(p.safeCents,25000);assert.equal(p.plannedCents,50000);assert.equal(p.remainingPlannedCents,undefined);assert.equal(p.extraCents,0);assert.deepEqual(s,before);
 });
 function extraIncomeCase(distribute){
  const s=fixture({balance:1000000}),h=require('./helpers/package5-fixture.cjs');
