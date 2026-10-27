@@ -1,0 +1,135 @@
+/* Layout-only corrections. Keep existing type sizes, colours and info controls. */
+.u4-actions-shortcut{display:none}
+
+@media (max-width:767px){
+  html body.v4-app[data-real-active-tab] .v4-main{width:100% !important;max-width:100% !important;min-width:0 !important}
+  html body.v4-app[data-real-active-tab] .wrap .mobile-kpi-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+    gap:10px !important;
+    margin-bottom:12px !important;
+  }
+  html body.v4-app[data-real-active-tab] .wrap .mobile-kpi-grid>.mobile-kpi-card{
+    display:flex !important;
+    flex-direction:column !important;
+    align-items:stretch !important;
+    width:100% !important;
+    min-width:0 !important;
+    max-width:100% !important;
+    height:auto !important;
+    min-height:142px !important;
+    max-height:none !important;
+    aspect-ratio:auto !important;
+    padding:11px !important;
+    gap:6px !important;
+    overflow:visible !important;
+  }
+  html body.v4-app[data-real-active-tab] .wrap .mobile-kpi-grid :is(.mobile-kpi-top,.mobile-kpi-label,.mobile-kpi-value,.mobile-kpi-edit-hint){
+    align-self:stretch !important;
+    width:100% !important;
+    min-width:0 !important;
+    max-width:100% !important;
+    min-height:0 !important;
+    height:auto !important;
+    margin:0 !important;
+    transform:none !important;
+  }
+  html body.v4-app[data-real-active-tab] .wrap .mobile-kpi-grid :is(.mobile-kpi-label,.mobile-kpi-value,.mobile-kpi-edit-hint){
+    white-space:normal !important;
+    overflow:visible !important;
+    overflow-wrap:anywhere;
+  }
+  html body.v4-app[data-real-active-tab] .wrap .mobile-kpi-value{text-align:left !important}
+  html body.v4-app .mobile-savings-kpis{grid-template-columns:repeat(2,minmax(0,1fr)) !important;gap:10px}
+  html body.v4-app[data-real-active-tab] .wrap .personal-income-sources>div{
+    flex-wrap:wrap;
+    gap:3px 6px;
+  }
+  html body.v4-app[data-real-active-tab] .wrap .personal-income-sources :is(span,button){
+    white-space:normal;
+    overflow-wrap:anywhere;
+    overflow:visible;
+  }
+  html body.v4-app[data-real-active-tab] .joint-two-column-row{
+    grid-template-columns:minmax(0,1fr) !important;
+    gap:12px !important;
+    margin-bottom:12px !important;
+  }
+  html body.v4-app[data-real-active-tab] .joint-two-column-row>.joint-two-column-card{
+    height:auto !important;
+    min-height:124px !important;
+    max-height:none !important;
+    padding:12px !important;
+  }
+  html body.v4-app .joint-variable-overview-list{gap:12px}
+  html body.v4-app .budget-preview-top{flex-wrap:wrap}
+  html body.v4-app .joint-variable-overview-card .budget-preview-top strong{
+    white-space:normal;
+    overflow:visible;
+    overflow-wrap:anywhere;
+  }
+  html body.v4-app .joint-transactions-list{max-height:360px}
+  html body.v4-app .joint-transaction-row{
+    grid-template-columns:44px minmax(0,1fr) max-content 16px;
+    gap:6px;
+    padding:8px 0;
+  }
+  html body.v4-app :is(.joint-transaction-meta,.joint-transaction-description){grid-template-rows:auto}
+  html body.v4-app :is(.joint-transaction-category,.joint-transaction-description-text,.joint-transaction-note){
+    white-space:normal;
+    overflow:visible;
+    overflow-wrap:anywhere;
+  }
+  html body.v4-app .joint-transaction-amount{overflow:visible}
+  .p3-filters{flex-wrap:wrap;overflow:visible}
+
+  /* A single overlay scroll owner, instead of a page and editor scrollbar. */
+  html:has(.modal-backdrop.open),html:has(#u4ImportModalRoot.open),
+  body.v4-app:has(.modal-backdrop.open),body.v4-app:has(#u4ImportModalRoot.open){overflow:hidden}
+  #incomeEditModal:has(>.goal-detail-editor),
+  #incomeEditModal:has(>.joint-variable-fullscreen-editor),
+  #incomeEditModal:has(>.u3-admin-modal),
+  #transactionModal:has(>.joint-transaction-fullscreen-editor){
+    align-items:flex-start !important;
+    overflow-y:auto;
+    overscroll-behavior:contain;
+  }
+  #incomeEditModal :is(.goal-detail-editor,.joint-variable-fullscreen-editor,.u3-admin-modal),
+  #transactionModal .joint-transaction-fullscreen-editor{
+    flex:0 0 auto;
+    height:auto !important;
+    min-height:100dvh;
+    max-height:none !important;
+    overflow:visible !important;
+  }
+  .u4-import-modal{scroll-padding-top:140px}
+  .u4-import-modal:has(>.u4-modal-actions)>.u4-modal-body{min-height:0}
+  .u4-import-modal>.u4-modal-actions{position:static;scroll-margin-top:12px}
+  .u4-actions-shortcut{
+    display:block;
+    position:sticky;
+    bottom:0;
+    z-index:4;
+    width:max-content;
+    max-width:calc(100% - 24px);
+    margin:0 12px 8px auto;
+    padding:8px 12px;
+    border:1px solid var(--border);
+    border-radius:12px;
+    background:var(--card);
+    color:var(--text);
+    text-decoration:none;
+  }
+  .u4-actions-shortcut:focus-visible{outline:2px solid var(--navy-bright);outline-offset:2px}
+}
+
+@media (min-width:768px) and (max-width:1199px){
+  body.v4-app .u5-joint-activity-row{grid-template-columns:minmax(0,1fr) !important}
+  body.v4-app .u5-joint-activity-row>.card{grid-column:1/-1 !important;min-width:0}
+  body.v4-app .u5-goal-master{grid-template-columns:minmax(0,1fr)}
+  body.v4-app .u5-goal-list{position:static;min-width:0}
+  body.v4-app .u5-goal-list-scroll{max-height:none}
+  body.v4-app .u5-goal-detail{min-width:0}
+  body.v4-app .u5-goal-detail-hero{grid-template-columns:minmax(0,1fr)}
+  body.v4-app .u5-goal-detail-image{width:min(220px,100%)}
+  body.v4-app .u5-goal-detail-hero>div{min-width:0;overflow-wrap:anywhere}
+}

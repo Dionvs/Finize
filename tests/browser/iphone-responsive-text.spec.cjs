@@ -23,6 +23,8 @@ for (const width of iphoneWidths) {
     await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
 
     await expect(page.locator('html')).toHaveClass(/finize-ios-phone/);
+    // The current dashboard uses P3 cards; owner tabs contain the legacy KPI grid.
+    await page.locator('.v4-bottom-nav [data-tab="dion"]').click();
     const columns = await page.locator('.mobile-kpi-grid').first().evaluate(element =>
       getComputedStyle(element).gridTemplateColumns.split(' ').filter(Boolean).length
     );
@@ -49,7 +51,7 @@ for (const width of iphoneWidths) {
   });
 }
 
-test('iPhone-invoervelden voorkomen Safari-inzoom, Android en desktop blijven ongewijzigd', async ({ browser }) => {
+test('iPhone-invoervelden voorkomen Safari-inzoom, Android deelt mobiele kolommen en desktop behoudt zijbalk', async ({ browser }) => {
   const iphoneContext = await browser.newContext({
     userAgent: iphoneUserAgent,
     viewport: { width: 390, height: 900 }
@@ -73,10 +75,11 @@ test('iPhone-invoervelden voorkomen Safari-inzoom, Android en desktop blijven on
   await keepTestLocal(androidPage);
   await androidPage.goto('/');
   await expect(androidPage.locator('html')).not.toHaveClass(/finize-ios-phone/);
+  await androidPage.locator('.v4-bottom-nav [data-tab="dion"]').click();
   const androidColumns = await androidPage.locator('.mobile-kpi-grid').first().evaluate(element =>
     getComputedStyle(element).gridTemplateColumns.split(' ').filter(Boolean).length
   );
-  expect(androidColumns).toBe(4);
+  expect(androidColumns).toBe(2);
   await androidContext.close();
 
   const desktopContext = await browser.newContext({ viewport: { width: 1440, height: 900 } });

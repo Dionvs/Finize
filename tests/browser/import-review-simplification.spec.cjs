@@ -33,6 +33,20 @@ async function openReview(page){
   return page.locator('[data-u4-row="review-row"]');
 }
 
+for(const width of [320,390])test(`mobiele importacties zijn bereikbaar zonder hoge vaste actiebalk ${width}px`,async({page})=>{
+  await page.setViewportSize({width,height:740});
+  await openReview(page);
+  const before=await page.evaluate(()=>JSON.stringify(state));
+  const footer=page.locator('#u4-import-actions'),shortcut=page.getByRole('link',{name:'Naar acties ↓',exact:true});
+  expect(await footer.evaluate(e=>getComputedStyle(e).position)).toBe('static');
+  await expect(shortcut).toBeInViewport();
+  await shortcut.click();
+  await expect(footer.getByRole('button',{name:'Concept opslaan',exact:true})).toBeInViewport();
+  await expect(footer.getByRole('button',{name:'Goedgekeurde verwerken',exact:true})).toBeInViewport();
+  await expect(footer).toBeFocused();
+  expect(await page.evaluate(()=>JSON.stringify(state))).toBe(before);
+});
+
 test('importcontrole splitst onbekend, nakijken en alleen handmatig goedgekeurd',async({page})=>{
   await openReview(page);
   await expect(page.locator('.u4-section-unknown > summary')).toContainText('Onbekend');
