@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Finize</title>
-<meta name="finize-inline-release" content="118-r35">
+<meta name="finize-inline-release" content="118-r36">
 <link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#6f8a55">
 <meta name="mobile-web-app-capable" content="yes">
@@ -23826,7 +23826,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
   function inspectSourceAvailability(state2, tx, batch) {
     var _a2, _b;
     const issues = [];
-    if (!tx || getTransactionSource(tx) !== "csv") return { ok: false, issues: ["Deze registratie is geen CSV-banktransactie."] };
+    if (!tx || !["csv", "bank-api"].includes(getTransactionSource(tx))) return { ok: false, issues: ["Deze registratie is geen banktransactie."] };
     if (!((_a2 = tx.bankOriginal) == null ? void 0 : _a2.bankDate) || tx.bankOriginal.amount === null || tx.bankOriginal.amount === void 0 || !Number.isFinite(Number(tx.bankOriginal.amount))) issues.push("De oorspronkelijke bankdatum of het oorspronkelijke bedrag ontbreekt.");
     if (!tx.importBatchId || !tx.importTransactionId || !((_b = batch == null ? void 0 : batch.rows) == null ? void 0 : _b.some((row) => row.id === tx.importTransactionId))) issues.push("De oorspronkelijke importregel of bronkoppeling ontbreekt.");
     if (!getTransactionAccountContext(tx, { accountProfiles: state2.accountProfiles || [] })) issues.push("De rekening waarop de bankbeweging plaatsvond is onbekend.");
@@ -23849,6 +23849,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
     var _a2, _b;
     const tx = (state2.transactions || []).find((row) => row.id === txId);
     if (!tx) throw new Error("De oorspronkelijke transactie bestaat niet meer.");
+    if (getTransactionSource(tx) !== "csv") throw new Error("CSV-bronherstel is alleen beschikbaar voor CSV-transacties.");
     if (inspectSourceAvailability(state2, tx, batch).ok) throw new Error("Deze transactie heeft al een geldige bron. Herstel is niet nodig.");
     if (!confirmed || !sourceRepairCandidates(state2, tx, [bank]).length) throw new Error("Bevestig een overeenkomst met dezelfde rekening, bankdatum en hetzelfde bedrag.");
     const candidate = copy9(state2), nextBatch = batch ? copy9(batch) : { id: tx.importBatchId || `recovery-${tx.id}`, rows: [], accountProfileId: tx.accountProfileId, accountOwner: getTransactionAccountContext(tx, { accountProfiles: state2.accountProfiles || [] }), lifecycle: tx.batchLifecycle || "active", status: "verwerkt", version: 0, summary: {}, fileName: "Herstelde oorspronkelijke CSV-bron" };
@@ -28493,6 +28494,13 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
         }
         return draft;
       }
+      if (getTransactionSource(tx) === "bank-api") {
+        const modal2 = ensureModalRoot();
+        modal2.innerHTML = `<div class="u4-import-modal"><header class="u4-modal-head"><h2>Banktransactie niet beschikbaar</h2><button class="ghost" data-u4-close>Sluiten</button></header><main class="u4-modal-body"><p>${check.issues.map(esc).join(" ")}</p><p>De oorspronkelijke gegevens van de bankkoppeling konden niet volledig worden opgehaald. Probeer opnieuw met internetverbinding. Je opgeslagen verwerking blijft behouden.</p></main></div>`;
+        modal2.classList.add("open");
+        modal2.querySelector("[data-u4-close]").onclick = closeDraft;
+        return null;
+      }
       const modal = ensureModalRoot();
       modal.innerHTML = `<div class="u4-import-modal"><header class="u4-modal-head"><h2>Oorspronkelijke bron herstellen</h2><button class="ghost" data-u4-close>Sluiten</button></header><main class="u4-modal-body"><p>${check.issues.map(esc).join(" ")}</p><p>Je goedgekeurde verwerking blijft behouden. Kies de oorspronkelijke CSV om een bronkoppeling voor te stellen.</p><label>Oorspronkelijke CSV<input type="file" accept=".csv,text/csv" data-u4-repair-file></label><div data-u4-repair-result role="status"></div></main></div>`;
       modal.classList.add("open");
@@ -29056,10 +29064,10 @@ window.addEventListener('load', async () => {
     const scope = new URL('./', location.href);
     const registration = await navigator.serviceWorker.getRegistration(scope.href);
     if (!registration?.active || registration.scope !== scope.href || registration.active.scriptURL !== new URL('service-worker.js', scope).href) return;
-    const response = await fetch(new URL('index.html?finize-inline-shell=118-r35', scope), {cache:'no-store'});
+    const response = await fetch(new URL('index.html?finize-inline-shell=118-r36', scope), {cache:'no-store'});
     if (!response.ok) return;
     const html = await response.clone().text();
-    if (!html.includes('<meta name="finize-inline-release" content="118-r35">')) return;
+    if (!html.includes('<meta name="finize-inline-release" content="118-r36">')) return;
     for (const name of await caches.keys()) {
       if (!/^finize-v[\w.-]+$/.test(name)) continue;
       const cache = await caches.open(name);

@@ -48,6 +48,12 @@ async function boot(page, width = 390, enabled = true, balance = false) {
   return snapshot;
 }
 
+test('bankkoppelingstransactie opent vanuit overzicht zonder CSV-herstel en zonder mutatie',async({page})=>{
+ await boot(page);await page.locator('[data-bank-sync]').click();await expect.poll(()=>page.evaluate(()=>state.transactions.some(tx=>tx.recordRole==='bank-source'))).toBe(true);await page.locator('[data-bank-close]').count().then(async count=>{if(count)await page.locator('[data-bank-close]').click();});
+ await page.evaluate(()=>{document.querySelector('#incomeEditModal')?.classList.remove('open');document.querySelector('#u4ImportModalRoot')?.classList.remove('open');});await page.locator('[data-tab="gezamenlijk"]:visible').first().click();
+ const before=await page.evaluate(()=>JSON.stringify(state));await page.locator('#tab-gezamenlijk .transaction-overview-row').filter({hasText:'Boodschappen'}).locator('button').click();await expect(page.locator('.u4-focus-head h2:visible')).toHaveText('Transactie aanpassen');await expect(page.getByText('Oorspronkelijke bron herstellen',{exact:true})).toHaveCount(0);await expect(page.locator('[data-u4-repair-file]')).toHaveCount(0);expect(await page.evaluate(()=>JSON.stringify(state))).toBe(before);
+});
+
 test('P5b explicit disabled override blocks bank requests', async ({ page }) => {
   await boot(page, 390, false);
   await expect(page.locator('[data-bank-sync]')).toBeDisabled();

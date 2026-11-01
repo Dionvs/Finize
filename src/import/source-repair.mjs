@@ -4,7 +4,7 @@ const copy=value=>JSON.parse(JSON.stringify(value));
 const iban=value=>String(value||'').replace(/\s/g,'').toUpperCase();
 export function inspectSourceAvailability(state,tx,batch){
   const issues=[];
-  if(!tx||getTransactionSource(tx)!=='csv')return {ok:false,issues:['Deze registratie is geen CSV-banktransactie.']};
+  if(!tx||!['csv','bank-api'].includes(getTransactionSource(tx)))return {ok:false,issues:['Deze registratie is geen banktransactie.']};
   if(!tx.bankOriginal?.bankDate||tx.bankOriginal.amount===null||tx.bankOriginal.amount===undefined||!Number.isFinite(Number(tx.bankOriginal.amount)))issues.push('De oorspronkelijke bankdatum of het oorspronkelijke bedrag ontbreekt.');
   if(!tx.importBatchId||!tx.importTransactionId||!batch?.rows?.some(row=>row.id===tx.importTransactionId))issues.push('De oorspronkelijke importregel of bronkoppeling ontbreekt.');
   if(!getTransactionAccountContext(tx,{accountProfiles:state.accountProfiles||[]}))issues.push('De rekening waarop de bankbeweging plaatsvond is onbekend.');
@@ -21,6 +21,7 @@ export function sourceRepairCandidates(state,tx,rows){
 }
 export function planSourceRepair(state,txId,batch,bank,{confirmed=false,operationId,timestamp,sourceIdentityProof}={}){
   const tx=(state.transactions||[]).find(row=>row.id===txId);if(!tx)throw new Error('De oorspronkelijke transactie bestaat niet meer.');
+  if(getTransactionSource(tx)!=='csv')throw new Error('CSV-bronherstel is alleen beschikbaar voor CSV-transacties.');
   if(inspectSourceAvailability(state,tx,batch).ok)throw new Error('Deze transactie heeft al een geldige bron. Herstel is niet nodig.');
   if(!confirmed||!sourceRepairCandidates(state,tx,[bank]).length)throw new Error('Bevestig een overeenkomst met dezelfde rekening, bankdatum en hetzelfde bedrag.');
   const candidate=copy(state),nextBatch=batch?copy(batch):{id:tx.importBatchId||`recovery-${tx.id}`,rows:[],accountProfileId:tx.accountProfileId,accountOwner:getTransactionAccountContext(tx,{accountProfiles:state.accountProfiles||[]}),lifecycle:tx.batchLifecycle||'active',status:'verwerkt',version:0,summary:{},fileName:'Herstelde oorspronkelijke CSV-bron'};

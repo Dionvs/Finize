@@ -2846,6 +2846,9 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
       if(row){const section=row.closest('details.u4-section');if(section)section.open=true;const details=row.querySelector('details');if(details)details.open=true;row.scrollIntoView({block:'nearest'});}
       return draft;
     }
+    if(getTransactionSource(tx)==='bank-api'){
+      const modal=ensureModalRoot();modal.innerHTML=`<div class="u4-import-modal"><header class="u4-modal-head"><h2>Banktransactie niet beschikbaar</h2><button class="ghost" data-u4-close>Sluiten</button></header><main class="u4-modal-body"><p>${check.issues.map(esc).join(' ')}</p><p>De oorspronkelijke gegevens van de bankkoppeling konden niet volledig worden opgehaald. Probeer opnieuw met internetverbinding. Je opgeslagen verwerking blijft behouden.</p></main></div>`;modal.classList.add('open');modal.querySelector('[data-u4-close]').onclick=closeDraft;return null;
+    }
     const modal=ensureModalRoot();modal.innerHTML=`<div class="u4-import-modal"><header class="u4-modal-head"><h2>Oorspronkelijke bron herstellen</h2><button class="ghost" data-u4-close>Sluiten</button></header><main class="u4-modal-body"><p>${check.issues.map(esc).join(' ')}</p><p>Je goedgekeurde verwerking blijft behouden. Kies de oorspronkelijke CSV om een bronkoppeling voor te stellen.</p><label>Oorspronkelijke CSV<input type="file" accept=".csv,text/csv" data-u4-repair-file></label><div data-u4-repair-result role="status"></div></main></div>`;modal.classList.add('open');modal.querySelector('[data-u4-close]').onclick=closeDraft;
     const baseSignature=JSON.stringify(root.state);
     modal.querySelector('[data-u4-repair-file]').onchange=async event=>{
