@@ -16158,9 +16158,43 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
     const actual = round22(rows.reduce((sum2, row) => sum2 + row.actual, 0)), planned = round22(rows.reduce((sum2, row) => sum2 + row.planned, 0));
     return ` · ${rows.some((row) => row.paid) ? "Betaald" : "Niet betaald"} · werkelijk ${eur(actual)} · verschil ${eur(actual - planned)}`;
   }
+  function u3OpenJointFixedOverview(fixed) {
+    const month = getSelectedMonth();
+    const occurrences = u3FixedOccurrences(month).filter((row) => row.financialFor === "gezamenlijk");
+    const entries = fixed.map((item) => {
+      const planned = occurrences.filter((row) => row.itemId === item.id);
+      const actuals = planned.map((row) => fixedOccurrenceActuals(state, row));
+      const amount = round22(actuals.reduce((sum2, row) => sum2 + row.planned, 0));
+      const actual = round22(actuals.reduce((sum2, row) => sum2 + row.actual, 0));
+      const dates = planned.map(fixedCashDate).filter(Boolean).sort();
+      return { item, planned, amount, actual, paid: actuals.some((row) => row.paid), date: dates[0] || "" };
+    });
+    const scheduled = entries.filter((row) => row.planned.length);
+    const plannedTotal = round22(scheduled.reduce((sum2, row) => sum2 + row.amount, 0));
+    const paidTotal = round22(scheduled.reduce((sum2, row) => sum2 + row.actual, 0));
+    const sort = (a, b) => (a.date || "9999").localeCompare(b.date || "9999") || String(a.item.naam || "").localeCompare(String(b.item.naam || ""), "nl");
+    const rowHtml = (row) => {
+      const item = row.item, date2 = row.date ? row.date.slice(8, 10) + "-" + row.date.slice(5, 7) : "—";
+      const n = Number(item.frequentieAantal) || 1, unit = item.frequentieEenheid;
+      const frequency = n === 1 ? { maanden: "Maandelijks", weken: "Wekelijks", jaren: "Jaarlijks" }[unit] || `Elke ${textSafe(unit)}` : `Elke ${n} ${textSafe(unit)}`;
+      const amount = row.planned.length ? row.amount : u3AmountAt2(item, month);
+      return `<button type="button" class="u3-admin-row joint-fixed-row" data-joint-fixed-id="${attrSafe(item.id)}" aria-label="${attrSafe(item.naam || "Zonder naam")} bewerken"><span class="joint-fixed-date">${date2}</span><span class="joint-fixed-icon" aria-hidden="true">${iconSvg(categoryIconName(`${item.naam || ""} ${item.categorie || ""}`))}</span><span class="joint-fixed-main"><strong class="joint-fixed-name">${textSafe(item.naam || "Zonder naam")}</strong><small>${frequency}${row.planned.length && !row.paid ? ' · <span class="joint-fixed-unpaid">Nog niet betaald</span>' : ""}</small></span><span class="joint-fixed-side"><strong>${eur(amount)}</strong></span></button>`;
+    };
+    const section = (title, rows, empty) => `<section class="joint-fixed-section"><h3>${title} <span>(${rows.length})</span></h3><div class="joint-fixed-list">${rows.sort(sort).map(rowHtml).join("") || `<p class="u3-empty">${empty}</p>`}</div></section>`;
+    const unpaid = scheduled.filter((row) => !row.paid), paid = scheduled.filter((row) => row.paid), unscheduled = entries.filter((row) => !row.planned.length);
+    const { modal } = u3AdminModal(`<div class="u3-admin-head joint-fixed-head"><div><div class="section-kicker">${monthLabel(month)} · Planning</div><h2>Gezamenlijk vaste lasten</h2><p>Gezamenlijke rekening</p></div><button type="button" class="ghost" data-u3-close>Sluiten</button></div>
+    <div class="joint-fixed-summary"><div><span>Nog te betalen</span><strong>${eur(round22(plannedTotal - paidTotal))}</strong></div><div><span>Betaald</span><strong>${eur(paidTotal)}</strong></div><div class="joint-fixed-total"><span>Totaal gepland deze maand</span><strong>${eur(plannedTotal)}</strong></div></div>
+    ${section("Nog te betalen", unpaid, "Geen openstaande vaste lasten in deze maand.")}
+    ${section("Betaald", paid, "Nog geen gekoppelde betalingen in deze maand.")}
+    ${unscheduled.length ? `<details class="joint-fixed-other"><summary>Overige vaste lasten (${unscheduled.length})</summary><p>Niet gepland deze maand</p><div class="joint-fixed-list">${unscheduled.sort(sort).map(rowHtml).join("")}</div></details>` : ""}
+    <button type="button" class="primary joint-fixed-add" data-u3-add-recurring="fixed">${iconSvg("plus")} Vaste last toevoegen</button>`, "joint-fixed-overview");
+    modal.querySelector("[data-u3-add-recurring]").addEventListener("click", () => u3OpenRecurringEditor("fixed", "", { owner: "gezamenlijk", planningOwner: "gezamenlijk" }));
+    modal.querySelectorAll("[data-joint-fixed-id]").forEach((row) => row.addEventListener("click", () => u3OpenRecurringEditor("fixed", row.dataset.jointFixedId, { planningOwner: "gezamenlijk" })));
+  }
   function u3OpenPlanning(owner = "") {
     const planningOwner = U3_ACCOUNTS.includes(owner) ? owner : "";
     const fixed = resolveFixedExpensesForMonth(state, getSelectedMonth()).filter((item) => !planningOwner || (item.financialFor || item.rekening || "gezamenlijk") === planningOwner);
+    if (planningOwner === "gezamenlijk") return u3OpenJointFixedOverview(fixed);
     const incomes = resolveIncomeSourcesForMonth(state, getSelectedMonth(), null, { planningOnly: true }).filter((item) => !planningOwner || (planningOwner === "gezamenlijk" ? (item.financialFor || item.rekening) === planningOwner : item.eigenaar === planningOwner));
     const ownerName = planningOwner ? u3AccountLabel(planningOwner) : "";
     const rows = (items, kind) => items.map((item) => `<article class="u3-admin-row"><div class="u3-row-head"><div><strong>${textSafe(item.naam || "Zonder naam")}</strong><br><small>${u3AccountLabel(item.rekening)} → ${u3AccountLabel(item.financialFor || item.rekening)} · elke ${textSafe(item.frequentieAantal)} ${textSafe(item.frequentieEenheid)}${kind === "fixed" ? ` · ${textSafe(u3FixedDistributionLabel(item))}` : ""}</small></div><div><span class="u3-status ${item.actief !== false ? "ok" : ""}">${item.actief !== false ? "Actief" : "Gestopt"}</span> <button class="ghost small" data-u3-edit-recurring="${attrSafe(kind + ":" + item.id)}">Bewerken</button></div></div><div>${eur(u3AmountAt2(item, getSelectedMonth()))} <small>· gemiddeld ${eur(u3MonthlyAverage(item))} p/m${kind === "fixed" ? ` · afschrijving ${paymentDayLabel(item)}` : ""}${kind === "fixed" ? fixedRealizationLabel(item) : ""}</small></div></article>`).join("");
