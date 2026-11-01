@@ -33,6 +33,25 @@ async function openReview(page){
   return page.locator('[data-u4-row="review-row"]');
 }
 
+test('bankregel openen toont één verwerking en behoudt oorspronkelijke gegevens',async({page},info)=>{
+ await page.setViewportSize({width:390,height:844});const row=await openReview(page);
+ const before=await page.evaluate(()=>JSON.stringify({state,original:window.__reviewDraft.rows[0].bankOriginal}));
+ await expect(row.locator('.u4-row-grid')).toBeHidden();await expect(row.locator('[data-u4-select-approval]')).toBeVisible();await row.screenshot({path:info.outputPath('bankimport-compact.png')});
+ await row.locator('[data-u4-focus-open]').click();await expect(page.locator('.u4-import-modal')).toHaveClass(/u4-focus-mode/);await expect(row.getByRole('heading',{name:'Transactie aanpassen'})).toBeVisible();
+ await expect(row.locator('[data-u4-field="processingDate"]')).toBeVisible();await expect(row.locator('[data-u4-field="processedAmount"]')).toBeVisible();await expect(row.locator('[data-u4-approve]')).toBeVisible();
+ await page.screenshot({path:info.outputPath('banktransactie-aanpassen.png')});
+ await row.locator('[data-u4-family]').selectOption('sparen');await expect(page.locator('.u4-import-modal')).toHaveClass(/u4-focus-mode/);await expect(row.locator('[data-u4-field="savingsGoalId"]')).toBeVisible();
+ await row.locator('[data-u4-focus-back]').click();await expect(page.locator('.u4-import-modal')).not.toHaveClass(/u4-focus-mode/);expect(await page.evaluate(()=>JSON.stringify({state,original:window.__reviewDraft.rows[0].bankOriginal}))).toBe(before);
+});
+
+test('bankregel verwerken vanuit de gerichte weergave vraagt de bestaande goedkeuring',async({page})=>{
+ await page.setViewportSize({width:390,height:844});const row=await openReview(page);await row.locator('[data-u4-focus-open]').click();await row.locator('[data-u4-approve]').click();await expect.poll(()=>page.evaluate(()=>state.transactions.some(tx=>tx.importTransactionId==='review-row'&&tx.processingStatus==='goedgekeurd'))).toBe(true);
+});
+
+test('compacte regels blijven selecteerbaar voor groepsgoedkeuring',async({page})=>{
+ const row=await openReview(page);await row.locator('[data-u4-select-approval]').check();await expect(row.locator('[data-u4-select-approval]')).toBeChecked();await expect(page.locator('[data-u4-approve-selection]')).toBeVisible();await expect(row.locator('.u4-row-grid')).toBeHidden();
+});
+
 for(const width of [320,390])test(`mobiele importacties zijn bereikbaar zonder hoge vaste actiebalk ${width}px`,async({page})=>{
   await page.setViewportSize({width,height:740});
   await openReview(page);
@@ -61,6 +80,7 @@ test('importcontrole splitst onbekend, nakijken en alleen handmatig goedgekeurd'
 test('gedeeltelijke verwerking houdt onbekende regels open en activeert expliciete goedkeuring',async({page})=>{
   await openReview(page);
   expect(await page.evaluate(()=>state.transactions.filter(tx=>tx.recordRole!=='bank-source'&&tx.importBatchId==='review-test').length)).toBe(0);
+  await page.locator('[data-u4-row="review-row"] [data-u4-focus-open]').click();
   await page.locator('[data-u4-row="review-row"] [data-u4-approve]').click();
   await expect(page.locator('.u4-section-approved [data-u4-row="review-row"]')).toHaveCount(1);
   await expect.poll(()=>page.evaluate(()=>state.transactions.some(tx=>tx.importTransactionId==='review-row'&&tx.processingStatus==='goedgekeurd'))).toBe(true);
@@ -69,6 +89,7 @@ test('gedeeltelijke verwerking houdt onbekende regels open en activeert explicie
 
 test('CSV-controle toont vier hoofdvelden en alleen relevante vervolgkeuzes',async({page})=>{
   const row=await openReview(page);
+  await row.locator('[data-u4-focus-open]').click();
   await expect(row.locator('.u4-row-grid > label')).toHaveCount(4);
   await expect(row.locator('.u4-row-grid')).toContainText('Verwerkingsdatum');
   await expect(row.locator('.u4-row-grid')).toContainText('Bedrag');
@@ -112,11 +133,12 @@ test('CSV-controle toont vier hoofdvelden en alleen relevante vervolgkeuzes',asy
   expect(await page.evaluate(()=>({type:window.__reviewDraft.rows[0].processing.transactionType,include:window.__reviewDraft.rows[0].processing.include}))).toEqual({type:'niet-meetellen',include:false});
 });
 
-test('de vier hoofdvelden blijven op telefoon twee bij twee',async({page})=>{
+test('de vier hoofdvelden blijven op telefoon leesbaar',async({page})=>{
   await page.setViewportSize({width:390,height:844});
   const row=await openReview(page);
+  await row.locator('[data-u4-focus-open]').click();
   const columns=await row.locator('.u4-row-grid').evaluate(element=>getComputedStyle(element).gridTemplateColumns.split(' ').length);
-  expect(columns).toBe(2);
+  expect(columns).toBe(1);
   const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>document.documentElement.clientWidth);
   expect(overflow).toBe(false);
 });

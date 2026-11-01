@@ -10229,13 +10229,15 @@
     });
     return parts2.join(" – ") || "Banktransactie";
   }
+  function renderOverviewTransactionRow(tx, owner) {
+    const label = compactTransactionLabel(tx), separator = label.indexOf(" – ");
+    const title = separator < 0 ? label : label.slice(0, separator), detail = separator < 0 ? "" : label.slice(separator + 3);
+    const amount = transactionDisplayAmount(tx), attr = owner === "gezamenlijk" ? "data-edit-joint-transaction" : "data-edit-personal-transaction";
+    return `<div class="joint-transaction-row ux-action-card transaction-overview-row" ${attr}="${attrSafe(tx.id)}" data-owner="${attrSafe(owner)}"><button type="button" class="ux-card-primary" aria-label="${attrSafe(formatDayMonth(tx.date) + " · " + label)} ${eur(amount)} · Transactie bewerken"></button><span class="joint-transaction-meta"><span class="joint-transaction-date" title="${formatDateNL(tx.date)}">${formatDayMonth(tx.date)}</span></span><span class="transaction-overview-icon" aria-hidden="true">${iconSvg(categoryIconName(tx.category || ""))}</span><span class="joint-transaction-description"><strong class="transaction-overview-name">${textSafe(title)}</strong>${detail ? `<small class="transaction-overview-detail">${textSafe(detail)}</small>` : ""}</span><strong class="joint-transaction-amount ${amount > 0 ? "transaction-overview-credit" : ""}">${eur(amount)}</strong></div>`;
+  }
   function renderJointTransactionsCard() {
     const rows = getAccountMonthTransactions("gezamenlijk").sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
-    const rowsHtml = rows.map((tx) => `<div class="joint-transaction-row ux-action-card" data-edit-joint-transaction="${attrSafe(tx.id)}"><button type="button" class="ux-card-primary" aria-label="${attrSafe(formatDayMonth(tx.date) + " · " + compactTransactionLabel(tx))} ${eur(transactionDisplayAmount(tx))} · Transactie bewerken"></button>
-    <span class="joint-transaction-meta"><span class="joint-transaction-date" title="${formatDateNL(tx.date)}">${formatDayMonth(tx.date)}</span></span>
-    <span class="joint-transaction-description"><span class="joint-transaction-description-text" title="${attrSafe(compactTransactionLabel(tx))}">${textSafe(compactTransactionLabel(tx))}</span></span>
-    <strong class="joint-transaction-amount">${eur(transactionDisplayAmount(tx))}</strong>
-  </div>`).join("");
+    const rowsHtml = rows.map((tx) => renderOverviewTransactionRow(tx, "gezamenlijk")).join("");
     return `<div class="card joint-two-column-card joint-transactions-card">${renderJointTransactionsCardHead()}<div class="joint-transactions-list">${rowsHtml || '<p class="joint-transactions-empty">Nog geen uitgaven deze maand.</p>'}</div><div class="joint-transactions-total"><span>Totaal uitgaven</span><strong>${eur(sumTransactionEffects(state, "realExpense", { month: getSelectedMonth(), account: "gezamenlijk" }))}</strong></div></div>`;
   }
   function legacyIconName(icon) {
@@ -12787,19 +12789,20 @@
     return `<button type="button" class="${className}" data-open-personal-transaction="${attrSafe(owner)}">+ Uitgave van ${textSafe(name)}</button>`;
   }
   function renderTransactionsTable(owner) {
-    const rows = getAccountMonthTransactions(owner).sort((a, b) => String(b.date).localeCompare(String(a.date))).map((tx) => `
-    <tr ${owner === "gezamenlijk" ? "data-edit-joint-transaction" : "data-edit-personal-transaction"}="${attrSafe(tx.id)}" data-owner="${attrSafe(owner)}" tabindex="0" aria-label="Transactie ${attrSafe(tx.description || tx.category || "")} bewerken">
+    const rows = getAccountMonthTransactions(owner).sort((a, b) => String(b.date).localeCompare(String(a.date))).map((tx) => {
+      const label = compactTransactionLabel(tx), index = label.indexOf(" – "), title = index < 0 ? label : label.slice(0, index), detail = index < 0 ? "" : label.slice(index + 3), amount = transactionDisplayAmount(tx);
+      return `<tr ${owner === "gezamenlijk" ? "data-edit-joint-transaction" : "data-edit-personal-transaction"}="${attrSafe(tx.id)}" data-owner="${attrSafe(owner)}" tabindex="0" aria-label="Transactie ${attrSafe(label)} bewerken">
       <td>${formatDateNL(tx.date)}</td>
-      <td>${textSafe(tx.category || "Overig")}</td>
-      <td>${textSafe(tx.description || "")}<div class="progress-label" style="text-align:left">${textSafe(tx.note || "")}</div></td>
-      <td class="num"><span class="value neg">${eur(transactionDisplayAmount(tx))}</span></td>
+      <td><span class="transaction-table-identity"><span class="transaction-overview-icon" aria-hidden="true">${iconSvg(categoryIconName(tx.category || ""))}</span><span><strong>${textSafe(title)}</strong>${detail ? `<small>${textSafe(detail)}</small>` : ""}</span></span></td>
+      <td class="num"><span class="${amount > 0 ? "value pos" : "value neg"}">${eur(amount)}</span></td>
       <td class="row-actions"><button class="danger-ghost" data-remove-transaction="${attrSafe(tx.id)}" title="${getTransactionSource(tx) === "csv" ? "Import beheren" : "Verwijderen"}">×</button></td>
-    </tr>`).join("");
+    </tr>`;
+    }).join("");
     const emptyIcon = owner ? "⌘" : "▤";
     const emptyText = owner ? `Je persoonlijke uitgaven verschijnen hier zodra je ze toevoegt.` : `Toegevoegde uitgaven verschijnen hier.`;
-    const emptyRow = `<tr><td colspan="5" style="padding:0">${renderEmptyState(emptyIcon, "Nog geen uitgaven deze maand", emptyText)}</td></tr>`;
+    const emptyRow = `<tr><td colspan="4" style="padding:0">${renderEmptyState(emptyIcon, "Nog geen uitgaven deze maand", emptyText)}</td></tr>`;
     return `<div class="scroll-area large"><table>
-    <thead><tr><th>Datum</th><th>Categorie</th><th>Omschrijving</th><th style="text-align:right">Bedrag</th><th></th></tr></thead>
+    <thead><tr><th>Datum</th><th>Naam en omschrijving</th><th style="text-align:right">Bedrag</th><th></th></tr></thead>
     <tbody>${rows || emptyRow}</tbody>
   </table></div>`;
   }
@@ -13774,7 +13777,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
       return;
     }
     const date2 = existing ? getTransactionDate(existing) : manualDefaultDate(month, today), categories = jointVariableCategoryOptions((existing == null ? void 0 : existing.category) || "", destination, date2.slice(0, 7)), name = ownerLabel(account);
-    modal.innerHTML = `<div class="modal joint-transaction-fullscreen-editor"><div class="card-head"><h2>${name} transactie ${existing ? "bewerken" : "toevoegen"}</h2><button class="danger-ghost" id="btnClose${suffix}" aria-label="Sluiten">×</button></div><p class="hint" style="margin-top:-4px">${monthLabel(month)}</p><div class="modal-grid"><label>Bedrag<input id="${prefix}Amount" type="number" step="0.01" inputmode="decimal" value="${existing ? Number(existing.amount) || "" : ""}"></label><label>Datum<input id="${prefix}Date" type="date" required max="${today}" value="${attrSafe(date2)}"></label><label class="full">Omschrijving<input id="${prefix}Description" type="text" value="${attrSafe((existing == null ? void 0 : existing.description) || "")}"></label><label data-manual-category>Categorie<select id="${prefix}Category">${categories.map((category) => `<option value="${attrSafe(category)}" ${category === (existing == null ? void 0 : existing.category) ? "selected" : ""}>${textSafe(category)}</option>`).join("")}</select></label><label class="full">Notitie<input id="${prefix}Note" value="${attrSafe((existing == null ? void 0 : existing.note) || "")}"></label>${financialProcessingFields(prefix, destination, existing || {})}</div><p class="hint" data-p4-error role="alert"></p>${existing ? `<button class="ghost" data-p4-open-coverage="${attrSafe(existing.id)}">Spaardekking beheren</button>` : ""}<div class="modal-actions"><button class="ghost" id="btnCancel${suffix}">Annuleren</button><button class="primary" id="btnSave${suffix}">${existing ? "Wijzigingen opslaan" : "Transactie opslaan"}</button></div></div>`;
+    modal.innerHTML = `<div class="modal joint-transaction-fullscreen-editor transaction-detail-editor"><div class="transaction-detail-head"><h2>Transactie ${existing ? "aanpassen" : "toevoegen"}</h2><button class="ghost" id="btnClose${suffix}" aria-label="Sluiten">${iconSvg("close")}</button></div>${existing ? `<div class="transaction-detail-identity"><span class="transaction-overview-icon" aria-hidden="true">${iconSvg(categoryIconName(existing.category || ""))}</span><div><strong>${textSafe(compactTransactionLabel(existing))}</strong><small>${textSafe(formatDateNL(date2))}</small></div></div>` : ""}<div class="modal-grid transaction-detail-fields"><label class="full">Omschrijving<input id="${prefix}Description" type="text" value="${attrSafe((existing == null ? void 0 : existing.description) || "")}"></label><label>Bedrag<input id="${prefix}Amount" type="number" step="0.01" inputmode="decimal" value="${existing ? Number(existing.amount) || "" : ""}"></label><label>Datum<input id="${prefix}Date" type="date" required max="${today}" value="${attrSafe(date2)}"></label><label data-manual-category>Categorie<select id="${prefix}Category">${categories.map((category) => `<option value="${attrSafe(category)}" ${category === (existing == null ? void 0 : existing.category) ? "selected" : ""}>${textSafe(category)}</option>`).join("")}</select></label><div class="transaction-detail-account"><span>Betaald vanuit</span><strong>${textSafe(name)}</strong></div><label class="full">Notitie<input id="${prefix}Note" value="${attrSafe((existing == null ? void 0 : existing.note) || "")}"></label><div class="transaction-processing-fields full">${financialProcessingFields(prefix, destination, existing || {})}</div></div><p class="hint" data-p4-error role="alert"></p>${existing ? `<button class="ghost" data-p4-open-coverage="${attrSafe(existing.id)}">Spaardekking beheren</button>` : ""}<div class="modal-actions"><button class="ghost" id="btnCancel${suffix}">Annuleren</button><button class="primary" id="btnSave${suffix}">${existing ? "Wijzigingen opslaan" : "Transactie opslaan"}</button></div></div>`;
     modal.classList.add("open", "joint-transaction-modal-open");
     bindFinancialProcessingFields(modal, prefix, destination, existing, account);
     const close = () => modal.classList.remove("open", "joint-transaction-modal-open");
@@ -14560,11 +14563,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
   function renderPersonalTransactionsCard(owner) {
     const name = ownerLabel(owner);
     const rows = getAccountMonthTransactions(owner).sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
-    const rowsHtml = rows.map((tx) => `<div class="joint-transaction-row ux-action-card" data-edit-personal-transaction="${attrSafe(tx.id)}" data-owner="${attrSafe(owner)}"><button type="button" class="ux-card-primary" aria-label="${attrSafe(formatDayMonth(tx.date) + " · " + compactTransactionLabel(tx))} ${eur(transactionDisplayAmount(tx))} · Transactie bewerken"></button>
-    <span class="joint-transaction-meta"><span class="joint-transaction-date" title="${formatDateNL(tx.date)}">${formatDayMonth(tx.date)}</span></span>
-    <span class="joint-transaction-description"><span class="joint-transaction-description-text" title="${attrSafe(compactTransactionLabel(tx))}">${textSafe(compactTransactionLabel(tx))}</span></span>
-    <strong class="joint-transaction-amount">${eur(transactionDisplayAmount(tx))}</strong>
-  </div>`).join("");
+    const rowsHtml = rows.map((tx) => renderOverviewTransactionRow(tx, owner)).join("");
     const total = round22(sumTransactionEffects(state, "realExpense", { month: getSelectedMonth(), account: owner }));
     return `<div class="card joint-two-column-card joint-transactions-card"><div class="card-head joint-transactions-card-head"><div class="card-head-title"><h2>${name} transacties <span>— ${monthLabel(getSelectedMonth())}</span></h2><button type="button" class="joint-transaction-add-btn" data-open-personal-transaction="${owner}" aria-label="Uitgave toevoegen">${iconSvg("receipt")}</button></div></div><div class="joint-transactions-list">${rowsHtml || '<p class="joint-transactions-empty">Nog geen uitgaven deze maand.</p>'}</div><div class="joint-transactions-total"><span>Totaal uitgaven</span><strong>${eur(total)}</strong></div></div>`;
   }
@@ -18121,7 +18120,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
         summary: { newCount: active2.length, duplicateCount: rows.filter((row) => row.duplicate).length, totalIncome: round23(income), totalExpenses: round23(expenses), sureCount: 0, approvedCount: 0, reviewCount: active2.filter((row) => importReviewState(row) === "nakijken").length, unknownCount: active2.filter((row) => importReviewState(row) === "onbekend").length }
       };
     }
-    const UI = { draft: null, visibleRows: 60, root: null, conflicts: /* @__PURE__ */ new Map() };
+    const UI = { draft: null, visibleRows: 60, root: null, conflicts: /* @__PURE__ */ new Map(), focusRow: "", focusFromOverview: false };
     const importViewMonths = /* @__PURE__ */ new WeakMap();
     function selectedImportMonth(root2) {
       var _a2;
@@ -19721,8 +19720,9 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
       const family = transactionFamily(p);
       const reviewState = importReviewState(row);
       const statusLabel = reviewState === "niet-meetellen" ? "Niet meetellen" : reviewState === "goedgekeurd" ? "Goedgekeurd" : reviewState === "onbekend" ? "Onbekend" : "Nakijken";
-      return `<article class="u4-import-row" data-u4-row="${escAttr(row.id)}">
-      <div class="u4-import-row-main"><div><strong>${esc(p.description || original2.rawDescription || original2.description || "Onbekende transactie")}</strong><span class="u4-muted">${esc(displayDate(original2.bankDate))} · ${euro3(original2.amount)}</span>${Math.abs(Number(p.processedAmount) - Math.abs(Number(original2.amount))) > 4e-3 ? `<span class="u4-muted">Verwerking ${euro3(p.processedAmount)} · bankcashflow ${euro3(original2.amount)}</span>` : ""}${((_a2 = row.reasons) == null ? void 0 : _a2.length) ? `<div class="u4-row-reasons">${esc(row.reasons.join(" · "))}</div>` : ""}</div><div class="u4-row-approval">${["onbekend", "nakijken"].includes(reviewState) ? `<input type="checkbox" data-u4-select-approval="${escAttr(row.id)}" aria-label="${escAttr(p.description || original2.description || row.id)} selecteren voor groepsgoedkeuring">` : ""}<span class="u4-status ${reviewState}">${statusLabel}</span>${["goedgekeurd", "niet-meetellen"].includes(reviewState) ? '<button type="button" class="ghost small" data-u4-reopen>Bewerken</button>' : `<button type="button" class="primary small" data-u4-approve>Opslaan en verwerken</button>`}</div></div>
+      return `<article class="u4-import-row${UI.focusRow === String(row.id) ? " u4-focus-row" : ""}" data-u4-row="${escAttr(row.id)}">
+      <div class="u4-focus-head"><button type="button" class="ghost" data-u4-focus-back>${UI.focusFromOverview ? "Terug naar transacties" : "Terug naar bankimport"}</button><h2>Transactie aanpassen</h2></div>
+      <div class="u4-import-row-main"><div><button type="button" class="u4-focus-open" data-u4-focus-open><span class="u4-compact-date">${esc(displayDate(original2.bankDate))}</span><span class="u4-compact-icon" aria-hidden="true">${esc((p.description || original2.description || "?").trim().charAt(0).toLocaleUpperCase())}</span><strong>${esc(p.description || original2.rawDescription || original2.description || "Onbekende transactie")}</strong><b class="u4-compact-amount">${euro3(original2.amount)}</b></button>${Math.abs(Number(p.processedAmount) - Math.abs(Number(original2.amount))) > 4e-3 ? `<span class="u4-muted u4-processing-difference">Verwerking ${euro3(p.processedAmount)} · bankcashflow ${euro3(original2.amount)}</span>` : ""}${((_a2 = row.reasons) == null ? void 0 : _a2.length) ? `<div class="u4-row-reasons">${esc(row.reasons.join(" · "))}</div>` : ""}</div><div class="u4-row-approval">${["onbekend", "nakijken"].includes(reviewState) ? `<input type="checkbox" data-u4-select-approval="${escAttr(row.id)}" aria-label="${escAttr(p.description || original2.description || row.id)} selecteren voor groepsgoedkeuring">` : ""}<span class="u4-status ${reviewState}">${statusLabel}</span>${["goedgekeurd", "niet-meetellen"].includes(reviewState) ? '<button type="button" class="ghost small" data-u4-reopen>Bewerken</button>' : `<button type="button" class="primary small" data-u4-approve>Opslaan en verwerken</button>`}</div></div>
       ${suggestionHtml(row)}
       ${(root2.state.transactions || []).filter((tx) => !isBankSource(tx) && tx.importTransactionId === row.id).map((tx) => `<button type="button" class="ghost small" data-u4-coverage="${escAttr(tx.id)}">Spaardekking · ${esc(tx.category)}${tx.splitId ? " · split " + esc(tx.splitId) : ""}</button>`).join("")}
       <div class="u4-row-grid">
@@ -19900,6 +19900,11 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
       const unknown = active2.filter((row) => importReviewState(row) === "onbekend").slice(0, UI.visibleRows);
       const review = active2.filter((row) => importReviewState(row) === "nakijken").slice(0, UI.visibleRows);
       const approved = active2.filter((row) => ["goedgekeurd", "niet-meetellen"].includes(importReviewState(row))).slice(0, UI.visibleRows);
+      const focused = UI.focusRow && active2.find((row) => String(row.id) === UI.focusRow);
+      if (focused) {
+        const status2 = importReviewState(focused), group = status2 === "onbekend" ? unknown : status2 === "nakijken" ? review : approved;
+        if (!group.some((row) => row.id === focused.id)) group.push(focused);
+      }
       const modal = ensureModalRoot();
       modal.innerHTML = `<div class="u4-import-modal" role="dialog" aria-modal="true" aria-label="Bankimport controleren">
       <header class="u4-modal-head"><div><h2>${isConcept ? "Bankimport controleren" : "Importdetails"}</h2><p>${esc(draft.fileName)} · ${esc(draft.bank)} · ${esc(displayDate(draft.periodFrom) || "—")} t/m ${esc(displayDate(draft.periodTo) || "—")} · ${esc(draft.status)}</p></div><button type="button" class="ghost" data-u4-close>Sluiten</button></header>
@@ -19916,6 +19921,7 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
       <a class="u4-actions-shortcut" href="#u4-import-actions">Naar acties ↓</a><footer class="u4-modal-actions" id="u4-import-actions" tabindex="-1"><span class="u4-muted" data-u4-save-status>Goedkeuring vraagt altijd een expliciete keuze per bron of geselecteerde groep. ${batchLifecycle(draft) === "withdrawn" ? "Deze batch is teruggetrokken." : ""}</span><button type="button" class="ghost" data-u4-cancel-concept>Annuleren</button><button type="button" class="ghost" data-u4-save-concept>Concept opslaan</button>${batchLifecycle(draft) === "withdrawn" ? '<button type="button" class="primary" data-u4-restore>Herstellen</button>' : '<button type="button" class="danger-ghost" data-u4-withdraw>Terugtrekken</button>'}<button type="button" class="danger-ghost" data-u4-delete-batch>Verwijderen</button>${batchLifecycle(draft) === "active" ? '<button type="button" class="primary" data-u4-process>Goedgekeurde verwerken</button>' : ""}</footer>
     </div>`;
       modal.classList.add("open");
+      applyImportFocus(modal);
       bindDraftModal(root2, draft, modal);
     }
     function cloudImportMessage(error2) {
@@ -19950,7 +19956,7 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
         }
       });
     }
-    async function openDraft(root2, id, { month = selectedImportMonth(root2), rowId = "" } = {}) {
+    async function openDraft(root2, id, { month = selectedImportMonth(root2), rowId = "", returnToOverview = false } = {}) {
       var _a2, _b, _c, _d, _e, _f;
       const request2 = UI.openSequence = (UI.openSequence || 0) + 1, sessionAtStart = ImportEditors.get(String(id)), revisionAtStart = sessionAtStart == null ? void 0 : sessionAtStart.revision, baseAtStart = sessionAtStart ? cloneState(sessionAtStart.base) : null;
       let local;
@@ -19987,6 +19993,8 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
         const opened = await beginImportEditor(root2, resolved.record);
         if (request2 !== UI.openSequence) return null;
         UI.draft = opened;
+        UI.focusRow = rowId ? String(rowId) : "";
+        UI.focusFromOverview = !!returnToOverview;
         const focusRow = rowId && UI.draft.rows.find((row) => row.id === rowId);
         importViewMonths.set(UI.draft, focusRow ? String(((_f = focusRow.bankOriginal) == null ? void 0 : _f.bankDate) || "").slice(0, 7) : month);
         renderDraftModal(root2, UI.draft);
@@ -19998,8 +20006,24 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
     }
     function closeDraft() {
       UI.openSequence = (UI.openSequence || 0) + 1;
+      UI.focusRow = "";
+      UI.focusFromOverview = false;
       const modal = document.getElementById("u4ImportModalRoot");
       modal == null ? void 0 : modal.classList.remove("open");
+    }
+    function applyImportFocus(modal) {
+      var _a2;
+      const panel = modal.querySelector(".u4-import-modal"), rows = [...modal.querySelectorAll("[data-u4-row]")];
+      let active2 = false;
+      for (const row of rows) {
+        const selected = !!UI.focusRow && row.dataset.u4Row === UI.focusRow;
+        row.classList.toggle("u4-focus-row", selected);
+        if (selected) {
+          (_a2 = row.closest("details.u4-section")) == null ? void 0 : _a2.setAttribute("open", "");
+          active2 = true;
+        }
+      }
+      panel == null ? void 0 : panel.classList.toggle("u4-focus-mode", active2);
     }
     async function applyProfile(root2, draft, modal) {
       const selected = modal.querySelector("[data-u4-profile-select]").value;
@@ -20268,7 +20292,7 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
         if (event2.target.dataset.u4SplitField === "amount" || ["processedAmount", "singleLineAmount"].includes(event2.target.dataset.u4Field)) onDraftChange(event2);
       });
       modal.addEventListener("click", async (event2) => {
-        var _a3, _b2, _c2, _d, _e, _f, _g, _h;
+        var _a3, _b2, _c2, _d, _e, _f, _g, _h, _i, _j;
         const coverage = event2.target.closest("[data-u4-coverage]");
         if (coverage) {
           modal.classList.remove("open");
@@ -20280,6 +20304,28 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
         modal = ensureModalRoot();
         const container = event2.target.closest("[data-u4-row]");
         const row = container ? draft.rows.find((item) => item.id === container.dataset.u4Row) : null;
+        if (event2.target.closest("[data-u4-focus-open]") && row) {
+          UI.focusRow = String(row.id);
+          applyImportFocus(modal);
+          (_b2 = modal.querySelector(".u4-import-modal")) == null ? void 0 : _b2.scrollTo(0, 0);
+          return;
+        }
+        if (event2.target.closest("[data-u4-focus-back]")) {
+          if (UI.focusFromOverview) {
+            try {
+              await persistLocalImportEditor(root2, draft);
+              closeDraft();
+              (_c2 = root2.renderActiveTab) == null ? void 0 : _c2.call(root2);
+            } catch (error2) {
+              updateImportSaveStatus(`Teruggaan uitgesteld: ${(error2 == null ? void 0 : error2.message) || error2}`, true);
+              alert("Het concept kon niet worden bewaard. Probeer opnieuw.");
+            }
+          } else {
+            UI.focusRow = "";
+            applyImportFocus(modal);
+          }
+          return;
+        }
         const dismissSaving = event2.target.closest("[data-u4-dismiss-saving]");
         if (dismissSaving && row) {
           dismissedSavingsProposals.add(row);
@@ -20330,7 +20376,7 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
             await persistImportDraftImmediate(root2, base);
             await ImportStore.deleteJournal(`editor-draft-${draft.id}`);
             ImportEditors.delete(String(draft.id));
-            const current = await openDraft(root2, draft.id, { month: (_b2 = importViewMonths.get(draft)) != null ? _b2 : selectedImportMonth(root2) });
+            const current = await openDraft(root2, draft.id, { month: (_d = importViewMonths.get(draft)) != null ? _d : selectedImportMonth(root2) });
             for (const item of current.rows) {
               const edited = local.rows.find((old) => old.id === item.id);
               if (edited && (item.id !== row.id || decision === "distinct")) {
@@ -20356,7 +20402,7 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
           return;
         }
         if (event2.target.closest("[data-u4-confirm-replacement]") && row) {
-          const manualId = (_c2 = container.querySelector("[data-u4-replacement-choice]")) == null ? void 0 : _c2.value;
+          const manualId = (_e = container.querySelector("[data-u4-replacement-choice]")) == null ? void 0 : _e.value;
           if (!manualId) {
             alert("Kies eerst de handmatige registratie.");
             return;
@@ -20411,10 +20457,10 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
           return;
         }
         if (event2.target.closest("[data-u4-apply-bulk]")) {
-          const scope = ((_d = modal.querySelector("[data-u4-bulk-scope]")) == null ? void 0 : _d.value) || "review";
-          const owner = ((_e = modal.querySelector("[data-u4-bulk-owner]")) == null ? void 0 : _e.value) || "";
-          const category = ((_f = modal.querySelector("[data-u4-bulk-category]")) == null ? void 0 : _f.value) || "";
-          const type = ((_g = modal.querySelector("[data-u4-bulk-type]")) == null ? void 0 : _g.value) || "";
+          const scope = ((_f = modal.querySelector("[data-u4-bulk-scope]")) == null ? void 0 : _f.value) || "review";
+          const owner = ((_g = modal.querySelector("[data-u4-bulk-owner]")) == null ? void 0 : _g.value) || "";
+          const category = ((_h = modal.querySelector("[data-u4-bulk-category]")) == null ? void 0 : _h.value) || "";
+          const type = ((_i = modal.querySelector("[data-u4-bulk-type]")) == null ? void 0 : _i.value) || "";
           if (!owner && !category && !type) {
             alert("Kies minimaal één veld om aan te passen.");
             return;
@@ -20487,7 +20533,7 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
         if (event2.target.closest("[data-u4-conflict-cloud],[data-u4-conflict-local]")) {
           try {
             await resolveImportConflict(root2, draft.id, event2.target.closest("[data-u4-conflict-local]") ? "local" : "cloud");
-            await openDraft(root2, draft.id, { month: (_h = importViewMonths.get(draft)) != null ? _h : selectedImportMonth(root2) });
+            await openDraft(root2, draft.id, { month: (_j = importViewMonths.get(draft)) != null ? _j : selectedImportMonth(root2) });
           } catch (error2) {
             alert(error2.message);
           }
@@ -21374,7 +21420,7 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
       }
       const check = inspectSourceAvailability(root2.state, { ...tx, importBatchId: batchId, importTransactionId: rowId }, batch);
       if (check.ok) {
-        const draft = await openDraft(root2, batchId, { rowId }), modal2 = ensureModalRoot();
+        const draft = await openDraft(root2, batchId, { rowId, returnToOverview: true }), modal2 = ensureModalRoot();
         const row = findDraftRowElement(modal2, rowId);
         if (row) {
           const section = row.closest("details.u4-section");

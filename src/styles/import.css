@@ -43,6 +43,26 @@
 .u4-modal-head{position:sticky;top:0;z-index:4;padding:14px 18px;border-bottom:1px solid var(--border);background:rgba(255,253,250,.98);box-shadow:0 4px 14px rgba(50,35,25,.04)}
 .u4-modal-head h2,.u4-modal-head p{margin:0}
 .u4-modal-body{min-height:calc(100dvh - 150px);overflow:visible;padding:16px 18px 24px;display:grid;align-content:start;gap:14px}
+.u4-focus-open{display:grid;grid-template-columns:auto 34px minmax(0,1fr) auto;align-items:center;gap:9px;width:100%;padding:4px 0;border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.u4-compact-date{font-size:11px;color:var(--text-dim);white-space:nowrap}.u4-compact-icon{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:var(--green-bg);color:var(--green);font-weight:750}.u4-compact-amount{font-size:13px;white-space:nowrap}.u4-focus-open strong{overflow-wrap:anywhere}
+.u4-import-row:not(.u4-focus-row)>:not(.u4-import-row-main):not(.u4-focus-head){display:none}
+.u4-import-row:not(.u4-focus-row) .u4-row-approval button,.u4-import-row:not(.u4-focus-row) .u4-row-reasons,.u4-import-row:not(.u4-focus-row) .u4-processing-difference{display:none}
+.u4-import-row:not(.u4-focus-row) .u4-import-row-main{display:grid;grid-template-columns:minmax(0,1fr);align-items:center;gap:3px}
+.u4-import-row:not(.u4-focus-row) .u4-import-row-main>div:first-child{min-width:0}
+.u4-import-row:not(.u4-focus-row) .u4-row-approval{display:flex;justify-content:flex-end;align-items:center;gap:5px}
+.u4-focus-open:focus-visible{outline:2px solid var(--green);outline-offset:3px}
+.u4-focus-head{display:none}
+.u4-focus-mode>.u4-modal-actions,.u4-focus-mode>.u4-actions-shortcut{display:none}
+.u4-focus-mode>.u4-modal-body{min-height:100%;max-width:680px;margin:auto;padding:18px 16px 32px}
+.u4-focus-mode>.u4-modal-body>*:not(.u4-section:has(.u4-focus-row)){display:none}
+.u4-focus-mode .u4-section:has(.u4-focus-row)>summary{display:none}
+.u4-focus-mode .u4-section-list>.u4-import-row:not(.u4-focus-row),.u4-focus-mode .u4-section-list>.u4-empty{display:none}
+.u4-focus-mode .u4-focus-head{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+.u4-focus-mode .u4-focus-head h2{margin:0;font-size:22px}
+.u4-focus-mode .u4-import-row.u4-focus-row{padding:18px;border:0;background:var(--bg)}
+.u4-focus-mode .u4-row-grid,.u4-focus-mode .u4-dependent-grid,.u4-focus-mode .u4-more-grid{grid-template-columns:1fr;gap:14px}
+.u4-focus-mode .u4-focus-row label{font-size:14px}
+.u4-focus-mode .u4-focus-row input:not([type=checkbox]),.u4-focus-mode .u4-focus-row select{min-height:46px;font-size:16px}
 .u4-modal-actions{position:sticky;left:auto;right:auto;bottom:0;z-index:4;padding:12px 18px calc(12px + env(safe-area-inset-bottom));background:rgba(255,253,250,.98);border-top:1px solid var(--border);box-shadow:0 -8px 24px rgba(50,35,25,.08)}
 .u4-section{border:1px solid var(--border);border-radius:16px;background:var(--surface);overflow:hidden}
 .u4-section>summary{padding:13px 15px;font-weight:900;cursor:pointer;display:flex;justify-content:space-between}

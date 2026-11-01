@@ -34,6 +34,7 @@ test('vijftig importrenders houden één gedelegeerde click- en change-handler',
 test('vaste lasten volgen de budgeteigenaar en datums zijn Nederlands', async ({ page }) => {
   await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   await page.evaluate(() => {
+    state.meta.selectedMonth='2026-08';
     state.recurringFixedExpenses = [
       {id:'fixed-joint',begindatum:'2026-01-01',actief:true,naam:'Gezamenlijke verzekering',financialFor:'gezamenlijk',rekening:'gezamenlijk'},
       {id:'fixed-dion',begindatum:'2026-01-01',actief:true,naam:'Dion telefoon',financialFor:'dion',rekening:'dion'},
@@ -48,6 +49,7 @@ test('vaste lasten volgen de budgeteigenaar en datums zijn Nederlands', async ({
   });
   const modal=page.locator('#u4ImportModalRoot');
   await expect(modal).toContainText('03-08-2026');
+  await modal.locator('[data-u4-focus-open]').click();
   await expect(modal.locator('[data-u4-field="fixedExpenseId"] option')).toHaveText(['Geen vaste last','Dion telefoon']);
   await modal.locator('[data-u4-field="budgetOwner"]').selectOption('dara');
   await expect(modal.locator('[data-u4-field="fixedExpenseId"] option')).toHaveText(['Geen vaste last','Dara telefoon']);

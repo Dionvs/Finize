@@ -173,6 +173,21 @@ html body.v4-app .joint-transaction-description-text{
   line-height:1.4;
 }
 html body.v4-app .joint-transaction-amount{white-space:nowrap;font-variant-numeric:tabular-nums}
+html body.v4-app .joint-transaction-row.transaction-overview-row{grid-template-columns:42px 38px minmax(0,1fr) max-content;gap:9px;min-height:64px;padding:11px 0}
+.transaction-overview-icon{display:grid;place-items:center;width:36px;height:36px;border-radius:50%;background:var(--green-bg);color:var(--green);flex:none}
+.transaction-overview-icon svg{width:20px;height:20px}
+.transaction-table-identity{display:flex;align-items:center;gap:10px}.transaction-table-identity>span:last-child{display:grid;gap:3px;min-width:0}.transaction-table-identity small{color:var(--text-dim);overflow-wrap:anywhere}
+.transaction-overview-name,.transaction-overview-detail{display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;line-height:1.35}
+.transaction-overview-name{-webkit-line-clamp:2;font-size:12px;font-weight:750}.transaction-overview-detail{-webkit-line-clamp:2;margin-top:3px;color:var(--text-dim);font-size:11px}
+html body.v4-app .transaction-overview-credit{color:var(--green)}
+.transaction-detail-editor{background:var(--bg)}
+.transaction-detail-head{display:flex;align-items:center;gap:12px;margin-bottom:20px}.transaction-detail-head h2{flex:1;margin:0;font-size:clamp(20px,4vw,28px)}.transaction-detail-head button{min-width:40px;min-height:40px}.transaction-detail-head svg{width:20px;height:20px}
+.transaction-detail-identity{display:flex;align-items:center;gap:14px;margin:0 0 22px}.transaction-detail-identity div{display:grid;gap:4px;min-width:0}.transaction-detail-identity strong{overflow-wrap:anywhere}.transaction-detail-identity small{color:var(--text-dim)}
+.transaction-detail-fields.modal-grid{display:grid;grid-template-columns:1fr;gap:16px}.transaction-detail-fields label,.transaction-detail-account{display:grid;gap:6px;color:var(--text);font-size:14px;font-weight:700}
+.transaction-detail-fields input:not([type=checkbox]),.transaction-detail-fields select{width:100%;max-width:none;min-height:48px;font-size:16px}
+.transaction-detail-account strong{display:block;padding:13px;border:1px solid var(--border);border-radius:10px;background:var(--card);font-size:14px}
+.transaction-processing-fields{display:grid;gap:12px}.transaction-processing-fields [hidden]{display:none!important}
+.transaction-detail-editor .modal-actions{display:flex;flex-direction:column-reverse;align-items:stretch}.transaction-detail-editor .modal-actions button{min-height:46px}
 @media(max-width:767px){
   html body.v4-app[data-real-active-tab] .wrap .joint-transactions-card{
     height:372px !important;

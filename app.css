@@ -5626,6 +5626,26 @@ button.icon-only-finize{width:34px;height:34px;padding:0!important;border-radius
 .u4-modal-head{position:sticky;top:0;z-index:4;padding:14px 18px;border-bottom:1px solid var(--border);background:rgba(255,253,250,.98);box-shadow:0 4px 14px rgba(50,35,25,.04)}
 .u4-modal-head h2,.u4-modal-head p{margin:0}
 .u4-modal-body{min-height:calc(100dvh - 150px);overflow:visible;padding:16px 18px 24px;display:grid;align-content:start;gap:14px}
+.u4-focus-open{display:grid;grid-template-columns:auto 34px minmax(0,1fr) auto;align-items:center;gap:9px;width:100%;padding:4px 0;border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.u4-compact-date{font-size:11px;color:var(--text-dim);white-space:nowrap}.u4-compact-icon{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:var(--green-bg);color:var(--green);font-weight:750}.u4-compact-amount{font-size:13px;white-space:nowrap}.u4-focus-open strong{overflow-wrap:anywhere}
+.u4-import-row:not(.u4-focus-row)>:not(.u4-import-row-main):not(.u4-focus-head){display:none}
+.u4-import-row:not(.u4-focus-row) .u4-row-approval button,.u4-import-row:not(.u4-focus-row) .u4-row-reasons,.u4-import-row:not(.u4-focus-row) .u4-processing-difference{display:none}
+.u4-import-row:not(.u4-focus-row) .u4-import-row-main{display:grid;grid-template-columns:minmax(0,1fr);align-items:center;gap:3px}
+.u4-import-row:not(.u4-focus-row) .u4-import-row-main>div:first-child{min-width:0}
+.u4-import-row:not(.u4-focus-row) .u4-row-approval{display:flex;justify-content:flex-end;align-items:center;gap:5px}
+.u4-focus-open:focus-visible{outline:2px solid var(--green);outline-offset:3px}
+.u4-focus-head{display:none}
+.u4-focus-mode>.u4-modal-actions,.u4-focus-mode>.u4-actions-shortcut{display:none}
+.u4-focus-mode>.u4-modal-body{min-height:100%;max-width:680px;margin:auto;padding:18px 16px 32px}
+.u4-focus-mode>.u4-modal-body>*:not(.u4-section:has(.u4-focus-row)){display:none}
+.u4-focus-mode .u4-section:has(.u4-focus-row)>summary{display:none}
+.u4-focus-mode .u4-section-list>.u4-import-row:not(.u4-focus-row),.u4-focus-mode .u4-section-list>.u4-empty{display:none}
+.u4-focus-mode .u4-focus-head{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+.u4-focus-mode .u4-focus-head h2{margin:0;font-size:22px}
+.u4-focus-mode .u4-import-row.u4-focus-row{padding:18px;border:0;background:var(--bg)}
+.u4-focus-mode .u4-row-grid,.u4-focus-mode .u4-dependent-grid,.u4-focus-mode .u4-more-grid{grid-template-columns:1fr;gap:14px}
+.u4-focus-mode .u4-focus-row label{font-size:14px}
+.u4-focus-mode .u4-focus-row input:not([type=checkbox]),.u4-focus-mode .u4-focus-row select{min-height:46px;font-size:16px}
 .u4-modal-actions{position:sticky;left:auto;right:auto;bottom:0;z-index:4;padding:12px 18px calc(12px + env(safe-area-inset-bottom));background:rgba(255,253,250,.98);border-top:1px solid var(--border);box-shadow:0 -8px 24px rgba(50,35,25,.08)}
 .u4-section{border:1px solid var(--border);border-radius:16px;background:var(--surface);overflow:hidden}
 .u4-section>summary{padding:13px 15px;font-weight:900;cursor:pointer;display:flex;justify-content:space-between}
@@ -6875,6 +6895,21 @@ html body.v4-app .joint-transaction-description-text{
   line-height:1.4;
 }
 html body.v4-app .joint-transaction-amount{white-space:nowrap;font-variant-numeric:tabular-nums}
+html body.v4-app .joint-transaction-row.transaction-overview-row{grid-template-columns:42px 38px minmax(0,1fr) max-content;gap:9px;min-height:64px;padding:11px 0}
+.transaction-overview-icon{display:grid;place-items:center;width:36px;height:36px;border-radius:50%;background:var(--green-bg);color:var(--green);flex:none}
+.transaction-overview-icon svg{width:20px;height:20px}
+.transaction-table-identity{display:flex;align-items:center;gap:10px}.transaction-table-identity>span:last-child{display:grid;gap:3px;min-width:0}.transaction-table-identity small{color:var(--text-dim);overflow-wrap:anywhere}
+.transaction-overview-name,.transaction-overview-detail{display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;line-height:1.35}
+.transaction-overview-name{-webkit-line-clamp:2;font-size:12px;font-weight:750}.transaction-overview-detail{-webkit-line-clamp:2;margin-top:3px;color:var(--text-dim);font-size:11px}
+html body.v4-app .transaction-overview-credit{color:var(--green)}
+.transaction-detail-editor{background:var(--bg)}
+.transaction-detail-head{display:flex;align-items:center;gap:12px;margin-bottom:20px}.transaction-detail-head h2{flex:1;margin:0;font-size:clamp(20px,4vw,28px)}.transaction-detail-head button{min-width:40px;min-height:40px}.transaction-detail-head svg{width:20px;height:20px}
+.transaction-detail-identity{display:flex;align-items:center;gap:14px;margin:0 0 22px}.transaction-detail-identity div{display:grid;gap:4px;min-width:0}.transaction-detail-identity strong{overflow-wrap:anywhere}.transaction-detail-identity small{color:var(--text-dim)}
+.transaction-detail-fields.modal-grid{display:grid;grid-template-columns:1fr;gap:16px}.transaction-detail-fields label,.transaction-detail-account{display:grid;gap:6px;color:var(--text);font-size:14px;font-weight:700}
+.transaction-detail-fields input:not([type=checkbox]),.transaction-detail-fields select{width:100%;max-width:none;min-height:48px;font-size:16px}
+.transaction-detail-account strong{display:block;padding:13px;border:1px solid var(--border);border-radius:10px;background:var(--card);font-size:14px}
+.transaction-processing-fields{display:grid;gap:12px}.transaction-processing-fields [hidden]{display:none!important}
+.transaction-detail-editor .modal-actions{display:flex;flex-direction:column-reverse;align-items:stretch}.transaction-detail-editor .modal-actions button{min-height:46px}
 @media(max-width:767px){
   html body.v4-app[data-real-active-tab] .wrap .joint-transactions-card{
     height:372px !important;

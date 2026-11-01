@@ -776,7 +776,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
     };
   }
 
-  const UI={draft:null,visibleRows:60,root:null,conflicts:new Map()};
+  const UI={draft:null,visibleRows:60,root:null,conflicts:new Map(),focusRow:'',focusFromOverview:false};
   const importViewMonths=new WeakMap();
   function selectedImportMonth(root){return String(root.state.meta?.selectedMonth||'').slice(0,7);}
   function importViewRows(draft,month=importViewMonths.get(draft)||''){
@@ -1878,8 +1878,9 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
     const family=transactionFamily(p);
     const reviewState=importReviewState(row);
     const statusLabel=reviewState==='niet-meetellen'?'Niet meetellen':reviewState==='goedgekeurd'?'Goedgekeurd':reviewState==='onbekend'?'Onbekend':'Nakijken';
-    return `<article class="u4-import-row" data-u4-row="${escAttr(row.id)}">
-      <div class="u4-import-row-main"><div><strong>${esc(p.description||original.rawDescription||original.description||'Onbekende transactie')}</strong><span class="u4-muted">${esc(displayDate(original.bankDate))} · ${euro(original.amount)}</span>${Math.abs(Number(p.processedAmount)-Math.abs(Number(original.amount)))>.004?`<span class="u4-muted">Verwerking ${euro(p.processedAmount)} · bankcashflow ${euro(original.amount)}</span>`:''}${row.reasons?.length?`<div class="u4-row-reasons">${esc(row.reasons.join(' · '))}</div>`:''}</div><div class="u4-row-approval">${['onbekend','nakijken'].includes(reviewState)?`<input type="checkbox" data-u4-select-approval="${escAttr(row.id)}" aria-label="${escAttr(p.description||original.description||row.id)} selecteren voor groepsgoedkeuring">`:''}<span class="u4-status ${reviewState}">${statusLabel}</span>${['goedgekeurd','niet-meetellen'].includes(reviewState)?'<button type="button" class="ghost small" data-u4-reopen>Bewerken</button>':`<button type="button" class="primary small" data-u4-approve>Opslaan en verwerken</button>`}</div></div>
+    return `<article class="u4-import-row${UI.focusRow===String(row.id)?' u4-focus-row':''}" data-u4-row="${escAttr(row.id)}">
+      <div class="u4-focus-head"><button type="button" class="ghost" data-u4-focus-back>${UI.focusFromOverview?'Terug naar transacties':'Terug naar bankimport'}</button><h2>Transactie aanpassen</h2></div>
+      <div class="u4-import-row-main"><div><button type="button" class="u4-focus-open" data-u4-focus-open><span class="u4-compact-date">${esc(displayDate(original.bankDate))}</span><span class="u4-compact-icon" aria-hidden="true">${esc((p.description||original.description||'?').trim().charAt(0).toLocaleUpperCase())}</span><strong>${esc(p.description||original.rawDescription||original.description||'Onbekende transactie')}</strong><b class="u4-compact-amount">${euro(original.amount)}</b></button>${Math.abs(Number(p.processedAmount)-Math.abs(Number(original.amount)))>.004?`<span class="u4-muted u4-processing-difference">Verwerking ${euro(p.processedAmount)} · bankcashflow ${euro(original.amount)}</span>`:''}${row.reasons?.length?`<div class="u4-row-reasons">${esc(row.reasons.join(' · '))}</div>`:''}</div><div class="u4-row-approval">${['onbekend','nakijken'].includes(reviewState)?`<input type="checkbox" data-u4-select-approval="${escAttr(row.id)}" aria-label="${escAttr(p.description||original.description||row.id)} selecteren voor groepsgoedkeuring">`:''}<span class="u4-status ${reviewState}">${statusLabel}</span>${['goedgekeurd','niet-meetellen'].includes(reviewState)?'<button type="button" class="ghost small" data-u4-reopen>Bewerken</button>':`<button type="button" class="primary small" data-u4-approve>Opslaan en verwerken</button>`}</div></div>
       ${suggestionHtml(row)}
       ${(root.state.transactions||[]).filter(tx=>!isBankSource(tx)&&tx.importTransactionId===row.id).map(tx=>`<button type="button" class="ghost small" data-u4-coverage="${escAttr(tx.id)}">Spaardekking · ${esc(tx.category)}${tx.splitId?' · split '+esc(tx.splitId):''}</button>`).join('')}
       <div class="u4-row-grid">
@@ -1998,6 +1999,8 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
     const unknown=active.filter(row=>importReviewState(row)==='onbekend').slice(0,UI.visibleRows);
     const review=active.filter(row=>importReviewState(row)==='nakijken').slice(0,UI.visibleRows);
     const approved=active.filter(row=>['goedgekeurd','niet-meetellen'].includes(importReviewState(row))).slice(0,UI.visibleRows);
+    const focused=UI.focusRow&&active.find(row=>String(row.id)===UI.focusRow);
+    if(focused){const status=importReviewState(focused),group=status==='onbekend'?unknown:status==='nakijken'?review:approved;if(!group.some(row=>row.id===focused.id))group.push(focused);}
     const modal=ensureModalRoot();
     modal.innerHTML=`<div class="u4-import-modal" role="dialog" aria-modal="true" aria-label="Bankimport controleren">
       <header class="u4-modal-head"><div><h2>${isConcept?'Bankimport controleren':'Importdetails'}</h2><p>${esc(draft.fileName)} · ${esc(draft.bank)} · ${esc(displayDate(draft.periodFrom)||'—')} t/m ${esc(displayDate(draft.periodTo)||'—')} · ${esc(draft.status)}</p></div><button type="button" class="ghost" data-u4-close>Sluiten</button></header>
@@ -2011,6 +2014,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
       <a class="u4-actions-shortcut" href="#u4-import-actions">Naar acties ↓</a><footer class="u4-modal-actions" id="u4-import-actions" tabindex="-1"><span class="u4-muted" data-u4-save-status>Goedkeuring vraagt altijd een expliciete keuze per bron of geselecteerde groep. ${batchLifecycle(draft)==='withdrawn'?'Deze batch is teruggetrokken.':''}</span><button type="button" class="ghost" data-u4-cancel-concept>Annuleren</button><button type="button" class="ghost" data-u4-save-concept>Concept opslaan</button>${batchLifecycle(draft)==='withdrawn'?'<button type="button" class="primary" data-u4-restore>Herstellen</button>':'<button type="button" class="danger-ghost" data-u4-withdraw>Terugtrekken</button>'}<button type="button" class="danger-ghost" data-u4-delete-batch>Verwijderen</button>${batchLifecycle(draft)==='active'?'<button type="button" class="primary" data-u4-process>Goedgekeurde verwerken</button>':''}</footer>
     </div>`;
     modal.classList.add('open');
+    applyImportFocus(modal);
     bindDraftModal(root,draft,modal);
   }
   function cloudImportMessage(error){
@@ -2044,7 +2048,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
       }
     });
   }
-  async function openDraft(root,id,{month=selectedImportMonth(root),rowId=''}={}){
+  async function openDraft(root,id,{month=selectedImportMonth(root),rowId='',returnToOverview=false}={}){
     const request=UI.openSequence=(UI.openSequence||0)+1,sessionAtStart=ImportEditors.get(String(id)),revisionAtStart=sessionAtStart?.revision,baseAtStart=sessionAtStart?clone(sessionAtStart.base):null;
     let local;
     try{await recoverJournal(root,{importId:id});local=await ImportStore.getImport(id);}
@@ -2063,7 +2067,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
       if(request!==UI.openSequence)return null;
       const opened=await beginImportEditor(root,resolved.record);
       if(request!==UI.openSequence)return null;
-      UI.draft=opened;
+      UI.draft=opened;UI.focusRow=rowId?String(rowId):'';UI.focusFromOverview=!!returnToOverview;
       const focusRow=rowId&&UI.draft.rows.find(row=>row.id===rowId);
       importViewMonths.set(UI.draft,focusRow?String(focusRow.bankOriginal?.bankDate||'').slice(0,7):month);renderDraftModal(root,UI.draft);
       return UI.draft;
@@ -2072,7 +2076,13 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
       return null;
     }
   }
-  function closeDraft(){UI.openSequence=(UI.openSequence||0)+1;const modal=document.getElementById('u4ImportModalRoot');modal?.classList.remove('open');}
+  function closeDraft(){UI.openSequence=(UI.openSequence||0)+1;UI.focusRow='';UI.focusFromOverview=false;const modal=document.getElementById('u4ImportModalRoot');modal?.classList.remove('open');}
+  function applyImportFocus(modal){
+    const panel=modal.querySelector('.u4-import-modal'),rows=[...modal.querySelectorAll('[data-u4-row]')];
+    let active=false;
+    for(const row of rows){const selected=!!UI.focusRow&&row.dataset.u4Row===UI.focusRow;row.classList.toggle('u4-focus-row',selected);if(selected){row.closest('details.u4-section')?.setAttribute('open','');active=true;}}
+    panel?.classList.toggle('u4-focus-mode',active);
+  }
   async function applyProfile(root,draft,modal){
     const selected=modal.querySelector('[data-u4-profile-select]').value;
     let profile=root.state.accountProfiles.find(item=>item.id===selected);
@@ -2232,6 +2242,8 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
       const coverage=event.target.closest('[data-u4-coverage]');if(coverage){modal.classList.remove('open');window.FinizeTransactions?.openCoverage(coverage.dataset.u4Coverage);return;}
       root=UI.root;draft=UI.draft;modal=ensureModalRoot();
       const container=event.target.closest('[data-u4-row]');const row=container?draft.rows.find(item=>item.id===container.dataset.u4Row):null;
+      if(event.target.closest('[data-u4-focus-open]')&&row){UI.focusRow=String(row.id);applyImportFocus(modal);modal.querySelector('.u4-import-modal')?.scrollTo(0,0);return;}
+      if(event.target.closest('[data-u4-focus-back]')){if(UI.focusFromOverview){try{await persistLocalImportEditor(root,draft);closeDraft();root.renderActiveTab?.();}catch(error){updateImportSaveStatus(`Teruggaan uitgesteld: ${error?.message||error}`,true);alert('Het concept kon niet worden bewaard. Probeer opnieuw.');}}else{UI.focusRow='';applyImportFocus(modal);}return;}
       const dismissSaving=event.target.closest('[data-u4-dismiss-saving]');
       if(dismissSaving&&row){dismissedSavingsProposals.add(row);renderDraftRowCard(root,draft,modal,row.id);return;}
       const linkSaving=event.target.closest('[data-u4-link-saving]');
@@ -2829,7 +2841,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
     if(!batch&&batchId){try{batch=await fetchImportFromCloud(root,batchId);}catch{}}
     const check=inspectSourceAvailability(root.state,{...tx,importBatchId:batchId,importTransactionId:rowId},batch);
     if(check.ok){
-      const draft=await openDraft(root,batchId,{rowId}),modal=ensureModalRoot();
+      const draft=await openDraft(root,batchId,{rowId,returnToOverview:true}),modal=ensureModalRoot();
       const row=findDraftRowElement(modal,rowId);
       if(row){const section=row.closest('details.u4-section');if(section)section.open=true;const details=row.querySelector('details');if(details)details.open=true;row.scrollIntoView({block:'nearest'});}
       return draft;
