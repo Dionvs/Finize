@@ -42,6 +42,24 @@
 .p3-explanation summary{cursor:pointer;min-height:44px;padding:12px 0}
 .p3-explanation p{max-width:75ch;line-height:1.6;margin:8px 0}
 .p3-warning{background:var(--red-bg);color:var(--red);padding:12px 14px;font-size:13px;line-height:1.5;border-radius:10px;margin-top:8px}
+.p3-buffer-warning{margin-top:12px;border-top:1px solid var(--border);color:var(--text-dim);font-size:13px;line-height:1.5}
+.p3-buffer-warning.is-hard{color:var(--red)}
+.p3-buffer-warning>summary{display:flex;align-items:center;gap:10px;min-height:56px;padding:10px 0;cursor:pointer;list-style:none}
+.p3-buffer-warning>summary::-webkit-details-marker{display:none}
+.p3-buffer-icon{display:flex;flex:0 0 20px}
+.p3-buffer-icon svg{width:20px;height:20px}
+.p3-buffer-copy{display:grid;gap:2px;min-width:0;flex:1;overflow-wrap:anywhere}
+.p3-buffer-copy strong{font-size:14px}
+.p3-buffer-copy small{font-size:12px;color:var(--text-dim)}
+.p3-buffer-chevron{font-size:20px;line-height:1}
+.p3-buffer-warning[open] .p3-buffer-chevron{transform:rotate(180deg)}
+.p3-buffer-detail{padding:0 0 12px;color:var(--text-dim);overflow-wrap:anywhere}
+.p3-buffer-detail dl{margin:0}
+.p3-buffer-detail dl>div{display:flex;flex-wrap:wrap;justify-content:space-between;gap:2px 12px;padding:4px 0}
+.p3-buffer-detail dt{flex:1 1 170px}
+.p3-buffer-detail dd{margin:0;font-weight:600;color:var(--text)}
+.p3-buffer-detail ul{padding-left:20px;margin:8px 0}
+.p3-buffer-detail p{margin:8px 0}
 .p3-quality{font-size:12px;line-height:1.5;color:var(--text-dim);display:flex;align-items:flex-start;gap:12px;flex:1;min-width:0}
 .p3-quality details{flex:1;min-width:0}
 .p3-quality-actions{display:flex;gap:10px;flex-wrap:wrap}

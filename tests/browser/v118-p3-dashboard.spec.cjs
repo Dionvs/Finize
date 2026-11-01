@@ -54,7 +54,7 @@ test('P3 budgetten zakgeld en jaarcijfers zijn exact bestaande maandprojecties',
  await page.locator('[data-p3-event]').first().click();await expect(page.locator('#incomeEditModal')).toContainText('Vaste lasten');
 });
 test('P3 negatieve prognose meldt onzekerheid; ontbrekende salarisdatum heeft instellingsactie',async({page})=>{
- await boot(page);await page.evaluate(()=>{state.balanceCheckpoints[0].amountCents=10000;document.querySelector('#tabs [data-tab="dashboard"]').click();});await expect(page.locator('.p3-warning').first()).toContainText('onder € 0');await expect(page.locator('.p3-warning').first()).toContainText('Onvolledig');await expect(page.locator('.p3-kpi').nth(2)).toContainText('-');
+ await boot(page);await page.evaluate(()=>{state.balanceCheckpoints[0].amountCents=10000;document.querySelector('#tabs [data-tab="dashboard"]').click();});await expect(page.locator('[data-p3-buffer-warning] summary')).toContainText('onder buffer');await page.locator('[data-p3-buffer-warning] summary').click();await expect(page.locator('.p3-buffer-detail')).toContainText('nog niet bevestigd');await expect(page.locator('.p3-kpi').nth(2)).toContainText('-');
  await page.evaluate(()=>{state.accountProfiles[0].liquidity.salaryDays={};document.querySelector('#tabs [data-tab="dashboard"]').click();});await expect(page.locator('[data-p3-action="settings"]').last()).toContainText('Salarisdatum instellen');await page.locator('[data-p3-action="settings"]').last().click();await expect(page.locator('[name="salary-dion"]')).toBeVisible();
 });
 test('P3 herstel aandelen gezamenlijk Dion Dara en ongewijzigde bedragen en state',async({page})=>{

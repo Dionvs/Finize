@@ -421,6 +421,7 @@ function hardAvailability(projection,input,fromDate) {
 }
 function withAvailability(projection,input,fromDate,goalInputFor) {
   let {hard,softIds}=hardAvailability(projection,input,fromDate);
+  const bufferWarning=bufferWarningFor(hard,input,fromDate,softIds);
   if(input.incomeKpis){
     const opening=hard.opening.balanceCents;
     const points=opening===null||!hard.horizon.endDate?[]:[{date:fromDate,expectedBalanceCents:opening},...hard.days.filter(row=>row.date>=fromDate)];
@@ -440,7 +441,34 @@ function withAvailability(projection,input,fromDate,goalInputFor) {
   }
   const guidance=savingsGuidance(goalProjection,hard.indicativeFreeAfterObligationsCents);
   return {...projection,...(input.incomeKpis?{minimumBalanceCents:hard.minimumBalanceCents,minimumDate:hard.minimumDate}:{}),freeAfterObligationsCents:hard.freeAfterObligationsCents,indicativeFreeAfterObligationsCents:hard.indicativeFreeAfterObligationsCents,
-    availability:{...hard.availability,excludedSavingsPlanIds:[...softIds]},softSavings:guidance};
+    availability:{...hard.availability,excludedSavingsPlanIds:[...softIds]},softSavings:guidance,bufferWarning};
+}
+
+// Read-only comparison using P2 itself. Removing only estimated budget pots
+// preserves cash events, observations, period boundaries and uncertain reserves.
+function bufferWarningFor(inclusive,input,fromDate,softIds) {
+  const certain=projectDailyLiquidity({...input,
+    events:input.events.filter(e=>!softIds.has(e.id)),
+    reservations:input.reservations.filter(r=>r.type!=='budget'&&!softIds.has(r.id.replace(/^undated:/,''))),
+    reasons:inclusive.reasons});
+  const points=p=>[...(p.opening.balanceCents===null?[]:[{date:fromDate,expectedBalanceCents:p.opening.balanceCents}]),...p.days.filter(d=>d.date>=fromDate)];
+  const minimum=rows=>rows.reduce((best,d)=>!best||d.expectedBalanceCents<best.expectedBalanceCents?d:best,null);
+  const hard=minimum(points(certain)),all=minimum(points(inclusive));
+  const uncertainties=certain.reservations.filter(r=>r.type==='undated-obligation'&&r.amountCents>0);
+  const uncertain=uncertainties.length>0||certain.reasons.some(r=>r.severity==='incomplete');
+  if(!hard||!all)return {kind:'unknown',uncertain:true};
+  const hardShortfallCents=Math.max(0,input.bufferCents-hard.expectedBalanceCents);
+  const inclusiveShortfallCents=Math.max(0,input.bufferCents-all.expectedBalanceCents);
+  const atInclusive=points(certain).find(d=>d.date===all.date);
+  const budgetEffectCents=Math.max(0,(atInclusive?.expectedBalanceCents??all.expectedBalanceCents)-all.expectedBalanceCents);
+  const kind=hardShortfallCents>0?'hard':inclusiveShortfallCents>0?'soft':uncertain?'uncertain':'none';
+  return {kind,uncertain,bufferCents:input.bufferCents,
+    hard:{date:hard.date,balanceCents:hard.expectedBalanceCents,shortfallCents:hardShortfallCents},
+    inclusive:{date:all.date,balanceCents:all.expectedBalanceCents,shortfallCents:inclusiveShortfallCents},
+    budgetEffectCents,hardBalanceAtInclusiveCents:atInclusive?.expectedBalanceCents??null,
+    additionalShortfallCents:Math.max(0,inclusiveShortfallCents-Math.max(0,input.bufferCents-(atInclusive?.expectedBalanceCents??all.expectedBalanceCents))),
+    obligations:inclusive.events.filter(e=>e.amountCents<0&&e.status==='planned'&&!e.isSavingsPlan&&e.date>=fromDate&&e.date<=[hard.date,all.date].sort().at(-1)),
+    uncertainties,reasons:certain.reasons.filter(r=>r.severity==='incomplete')};
 }
 function liquidityObservations(state,accountProfileId,toDate,scope) {
   const rows=new Map(checkpointHistory(state,accountProfileId,scope).active.filter(row=>row.asOfDate<=toDate).map(row=>[row.asOfDate,row]));

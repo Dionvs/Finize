@@ -3756,6 +3756,7 @@
   function withAvailability(projection, input, fromDate, goalInputFor) {
     var _a2, _b, _c;
     let { hard, softIds } = hardAvailability(projection, input, fromDate);
+    const bufferWarning = bufferWarningFor(hard, input, fromDate, softIds);
     if (input.incomeKpis) {
       const opening = hard.opening.balanceCents;
       const points = opening === null || !hard.horizon.endDate ? [] : [{ date: fromDate, expectedBalanceCents: opening }, ...hard.days.filter((row) => row.date >= fromDate)];
@@ -3783,7 +3784,41 @@
       freeAfterObligationsCents: hard.freeAfterObligationsCents,
       indicativeFreeAfterObligationsCents: hard.indicativeFreeAfterObligationsCents,
       availability: { ...hard.availability, excludedSavingsPlanIds: [...softIds] },
-      softSavings: guidance
+      softSavings: guidance,
+      bufferWarning
+    };
+  }
+  function bufferWarningFor(inclusive, input, fromDate, softIds) {
+    var _a2, _b, _c;
+    const certain = projectDailyLiquidity({
+      ...input,
+      events: input.events.filter((e) => !softIds.has(e.id)),
+      reservations: input.reservations.filter((r) => r.type !== "budget" && !softIds.has(r.id.replace(/^undated:/, ""))),
+      reasons: inclusive.reasons
+    });
+    const points = (p) => [...p.opening.balanceCents === null ? [] : [{ date: fromDate, expectedBalanceCents: p.opening.balanceCents }], ...p.days.filter((d) => d.date >= fromDate)];
+    const minimum = (rows) => rows.reduce((best, d) => !best || d.expectedBalanceCents < best.expectedBalanceCents ? d : best, null);
+    const hard = minimum(points(certain)), all = minimum(points(inclusive));
+    const uncertainties = certain.reservations.filter((r) => r.type === "undated-obligation" && r.amountCents > 0);
+    const uncertain = uncertainties.length > 0 || certain.reasons.some((r) => r.severity === "incomplete");
+    if (!hard || !all) return { kind: "unknown", uncertain: true };
+    const hardShortfallCents = Math.max(0, input.bufferCents - hard.expectedBalanceCents);
+    const inclusiveShortfallCents = Math.max(0, input.bufferCents - all.expectedBalanceCents);
+    const atInclusive = points(certain).find((d) => d.date === all.date);
+    const budgetEffectCents = Math.max(0, ((_a2 = atInclusive == null ? void 0 : atInclusive.expectedBalanceCents) != null ? _a2 : all.expectedBalanceCents) - all.expectedBalanceCents);
+    const kind = hardShortfallCents > 0 ? "hard" : inclusiveShortfallCents > 0 ? "soft" : uncertain ? "uncertain" : "none";
+    return {
+      kind,
+      uncertain,
+      bufferCents: input.bufferCents,
+      hard: { date: hard.date, balanceCents: hard.expectedBalanceCents, shortfallCents: hardShortfallCents },
+      inclusive: { date: all.date, balanceCents: all.expectedBalanceCents, shortfallCents: inclusiveShortfallCents },
+      budgetEffectCents,
+      hardBalanceAtInclusiveCents: (_b = atInclusive == null ? void 0 : atInclusive.expectedBalanceCents) != null ? _b : null,
+      additionalShortfallCents: Math.max(0, inclusiveShortfallCents - Math.max(0, input.bufferCents - ((_c = atInclusive == null ? void 0 : atInclusive.expectedBalanceCents) != null ? _c : all.expectedBalanceCents))),
+      obligations: inclusive.events.filter((e) => e.amountCents < 0 && e.status === "planned" && !e.isSavingsPlan && e.date >= fromDate && e.date <= [hard.date, all.date].sort().at(-1)),
+      uncertainties,
+      reasons: certain.reasons.filter((r) => r.severity === "incomplete")
     };
   }
   function liquidityObservations(state2, accountProfileId, toDate, scope) {
@@ -4144,13 +4179,32 @@
     const reasons2 = explainLiquidityReasons({ ...p, reasons: [...p.reasons, ...((_a2 = p.monthEndSavings) == null ? void 0 : _a2.reasons) || []] });
     return reasons2.length ? `<p>${status(p.status)}. De onderstaande punten zijn door de huidige prognose vastgesteld.</p>${reasons2.map((r) => `<section data-p3-reason="${escape2(r.code)}"><strong>${escape2(r.problem)}</strong><p>${escape2(r.why)}</p><p><b>Wat kun je doen?</b> ${escape2(r.solution)}</p>${action(r.action, r.action === "balance" ? "Saldo controleren" : r.action === "payments" ? "Betalingen bekijken" : r.action === "data" ? "Data & back-up openen" : r.action === "accounts" ? "Bankrekeningen openen" : r.action === "budgets" ? "Overzicht openen" : "Prognose instellen")}<details><summary>Technische details</summary><p>${escape2(r.detail)} (${escape2(r.code)})</p></details></section>`).join("")}` : `<p>${status(p.status)}. Er zijn voor deze prognose geen aanvullende oorzaken gemeld. Een prognose blijft een verwachting; bedragen en betaalmomenten kunnen veranderen.</p>`;
   }
+  function bufferWarningHtml(w, label, iconSvg2) {
+    if (!w || w.kind === "none") return "";
+    const hard = w.kind === "hard", unknown = ["unknown", "uncertain"].includes(w.kind);
+    const both = hard && w.budgetEffectCents > 0 && w.inclusive.shortfallCents > 0;
+    const selected = hard ? w.hard : w.inclusive;
+    const title = unknown ? "Buffer nog onzeker" : `${hard ? "" : "Mogelijk "}${money2(selected.shortfallCents)} onder buffer`;
+    const cause = unknown ? "Controleer openstaande verplichtingen" : hard ? both ? "Vaste lasten + budgetuitgaven" : "Vaste lasten" : w.uncertain ? "Budgetuitgaven · verplichtingen onzeker" : "Verwachte budgetuitgaven";
+    const line = (name, value) => `<div><dt>${name}</dt><dd>${value}</dd></div>`;
+    const uncertain = w.uncertain ? "<p>Er zijn onzekere of ongedateerde verplichtingen. Of alle vaste lasten gedekt zijn, is nog niet bevestigd.</p>" : !hard && !unknown ? "<p>De vaste lasten en overige verplichtingen blijven volgens deze prognose boven de buffer.</p>" : "";
+    const obligations = (w.obligations || []).slice(0, 5).map((e) => `<li>${escape2(label(e))} · ${date(e.date)} <strong>${money2(-e.amountCents)}</strong></li>`).join("");
+    const pending = (w.uncertainties || []).map((e) => `<li>Onzeker: ${escape2(label({ ...e, type: e.planningSourceId ? "fixed" : e.type }))} <strong>${money2(e.amountCents)}</strong> · betaaldatum of afwikkeling onbekend</li>`).join("");
+    return `<details class="p3-buffer-warning ${hard ? "is-hard" : "is-soft"}" data-p3-buffer-warning="${w.kind}"><summary aria-expanded="false"><span class="p3-buffer-icon" aria-hidden="true">${iconSvg2(hard ? "warning" : "info")}</span><span class="p3-buffer-copy"><strong>${title}</strong><small>${cause}${selected ? ` · ${date(selected.date)}` : ""}</small></span><span class="p3-buffer-chevron" aria-hidden="true">⌄</span></summary><div class="p3-buffer-detail">${unknown ? "" : `<dl>${line("Minimum zonder geschatte budgetuitgaven", `${money2(w.hard.balanceCents)} · ${date(w.hard.date)}`)}${line("Minimum inclusief budgetuitgaven", `${money2(w.inclusive.balanceCents)} · ${date(w.inclusive.date)}`)}${line(`Zonder budget op ${date(w.inclusive.date)}`, money2(w.hardBalanceAtInclusiveCents))}${line("Ingestelde buffer", money2(w.bufferCents))}${line("Tekort zonder budgetuitgaven", money2(w.hard.shortfallCents))}${line("Tekort inclusief budgetuitgaven", money2(w.inclusive.shortfallCents))}${line(`Geschatte budgetuitgaven t/m ${date(w.inclusive.date)}`, money2(w.budgetEffectCents))}${line(`Extra tekort door budget op ${date(w.inclusive.date)}`, money2(w.additionalShortfallCents))}</dl><p>Budgetuitgaven zijn geschat en geen geplande bankafschrijving. De tekorten zijn twee vergelijkingen en worden niet bij elkaar opgeteld.</p>`}${uncertain}${obligations || pending ? `<ul>${obligations}${(w.obligations || []).length > 5 ? `<li>En ${w.obligations.length - 5} andere verplichtingen in deze periode.</li>` : ""}${pending}</ul>` : ""}</div></details>`;
+  }
+  function bindBufferWarning(root2, signal) {
+    root2.addEventListener("toggle", (e) => {
+      var _a2, _b;
+      if ((_b = (_a2 = e.target).matches) == null ? void 0 : _b.call(_a2, "[data-p3-buffer-warning]")) e.target.querySelector("summary").setAttribute("aria-expanded", String(e.target.open));
+    }, { capture: true, ...signal ? { signal } : {} });
+  }
   function outlookHtml(p, profile, label, iconSvg2, bankMarkup = "") {
     var _a2, _b, _c;
     if (!profile) return `<p class="p3-empty">Kies de primaire betaalrekening voor deze context. Er wordt geen willekeurige rekening gebruikt.</p>${action("accounts", "Rekening instellen")}`;
     if (!p) return '<p class="p3-empty" role="status">Vooruitblik laden…</p>';
     const v = liquidityView(p), balance = p.currentBalance || p.opening;
     const kpi = (key, title, value, sub, icon, explanation, act = "") => `<article class="p3-kpi">${act ? `<button type="button" class="ux-card-primary" data-p3-action="${act}" aria-label="${title} ${escape2(value)} · ${act === "balance" ? "Saldo bijwerken" : "Buffer instellen"}"></button>` : ""}<span class="p3-kpi-icon" aria-hidden="true">${iconSvg2(icon)}</span><span class="p3-kpi-copy"><span class="p3-kpi-title"><span>${title}</span>${info(key, title, explanation)}</span><strong>${value}</strong><small>${sub}</small>${key === "balance" ? bankMarkup : ""}</span></article>`;
-    const warning = v.minimum !== null && v.minimum < v.buffer ? `<div class="p3-warning" role="status">${p.status !== "projected" ? `${status(p.status)} · ` : ""}Op ${date(v.minimumDate)} wordt ${money2(v.minimum)} verwacht. ${v.minimum < 0 ? "Dit is onder € 0. " : ""}Dat is ${money2(v.buffer - v.minimum)} onder je buffer van ${money2(v.buffer)}.</div>` : "";
+    const warning = bufferWarningHtml(p.bufferWarning, label, iconSvg2);
     const saving = p.monthEndSavings, amount = (_b = (_a2 = saving == null ? void 0 : saving.safeCents) != null ? _a2 : saving == null ? void 0 : saving.indicativeCents) != null ? _b : null;
     const savingTitle = "Veilig te sparen op " + savingDate(saving == null ? void 0 : saving.transferDate);
     const freeSub = `${amount === null ? "Onvolledige prognose · bedrag niet vast te stellen" : saving.status === "provisional" ? "Indicatie" : ""}<span data-p3-savings-plan>Gepland sparen: ${money2(saving == null ? void 0 : saving.plannedCents)}</span>${amount === null ? "" : `<span data-p3-savings-extra>Extra ruimte: ${money2(saving.extraCents)}</span>`}`;
@@ -4319,6 +4373,7 @@
       unmount();
       controller = new AbortController();
       const signal = controller.signal;
+      bindBufferWarning(root2, signal);
       const month = deps.month();
       if (selectedMonth !== null && selectedMonth !== month) {
         filter = "month";
