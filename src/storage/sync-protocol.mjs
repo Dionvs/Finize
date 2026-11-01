@@ -48,7 +48,7 @@ export function assertAccountProfilesPreserved(previous,next,base=null) {
       const byId=rows=>JSON.stringify([...rows].sort((a,b)=>a.id.localeCompare(b.id)),(_,value)=>isPlainObject(value)?Object.fromEntries(Object.keys(value).sort().map(key=>[key,value[key]])):value);
       if(byId(merged)!==byId(next.accountProfiles||[]))throw new Error('Lokale rekeningwijzigingen ontbreken in de cloudstand.');
     }else{
-      for(const row of previous.accountProfiles||[]){const incoming=(next.accountProfiles||[]).find(item=>item.id===row.id);if(row.lastAccountOperationId&&!sameValue(row,incoming))throw new Error('Lokale rekeningwijzigingen zijn nog niet gezamenlijk bevestigd.');}
+      for(const row of previous.accountProfiles||[]){const incoming=(next.accountProfiles||[]).find(item=>item.id===row.id);if(row.lastAccountOperationId&&!sameAccountProfileValue(row,incoming))throw new Error('Lokale rekeningwijzigingen zijn nog niet gezamenlijk bevestigd.');}
     }
   }catch(error){throw Object.assign(new Error(error.message),{code:CLOUD_CONFLICT_CODE,accountProfileConflict:true});}
 }
@@ -130,6 +130,18 @@ function copyValue(value) {
 
 function sameValue(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function sameAccountProfileValue(left, right) {
+  const withoutSyncMetadata=value=>{
+    if(!isPlainObject(value))return value;
+    const comparable={...value};
+    delete comparable.updatedAt;
+    delete comparable.lastAccountOperationId;
+    delete comparable.lastAccountOperationSignature;
+    return comparable;
+  };
+  return sameValue(withoutSyncMetadata(left),withoutSyncMetadata(right));
 }
 
 function isPlainObject(value) {

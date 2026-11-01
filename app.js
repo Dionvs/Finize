@@ -8648,7 +8648,7 @@
       } else {
         for (const row of previous.accountProfiles || []) {
           const incoming = (next.accountProfiles || []).find((item) => item.id === row.id);
-          if (row.lastAccountOperationId && !sameValue(row, incoming)) throw new Error("Lokale rekeningwijzigingen zijn nog niet gezamenlijk bevestigd.");
+          if (row.lastAccountOperationId && !sameAccountProfileValue(row, incoming)) throw new Error("Lokale rekeningwijzigingen zijn nog niet gezamenlijk bevestigd.");
         }
       }
     } catch (error2) {
@@ -8719,6 +8719,17 @@
   }
   function sameValue(left, right) {
     return JSON.stringify(left) === JSON.stringify(right);
+  }
+  function sameAccountProfileValue(left, right) {
+    const withoutSyncMetadata = (value) => {
+      if (!isPlainObject(value)) return value;
+      const comparable = { ...value };
+      delete comparable.updatedAt;
+      delete comparable.lastAccountOperationId;
+      delete comparable.lastAccountOperationSignature;
+      return comparable;
+    };
+    return sameValue(withoutSyncMetadata(left), withoutSyncMetadata(right));
   }
   function isPlainObject(value) {
     return !!value && typeof value === "object" && !Array.isArray(value);
