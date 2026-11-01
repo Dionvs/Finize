@@ -5419,6 +5419,25 @@ body.v4-app[data-real-active-tab="spaardoelen"] .u2-goal-accordion>summary::afte
 .u3-review-fields label{display:grid;gap:4px;font-size:9px;color:var(--text-dim)}
 .u3-empty{padding:16px;text-align:center;color:var(--text-dim);font-size:11px}
 
+/* Aanpassen van een vaste last, met bestaande formulierfuncties. */
+.u3-admin-modal.fixed-editor{width:min(680px,100%);padding:24px;background:var(--bg)}
+.fixed-editor-head{display:flex;align-items:center;gap:12px;margin-bottom:22px}
+.fixed-editor-head h2{flex:1;margin:0;font-size:clamp(21px,4vw,28px);line-height:1.2}
+.fixed-editor-head button{display:grid;place-items:center;min-width:40px;min-height:40px;padding:8px}
+.fixed-editor-head svg{width:20px;height:20px}
+.fixed-editor-identity{display:flex;align-items:center;gap:14px;margin:0 0 24px}
+.fixed-editor-identity>div{display:grid;gap:4px}.fixed-editor-identity strong{font-size:18px}.fixed-editor-identity span{color:var(--text-dim)}
+.fixed-editor-fields,.fixed-editor-extra-fields{display:grid;gap:18px}
+.fixed-editor-fields label,.fixed-editor-extra-fields label{display:grid;gap:7px;color:var(--text);font-size:14px;font-weight:700}
+.fixed-editor-fields input:not([type=checkbox]),.fixed-editor-fields select{width:100%;min-height:48px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--text);font:inherit;font-size:16px}
+.fixed-editor-fields small{font-size:12px;font-weight:400;color:var(--text-dim);line-height:1.4}
+.fixed-editor-repeat{margin:0;padding:0;border:0}.fixed-editor-repeat legend{margin-bottom:7px;font-size:14px;font-weight:700}.fixed-editor-repeat>div{display:grid;grid-template-columns:1fr 2fr;gap:10px}
+.fixed-editor-note{margin:0;padding:14px;border-radius:10px;background:var(--green-bg);color:var(--text);line-height:1.45;font-size:13px}
+.fixed-editor-extra{border:1px solid var(--border);border-radius:10px;background:var(--card)}.fixed-editor-extra summary{padding:14px;font-weight:700;cursor:pointer}.fixed-editor-extra-fields{padding:0 14px 14px}
+.fixed-editor-extra-fields label[hidden]{display:none}.fixed-editor-extra-fields .u2-checkbox{display:flex;align-items:center;gap:8px}
+.fixed-editor-actions{display:grid;gap:8px;margin-top:22px}.fixed-editor-actions button{min-height:46px}
+@media(max-width:767px){#incomeEditModal .u3-admin-modal.fixed-editor{padding:16px 16px calc(20px + env(safe-area-inset-bottom))}}
+
 /* Gezamenlijke vaste lasten: dezelfde gegevens, rustiger gegroepeerd. */
 .u3-admin-modal.joint-fixed-overview{width:min(680px,100%);background:var(--bg);padding:24px}
 .joint-fixed-head{align-items:flex-start;margin-bottom:20px}

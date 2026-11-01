@@ -16211,7 +16211,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
     }));
   }
   function u3OpenRecurringEditor(kind, id = "", defaults = {}) {
-    var _a2, _b, _c, _d;
+    var _a2, _b, _c;
     const record = u3RecurringRows(kind).find((item) => item.id === id);
     const income = kind === "income";
     const current = getSelectedMonth();
@@ -16219,7 +16219,27 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
     const value = existing ? u3AmountAt2(existing, current) : 0;
     const defaultOwner = U3_ACCOUNTS.includes(defaults.owner) ? defaults.owner : "gezamenlijk";
     const planningOwner = U3_ACCOUNTS.includes(defaults.planningOwner) ? defaults.planningOwner : "";
-    const { modal } = u3AdminModal(`<div class="u3-admin-head"><div><div class="section-kicker">${income ? "Inkomstenbron" : "Vaste last"}</div><h2>${existing ? "Bewerken" : "Toevoegen"}</h2></div><button class="ghost" data-u3-close>Sluiten</button></div>
+    const fixedEditor = `<div class="fixed-editor-head"><button type="button" class="ghost fixed-editor-back" data-u3-back-planning aria-label="Terug naar vaste lasten">${iconSvg("undo")}</button><h2>Vaste last ${existing ? "aanpassen" : "toevoegen"}</h2><button type="button" class="ghost fixed-editor-close" data-u3-close aria-label="Sluiten">${iconSvg("close")}</button></div>
+    ${existing ? `<div class="fixed-editor-identity"><span class="joint-fixed-icon">${iconSvg(categoryIconName(`${existing.naam || ""} ${existing.categorie || ""}`))}</span><div><strong>${textSafe(existing.naam || "Zonder naam")}</strong><span>${textSafe(u3AccountLabel(existing.financialFor || existing.rekening || defaultOwner))}</span></div></div>` : ""}
+    <div class="fixed-editor-fields">
+      <label>Naam<input id="u3RecName" value="${textSafe((existing == null ? void 0 : existing.naam) || "")}"></label>
+      <label>Categorie<input id="u3RecCategory" value="${textSafe((existing == null ? void 0 : existing.categorie) || "Overig")}"></label>
+      <label>Bedrag per afschrijving<input id="u3RecAmount" type="number" step="0.01" inputmode="decimal" value="${Number(value) || ""}"></label>
+      <fieldset class="fixed-editor-repeat"><legend>Herhaling</legend><div><label>Elke<input id="u3RecFrequency" type="number" min="1" step="1" value="${attrSafe((existing == null ? void 0 : existing.frequentieAantal) || 1)}"></label><label>Frequentie<select id="u3RecUnit">${U3_FREQUENCY_UNITS2.map((unit) => `<option value="${unit}" ${((existing == null ? void 0 : existing.frequentieEenheid) || "maanden") === unit ? "selected" : ""}>${unit}</option>`).join("")}</select></label></div></fieldset>
+      <label>Afschrijfdag<select id="u3RecDebitDay">${paymentDayOptions(fixedPaymentDay(existing || {}))}</select><small id="u3RecDebitHint"></small></label>
+      <label>Geldigheid<select id="u3RecScope"><option value="from">Vanaf ${monthLabel(current)}</option><option value="once">Alleen ${monthLabel(current)}</option></select></label>
+      <p class="fixed-editor-note">De gekozen geldigheid bepaalt vanaf wanneer de wijziging geldt. Eerdere maanden blijven ongewijzigd.</p>
+      <label>Voor wie<select id="u3RecFor">${U3_ACCOUNTS.map((owner) => `<option value="${owner}" ${((existing == null ? void 0 : existing.financialFor) || (existing == null ? void 0 : existing.rekening) || defaultOwner) === owner ? "selected" : ""}>${u3AccountLabel(owner)}</option>`).join("")}</select><small>De geplande afschrijving gebruikt na opslaan dezelfde rekening.</small></label>
+      ${existing && existing.rekening && (existing.financialFor || existing.rekening) !== existing.rekening ? `<p class="fixed-editor-note">Huidige afschrijfrekening: ${textSafe(u3AccountLabel(existing.rekening))}. Na opslaan wordt dit de rekening van de gekozen persoon of Gezamenlijk.</p>` : ""}
+      <details class="fixed-editor-extra"><summary>Extra instellingen</summary><div class="fixed-editor-extra-fields">
+        <label>Ingangsdatum<input id="u3RecStart" type="date" value="${textSafe((existing == null ? void 0 : existing.begindatum) || `${current}-01`)}"></label>
+        <label>Einddatum<input id="u3RecEnd" type="date" value="${textSafe((existing == null ? void 0 : existing.einddatum) || "")}"></label>
+        <label id="u3RecDistributionField">Verdeling<select id="u3RecDistribution"><option value="income-ratio" ${u3FixedDistributionMode(existing || {}, (existing == null ? void 0 : existing.financialFor) || defaultOwner) === "income-ratio" ? "selected" : ""}>Naar rato · Dion minimaal 40%</option><option value="equal" ${u3FixedDistributionMode(existing || {}, (existing == null ? void 0 : existing.financialFor) || defaultOwner) === "equal" ? "selected" : ""}>50/50</option></select><small id="u3RecDistributionHint"></small></label>
+        <label class="u2-checkbox"><input id="u3RecActive" type="checkbox" ${(existing == null ? void 0 : existing.actief) !== false ? "checked" : ""}> Actief</label>
+        ${existing && existing.actief !== false ? '<button type="button" class="ghost" id="u3RecStop">Stoppen na deze maand</button>' : ""}
+      </div></details>
+    </div><div class="fixed-editor-actions"><button type="button" class="primary" id="u3RecSave">${existing ? "Wijzigingen opslaan" : "Vaste last toevoegen"}</button><button type="button" class="ghost" data-u3-back-planning>Annuleren</button>${existing ? '<button type="button" class="danger-ghost" id="u3RecDelete">Vaste last verwijderen</button>' : ""}</div>`;
+    const incomeEditor = `<div class="u3-admin-head"><div><div class="section-kicker">${income ? "Inkomstenbron" : "Vaste last"}</div><h2>${existing ? "Bewerken" : "Toevoegen"}</h2></div><button class="ghost" data-u3-close>Sluiten</button></div>
     <div class="u3-grid">
       <label class="full">Naam<input id="u3RecName" value="${textSafe((existing == null ? void 0 : existing.naam) || "")}"></label>
       <label>Bedrag<input id="u3RecAmount" type="number" step="0.01" inputmode="decimal" value="${Number(value) || ""}"></label>
@@ -16235,8 +16255,9 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
       <label>Geldigheid<select id="u3RecScope"><option value="from">Vanaf ${monthLabel(current)}</option><option value="once">Alleen ${monthLabel(current)}</option></select></label>
       <label class="u2-checkbox"><input id="u3RecActive" type="checkbox" ${(existing == null ? void 0 : existing.actief) !== false ? "checked" : ""}> Actief</label>
     </div>
-    <div class="modal-actions">${existing ? `${existing.actief !== false ? '<button class="ghost" id="u3RecStop">Stoppen na deze maand</button>' : ""}<button class="danger-ghost" id="u3RecDelete">Verwijderen</button>` : ""}<button class="ghost" data-u3-back-planning>Terug</button><button class="primary" id="u3RecSave">Opslaan</button></div>`);
-    (_a2 = modal.querySelector("[data-u3-back-planning]")) == null ? void 0 : _a2.addEventListener("click", () => u3OpenPlanning(planningOwner));
+    <div class="modal-actions">${existing ? `${existing.actief !== false ? '<button class="ghost" id="u3RecStop">Stoppen na deze maand</button>' : ""}<button class="danger-ghost" id="u3RecDelete">Verwijderen</button>` : ""}<button class="ghost" data-u3-back-planning>Terug</button><button class="primary" id="u3RecSave">Opslaan</button></div>`;
+    const { modal } = u3AdminModal(income ? incomeEditor : fixedEditor, income ? "" : "fixed-editor");
+    modal.querySelectorAll("[data-u3-back-planning]").forEach((button) => button.addEventListener("click", () => u3OpenPlanning(planningOwner)));
     const updateDebitDay = () => {
       const day = modal.querySelector("#u3RecDebitDay");
       if (!day) return;
@@ -16258,9 +16279,9 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
       select.disabled = !isJoint;
       if (hint) hint.textContent = "Kies hoe Dion en Dara deze gezamenlijke vaste last verdelen.";
     };
-    (_b = modal.querySelector("#u3RecFor")) == null ? void 0 : _b.addEventListener("change", updateDistributionField);
+    (_a2 = modal.querySelector("#u3RecFor")) == null ? void 0 : _a2.addEventListener("change", updateDistributionField);
     updateDistributionField();
-    (_c = modal.querySelector("#u3RecStop")) == null ? void 0 : _c.addEventListener("click", async () => {
+    (_b = modal.querySelector("#u3RecStop")) == null ? void 0 : _b.addEventListener("click", async () => {
       try {
         u3AssertMonthOpen();
         if (!await commitChange(() => income ? endIncomeSourceFromMonth(state, record, nextPlanningMonth(current)) : endRecurringFromMonth(record, nextPlanningMonth(current)), { render: false })) return;
@@ -16269,7 +16290,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
         alert(error2.message);
       }
     });
-    (_d = modal.querySelector("#u3RecDelete")) == null ? void 0 : _d.addEventListener("click", async () => {
+    (_c = modal.querySelector("#u3RecDelete")) == null ? void 0 : _c.addEventListener("click", async () => {
       const label = (existing == null ? void 0 : existing.naam) || `${income ? "inkomstenbron" : "vaste last"}`;
       if (!confirm(`“${label}” verwijderen vanaf ${monthLabel(current)}? Eerdere maanden en bestaande transacties blijven bewaard.`)) return;
       try {
@@ -16289,10 +16310,11 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
         if (!name || !Number.isFinite(amount) || amount < 0) throw new Error("Vul een naam en een geldig bedrag in.");
         if (!await commitChange(() => {
           const item = record || { id: uid(), amountHistory: [], monthOverrides: {}, recognition: { text: "", counterparty: "", amountTolerance: 5 } };
+          const financialFor = modal.querySelector("#u3RecFor").value;
           const changes = {
             naam: name,
-            rekening: modal.querySelector("#u3RecAccount").value,
-            financialFor: modal.querySelector("#u3RecFor").value,
+            rekening: income ? modal.querySelector("#u3RecAccount").value : financialFor,
+            financialFor,
             frequentieAantal: Math.max(1, Math.floor(Number(modal.querySelector("#u3RecFrequency").value) || 1)),
             frequentieEenheid: modal.querySelector("#u3RecUnit").value,
             begindatum: modal.querySelector("#u3RecStart").value,

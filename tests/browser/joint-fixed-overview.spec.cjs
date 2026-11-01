@@ -25,8 +25,8 @@ for(const width of [320,390,1440])test(`gezamenlijk overzicht behoudt gegevens e
   expect(await page.evaluate(()=>({state:JSON.stringify(state),actual:FinizeUpdate3.fixedActuals('2026-10')}))).toEqual(before);
   expect(await dialog.evaluate(e=>e.scrollWidth<=e.clientWidth+1)).toBe(true);
   await page.screenshot({path:info.outputPath('gezamenlijk-'+width+'.png')});
-  await dialog.getByRole('button',{name:'Voorbeeld open bewerken'}).click();await expect(page.locator('#u3RecName')).toHaveValue('Voorbeeld open');await page.getByRole('button',{name:'Terug'}).click();
-  await page.getByRole('button',{name:'Vaste last toevoegen'}).click();await expect(page.locator('#u3RecName')).toBeVisible();await page.getByRole('button',{name:'Terug'}).click();
+  await dialog.getByRole('button',{name:'Voorbeeld open bewerken'}).click();await expect(page.locator('#u3RecName')).toHaveValue('Voorbeeld open');await page.getByRole('button',{name:'Terug naar vaste lasten'}).click();
+  await page.getByRole('button',{name:'Vaste last toevoegen'}).click();await expect(page.locator('#u3RecName')).toBeVisible();await page.getByRole('button',{name:'Terug naar vaste lasten'}).click();
   await page.getByRole('button',{name:'Sluiten'}).click();expect(await page.evaluate(()=>JSON.stringify(state))).toBe(before.state);
 });
 
@@ -36,8 +36,8 @@ for(const width of [390,1440])for(const [owner,label,name,other] of [['dion','Di
   await page.locator(`[data-tab="${owner}"]:visible`).first().click();const before=await page.evaluate(()=>JSON.stringify(state));
   await page.locator(`#tab-${owner} [data-u3-planning-owner="${owner}"]:visible`).first().click();
   const dialog=page.getByRole('dialog');await expect(dialog.getByRole('heading',{name:`${label} vaste lasten`})).toBeVisible();await expect(dialog).toContainText(name);await expect(dialog).not.toContainText(other);await expect(dialog).not.toContainText('Voorbeeld open');
-  await dialog.getByRole('button',{name:`${name} bewerken`}).click();await expect(page.locator('#u3RecName')).toHaveValue(name);await page.getByRole('button',{name:'Terug'}).click();
-  await page.getByRole('button',{name:'Vaste last toevoegen'}).click();await expect(page.locator('#u3RecAccount')).toHaveValue(owner);await expect(page.locator('#u3RecFor')).toHaveValue(owner);await page.getByRole('button',{name:'Terug'}).click();
+  await dialog.getByRole('button',{name:`${name} bewerken`}).click();await expect(page.locator('#u3RecName')).toHaveValue(name);await page.getByRole('button',{name:'Terug naar vaste lasten'}).click();
+  await page.getByRole('button',{name:'Vaste last toevoegen'}).click();await expect(page.locator('#u3RecFor')).toHaveValue(owner);await page.getByRole('button',{name:'Terug naar vaste lasten'}).click();
   await expect(page.getByRole('dialog').getByRole('heading',{name:`${label} vaste lasten`})).toBeVisible();await page.getByRole('button',{name:'Sluiten'}).click();expect(await page.evaluate(()=>JSON.stringify(state))).toBe(before);
 });
 

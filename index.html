@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Finize</title>
-<meta name="finize-inline-release" content="118-r30">
+<meta name="finize-inline-release" content="118-r31">
 <link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#6f8a55">
 <meta name="mobile-web-app-capable" content="yes">
@@ -5434,6 +5434,25 @@ body.v4-app[data-real-active-tab="spaardoelen"] .u2-goal-accordion>summary::afte
 .u3-review-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
 .u3-review-fields label{display:grid;gap:4px;font-size:9px;color:var(--text-dim)}
 .u3-empty{padding:16px;text-align:center;color:var(--text-dim);font-size:11px}
+
+/* Aanpassen van een vaste last, met bestaande formulierfuncties. */
+.u3-admin-modal.fixed-editor{width:min(680px,100%);padding:24px;background:var(--bg)}
+.fixed-editor-head{display:flex;align-items:center;gap:12px;margin-bottom:22px}
+.fixed-editor-head h2{flex:1;margin:0;font-size:clamp(21px,4vw,28px);line-height:1.2}
+.fixed-editor-head button{display:grid;place-items:center;min-width:40px;min-height:40px;padding:8px}
+.fixed-editor-head svg{width:20px;height:20px}
+.fixed-editor-identity{display:flex;align-items:center;gap:14px;margin:0 0 24px}
+.fixed-editor-identity>div{display:grid;gap:4px}.fixed-editor-identity strong{font-size:18px}.fixed-editor-identity span{color:var(--text-dim)}
+.fixed-editor-fields,.fixed-editor-extra-fields{display:grid;gap:18px}
+.fixed-editor-fields label,.fixed-editor-extra-fields label{display:grid;gap:7px;color:var(--text);font-size:14px;font-weight:700}
+.fixed-editor-fields input:not([type=checkbox]),.fixed-editor-fields select{width:100%;min-height:48px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--text);font:inherit;font-size:16px}
+.fixed-editor-fields small{font-size:12px;font-weight:400;color:var(--text-dim);line-height:1.4}
+.fixed-editor-repeat{margin:0;padding:0;border:0}.fixed-editor-repeat legend{margin-bottom:7px;font-size:14px;font-weight:700}.fixed-editor-repeat>div{display:grid;grid-template-columns:1fr 2fr;gap:10px}
+.fixed-editor-note{margin:0;padding:14px;border-radius:10px;background:var(--green-bg);color:var(--text);line-height:1.45;font-size:13px}
+.fixed-editor-extra{border:1px solid var(--border);border-radius:10px;background:var(--card)}.fixed-editor-extra summary{padding:14px;font-weight:700;cursor:pointer}.fixed-editor-extra-fields{padding:0 14px 14px}
+.fixed-editor-extra-fields label[hidden]{display:none}.fixed-editor-extra-fields .u2-checkbox{display:flex;align-items:center;gap:8px}
+.fixed-editor-actions{display:grid;gap:8px;margin-top:22px}.fixed-editor-actions button{min-height:46px}
+@media(max-width:767px){#incomeEditModal .u3-admin-modal.fixed-editor{padding:16px 16px calc(20px + env(safe-area-inset-bottom))}}
 
 /* Gezamenlijke vaste lasten: dezelfde gegevens, rustiger gegroepeerd. */
 .u3-admin-modal.joint-fixed-overview{width:min(680px,100%);background:var(--bg);padding:24px}
@@ -23177,7 +23196,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
     }));
   }
   function u3OpenRecurringEditor(kind, id = "", defaults = {}) {
-    var _a2, _b, _c, _d;
+    var _a2, _b, _c;
     const record = u3RecurringRows(kind).find((item) => item.id === id);
     const income = kind === "income";
     const current = getSelectedMonth();
@@ -23185,7 +23204,27 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
     const value = existing ? u3AmountAt2(existing, current) : 0;
     const defaultOwner = U3_ACCOUNTS.includes(defaults.owner) ? defaults.owner : "gezamenlijk";
     const planningOwner = U3_ACCOUNTS.includes(defaults.planningOwner) ? defaults.planningOwner : "";
-    const { modal } = u3AdminModal(`<div class="u3-admin-head"><div><div class="section-kicker">${income ? "Inkomstenbron" : "Vaste last"}</div><h2>${existing ? "Bewerken" : "Toevoegen"}</h2></div><button class="ghost" data-u3-close>Sluiten</button></div>
+    const fixedEditor = `<div class="fixed-editor-head"><button type="button" class="ghost fixed-editor-back" data-u3-back-planning aria-label="Terug naar vaste lasten">${iconSvg("undo")}</button><h2>Vaste last ${existing ? "aanpassen" : "toevoegen"}</h2><button type="button" class="ghost fixed-editor-close" data-u3-close aria-label="Sluiten">${iconSvg("close")}</button></div>
+    ${existing ? `<div class="fixed-editor-identity"><span class="joint-fixed-icon">${iconSvg(categoryIconName(`${existing.naam || ""} ${existing.categorie || ""}`))}</span><div><strong>${textSafe(existing.naam || "Zonder naam")}</strong><span>${textSafe(u3AccountLabel(existing.financialFor || existing.rekening || defaultOwner))}</span></div></div>` : ""}
+    <div class="fixed-editor-fields">
+      <label>Naam<input id="u3RecName" value="${textSafe((existing == null ? void 0 : existing.naam) || "")}"></label>
+      <label>Categorie<input id="u3RecCategory" value="${textSafe((existing == null ? void 0 : existing.categorie) || "Overig")}"></label>
+      <label>Bedrag per afschrijving<input id="u3RecAmount" type="number" step="0.01" inputmode="decimal" value="${Number(value) || ""}"></label>
+      <fieldset class="fixed-editor-repeat"><legend>Herhaling</legend><div><label>Elke<input id="u3RecFrequency" type="number" min="1" step="1" value="${attrSafe((existing == null ? void 0 : existing.frequentieAantal) || 1)}"></label><label>Frequentie<select id="u3RecUnit">${U3_FREQUENCY_UNITS2.map((unit) => `<option value="${unit}" ${((existing == null ? void 0 : existing.frequentieEenheid) || "maanden") === unit ? "selected" : ""}>${unit}</option>`).join("")}</select></label></div></fieldset>
+      <label>Afschrijfdag<select id="u3RecDebitDay">${paymentDayOptions(fixedPaymentDay(existing || {}))}</select><small id="u3RecDebitHint"></small></label>
+      <label>Geldigheid<select id="u3RecScope"><option value="from">Vanaf ${monthLabel(current)}</option><option value="once">Alleen ${monthLabel(current)}</option></select></label>
+      <p class="fixed-editor-note">De gekozen geldigheid bepaalt vanaf wanneer de wijziging geldt. Eerdere maanden blijven ongewijzigd.</p>
+      <label>Voor wie<select id="u3RecFor">${U3_ACCOUNTS.map((owner) => `<option value="${owner}" ${((existing == null ? void 0 : existing.financialFor) || (existing == null ? void 0 : existing.rekening) || defaultOwner) === owner ? "selected" : ""}>${u3AccountLabel(owner)}</option>`).join("")}</select><small>De geplande afschrijving gebruikt na opslaan dezelfde rekening.</small></label>
+      ${existing && existing.rekening && (existing.financialFor || existing.rekening) !== existing.rekening ? `<p class="fixed-editor-note">Huidige afschrijfrekening: ${textSafe(u3AccountLabel(existing.rekening))}. Na opslaan wordt dit de rekening van de gekozen persoon of Gezamenlijk.</p>` : ""}
+      <details class="fixed-editor-extra"><summary>Extra instellingen</summary><div class="fixed-editor-extra-fields">
+        <label>Ingangsdatum<input id="u3RecStart" type="date" value="${textSafe((existing == null ? void 0 : existing.begindatum) || `${current}-01`)}"></label>
+        <label>Einddatum<input id="u3RecEnd" type="date" value="${textSafe((existing == null ? void 0 : existing.einddatum) || "")}"></label>
+        <label id="u3RecDistributionField">Verdeling<select id="u3RecDistribution"><option value="income-ratio" ${u3FixedDistributionMode(existing || {}, (existing == null ? void 0 : existing.financialFor) || defaultOwner) === "income-ratio" ? "selected" : ""}>Naar rato · Dion minimaal 40%</option><option value="equal" ${u3FixedDistributionMode(existing || {}, (existing == null ? void 0 : existing.financialFor) || defaultOwner) === "equal" ? "selected" : ""}>50/50</option></select><small id="u3RecDistributionHint"></small></label>
+        <label class="u2-checkbox"><input id="u3RecActive" type="checkbox" ${(existing == null ? void 0 : existing.actief) !== false ? "checked" : ""}> Actief</label>
+        ${existing && existing.actief !== false ? '<button type="button" class="ghost" id="u3RecStop">Stoppen na deze maand</button>' : ""}
+      </div></details>
+    </div><div class="fixed-editor-actions"><button type="button" class="primary" id="u3RecSave">${existing ? "Wijzigingen opslaan" : "Vaste last toevoegen"}</button><button type="button" class="ghost" data-u3-back-planning>Annuleren</button>${existing ? '<button type="button" class="danger-ghost" id="u3RecDelete">Vaste last verwijderen</button>' : ""}</div>`;
+    const incomeEditor = `<div class="u3-admin-head"><div><div class="section-kicker">${income ? "Inkomstenbron" : "Vaste last"}</div><h2>${existing ? "Bewerken" : "Toevoegen"}</h2></div><button class="ghost" data-u3-close>Sluiten</button></div>
     <div class="u3-grid">
       <label class="full">Naam<input id="u3RecName" value="${textSafe((existing == null ? void 0 : existing.naam) || "")}"></label>
       <label>Bedrag<input id="u3RecAmount" type="number" step="0.01" inputmode="decimal" value="${Number(value) || ""}"></label>
@@ -23201,8 +23240,9 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
       <label>Geldigheid<select id="u3RecScope"><option value="from">Vanaf ${monthLabel(current)}</option><option value="once">Alleen ${monthLabel(current)}</option></select></label>
       <label class="u2-checkbox"><input id="u3RecActive" type="checkbox" ${(existing == null ? void 0 : existing.actief) !== false ? "checked" : ""}> Actief</label>
     </div>
-    <div class="modal-actions">${existing ? `${existing.actief !== false ? '<button class="ghost" id="u3RecStop">Stoppen na deze maand</button>' : ""}<button class="danger-ghost" id="u3RecDelete">Verwijderen</button>` : ""}<button class="ghost" data-u3-back-planning>Terug</button><button class="primary" id="u3RecSave">Opslaan</button></div>`);
-    (_a2 = modal.querySelector("[data-u3-back-planning]")) == null ? void 0 : _a2.addEventListener("click", () => u3OpenPlanning(planningOwner));
+    <div class="modal-actions">${existing ? `${existing.actief !== false ? '<button class="ghost" id="u3RecStop">Stoppen na deze maand</button>' : ""}<button class="danger-ghost" id="u3RecDelete">Verwijderen</button>` : ""}<button class="ghost" data-u3-back-planning>Terug</button><button class="primary" id="u3RecSave">Opslaan</button></div>`;
+    const { modal } = u3AdminModal(income ? incomeEditor : fixedEditor, income ? "" : "fixed-editor");
+    modal.querySelectorAll("[data-u3-back-planning]").forEach((button) => button.addEventListener("click", () => u3OpenPlanning(planningOwner)));
     const updateDebitDay = () => {
       const day = modal.querySelector("#u3RecDebitDay");
       if (!day) return;
@@ -23224,9 +23264,9 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
       select.disabled = !isJoint;
       if (hint) hint.textContent = "Kies hoe Dion en Dara deze gezamenlijke vaste last verdelen.";
     };
-    (_b = modal.querySelector("#u3RecFor")) == null ? void 0 : _b.addEventListener("change", updateDistributionField);
+    (_a2 = modal.querySelector("#u3RecFor")) == null ? void 0 : _a2.addEventListener("change", updateDistributionField);
     updateDistributionField();
-    (_c = modal.querySelector("#u3RecStop")) == null ? void 0 : _c.addEventListener("click", async () => {
+    (_b = modal.querySelector("#u3RecStop")) == null ? void 0 : _b.addEventListener("click", async () => {
       try {
         u3AssertMonthOpen();
         if (!await commitChange(() => income ? endIncomeSourceFromMonth(state, record, nextPlanningMonth(current)) : endRecurringFromMonth(record, nextPlanningMonth(current)), { render: false })) return;
@@ -23235,7 +23275,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
         alert(error2.message);
       }
     });
-    (_d = modal.querySelector("#u3RecDelete")) == null ? void 0 : _d.addEventListener("click", async () => {
+    (_c = modal.querySelector("#u3RecDelete")) == null ? void 0 : _c.addEventListener("click", async () => {
       const label = (existing == null ? void 0 : existing.naam) || `${income ? "inkomstenbron" : "vaste last"}`;
       if (!confirm(`“${label}” verwijderen vanaf ${monthLabel(current)}? Eerdere maanden en bestaande transacties blijven bewaard.`)) return;
       try {
@@ -23255,10 +23295,11 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
         if (!name || !Number.isFinite(amount) || amount < 0) throw new Error("Vul een naam en een geldig bedrag in.");
         if (!await commitChange(() => {
           const item = record || { id: uid(), amountHistory: [], monthOverrides: {}, recognition: { text: "", counterparty: "", amountTolerance: 5 } };
+          const financialFor = modal.querySelector("#u3RecFor").value;
           const changes = {
             naam: name,
-            rekening: modal.querySelector("#u3RecAccount").value,
-            financialFor: modal.querySelector("#u3RecFor").value,
+            rekening: income ? modal.querySelector("#u3RecAccount").value : financialFor,
+            financialFor,
             frequentieAantal: Math.max(1, Math.floor(Number(modal.querySelector("#u3RecFrequency").value) || 1)),
             frequentieEenheid: modal.querySelector("#u3RecUnit").value,
             begindatum: modal.querySelector("#u3RecStart").value,
@@ -28892,10 +28933,10 @@ window.addEventListener('load', async () => {
     const scope = new URL('./', location.href);
     const registration = await navigator.serviceWorker.getRegistration(scope.href);
     if (!registration?.active || registration.scope !== scope.href || registration.active.scriptURL !== new URL('service-worker.js', scope).href) return;
-    const response = await fetch(new URL('index.html?finize-inline-shell=118-r30', scope), {cache:'no-store'});
+    const response = await fetch(new URL('index.html?finize-inline-shell=118-r31', scope), {cache:'no-store'});
     if (!response.ok) return;
     const html = await response.clone().text();
-    if (!html.includes('<meta name="finize-inline-release" content="118-r30">')) return;
+    if (!html.includes('<meta name="finize-inline-release" content="118-r31">')) return;
     for (const name of await caches.keys()) {
       if (!/^finize-v[\w.-]+$/.test(name)) continue;
       const cache = await caches.open(name);
