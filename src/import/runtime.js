@@ -2242,7 +2242,7 @@ import { normalizeDataTransaction, getTransactionAccountContext, getTransactionS
       const coverage=event.target.closest('[data-u4-coverage]');if(coverage){modal.classList.remove('open');window.FinizeTransactions?.openCoverage(coverage.dataset.u4Coverage);return;}
       root=UI.root;draft=UI.draft;modal=ensureModalRoot();
       const container=event.target.closest('[data-u4-row]');const row=container?draft.rows.find(item=>item.id===container.dataset.u4Row):null;
-      if(event.target.closest('[data-u4-focus-open]')&&row){UI.focusRow=String(row.id);applyImportFocus(modal);modal.querySelector('.u4-import-modal')?.scrollTo(0,0);return;}
+      if(row&&(event.target.closest('[data-u4-focus-open]')||!container.classList.contains('u4-focus-row')&&!event.target.closest('button,input,select,textarea,a,summary'))){UI.focusRow=String(row.id);applyImportFocus(modal);modal.querySelector('.u4-import-modal')?.scrollTo(0,0);return;}
       if(event.target.closest('[data-u4-focus-back]')){if(UI.focusFromOverview){try{await persistLocalImportEditor(root,draft);closeDraft();root.renderActiveTab?.();}catch(error){updateImportSaveStatus(`Teruggaan uitgesteld: ${error?.message||error}`,true);alert('Het concept kon niet worden bewaard. Probeer opnieuw.');}}else{UI.focusRow='';applyImportFocus(modal);}return;}
       const dismissSaving=event.target.closest('[data-u4-dismiss-saving]');
       if(dismissSaving&&row){dismissedSavingsProposals.add(row);renderDraftRowCard(root,draft,modal,row.id);return;}

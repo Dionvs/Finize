@@ -4246,7 +4246,7 @@ function bindBankImport(root){
 }
 
 function routeImportedTransactionEdit(tx){
-  if(!tx||getTransactionSource(tx)!=='csv')return false;
+  if(!tx||!['csv','bank-api'].includes(getTransactionSource(tx)))return false;
   document.getElementById('transactionModal')?.classList.remove('open','joint-transaction-modal-open');
   const persisted=(state.transactions||[]).some(item=>item.id===tx.id);
   const opening=persisted?window.FinizeUpdate4?.openTransactionSource(tx.id):window.FinizeUpdate4?.openImportDetails(tx.importBatchId,tx.importTransactionId);

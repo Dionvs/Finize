@@ -13702,7 +13702,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
   }
   function routeImportedTransactionEdit(tx) {
     var _a2, _b, _c;
-    if (!tx || getTransactionSource(tx) !== "csv") return false;
+    if (!tx || !["csv", "bank-api"].includes(getTransactionSource(tx))) return false;
     (_a2 = document.getElementById("transactionModal")) == null ? void 0 : _a2.classList.remove("open", "joint-transaction-modal-open");
     const persisted = (state.transactions || []).some((item) => item.id === tx.id);
     const opening = persisted ? (_b = window.FinizeUpdate4) == null ? void 0 : _b.openTransactionSource(tx.id) : (_c = window.FinizeUpdate4) == null ? void 0 : _c.openImportDetails(tx.importBatchId, tx.importTransactionId);
@@ -20315,7 +20315,7 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
         modal = ensureModalRoot();
         const container = event2.target.closest("[data-u4-row]");
         const row = container ? draft.rows.find((item) => item.id === container.dataset.u4Row) : null;
-        if (event2.target.closest("[data-u4-focus-open]") && row) {
+        if (row && (event2.target.closest("[data-u4-focus-open]") || !container.classList.contains("u4-focus-row") && !event2.target.closest("button,input,select,textarea,a,summary"))) {
           UI.focusRow = String(row.id);
           applyImportFocus(modal);
           (_b2 = modal.querySelector(".u4-import-modal")) == null ? void 0 : _b2.scrollTo(0, 0);
