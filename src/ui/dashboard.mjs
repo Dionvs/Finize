@@ -127,7 +127,8 @@ function outlookHtml(p,profile,label,iconSvg,bankMarkup=''){
   const saving=p.monthEndSavings,amount=saving?.safeCents??saving?.indicativeCents??null;
   const savingTitle='Veilig te sparen op '+savingDate(saving?.transferDate);
   const freeSub=`${amount===null?'Onvolledige prognose · bedrag niet vast te stellen':saving.status==='provisional'?'Indicatie':''}<span data-p3-savings-plan>Gepland sparen: ${money(saving?.plannedCents)}</span>${amount===null?'':`<span data-p3-savings-extra>Extra ruimte: ${money(saving.extraCents)}</span>`}`;
-  const savingsWarning=amount===null?'<div class="p3-warning" role="status">Onvolledige spaarprognose. Controleer de saldobasis en betaalmomenten; een veilig spaarbedrag is nog niet vast te stellen.</div>':'';
+  const blockingReasons=explainLiquidityReasons({reasons:(saving?.reasons||[]).filter(r=>!['partial-bank-coverage','unknown-bank-coverage'].includes(r.code)&&(r.severity==='incomplete'||['unknown-cash-date','missing-checkpoint','past-saving-date'].includes(r.code)))});
+  const savingsWarning=amount===null?`<div class="p3-warning" role="status">Spaarbedrag nog niet te berekenen.${blockingReasons.length?`<ul>${blockingReasons.map(r=>`<li>${escape(r.problem)} ${escape(r.solution)}</li>`).join('')}</ul>`:' Open de uitleg bij Veilig te sparen voor de beschikbare gegevens.'}</div>`:'';
   const balanceDate=balance.checkpoint?.asOfDate;
   const balanceSub=`${status(balance.status)}${balanceDate?` · Berekend t/m ${date(balance.toDate||p.asOfDate)}`:''}${bankMarkup?'':' · Saldo bijwerken'}`;
   const reconciliations=(p.reconciliations || []).filter(r=>r.differenceCents!==null&&r.differenceCents!==0).map(r=>`<p class="p3-caption">Saldo-ijkpunt ${date(r.date)}: ${money(r.observedCents)} · berekend ${money(r.modeledCents)} · verschil ${money(r.differenceCents)}. Vanaf deze dag loopt de berekening verder met het handmatig ingestelde saldo.</p>`).join('');

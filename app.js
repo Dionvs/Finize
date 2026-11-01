@@ -3216,6 +3216,7 @@
       "unknown-bank-coverage": "Niet bevestigd dat alle bankmutaties sinds het ijkpunt aanwezig zijn.",
       "partial-bank-coverage": "De bankgegevens dekken slechts een deel van de periode.",
       "awaiting-review": "Geboekte bankmutaties bij Nakijken tellen voorlopig mee.",
+      "overdue-fixed-reserved": "Een nog niet gekoppelde vaste last met een verstreken betaaldatum is vanaf nu volledig gereserveerd; dit is geen bankafschrijving.",
       "unknown-cash-date": "Een kasdatum is onbekend of een gepland bedrag staat nog open na de betaaldag.",
       "unresolved-account-profile": "Een gebeurtenis heeft nog geen betrouwbare fysieke rekening.",
       "unresolved-budget-account": "Een budget heeft nog geen aangewezen fysieke betaalrekening.",
@@ -3422,7 +3423,7 @@
     for (const month of requiredMonths) if (state2.__finizePartialHistory && !((_c = state2.verifiedPeriods) == null ? void 0 : _c.includes(month))) reasons2.push(issue("missing-period", month));
     const last = horizonEnd2 || asOfDate;
     const future = selectAccountBalance(state2, { accountProfileId, toDate: last, scope, imports, importsAvailable, coverage, checkpointId: (_d = opening.checkpoint) == null ? void 0 : _d.id });
-    future.reasons.filter((row) => !["unknown-bank-coverage", "partial-bank-coverage"].includes(row.code)).forEach((row) => reasons2.push(issue(row.code, row.sourceId, row.code === "awaiting-review" ? "provisional" : "incomplete")));
+    future.reasons.filter((row) => !["unknown-bank-coverage", "partial-bank-coverage"].includes(row.code)).forEach((row) => reasons2.push(issue(row.code, row.sourceId, ["awaiting-review", "intraday-provider-balance"].includes(row.code) ? "provisional" : "incomplete")));
     for (const row of future.mutations.filter((row2) => row2.date > asOfDate)) {
       const linked = projections.filter((p) => sourceRecordKey(p.transaction) === row.sourceId);
       events.push(event({
@@ -3448,7 +3449,10 @@
       }));
       if (!relevant(row)) return;
       if (row.warnings.includes("ambiguous-allowance-occurrence")) reasons2.push(issue("ambiguous-allowance-occurrence", row.id));
-      if (row.type === "fixed" && projections.some((p) => p.active && p.fixedExpenseId === row.planningSourceId && !p.fixedOccurrenceId)) reasons2.push(issue("ambiguous-fixed-occurrence", row.id));
+      if (row.type === "fixed" && projections.some((p) => p.active && p.fixedExpenseId === row.planningSourceId && !p.fixedOccurrenceId)) {
+        row.warnings.push("ambiguous-fixed-occurrence");
+        reasons2.push(issue("ambiguous-fixed-occurrence", row.id));
+      }
       if (row.type === "income" && projections.some((p) => p.active && p.incomeSourceId === row.planningSourceId && !p.incomeOccurrenceId && p.effects.incomeImpact > 0 && p.calendarMonth === row.month)) {
         row.date = null;
         row.dateQuality = "unknown";
@@ -3496,6 +3500,14 @@
         row.warnings.push("overdue-unmatched-plan");
         row.plannedDate = row.date;
         row.date = null;
+        if (!planningBasis && row.type === "fixed" && row.amountCents < 0 && row.accountProfileId && !row.warnings.includes("ambiguous-fixed-occurrence")) {
+          row.status = "reservation";
+          row.warnings.push("overdue-fixed-reserved");
+          reservations.push({ ...row, id: "undated:" + row.id, amountCents: -row.amountCents, type: "undated-obligation", reserveFromDate: asOfDate });
+          reasons2.push(issue("overdue-fixed-reserved", row.id, "provisional"));
+          events.push(row);
+          return;
+        }
       }
       if (!row.date) {
         row.warnings.push("unknown-cash-date");
@@ -3644,11 +3656,13 @@
     const observations = new Map((input.observations || []).map((row) => [row.asOfDate, row]));
     const days = [];
     if (opening.balanceCents !== null && horizon.endDate) {
-      let bank = opening.balanceCents, spent = 0, earlierEstimated = 0, lastObservationMonth = null;
+      let bank = opening.balanceCents, spent = 0, earlierEstimated = 0, lastObservationMonth = null, reserveAppliedCents = 0;
       for (let date2 = asOfDate; date2 <= horizon.endDate; date2 = shiftLiquidityDay(date2, 1)) {
         const rows = dated.filter((row) => row.date === date2);
-        const openingBalanceCents = safe(bank - spent);
-        let mutationCents = safe(sum(rows.map((row) => row.amountCents)) - (estimated.get(date2) || 0));
+        const reservedObligationCents = sum(reservations.filter((row) => row.reserveFromDate && row.reserveFromDate <= date2).map((row) => row.amountCents));
+        const openingBalanceCents = safe(bank - spent - reserveAppliedCents);
+        let mutationCents = safe(sum(rows.map((row) => row.amountCents)) - (estimated.get(date2) || 0) - (reservedObligationCents - reserveAppliedCents));
+        reserveAppliedCents = reservedObligationCents;
         bank = safe(bank + sum(rows.map((row) => row.amountCents)));
         spent = safe(spent + (estimated.get(date2) || 0));
         if (input.displayStartDate && date2 < input.displayStartDate.slice(0, 7) + "-01") earlierEstimated = safe(earlierEstimated + (estimated.get(date2) || 0));
@@ -3673,7 +3687,8 @@
           mutationCents,
           cashBalanceCents: bank,
           estimatedBudgetCents: estimated.get(date2) || 0,
-          expectedBalanceCents: safe(bank - spent),
+          reservedObligationCents,
+          expectedBalanceCents: safe(bank - spent - reservedObligationCents),
           afterReservationsCents: safe(bank - earlierEstimated - sum(reservations.filter((row) => row.reserveForDisplay !== false && (!lastObservationMonth || row.type !== "budget" || row.month >= lastObservationMonth)).map((row) => row.amountCents))),
           eventIds: rows.map((row) => row.id)
         });
@@ -3978,6 +3993,8 @@
 
   // src/ui/liquidity-explanations.mjs
   var explanations = {
+    "intraday-provider-balance": ["Het banksaldo is overdag opgehaald.", "De prognose rekent met dit beschikbare saldo en de resterende planning; de bankdag is nog niet afgesloten.", "Werk je bank bij als je een actueler uitgangspunt wilt.", "balance"],
+    "overdue-fixed-reserved": ["Een openstaande vaste last is direct gereserveerd.", "De geplande betaaldatum is voorbij, maar er is nog geen gekoppelde afschrijving. Het bedrag verlaagt de prognose en spaarruimte één keer.", "Controleer de koppeling zodra de afschrijving binnenkomt.", "payments"],
     "missing-checkpoint": ["Een bruikbaar banksaldo ontbreekt.", "Zonder een werkelijk saldo met datum kan Finize het saldoverloop niet bepalen.", "Vul een banksaldo met bijbehorende datum in.", "balance"],
     "missing-period-opening": ["Een beginsaldo vóór de gekozen periode ontbreekt.", "De lijn kan pas beginnen bij het eerste bruikbare saldo. Eerdere saldi blijven onbekend.", "Vul een eerder banksaldo met bijbehorende datum in.", "balance"],
     "missing-reliable-horizon": ["Een betrouwbare volgende ontvangstdatum ontbreekt.", "Finize kan daardoor het einde van deze prognoseperiode niet bepalen.", "Stel een ontvangstdatum in of kies een eigen einddatum.", "settings"],
@@ -4030,7 +4047,7 @@
       return true;
     }).map((reason) => {
       const entry = explanations[reason.code] || ["De precieze oorzaak is niet bekend.", "De bestaande prognose kan niet volledig worden gecontroleerd.", "Controleer je rekeninggegevens en prognose-instellingen.", "settings"];
-      return { code: reason.code, problem: entry[0], why: entry[1], solution: entry[2], action: entry[3], detail: reason.message || "" };
+      return { code: reason.code, problem: entry[0], why: entry[1], solution: entry[2], action: entry[3], detail: [reason.message, reason.eventId].filter(Boolean).join(" · ") };
     });
   }
 
@@ -4208,7 +4225,8 @@
     const saving = p.monthEndSavings, amount = (_b = (_a2 = saving == null ? void 0 : saving.safeCents) != null ? _a2 : saving == null ? void 0 : saving.indicativeCents) != null ? _b : null;
     const savingTitle = "Veilig te sparen op " + savingDate(saving == null ? void 0 : saving.transferDate);
     const freeSub = `${amount === null ? "Onvolledige prognose · bedrag niet vast te stellen" : saving.status === "provisional" ? "Indicatie" : ""}<span data-p3-savings-plan>Gepland sparen: ${money2(saving == null ? void 0 : saving.plannedCents)}</span>${amount === null ? "" : `<span data-p3-savings-extra>Extra ruimte: ${money2(saving.extraCents)}</span>`}`;
-    const savingsWarning = amount === null ? '<div class="p3-warning" role="status">Onvolledige spaarprognose. Controleer de saldobasis en betaalmomenten; een veilig spaarbedrag is nog niet vast te stellen.</div>' : "";
+    const blockingReasons = explainLiquidityReasons({ reasons: ((saving == null ? void 0 : saving.reasons) || []).filter((r) => !["partial-bank-coverage", "unknown-bank-coverage"].includes(r.code) && (r.severity === "incomplete" || ["unknown-cash-date", "missing-checkpoint", "past-saving-date"].includes(r.code))) });
+    const savingsWarning = amount === null ? `<div class="p3-warning" role="status">Spaarbedrag nog niet te berekenen.${blockingReasons.length ? `<ul>${blockingReasons.map((r) => `<li>${escape2(r.problem)} ${escape2(r.solution)}</li>`).join("")}</ul>` : " Open de uitleg bij Veilig te sparen voor de beschikbare gegevens."}</div>` : "";
     const balanceDate = (_c = balance.checkpoint) == null ? void 0 : _c.asOfDate;
     const balanceSub = `${status(balance.status)}${balanceDate ? ` · Berekend t/m ${date(balance.toDate || p.asOfDate)}` : ""}${bankMarkup ? "" : " · Saldo bijwerken"}`;
     const reconciliations = (p.reconciliations || []).filter((r) => r.differenceCents !== null && r.differenceCents !== 0).map((r) => `<p class="p3-caption">Saldo-ijkpunt ${date(r.date)}: ${money2(r.observedCents)} · berekend ${money2(r.modeledCents)} · verschil ${money2(r.differenceCents)}. Vanaf deze dag loopt de berekening verder met het handmatig ingestelde saldo.</p>`).join("");
@@ -10180,13 +10198,43 @@
     <div class="card-head-title"><h2>Gezamenlijke transacties <span>— ${monthLabel(getSelectedMonth())}</span></h2><button type="button" class="joint-transaction-add-btn" data-open-joint-transaction aria-label="Gezamenlijke uitgave toevoegen">${iconSvg("receipt")}</button></div>
   </div>`;
   }
+  function compactTransactionLabel(tx) {
+    var _a2, _b, _c, _d, _e, _f, _g, _h, _i;
+    const bank = tx.bankOriginal || {};
+    const clean = (value) => String(value || "").replace(/\s+/g, " ").trim();
+    const stop = /\s+(?:IBAN|BIC|Kenmerk|Machtigingskenmerk|Incassant(?:\s*ID)?|Rekeningnummer|Pasvolgnr|Pasnr|Kaartnr|Terminal|Transactie(?:nummer)?|Valutadatum|Boekdatum|Datum|Tijd)\s*:/i;
+    const trimBankDetails = (value) => clean(value).replace(/^BEA,?\s*(?:Betaalpas\s*)?/i, "").split(stop)[0].replace(/[, ]+PAS\d+\b.*$/i, "").replace(/\s+(?:IBAN\s+)?[A-Z]{2}\d{2}[A-Z0-9]{10,30}\b.*$/i, "").trim();
+    const raw = clean(bank.rawDescription || bank.description || tx.description);
+    const field = (label) => {
+      const match = raw.match(new RegExp("(?:^|\\s)" + label + ":\\s*(.*?)(?=\\s+(?:Naam|Omschrijving|Mededelingen|IBAN|BIC|Kenmerk|Machtigingskenmerk|Incassant(?:\\s*ID)?|Rekeningnummer|Pasvolgnr|Pasnr|Kaartnr|Terminal|Transactie(?:nummer)?|Valutadatum|Boekdatum|Datum|Tijd|Plaats):|$)", "i"));
+      return match ? trimBankDetails(match[1]) : "";
+    };
+    const imported = (_f = (_e = (_d = (_c = (_b = (_a2 = window.FinizeUpdate4) == null ? void 0 : _a2.importStore) == null ? void 0 : _b.bankReadCache) == null ? void 0 : _c.get) == null ? void 0 : _d.call(_c, tx.importBatchId)) == null ? void 0 : _e.rows) == null ? void 0 : _f.find((row) => row.id === tx.importTransactionId);
+    const payload = ((_g = (tx.providerInput || tx.bankInput || (imported == null ? void 0 : imported.providerInput) || {}).provenance) == null ? void 0 : _g.payload) || {};
+    const party = tx.bankAmount > 0 || bank.amount > 0 ? payload.debtor : payload.creditor;
+    const name = field("Naam") || clean(bank.counterpartyName || tx.counterpartyName || (party == null ? void 0 : party.name));
+    const displayDescription = ((_h = tx.approvedProcessing) == null ? void 0 : _h.description) || ((_i = tx.processing) == null ? void 0 : _i.description) || tx.description;
+    const description = trimBankDetails(displayDescription || bank.description || raw);
+    const edited = clean(displayDescription) && clean(displayDescription) !== clean(bank.description || bank.rawDescription);
+    const detail = edited ? description : field("Omschrijving") || field("Mededelingen") || (name ? description.replace(/^SEPA\s+[^:]+:\s*/i, "") : description);
+    const values = name ? [name, detail] : [description];
+    if (tx.note) values.push(trimBankDetails(tx.note));
+    const seen = /* @__PURE__ */ new Set();
+    const parts2 = values.filter((value) => {
+      if (!value || /^(?:SEPA\b|Naam\s*:)/i.test(value)) return false;
+      const key = value.toLocaleLowerCase("nl");
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    return parts2.join(" – ") || "Banktransactie";
+  }
   function renderJointTransactionsCard() {
     const rows = getAccountMonthTransactions("gezamenlijk").sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
-    const rowsHtml = rows.map((tx) => `<div class="joint-transaction-row ux-action-card" data-edit-joint-transaction="${attrSafe(tx.id)}"><button type="button" class="ux-card-primary" aria-label="${attrSafe(tx.description || tx.category || "Transactie")} ${eur(transactionDisplayAmount(tx))} · Transactie bewerken"></button>
-    <span class="joint-transaction-meta"><span class="joint-transaction-date" title="${formatDateNL(tx.date)}">${formatDayMonth(tx.date)}</span><span class="joint-transaction-category" title="${textSafe(tx.category || "Overig")}">${textSafe(tx.category || "Overig")}</span></span>
-    <span class="joint-transaction-description"><span class="joint-transaction-description-text" title="${textSafe(tx.description || "")}">${textSafe(tx.description || "—")}</span>${tx.note ? `<span class="joint-transaction-note" title="${textSafe(tx.note)}">${textSafe(tx.note)}</span>` : ""}</span>
+    const rowsHtml = rows.map((tx) => `<div class="joint-transaction-row ux-action-card" data-edit-joint-transaction="${attrSafe(tx.id)}"><button type="button" class="ux-card-primary" aria-label="${attrSafe(formatDayMonth(tx.date) + " · " + compactTransactionLabel(tx))} ${eur(transactionDisplayAmount(tx))} · Transactie bewerken"></button>
+    <span class="joint-transaction-meta"><span class="joint-transaction-date" title="${formatDateNL(tx.date)}">${formatDayMonth(tx.date)}</span></span>
+    <span class="joint-transaction-description"><span class="joint-transaction-description-text" title="${attrSafe(compactTransactionLabel(tx))}">${textSafe(compactTransactionLabel(tx))}</span></span>
     <strong class="joint-transaction-amount">${eur(transactionDisplayAmount(tx))}</strong>
-    <button type="button" class="joint-transaction-delete" data-remove-transaction="${attrSafe(tx.id)}" aria-label="${getTransactionSource(tx) === "csv" ? "Import beheren" : "Transactie verwijderen"}">×</button>
   </div>`).join("");
     return `<div class="card joint-two-column-card joint-transactions-card">${renderJointTransactionsCardHead()}<div class="joint-transactions-list">${rowsHtml || '<p class="joint-transactions-empty">Nog geen uitgaven deze maand.</p>'}</div><div class="joint-transactions-total"><span>Totaal uitgaven</span><strong>${eur(sumTransactionEffects(state, "realExpense", { month: getSelectedMonth(), account: "gezamenlijk" }))}</strong></div></div>`;
   }
@@ -14512,11 +14560,10 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
   function renderPersonalTransactionsCard(owner) {
     const name = ownerLabel(owner);
     const rows = getAccountMonthTransactions(owner).sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
-    const rowsHtml = rows.map((tx) => `<div class="joint-transaction-row ux-action-card" data-edit-personal-transaction="${attrSafe(tx.id)}" data-owner="${attrSafe(owner)}"><button type="button" class="ux-card-primary" aria-label="${attrSafe(tx.description || tx.category || "Transactie")} ${eur(transactionDisplayAmount(tx))} · Transactie bewerken"></button>
-    <span class="joint-transaction-meta"><span class="joint-transaction-date">${formatDayMonth(tx.date)}</span><span class="joint-transaction-category">${textSafe(tx.category || "Overig")}</span></span>
-    <span class="joint-transaction-description"><span class="joint-transaction-description-text">${textSafe(tx.description || "—")}</span>${tx.note ? `<span class="joint-transaction-note">${textSafe(tx.note)}</span>` : ""}</span>
+    const rowsHtml = rows.map((tx) => `<div class="joint-transaction-row ux-action-card" data-edit-personal-transaction="${attrSafe(tx.id)}" data-owner="${attrSafe(owner)}"><button type="button" class="ux-card-primary" aria-label="${attrSafe(formatDayMonth(tx.date) + " · " + compactTransactionLabel(tx))} ${eur(transactionDisplayAmount(tx))} · Transactie bewerken"></button>
+    <span class="joint-transaction-meta"><span class="joint-transaction-date" title="${formatDateNL(tx.date)}">${formatDayMonth(tx.date)}</span></span>
+    <span class="joint-transaction-description"><span class="joint-transaction-description-text" title="${attrSafe(compactTransactionLabel(tx))}">${textSafe(compactTransactionLabel(tx))}</span></span>
     <strong class="joint-transaction-amount">${eur(transactionDisplayAmount(tx))}</strong>
-    <button type="button" class="joint-transaction-delete" data-remove-transaction="${attrSafe(tx.id)}" aria-label="${getTransactionSource(tx) === "csv" ? "Import beheren" : "Transactie verwijderen"}">×</button>
   </div>`).join("");
     const total = round22(sumTransactionEffects(state, "realExpense", { month: getSelectedMonth(), account: owner }));
     return `<div class="card joint-two-column-card joint-transactions-card"><div class="card-head joint-transactions-card-head"><div class="card-head-title"><h2>${name} transacties <span>— ${monthLabel(getSelectedMonth())}</span></h2><button type="button" class="joint-transaction-add-btn" data-open-personal-transaction="${owner}" aria-label="Uitgave toevoegen">${iconSvg("receipt")}</button></div></div><div class="joint-transactions-list">${rowsHtml || '<p class="joint-transactions-empty">Nog geen uitgaven deze maand.</p>'}</div><div class="joint-transactions-total"><span>Totaal uitgaven</span><strong>${eur(total)}</strong></div></div>`;

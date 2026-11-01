@@ -61,6 +61,13 @@ const outputs = new Map([
   ["app.css", await bundleSources(styleSources, "Finize bron")],
   ["app.js", await buildJavaScript()]
 ]);
+// Preserve the current single-file delivery, generated from the editable sources.
+const shell = normalize(await readFile(path.join(root, 'index.html'), 'utf8'));
+if (shell.includes('name="finize-inline-release"')) {
+  outputs.set('index.html', shell
+    .replace(/<style>[\s\S]*?<\/style>/, () => `<style>\n${outputs.get('app.css')}</style>`)
+    .replace(/<script>\s*\(\(\) => \{[\s\S]*?<\/script>/, () => `<script>\n${outputs.get('app.js')}</script>`));
+}
 
 if (process.argv.includes("--check")) {
   const mismatches = [];

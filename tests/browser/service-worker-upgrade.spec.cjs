@@ -9,8 +9,8 @@ test('Offline herladen kiest actuele release ook wanneer oude cache eerder staat
   const stale=await caches.open('finize-obsolete-late');await stale.put('./index.html',new Response('<html><body>Verouderde Finize-pagina</body></html>',{headers:{'content-type':'text/html'}}));
   // Simulate an old cache preceding the current cache, without changing application data.
   await caches.delete(name);const current=await caches.open(name);for(const [key,value] of entries)await current.put(key,value);
-  return {state:JSON.stringify(state),script:document.querySelector('script[src*="app.js"]').getAttribute('src')};
+  return {state:JSON.stringify(state),script:document.querySelector('meta[name="finize-inline-release"]').getAttribute('content')};
  });
  await context.setOffline(true);await page.reload();await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
- expect(await page.locator('script[src*="app.js"]').getAttribute('src')).toBe(before.script);expect(await page.evaluate(()=>JSON.stringify(state))).toBe(before.state);await expect(page.locator('#tab-dashboard')).not.toBeEmpty();
+ expect(await page.locator('meta[name="finize-inline-release"]').getAttribute('content')).toBe(before.script);expect(await page.evaluate(()=>JSON.stringify(state))).toBe(before.state);await expect(page.locator('#tab-dashboard')).not.toBeEmpty();
 });

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Finize</title>
-<meta name="finize-inline-release" content="118-r27">
+<meta name="finize-inline-release" content="118-r28">
 <link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#6f8a55">
 <meta name="mobile-web-app-capable" content="yes">
@@ -6420,6 +6420,24 @@ body.v4-app .value.is-negative{color:var(--red) !important}
 .p3-explanation summary{cursor:pointer;min-height:44px;padding:12px 0}
 .p3-explanation p{max-width:75ch;line-height:1.6;margin:8px 0}
 .p3-warning{background:var(--red-bg);color:var(--red);padding:12px 14px;font-size:13px;line-height:1.5;border-radius:10px;margin-top:8px}
+.p3-buffer-warning{margin-top:12px;border-top:1px solid var(--border);color:var(--text-dim);font-size:13px;line-height:1.5}
+.p3-buffer-warning.is-hard{color:var(--red)}
+.p3-buffer-warning>summary{display:flex;align-items:center;gap:10px;min-height:56px;padding:10px 0;cursor:pointer;list-style:none}
+.p3-buffer-warning>summary::-webkit-details-marker{display:none}
+.p3-buffer-icon{display:flex;flex:0 0 20px}
+.p3-buffer-icon svg{width:20px;height:20px}
+.p3-buffer-copy{display:grid;gap:2px;min-width:0;flex:1;overflow-wrap:anywhere}
+.p3-buffer-copy strong{font-size:14px}
+.p3-buffer-copy small{font-size:12px;color:var(--text-dim)}
+.p3-buffer-chevron{font-size:20px;line-height:1}
+.p3-buffer-warning[open] .p3-buffer-chevron{transform:rotate(180deg)}
+.p3-buffer-detail{padding:0 0 12px;color:var(--text-dim);overflow-wrap:anywhere}
+.p3-buffer-detail dl{margin:0}
+.p3-buffer-detail dl>div{display:flex;flex-wrap:wrap;justify-content:space-between;gap:2px 12px;padding:4px 0}
+.p3-buffer-detail dt{flex:1 1 170px}
+.p3-buffer-detail dd{margin:0;font-weight:600;color:var(--text)}
+.p3-buffer-detail ul{padding-left:20px;margin:8px 0}
+.p3-buffer-detail p{margin:8px 0}
 .p3-quality{font-size:12px;line-height:1.5;color:var(--text-dim);display:flex;align-items:flex-start;gap:12px;flex:1;min-width:0}
 .p3-quality details{flex:1;min-width:0}
 .p3-quality-actions{display:flex;gap:10px;flex-wrap:wrap}
@@ -6775,7 +6793,6 @@ body.v4-app .fixed-payment-kpi .fixed-payment-track{position:relative;height:14p
   body.v4-app .u5-goal-detail-hero>div{min-width:0;overflow-wrap:anywhere}
 }
 
-
 /* r27: readable transaction summaries; original details remain in the editor. */
 html body.v4-app[data-real-active-tab] .wrap .joint-transactions-card{
   contain:none !important;
@@ -6829,7 +6846,6 @@ html body.v4-app .joint-transaction-amount{white-space:nowrap;font-variant-numer
   html body.v4-app .joint-transactions-card-head,
   html body.v4-app .joint-transactions-total{flex:0 0 auto}
 }
-
 </style>
 </head>
 <body class="v4-app auth-pending">
@@ -10681,6 +10697,7 @@ html body.v4-app .joint-transaction-amount{white-space:nowrap;font-variant-numer
   function withAvailability(projection, input, fromDate, goalInputFor) {
     var _a2, _b, _c;
     let { hard, softIds } = hardAvailability(projection, input, fromDate);
+    const bufferWarning = bufferWarningFor(hard, input, fromDate, softIds);
     if (input.incomeKpis) {
       const opening = hard.opening.balanceCents;
       const points = opening === null || !hard.horizon.endDate ? [] : [{ date: fromDate, expectedBalanceCents: opening }, ...hard.days.filter((row) => row.date >= fromDate)];
@@ -10708,7 +10725,41 @@ html body.v4-app .joint-transaction-amount{white-space:nowrap;font-variant-numer
       freeAfterObligationsCents: hard.freeAfterObligationsCents,
       indicativeFreeAfterObligationsCents: hard.indicativeFreeAfterObligationsCents,
       availability: { ...hard.availability, excludedSavingsPlanIds: [...softIds] },
-      softSavings: guidance
+      softSavings: guidance,
+      bufferWarning
+    };
+  }
+  function bufferWarningFor(inclusive, input, fromDate, softIds) {
+    var _a2, _b, _c;
+    const certain = projectDailyLiquidity({
+      ...input,
+      events: input.events.filter((e) => !softIds.has(e.id)),
+      reservations: input.reservations.filter((r) => r.type !== "budget" && !softIds.has(r.id.replace(/^undated:/, ""))),
+      reasons: inclusive.reasons
+    });
+    const points = (p) => [...p.opening.balanceCents === null ? [] : [{ date: fromDate, expectedBalanceCents: p.opening.balanceCents }], ...p.days.filter((d) => d.date >= fromDate)];
+    const minimum = (rows) => rows.reduce((best, d) => !best || d.expectedBalanceCents < best.expectedBalanceCents ? d : best, null);
+    const hard = minimum(points(certain)), all = minimum(points(inclusive));
+    const uncertainties = certain.reservations.filter((r) => r.type === "undated-obligation" && r.amountCents > 0);
+    const uncertain = uncertainties.length > 0 || certain.reasons.some((r) => r.severity === "incomplete");
+    if (!hard || !all) return { kind: "unknown", uncertain: true };
+    const hardShortfallCents = Math.max(0, input.bufferCents - hard.expectedBalanceCents);
+    const inclusiveShortfallCents = Math.max(0, input.bufferCents - all.expectedBalanceCents);
+    const atInclusive = points(certain).find((d) => d.date === all.date);
+    const budgetEffectCents = Math.max(0, ((_a2 = atInclusive == null ? void 0 : atInclusive.expectedBalanceCents) != null ? _a2 : all.expectedBalanceCents) - all.expectedBalanceCents);
+    const kind = hardShortfallCents > 0 ? "hard" : inclusiveShortfallCents > 0 ? "soft" : uncertain ? "uncertain" : "none";
+    return {
+      kind,
+      uncertain,
+      bufferCents: input.bufferCents,
+      hard: { date: hard.date, balanceCents: hard.expectedBalanceCents, shortfallCents: hardShortfallCents },
+      inclusive: { date: all.date, balanceCents: all.expectedBalanceCents, shortfallCents: inclusiveShortfallCents },
+      budgetEffectCents,
+      hardBalanceAtInclusiveCents: (_b = atInclusive == null ? void 0 : atInclusive.expectedBalanceCents) != null ? _b : null,
+      additionalShortfallCents: Math.max(0, inclusiveShortfallCents - Math.max(0, input.bufferCents - ((_c = atInclusive == null ? void 0 : atInclusive.expectedBalanceCents) != null ? _c : all.expectedBalanceCents))),
+      obligations: inclusive.events.filter((e) => e.amountCents < 0 && e.status === "planned" && !e.isSavingsPlan && e.date >= fromDate && e.date <= [hard.date, all.date].sort().at(-1)),
+      uncertainties,
+      reasons: certain.reasons.filter((r) => r.severity === "incomplete")
     };
   }
   function liquidityObservations(state2, accountProfileId, toDate, scope) {
@@ -11071,13 +11122,32 @@ html body.v4-app .joint-transaction-amount{white-space:nowrap;font-variant-numer
     const reasons2 = explainLiquidityReasons({ ...p, reasons: [...p.reasons, ...((_a2 = p.monthEndSavings) == null ? void 0 : _a2.reasons) || []] });
     return reasons2.length ? `<p>${status(p.status)}. De onderstaande punten zijn door de huidige prognose vastgesteld.</p>${reasons2.map((r) => `<section data-p3-reason="${escape2(r.code)}"><strong>${escape2(r.problem)}</strong><p>${escape2(r.why)}</p><p><b>Wat kun je doen?</b> ${escape2(r.solution)}</p>${action(r.action, r.action === "balance" ? "Saldo controleren" : r.action === "payments" ? "Betalingen bekijken" : r.action === "data" ? "Data & back-up openen" : r.action === "accounts" ? "Bankrekeningen openen" : r.action === "budgets" ? "Overzicht openen" : "Prognose instellen")}<details><summary>Technische details</summary><p>${escape2(r.detail)} (${escape2(r.code)})</p></details></section>`).join("")}` : `<p>${status(p.status)}. Er zijn voor deze prognose geen aanvullende oorzaken gemeld. Een prognose blijft een verwachting; bedragen en betaalmomenten kunnen veranderen.</p>`;
   }
+  function bufferWarningHtml(w, label, iconSvg2) {
+    if (!w || w.kind === "none") return "";
+    const hard = w.kind === "hard", unknown = ["unknown", "uncertain"].includes(w.kind);
+    const both = hard && w.budgetEffectCents > 0 && w.inclusive.shortfallCents > 0;
+    const selected = hard ? w.hard : w.inclusive;
+    const title = unknown ? "Buffer nog onzeker" : `${hard ? "" : "Mogelijk "}${money2(selected.shortfallCents)} onder buffer`;
+    const cause = unknown ? "Controleer openstaande verplichtingen" : hard ? both ? "Vaste lasten + budgetuitgaven" : "Vaste lasten" : w.uncertain ? "Budgetuitgaven · verplichtingen onzeker" : "Verwachte budgetuitgaven";
+    const line = (name, value) => `<div><dt>${name}</dt><dd>${value}</dd></div>`;
+    const uncertain = w.uncertain ? "<p>Er zijn onzekere of ongedateerde verplichtingen. Of alle vaste lasten gedekt zijn, is nog niet bevestigd.</p>" : !hard && !unknown ? "<p>De vaste lasten en overige verplichtingen blijven volgens deze prognose boven de buffer.</p>" : "";
+    const obligations = (w.obligations || []).slice(0, 5).map((e) => `<li>${escape2(label(e))} · ${date(e.date)} <strong>${money2(-e.amountCents)}</strong></li>`).join("");
+    const pending = (w.uncertainties || []).map((e) => `<li>Onzeker: ${escape2(label({ ...e, type: e.planningSourceId ? "fixed" : e.type }))} <strong>${money2(e.amountCents)}</strong> · betaaldatum of afwikkeling onbekend</li>`).join("");
+    return `<details class="p3-buffer-warning ${hard ? "is-hard" : "is-soft"}" data-p3-buffer-warning="${w.kind}"><summary aria-expanded="false"><span class="p3-buffer-icon" aria-hidden="true">${iconSvg2(hard ? "warning" : "info")}</span><span class="p3-buffer-copy"><strong>${title}</strong><small>${cause}${selected ? ` · ${date(selected.date)}` : ""}</small></span><span class="p3-buffer-chevron" aria-hidden="true">⌄</span></summary><div class="p3-buffer-detail">${unknown ? "" : `<dl>${line("Minimum zonder geschatte budgetuitgaven", `${money2(w.hard.balanceCents)} · ${date(w.hard.date)}`)}${line("Minimum inclusief budgetuitgaven", `${money2(w.inclusive.balanceCents)} · ${date(w.inclusive.date)}`)}${line(`Zonder budget op ${date(w.inclusive.date)}`, money2(w.hardBalanceAtInclusiveCents))}${line("Ingestelde buffer", money2(w.bufferCents))}${line("Tekort zonder budgetuitgaven", money2(w.hard.shortfallCents))}${line("Tekort inclusief budgetuitgaven", money2(w.inclusive.shortfallCents))}${line(`Geschatte budgetuitgaven t/m ${date(w.inclusive.date)}`, money2(w.budgetEffectCents))}${line(`Extra tekort door budget op ${date(w.inclusive.date)}`, money2(w.additionalShortfallCents))}</dl><p>Budgetuitgaven zijn geschat en geen geplande bankafschrijving. De tekorten zijn twee vergelijkingen en worden niet bij elkaar opgeteld.</p>`}${uncertain}${obligations || pending ? `<ul>${obligations}${(w.obligations || []).length > 5 ? `<li>En ${w.obligations.length - 5} andere verplichtingen in deze periode.</li>` : ""}${pending}</ul>` : ""}</div></details>`;
+  }
+  function bindBufferWarning(root2, signal) {
+    root2.addEventListener("toggle", (e) => {
+      var _a2, _b;
+      if ((_b = (_a2 = e.target).matches) == null ? void 0 : _b.call(_a2, "[data-p3-buffer-warning]")) e.target.querySelector("summary").setAttribute("aria-expanded", String(e.target.open));
+    }, { capture: true, ...signal ? { signal } : {} });
+  }
   function outlookHtml(p, profile, label, iconSvg2, bankMarkup = "") {
     var _a2, _b, _c;
     if (!profile) return `<p class="p3-empty">Kies de primaire betaalrekening voor deze context. Er wordt geen willekeurige rekening gebruikt.</p>${action("accounts", "Rekening instellen")}`;
     if (!p) return '<p class="p3-empty" role="status">Vooruitblik laden…</p>';
     const v = liquidityView(p), balance = p.currentBalance || p.opening;
     const kpi = (key, title, value, sub, icon, explanation, act = "") => `<article class="p3-kpi">${act ? `<button type="button" class="ux-card-primary" data-p3-action="${act}" aria-label="${title} ${escape2(value)} · ${act === "balance" ? "Saldo bijwerken" : "Buffer instellen"}"></button>` : ""}<span class="p3-kpi-icon" aria-hidden="true">${iconSvg2(icon)}</span><span class="p3-kpi-copy"><span class="p3-kpi-title"><span>${title}</span>${info(key, title, explanation)}</span><strong>${value}</strong><small>${sub}</small>${key === "balance" ? bankMarkup : ""}</span></article>`;
-    const warning = v.minimum !== null && v.minimum < v.buffer ? `<div class="p3-warning" role="status">${p.status !== "projected" ? `${status(p.status)} · ` : ""}Op ${date(v.minimumDate)} wordt ${money2(v.minimum)} verwacht. ${v.minimum < 0 ? "Dit is onder € 0. " : ""}Dat is ${money2(v.buffer - v.minimum)} onder je buffer van ${money2(v.buffer)}.</div>` : "";
+    const warning = bufferWarningHtml(p.bufferWarning, label, iconSvg2);
     const saving = p.monthEndSavings, amount = (_b = (_a2 = saving == null ? void 0 : saving.safeCents) != null ? _a2 : saving == null ? void 0 : saving.indicativeCents) != null ? _b : null;
     const savingTitle = "Veilig te sparen op " + savingDate(saving == null ? void 0 : saving.transferDate);
     const freeSub = `${amount === null ? "Onvolledige prognose · bedrag niet vast te stellen" : saving.status === "provisional" ? "Indicatie" : ""}<span data-p3-savings-plan>Gepland sparen: ${money2(saving == null ? void 0 : saving.plannedCents)}</span>${amount === null ? "" : `<span data-p3-savings-extra>Extra ruimte: ${money2(saving.extraCents)}</span>`}`;
@@ -11247,6 +11317,7 @@ html body.v4-app .joint-transaction-amount{white-space:nowrap;font-variant-numer
       unmount();
       controller = new AbortController();
       const signal = controller.signal;
+      bindBufferWarning(root2, signal);
       const month = deps.month();
       if (selectedMonth !== null && selectedMonth !== month) {
         filter = "month";
@@ -17053,40 +17124,40 @@ html body.v4-app .joint-transaction-amount{white-space:nowrap;font-variant-numer
     <div class="card-head-title"><h2>Gezamenlijke transacties <span>— ${monthLabel(getSelectedMonth())}</span></h2><button type="button" class="joint-transaction-add-btn" data-open-joint-transaction aria-label="Gezamenlijke uitgave toevoegen">${iconSvg("receipt")}</button></div>
   </div>`;
   }
-  // Display-only summary. Never changes imported bank facts or processing choices.
   function compactTransactionLabel(tx) {
+    var _a2, _b, _c, _d, _e, _f, _g, _h, _i;
     const bank = tx.bankOriginal || {};
-    const clean = value => String(value || '').replace(/\s+/g, ' ').trim();
+    const clean = (value) => String(value || "").replace(/\s+/g, " ").trim();
     const stop = /\s+(?:IBAN|BIC|Kenmerk|Machtigingskenmerk|Incassant(?:\s*ID)?|Rekeningnummer|Pasvolgnr|Pasnr|Kaartnr|Terminal|Transactie(?:nummer)?|Valutadatum|Boekdatum|Datum|Tijd)\s*:/i;
-    const trimBankDetails = value => clean(value).replace(/^BEA,?\s*(?:Betaalpas\s*)?/i, '').split(stop)[0].replace(/[, ]+PAS\d+\b.*$/i, '').replace(/\s+(?:IBAN\s+)?[A-Z]{2}\d{2}[A-Z0-9]{10,30}\b.*$/i, '').trim();
+    const trimBankDetails = (value) => clean(value).replace(/^BEA,?\s*(?:Betaalpas\s*)?/i, "").split(stop)[0].replace(/[, ]+PAS\d+\b.*$/i, "").replace(/\s+(?:IBAN\s+)?[A-Z]{2}\d{2}[A-Z0-9]{10,30}\b.*$/i, "").trim();
     const raw = clean(bank.rawDescription || bank.description || tx.description);
-    const field = label => {
-      const match = raw.match(new RegExp('(?:^|\\s)' + label + ':\\s*(.*?)(?=\\s+(?:Naam|Omschrijving|Mededelingen|IBAN|BIC|Kenmerk|Machtigingskenmerk|Incassant(?:\\s*ID)?|Rekeningnummer|Pasvolgnr|Pasnr|Kaartnr|Terminal|Transactie(?:nummer)?|Valutadatum|Boekdatum|Datum|Tijd|Plaats):|$)', 'i'));
-      return match ? trimBankDetails(match[1]) : '';
+    const field = (label) => {
+      const match = raw.match(new RegExp("(?:^|\\s)" + label + ":\\s*(.*?)(?=\\s+(?:Naam|Omschrijving|Mededelingen|IBAN|BIC|Kenmerk|Machtigingskenmerk|Incassant(?:\\s*ID)?|Rekeningnummer|Pasvolgnr|Pasnr|Kaartnr|Terminal|Transactie(?:nummer)?|Valutadatum|Boekdatum|Datum|Tijd|Plaats):|$)", "i"));
+      return match ? trimBankDetails(match[1]) : "";
     };
-    const imported = window.FinizeUpdate4?.importStore?.bankReadCache?.get?.(tx.importBatchId)?.rows?.find(row => row.id === tx.importTransactionId);
-    const payload = (tx.providerInput || tx.bankInput || imported?.providerInput || {}).provenance?.payload || {};
+    const imported = (_f = (_e = (_d = (_c = (_b = (_a2 = window.FinizeUpdate4) == null ? void 0 : _a2.importStore) == null ? void 0 : _b.bankReadCache) == null ? void 0 : _c.get) == null ? void 0 : _d.call(_c, tx.importBatchId)) == null ? void 0 : _e.rows) == null ? void 0 : _f.find((row) => row.id === tx.importTransactionId);
+    const payload = ((_g = (tx.providerInput || tx.bankInput || (imported == null ? void 0 : imported.providerInput) || {}).provenance) == null ? void 0 : _g.payload) || {};
     const party = tx.bankAmount > 0 || bank.amount > 0 ? payload.debtor : payload.creditor;
-    const name = field('Naam') || clean(bank.counterpartyName || tx.counterpartyName || party?.name);
-    const displayDescription = tx.approvedProcessing?.description || tx.processing?.description || tx.description;
+    const name = field("Naam") || clean(bank.counterpartyName || tx.counterpartyName || (party == null ? void 0 : party.name));
+    const displayDescription = ((_h = tx.approvedProcessing) == null ? void 0 : _h.description) || ((_i = tx.processing) == null ? void 0 : _i.description) || tx.description;
     const description = trimBankDetails(displayDescription || bank.description || raw);
     const edited = clean(displayDescription) && clean(displayDescription) !== clean(bank.description || bank.rawDescription);
-    const detail = edited ? description : field('Omschrijving') || field('Mededelingen') || (name ? description.replace(/^SEPA\s+[^:]+:\s*/i, '') : description);
+    const detail = edited ? description : field("Omschrijving") || field("Mededelingen") || (name ? description.replace(/^SEPA\s+[^:]+:\s*/i, "") : description);
     const values = name ? [name, detail] : [description];
     if (tx.note) values.push(trimBankDetails(tx.note));
-    const seen = new Set();
-    const parts = values.filter(value => {
+    const seen = /* @__PURE__ */ new Set();
+    const parts2 = values.filter((value) => {
       if (!value || /^(?:SEPA\b|Naam\s*:)/i.test(value)) return false;
-      const key = value.toLocaleLowerCase('nl');
+      const key = value.toLocaleLowerCase("nl");
       if (seen.has(key)) return false;
-      seen.add(key);return true;
+      seen.add(key);
+      return true;
     });
-    return parts.join(' – ') || 'Banktransactie';
+    return parts2.join(" – ") || "Banktransactie";
   }
-
   function renderJointTransactionsCard() {
     const rows = getAccountMonthTransactions("gezamenlijk").sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
-    const rowsHtml = rows.map((tx) => `<div class="joint-transaction-row ux-action-card" data-edit-joint-transaction="${attrSafe(tx.id)}"><button type="button" class="ux-card-primary" aria-label="${attrSafe(formatDayMonth(tx.date) + ' · ' + compactTransactionLabel(tx))} ${eur(transactionDisplayAmount(tx))} · Transactie bewerken"></button>
+    const rowsHtml = rows.map((tx) => `<div class="joint-transaction-row ux-action-card" data-edit-joint-transaction="${attrSafe(tx.id)}"><button type="button" class="ux-card-primary" aria-label="${attrSafe(formatDayMonth(tx.date) + " · " + compactTransactionLabel(tx))} ${eur(transactionDisplayAmount(tx))} · Transactie bewerken"></button>
     <span class="joint-transaction-meta"><span class="joint-transaction-date" title="${formatDateNL(tx.date)}">${formatDayMonth(tx.date)}</span></span>
     <span class="joint-transaction-description"><span class="joint-transaction-description-text" title="${attrSafe(compactTransactionLabel(tx))}">${textSafe(compactTransactionLabel(tx))}</span></span>
     <strong class="joint-transaction-amount">${eur(transactionDisplayAmount(tx))}</strong>
@@ -21415,7 +21486,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
   function renderPersonalTransactionsCard(owner) {
     const name = ownerLabel(owner);
     const rows = getAccountMonthTransactions(owner).sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
-    const rowsHtml = rows.map((tx) => `<div class="joint-transaction-row ux-action-card" data-edit-personal-transaction="${attrSafe(tx.id)}" data-owner="${attrSafe(owner)}"><button type="button" class="ux-card-primary" aria-label="${attrSafe(formatDayMonth(tx.date) + ' · ' + compactTransactionLabel(tx))} ${eur(transactionDisplayAmount(tx))} · Transactie bewerken"></button>
+    const rowsHtml = rows.map((tx) => `<div class="joint-transaction-row ux-action-card" data-edit-personal-transaction="${attrSafe(tx.id)}" data-owner="${attrSafe(owner)}"><button type="button" class="ux-card-primary" aria-label="${attrSafe(formatDayMonth(tx.date) + " · " + compactTransactionLabel(tx))} ${eur(transactionDisplayAmount(tx))} · Transactie bewerken"></button>
     <span class="joint-transaction-meta"><span class="joint-transaction-date" title="${formatDateNL(tx.date)}">${formatDayMonth(tx.date)}</span></span>
     <span class="joint-transaction-description"><span class="joint-transaction-description-text" title="${attrSafe(compactTransactionLabel(tx))}">${textSafe(compactTransactionLabel(tx))}</span></span>
     <strong class="joint-transaction-amount">${eur(transactionDisplayAmount(tx))}</strong>
@@ -28729,14 +28800,13 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
   new MutationObserver(update).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["class", "hidden"] });
   update();
 
-  // Single-file upload: keep an installed worker; the old external-file installer cannot install this shell.
-  if (false) {
+  // src/storage/service-worker-registration.js
+  if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
       navigator.serviceWorker.register("./service-worker.js").catch((error2) => console.error("Service worker registratie mislukt:", error2));
     });
   }
 })();
-
 </script>
 <script>
 // This single-file delivery reuses an already installed Finize worker only.
@@ -28747,10 +28817,10 @@ window.addEventListener('load', async () => {
     const scope = new URL('./', location.href);
     const registration = await navigator.serviceWorker.getRegistration(scope.href);
     if (!registration?.active || registration.scope !== scope.href || registration.active.scriptURL !== new URL('service-worker.js', scope).href) return;
-    const response = await fetch(new URL('index.html?finize-inline-shell=118-r27', scope), {cache:'no-store'});
+    const response = await fetch(new URL('index.html?finize-inline-shell=118-r28', scope), {cache:'no-store'});
     if (!response.ok) return;
     const html = await response.clone().text();
-    if (!html.includes('<meta name="finize-inline-release" content="118-r27">')) return;
+    if (!html.includes('<meta name="finize-inline-release" content="118-r28">')) return;
     for (const name of await caches.keys()) {
       if (!/^finize-v[\w.-]+$/.test(name)) continue;
       const cache = await caches.open(name);

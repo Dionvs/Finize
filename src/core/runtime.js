@@ -1134,16 +1134,45 @@ function renderJointTransactionsCardHead(){
     <div class="card-head-title"><h2>Gezamenlijke transacties <span>— ${monthLabel(getSelectedMonth())}</span></h2><button type="button" class="joint-transaction-add-btn" data-open-joint-transaction aria-label="Gezamenlijke uitgave toevoegen">${iconSvg('receipt')}</button></div>
   </div>`;
 }
-function renderJointTransactionsCard(){
-  const rows = getAccountMonthTransactions('gezamenlijk').sort((a,b)=>String(b.date || '').localeCompare(String(a.date || '')));
-  const rowsHtml = rows.map(tx=>`<div class="joint-transaction-row ux-action-card" data-edit-joint-transaction="${attrSafe(tx.id)}"><button type="button" class="ux-card-primary" aria-label="${attrSafe(tx.description || tx.category || 'Transactie')} ${eur(transactionDisplayAmount(tx))} · Transactie bewerken"></button>
-    <span class="joint-transaction-meta"><span class="joint-transaction-date" title="${formatDateNL(tx.date)}">${formatDayMonth(tx.date)}</span><span class="joint-transaction-category" title="${textSafe(tx.category || 'Overig')}">${textSafe(tx.category || 'Overig')}</span></span>
-    <span class="joint-transaction-description"><span class="joint-transaction-description-text" title="${textSafe(tx.description || '')}">${textSafe(tx.description || '—')}</span>${tx.note ? `<span class="joint-transaction-note" title="${textSafe(tx.note)}">${textSafe(tx.note)}</span>` : ''}</span>
+function compactTransactionLabel(tx) {
+    const bank = tx.bankOriginal || {};
+    const clean = value => String(value || '').replace(/\s+/g, ' ').trim();
+    const stop = /\s+(?:IBAN|BIC|Kenmerk|Machtigingskenmerk|Incassant(?:\s*ID)?|Rekeningnummer|Pasvolgnr|Pasnr|Kaartnr|Terminal|Transactie(?:nummer)?|Valutadatum|Boekdatum|Datum|Tijd)\s*:/i;
+    const trimBankDetails = value => clean(value).replace(/^BEA,?\s*(?:Betaalpas\s*)?/i, '').split(stop)[0].replace(/[, ]+PAS\d+\b.*$/i, '').replace(/\s+(?:IBAN\s+)?[A-Z]{2}\d{2}[A-Z0-9]{10,30}\b.*$/i, '').trim();
+    const raw = clean(bank.rawDescription || bank.description || tx.description);
+    const field = label => {
+      const match = raw.match(new RegExp('(?:^|\\s)' + label + ':\\s*(.*?)(?=\\s+(?:Naam|Omschrijving|Mededelingen|IBAN|BIC|Kenmerk|Machtigingskenmerk|Incassant(?:\\s*ID)?|Rekeningnummer|Pasvolgnr|Pasnr|Kaartnr|Terminal|Transactie(?:nummer)?|Valutadatum|Boekdatum|Datum|Tijd|Plaats):|$)', 'i'));
+      return match ? trimBankDetails(match[1]) : '';
+    };
+    const imported = window.FinizeUpdate4?.importStore?.bankReadCache?.get?.(tx.importBatchId)?.rows?.find(row => row.id === tx.importTransactionId);
+    const payload = (tx.providerInput || tx.bankInput || imported?.providerInput || {}).provenance?.payload || {};
+    const party = tx.bankAmount > 0 || bank.amount > 0 ? payload.debtor : payload.creditor;
+    const name = field('Naam') || clean(bank.counterpartyName || tx.counterpartyName || party?.name);
+    const displayDescription = tx.approvedProcessing?.description || tx.processing?.description || tx.description;
+    const description = trimBankDetails(displayDescription || bank.description || raw);
+    const edited = clean(displayDescription) && clean(displayDescription) !== clean(bank.description || bank.rawDescription);
+    const detail = edited ? description : field('Omschrijving') || field('Mededelingen') || (name ? description.replace(/^SEPA\s+[^:]+:\s*/i, '') : description);
+    const values = name ? [name, detail] : [description];
+    if (tx.note) values.push(trimBankDetails(tx.note));
+    const seen = new Set();
+    const parts = values.filter(value => {
+      if (!value || /^(?:SEPA\b|Naam\s*:)/i.test(value)) return false;
+      const key = value.toLocaleLowerCase('nl');
+      if (seen.has(key)) return false;
+      seen.add(key);return true;
+    });
+    return parts.join(' – ') || 'Banktransactie';
+  }
+
+function renderJointTransactionsCard() {
+    const rows = getAccountMonthTransactions("gezamenlijk").sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+    const rowsHtml = rows.map((tx) => `<div class="joint-transaction-row ux-action-card" data-edit-joint-transaction="${attrSafe(tx.id)}"><button type="button" class="ux-card-primary" aria-label="${attrSafe(formatDayMonth(tx.date) + ' · ' + compactTransactionLabel(tx))} ${eur(transactionDisplayAmount(tx))} · Transactie bewerken"></button>
+    <span class="joint-transaction-meta"><span class="joint-transaction-date" title="${formatDateNL(tx.date)}">${formatDayMonth(tx.date)}</span></span>
+    <span class="joint-transaction-description"><span class="joint-transaction-description-text" title="${attrSafe(compactTransactionLabel(tx))}">${textSafe(compactTransactionLabel(tx))}</span></span>
     <strong class="joint-transaction-amount">${eur(transactionDisplayAmount(tx))}</strong>
-    <button type="button" class="joint-transaction-delete" data-remove-transaction="${attrSafe(tx.id)}" aria-label="${getTransactionSource(tx)==='csv'?'Import beheren':'Transactie verwijderen'}">×</button>
-  </div>`).join('');
-  return `<div class="card joint-two-column-card joint-transactions-card">${renderJointTransactionsCardHead()}<div class="joint-transactions-list">${rowsHtml || '<p class="joint-transactions-empty">Nog geen uitgaven deze maand.</p>'}</div><div class="joint-transactions-total"><span>Totaal uitgaven</span><strong>${eur(sumTransactionEffects(state,'realExpense',{month:getSelectedMonth(),account:'gezamenlijk'}))}</strong></div></div>`;
-}
+  </div>`).join("");
+    return `<div class="card joint-two-column-card joint-transactions-card">${renderJointTransactionsCardHead()}<div class="joint-transactions-list">${rowsHtml || '<p class="joint-transactions-empty">Nog geen uitgaven deze maand.</p>'}</div><div class="joint-transactions-total"><span>Totaal uitgaven</span><strong>${eur(sumTransactionEffects(state, "realExpense", { month: getSelectedMonth(), account: "gezamenlijk" }))}</strong></div></div>`;
+  }
 
 function legacyIconName(icon){
   const map={'▤':'receipt','◈':'wallet','↗':'trend','◔':'budgetmeter','▥':'dashboard','◎':'target','€':'euro','⌘':'list','☁':'cloud','✈':'plane','⌂':'house'};
@@ -4972,18 +5001,17 @@ function renderJointFirstRow(){
   ${renderDesktopGoalsPreview(state.spaardoelen.gezamenlijk||[],r.spaarpotDezeMaand)}`;
 }
 
-function renderPersonalTransactionsCard(owner){
-  const name = ownerLabel(owner);
-  const rows = getAccountMonthTransactions(owner).sort((a,b)=>String(b.date || '').localeCompare(String(a.date || '')));
-  const rowsHtml = rows.map(tx=>`<div class="joint-transaction-row ux-action-card" data-edit-personal-transaction="${attrSafe(tx.id)}" data-owner="${attrSafe(owner)}"><button type="button" class="ux-card-primary" aria-label="${attrSafe(tx.description || tx.category || 'Transactie')} ${eur(transactionDisplayAmount(tx))} · Transactie bewerken"></button>
-    <span class="joint-transaction-meta"><span class="joint-transaction-date">${formatDayMonth(tx.date)}</span><span class="joint-transaction-category">${textSafe(tx.category || 'Overig')}</span></span>
-    <span class="joint-transaction-description"><span class="joint-transaction-description-text">${textSafe(tx.description || '—')}</span>${tx.note ? `<span class="joint-transaction-note">${textSafe(tx.note)}</span>` : ''}</span>
+function renderPersonalTransactionsCard(owner) {
+    const name = ownerLabel(owner);
+    const rows = getAccountMonthTransactions(owner).sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+    const rowsHtml = rows.map((tx) => `<div class="joint-transaction-row ux-action-card" data-edit-personal-transaction="${attrSafe(tx.id)}" data-owner="${attrSafe(owner)}"><button type="button" class="ux-card-primary" aria-label="${attrSafe(formatDayMonth(tx.date) + ' · ' + compactTransactionLabel(tx))} ${eur(transactionDisplayAmount(tx))} · Transactie bewerken"></button>
+    <span class="joint-transaction-meta"><span class="joint-transaction-date" title="${formatDateNL(tx.date)}">${formatDayMonth(tx.date)}</span></span>
+    <span class="joint-transaction-description"><span class="joint-transaction-description-text" title="${attrSafe(compactTransactionLabel(tx))}">${textSafe(compactTransactionLabel(tx))}</span></span>
     <strong class="joint-transaction-amount">${eur(transactionDisplayAmount(tx))}</strong>
-    <button type="button" class="joint-transaction-delete" data-remove-transaction="${attrSafe(tx.id)}" aria-label="${getTransactionSource(tx)==='csv'?'Import beheren':'Transactie verwijderen'}">×</button>
-  </div>`).join('');
-  const total = round2(sumTransactionEffects(state,'realExpense',{month:getSelectedMonth(),account:owner}));
-  return `<div class="card joint-two-column-card joint-transactions-card"><div class="card-head joint-transactions-card-head"><div class="card-head-title"><h2>${name} transacties <span>— ${monthLabel(getSelectedMonth())}</span></h2><button type="button" class="joint-transaction-add-btn" data-open-personal-transaction="${owner}" aria-label="Uitgave toevoegen">${iconSvg('receipt')}</button></div></div><div class="joint-transactions-list">${rowsHtml || '<p class="joint-transactions-empty">Nog geen uitgaven deze maand.</p>'}</div><div class="joint-transactions-total"><span>Totaal uitgaven</span><strong>${eur(total)}</strong></div></div>`;
-}
+  </div>`).join("");
+    const total = round2(sumTransactionEffects(state, "realExpense", { month: getSelectedMonth(), account: owner }));
+    return `<div class="card joint-two-column-card joint-transactions-card"><div class="card-head joint-transactions-card-head"><div class="card-head-title"><h2>${name} transacties <span>— ${monthLabel(getSelectedMonth())}</span></h2><button type="button" class="joint-transaction-add-btn" data-open-personal-transaction="${owner}" aria-label="Uitgave toevoegen">${iconSvg("receipt")}</button></div></div><div class="joint-transactions-list">${rowsHtml || '<p class="joint-transactions-empty">Nog geen uitgaven deze maand.</p>'}</div><div class="joint-transactions-total"><span>Totaal uitgaven</span><strong>${eur(total)}</strong></div></div>`;
+  }
 
 function openPersonalTransactionModal(owner,transactionId=''){if(['dion','dara'].includes(owner)&&!isReadOnlyPersonalTab(owner))openContextTransactionModal(owner,transactionId);}
 

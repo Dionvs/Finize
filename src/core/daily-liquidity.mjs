@@ -33,6 +33,7 @@ export function liquidityReasonMessage(reason) {
     'unknown-bank-coverage':'Niet bevestigd dat alle bankmutaties sinds het ijkpunt aanwezig zijn.',
     'partial-bank-coverage':'De bankgegevens dekken slechts een deel van de periode.',
     'awaiting-review':'Geboekte bankmutaties bij Nakijken tellen voorlopig mee.',
+    'overdue-fixed-reserved':'Een nog niet gekoppelde vaste last met een verstreken betaaldatum is vanaf nu volledig gereserveerd; dit is geen bankafschrijving.',
     'unknown-cash-date':'Een kasdatum is onbekend of een gepland bedrag staat nog open na de betaaldag.',
     'unresolved-account-profile':'Een gebeurtenis heeft nog geen betrouwbare fysieke rekening.',
     'unresolved-budget-account':'Een budget heeft nog geen aangewezen fysieke betaalrekening.',
@@ -205,7 +206,7 @@ export function buildLiquidityInput(state,{accountProfileId,asOfDate,endDate,sco
   const last=horizonEnd || asOfDate;
   // Keep the starting checkpoint fixed even if a later observation is present.
   const future=selectAccountBalance(state,{accountProfileId,toDate:last,scope,imports,importsAvailable,coverage,checkpointId:opening.checkpoint?.id});
-  future.reasons.filter(row=>!['unknown-bank-coverage','partial-bank-coverage'].includes(row.code)).forEach(row=>reasons.push(issue(row.code,row.sourceId,row.code==='awaiting-review'?'provisional':'incomplete')));
+  future.reasons.filter(row=>!['unknown-bank-coverage','partial-bank-coverage'].includes(row.code)).forEach(row=>reasons.push(issue(row.code,row.sourceId,['awaiting-review','intraday-provider-balance'].includes(row.code)?'provisional':'incomplete')));
   for (const row of future.mutations.filter(row=>row.date>asOfDate)) {
     const linked=projections.filter(p=>sourceRecordKey(p.transaction)===row.sourceId);
     events.push(event({id:'bank:'+row.sourceId,accountProfileId,date:row.date,amountCents:row.amountCents,type:'bank',status:row.status==='confirmed'?'actual':'provisional',dateQuality:'confirmed',sourceId:row.sourceId,
@@ -217,7 +218,7 @@ export function buildLiquidityInput(state,{accountProfileId,asOfDate,endDate,sco
     row.replacedBy=row.replacedBy.filter(key=>projections.some(p=>sourceRecordKey(p.transaction)===key&&p.transaction.accountProfileId===row.accountProfileId&&Math.sign(Number(p.transaction.bankOriginal?.amount))===Math.sign(row.amountCents)));
     if (!relevant(row)) return;
     if(row.warnings.includes('ambiguous-allowance-occurrence')) reasons.push(issue('ambiguous-allowance-occurrence',row.id));
-    if (row.type==='fixed' && projections.some(p=>p.active&&p.fixedExpenseId===row.planningSourceId&&!p.fixedOccurrenceId)) reasons.push(issue('ambiguous-fixed-occurrence',row.id));
+    if (row.type==='fixed' && projections.some(p=>p.active&&p.fixedExpenseId===row.planningSourceId&&!p.fixedOccurrenceId)) { row.warnings.push('ambiguous-fixed-occurrence'); reasons.push(issue('ambiguous-fixed-occurrence',row.id)); }
     if (row.type==='income' && projections.some(p=>p.active&&p.incomeSourceId===row.planningSourceId&&!p.incomeOccurrenceId&&p.effects.incomeImpact>0&&p.calendarMonth===row.month)) {
       row.date=null;row.dateQuality='unknown';row.warnings.push('ambiguous-income-occurrence');reasons.push(issue('ambiguous-income-occurrence',row.id));
     }
@@ -245,7 +246,9 @@ export function buildLiquidityInput(state,{accountProfileId,asOfDate,endDate,sco
       reasons.push(issue('unconfirmed-transfer-plan',row.id));return;
     }
     if (!row.accountProfileId) { row.warnings.push('unresolved-account-profile'); reasons.push(issue('unresolved-account-profile',row.id)); }
-    if (row.date && (row.date<asOfDate||row.date===asOfDate&&!includeAsOfPlans)) { row.warnings.push('overdue-unmatched-plan'); row.plannedDate=row.date;row.date=null; }
+    if (row.date && (row.date<asOfDate||row.date===asOfDate&&!includeAsOfPlans)) { row.warnings.push('overdue-unmatched-plan'); row.plannedDate=row.date;row.date=null;
+      if(!planningBasis&&row.type==='fixed'&&row.amountCents<0&&row.accountProfileId&&!row.warnings.includes('ambiguous-fixed-occurrence')){row.status='reservation';row.warnings.push('overdue-fixed-reserved');reservations.push({...row,id:'undated:'+row.id,amountCents:-row.amountCents,type:'undated-obligation',reserveFromDate:asOfDate});reasons.push(issue('overdue-fixed-reserved',row.id,'provisional'));events.push(row);return;}
+    }
     if (!row.date) {
       row.warnings.push('unknown-cash-date');reasons.push(issue('unknown-cash-date',row.id,row.amountCents>0?'provisional':'incomplete'));
       // Positive undated income never increases spending capacity. Debits remain reserved.
@@ -340,11 +343,12 @@ export function projectDailyLiquidity(input) {
   const observations=new Map((input.observations || []).map(row=>[row.asOfDate,row]));
   const days=[];
   if(opening.balanceCents!==null&&horizon.endDate) {
-    let bank=opening.balanceCents,spent=0,earlierEstimated=0,lastObservationMonth=null;
+    let bank=opening.balanceCents,spent=0,earlierEstimated=0,lastObservationMonth=null,reserveAppliedCents=0;
     for(let date=asOfDate;date<=horizon.endDate;date=shiftLiquidityDay(date,1)) {
       const rows=dated.filter(row=>row.date===date);
-      const openingBalanceCents=safe(bank-spent);
-      let mutationCents=safe(sum(rows.map(row=>row.amountCents))-(estimated.get(date)||0));
+      const reservedObligationCents=sum(reservations.filter(row=>row.reserveFromDate&&row.reserveFromDate<=date).map(row=>row.amountCents));
+      const openingBalanceCents=safe(bank-spent-reserveAppliedCents);
+      let mutationCents=safe(sum(rows.map(row=>row.amountCents))-(estimated.get(date)||0)-(reservedObligationCents-reserveAppliedCents));reserveAppliedCents=reservedObligationCents;
       bank=safe(bank+sum(rows.map(row=>row.amountCents)));spent=safe(spent+(estimated.get(date)||0));
       if(input.displayStartDate&&date<input.displayStartDate.slice(0,7)+'-01')earlierEstimated=safe(earlierEstimated+(estimated.get(date)||0));
       const observation=observations.get(date);
@@ -361,7 +365,7 @@ export function projectDailyLiquidity(input) {
         for(const row of reservations.filter(row=>row.type==='budget'&&row.fromDate<=date&&row.toDate>date))distribute(row,shiftLiquidityDay(date,1));
       }
       if(input.displayStartDate&&date<input.displayStartDate)continue;
-      days.push({date,openingBalanceCents,mutationCents,cashBalanceCents:bank,estimatedBudgetCents:estimated.get(date)||0,expectedBalanceCents:safe(bank-spent),
+      days.push({date,openingBalanceCents,mutationCents,cashBalanceCents:bank,estimatedBudgetCents:estimated.get(date)||0,reservedObligationCents,expectedBalanceCents:safe(bank-spent-reservedObligationCents),
         afterReservationsCents:safe(bank-earlierEstimated-sum(reservations.filter(row=>row.reserveForDisplay!==false&&(!lastObservationMonth||row.type!=='budget'||row.month>=lastObservationMonth)).map(row=>row.amountCents))),eventIds:rows.map(row=>row.id)});
     }
   }

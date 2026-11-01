@@ -50,3 +50,9 @@ Synthetische lokale afbeeldingen staan in .cache/buffer-warning/:
 - hard-390-open.png: beide oorzaken met afzonderlijke tekorten en datums.
 
 Stop vóór publicatie. Afzonderlijk akkoord voor push/merge/deployment is nog niet gegeven.
+
+## Publicatie r28 — 1 november 2026
+
+Publicatie is daarna expliciet door de gebruiker geautoriseerd. Tijdens verversen van origin/main bleken commits tot f8130ba uitsluitend een inline index.html te hebben gewijzigd. De daarin aanwezige financiële correcties, compacte transactielabels en styling zijn behouden en naar de bewerkbare bronnen gesynchroniseerd. buildLiquidityInput, projectDailyLiquidity en selectMonthEndSavings zijn na bundeling rechtstreeks vergeleken met de actuele r27-inlinecode en gelijk bevonden. De oorspronkelijke lokale vergelijkingen met 7c83a41 blijven historisch testbewijs; r27 is de publicatiebasis.
+
+De build genereert voortaan ook de aanwezige inline-shell uit dezelfde JS/CSS-bronnen. Cache-/inlineversie is r28; de serviceworker herkent de actuele inline-marker naast de bestaande externe-assetshell. Offline herladen met een bewust aanwezige oude cache slaagt met ongewijzigde opgeslagen synthetische state. De 15 component-/dashboardcontroles slagen op de gecombineerde bron; aanvullende 430px-controles en 13 gerichte Node/cachetests zijn uitgevoerd. Geen productieboekingen, banksyncs of cloudgegevenswijzigingen.

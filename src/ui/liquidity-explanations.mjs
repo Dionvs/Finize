@@ -1,5 +1,7 @@
 // Presentation only: translate reasons already returned by P2. No additional financial checks.
 const explanations = {
+  'intraday-provider-balance':['Het banksaldo is overdag opgehaald.','De prognose rekent met dit beschikbare saldo en de resterende planning; de bankdag is nog niet afgesloten.','Werk je bank bij als je een actueler uitgangspunt wilt.','balance'],
+  'overdue-fixed-reserved':['Een openstaande vaste last is direct gereserveerd.','De geplande betaaldatum is voorbij, maar er is nog geen gekoppelde afschrijving. Het bedrag verlaagt de prognose en spaarruimte één keer.','Controleer de koppeling zodra de afschrijving binnenkomt.','payments'],
   'missing-checkpoint':['Een bruikbaar banksaldo ontbreekt.','Zonder een werkelijk saldo met datum kan Finize het saldoverloop niet bepalen.','Vul een banksaldo met bijbehorende datum in.','balance'],
   'missing-period-opening':['Een beginsaldo vóór de gekozen periode ontbreekt.','De lijn kan pas beginnen bij het eerste bruikbare saldo. Eerdere saldi blijven onbekend.','Vul een eerder banksaldo met bijbehorende datum in.','balance'],
   'missing-reliable-horizon':['Een betrouwbare volgende ontvangstdatum ontbreekt.','Finize kan daardoor het einde van deze prognoseperiode niet bepalen.','Stel een ontvangstdatum in of kies een eigen einddatum.','settings'],
@@ -49,6 +51,6 @@ export function explainLiquidityReasons(projection) {
   const seen=new Set();
   return (projection?.reasons || []).filter(reason=>{if(seen.has(reason.code))return false;seen.add(reason.code);return true;}).map(reason=>{
     const entry=explanations[reason.code] || ['De precieze oorzaak is niet bekend.','De bestaande prognose kan niet volledig worden gecontroleerd.','Controleer je rekeninggegevens en prognose-instellingen.','settings'];
-    return {code:reason.code,problem:entry[0],why:entry[1],solution:entry[2],action:entry[3],detail:reason.message || ''};
+    return {code:reason.code,problem:entry[0],why:entry[1],solution:entry[2],action:entry[3],detail:[reason.message,reason.eventId].filter(Boolean).join(' · ')};
   });
 }
