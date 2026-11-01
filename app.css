@@ -6924,3 +6924,34 @@ html body.v4-app .transaction-overview-credit{color:var(--green)}
   html body.v4-app .joint-transactions-card-head,
   html body.v4-app .joint-transactions-total{flex:0 0 auto}
 }
+
+/* Desktopindeling voor vaste lasten en transacties; mobiele indeling blijft leidend onder 1024px. */
+.joint-fixed-desktop-frequency,.joint-fixed-desktop-status,.joint-fixed-desktop-chevron,.joint-fixed-desktop-head{display:none}
+@media(min-width:1024px){
+  #incomeEditModal .u3-admin-modal.joint-fixed-overview{width:min(1180px,calc(100vw - 64px));max-width:none;padding:30px}
+  .joint-fixed-summary{grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;padding:24px}
+  .joint-fixed-summary .joint-fixed-total{grid-column:auto;display:grid;align-content:start;gap:5px;padding:0 0 0 24px;border-top:0;border-left:1px solid var(--border)}
+  .joint-fixed-total strong{font-size:28px;text-align:left}.joint-fixed-summary>div:nth-child(2){padding-left:24px}
+  .joint-fixed-desktop-head,.joint-fixed-row.u3-admin-row{grid-template-columns:64px 44px minmax(140px,1fr) 120px 110px 135px 18px;gap:12px}
+  .joint-fixed-desktop-head{display:grid;padding:12px 16px;color:var(--text-dim);font-size:13px;border-bottom:1px solid var(--border)}
+  .joint-fixed-row.u3-admin-row{padding:16px;min-height:76px}
+  .joint-fixed-desktop-frequency,.joint-fixed-desktop-status,.joint-fixed-desktop-chevron{display:block;font-size:13px}
+  .joint-fixed-desktop-status{color:var(--red)}.joint-fixed-desktop-status.is-paid{color:var(--green)}.joint-fixed-desktop-chevron{font-size:24px}
+  .joint-fixed-main small{display:none}.joint-fixed-main strong{font-size:16px}.joint-fixed-side strong{font-size:16px}
+  #incomeEditModal .u3-admin-modal.fixed-editor,#transactionModal .transaction-detail-editor{width:min(1000px,calc(100vw - 80px));max-width:none;padding:32px;max-height:92dvh;overflow:auto}
+  .fixed-editor-fields,.transaction-detail-fields.modal-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:24px 30px}
+  .fixed-editor-fields>.fixed-editor-note,.fixed-editor-fields>.fixed-editor-extra,.fixed-editor-fields>label:has(#u3RecFor){grid-column:1/-1}
+  .fixed-editor-extra-fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .fixed-editor-head,.transaction-detail-head{margin-bottom:26px}.fixed-editor-identity,.transaction-detail-identity{margin-bottom:28px}
+  .fixed-editor-actions,.transaction-detail-editor .modal-actions{display:flex;flex-direction:row;justify-content:flex-end;align-items:center;gap:12px;padding-top:20px;border-top:1px solid var(--border);margin-top:26px}
+  .fixed-editor-actions #u3RecDelete{margin-right:auto;order:0}.fixed-editor-actions [data-u3-back-planning]{order:1}.fixed-editor-actions #u3RecSave{order:2}
+  .fixed-editor-actions button,.transaction-detail-editor .modal-actions button{min-width:140px;padding-inline:20px}
+  .transaction-detail-fields>label:has(input[id$=Description]){grid-column:auto}
+  .transaction-detail-fields>label:has(input[id$=Note]),.transaction-detail-fields>.transaction-processing-fields{grid-column:1/-1}
+  .transaction-processing-fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .u4-focus-mode>.u4-modal-body{max-width:1080px}.u4-focus-mode .u4-row-grid,.u4-focus-mode .u4-dependent-grid,.u4-focus-mode .u4-more-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:22px}
+}
+
+@media(min-width:1024px){
+ .fixed-editor-actions{position:sticky;bottom:-32px;z-index:3;background:var(--bg);padding-block:16px}
+}
