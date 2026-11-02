@@ -90,6 +90,8 @@ export function getTransactionFinancialDestination(tx) {
   return [tx?.budgetOwner,tx?.processing?.budgetOwner,tx?.financialFor,tx?.owner].find(validAccount) || null;
 }
 export function getTransactionDate(tx) {
+  const selected=tx?.processing?.processingDate;
+  if(typeof selected==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(selected)&&Number.isFinite(Date.parse(selected+'T12:00:00Z'))&&new Date(selected+'T12:00:00Z').toISOString().slice(0,10)===selected)return selected;
   return tx?.transactionDate || tx?.bankOriginal?.bankDate || tx?.rawData?.transactionDate || tx?.date || '';
 }
 export function getTransactionClassification(tx) {

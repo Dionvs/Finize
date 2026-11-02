@@ -97,13 +97,13 @@ export function normalizeBankInput(input, scope) {
     };
   } else if (source.recordType === 'balance-observation') {
     money(); date('asOfDate');
-    if (!['booked', 'available'].includes(facts.balanceType)) error('unsupported-balance-type', 'facts.balanceType');
+    if (!['booked', 'available', 'expected'].includes(facts.balanceType)) error('unsupported-balance-type', 'facts.balanceType');
     if (!['end-of-bank-day', 'timestamp'].includes(facts.boundary)) error('unsupported-balance-boundary', 'facts.boundary');
     const observedAt = optional(facts.observedAt);
     if (observedAt !== null && (typeof observedAt !== 'string' || !/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|[+-](?:0\d|1[0-4]):[0-5]\d)$/.test(observedAt) ||
         !validCalendarDate(observedAt.slice(0, 10)) || !Number.isFinite(Date.parse(observedAt)))) error('invalid-observation-time', 'facts.observedAt');
     if (facts.boundary === 'timestamp' && observedAt === null) error('missing-observation-time', 'facts.observedAt');
-    if (facts.boundary === 'timestamp' || facts.balanceType === 'available') {
+    if (facts.boundary === 'timestamp' || facts.balanceType !== 'booked') {
       deferred = true; warn('balance-inclusion-unresolved', 'facts.boundary');
     }
     normalizedFacts = { amountCents: facts.amountCents, currency: facts.currency, asOfDate: facts.asOfDate,

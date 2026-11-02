@@ -1,3 +1,4 @@
+import { selectCurrentAccountBalance } from './current-account-balance.mjs';
 import { selectAccountBalance, balanceRequiredMonths, checkpointHistory } from './balance-checkpoints.mjs';
 import { providerBalanceHistory } from './provider-balances.mjs';
 import { validCalendarDate } from '../import/import-identity.mjs';
@@ -160,11 +161,15 @@ export function buildLiquidityInput(state,{accountProfileId,asOfDate,endDate,sco
   if (!planningBasis && endDate && balanceRequiredMonths(asOfDate,endDate).length > 24) throw new Error('Kies een prognose van maximaal 24 kalendermaanden.');
   const reasons=[],events=[],reservations=[],savingsPlans=[];
   const profile = (state.accountProfiles || []).find(p => p.id === accountProfileId);
-  const opening = selectAccountBalance(state,{accountProfileId,toDate:asOfDate,scope,imports,importsAvailable,coverage});
+  const current = planningBasis ? null : selectCurrentAccountBalance(state,{accountProfileId,toDate:asOfDate,scope,imports,importsAvailable,coverage});
+  const opening = current?.source==='external' ? {...current,toDate:asOfDate,openingCents:current.balanceCents,
+    checkpoint:null,confirmedCents:0,provisionalCents:0,mutations:[],reasons:[],status:'observed',
+    quality:{bankSources:'not-applied',coverage:'unknown',storage:'verified'}}
+    : current || selectAccountBalance(state,{accountProfileId,toDate:asOfDate,scope,imports,importsAvailable,coverage});
   // Rolling an older observation forward through available bank rows does not
   // confirm that today's bank day has closed. Unmatched plans for today remain
   // on today's expected cash line; an explicit end-of-day observation does not.
-  const includeAsOfPlans=!!opening.checkpoint&&(opening.boundary==='timestamp'||opening.checkpoint.asOfDate<asOfDate);
+  const includeAsOfPlans=opening.source==='external'&&opening.boundary==='timestamp'||!!opening.checkpoint&&(opening.boundary==='timestamp'||opening.checkpoint.asOfDate<asOfDate);
   opening.reasons.forEach(row => reasons.push(issue(row.code,row.sourceId,opening.status==='incomplete'||opening.status==='unknown'?'incomplete':'provisional')));
   let projections=[];
   try { projections = selectDependencyProjections(state,{includeInactive:true}); }
@@ -205,7 +210,8 @@ export function buildLiquidityInput(state,{accountProfileId,asOfDate,endDate,sco
   for (const month of requiredMonths) if(state.__finizePartialHistory&&!state.verifiedPeriods?.includes(month)) reasons.push(issue('missing-period',month));
   const last=horizonEnd || asOfDate;
   // Keep the starting checkpoint fixed even if a later observation is present.
-  const future=selectAccountBalance(state,{accountProfileId,toDate:last,scope,imports,importsAvailable,coverage,checkpointId:opening.checkpoint?.id});
+  // External balance is the whole current cash basis. Imported bookings only affect administration.
+  const future=opening.source==='external'?{mutations:[],reasons:[]}:selectAccountBalance(state,{accountProfileId,toDate:last,scope,imports,importsAvailable,coverage,checkpointId:opening.checkpoint?.id});
   future.reasons.filter(row=>!['unknown-bank-coverage','partial-bank-coverage'].includes(row.code)).forEach(row=>reasons.push(issue(row.code,row.sourceId,['awaiting-review','intraday-provider-balance'].includes(row.code)?'provisional':'incomplete')));
   for (const row of future.mutations.filter(row=>row.date>asOfDate)) {
     const linked=projections.filter(p=>sourceRecordKey(p.transaction)===row.sourceId);
@@ -229,11 +235,12 @@ export function buildLiquidityInput(state,{accountProfileId,asOfDate,endDate,sco
         const p=projections.find(p=>sourceRecordKey(p.transaction)===sourceId);
         const bankDate=p?.transaction.bankOriginal?.bankDate;
         const bank=p?.transaction.bankOriginal;
-        if (!bank?.valid || bank.currency!=='EUR' || (bank.bankStatus??'booked')!=='booked' || !validCalendarDate(bankDate) || bankDate>asOfDate && bankDate<=last && !future.mutations.some(m=>m.sourceId===sourceId)) reasons.push(issue('replacement-bank-source-unusable',row.id));
+        if (!bank?.valid || bank.currency!=='EUR' || (bank.bankStatus??'booked')!=='booked' || !validCalendarDate(bankDate) || opening.source!=='external' && bankDate>asOfDate && bankDate<=last && !future.mutations.some(m=>m.sourceId===sourceId)) reasons.push(issue('replacement-bank-source-unusable',row.id));
       }
       return;
     }
     const overlap=projections.some(p=>{
+      if(opening.source==='external'&&!p.active)return false;
       const tx=p.transaction,b=tx.bankOriginal;
       if(!b?.valid||b.currency!=='EUR'||(b.bankStatus??'booked')!=='booked'||tx.accountProfileId!==row.accountProfileId||!validCalendarDate(b.bankDate)||Math.sign(Number(b.amount))!==Math.sign(row.amountCents))return false;
       return replacementKeys(p,state).includes(row.id)||row.type==='fixed'&&p.fixedExpenseId===row.planningSourceId&&p.calendarMonth===row.month;
@@ -530,9 +537,9 @@ export function selectDailyLiquidity(state, options) {
     return {checkpointId:row.id.slice('checkpoint:'.length),date:row.date,observedCents:row.observedBalanceCents,modeledCents:row.modeledBalanceCents,differenceCents:row.amountCents};
   });
   const history=withAvailability({...result,asOfDate,calculationStartDate:origin,currentBalance:current.opening,displayStartDate:startDate,historyComplete:!!anchor&&origin<startDate,reconciliations},input,availabilityFromDate,inputFor);
-  if(!options.currentCashBasis||!horizon.endDate||horizon.endDate<asOfDate)return history;
+  if((!options.currentCashBasis&&current.opening.source!=='external')||!horizon.endDate||horizon.endDate<asOfDate)return history;
   // History may contain reconstructed plans. It must never seed tomorrow's cash.
-  // Future days use the same observed P1 basis and forward calculation as the KPIs.
+  // Future days use the same selected current balance and forward calculation as the KPIs.
   const forwardInputFor=endDate=>{
     const next=buildLiquidityInput(state,{...options,asOfDate,endDate,salaryOnly:false});
     next.availabilityFromDate=availabilityFromDate;

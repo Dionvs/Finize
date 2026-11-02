@@ -37,7 +37,7 @@ test('P3 partial ten savings uses the existing approval engine and verified hist
   assert.deepEqual(requiredMutationPeriods(partial,next),['2026-10']);
 });
 test('P3 partial writes require explicit historical dependencies and global planning review',async()=>{
-  const {partial}=await example(),missing=copy(partial);missing.transactions[0].date='2026-07-03';missing.transactions[0].transactionDate='2026-07-03';
+  const {partial}=await example(),missing=copy(partial);missing.transactions[0].date='2026-07-03';missing.transactions[0].transactionDate='2026-07-03';missing.transactions[0].processing.processingDate='2026-07-03';
   assert.throws(()=>assertWorkspaceMutation(partial,missing),{code:'dependency-required'});
   const planning=copy(partial);planning.planning.spaarpotDezeMaand=999;assert.throws(()=>assertWorkspaceMutation(partial,planning),{code:'full-history-required'});
   const closed=copy(partial);closed.monthRecords['2026-08']={status:'open'};assert.throws(()=>assertWorkspaceMutation(partial,closed),{code:'dependency-required'});

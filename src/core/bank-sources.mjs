@@ -1,4 +1,4 @@
-import { getTransactionAccountContext, getTransactionSource, getTransactionProcessingStatus } from './transaction-model.mjs';
+import { getTransactionAccountContext, getTransactionSource, getTransactionProcessingStatus, getTransactionDate } from './transaction-model.mjs';
 const copy=value=>JSON.parse(JSON.stringify(value));
 export const isBankSource=tx=>tx?.recordRole==='bank-source';
 export const sourceRecordKey=tx=>tx.bankSourceId||(tx.importBatchId&&tx.importTransactionId?`${tx.importBatchId}:${tx.importTransactionId}`:tx.id);
@@ -81,4 +81,16 @@ export function updateSourceApproval(state,batch,row){
   const source=bankSourceForImport(state,batch.id,row.id);if(!source)return;
   if(JSON.stringify(source.approvedProcessing)!==JSON.stringify(row.processing))source.processingRevision=(source.processingRevision||0)+1;
   source.approvedProcessing=copy(row.processing);source.processingStatus=getTransactionProcessingStatus({...row,source:'csv'});source.approvalSource=row.approvalSource||'';source.approvedAt=row.approvedAt||'';
+}
+
+// Administrative list over the loaded dependency window. Physical selectors stay bank-dated.
+export function selectAdministrativeBankTransactions(state,{month,account,imports=[]}){
+  if(state.__finizePartialHistory&&!state.verifiedPeriods?.includes(month))throw Object.assign(new Error('De financiële periode is niet volledig geladen.'),{code:'period-incomplete'});
+  const windows=state.__finizePartialHistory?state.verifiedPeriods:[null];
+  const rows=new Map();
+  for(const bankMonth of windows)for(const tx of selectBankTransactions(state,{month:bankMonth,account,imports})){
+    const date=getTransactionDate(tx);
+    if(date.slice(0,7)===month)rows.set(sourceRecordKey(tx),{...tx,date,transactionDate:date});
+  }
+  return [...rows.values()];
 }

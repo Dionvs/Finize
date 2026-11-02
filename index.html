@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Finize</title>
-<meta name="finize-inline-release" content="118-r36">
+<meta name="finize-inline-release" content="118-r37">
 <link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#6f8a55">
 <meta name="mobile-web-app-capable" content="yes">
@@ -7692,12 +7692,12 @@ html body.v4-app .transaction-overview-credit{color:var(--green)}
     } else if (source.recordType === "balance-observation") {
       money4();
       date2("asOfDate");
-      if (!["booked", "available"].includes(facts.balanceType)) error2("unsupported-balance-type", "facts.balanceType");
+      if (!["booked", "available", "expected"].includes(facts.balanceType)) error2("unsupported-balance-type", "facts.balanceType");
       if (!["end-of-bank-day", "timestamp"].includes(facts.boundary)) error2("unsupported-balance-boundary", "facts.boundary");
       const observedAt = optional(facts.observedAt);
       if (observedAt !== null && (typeof observedAt !== "string" || !/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|[+-](?:0\d|1[0-4]):[0-5]\d)$/.test(observedAt) || !validCalendarDate(observedAt.slice(0, 10)) || !Number.isFinite(Date.parse(observedAt)))) error2("invalid-observation-time", "facts.observedAt");
       if (facts.boundary === "timestamp" && observedAt === null) error2("missing-observation-time", "facts.observedAt");
-      if (facts.boundary === "timestamp" || facts.balanceType === "available") {
+      if (facts.boundary === "timestamp" || facts.balanceType !== "booked") {
         deferred = true;
         warn("balance-inclusion-unresolved", "facts.boundary");
       }
@@ -7924,7 +7924,7 @@ html body.v4-app .transaction-overview-credit{color:var(--green)}
   function normalizeProviderBalances(snapshot2, scope) {
     return (snapshot2.balances || []).map((raw, index) => {
       var _a2, _b;
-      const type = ["CLBD", "ITBD", "OPBD"].includes(raw.balance_type) ? "booked" : ["CLAV", "ITAV", "OPAV", "PRAV", "FWAV"].includes(raw.balance_type) ? "available" : null;
+      const type = ["CLBD", "ITBD", "OPBD"].includes(raw.balance_type) ? "booked" : ["CLAV", "ITAV", "OPAV", "PRAV", "FWAV"].includes(raw.balance_type) ? "available" : raw.balance_type === "XPCD" ? "expected" : null;
       const timestamp = raw.last_change_date_time;
       const boundary = raw.balance_type === "CLBD" && validCalendarDate(raw.reference_date) ? "end-of-bank-day" : "timestamp";
       const asOfDate = boundary === "end-of-bank-day" ? raw.reference_date : typeof timestamp === "string" ? timestamp.slice(0, 10) : raw.reference_date;
@@ -8077,329 +8077,6 @@ html body.v4-app .transaction-overview-credit{color:var(--green)}
     state2.bankSyncStatus = { ...state2.bankSyncStatus || {}, [batch.accountProfileId]: copy(batch.providerSync) };
   }
 
-  // src/import/bank-authorization-url.mjs
-  var origins = /* @__PURE__ */ new Set(["https://auth.enablebanking.com", "https://tilisy.enablebanking.com"]);
-  function bankAuthorizationUrl(value) {
-    if (typeof value !== "string") return null;
-    try {
-      const url = new URL(value);
-      if (!origins.has(url.origin) || url.username || url.password || url.pathname.replace(/\/$/, "") !== "/ais/start") return null;
-      return url.href;
-    } catch (e) {
-      return null;
-    }
-  }
-
-  // src/ui/bank-connection.mjs
-  var BANK_BACKEND_URL = "https://europe-west4-financien-7dd43.cloudfunctions.net/enableBanking";
-  var BANK_API_ENABLED = true;
-  var escape = (value) => String(value != null ? value : "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
-  var messages = {
-    "provider-batch-conflict": "De bankimport hoort niet bij de verwachte actieve bundel. Bestaande gegevens blijven behouden.",
-    "bank-import-deleted": "De eerdere bankimport is verwijderd. Een nieuwe importbundel vereist jouw bevestiging.",
-    "bank-import-restart-cancelled": "Geen nieuwe importbundel gestart. Het verwijderbewijs blijft behouden.",
-    "bank-import-restart-blocked": "Een nieuwe importbundel kan nog niet veilig starten. Synchroniseer eerst de administratie en laat bestaande verwijzingen controleren.",
-    "backend-not-configured": "De bankkoppeling is nog niet geactiveerd.",
-    "reauthorization-required": "Banktoegang is verlopen. Autoriseer de rekening opnieuw.",
-    "forbidden-user": "Deze bankkoppeling is niet beschikbaar voor jouw aanmelding. Gebruik de geverifieerde aanmelding van de toegestane rekeninghouder.",
-    "forbidden-account": "Deze rekening is niet toegestaan.",
-    "unauthenticated": "Log opnieuw in bij Finize en probeer het nog eens.",
-    "invalid-token": "Je aanmelding is verlopen. Log opnieuw in bij Finize.",
-    "scope-changed": "Het huishouden is gewijzigd. Open deze rekening opnieuw.",
-    "no-bank-transactions": "Nog geen banktransacties opgehaald. Bestaande CSV-imports blijven beschikbaar bij Importeren.",
-    "synchronization-busy": "Deze rekening wordt al bijgewerkt. Probeer het straks opnieuw.",
-    "provider-identity-conflict": "Afwijkende gegevens voor dezelfde bankidentiteit. Bestaande gegevens blijven behouden.",
-    "import-conflict": "De import is intussen gewijzigd. Synchroniseer eerst de administratie en open daarna de actuele import. Bestaande keuzes blijven behouden.",
-    "cloud-missing": "De bestaande bankimport ontbreekt in de cloud. Er zijn geen nieuwe bankgegevens verwerkt. Laat de opslag controleren.",
-    "provider-unavailable": "De bank is tijdelijk niet bereikbaar. Bestaande gegevens blijven behouden.",
-    "provider-access-blocked": "Deze rekening is nog niet vrijgegeven voor deze Enable Banking-app. Voor een andere rekeninghouder zijn eigen toestemming en passende providertoegang vereist.",
-    "bank-registry-migration-required": "De bestaande bankverbinding moet eerst veilig door de beheerder worden overgezet. Autoriseer niet opnieuw.",
-    "account-identity-changed": "De rekeningbinding wijkt af. De verbinding is uit voorzorg geblokkeerd; laat de beheerder dit controleren.",
-    "session-owner-missing": "De bestaande banksessie kan niet veilig aan deze rekening worden gekoppeld. Laat de beheerder de overgang controleren.",
-    "wrong-provider-account": "Het bankantwoord hoort bij een andere rekening. Er zijn geen gegevens verwerkt.",
-    "bootstrap-busy": "Er staat al een toestemmingsaanvraag open. Rond die eerst af of probeer het na tien minuten opnieuw.",
-    "bootstrap-session-protected": "De ontvangen banksessie hoort bij een bestaande verbinding. Die is beschermd; laat de beheerder dit controleren.",
-    "bootstrap-candidate-exists": "Er is al banktoestemming ontvangen. Laat deze eerst controleren en activeren.",
-    "bootstrap-candidate-unavailable": "Er is nog geen bruikbare nieuwe banktoestemming. Laat de beheerder dit controleren.",
-    "bootstrap-provider-session-invalid": "De nieuwe banktoestemming kon niet worden bevestigd. Laat de beheerder dit controleren.",
-    "bootstrap-review-required": "De uitkomst van de toestemmingsaanvraag moet eerst door de beheerder worden gecontroleerd. Start nog geen nieuwe aanvraag."
-  };
-  function installBankConnection(root2, { enabled: enabled2 = BANK_API_ENABLED, baseUrl = BANK_BACKEND_URL } = {}) {
-    var _a2;
-    const production = new URL(BANK_BACKEND_URL), target = new URL(baseUrl);
-    const local = ["127.0.0.1", "localhost"].includes((_a2 = root2.location) == null ? void 0 : _a2.hostname) && target.hostname === "127.0.0.1" && target.protocol === "http:";
-    if (!local && (target.origin !== production.origin || target.pathname !== production.pathname || target.protocol !== "https:")) throw new Error("Ongeldige bankbackend.");
-    const busyAccounts = /* @__PURE__ */ new Set();
-    const panels = /* @__PURE__ */ new Map();
-    let lastFailure = null;
-    const phaseNames = {
-      authorization: "Aanmelding controleren",
-      request: "Bankgegevens ophalen",
-      response: "Bankantwoord lezen",
-      "import-read": "Bestaande import lezen",
-      staging: "Bankgegevens vergelijken",
-      storage: "Import opslaan"
-    };
-    const inPhase = async (phase, action2) => {
-      try {
-        return await action2();
-      } catch (error2) {
-        throw Object.assign(error2 instanceof Error ? error2 : new Error("bank-unavailable"), { bankPhase: phase });
-      }
-    };
-    function refreshControls() {
-      for (const [element, update2] of panels) {
-        if (!element.isConnected) panels.delete(element);
-        else update2();
-      }
-    }
-    async function request2(route, payload) {
-      var _a3;
-      if (!enabled2) throw new Error("backend-not-configured");
-      const user = (_a3 = root2.FinizeAuth) == null ? void 0 : _a3.user;
-      if (!(user == null ? void 0 : user.getIdToken)) throw new Error("forbidden-user");
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), route === "/sync" ? 19e4 : 65e3);
-      try {
-        const token = await inPhase("authorization", () => user.getIdToken());
-        const response = await inPhase("request", () => root2.fetch(baseUrl + route, {
-          method: "POST",
-          cache: "no-store",
-          redirect: "error",
-          signal: controller.signal,
-          headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-          body: JSON.stringify(payload)
-        }));
-        const data = await inPhase("response", () => response.json());
-        if (!response.ok) throw Object.assign(new Error("bank-unavailable"), { code: data.error, bankPhase: "request", httpStatus: response.status });
-        return data;
-      } finally {
-        clearTimeout(timer);
-      }
-    }
-    function lastSync(profile) {
-      var _a3, _b;
-      const sync = (_b = (_a3 = root2.state) == null ? void 0 : _a3.bankSyncStatus) == null ? void 0 : _b[profile.id];
-      const at = new Date(sync == null ? void 0 : sync.fetchedAt);
-      return sync && Number.isFinite(at.getTime()) ? " Laatst opgehaald: " + new Intl.DateTimeFormat("nl-NL", { dateStyle: "short", timeStyle: "short" }).format(at) + (sync.complete ? "." : " · onvolledig.") : "";
-    }
-    function render2(profile, { compact = false } = {}) {
-      var _a3, _b;
-      if (compact) {
-        if (!enabled2 || profile.status === "archived" || !((_b = (_a3 = root2.state) == null ? void 0 : _a3.bankSyncStatus) == null ? void 0 : _b[profile.id])) return "";
-        return '<span class="p3-bank-update" data-bank-connection="' + escape(profile.id) + '" data-bank-compact><span class="p3-bank-actions"><button type="button" class="primary small" data-bank-sync disabled>Bank bijwerken</button><button type="button" class="ghost small" data-bank-review>Nakijken</button></span><small role="status" aria-live="polite" data-bank-status>Verbinding controleren…</small></span>';
-      }
-      const disabled = !enabled2 || profile.status === "archived" ? "disabled" : "";
-      const status2 = !enabled2 ? "Nog niet geactiveerd. De bestaande administratie blijft beschikbaar." : profile.status === "archived" ? "Deze rekening is gearchiveerd. De historie blijft beschikbaar." : "Verbinding controleren…";
-      return '<section class="balance-panel" data-bank-connection="' + escape(profile.id) + '" aria-label="ING-bankkoppeling"><h3>ING-bankkoppeling</h3><p>Geboekte bankmutaties tellen direct mee voor de rekeningstand. Financiële verwerking bevestig je bij Nakijken.</p><p role="status" aria-live="polite" data-bank-status>' + status2 + '</p><div class="balance-actions"><button type="button" class="ghost" data-bank-authorize ' + disabled + '>Banktoegang autoriseren</button><button type="button" class="primary" data-bank-sync disabled>Bank bijwerken</button><button type="button" class="ghost" data-bank-review>Nakijken</button><button type="button" class="ghost" data-bank-disconnect ' + disabled + ">Banktoegang intrekken</button></div></section>";
-    }
-    async function ingest(snapshot2, householdId, expectedProfileId = snapshot2.accountProfileId, { confirmRestart = null } = {}) {
-      if (snapshot2.accountProfileId !== expectedProfileId) throw Object.assign(new Error("wrong-provider-account"), { code: "wrong-provider-account" });
-      const runtime = root2.FinizeUpdate4Runtime;
-      if (root2.CloudAdapter.importScope() !== householdId || snapshot2.householdId !== householdId) throw new Error("Het huishouden is gewijzigd.");
-      const id = providerBatchId(snapshot2.accountProfileId, snapshot2.account.identificationHash);
-      const resolve = async () => {
-        var _a3, _b, _c;
-        let previous = await runtime.resolveProviderImportBase(root2, id), restartFrom = null;
-        for (let depth = 0; (previous == null ? void 0 : previous.lifecycle) === "deleted"; depth++) {
-          if (depth >= 16) throw Object.assign(new Error("bank-import-restart-blocked"), { code: "bank-import-restart-blocked" });
-          if (!((_b = (_a3 = root2.CloudAdapter) == null ? void 0 : _a3.isConnected) == null ? void 0 : _b.call(_a3)) || root2.CloudAdapter.conflict || root2.CloudAdapter.initialSyncComplete === false || !((_c = root2.DataAdapter) == null ? void 0 : _c.supportsAtomicImports) || root2.state.__finizePartialHistory) throw Object.assign(new Error("bank-import-restart-blocked"), { code: "bank-import-restart-blocked" });
-          assertProviderRestartState(root2.state, previous);
-          assertProviderRestartParent(previous, await runtime.fetchImportFromCloud(root2, previous.id));
-          restartFrom = previous;
-          previous = await runtime.resolveProviderImportBase(root2, nextProviderBatchId(id, previous));
-        }
-        if (previous) restartFrom = null;
-        return { previous, restartFrom };
-      };
-      let base = await inPhase("import-read", resolve);
-      if (base.restartFrom) {
-        if (!confirmRestart) throw Object.assign(new Error("bank-import-deleted"), { code: "bank-import-deleted", bankPhase: "staging" });
-        const proof = JSON.stringify(base.restartFrom), basis = root2.DataAdapter.commitBaseSignature();
-        if (await confirmRestart() !== true) throw Object.assign(new Error("bank-import-restart-cancelled"), { code: "bank-import-restart-cancelled", bankPhase: "staging" });
-        if (root2.CloudAdapter.importScope() !== householdId || root2.DataAdapter.commitBaseSignature() !== basis) throw Object.assign(new Error("import-conflict"), { code: "import-conflict" });
-        base = await inPhase("import-read", resolve);
-        if (!base.restartFrom || JSON.stringify(base.restartFrom) !== proof) throw Object.assign(new Error("import-conflict"), { code: "import-conflict" });
-      }
-      const imports = await inPhase("import-read", () => runtime.ImportStore.listImports());
-      if (root2.CloudAdapter.importScope() !== householdId) throw Object.assign(new Error("scope-changed"), { code: "scope-changed" });
-      const batch = await inPhase("staging", () => stageProviderSnapshot(snapshot2, root2.state, base.previous, imports, runtime.classifyOriginal, base.restartFrom));
-      await inPhase("storage", () => runtime.persistImportDraft(root2, batch));
-      return batch;
-    }
-    function bind(panel, profile) {
-      const element = panel.querySelector("[data-bank-connection]");
-      if (!element || element.dataset.bound) return;
-      element.dataset.bound = "true";
-      const householdId = root2.CloudAdapter.importScope(), status2 = element.querySelector("[data-bank-status]");
-      const actionKey = JSON.stringify([householdId, profile.id]);
-      const compact = element.hasAttribute("data-bank-compact");
-      let connected = false, checking = false, activationBlocked = false, bootstrapAvailable = false, bootstrapCandidate = false;
-      const eligible = enabled2 && profile.status !== "archived";
-      const sameScope = () => {
-        if (root2.CloudAdapter.importScope() !== householdId) throw Object.assign(new Error("scope-changed"), { code: "scope-changed" });
-      };
-      const controls = () => element.querySelectorAll("button").forEach((item) => {
-        item.disabled = busyAccounts.has(actionKey) || checking && !item.hasAttribute("data-bank-review") || !eligible && !item.hasAttribute("data-bank-review") || activationBlocked && (item.hasAttribute("data-bank-authorize") || item.hasAttribute("data-bank-sync")) || item.hasAttribute("data-bank-sync") && !connected;
-      });
-      panels.set(element, controls);
-      const failureMessage = (error2) => {
-        const rawCode = error2.code || error2.message;
-        const code = Object.hasOwn(messages, rawCode) ? rawCode : "bank-unavailable";
-        const phase = Object.hasOwn(phaseNames, error2.bankPhase) ? error2.bankPhase : null;
-        lastFailure = { phase, code, httpStatus: Number.isInteger(error2.httpStatus) && error2.httpStatus >= 400 && error2.httpStatus <= 599 ? error2.httpStatus : null };
-        const message = messages[code] || (error2.name === "AbortError" ? "De bank reageert niet op tijd. Probeer het opnieuw." : "De actie is niet afgerond. Controleer je verbinding en probeer opnieuw.");
-        return message + (phase ? " Stap: " + phaseNames[phase] + "." : "");
-      };
-      async function checkConnection() {
-        var _a3, _b, _c, _d;
-        if (!eligible) return;
-        checking = true;
-        controls();
-        try {
-          const result2 = await request2("/status", { accountProfileId: profile.id });
-          sameScope();
-          connected = result2.connected === true;
-          bootstrapAvailable = result2.bootstrapAvailable === true && !connected;
-          bootstrapCandidate = bootstrapAvailable && result2.candidateVerified === true;
-          activationBlocked = result2.activationBlocked === true || bootstrapAvailable && (result2.bootstrapBusy || result2.revocationPending || result2.bootstrapReviewRequired);
-          const authorizeButton = element.querySelector("[data-bank-authorize]");
-          if (authorizeButton) authorizeButton.textContent = bootstrapCandidate ? "Banktoegang controleren" : "Banktoegang autoriseren";
-          const consent = new Date(result2.validUntil), lastSuccessful = new Date((_a3 = result2.lastSuccessfulSync) == null ? void 0 : _a3.fetchedAt);
-          const sameSuccessfulFetch = !compact && Number.isFinite(lastSuccessful.getTime()) && result2.lastSuccessfulSync.fetchedAt === ((_d = (_c = (_b = root2.state) == null ? void 0 : _b.bankSyncStatus) == null ? void 0 : _c[profile.id]) == null ? void 0 : _d.fetchedAt);
-          status2.textContent = (result2.bootstrapReviewRequired ? messages["bootstrap-review-required"] : bootstrapCandidate ? "Toestemming ontvangen. Deze rekening wacht nog op activering. Je kunt de banktoegang alvast controleren." : bootstrapAvailable ? "Je kunt voor deze gezamenlijke rekening afzonderlijk toestemming geven bij ING." : activationBlocked ? messages["provider-access-blocked"] : connected ? compact ? "" : "Verbonden. Je kunt de bank handmatig bijwerken." : "Geen geldige bankverbinding. Geef toestemming bij ING om deze rekening te koppelen.") + (!compact && result2.validUntil && Number.isFinite(consent.getTime()) ? " Toestemming geldig tot " + new Intl.DateTimeFormat("nl-NL", { dateStyle: "short" }).format(consent) + "." : "") + (!compact && Number.isFinite(lastSuccessful.getTime()) ? " Laatste volledige synchronisatie: " + new Intl.DateTimeFormat("nl-NL", { dateStyle: "short", timeStyle: "short" }).format(lastSuccessful) + "." : "") + (result2.revocationPending ? " Eerdere banktoegang is nog niet volledig ingetrokken. Kies Banktoegang intrekken om het opnieuw te proberen." : "") + (sameSuccessfulFetch ? "" : lastSync(profile));
-        } catch (error2) {
-          connected = false;
-          activationBlocked = ["forbidden-user", "forbidden-account", "provider-access-blocked", "bank-registry-migration-required", "account-identity-changed", "session-owner-missing"].includes(error2.code);
-          status2.textContent = failureMessage(error2) + lastSync(profile);
-        } finally {
-          checking = false;
-          refreshControls();
-        }
-      }
-      void checkConnection();
-      element.addEventListener("click", async (event2) => {
-        var _a3;
-        const button = event2.target.closest("button");
-        if (!button || button.disabled || busyAccounts.has(actionKey) || checking && !button.hasAttribute("data-bank-review")) return;
-        busyAccounts.add(actionKey);
-        refreshControls();
-        try {
-          sameScope();
-          if (button.hasAttribute("data-bank-review")) {
-            const imports = await root2.FinizeUpdate4Runtime.ImportStore.listImports();
-            sameScope();
-            const batch = imports.find((item) => item.channel === "bank-api" && item.accountProfileId === profile.id && !["deleted", "withdrawn"].includes(item.lifecycle));
-            if (!batch) throw Object.assign(new Error("no-bank-transactions"), { code: "no-bank-transactions" });
-            await root2.FinizeUpdate4.openImportDetails(batch.id);
-          } else if (button.hasAttribute("data-bank-authorize")) {
-            if (bootstrapCandidate) {
-              status2.textContent = "Nieuwe banktoegang controleren…";
-              await request2("/bootstrap/verify", { accountProfileId: profile.id });
-              sameScope();
-              await checkConnection();
-              return;
-            }
-            status2.textContent = "Toestemmingspagina van ING openen via Enable Banking…";
-            const result2 = await request2(bootstrapAvailable ? "/bootstrap/start" : "/auth/start", { accountProfileId: profile.id });
-            sameScope();
-            const url = bankAuthorizationUrl(result2.url);
-            if (!url) throw new Error("Ongeldige autorisatielink.");
-            root2.location.assign(url);
-          } else if (button.hasAttribute("data-bank-disconnect")) {
-            status2.textContent = "Banktoegang intrekken…";
-            await request2(bootstrapAvailable ? "/bootstrap/disconnect" : "/disconnect", { accountProfileId: profile.id });
-            sameScope();
-            connected = false;
-            status2.textContent = "Banktoegang ingetrokken. Je financiële historie blijft behouden.";
-          } else if (button.hasAttribute("data-bank-sync")) {
-            lastFailure = null;
-            status2.textContent = "Bankgegevens ophalen…";
-            const toDate = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-            const fromDate = new Date(Date.parse(toDate) - 30 * 864e5).toISOString().slice(0, 10);
-            const snapshot2 = await request2("/sync", { accountProfileId: profile.id, fromDate, toDate });
-            sameScope();
-            await ingest(snapshot2, householdId, profile.id, { confirmRestart: () => root2.confirm("De eerdere bankimport is bewust verwijderd. Wil je een nieuwe importbundel starten? Het oude verwijderbewijs blijft bewaard. Nieuwe transacties staan opnieuw bij Nakijken en zijn niet goedgekeurd.") });
-            status2.textContent = snapshot2.complete ? "Bank bijgewerkt. Financiële verwerking staat klaar bij Nakijken." : "Gedeeltelijk opgehaald. Eerdere transacties blijven behouden; probeer later opnieuw.";
-            (_a3 = root2.renderActiveTab) == null ? void 0 : _a3.call(root2);
-          }
-        } catch (error2) {
-          if (error2.code === "reauthorization-required" || button.hasAttribute("data-bank-disconnect")) connected = false;
-          status2.textContent = button.hasAttribute("data-bank-disconnect") ? "Het intrekken is nog niet bevestigd. Probeer Banktoegang intrekken opnieuw. Je financiële historie blijft behouden." : failureMessage(error2);
-        } finally {
-          busyAccounts.delete(actionKey);
-          refreshControls();
-        }
-      });
-    }
-    return { render: render2, bind, ingest, get lastFailure() {
-      return lastFailure && { ...lastFailure };
-    } };
-  }
-
-  // src/core/personal-month-summary.mjs
-  function personalMonthRemaining({ income, fixed, usedBudget }) {
-    const cents5 = decimalAmountToCents(income) - decimalAmountToCents(fixed) - decimalAmountToCents(usedBudget);
-    if (!Number.isSafeInteger(cents5)) throw new Error("Maandbedrag valt buiten het exacte centbereik.");
-    return cents5 / 100;
-  }
-
-  // src/core/liquidity-settings.mjs
-  var validPaymentDay = (day) => day === "last" || Number.isInteger(day) && day >= 1 && day <= 31;
-  function monthlyPaymentDate(month, day) {
-    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month) || !validPaymentDay(day)) return null;
-    const last = new Date(Number(month.slice(0, 4)), Number(month.slice(5)), 0, 12).getDate();
-    return month + "-" + String(day === "last" ? last : Math.min(day, last)).padStart(2, "0");
-  }
-  function fixedPaymentDay(source) {
-    if (Object.hasOwn(source, "afschrijfdag")) return source.afschrijfdag;
-    return validCalendarDate(source.afschrijfdatum) ? Number(source.afschrijfdatum.slice(8)) : "";
-  }
-  function fixedCashDate(occurrence) {
-    var _a2;
-    const source = occurrence.source;
-    if ((_a2 = source.cashDates) == null ? void 0 : _a2[occurrence.id]) return source.cashDates[occurrence.id];
-    if (source.frequentieEenheid === "weken") return Object.hasOwn(source, "afschrijfdag") ? occurrence.date : source.afschrijfdatum === occurrence.date ? occurrence.date : null;
-    return monthlyPaymentDate(occurrence.month, fixedPaymentDay(source));
-  }
-  function liquidityBuffer(profile) {
-    var _a2, _b, _c;
-    return (_c = (_a2 = profile == null ? void 0 : profile.liquidity) == null ? void 0 : _a2.bufferCents) != null ? _c : (profile == null ? void 0 : profile.accountOwner) === "gezamenlijk" && ((_b = profile == null ? void 0 : profile.liquidity) == null ? void 0 : _b.primaryForOwner) ? 2e4 : 0;
-  }
-  function validateLiquiditySettings(profile, profiles) {
-    const value = profile.liquidity;
-    if (value === void 0) return;
-    const fail8 = (message) => {
-      throw Object.assign(new Error(message), { code: "invalid-liquidity-settings" });
-    };
-    if (!value || value.version !== 1 || typeof value.primaryForOwner !== "boolean" || !Number.isSafeInteger(value.bufferCents) || value.bufferCents < 0)
-      fail8("Vul een niet-negatieve veiligheidsbuffer in hele eurocenten in.");
-    if (value.primaryForOwner && profile.accountType !== "payment") fail8("Kies een betaalrekening voor de maandplanning.");
-    if (value.primaryForOwner && profiles.some((p) => {
-      var _a2;
-      return p.id !== profile.id && p.accountOwner === profile.accountOwner && ((_a2 = p.liquidity) == null ? void 0 : _a2.primaryForOwner);
-    }))
-      fail8("Er is al een rekening voor deze maandplanning. Schakel die keuze daar eerst uit.");
-    if (profile.accountOwner === "gezamenlijk" && !value.primaryForOwner && value.bufferCents !== 0)
-      fail8("De gezamenlijke buffer hoort alleen bij de primaire gezamenlijke betaalrekening.");
-    if (!value.salaryDays || typeof value.salaryDays !== "object" || Array.isArray(value.salaryDays)) fail8("Controleer de salarisbetaaldagen.");
-    for (const [person, day] of Object.entries(value.salaryDays)) {
-      if (!["dion", "dara"].includes(person) || !validPaymentDay(day)) fail8("Kies voor salaris een dag van 1 tot en met 31, de laatste dag, of laat het veld leeg.");
-      if (profiles.some((p) => {
-        var _a2, _b;
-        return p.id !== profile.id && ((_b = (_a2 = p.liquidity) == null ? void 0 : _a2.salaryDays) == null ? void 0 : _b[person]);
-      })) fail8("Dit salaris is al aan een andere rekening gekoppeld. Verwijder die betaaldag daar eerst.");
-    }
-    if (value.allowanceDays !== void 0 && (!value.allowanceDays || typeof value.allowanceDays !== "object" || Array.isArray(value.allowanceDays))) fail8("Controleer de zakgeldbetaaldagen.");
-    for (const [person, day] of Object.entries(value.allowanceDays || {})) {
-      if (!["dion", "dara"].includes(person) || profile.accountOwner !== person || profile.accountType !== "payment" || !validPaymentDay(day)) fail8("Koppel zakgeld aan de persoonlijke betaalrekening van de juiste eigenaar en kies een afschrijfdag.");
-      if (profiles.some((p) => {
-        var _a2, _b;
-        return p.id !== profile.id && ((_b = (_a2 = p.liquidity) == null ? void 0 : _a2.allowanceDays) == null ? void 0 : _b[person]);
-      })) fail8("Dit zakgeld is al aan een andere rekening gekoppeld. Verwijder die betaaldag daar eerst.");
-    }
-  }
-
   // src/core/provider-balances.mjs
   function providerBalanceAnchor(state2, accountProfileId, toDate, scope, checkpointId = null) {
     var _a2;
@@ -8518,8 +8195,10 @@ html body.v4-app .transaction-overview-credit{color:var(--green)}
     return [tx == null ? void 0 : tx.budgetOwner, (_b = tx == null ? void 0 : tx.processing) == null ? void 0 : _b.budgetOwner, tx == null ? void 0 : tx.financialFor, tx == null ? void 0 : tx.owner].find(validAccount) || null;
   }
   function getTransactionDate(tx) {
-    var _a2, _b;
-    return (tx == null ? void 0 : tx.transactionDate) || ((_a2 = tx == null ? void 0 : tx.bankOriginal) == null ? void 0 : _a2.bankDate) || ((_b = tx == null ? void 0 : tx.rawData) == null ? void 0 : _b.transactionDate) || (tx == null ? void 0 : tx.date) || "";
+    var _a2, _b, _c;
+    const selected = (_a2 = tx == null ? void 0 : tx.processing) == null ? void 0 : _a2.processingDate;
+    if (typeof selected === "string" && /^\d{4}-\d{2}-\d{2}$/.test(selected) && Number.isFinite(Date.parse(selected + "T12:00:00Z")) && (/* @__PURE__ */ new Date(selected + "T12:00:00Z")).toISOString().slice(0, 10) === selected) return selected;
+    return (tx == null ? void 0 : tx.transactionDate) || ((_b = tx == null ? void 0 : tx.bankOriginal) == null ? void 0 : _b.bankDate) || ((_c = tx == null ? void 0 : tx.rawData) == null ? void 0 : _c.transactionDate) || (tx == null ? void 0 : tx.date) || "";
   }
   function getTransactionClassification(tx) {
     var _a2;
@@ -8693,6 +8372,17 @@ html body.v4-app .transaction-overview-credit{color:var(--green)}
     source.processingStatus = getTransactionProcessingStatus({ ...row, source: "csv" });
     source.approvalSource = row.approvalSource || "";
     source.approvedAt = row.approvedAt || "";
+  }
+  function selectAdministrativeBankTransactions(state2, { month, account, imports = [] }) {
+    var _a2;
+    if (state2.__finizePartialHistory && !((_a2 = state2.verifiedPeriods) == null ? void 0 : _a2.includes(month))) throw Object.assign(new Error("De financiële periode is niet volledig geladen."), { code: "period-incomplete" });
+    const windows = state2.__finizePartialHistory ? state2.verifiedPeriods : [null];
+    const rows = /* @__PURE__ */ new Map();
+    for (const bankMonth of windows) for (const tx of selectBankTransactions(state2, { month: bankMonth, account, imports })) {
+      const date2 = getTransactionDate(tx);
+      if (date2.slice(0, 7) === month) rows.set(sourceRecordKey(tx), { ...tx, date: date2, transactionDate: date2 });
+    }
+    return [...rows.values()];
   }
 
   // src/core/balance-checkpoints.mjs
@@ -9020,6 +8710,381 @@ html body.v4-app .transaction-overview-credit{color:var(--green)}
       throw fail3("balance-confirmation-required", "Controleer de actuele vergelijking en bevestig de waarneming opnieuw.");
     state2.balanceCheckpoints = [...state2.balanceCheckpoints || [], prepared.record];
     return prepared;
+  }
+
+  // src/core/current-account-balance.mjs
+  function selectCurrentAccountBalance(state2, options) {
+    var _a2, _b, _c, _d;
+    const { accountProfileId, scope, toDate, imports = [] } = options;
+    const profile = (state2.accountProfiles || []).find((p) => p.id === accountProfileId);
+    const values = [...state2.bankBalanceObservations || []];
+    for (const batch of imports) {
+      if (batch.channel !== "bank-api" || batch.accountProfileId !== accountProfileId || batch.householdId !== scope.householdId || ["deleted", "withdrawn"].includes(batch.lifecycle) || !(state2.importSummaries || []).some((s) => s.id === batch.id && !["deleted", "withdrawn"].includes(s.lifecycle))) continue;
+      const input = (_b = (_a2 = batch.rows) == null ? void 0 : _a2.find((r) => {
+        var _a3;
+        return ((_a3 = r.providerInput) == null ? void 0 : _a3.accountProfileId) === accountProfileId;
+      })) == null ? void 0 : _b.providerInput;
+      if (!((_c = input == null ? void 0 : input.provenance) == null ? void 0 : _c.accountHash)) continue;
+      for (const value of batch.balanceObservations || []) {
+        if (!value.unusable) {
+          values.push(value);
+          continue;
+        }
+        try {
+          values.push(...normalizeProviderBalances({ householdId: scope.householdId, accountProfileId, account: { identificationHash: input.provenance.accountHash }, fetchedAt: (_d = batch.providerSync) == null ? void 0 : _d.fetchedAt, balances: [value.raw] }, scope));
+        } catch (e) {
+        }
+      }
+    }
+    const candidates = [];
+    if ((profile == null ? void 0 : profile.status) !== "archived") for (const value of values) {
+      const result2 = normalizeBankInput(value, scope);
+      if (!result2.ok) continue;
+      const r = result2.record, { facts: f, provenance: p } = r;
+      if (r.accountProfileId !== accountProfileId || r.channel !== "bank-api" || r.authority !== "enablebanking:ING:NL" || !p.accountHash || f.currency !== "EUR" || !["XPCD", "ITAV", "ITBD", "CLBD"].includes(p.providerType)) continue;
+      if ({ XPCD: "expected", ITAV: "available", ITBD: "booked", CLBD: "booked" }[p.providerType] !== f.balanceType) continue;
+      const observed = f.observedAt || f.asOfDate + "T23:59:59Z";
+      if (!Number.isFinite(Date.parse(p.fetchedAt)) || !Number.isFinite(Date.parse(observed)) || Date.parse(observed) > Date.parse(p.fetchedAt) || f.asOfDate > toDate || p.fetchedAt.slice(0, 10) > toDate) continue;
+      candidates.push({ source: "external", accountProfileId, accountHash: p.accountHash, balanceCents: f.amountCents, balanceType: f.balanceType, boundary: f.boundary, providerType: p.providerType, observedAt: f.observedAt, asOfDate: f.asOfDate, fetchedAt: p.fetchedAt, authority: r.authority, observationId: r.identity.id, sortAt: observed });
+    }
+    candidates.sort((a, b) => Date.parse(b.sortAt) - Date.parse(a.sortAt) || Date.parse(b.fetchedAt) - Date.parse(a.fetchedAt) || ["XPCD", "ITAV", "ITBD", "CLBD"].indexOf(a.providerType) - ["XPCD", "ITAV", "ITBD", "CLBD"].indexOf(b.providerType));
+    const selected = candidates[0];
+    const conflict = selected && candidates.some((c) => c.sortAt === selected.sortAt && c.fetchedAt === selected.fetchedAt && c.providerType === selected.providerType && c.balanceCents !== selected.balanceCents);
+    if (selected && !conflict) return selected;
+    return { ...selectAccountBalance(state2, options), source: "reconstruction", externalConflict: !!conflict };
+  }
+  function attachCurrentBalance(state2, options, projection) {
+    var _a2;
+    if (((_a2 = projection.horizon) == null ? void 0 : _a2.endDate) < options.asOfDate) return projection;
+    const current = selectCurrentAccountBalance(state2, { ...options, toDate: options.asOfDate });
+    return {
+      ...projection,
+      externalCurrentBalance: current,
+      forecastNotice: current.source === "external" && ["expected", "available"].includes(current.balanceType) ? "De prognose begint bij de laatst ontvangen ING-stand. Een betaling kan hierin al verwerkt zijn terwijl de vaste last nog gepland staat. Totdat de transactie verwerkt en gekoppeld is, kan de prognose tijdelijk te voorzichtig zijn." : null
+    };
+  }
+
+  // src/import/bank-authorization-url.mjs
+  var origins = /* @__PURE__ */ new Set(["https://auth.enablebanking.com", "https://tilisy.enablebanking.com"]);
+  function bankAuthorizationUrl(value) {
+    if (typeof value !== "string") return null;
+    try {
+      const url = new URL(value);
+      if (!origins.has(url.origin) || url.username || url.password || url.pathname.replace(/\/$/, "") !== "/ais/start") return null;
+      return url.href;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // src/ui/bank-connection.mjs
+  var BANK_BACKEND_URL = "https://europe-west4-financien-7dd43.cloudfunctions.net/enableBanking";
+  var BANK_API_ENABLED = true;
+  var escape = (value) => String(value != null ? value : "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
+  var messages = {
+    "provider-batch-conflict": "De bankimport hoort niet bij de verwachte actieve bundel. Bestaande gegevens blijven behouden.",
+    "bank-import-deleted": "De eerdere bankimport is verwijderd. Een nieuwe importbundel vereist jouw bevestiging.",
+    "bank-import-restart-cancelled": "Geen nieuwe importbundel gestart. Het verwijderbewijs blijft behouden.",
+    "bank-import-restart-blocked": "Een nieuwe importbundel kan nog niet veilig starten. Synchroniseer eerst de administratie en laat bestaande verwijzingen controleren.",
+    "backend-not-configured": "De bankkoppeling is nog niet geactiveerd.",
+    "reauthorization-required": "Banktoegang is verlopen. Autoriseer de rekening opnieuw.",
+    "forbidden-user": "Deze bankkoppeling is niet beschikbaar voor jouw aanmelding. Gebruik de geverifieerde aanmelding van de toegestane rekeninghouder.",
+    "forbidden-account": "Deze rekening is niet toegestaan.",
+    "unauthenticated": "Log opnieuw in bij Finize en probeer het nog eens.",
+    "invalid-token": "Je aanmelding is verlopen. Log opnieuw in bij Finize.",
+    "scope-changed": "Het huishouden is gewijzigd. Open deze rekening opnieuw.",
+    "no-bank-transactions": "Nog geen banktransacties opgehaald. Bestaande CSV-imports blijven beschikbaar bij Importeren.",
+    "synchronization-busy": "Deze rekening wordt al bijgewerkt. Probeer het straks opnieuw.",
+    "provider-identity-conflict": "Afwijkende gegevens voor dezelfde bankidentiteit. Bestaande gegevens blijven behouden.",
+    "import-conflict": "De import is intussen gewijzigd. Synchroniseer eerst de administratie en open daarna de actuele import. Bestaande keuzes blijven behouden.",
+    "cloud-missing": "De bestaande bankimport ontbreekt in de cloud. Er zijn geen nieuwe bankgegevens verwerkt. Laat de opslag controleren.",
+    "provider-unavailable": "De bank is tijdelijk niet bereikbaar. Bestaande gegevens blijven behouden.",
+    "provider-access-blocked": "Deze rekening is nog niet vrijgegeven voor deze Enable Banking-app. Voor een andere rekeninghouder zijn eigen toestemming en passende providertoegang vereist.",
+    "bank-registry-migration-required": "De bestaande bankverbinding moet eerst veilig door de beheerder worden overgezet. Autoriseer niet opnieuw.",
+    "account-identity-changed": "De rekeningbinding wijkt af. De verbinding is uit voorzorg geblokkeerd; laat de beheerder dit controleren.",
+    "session-owner-missing": "De bestaande banksessie kan niet veilig aan deze rekening worden gekoppeld. Laat de beheerder de overgang controleren.",
+    "wrong-provider-account": "Het bankantwoord hoort bij een andere rekening. Er zijn geen gegevens verwerkt.",
+    "bootstrap-busy": "Er staat al een toestemmingsaanvraag open. Rond die eerst af of probeer het na tien minuten opnieuw.",
+    "bootstrap-session-protected": "De ontvangen banksessie hoort bij een bestaande verbinding. Die is beschermd; laat de beheerder dit controleren.",
+    "bootstrap-candidate-exists": "Er is al banktoestemming ontvangen. Laat deze eerst controleren en activeren.",
+    "bootstrap-candidate-unavailable": "Er is nog geen bruikbare nieuwe banktoestemming. Laat de beheerder dit controleren.",
+    "bootstrap-provider-session-invalid": "De nieuwe banktoestemming kon niet worden bevestigd. Laat de beheerder dit controleren.",
+    "bootstrap-review-required": "De uitkomst van de toestemmingsaanvraag moet eerst door de beheerder worden gecontroleerd. Start nog geen nieuwe aanvraag."
+  };
+  function installBankConnection(root2, { enabled: enabled2 = BANK_API_ENABLED, baseUrl = BANK_BACKEND_URL } = {}) {
+    var _a2;
+    const production = new URL(BANK_BACKEND_URL), target = new URL(baseUrl);
+    const local = ["127.0.0.1", "localhost"].includes((_a2 = root2.location) == null ? void 0 : _a2.hostname) && target.hostname === "127.0.0.1" && target.protocol === "http:";
+    if (!local && (target.origin !== production.origin || target.pathname !== production.pathname || target.protocol !== "https:")) throw new Error("Ongeldige bankbackend.");
+    const busyAccounts = /* @__PURE__ */ new Set();
+    const panels = /* @__PURE__ */ new Map();
+    let lastFailure = null;
+    const phaseNames = {
+      authorization: "Aanmelding controleren",
+      request: "Bankgegevens ophalen",
+      response: "Bankantwoord lezen",
+      "import-read": "Bestaande import lezen",
+      staging: "Bankgegevens vergelijken",
+      storage: "Import opslaan"
+    };
+    const inPhase = async (phase, action2) => {
+      try {
+        return await action2();
+      } catch (error2) {
+        throw Object.assign(error2 instanceof Error ? error2 : new Error("bank-unavailable"), { bankPhase: phase });
+      }
+    };
+    function refreshControls() {
+      for (const [element, update2] of panels) {
+        if (!element.isConnected) panels.delete(element);
+        else update2();
+      }
+    }
+    async function request2(route, payload) {
+      var _a3;
+      if (!enabled2) throw new Error("backend-not-configured");
+      const user = (_a3 = root2.FinizeAuth) == null ? void 0 : _a3.user;
+      if (!(user == null ? void 0 : user.getIdToken)) throw new Error("forbidden-user");
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), route === "/sync" ? 19e4 : 65e3);
+      try {
+        const token = await inPhase("authorization", () => user.getIdToken());
+        const response = await inPhase("request", () => root2.fetch(baseUrl + route, {
+          method: "POST",
+          cache: "no-store",
+          redirect: "error",
+          signal: controller.signal,
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+          body: JSON.stringify(payload)
+        }));
+        const data = await inPhase("response", () => response.json());
+        if (!response.ok) throw Object.assign(new Error("bank-unavailable"), { code: data.error, bankPhase: "request", httpStatus: response.status });
+        return data;
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+    function lastSync(profile) {
+      var _a3, _b;
+      const sync = (_b = (_a3 = root2.state) == null ? void 0 : _a3.bankSyncStatus) == null ? void 0 : _b[profile.id];
+      const at = new Date(sync == null ? void 0 : sync.fetchedAt);
+      return sync && Number.isFinite(at.getTime()) ? " Laatst opgehaald: " + new Intl.DateTimeFormat("nl-NL", { dateStyle: "short", timeStyle: "short" }).format(at) + (sync.complete ? "." : " · onvolledig.") : "";
+    }
+    function render2(profile, { compact = false } = {}) {
+      var _a3, _b;
+      if (compact) {
+        if (!enabled2 || profile.status === "archived" || !((_b = (_a3 = root2.state) == null ? void 0 : _a3.bankSyncStatus) == null ? void 0 : _b[profile.id])) return "";
+        return '<span class="p3-bank-update" data-bank-connection="' + escape(profile.id) + '" data-bank-compact><span class="p3-bank-actions"><button type="button" class="primary small" data-bank-sync disabled>Bank bijwerken</button><button type="button" class="ghost small" data-bank-review>Nakijken</button></span><small role="status" aria-live="polite" data-bank-status>Verbinding controleren…</small></span>';
+      }
+      const disabled = !enabled2 || profile.status === "archived" ? "disabled" : "";
+      const status2 = !enabled2 ? "Nog niet geactiveerd. De bestaande administratie blijft beschikbaar." : profile.status === "archived" ? "Deze rekening is gearchiveerd. De historie blijft beschikbaar." : "Verbinding controleren…";
+      return '<section class="balance-panel" data-bank-connection="' + escape(profile.id) + '" aria-label="ING-bankkoppeling"><h3>ING-bankkoppeling</h3><p>Geboekte bankmutaties tellen direct mee voor de rekeningstand. Financiële verwerking bevestig je bij Nakijken.</p><p role="status" aria-live="polite" data-bank-status>' + status2 + '</p><div class="balance-actions"><button type="button" class="ghost" data-bank-authorize ' + disabled + '>Banktoegang autoriseren</button><button type="button" class="primary" data-bank-sync disabled>Bank bijwerken</button><button type="button" class="ghost" data-bank-review>Nakijken</button><button type="button" class="ghost" data-bank-disconnect ' + disabled + ">Banktoegang intrekken</button></div></section>";
+    }
+    async function ingest(snapshot2, householdId, expectedProfileId = snapshot2.accountProfileId, { confirmRestart = null } = {}) {
+      if (snapshot2.accountProfileId !== expectedProfileId) throw Object.assign(new Error("wrong-provider-account"), { code: "wrong-provider-account" });
+      const runtime = root2.FinizeUpdate4Runtime;
+      if (root2.CloudAdapter.importScope() !== householdId || snapshot2.householdId !== householdId) throw new Error("Het huishouden is gewijzigd.");
+      const id = providerBatchId(snapshot2.accountProfileId, snapshot2.account.identificationHash);
+      const resolve = async () => {
+        var _a3, _b, _c;
+        let previous = await runtime.resolveProviderImportBase(root2, id), restartFrom = null;
+        for (let depth = 0; (previous == null ? void 0 : previous.lifecycle) === "deleted"; depth++) {
+          if (depth >= 16) throw Object.assign(new Error("bank-import-restart-blocked"), { code: "bank-import-restart-blocked" });
+          if (!((_b = (_a3 = root2.CloudAdapter) == null ? void 0 : _a3.isConnected) == null ? void 0 : _b.call(_a3)) || root2.CloudAdapter.conflict || root2.CloudAdapter.initialSyncComplete === false || !((_c = root2.DataAdapter) == null ? void 0 : _c.supportsAtomicImports) || root2.state.__finizePartialHistory) throw Object.assign(new Error("bank-import-restart-blocked"), { code: "bank-import-restart-blocked" });
+          assertProviderRestartState(root2.state, previous);
+          assertProviderRestartParent(previous, await runtime.fetchImportFromCloud(root2, previous.id));
+          restartFrom = previous;
+          previous = await runtime.resolveProviderImportBase(root2, nextProviderBatchId(id, previous));
+        }
+        if (previous) restartFrom = null;
+        return { previous, restartFrom };
+      };
+      let base = await inPhase("import-read", resolve);
+      if (base.restartFrom) {
+        if (!confirmRestart) throw Object.assign(new Error("bank-import-deleted"), { code: "bank-import-deleted", bankPhase: "staging" });
+        const proof = JSON.stringify(base.restartFrom), basis = root2.DataAdapter.commitBaseSignature();
+        if (await confirmRestart() !== true) throw Object.assign(new Error("bank-import-restart-cancelled"), { code: "bank-import-restart-cancelled", bankPhase: "staging" });
+        if (root2.CloudAdapter.importScope() !== householdId || root2.DataAdapter.commitBaseSignature() !== basis) throw Object.assign(new Error("import-conflict"), { code: "import-conflict" });
+        base = await inPhase("import-read", resolve);
+        if (!base.restartFrom || JSON.stringify(base.restartFrom) !== proof) throw Object.assign(new Error("import-conflict"), { code: "import-conflict" });
+      }
+      const imports = await inPhase("import-read", () => runtime.ImportStore.listImports());
+      if (root2.CloudAdapter.importScope() !== householdId) throw Object.assign(new Error("scope-changed"), { code: "scope-changed" });
+      const batch = await inPhase("staging", () => stageProviderSnapshot(snapshot2, root2.state, base.previous, imports, runtime.classifyOriginal, base.restartFrom));
+      await inPhase("storage", () => runtime.persistImportDraft(root2, batch));
+      return batch;
+    }
+    function bind(panel, profile) {
+      const element = panel.querySelector("[data-bank-connection]");
+      if (!element || element.dataset.bound) return;
+      element.dataset.bound = "true";
+      const householdId = root2.CloudAdapter.importScope(), status2 = element.querySelector("[data-bank-status]");
+      const actionKey = JSON.stringify([householdId, profile.id]);
+      const compact = element.hasAttribute("data-bank-compact");
+      let connected = false, checking = false, activationBlocked = false, bootstrapAvailable = false, bootstrapCandidate = false;
+      const eligible = enabled2 && profile.status !== "archived";
+      const sameScope = () => {
+        if (root2.CloudAdapter.importScope() !== householdId) throw Object.assign(new Error("scope-changed"), { code: "scope-changed" });
+      };
+      const controls = () => element.querySelectorAll("button").forEach((item) => {
+        item.disabled = busyAccounts.has(actionKey) || checking && !item.hasAttribute("data-bank-review") || !eligible && !item.hasAttribute("data-bank-review") || activationBlocked && (item.hasAttribute("data-bank-authorize") || item.hasAttribute("data-bank-sync")) || item.hasAttribute("data-bank-sync") && !connected;
+      });
+      panels.set(element, controls);
+      const failureMessage = (error2) => {
+        const rawCode = error2.code || error2.message;
+        const code = Object.hasOwn(messages, rawCode) ? rawCode : "bank-unavailable";
+        const phase = Object.hasOwn(phaseNames, error2.bankPhase) ? error2.bankPhase : null;
+        lastFailure = { phase, code, httpStatus: Number.isInteger(error2.httpStatus) && error2.httpStatus >= 400 && error2.httpStatus <= 599 ? error2.httpStatus : null };
+        const message = messages[code] || (error2.name === "AbortError" ? "De bank reageert niet op tijd. Probeer het opnieuw." : "De actie is niet afgerond. Controleer je verbinding en probeer opnieuw.");
+        return message + (phase ? " Stap: " + phaseNames[phase] + "." : "");
+      };
+      async function checkConnection() {
+        var _a3, _b, _c, _d;
+        if (!eligible) return;
+        checking = true;
+        controls();
+        try {
+          const result2 = await request2("/status", { accountProfileId: profile.id });
+          sameScope();
+          connected = result2.connected === true;
+          bootstrapAvailable = result2.bootstrapAvailable === true && !connected;
+          bootstrapCandidate = bootstrapAvailable && result2.candidateVerified === true;
+          activationBlocked = result2.activationBlocked === true || bootstrapAvailable && (result2.bootstrapBusy || result2.revocationPending || result2.bootstrapReviewRequired);
+          const authorizeButton = element.querySelector("[data-bank-authorize]");
+          if (authorizeButton) authorizeButton.textContent = bootstrapCandidate ? "Banktoegang controleren" : "Banktoegang autoriseren";
+          const consent = new Date(result2.validUntil), lastSuccessful = new Date((_a3 = result2.lastSuccessfulSync) == null ? void 0 : _a3.fetchedAt);
+          const sameSuccessfulFetch = !compact && Number.isFinite(lastSuccessful.getTime()) && result2.lastSuccessfulSync.fetchedAt === ((_d = (_c = (_b = root2.state) == null ? void 0 : _b.bankSyncStatus) == null ? void 0 : _c[profile.id]) == null ? void 0 : _d.fetchedAt);
+          status2.textContent = (result2.bootstrapReviewRequired ? messages["bootstrap-review-required"] : bootstrapCandidate ? "Toestemming ontvangen. Deze rekening wacht nog op activering. Je kunt de banktoegang alvast controleren." : bootstrapAvailable ? "Je kunt voor deze gezamenlijke rekening afzonderlijk toestemming geven bij ING." : activationBlocked ? messages["provider-access-blocked"] : connected ? compact ? "" : "Verbonden. Je kunt de bank handmatig bijwerken." : "Geen geldige bankverbinding. Geef toestemming bij ING om deze rekening te koppelen.") + (!compact && result2.validUntil && Number.isFinite(consent.getTime()) ? " Toestemming geldig tot " + new Intl.DateTimeFormat("nl-NL", { dateStyle: "short" }).format(consent) + "." : "") + (!compact && Number.isFinite(lastSuccessful.getTime()) ? " Laatste volledige synchronisatie: " + new Intl.DateTimeFormat("nl-NL", { dateStyle: "short", timeStyle: "short" }).format(lastSuccessful) + "." : "") + (result2.revocationPending ? " Eerdere banktoegang is nog niet volledig ingetrokken. Kies Banktoegang intrekken om het opnieuw te proberen." : "") + (sameSuccessfulFetch ? "" : lastSync(profile));
+        } catch (error2) {
+          connected = false;
+          activationBlocked = ["forbidden-user", "forbidden-account", "provider-access-blocked", "bank-registry-migration-required", "account-identity-changed", "session-owner-missing"].includes(error2.code);
+          status2.textContent = failureMessage(error2) + lastSync(profile);
+        } finally {
+          checking = false;
+          refreshControls();
+        }
+      }
+      void checkConnection();
+      element.addEventListener("click", async (event2) => {
+        var _a3;
+        const button = event2.target.closest("button");
+        if (!button || button.disabled || busyAccounts.has(actionKey) || checking && !button.hasAttribute("data-bank-review")) return;
+        busyAccounts.add(actionKey);
+        refreshControls();
+        try {
+          sameScope();
+          if (button.hasAttribute("data-bank-review")) {
+            const imports = await root2.FinizeUpdate4Runtime.ImportStore.listImports();
+            sameScope();
+            const batch = imports.find((item) => item.channel === "bank-api" && item.accountProfileId === profile.id && !["deleted", "withdrawn"].includes(item.lifecycle));
+            if (!batch) throw Object.assign(new Error("no-bank-transactions"), { code: "no-bank-transactions" });
+            await root2.FinizeUpdate4.openImportDetails(batch.id);
+          } else if (button.hasAttribute("data-bank-authorize")) {
+            if (bootstrapCandidate) {
+              status2.textContent = "Nieuwe banktoegang controleren…";
+              await request2("/bootstrap/verify", { accountProfileId: profile.id });
+              sameScope();
+              await checkConnection();
+              return;
+            }
+            status2.textContent = "Toestemmingspagina van ING openen via Enable Banking…";
+            const result2 = await request2(bootstrapAvailable ? "/bootstrap/start" : "/auth/start", { accountProfileId: profile.id });
+            sameScope();
+            const url = bankAuthorizationUrl(result2.url);
+            if (!url) throw new Error("Ongeldige autorisatielink.");
+            root2.location.assign(url);
+          } else if (button.hasAttribute("data-bank-disconnect")) {
+            status2.textContent = "Banktoegang intrekken…";
+            await request2(bootstrapAvailable ? "/bootstrap/disconnect" : "/disconnect", { accountProfileId: profile.id });
+            sameScope();
+            connected = false;
+            status2.textContent = "Banktoegang ingetrokken. Je financiële historie blijft behouden.";
+          } else if (button.hasAttribute("data-bank-sync")) {
+            lastFailure = null;
+            status2.textContent = "Bankgegevens ophalen…";
+            const toDate = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+            const fromDate = new Date(Date.parse(toDate) - 30 * 864e5).toISOString().slice(0, 10);
+            const snapshot2 = await request2("/sync", { accountProfileId: profile.id, fromDate, toDate });
+            sameScope();
+            await ingest(snapshot2, householdId, profile.id, { confirmRestart: () => root2.confirm("De eerdere bankimport is bewust verwijderd. Wil je een nieuwe importbundel starten? Het oude verwijderbewijs blijft bewaard. Nieuwe transacties staan opnieuw bij Nakijken en zijn niet goedgekeurd.") });
+            status2.textContent = snapshot2.complete ? "Bank bijgewerkt. Financiële verwerking staat klaar bij Nakijken." : "Gedeeltelijk opgehaald. Eerdere transacties blijven behouden; probeer later opnieuw.";
+            (_a3 = root2.renderActiveTab) == null ? void 0 : _a3.call(root2);
+          }
+        } catch (error2) {
+          if (error2.code === "reauthorization-required" || button.hasAttribute("data-bank-disconnect")) connected = false;
+          status2.textContent = button.hasAttribute("data-bank-disconnect") ? "Het intrekken is nog niet bevestigd. Probeer Banktoegang intrekken opnieuw. Je financiële historie blijft behouden." : failureMessage(error2);
+        } finally {
+          busyAccounts.delete(actionKey);
+          refreshControls();
+        }
+      });
+    }
+    return { render: render2, bind, ingest, get lastFailure() {
+      return lastFailure && { ...lastFailure };
+    } };
+  }
+
+  // src/core/personal-month-summary.mjs
+  function personalMonthRemaining({ income, fixed, usedBudget }) {
+    const cents5 = decimalAmountToCents(income) - decimalAmountToCents(fixed) - decimalAmountToCents(usedBudget);
+    if (!Number.isSafeInteger(cents5)) throw new Error("Maandbedrag valt buiten het exacte centbereik.");
+    return cents5 / 100;
+  }
+
+  // src/core/liquidity-settings.mjs
+  var validPaymentDay = (day) => day === "last" || Number.isInteger(day) && day >= 1 && day <= 31;
+  function monthlyPaymentDate(month, day) {
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month) || !validPaymentDay(day)) return null;
+    const last = new Date(Number(month.slice(0, 4)), Number(month.slice(5)), 0, 12).getDate();
+    return month + "-" + String(day === "last" ? last : Math.min(day, last)).padStart(2, "0");
+  }
+  function fixedPaymentDay(source) {
+    if (Object.hasOwn(source, "afschrijfdag")) return source.afschrijfdag;
+    return validCalendarDate(source.afschrijfdatum) ? Number(source.afschrijfdatum.slice(8)) : "";
+  }
+  function fixedCashDate(occurrence) {
+    var _a2;
+    const source = occurrence.source;
+    if ((_a2 = source.cashDates) == null ? void 0 : _a2[occurrence.id]) return source.cashDates[occurrence.id];
+    if (source.frequentieEenheid === "weken") return Object.hasOwn(source, "afschrijfdag") ? occurrence.date : source.afschrijfdatum === occurrence.date ? occurrence.date : null;
+    return monthlyPaymentDate(occurrence.month, fixedPaymentDay(source));
+  }
+  function liquidityBuffer(profile) {
+    var _a2, _b, _c;
+    return (_c = (_a2 = profile == null ? void 0 : profile.liquidity) == null ? void 0 : _a2.bufferCents) != null ? _c : (profile == null ? void 0 : profile.accountOwner) === "gezamenlijk" && ((_b = profile == null ? void 0 : profile.liquidity) == null ? void 0 : _b.primaryForOwner) ? 2e4 : 0;
+  }
+  function validateLiquiditySettings(profile, profiles) {
+    const value = profile.liquidity;
+    if (value === void 0) return;
+    const fail8 = (message) => {
+      throw Object.assign(new Error(message), { code: "invalid-liquidity-settings" });
+    };
+    if (!value || value.version !== 1 || typeof value.primaryForOwner !== "boolean" || !Number.isSafeInteger(value.bufferCents) || value.bufferCents < 0)
+      fail8("Vul een niet-negatieve veiligheidsbuffer in hele eurocenten in.");
+    if (value.primaryForOwner && profile.accountType !== "payment") fail8("Kies een betaalrekening voor de maandplanning.");
+    if (value.primaryForOwner && profiles.some((p) => {
+      var _a2;
+      return p.id !== profile.id && p.accountOwner === profile.accountOwner && ((_a2 = p.liquidity) == null ? void 0 : _a2.primaryForOwner);
+    }))
+      fail8("Er is al een rekening voor deze maandplanning. Schakel die keuze daar eerst uit.");
+    if (profile.accountOwner === "gezamenlijk" && !value.primaryForOwner && value.bufferCents !== 0)
+      fail8("De gezamenlijke buffer hoort alleen bij de primaire gezamenlijke betaalrekening.");
+    if (!value.salaryDays || typeof value.salaryDays !== "object" || Array.isArray(value.salaryDays)) fail8("Controleer de salarisbetaaldagen.");
+    for (const [person, day] of Object.entries(value.salaryDays)) {
+      if (!["dion", "dara"].includes(person) || !validPaymentDay(day)) fail8("Kies voor salaris een dag van 1 tot en met 31, de laatste dag, of laat het veld leeg.");
+      if (profiles.some((p) => {
+        var _a2, _b;
+        return p.id !== profile.id && ((_b = (_a2 = p.liquidity) == null ? void 0 : _a2.salaryDays) == null ? void 0 : _b[person]);
+      })) fail8("Dit salaris is al aan een andere rekening gekoppeld. Verwijder die betaaldag daar eerst.");
+    }
+    if (value.allowanceDays !== void 0 && (!value.allowanceDays || typeof value.allowanceDays !== "object" || Array.isArray(value.allowanceDays))) fail8("Controleer de zakgeldbetaaldagen.");
+    for (const [person, day] of Object.entries(value.allowanceDays || {})) {
+      if (!["dion", "dara"].includes(person) || profile.accountOwner !== person || profile.accountType !== "payment" || !validPaymentDay(day)) fail8("Koppel zakgeld aan de persoonlijke betaalrekening van de juiste eigenaar en kies een afschrijfdag.");
+      if (profiles.some((p) => {
+        var _a2, _b;
+        return p.id !== profile.id && ((_b = (_a2 = p.liquidity) == null ? void 0 : _a2.allowanceDays) == null ? void 0 : _b[person]);
+      })) fail8("Dit zakgeld is al aan een andere rekening gekoppeld. Verwijder die betaaldag daar eerst.");
+    }
   }
 
   // src/core/processing-lines.mjs
@@ -10423,8 +10488,20 @@ html body.v4-app .transaction-overview-credit{color:var(--green)}
     if (!planningBasis && endDate && balanceRequiredMonths(asOfDate, endDate).length > 24) throw new Error("Kies een prognose van maximaal 24 kalendermaanden.");
     const reasons2 = [], events = [], reservations = [], savingsPlans = [];
     const profile = (state2.accountProfiles || []).find((p) => p.id === accountProfileId);
-    const opening = selectAccountBalance(state2, { accountProfileId, toDate: asOfDate, scope, imports, importsAvailable, coverage });
-    const includeAsOfPlans = !!opening.checkpoint && (opening.boundary === "timestamp" || opening.checkpoint.asOfDate < asOfDate);
+    const current = planningBasis ? null : selectCurrentAccountBalance(state2, { accountProfileId, toDate: asOfDate, scope, imports, importsAvailable, coverage });
+    const opening = (current == null ? void 0 : current.source) === "external" ? {
+      ...current,
+      toDate: asOfDate,
+      openingCents: current.balanceCents,
+      checkpoint: null,
+      confirmedCents: 0,
+      provisionalCents: 0,
+      mutations: [],
+      reasons: [],
+      status: "observed",
+      quality: { bankSources: "not-applied", coverage: "unknown", storage: "verified" }
+    } : current || selectAccountBalance(state2, { accountProfileId, toDate: asOfDate, scope, imports, importsAvailable, coverage });
+    const includeAsOfPlans = opening.source === "external" && opening.boundary === "timestamp" || !!opening.checkpoint && (opening.boundary === "timestamp" || opening.checkpoint.asOfDate < asOfDate);
     opening.reasons.forEach((row) => reasons2.push(issue(row.code, row.sourceId, opening.status === "incomplete" || opening.status === "unknown" ? "incomplete" : "provisional")));
     let projections = [];
     try {
@@ -10473,7 +10550,7 @@ html body.v4-app .transaction-overview-credit{color:var(--green)}
     const requiredMonths = liquidityRequiredMonths(state2, { accountProfileId, asOfDate, endDate: horizonEnd2 || asOfDate, scope }).filter((month) => !planningBasis || month >= shiftLiquidityDay(asOfDate, 1).slice(0, 7));
     for (const month of requiredMonths) if (state2.__finizePartialHistory && !((_c = state2.verifiedPeriods) == null ? void 0 : _c.includes(month))) reasons2.push(issue("missing-period", month));
     const last = horizonEnd2 || asOfDate;
-    const future = selectAccountBalance(state2, { accountProfileId, toDate: last, scope, imports, importsAvailable, coverage, checkpointId: (_d = opening.checkpoint) == null ? void 0 : _d.id });
+    const future = opening.source === "external" ? { mutations: [], reasons: [] } : selectAccountBalance(state2, { accountProfileId, toDate: last, scope, imports, importsAvailable, coverage, checkpointId: (_d = opening.checkpoint) == null ? void 0 : _d.id });
     future.reasons.filter((row) => !["unknown-bank-coverage", "partial-bank-coverage"].includes(row.code)).forEach((row) => reasons2.push(issue(row.code, row.sourceId, ["awaiting-review", "intraday-provider-balance"].includes(row.code) ? "provisional" : "incomplete")));
     for (const row of future.mutations.filter((row2) => row2.date > asOfDate)) {
       const linked = projections.filter((p) => sourceRecordKey(p.transaction) === row.sourceId);
@@ -10517,12 +10594,13 @@ html body.v4-app .transaction-overview-credit{color:var(--green)}
           const p = projections.find((p2) => sourceRecordKey(p2.transaction) === sourceId);
           const bankDate2 = (_a3 = p == null ? void 0 : p.transaction.bankOriginal) == null ? void 0 : _a3.bankDate;
           const bank = p == null ? void 0 : p.transaction.bankOriginal;
-          if (!(bank == null ? void 0 : bank.valid) || bank.currency !== "EUR" || ((_b2 = bank.bankStatus) != null ? _b2 : "booked") !== "booked" || !validCalendarDate(bankDate2) || bankDate2 > asOfDate && bankDate2 <= last && !future.mutations.some((m) => m.sourceId === sourceId)) reasons2.push(issue("replacement-bank-source-unusable", row.id));
+          if (!(bank == null ? void 0 : bank.valid) || bank.currency !== "EUR" || ((_b2 = bank.bankStatus) != null ? _b2 : "booked") !== "booked" || !validCalendarDate(bankDate2) || opening.source !== "external" && bankDate2 > asOfDate && bankDate2 <= last && !future.mutations.some((m) => m.sourceId === sourceId)) reasons2.push(issue("replacement-bank-source-unusable", row.id));
         }
         return;
       }
       const overlap = projections.some((p) => {
         var _a4;
+        if (opening.source === "external" && !p.active) return false;
         const tx = p.transaction, b = tx.bankOriginal;
         if (!(b == null ? void 0 : b.valid) || b.currency !== "EUR" || ((_a4 = b.bankStatus) != null ? _a4 : "booked") !== "booked" || tx.accountProfileId !== row.accountProfileId || !validCalendarDate(b.bankDate) || Math.sign(Number(b.amount)) !== Math.sign(row.amountCents)) return false;
         return replacementKeys(p, state2).includes(row.id) || row.type === "fixed" && p.fixedExpenseId === row.planningSourceId && p.calendarMonth === row.month;
@@ -10950,7 +11028,7 @@ html body.v4-app .transaction-overview-credit{color:var(--green)}
       return { checkpointId: row.id.slice("checkpoint:".length), date: row.date, observedCents: row.observedBalanceCents, modeledCents: row.modeledBalanceCents, differenceCents: row.amountCents };
     });
     const history = withAvailability({ ...result2, asOfDate, calculationStartDate: origin, currentBalance: current.opening, displayStartDate: startDate, historyComplete: !!anchor && origin < startDate, reconciliations }, input, availabilityFromDate, inputFor);
-    if (!options.currentCashBasis || !horizon.endDate || horizon.endDate < asOfDate) return history;
+    if (!options.currentCashBasis && current.opening.source !== "external" || !horizon.endDate || horizon.endDate < asOfDate) return history;
     const forwardInputFor = (endDate) => {
       const next = buildLiquidityInput(state2, { ...options, asOfDate, endDate, salaryOnly: false });
       next.availabilityFromDate = availabilityFromDate;
@@ -11168,7 +11246,7 @@ html body.v4-app .transaction-overview-credit{color:var(--green)}
   }
   function liquidityView(p) {
     var _a2;
-    return { free: (_a2 = p.freeAfterObligationsCents) != null ? _a2 : p.indicativeFreeAfterObligationsCents, indicative: p.freeAfterObligationsCents == null, savings: p.savingsGoalCents, balance: (p.currentBalance || p.opening).balanceCents, minimum: p.minimumBalanceCents, minimumDate: p.minimumDate, buffer: p.bufferCents };
+    return { free: (_a2 = p.freeAfterObligationsCents) != null ? _a2 : p.indicativeFreeAfterObligationsCents, indicative: p.freeAfterObligationsCents == null, savings: p.savingsGoalCents, balance: (p.externalCurrentBalance || p.currentBalance || p.opening).balanceCents, minimum: p.minimumBalanceCents, minimumDate: p.minimumDate, buffer: p.bufferCents };
   }
   function savingsNote(p) {
     var _a2;
@@ -11238,9 +11316,9 @@ html body.v4-app .transaction-overview-credit{color:var(--green)}
   var info = (key, title, content) => `<button type="button" class="p3-info-button" data-p3-info="${key}" aria-label="Uitleg over ${escape2(title)}" aria-controls="p3-info-${key}" aria-expanded="false">ⓘ</button><div class="p3-info-popover" id="p3-info-${key}" popover="auto" role="dialog" aria-modal="false" aria-label="${escape2(title)}" data-p3-info-panel="${key}"><div class="p3-info-heading"><strong>${title}</strong><button type="button" class="ghost small" data-p3-close-info="${key}" aria-label="Sluiten · uitleg over ${escape2(title)}">Sluiten</button></div>${content}</div>`;
   var savingDate = (value) => value ? new Intl.DateTimeFormat("nl-NL", { day: "numeric", month: "long", timeZone: "UTC" }).format(/* @__PURE__ */ new Date(value + "T12:00:00Z")) : "maandultimo";
   var calculationHelp = (p) => {
-    var _a2;
+    var _a2, _b;
     const s = p.monthEndSavings;
-    return s ? `<p>Het maximaal over te boeken bedrag op ${savingDate(s.transferDate)}. Dit is geen geld dat vandaag vrij besteedbaar is.</p><p>De berekening gebruikt het vastgelegde saldo en de aanwezige transacties. Werk zelf je bank bij op de laatste dag van de maand. Onbevestigde bankdekking is informatief en houdt het bedrag niet tegen.</p><p>Verwacht eindsaldo: ${money2(s.expectedEndBalanceCents)}<br>Nodig vanaf volgende maand: ${money2(s.requiredOpeningCents)}<br>Inclusief permanente buffer: ${money2((_a2 = s.bufferCents) != null ? _a2 : p.bufferCents)}.</p><p>Alleen de volledige volgende kalendermaand telt mee (tot en met ${date(s.assessmentEndDate)}). Salarissen en vaste lasten tellen op hun ingestelde betaaldatums. Het volledige resterende variabele maandbudget wordt alleen op de laatste kalenderdag afgetrokken. Concrete budgetbetalingen verlagen de resterende pot en tellen niet dubbel mee. De simulatie begint bij € 0; het benodigde beginsaldo is € 200 min de laagste cumulatieve kasstroom (inclusief het startpunt € 0). Veilig te sparen is het verwachte eindsaldo min dit beginsaldo, met minimaal € 0. De buffer telt precies één keer mee. De dagelijkse budgetspreiding voor Laagste prognose blijft ongewijzigd. Gepland sparen en Extra ruimte zijn alleen een vergelijking; de bestaande planning wordt niet automatisch gewijzigd.</p>` : "";
+    return s ? `${p.forecastNotice ? `<p>${escape2(p.forecastNotice)}</p>` : ""}<p>Het maximaal over te boeken bedrag op ${savingDate(s.transferDate)}. Dit is geen geld dat vandaag vrij besteedbaar is.</p>${((_a2 = p.externalCurrentBalance) == null ? void 0 : _a2.source) === "external" ? "<p>De berekening gebruikt de laatst ontvangen ING-stand met de resterende planning en budgetten. Geïmporteerde bankboekingen worden niet opnieuw op die stand toegepast.</p>" : "<p>De berekening gebruikt het vastgelegde saldo en de aanwezige transacties. Werk zelf je bank bij op de laatste dag van de maand. Onbevestigde bankdekking is informatief en houdt het bedrag niet tegen.</p>"}<p>Verwacht eindsaldo: ${money2(s.expectedEndBalanceCents)}<br>Nodig vanaf volgende maand: ${money2(s.requiredOpeningCents)}<br>Inclusief permanente buffer: ${money2((_b = s.bufferCents) != null ? _b : p.bufferCents)}.</p><p>Alleen de volledige volgende kalendermaand telt mee (tot en met ${date(s.assessmentEndDate)}). Salarissen en vaste lasten tellen op hun ingestelde betaaldatums. Het volledige resterende variabele maandbudget wordt alleen op de laatste kalenderdag afgetrokken. Concrete budgetbetalingen verlagen de resterende pot en tellen niet dubbel mee. De simulatie begint bij € 0; het benodigde beginsaldo is € 200 min de laagste cumulatieve kasstroom (inclusief het startpunt € 0). Veilig te sparen is het verwachte eindsaldo min dit beginsaldo, met minimaal € 0. De buffer telt precies één keer mee. De dagelijkse budgetspreiding voor Laagste prognose blijft ongewijzigd. Gepland sparen en Extra ruimte zijn alleen een vergelijking; de bestaande planning wordt niet automatisch gewijzigd.</p>` : "";
   };
   function qualityHelp(p) {
     var _a2;
@@ -11270,7 +11348,7 @@ html body.v4-app .transaction-overview-credit{color:var(--green)}
     var _a2, _b, _c;
     if (!profile) return `<p class="p3-empty">Kies de primaire betaalrekening voor deze context. Er wordt geen willekeurige rekening gebruikt.</p>${action("accounts", "Rekening instellen")}`;
     if (!p) return '<p class="p3-empty" role="status">Vooruitblik laden…</p>';
-    const v = liquidityView(p), balance = p.currentBalance || p.opening;
+    const v = liquidityView(p), balance = p.externalCurrentBalance || p.currentBalance || p.opening;
     const kpi = (key, title, value, sub, icon, explanation, act = "") => `<article class="p3-kpi">${act ? `<button type="button" class="ux-card-primary" data-p3-action="${act}" aria-label="${title} ${escape2(value)} · ${act === "balance" ? "Saldo bijwerken" : "Buffer instellen"}"></button>` : ""}<span class="p3-kpi-icon" aria-hidden="true">${iconSvg2(icon)}</span><span class="p3-kpi-copy"><span class="p3-kpi-title"><span>${title}</span>${info(key, title, explanation)}</span><strong>${value}</strong><small>${sub}</small>${key === "balance" ? bankMarkup : ""}</span></article>`;
     const warning = bufferWarningHtml(p.bufferWarning, label, iconSvg2);
     const saving = p.monthEndSavings, amount = (_b = (_a2 = saving == null ? void 0 : saving.safeCents) != null ? _a2 : saving == null ? void 0 : saving.indicativeCents) != null ? _b : null;
@@ -11279,10 +11357,10 @@ html body.v4-app .transaction-overview-credit{color:var(--green)}
     const blockingReasons = explainLiquidityReasons({ reasons: ((saving == null ? void 0 : saving.reasons) || []).filter((r) => !["partial-bank-coverage", "unknown-bank-coverage"].includes(r.code) && (r.severity === "incomplete" || ["unknown-cash-date", "missing-checkpoint", "past-saving-date"].includes(r.code))) });
     const savingsWarning = amount === null ? `<div class="p3-warning" role="status">Spaarbedrag nog niet te berekenen.${blockingReasons.length ? `<ul>${blockingReasons.map((r) => `<li>${escape2(r.problem)} ${escape2(r.solution)}</li>`).join("")}</ul>` : " Open de uitleg bij Veilig te sparen voor de beschikbare gegevens."}</div>` : "";
     const balanceDate = (_c = balance.checkpoint) == null ? void 0 : _c.asOfDate;
-    const balanceSub = `${status(balance.status)}${balanceDate ? ` · Berekend t/m ${date(balance.toDate || p.asOfDate)}` : ""}${bankMarkup ? "" : " · Saldo bijwerken"}`;
+    const balanceSub = balance.source === "external" ? `${balance.balanceType === "expected" ? "Verwacht banksaldo" : balance.balanceType === "available" ? "Beschikbaar banksaldo" : "Geboekt banksaldo"} · ${escape2(balance.providerType)} · ${escape2(new Date(balance.observedAt || balance.fetchedAt).toLocaleString("nl-NL"))}` : `Reconstructie · ${status(balance.status)}${balanceDate ? ` · Berekend t/m ${date(balance.toDate || p.asOfDate)}` : ""}${bankMarkup ? "" : " · Saldo bijwerken"}`;
     const reconciliations = (p.reconciliations || []).filter((r) => r.differenceCents !== null && r.differenceCents !== 0).map((r) => `<p class="p3-caption">Saldo-ijkpunt ${date(r.date)}: ${money2(r.observedCents)} · berekend ${money2(r.modeledCents)} · verschil ${money2(r.differenceCents)}. Vanaf deze dag loopt de berekening verder met het handmatig ingestelde saldo.</p>`).join("");
     const qualityActions = p.reasons.length ? `<div class="p3-quality-actions">${action("settings", p.reasons.some((r) => r.code === "missing-reliable-horizon") ? "Salarisdatum instellen" : "Prognose instellen")}${v.balance === null ? action("balance", "Saldo instellen") : ""}</div>` : "";
-    return `<div class="p3-kpis">${kpi("free", savingTitle, amount === null ? "—" : money2(amount), freeSub, "income", calculationHelp(p) + qualityHelp(p))}${kpi("balance", p.horizon.endDate < p.asOfDate ? "Saldo op " + date(p.horizon.endDate) : "Huidig saldo", v.balance === null ? "Saldo onbekend" : money2(v.balance), balanceSub, "wallet", `<p>Dit is de rekeningstand op basis van je vastgelegde banksaldo en beschikbare bankboekingen. ${balanceDate ? `Het startpunt is het saldo-ijkpunt van ${date(balanceDate)}. Daarna tellen beschikbare bankboekingen mee tot en met ${date(balance.toDate || p.asOfDate)}.` : ""} Dit is geen automatische bevestiging van je bank.</p>${qualityHelp(p)}`, "balance")}${kpi("minimum", "Laagste prognose", money2(v.minimum), `${date(v.minimumDate)} · ${status(p.status)}`, "chart", `<p>Het laagste verwachte saldo vanaf vandaag tot vlak vóór je volgende salaris- of zakgeldontvangst, inclusief je huidige saldo. Deze KPI verandert niet wanneer je de grafiekperiode wisselt.</p>${qualityHelp(p)}`)}${kpi("buffer", "Buffer", money2(v.buffer), "Buffer instellen", "shield", `<p>De buffer is de veiligheidsmarge die je op deze rekening wilt houden. Veilig te sparen op maandultimo beschermt deze marge. Je buffer is geen aparte bankboeking.</p>`, "settings")}</div>${warning}${savingsWarning}<div class="p3-outlook-footer"><span class="p3-account-name">Rekening: ${escape2(profile.name)}</span>${qualityActions}${reconciliations}</div>`;
+    return `<div class="p3-kpis">${kpi("free", savingTitle, amount === null ? "—" : money2(amount), freeSub, "income", calculationHelp(p) + qualityHelp(p))}${kpi("balance", p.horizon.endDate < p.asOfDate ? "Saldo op " + date(p.horizon.endDate) : "Huidig saldo", v.balance === null ? "Saldo onbekend" : money2(v.balance), balanceSub, "wallet", balance.source === "external" ? `<p>Rechtstreeks ontvangen van ING. ${escape2(balance.providerType)} · opgehaald ${escape2(new Date(balance.fetchedAt).toLocaleString("nl-NL"))}. Er zijn geen transacties bij dit bedrag opgeteld of afgetrokken.</p>` : `<p>Dit is de rekeningstand op basis van je vastgelegde banksaldo en beschikbare bankboekingen. ${balanceDate ? `Het startpunt is het saldo-ijkpunt van ${date(balanceDate)}. Daarna tellen beschikbare bankboekingen mee tot en met ${date(balance.toDate || p.asOfDate)}.` : ""} Dit is geen automatische bevestiging van je bank.</p>${qualityHelp(p)}`, "balance")}${kpi("minimum", "Laagste prognose", money2(v.minimum), `${date(v.minimumDate)} · ${status(p.status)}`, "chart", `<p>Het laagste verwachte saldo vanaf vandaag tot vlak vóór je volgende salaris- of zakgeldontvangst, inclusief je huidige saldo. Deze KPI verandert niet wanneer je de grafiekperiode wisselt.</p>${qualityHelp(p)}`)}${kpi("buffer", "Buffer", money2(v.buffer), "Buffer instellen", "shield", `<p>De buffer is de veiligheidsmarge die je op deze rekening wilt houden. Veilig te sparen op maandultimo beschermt deze marge. Je buffer is geen aparte bankboeking.</p>`, "settings")}</div>${warning}${savingsWarning}<div class="p3-outlook-footer"><span class="p3-account-name">Rekening: ${escape2(profile.name)}</span>${qualityActions}${reconciliations}</div>`;
   }
   function yearHtml(year, getMonth) {
     const v = yearView(year, getMonth), max = Math.max(1, ...v.months.filter((m) => !m.missing).flatMap((m) => [m.income, m.spent]));
@@ -11334,6 +11412,7 @@ html body.v4-app .transaction-overview-credit{color:var(--green)}
       if (!d) return;
       selectedDay = day;
       root2.querySelectorAll("g[data-p3-point]").forEach((point) => point.setAttribute("aria-pressed", String(point.dataset.p3Point === day)));
+      if (!root2.querySelector("[data-p3-day]")) return;
       root2.querySelector("[data-p3-day]").value = day;
       const detail = root2.querySelector("[data-p3-point-detail]");
       detail.hidden = false;
@@ -11455,7 +11534,7 @@ html body.v4-app .transaction-overview-credit{color:var(--green)}
       year != null ? year : year = Number(month.slice(0, 4));
       const bounds = dashboardPeriod({ month, today: deps.today() });
       root2.classList.add("p3-dashboard");
-      root2.insertAdjacentHTML("beforeend", `<div class="p3-surface"><section class="p3-panel p3-outlook"><div class="p3-toolbar"><div><h2>Vooruitblik</h2></div><div class="p3-context" role="group" aria-label="Dashboardcontext">${["gezamenlijk", "persoonlijk"].map((c) => `<button type="button" data-p3-context="${c}" aria-pressed="${context === c}">${c === "gezamenlijk" ? "Gezamenlijk" : "Persoonlijk"}</button>`).join("")}</div>${!deps.personalRole() ? `<label class="p3-person" ${context === "gezamenlijk" ? "hidden" : ""}>Persoon <select data-p3-person><option value="dion" ${localPerson === "dion" ? "selected" : ""}>Dion</option><option value="dara" ${localPerson === "dara" ? "selected" : ""}>Dara</option></select></label>` : ""}<div class="p3-filters" role="group" aria-label="Prognoseperiode">${[["month", "Deze maand"], ["7", "7 dagen"], ["14", "14 dagen"], ["custom", "Eigen datum"], ["salary", "Volgend salaris"]].map(([value, title]) => `<button type="button" data-p3-filter="${value}" aria-pressed="${filter === value}">${title}</button>`).join("")}</div></div><label class="p3-custom" ${filter === "custom" ? "" : "hidden"}>Tot en met <input type="date" data-p3-custom min="${bounds.minDate}" max="${bounds.maxDate}" value="${custom}" required></label><div data-p3-outlook></div></section><div class="p3-main"><section class="p3-panel">${head("Saldo-ontwikkeling", info("chart", "Saldo-ontwikkeling", "<p>Berekend saldo uit planning en bankboekingen. Oranje toont het verleden, groen vandaag en de toekomst. Budgetuitgaven zonder datum zijn geschat.</p><p>Het minimum en de bufferlijn blijven in de grafiek zichtbaar. Kies een dag voor de bijbehorende bedragen en betalingen.</p>"))}<p class="p3-period" data-p3-period aria-live="polite"></p><div data-p3-chart></div></section><section class="p3-panel">${head("Betalingen in deze periode")}<p class="p3-caption">Toekomstige vaste lasten en inkomsten na vandaag.</p><ul class="p3-payments" data-p3-payments tabindex="0" aria-label="Toekomstige vaste betalingen en inkomsten"></ul></section></div><div class="p3-summary" data-p3-summary></div><section class="p3-panel p3-year" data-p3-year-panel></section></div>`);
+      root2.insertAdjacentHTML("beforeend", `<div class="p3-surface"><section class="p3-panel p3-outlook"><div class="p3-toolbar"><div><h2>Vooruitblik</h2></div><div class="p3-context" role="group" aria-label="Dashboardcontext">${["gezamenlijk", "persoonlijk"].map((c) => `<button type="button" data-p3-context="${c}" aria-pressed="${context === c}">${c === "gezamenlijk" ? "Gezamenlijk" : "Persoonlijk"}</button>`).join("")}</div>${!deps.personalRole() ? `<label class="p3-person" ${context === "gezamenlijk" ? "hidden" : ""}>Persoon <select data-p3-person><option value="dion" ${localPerson === "dion" ? "selected" : ""}>Dion</option><option value="dara" ${localPerson === "dara" ? "selected" : ""}>Dara</option></select></label>` : ""}<div class="p3-filters" role="group" aria-label="Prognoseperiode">${[["month", "Deze maand"], ["7", "7 dagen"], ["14", "14 dagen"], ["custom", "Eigen datum"], ["salary", "Volgend salaris"]].map(([value, title]) => `<button type="button" data-p3-filter="${value}" aria-pressed="${filter === value}">${title}</button>`).join("")}</div></div><label class="p3-custom" ${filter === "custom" ? "" : "hidden"}>Tot en met <input type="date" data-p3-custom min="${bounds.minDate}" max="${bounds.maxDate}" value="${custom}" required></label><div data-p3-outlook></div></section><div class="p3-main"><section class="p3-panel">${head("Saldo-ontwikkeling", info("chart", "Saldo-ontwikkeling", "<p>Bij een bruikbare ING-opgave begint de actuele prognose bij die bankstand, met resterende planning en budgetten. Anders geldt de bestaande saldoreconstructie. Oranje toont het verleden, groen vandaag en de toekomst. Budgetuitgaven zonder datum zijn geschat.</p><p>Het minimum en de bufferlijn blijven in de grafiek zichtbaar. Kies een dag voor de bijbehorende bedragen en betalingen.</p>"))}<p class="p3-period" data-p3-period aria-live="polite"></p><div data-p3-chart></div></section><section class="p3-panel">${head("Betalingen in deze periode")}<p class="p3-caption">Toekomstige vaste lasten en inkomsten na vandaag.</p><ul class="p3-payments" data-p3-payments tabindex="0" aria-label="Toekomstige vaste betalingen en inkomsten"></ul></section></div><div class="p3-summary" data-p3-summary></div><section class="p3-panel p3-year" data-p3-year-panel></section></div>`);
       const isInfoOpen = (panel) => typeof panel.showPopover === "function" ? panel.matches(":popover-open") : panel.dataset.open === "true";
       const closeInfo = (panel) => {
         var _a2;
@@ -11815,11 +11894,12 @@ html body.v4-app .transaction-overview-credit{color:var(--green)}
         const state2 = getState(), profiles = (state2.accountProfiles || []).filter((profile) => selectedProfileId ? profile.id === selectedProfileId : !owner || profile.accountOwner === owner);
         panel.innerHTML = `<h3>Rekeningstanden</h3><p class="hint">Gebruik het geboekte banksaldo aan het einde van een bankdag. Stand tot en met ${dateNL(today())}.</p>${profiles.length ? profiles.map((profile) => {
           const projection = selectAccountBalance(state2, { ...options(), accountProfileId: profile.id, toDate: today() });
+          const current = selectCurrentAccountBalance(state2, { ...options(), accountProfileId: profile.id, toDate: today() });
           const history = checkpointHistory(state2, profile.id, getScope());
           const active2 = new Set(history.active.map((row) => row.id));
-          return `<article class="balance-account" data-balance-account="${escape3(profile.id)}"><div class="u4-receipt-head"><div><h4>${escape3(profile.name || profile.bank || "Bankrekening")}</h4><p class="hint balance-identifier">${escape3(profile.identifier || "")}</p></div><div><strong class="balance-amount" data-balance-value>${euro(projection.balanceCents)}</strong><span class="balance-status" data-balance-status>${statusLabels[projection.status]}</span></div></div>
-          <p class="hint">${projection.checkpoint ? `${projection.checkpoint.source === "provider-observation" ? "Vanaf providersaldo" : "Vanaf ijkpunt"} ${dateNL(projection.checkpoint.asOfDate)}${projection.observedAt ? " · " + escape3(recordedAt(projection.observedAt)) : ""} · ${euro(projection.openingCents)}` : "Nog geen saldo-ijkpunt."}</p>
-          <details class="balance-explanation"><summary>Controle en herkomst</summary><p>Bankbronnen: ${statusLabels[projection.quality.bankSources] || "Onzeker"}. Dekking: ${{ complete: "bekend compleet", partial: "gedeeltelijk", unknown: "onbekend" }[projection.quality.coverage]}. Opslag: ${projection.quality.storage === "verified" ? "gegevens beschikbaar" : "afhankelijkheden ontbreken"}.</p><ul>${reasonMarkup(projection.reasons)}</ul><p>Bevestigde mutaties: ${euro(projection.confirmedCents)} · Voorlopige mutaties: ${euro(projection.provisionalCents)}.</p></details>
+          return `<article class="balance-account" data-balance-account="${escape3(profile.id)}"><div class="u4-receipt-head"><div><h4>${escape3(profile.name || profile.bank || "Bankrekening")}</h4><p class="hint balance-identifier">${escape3(profile.identifier || "")}</p></div><div><strong class="balance-amount" data-balance-value>${euro(current.balanceCents)}</strong><span class="balance-status" data-balance-status>${current.source === "external" ? "Banksaldo · " + escape3(current.providerType) : "Reconstructie · " + statusLabels[projection.status]}</span></div></div>
+          <p class="hint">${current.source === "external" ? `Rechtstreeks van de bank · ${current.balanceType === "expected" ? "Verwacht saldo" : current.balanceType === "available" ? "Beschikbaar saldo" : "Geboekt saldo"} · ${escape3(recordedAt(current.observedAt || current.fetchedAt))}` : projection.checkpoint ? `${projection.checkpoint.source === "provider-observation" ? "Vanaf providersaldo" : "Vanaf ijkpunt"} ${dateNL(projection.checkpoint.asOfDate)}${projection.observedAt ? " · " + escape3(recordedAt(projection.observedAt)) : ""} · ${euro(projection.openingCents)}` : "Nog geen saldo-ijkpunt."}</p>
+          <details class="balance-explanation"><summary>Controle en herkomst</summary>${current.source === "external" ? "<p>Onderstaande controle betreft de afzonderlijke reconstructie. Deze mutaties worden niet op het externe banksaldo toegepast.</p>" : ""}<p>Bankbronnen: ${statusLabels[projection.quality.bankSources] || "Onzeker"}. Dekking: ${{ complete: "bekend compleet", partial: "gedeeltelijk", unknown: "onbekend" }[projection.quality.coverage]}. Opslag: ${projection.quality.storage === "verified" ? "gegevens beschikbaar" : "afhankelijkheden ontbreken"}.</p><ul>${reasonMarkup(projection.reasons)}</ul><p>Bevestigde mutaties: ${euro(projection.confirmedCents)} · Voorlopige mutaties: ${euro(projection.provisionalCents)}.</p></details>
           <div class="balance-actions"><button type="button" class="primary small" data-balance-add ${accountIsArchived(profile) ? "disabled" : ""}>${projection.checkpoint ? "Banksaldo bijwerken" : "Banksaldo invoeren"}</button>${accountIsArchived(profile) ? '<p class="hint">Heractiveer de rekening voor een nieuw banksaldo. Eerdere ijkpunten blijven raadpleegbaar en corrigeerbaar.</p>' : ""}</div>
           <details class="balance-history"><summary>Eerdere ijkpunten (${history.rows.length})</summary>${history.rows.map((row) => {
             var _a2, _b;
@@ -14922,11 +15002,11 @@ html body.v4-app .transaction-overview-credit{color:var(--green)}
     return state2;
   }
   function createTransactionSavingsEntry(tx, state2) {
-    var _a2, _b, _c, _d;
+    var _a2, _b, _c;
     const type = getTransactionClassification(tx), goalId = tx.savingsGoalId || ((_a2 = tx.processing) == null ? void 0 : _a2.savingsGoalId);
     if (!["sparen", "naar-spaarrekening", "van-spaarrekening"].includes(type) || !goalId || getTransactionProcessingStatus(tx) !== "goedgekeurd") return null;
     if (!allGoals(state2).some(({ goal }) => goal.id === goalId)) return null;
-    const month = String(tx.transactionDate || ((_b = tx.bankOriginal) == null ? void 0 : _b.bankDate) || tx.date || "").slice(0, 7), amount = money3(Math.abs(Number((_d = tx.amount) != null ? _d : (_c = tx.processing) == null ? void 0 : _c.processedAmount) || 0)) * (type === "van-spaarrekening" ? -1 : 1);
+    const month = getTransactionDate(tx).slice(0, 7), amount = money3(Math.abs(Number((_c = tx.amount) != null ? _c : (_b = tx.processing) == null ? void 0 : _b.processedAmount) || 0)) * (type === "van-spaarrekening" ? -1 : 1);
     const candidates = (state2.savingsGoalLedger || []).filter((entry) => entry.goalId === goalId && entry.month === month && entry.active !== false && !entry.transactionId && entry.source === "planned");
     const planned = amount > 0 ? candidates.find((entry) => Math.abs(Number(entry.plannedAmount || entry.effectiveAmount) - amount) <= 0.01) || (candidates.length === 1 ? candidates[0] : null) : null;
     return { id: `saving-${tx.id}`, transactionId: tx.id, sourceTransactionId: tx.sourceTransactionId || "", importBatchId: tx.importBatchId || "", goalId, month, plannedAmount: 0, actualAmount: amount, effectiveAmount: amount, matchedContributionId: (planned == null ? void 0 : planned.id) || "", status: planned && Math.abs(amount - Number(planned.plannedAmount || 0)) > 4e-3 ? "afwijkend" : "uitgevoerd", source: getTransactionSource(tx) === "manual" ? "manual-transaction" : planned ? "bank-match" : "bank-import", active: true, createdAt: tx.createdAt || tx.approvedAt || (/* @__PURE__ */ new Date(0)).toISOString(), updatedAt: tx.approvedAt || tx.createdAt || (/* @__PURE__ */ new Date(0)).toISOString() };
@@ -17247,7 +17327,8 @@ html body.v4-app .transaction-overview-credit{color:var(--green)}
     return selectBankTransactions(state, { ...options, imports });
   }
   function getAccountMonthTransactions(account, month = getSelectedMonth()) {
-    return currentBankTransactions({ month, account });
+    var _a2, _b, _c, _d;
+    return selectAdministrativeBankTransactions(state, { account, month, imports: [...((_d = (_c = (_b = (_a2 = window.FinizeUpdate4) == null ? void 0 : _a2.importStore) == null ? void 0 : _b.bankReadCache) == null ? void 0 : _c.values) == null ? void 0 : _d.call(_c)) || []] });
   }
   function transactionDisplayAmount(tx) {
     if (tx.bankAmount !== void 0) return tx.bankAmount;
@@ -20839,7 +20920,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
       return;
     }
     const date2 = existing ? getTransactionDate(existing) : manualDefaultDate(month, today), categories = jointVariableCategoryOptions((existing == null ? void 0 : existing.category) || "", destination, date2.slice(0, 7)), name = ownerLabel(account);
-    modal.innerHTML = `<div class="modal joint-transaction-fullscreen-editor transaction-detail-editor"><div class="transaction-detail-head"><h2>Transactie ${existing ? "aanpassen" : "toevoegen"}</h2><button class="ghost" id="btnClose${suffix}" aria-label="Sluiten">${iconSvg("close")}</button></div>${existing ? `<div class="transaction-detail-identity"><span class="transaction-overview-icon" aria-hidden="true">${iconSvg(categoryIconName(existing.category || ""))}</span><div><strong>${textSafe(compactTransactionLabel(existing))}</strong><small>${textSafe(formatDateNL(date2))}</small></div></div>` : ""}<div class="modal-grid transaction-detail-fields"><label class="full">Omschrijving<input id="${prefix}Description" type="text" value="${attrSafe((existing == null ? void 0 : existing.description) || "")}"></label><label>Bedrag<input id="${prefix}Amount" type="number" step="0.01" inputmode="decimal" value="${existing ? Number(existing.amount) || "" : ""}"></label><label>Datum<input id="${prefix}Date" type="date" required max="${today}" value="${attrSafe(date2)}"></label><label data-manual-category>Categorie<select id="${prefix}Category">${categories.map((category) => `<option value="${attrSafe(category)}" ${category === (existing == null ? void 0 : existing.category) ? "selected" : ""}>${textSafe(category)}</option>`).join("")}</select></label><div class="transaction-detail-account"><span>Betaald vanuit</span><strong>${textSafe(name)}</strong></div><label class="full">Notitie<input id="${prefix}Note" value="${attrSafe((existing == null ? void 0 : existing.note) || "")}"></label><div class="transaction-processing-fields full">${financialProcessingFields(prefix, destination, existing || {})}</div></div><p class="hint" data-p4-error role="alert"></p>${existing ? `<button class="ghost" data-p4-open-coverage="${attrSafe(existing.id)}">Spaardekking beheren</button>` : ""}<div class="modal-actions"><button class="ghost" id="btnCancel${suffix}">Annuleren</button><button class="primary" id="btnSave${suffix}">${existing ? "Wijzigingen opslaan" : "Transactie opslaan"}</button></div></div>`;
+    modal.innerHTML = `<div class="modal joint-transaction-fullscreen-editor transaction-detail-editor"><div class="transaction-detail-head"><h2>Transactie ${existing ? "aanpassen" : "toevoegen"}</h2><button class="ghost" id="btnClose${suffix}" aria-label="Sluiten">${iconSvg("close")}</button></div>${existing ? `<div class="transaction-detail-identity"><span class="transaction-overview-icon" aria-hidden="true">${iconSvg(categoryIconName(existing.category || ""))}</span><div><strong>${textSafe(compactTransactionLabel(existing))}</strong><small>${textSafe(formatDateNL(date2))}</small></div></div>` : ""}<div class="modal-grid transaction-detail-fields"><label class="full">Omschrijving<input id="${prefix}Description" type="text" value="${attrSafe((existing == null ? void 0 : existing.description) || "")}"></label><label>Bedrag<input id="${prefix}Amount" type="number" step="0.01" inputmode="decimal" value="${existing ? Number(existing.amount) || "" : ""}"></label><label>Betaaldatum<input id="${prefix}Date" type="date" required max="${today}" value="${attrSafe(date2)}"></label><label data-manual-category>Categorie<select id="${prefix}Category">${categories.map((category) => `<option value="${attrSafe(category)}" ${category === (existing == null ? void 0 : existing.category) ? "selected" : ""}>${textSafe(category)}</option>`).join("")}</select></label><div class="transaction-detail-account"><span>Betaald vanuit</span><strong>${textSafe(name)}</strong></div><label class="full">Notitie<input id="${prefix}Note" value="${attrSafe((existing == null ? void 0 : existing.note) || "")}"></label><div class="transaction-processing-fields full">${financialProcessingFields(prefix, destination, existing || {})}</div></div><p class="hint" data-p4-error role="alert"></p>${existing ? `<button class="ghost" data-p4-open-coverage="${attrSafe(existing.id)}">Spaardekking beheren</button>` : ""}<div class="modal-actions"><button class="ghost" id="btnCancel${suffix}">Annuleren</button><button class="primary" id="btnSave${suffix}">${existing ? "Wijzigingen opslaan" : "Transactie opslaan"}</button></div></div>`;
     modal.classList.add("open", "joint-transaction-modal-open");
     bindFinancialProcessingFields(modal, prefix, destination, existing, account);
     const close = () => modal.classList.remove("open", "joint-transaction-modal-open");
@@ -20863,7 +20944,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
         const leavingSalary = existing && getTransactionClassification(existing) === "salaris" && type !== "salaris";
         const financialDestination = type === "salaris" && ["dion", "dara"].includes(chosenSalaryPerson) ? chosenSalaryPerson : explicitNewLink && ["salaris", "inkomen"].includes(type) && (incomeSource == null ? void 0 : incomeSource.legacyKind) === "salary" && ["dion", "dara"].includes(incomeSource.eigenaar) ? incomeSource.eigenaar : leavingSalary ? account : destination;
         const next = { ...existing || {}, ...fields2, salaryPersonId: type === "salaris" ? financialDestination : "", id: (existing == null ? void 0 : existing.id) || uid(), date: date3, transactionDate: date3, owner: financialDestination, financialFor: financialDestination, budgetOwner: financialDestination, category, amount, description: document.getElementById(prefix + "Description").value.trim(), note: document.getElementById(prefix + "Note").value.trim(), kind: income ? "inkomen" : "uitgave", createdAt: (existing == null ? void 0 : existing.createdAt) || (/* @__PURE__ */ new Date()).toISOString(), fixedExpenseId: (fixed == null ? void 0 : fixed.itemId) || "", fixedOccurrenceId: (fixed == null ? void 0 : fixed.id) || "", fixedOccurrenceMonth: (fixed == null ? void 0 : fixed.month) || "", incomeSourceId };
-        if (existing == null ? void 0 : existing.processing) next.processing = { ...existing.processing, ...fields2, transactionType: type, category, budgetOwner: financialDestination, processedAmount: amount, fixedExpenseId: next.fixedExpenseId, fixedOccurrenceId: next.fixedOccurrenceId, fixedOccurrenceMonth: next.fixedOccurrenceMonth, incomeSourceId: next.incomeSourceId };
+        if (existing == null ? void 0 : existing.processing) next.processing = { ...existing.processing, ...fields2, processingDate: date3, transactionType: type, category, budgetOwner: financialDestination, processedAmount: amount, fixedExpenseId: next.fixedExpenseId, fixedOccurrenceId: next.fixedOccurrenceId, fixedOccurrenceMonth: next.fixedOccurrenceMonth, incomeSourceId: next.incomeSourceId };
         const candidate = cloneState(state);
         upsertManualFinancialTransaction(candidate, next, account, { today: localTransactionToday() });
         button.disabled = true;
@@ -23642,7 +23723,8 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
       const select = () => {
         var _a2;
         const result3 = selectDailyLiquidity(state, { ...options, imports, monthlyForecast: (_, month) => monthlyFinancialForecast(month), scope: { householdId: scope, accountProfiles: state.accountProfiles || [] } });
-        return options.withFinancialBasis ? { ...result3, financialBasis: (_a2 = DataAdapter.store().head) == null ? void 0 : _a2.sha256 } : result3;
+        const view = attachCurrentBalance(state, { ...options, imports, scope: { householdId: scope, accountProfiles: state.accountProfiles || [] } }, result3);
+        return options.withFinancialBasis ? { ...view, financialBasis: (_a2 = DataAdapter.store().head) == null ? void 0 : _a2.sha256 } : view;
       };
       let result2 = select();
       if (state.__finizePartialHistory && CloudAdapter.recordSession && result2.requiredMonths.some((month) => {
@@ -25727,7 +25809,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
         if (((_b = row.bankOriginal) == null ? void 0 : _b.valid) && !isExplicitlyApproved(row)) errors.push({ rowId: row.id, code: "approval", message: "Keur deze transactie expliciet goed voordat je de import verwerkt." });
         const p = row.processing || {};
         rowProcessingValidation(row, state2).errors.forEach((error2) => errors.push({ ...error2, rowId: row.id }));
-        if (!parseDate(p.processingDate)) errors.push({ rowId: row.id, code: "date", message: "Ongeldige verwerkingsdatum." });
+        if (!parseDate(p.processingDate)) errors.push({ rowId: row.id, code: "date", message: "Ongeldige betaaldatum." });
         if (!Number.isFinite(Number(p.processedAmount))) errors.push({ rowId: row.id, code: "amount", message: "Verwerkt bedrag ontbreekt." });
         if (!OWNERS2.includes(p.budgetOwner)) errors.push({ rowId: row.id, code: "owner", message: "Budgeteigenaar ontbreekt." });
         if (p.transactionType === "maandelijkse-bijdrage" && !["dion", "dara"].includes(p.budgetOwner)) errors.push({ rowId: row.id, code: "owner", message: "Kies Dion of Dara als ontvanger van het zakgeld." });
@@ -25850,13 +25932,13 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
           var _a3, _b;
           const lineType = part.transactionType || type;
           const kind = transactionKind(lineType, part.include);
-          if (lineType === "uitgave" && !part.fixedExpenseId) part.budgetItemId = bindBudgetAssignment(state2, row.bankOriginal.bankDate.slice(0, 7), part.budgetOwner, part);
+          if (lineType === "uitgave" && !part.fixedExpenseId) part.budgetItemId = bindBudgetAssignment(state2, getTransactionDate(row).slice(0, 7), part.budgetOwner, part);
           const salary = lineType === "salaris" && p.salaryLinkVersion === 117 ? salaryLink({ ...row, processing: p }, state2, { requireChoice: true }) : null;
           if (salary) part.budgetOwner = salary.salaryPersonId;
           const tx = {
             id: part.id,
-            date: row.bankOriginal.bankDate,
-            transactionDate: row.bankOriginal.bankDate,
+            date: getTransactionDate(row),
+            transactionDate: getTransactionDate(row),
             amount: round23(part.amount),
             description: row.bankOriginal.description,
             category: part.category || "Ongecategoriseerd",
@@ -25936,6 +26018,10 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
             });
           }
         }
+      }
+      for (const prior of state2.transactions || []) if (prior.importBatchId === draft.id && draft.rows.some((row) => row.id === prior.importTransactionId)) {
+        affectedMonths.add(getTransactionDate(prior).slice(0, 7));
+        if (prior.transactionDate) affectedMonths.add(prior.transactionDate.slice(0, 7));
       }
       const internalPairs = detectInternalPairs(transactions, state2);
       return { ok: true, sourceBatch: draft, importId: draft.id, transactions, replacements, savingsEntries, advances, repayments, internalPairs, fixedAdjustments, affectedMonths: [...affectedMonths], counts, duplicateCount: draft.summary.duplicateCount || 0, totalIncome: draft.summary.totalIncome, totalExpenses: draft.summary.totalExpenses };
@@ -26565,7 +26651,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
     }
     function selectFixedOccurrence(root2, row, line, { resetMonth = false } = {}) {
       if (!line.fixedExpenseId) return;
-      if (resetMonth || !line.fixedOccurrenceMonth) line.fixedOccurrenceMonth = String(row.bankOriginal.bankDate).slice(0, 7);
+      if (resetMonth || !line.fixedOccurrenceMonth) line.fixedOccurrenceMonth = getTransactionDate(row).slice(0, 7);
       const month = line.fixedOccurrenceMonth;
       const occurrences = u3PlannedOccurrences(resolveFixedExpensesForMonth(root2.state, month), month).filter((item) => item.itemId === line.fixedExpenseId);
       if (!occurrences.some((item) => item.id === line.fixedOccurrenceId)) line.fixedOccurrenceId = occurrences.length === 1 ? occurrences[0].id : "";
@@ -26628,14 +26714,14 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
       if (target.processing.transactionType === "vaste-last" && target.processing.fixedOccurrenceId && !String(target.processing.fixedOccurrenceId).startsWith(target.processing.fixedExpenseId + ":")) target.processing.fixedOccurrenceId = "";
     }
     function occurrenceFields(root2, row, line, split = false) {
-      const month = line.fixedOccurrenceMonth || String(row.bankOriginal.bankDate).slice(0, 7);
+      const month = line.fixedOccurrenceMonth || getTransactionDate(row).slice(0, 7);
       const attr = split ? "data-u4-split-field" : "data-u4-field";
       const occurrences = /^\d{4}-(0[1-9]|1[0-2])$/.test(month) ? u3PlannedOccurrences(resolveFixedExpensesForMonth(root2.state, month), month).filter((item) => item.itemId === line.fixedExpenseId) : [];
-      return `<label>Geplande maand<input type="month" ${attr}="fixedOccurrenceMonth" value="${esc(month)}"></label><label>Betaalmoment<select ${attr}="fixedOccurrenceId"><option value="">Kies expliciet een betaalmoment</option>${occurrences.map((item) => option(item.id, `${displayDate(item.date)} · ${item.naam} · ${euro3(item.amount)}`, line.fixedOccurrenceId || "")).join("")}</select></label><span class="u4-muted">Koppel het juiste betaalmoment. Na goedkeuring telt het werkelijk betaalde bedrag voor dit moment. De toekomstige planning blijft behouden bij Planning niet aanpassen.</span>`;
+      return `${month !== getTransactionDate(row).slice(0, 7) ? '<p role="status" class="u4-muted">De betaaldatum valt buiten de gekoppelde maand. Controleer het betaalmoment; de bestaande koppeling blijft behouden.</p>' : ""}<label>Geplande maand<input type="month" ${attr}="fixedOccurrenceMonth" value="${esc(month)}"></label><label>Betaalmoment<select ${attr}="fixedOccurrenceId"><option value="">Kies expliciet een betaalmoment</option>${occurrences.map((item) => option(item.id, `${displayDate(item.date)} · ${item.naam} · ${euro3(item.amount)}`, line.fixedOccurrenceId || "")).join("")}</select></label><span class="u4-muted">Koppel het juiste betaalmoment. Na goedkeuring telt het werkelijk betaalde bedrag voor dit moment. De toekomstige planning blijft behouden bij Planning niet aanpassen.</span>`;
     }
     function splitHtml(root2, row, split, index) {
       var _a2;
-      const p = row.processing, family = transactionFamily(p), month = split.refundMonth || row.bankOriginal.bankDate.slice(0, 7), owner = split.budgetOwner || p.budgetOwner;
+      const p = row.processing, family = transactionFamily(p), month = split.refundMonth || getTransactionDate(row).slice(0, 7), owner = split.budgetOwner || p.budgetOwner;
       const fixed = split.transactionType === "vaste-last", excluded = split.transactionType === "niet-meetellen" || split.include === false;
       let destination = "", extra = "";
       if (family === "uitgave") {
@@ -26645,7 +26731,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
         destination = `<select data-u4-split-field="refundCategory" aria-label="Budgetcategorie split ${index + 1}"><option value="">Kies budgetcategorie</option>${categoryOptions(root2, owner, split.refundCategory, month)}</select>`;
         extra = `<label>Correctiemaand<input type="month" data-u4-split-field="refundMonth" value="${esc(split.refundMonth || (((_a2 = row.suggestion) == null ? void 0 : _a2.version) === 118 ? "" : month))}"></label>`;
       } else if (family === "sparen" && p.transactionType === "van-spaarrekening") {
-        destination = `<select data-u4-split-field="withdrawalBudgetCategory" aria-label="Optionele budgetcategorie split ${index + 1}"><option value="">Zonder budgetcorrectie</option>${categoryOptions(root2, owner, split.withdrawalBudgetCategory, row.bankOriginal.bankDate.slice(0, 7))}</select>`;
+        destination = `<select data-u4-split-field="withdrawalBudgetCategory" aria-label="Optionele budgetcategorie split ${index + 1}"><option value="">Zonder budgetcorrectie</option>${categoryOptions(root2, owner, split.withdrawalBudgetCategory, getTransactionDate(row).slice(0, 7))}</select>`;
       } else destination = `<span>${esc(family === "sparen" ? "Naar hetzelfde spaardoel" : split.category || "Verwerking")}</span>`;
       const errors = rowProcessingValidation(row, root2.state).errors.filter((error2) => error2.splitIndex === index);
       return `<div class="u4-split-line" data-u4-split="${index}"><div class="u4-split-row"><label><span class="sr-only">Bedrag split ${index + 1}</span><input type="number" min="0" step="0.01" value="${Number(split.amount) || 0}" data-u4-split-field="amount" aria-label="Bedrag split ${index + 1}"></label>${destination}<button type="button" class="danger-ghost small" data-u4-remove-split="${index}" aria-label="Split ${index + 1} verwijderen">×</button></div><div class="u4-context-grid">${!excluded ? `<label>Budgeteigenaar<select data-u4-split-field="budgetOwner">${OWNERS2.map((value) => option(value, ownerLabel2(value), owner)).join("")}</select></label>` : ""}${extra}</div>${errors.map((error2) => `<p class="u4-error" role="status">${esc(error2.message)}</p>`).join("")}</div>`;
@@ -26704,10 +26790,10 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
       var _a2, _b;
       const p = row.processing;
       if (((_a2 = p.splits) == null ? void 0 : _a2.length) || p.savingsContributionId) return [];
-      return savingsLinkProposals(projections, { transactionType: p.transactionType, month: row.bankOriginal.bankDate.slice(0, 7), owner: p.budgetOwner, goalId: p.savingsGoalId, amountCents: Math.round(Number(p.processedAmount) * 100), excludeTransactionId: (_b = projections.find((t) => t.transaction.importTransactionId === row.id)) == null ? void 0 : _b.id });
+      return savingsLinkProposals(projections, { transactionType: p.transactionType, month: getTransactionDate(row).slice(0, 7), owner: p.budgetOwner, goalId: p.savingsGoalId, amountCents: Math.round(Number(p.processedAmount) * 100), excludeTransactionId: (_b = projections.find((t) => t.transaction.importTransactionId === row.id)) == null ? void 0 : _b.id });
     }
     function savingsContributionFields(root2, row) {
-      const p = row.processing, month = row.bankOriginal.bankDate.slice(0, 7);
+      const p = row.processing, month = getTransactionDate(row).slice(0, 7);
       const projections = selectTransactionProjections(root2.state);
       const sources = projections.filter((t) => {
         var _a2;
@@ -26735,7 +26821,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
         var _a3;
         return option(type, ((_a3 = TYPE_GROUPS[1].items.find((item) => item[0] === type)) == null ? void 0 : _a3[1]) || type, p.transactionType);
       }).join("")}</select></label>${p.transactionType !== "salaris" ? `<label class="u2-checkbox"><input type="checkbox" data-u4-field="meetellenVoorVerdeling" ${p.meetellenVoorVerdeling !== false ? "checked" : ""}> Meetellen voor zakgeldverdeling</label><span class="u4-muted">Uitgevinkt blijft dit inkomen bij gezamenlijk, bijvoorbeeld om te sparen. Een spaarinleg telt één keer mee.</span>` : ""}${p.transactionType === "salaris" ? `<label>Salaris van<select data-u4-field="salaryPersonId"><option value="">Kies Dion of Dara</option>${["dion", "dara"].map((person) => option(person, ownerLabel2(person), p.salaryPersonId || "")).join("")}</select></label><span class="u4-muted">Salarismaand ${esc(originalSalaryMonth(row))}. Na goedkeuring vervangt deze ontvangst de salarisplanning van de gekozen persoon. Een eerdere handmatige ontvangst vervang je apart via Meer opties.</span>` : ""}</div>`;
-      if (family === "sparen") return `<div class="u4-dependent-grid"><label>Spaarbeweging<select data-u4-field="transactionType">${option("sparen", "Naar spaardoel", p.transactionType)}${option("naar-spaarrekening", "Naar spaarrekening", p.transactionType)}${option("van-spaarrekening", "Van spaarrekening", p.transactionType)}</select></label><label>Spaardoel<select data-u4-field="savingsGoalId">${goalOptions(root2, p.savingsGoalId)}</select></label>${["sparen", "naar-spaarrekening"].includes(p.transactionType) ? savingsContributionFields(root2, row) : ""}${p.transactionType === "van-spaarrekening" && !((_d = p.splits) == null ? void 0 : _d.length) ? `<label>Budgetcorrectie (optioneel)<select data-u4-field="withdrawalBudgetCategory"><option value="">Zonder budgetcorrectie</option>${categoryOptions(root2, p.budgetOwner, p.withdrawalBudgetCategory, row.bankOriginal.bankDate.slice(0, 7))}</select></label>` : ""}</div>`;
+      if (family === "sparen") return `<div class="u4-dependent-grid"><label>Spaarbeweging<select data-u4-field="transactionType">${option("sparen", "Naar spaardoel", p.transactionType)}${option("naar-spaarrekening", "Naar spaarrekening", p.transactionType)}${option("van-spaarrekening", "Van spaarrekening", p.transactionType)}</select></label><label>Spaardoel<select data-u4-field="savingsGoalId">${goalOptions(root2, p.savingsGoalId)}</select></label>${["sparen", "naar-spaarrekening"].includes(p.transactionType) ? savingsContributionFields(root2, row) : ""}${p.transactionType === "van-spaarrekening" && !((_d = p.splits) == null ? void 0 : _d.length) ? `<label>Budgetcorrectie (optioneel)<select data-u4-field="withdrawalBudgetCategory"><option value="">Zonder budgetcorrectie</option>${categoryOptions(root2, p.budgetOwner, p.withdrawalBudgetCategory, getTransactionDate(row).slice(0, 7))}</select></label>` : ""}</div>`;
       if (family === "overboeking") return `${incomingContributionFields(root2, row)}<div class="u4-dependent-grid"><label>Soort overboeking<select data-u4-field="transactionType">${TYPE_GROUPS[2].items.filter((item) => TRANSFER_TYPES.includes(item[0])).map(([type, label]) => option(type, label, p.transactionType)).join("")}</select></label></div>${transferFieldsHtml(root2, row)}`;
       if (family === "zakgeld") return '<p class="u4-dependent-hint">Kies Dion of Dara bij Budgeteigenaar.</p>';
       if (family === "extra-bijdrage") return incomingContributionFields(root2, row) + '<p class="u4-dependent-hint">De budgeteigenaar ontvangt deze extra bijdrage.</p>';
@@ -26789,7 +26875,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
       ${suggestionHtml(row)}
       ${(root2.state.transactions || []).filter((tx) => !isBankSource(tx) && tx.importTransactionId === row.id).map((tx) => `<button type="button" class="ghost small" data-u4-coverage="${escAttr(tx.id)}">Spaardekking · ${esc(tx.category)}${tx.splitId ? " · split " + esc(tx.splitId) : ""}</button>`).join("")}
       <div class="u4-row-grid">
-        <label>${p.transactionType === "vaste-last" ? "Bankdatum" : "Verwerkingsdatum"}<input type="date" data-u4-field="processingDate" value="${esc(p.transactionType === "vaste-last" ? original2.bankDate : p.processingDate)}" ${p.transactionType === "vaste-last" ? "readonly" : ""}></label>
+        <label>Betaaldatum<input type="date" data-u4-field="processingDate" value="${esc(getTransactionDate(row))}"></label>
         <label>Bedrag<input type="number" step="0.01" data-u4-field="${p.singleLineAmount !== void 0 ? "singleLineAmount" : "processedAmount"}" value="${Number((_b = p.singleLineAmount) != null ? _b : p.processedAmount) || 0}"></label>
         <label>Budgeteigenaar<select data-u4-field="budgetOwner">${ownerOptions(row)}</select></label>
         <label>Transactie<select data-u4-family>${familyOptions(family)}</select></label>
@@ -29064,10 +29150,10 @@ window.addEventListener('load', async () => {
     const scope = new URL('./', location.href);
     const registration = await navigator.serviceWorker.getRegistration(scope.href);
     if (!registration?.active || registration.scope !== scope.href || registration.active.scriptURL !== new URL('service-worker.js', scope).href) return;
-    const response = await fetch(new URL('index.html?finize-inline-shell=118-r36', scope), {cache:'no-store'});
+    const response = await fetch(new URL('index.html?finize-inline-shell=118-r37', scope), {cache:'no-store'});
     if (!response.ok) return;
     const html = await response.clone().text();
-    if (!html.includes('<meta name="finize-inline-release" content="118-r36">')) return;
+    if (!html.includes('<meta name="finize-inline-release" content="118-r37">')) return;
     for (const name of await caches.keys()) {
       if (!/^finize-v[\w.-]+$/.test(name)) continue;
       const cache = await caches.open(name);

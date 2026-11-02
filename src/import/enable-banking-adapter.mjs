@@ -41,7 +41,7 @@ export function normalizeProviderBalances(snapshot, scope) {
   return (snapshot.balances || []).map((raw, index) => {
     // CLBD is closing booked; ITBD interim booked. Available balances never seed P1.
     const type = ['CLBD', 'ITBD', 'OPBD'].includes(raw.balance_type) ? 'booked' :
-      ['CLAV', 'ITAV', 'OPAV', 'PRAV', 'FWAV'].includes(raw.balance_type) ? 'available' : null;
+      ['CLAV', 'ITAV', 'OPAV', 'PRAV', 'FWAV'].includes(raw.balance_type) ? 'available' : raw.balance_type === 'XPCD' ? 'expected' : null;
     const timestamp = raw.last_change_date_time;
     const boundary = raw.balance_type === 'CLBD' && validCalendarDate(raw.reference_date) ? 'end-of-bank-day' : 'timestamp';
     const asOfDate = boundary === 'end-of-bank-day' ? raw.reference_date : typeof timestamp === 'string' ? timestamp.slice(0, 10) : raw.reference_date;

@@ -20,7 +20,7 @@ test('N1 normale expense heeft real/budget 100',()=>{const p=project(manual({amo
 test('N2 income is geen negatieve expense',()=>{const p=project(manual({amount:100,kind:'inkomen'}));assert.equal(p.effects.incomeImpact,100);assert.equal(p.effects.realExpense,0);assert.equal(p.effects.accountCashflow,100);});
 test('N3 niet-goedgekeurd alle effecten nul',()=>assert.ok(Object.values(project(csv()).effects).every(value=>value===0)));
 test('N4 uitgesloten alle effecten nul',()=>assert.ok(Object.values(project(approved({kind:'niet-meetellen'})).effects).every(value=>value===0)));
-test('N5 transactiedatum voor booking/processing date',()=>{const p=project(approved({date:'2026-11-02',bookingDate:'2026-11-02',processing:{processingDate:'2026-12-01'}}));assert.equal(p.calendarMonth,'2026-10');});
+test('N5 gekozen betaaldatum bepaalt de administratieve maand',()=>{const p=project(approved({date:'2026-11-02',bookingDate:'2026-11-02',processing:{processingDate:'2026-12-01'}}));assert.equal(p.calendarMonth,'2026-12');});
 const occurrence={id:'hyp:2026-10-01',itemId:'hyp',month:'2026-10',amount:100};
 const fixed=(id,amount,extra={})=>approved({id,importTransactionId:id,amount,transactionType:'vaste-last',fixedExpenseId:'hyp',fixedOccurrenceId:occurrence.id,...extra});
 test('F1 planned 100 actual 105 deviation 5; geen planningwrite',()=>{const o=clone(occurrence),p=engine.fixedOccurrenceActuals(state([fixed('one',105)]),o);assert.equal(p.planned,100);assert.equal(p.actual,105);assert.equal(p.deviation,5);assert.deepEqual(o,occurrence);});

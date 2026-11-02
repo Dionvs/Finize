@@ -140,7 +140,7 @@ export function createTransactionSavingsEntry(tx,state){
   const type=getTransactionClassification(tx),goalId=tx.savingsGoalId||tx.processing?.savingsGoalId;
   if(!['sparen','naar-spaarrekening','van-spaarrekening'].includes(type)||!goalId||getTransactionProcessingStatus(tx)!=='goedgekeurd')return null;
   if(!allGoals(state).some(({goal})=>goal.id===goalId))return null;
-  const month=String(tx.transactionDate||tx.bankOriginal?.bankDate||tx.date||'').slice(0,7),amount=money(Math.abs(Number(tx.amount??tx.processing?.processedAmount)||0))*(type==='van-spaarrekening'?-1:1);
+  const month=getTransactionDate(tx).slice(0,7),amount=money(Math.abs(Number(tx.amount??tx.processing?.processedAmount)||0))*(type==='van-spaarrekening'?-1:1);
   const candidates=(state.savingsGoalLedger||[]).filter(entry=>entry.goalId===goalId&&entry.month===month&&entry.active!==false&&!entry.transactionId&&entry.source==='planned');
   const planned=amount>0?(candidates.find(entry=>Math.abs(Number(entry.plannedAmount||entry.effectiveAmount)-amount)<=.01)||(candidates.length===1?candidates[0]:null)):null;
   return {id:`saving-${tx.id}`,transactionId:tx.id,sourceTransactionId:tx.sourceTransactionId||'',importBatchId:tx.importBatchId||'',goalId,month,plannedAmount:0,actualAmount:amount,effectiveAmount:amount,matchedContributionId:planned?.id||'',status:planned&&Math.abs(amount-Number(planned.plannedAmount||0))>.004?'afwijkend':'uitgevoerd',source:getTransactionSource(tx)==='manual'?'manual-transaction':planned?'bank-match':'bank-import',active:true,createdAt:tx.createdAt||tx.approvedAt||new Date(0).toISOString(),updatedAt:tx.approvedAt||tx.createdAt||new Date(0).toISOString()};
