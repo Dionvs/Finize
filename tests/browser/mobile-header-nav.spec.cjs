@@ -44,13 +44,14 @@ for(const width of [195,320,390,430])test(`header en enkele navigatierij blijven
 });
 
 for(const width of [320,390])test(`compacte header en maandpil op ${width}px`,async({page},info)=>{
- await boot(page,width,false,test.info().project.use.baseURL+'/');await navigate(page,'gezamenlijk');
+ await boot(page,width,false,test.info().project.use.baseURL+'/');await page.evaluate(()=>state.meta.selectedMonth='2026-09');await navigate(page,'gezamenlijk');
  const header=page.locator('#tab-gezamenlijk .mobile-header-top');
  const sizes=await header.evaluate(h=>{
   const title=h.querySelector('.mobile-tab-title').getBoundingClientRect(),pill=h.querySelector('.month-picker-btn').getBoundingClientRect(),logo=h.querySelector('.mobile-brand-icon').getBoundingClientRect();
-  return {height:h.getBoundingClientRect().height,pillHeight:pill.height,titleCenter:title.top+title.height/2,pillCenter:pill.top+pill.height/2,titleTop:title.top,pillTop:pill.top,logoTop:logo.top,logoMiddle:logo.top+logo.height/2,pillBottom:pill.bottom};
+  return {height:h.getBoundingClientRect().height,titleHeight:title.height,titleRight:title.right,pillLeft:pill.left,fontSize:parseFloat(getComputedStyle(h.querySelector('.mobile-tab-title')).fontSize),pillHeight:pill.height,titleCenter:title.top+title.height/2,pillCenter:pill.top+pill.height/2,titleTop:title.top,pillTop:pill.top,logoTop:logo.top,logoMiddle:logo.top+logo.height/2,pillBottom:pill.bottom};
  });
  expect(sizes.height).toBeLessThanOrEqual(60);expect(sizes.pillHeight).toBe(25.25);
+ expect(sizes.fontSize).toBe(width===390?21:18);expect(sizes.titleHeight).toBe(25.25);expect(sizes.titleRight).toBeLessThanOrEqual(sizes.pillLeft);
  expect(Math.abs(sizes.titleTop-sizes.logoTop)).toBeLessThanOrEqual(1);
  expect(Math.abs(sizes.pillTop-sizes.logoTop)).toBeLessThanOrEqual(1);
  if(width===390)expect(Math.abs(sizes.pillBottom-sizes.logoMiddle)).toBeLessThanOrEqual(1);
