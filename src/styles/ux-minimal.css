@@ -1,7 +1,9 @@
 /* V118: local accessibility corrections, preserving incumbent layout. */
 .ux-action-card,.u5-goal-list-card{position:relative}
 body.v4-app button.ux-card-primary{position:absolute;inset:0;z-index:1;width:100%;height:100%;margin:0;padding:0;border:0;border-radius:inherit;background:transparent;box-shadow:none;transform:none}
+@media (hover: hover) and (pointer: fine){
 body.v4-app button.ux-card-primary:hover{background:transparent;box-shadow:none;transform:none}
+}
 body.v4-app button.ux-card-primary:focus-visible{outline:2px solid var(--navy-bright);outline-offset:2px}
 .ux-action-card .income-source-link,.ux-action-card .joint-transaction-delete,.u5-goal-list-card .goal-direct-order-controls{position:relative;z-index:2}
 

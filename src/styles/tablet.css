@@ -78,7 +78,9 @@ body.v4-app .value.is-negative{color:var(--red) !important}
     color:var(--text-dim) !important;
   }
   .v4-sidebar .tab-btn::before{content:none !important}
-  .v4-sidebar .tab-btn:hover{transform:none !important;background:rgba(88,124,76,.08) !important}
+  @media (hover: hover) and (pointer: fine){
+.v4-sidebar .tab-btn:hover{transform:none !important;background:rgba(88,124,76,.08) !important}
+}
   .v4-sidebar .tab-btn.active{
     color:var(--green) !important;
     background:linear-gradient(135deg,rgba(88,124,76,.17),rgba(224,232,203,.72)) !important;
@@ -146,7 +148,9 @@ body.v4-app .value.is-negative{color:var(--red) !important}
     box-shadow:0 9px 24px rgba(63,43,30,.065) !important;
     transform:none !important;
   }
-  body.v4-app .card:hover{transform:none !important}
+  @media (hover: hover) and (pointer: fine){
+body.v4-app .card:hover{transform:none !important}
+}
   .metric-value,.value,.u5-goal-detail-grid strong{font-variant-numeric:tabular-nums}
   .u5-primary-kpis{
     grid-template-columns:repeat(2,minmax(0,1fr));
@@ -167,7 +171,9 @@ body.v4-app .value.is-negative{color:var(--red) !important}
     text-align:left;
     cursor:pointer;
   }
-  button.u5-primary-kpi:hover{background:#fffdf9 !important}
+  @media (hover: hover) and (pointer: fine){
+button.u5-primary-kpi:hover{background:#fffdf9 !important}
+}
   button.u5-primary-kpi:focus-visible{outline:3px solid rgba(67,123,181,.25);outline-offset:2px}
   .u5-primary-kpi.tone-income{border-top-color:var(--green) !important}
   .u5-primary-kpi.tone-budget{border-top-color:var(--terracotta) !important}
@@ -210,7 +216,9 @@ body.v4-app .value.is-negative{color:var(--red) !important}
     text-align:left;
     cursor:pointer;
   }
-  button.overview-kpi-action:hover{background:#fffdf9 !important}
+  @media (hover: hover) and (pointer: fine){
+button.overview-kpi-action:hover{background:#fffdf9 !important}
+}
   button.overview-kpi-action:focus-visible{outline:3px solid rgba(67,123,181,.25);outline-offset:2px}
   .overview-kpi-row .metric-value{font-size:clamp(19px,1.7vw,28px)}
   .overview-budget-track{
@@ -315,7 +323,9 @@ body.v4-app .value.is-negative{color:var(--red) !important}
     min-height:80px;padding:9px;border:1px solid var(--border-soft);border-radius:14px;background:#fffaf4;
     color:var(--text);text-align:left;box-shadow:none;cursor:pointer
   }
-  .u5-goal-list-card:hover{transform:none;background:#fffdf9}
+  @media (hover: hover) and (pointer: fine){
+.u5-goal-list-card:hover{transform:none;background:#fffdf9}
+}
   .u5-goal-list-card.active{border-color:rgba(88,124,76,.55);background:var(--green-bg);box-shadow:inset 3px 0 0 var(--green)}
   .u5-goal-list-image{width:56px;height:56px;display:grid;place-items:center;border-radius:13px;background:var(--green-bg);background-size:cover;background-position:center;font-size:24px}
   .u5-goal-list-copy{display:grid;gap:6px;min-width:0;max-width:100%}

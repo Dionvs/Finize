@@ -1,10 +1,100 @@
-/* Layout-only corrections. Keep existing type sizes, colours and info controls. */
+/* Responsive layout and touch readability; financial values remain unchanged. */
 .u4-actions-shortcut{display:none}
+.month-picker-compact-label{display:none}
 
 @media (max-width:767px){
-  html body.v4-app[data-real-active-tab] .v4-main{width:100% !important;max-width:100% !important;min-width:0 !important}
+  .quick-toast{bottom:calc(var(--mobile-nav-height) + 24px)}
+  html body.v4-app[data-active-tab] .mobile-header-top{
+    display:grid !important;
+    grid-template-columns:minmax(0,1fr) auto;
+    align-items:center !important;
+    gap:4px 8px !important;
+    padding:8px !important;
+    height:auto !important;
+  }
+  html body.v4-app .mobile-header-top .mobile-brand{
+    grid-column:1;
+    grid-row:1;
+    min-width:0 !important;
+    height:auto !important;
+    align-items:center !important;
+  }
+  html body.v4-app .mobile-header-top .mobile-tab-title{margin:0;font-size:18px;font-weight:800;line-height:1.2;color:var(--text);overflow-wrap:anywhere}
+  html body.v4-app .mobile-status-pill{
+    grid-column:1/-1;
+    grid-row:2;
+    width:100%;
+    min-height:44px;
+    min-width:44px;
+    white-space:normal;
+    text-align:left;
+    line-height:1.3 !important;
+    font-size:11px !important;
+    overflow-wrap:anywhere;
+  }
+  html body.v4-app .mobile-header-top .mobile-month-slot{grid-column:2;grid-row:1;position:static !important;transform:none !important;margin-left:0 !important;max-width:100%;height:auto !important}
+  html body.v4-app[data-active-tab] .mobile-header-top #monthControl .month-picker-btn{min-height:44px !important;height:auto !important}
+  html body.v4-app :is(.mobile-status-pill,.joint-transaction-add-btn)::after{content:none}
+  html body.v4-app .v4-bottom-nav{
+    display:flex;
+    flex-wrap:nowrap;
+    gap:2px;
+    align-items:stretch;
+    height:auto !important;
+    padding:6px 6px calc(6px + env(safe-area-inset-bottom)) !important;
+    overflow-x:auto !important;
+    overflow-y:hidden !important;
+    overscroll-behavior-x:contain;
+    scroll-padding-inline:6px;
+    scrollbar-width:thin;
+  }
+  html body.v4-app .v4-bottom-nav .bottom-nav-btn{
+    flex:1 0 auto;
+    min-width:44px !important;
+    min-height:56px;
+    padding:4px 3px !important;
+    margin:0;
+    touch-action:manipulation;
+  }
+  html body.v4-app .v4-bottom-nav .bottom-nav-btn .bn-icon{width:28px !important;height:28px !important;flex-basis:28px !important}
+  html body.v4-app .v4-bottom-nav .bottom-nav-btn span:last-child{
+    white-space:nowrap !important;
+    overflow:visible;
+    overflow-wrap:normal;
+    line-height:1.3;
+    font-size:9.5px !important;
+  }
+  html body.v4-app .progress-fill{transition:none}
+  html body.v4-app :is(.p3-info-button,.goal-direct-order-arrow){min-width:44px !important;min-height:44px !important}
+  html body.v4-app .p3-info-button::after{content:none}
+  html body.v4-app .p3-chart-stats{grid-template-columns:repeat(auto-fit,minmax(min(100%,11rem),1fr))}
+  html body.v4-app .p3-chart-stat+.p3-chart-stat{border-left:0;padding-left:0}
+  html body.v4-app .goal-detail-editor summary{min-height:44px;display:flex;align-items:center}
+  html body.v4-app :is(button,summary){touch-action:manipulation;-webkit-user-select:none;user-select:none}
+  html body.v4-app :is(.mobile-kpi-value,.mobile-savings-kpis strong,.p3-savings-amount){white-space:nowrap !important;overflow-wrap:normal;overflow-x:auto}
+  @media(max-width:359px){
+    html body.v4-app .mobile-header-top .mobile-brand{gap:6px !important}
+    html body.v4-app .mobile-header-top .mobile-brand-icon{width:32px !important;height:32px !important;flex-basis:32px !important;border-radius:9px !important}
+    html body.v4-app .mobile-header-top .mobile-brand-icon img{width:30px !important;height:30px !important}
+    html body.v4-app .mobile-header-top .mobile-tab-title{font-size:16px}
+  }
+  @media(max-width:239px){
+    html body.v4-app .mobile-header-top{gap:4px !important;padding:4px !important}
+    html body.v4-app .mobile-header-top .mobile-brand{gap:4px !important}
+    html body.v4-app .mobile-header-top .mobile-brand-icon{width:24px !important;height:24px !important;flex-basis:24px !important}
+    html body.v4-app .mobile-header-top .mobile-brand-icon img{width:22px !important;height:22px !important}
+    html body.v4-app .mobile-header-top .mobile-tab-title{font-size:13px}
+    html body.v4-app .mobile-header-top .month-picker-label{display:none}
+    html body.v4-app .mobile-header-top .month-picker-compact-label{display:inline}
+    html body.v4-app[data-active-tab] .mobile-header-top #monthControl .month-picker-btn{padding:4px !important;font-size:9px !important;gap:3px !important;min-width:0 !important}
+    html body.v4-app .mobile-header-top .month-picker-btn .finize-action-icon{display:none}
+    html body.v4-app[data-active-tab] .mobile-header-top #monthControl .month-picker-btn::before{display:none !important}
+    html body.v4-app[data-active-tab] .mobile-header-top #monthControl .month-picker-btn::after{width:12px !important;height:12px !important;flex-basis:12px !important}
+  }
+  html body.v4-app[data-real-active-tab] .v4-main{width:100% !important;max-width:100% !important;min-width:0 !important;padding-bottom:calc(var(--mobile-nav-height,96px) + 24px) !important}
+  html,html body.v4-app .v4-main{scroll-padding-bottom:calc(var(--mobile-nav-height,96px) + 24px)}
   html body.v4-app[data-real-active-tab] .wrap .mobile-kpi-grid{
-    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+    grid-template-columns:repeat(auto-fit,minmax(min(100%,11rem),1fr)) !important;
     gap:10px !important;
     margin-bottom:12px !important;
   }
@@ -36,10 +126,10 @@
   html body.v4-app[data-real-active-tab] .wrap .mobile-kpi-grid :is(.mobile-kpi-label,.mobile-kpi-value,.mobile-kpi-edit-hint){
     white-space:normal !important;
     overflow:visible !important;
-    overflow-wrap:anywhere;
+    overflow-wrap:normal;
   }
   html body.v4-app[data-real-active-tab] .wrap .mobile-kpi-value{text-align:left !important}
-  html body.v4-app .mobile-savings-kpis{grid-template-columns:repeat(2,minmax(0,1fr)) !important;gap:10px}
+  html body.v4-app .mobile-savings-kpis{grid-template-columns:repeat(auto-fit,minmax(min(100%,11rem),1fr)) !important;gap:10px}
   html body.v4-app[data-real-active-tab] .wrap .personal-income-sources>div{
     flex-wrap:wrap;
     gap:3px 6px;
@@ -120,6 +210,15 @@
     text-decoration:none;
   }
   .u4-actions-shortcut:focus-visible{outline:2px solid var(--navy-bright);outline-offset:2px}
+}
+
+/* Input readability depends on available space and input capability, not user agent. */
+@media(max-width:767px),(any-pointer:coarse){
+  html body.v4-app :is(input:not([type=checkbox]):not([type=radio]),select,textarea){font-size:16px !important}
+}
+@media(prefers-reduced-motion:reduce){
+  .quick-toast,.quick-toast.show{transform:translateX(-50%);transition:opacity 100ms ease-out}
+  .u4-import-row.u4-validation-target{animation:none}
 }
 
 @media (min-width:768px) and (max-width:1199px){

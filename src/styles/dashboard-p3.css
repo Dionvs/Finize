@@ -7,7 +7,9 @@
 .p3-period{font-size:12px;line-height:1.5;color:var(--text-dim);margin:2px 0}
 .p3-head{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:24px}
 .p3-surface button{font:inherit;cursor:pointer;color:inherit;min-height:44px}
+@media (hover: hover) and (pointer: fine){
 .p3-surface button:hover{background:var(--green-bg)}
+}
 .p3-surface :is(button,input,select,summary):focus-visible{outline:3px solid var(--blue);outline-offset:3px}
 .p3-surface :is(input,select){font:inherit;font-size:16px;min-height:44px;max-width:100%}
 .p3-surface [hidden]{display:none!important}

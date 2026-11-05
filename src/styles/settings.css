@@ -9,7 +9,9 @@ html body.v4-app .v4-sidebar .tab-btn[hidden],html body.v4-app .v4-bottom-nav .b
 .bank-account-row>span{display:grid;gap:6px;min-width:0;overflow-wrap:anywhere}
 .bank-account-row>span>span{font-size:13px;font-weight:400;color:var(--text-dim);line-height:1.5}
 .bank-account-row-balance{text-align:right;font-variant-numeric:tabular-nums}
+@media (hover: hover) and (pointer: fine){
 .bank-account-row:hover{border-color:var(--green)}
+}
 .bank-account-archive-filter{display:flex;align-items:center;gap:10px;min-height:44px}
 .bank-account-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
 .bank-account-iban-field{grid-column:1/-1}

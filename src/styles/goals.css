@@ -12,7 +12,9 @@
 .goal-direct-order-arrow{display:grid;place-items:center;width:22px;height:20px;min-width:22px;min-height:20px;padding:0;border:0;border-radius:6px;background:transparent;box-shadow:none;color:var(--text-dim);cursor:pointer}
 .goal-direct-order-arrow::before{content:"";width:7px;height:7px;background:var(--finize-chevron) center/7px 7px no-repeat}
 .goal-direct-order-arrow.up::before{transform:rotate(180deg)}
+@media (hover: hover) and (pointer: fine){
 .goal-direct-order-arrow:hover:not(:disabled){background:var(--surface-2);transform:none}
+}
 .goal-direct-order-arrow:focus-visible{outline:2px solid var(--green);outline-offset:1px}
 .goal-direct-order-arrow:disabled{opacity:.22;cursor:default}
 .u2-goal-card>.goal-direct-order-controls{position:absolute;z-index:2;left:5px;top:17px}
@@ -21,7 +23,9 @@
 .u2-goal-accordion[data-reorder-goal]{position:relative}
 .u2-goal-accordion[data-reorder-goal]>.goal-direct-order-controls{position:absolute;z-index:3;left:0;top:22px;transform:translateY(-50%)}
 .u2-goal-accordion[data-reorder-goal]>summary .mobile-goal-row{padding-left:28px}
+@media (hover: hover) and (pointer: fine){
 .u2-goal-main:hover{background:rgba(95,126,70,.055)}
+}
 .u2-goal-image{width:52px;height:52px;border-radius:13px;background:var(--soft-green);display:grid;place-items:center;font-size:21px;background-size:cover;background-position:center}
 .u2-goal-copy{min-width:0;display:grid;gap:5px}
 .u2-goal-title{display:flex;align-items:center;justify-content:space-between;gap:6px}

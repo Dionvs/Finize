@@ -19,16 +19,20 @@ function checkpoint(s,date,amountCents){
 }
 const project=(s,month,today='2026-10-14',filter='month',custom='')=>selectDailyLiquidity(s,{accountProfileId:'joint',asOfDate:today,scope:scope(s),...dashboardPeriod({month,today,filter,custom})});
 
-test('november rolt oktober vooruit zonder oktoberbetalingen of mutatie van de bron',()=>{
+test('november rolt oktober vooruit met eenmaal de ongekoppelde oktoberreservering en zonder bronmutatie',()=>{
  const s=fixture(),before=copy(s),p=project(s,'2026-11');
  assert.equal(p.asOfDate,'2026-10-14');assert.equal(p.days.length,30);
- assert.equal(p.days[0].date,'2026-11-01');assert.equal(p.days[0].openingBalanceCents,43478);
- assert.equal(p.days.at(-1).date,'2026-11-30');assert.equal(p.days.at(-1).expectedBalanceCents,33478);
- assert.equal(p.minimumDate,'2026-11-03');assert.equal(p.minimumBalanceCents,33478);
+ // The unpaid October 3 occurrence is reserved once, not booked as a bank payment.
+ const overdue=p.reservations.filter(r=>r.type==='undated-obligation');
+ assert.equal(overdue.length,1);assert.equal(overdue[0].amountCents,10000);assert.equal(overdue[0].plannedDate,'2026-10-03');
+ assert.equal(p.days[0].date,'2026-11-01');assert.equal(p.days[0].openingBalanceCents,33478);
+ assert.equal(p.days.at(-1).date,'2026-11-30');assert.equal(p.days.at(-1).expectedBalanceCents,23478);
+ assert.equal(p.minimumDate,'2026-11-03');assert.equal(p.minimumBalanceCents,23478);
  assert(paymentEvents(p).every(e=>e.date.startsWith('2026-11')));assert.deepEqual(s,before);
 });
 test('tussenliggende maandmutaties tellen eenmaal in de toekomstige opening',()=>{
- const p=project(fixture(),'2026-12');assert.equal(p.days[0].openingBalanceCents,33478);assert.equal(p.days.at(-1).expectedBalanceCents,23478);
+ const p=project(fixture(),'2026-12');assert.equal(p.days[0].openingBalanceCents,23478);assert.equal(p.days.at(-1).expectedBalanceCents,13478);
+ assert.equal(p.reservations.filter(r=>r.type==='undated-obligation').length,1);
  assert.equal(p.reservations.filter(r=>r.reserveForDisplay!==false&&r.type==='budget').length,0);
 });
 test('historische maand gebruikt nooit een ijkpunt na het geselecteerde maandeinde',()=>{
@@ -44,12 +48,12 @@ test('ontbrekend historisch beginsaldo blijft onbekend en tekent toch de gehele 
 test('latere saldowaarneming verzint geen eerste dertien oktoberdagen',()=>{
  const p=project(fixture(),'2026-10'),days=chartDays(p);
  assert.equal(days.length,31);assert(days.slice(0,13).every(d=>d.expectedBalanceCents===null));
- assert.equal(days[13].expectedBalanceCents,43478);assert.equal(days[13].openingBalanceCents,43478);
- assert.equal(p.minimumBalanceCents,43478);assert.equal(p.historyComplete,false);
+ assert.equal(days[13].expectedBalanceCents,33478);assert.equal(days[13].openingBalanceCents,43478);
+ assert.equal(p.minimumBalanceCents,33478);assert.equal(p.historyComplete,false);
 });
 test('waarneming na vandaag wordt niet gebruikt als opening voor een toekomstige maand',()=>{
  const s=fixture();checkpoint(s,'2026-10-20',999999);const p=project(s,'2026-11');
- assert.equal(p.days[0].openingBalanceCents,43478);assert.equal(p.currentBalance.checkpoint.asOfDate,'2026-10-14');
+ assert.equal(p.days[0].openingBalanceCents,33478);assert.equal(p.currentBalance.checkpoint.asOfDate,'2026-10-14');
 });
 for(const [month,count] of [['2024-02',29],['2025-02',28],['2026-11',30],['2026-12',31],['2027-01',31]])test('volledige kalendermaand '+month,()=>{
  const today=month+'-14',s=fixture(month+'-01');s.recurringFixedExpenses=[];const p=project(s,month,today);
@@ -82,6 +86,6 @@ test('salarisfilter laadt alle tussenmaanden tot de gekozen toekomstige maand',(
 });
 test('eerdere tekorten en ijkpuntcorrecties komen niet in het minimum of de footer van november',()=>{
  const s=fixture('2026-09-30',5000);checkpoint(s,'2026-10-14',43478);const p=project(s,'2026-11');
- assert.equal(p.minimumBalanceCents,33478);assert.equal(p.minimumDate,'2026-11-03');assert.deepEqual(p.reconciliations,[]);
+ assert.equal(p.minimumBalanceCents,23478);assert.equal(p.minimumDate,'2026-11-03');assert.deepEqual(p.reconciliations,[]);
  assert.throws(()=>selectDailyLiquidity(s,{accountProfileId:'joint',startDate:'2026-11-01',asOfDate:'2026-10-14',endDate:'2026-11-30',horizonLimitDate:'2026-10-31',scope:scope(s)}),/maandgrens/);
 });
