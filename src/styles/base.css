@@ -1761,7 +1761,7 @@ body.v4-app{ padding:0 0 84px; }
 html, body{ overflow-x:hidden; }
   body.v4-app[data-active-tab="dashboard"]{
     background:linear-gradient(180deg,#fffaf4 0%, #fbf4ea 64%, #fff3e6 100%);
-    padding-bottom:116px;
+    padding-bottom:84px;
   }
   body.v4-app[data-active-tab="dashboard"] .v4-main{
     width:100%;
@@ -2843,7 +2843,7 @@ html,
     padding-left:10px !important;
     padding-right:10px !important;
     padding-top:10px !important;
-    padding-bottom:96px !important;
+    padding-bottom:0 !important;
   }
 
   body.v4-app[data-active-tab="dashboard"] #tab-dashboard{
@@ -2871,7 +2871,7 @@ body.v4-app[data-active-tab="dashboard"] .v4-mobile-only-grid{ display:grid !imp
     width:100vw !important;
     max-width:none !important;
     margin:0 !important;
-    padding:10px 10px 96px !important;
+    padding:10px 10px 0 !important;
     box-sizing:border-box !important;
     overflow-x:hidden !important;
   }

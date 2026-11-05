@@ -44,6 +44,15 @@ for(const width of [320,390,430,768,1280,1440])test(`nieuw dashboard ${width}px`
   await expect(page.locator('[data-p3-filter]')).toHaveValue('month');
   await expect(page.locator('[data-p3-chart] svg')).toBeVisible();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  if(width<=430){
+    const layout=await page.evaluate(()=>{
+      const last=document.querySelector('.p3-goals .p3-link').getBoundingClientRect();
+      const calculation=document.querySelector('.p3-savings-copy .p3-info-button').getBoundingClientRect();
+      return {bottomSpace:document.body.scrollHeight-(last.bottom+scrollY),calculationWidth:calculation.width};
+    });
+    expect(layout.bottomSpace).toBeLessThanOrEqual(125);
+    expect(layout.calculationWidth).toBeGreaterThan(100);
+  }
   fs.mkdirSync('.cache/dashboard-olive-live',{recursive:true});
   await page.screenshot({path:`.cache/dashboard-olive-live/dashboard-${width}.png`,fullPage:true});
   await page.locator('[data-p3-filter]').selectOption('7');

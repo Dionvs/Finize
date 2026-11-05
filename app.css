@@ -1773,7 +1773,7 @@ body.v4-app{ padding:0 0 84px; }
 html, body{ overflow-x:hidden; }
   body.v4-app[data-active-tab="dashboard"]{
     background:linear-gradient(180deg,#fffaf4 0%, #fbf4ea 64%, #fff3e6 100%);
-    padding-bottom:116px;
+    padding-bottom:84px;
   }
   body.v4-app[data-active-tab="dashboard"] .v4-main{
     width:100%;
@@ -2855,7 +2855,7 @@ html,
     padding-left:10px !important;
     padding-right:10px !important;
     padding-top:10px !important;
-    padding-bottom:96px !important;
+    padding-bottom:0 !important;
   }
 
   body.v4-app[data-active-tab="dashboard"] #tab-dashboard{
@@ -2883,7 +2883,7 @@ body.v4-app[data-active-tab="dashboard"] .v4-mobile-only-grid{ display:grid !imp
     width:100vw !important;
     max-width:none !important;
     margin:0 !important;
-    padding:10px 10px 96px !important;
+    padding:10px 10px 0 !important;
     box-sizing:border-box !important;
     overflow-x:hidden !important;
   }
@@ -6647,7 +6647,7 @@ body.v4-app .value.is-negative{color:var(--red) !important}
 
 /* Dashboardrichting november: mobiele compositie op ieder scherm. */
 .p3-dashboard{width:min(100%,480px);margin-inline:auto}
-.p3-dashboard .p3-surface{display:flex;flex-direction:column;gap:0;padding:8px 14px 110px;background:#fff9f3;color:#3d2116}
+.p3-dashboard .p3-surface{display:flex;flex-direction:column;gap:0;padding:8px 14px 16px;background:#fff9f3;color:#3d2116}
 .p3-dashboard .p3-surface h2{font-size:22px;line-height:1.18;letter-spacing:-.025em;color:#3d2116}
 .p3-dashboard .p3-toolbar{display:flex;align-items:center;gap:10px;margin:0 0 13px}
 .p3-dashboard .p3-context{display:flex;flex:1;width:100%;padding:2px;background:#f5eadd;border-radius:28px}
@@ -6661,8 +6661,8 @@ body.v4-app .value.is-negative{color:var(--red) !important}
 .p3-savings-copy h2{font-size:21px!important;margin:0 0 1px}
 .p3-savings-amount{font-size:clamp(37px,9vw,47px);letter-spacing:-.045em;line-height:1.02;color:#5a872d;font-variant-numeric:tabular-nums}
 .p3-savings-date{font-size:13px;color:#4f3829}
-.p3-savings-copy .p3-info-button{width:auto;max-width:none;text-align:left;white-space:nowrap;border:0;background:transparent;min-height:36px;padding:4px 0;color:#2e8b19;font-weight:700;font-size:13px}
-.p3-savings-art{position:absolute;z-index:0;right:-11px;bottom:-4px;width:73%;height:160px;object-fit:contain;object-position:right bottom;pointer-events:none}
+.p3-dashboard .p3-savings-copy button.p3-info-button{flex:0 0 auto;width:auto;height:auto;max-width:none;text-align:left;white-space:nowrap;border:0;background:transparent;min-height:36px;padding:4px 0;color:#2e8b19;font-weight:700;font-size:13px;line-height:1.4}
+.p3-savings-art{position:absolute;z-index:0;right:-11px;bottom:-32px;width:73%;height:160px;object-fit:contain;object-position:right bottom;pointer-events:none}
 .p3-savings-balance{position:relative;border-top:1px solid #cbd7b7;margin:0 20px;padding:8px 0 14px}
 .p3-savings-balance>button{width:100%;display:grid;grid-template-columns:1fr auto;text-align:left;gap:0;border:0;background:transparent;padding:0;min-height:48px}
 .p3-savings-balance>button span:first-child{grid-column:1;font-size:13px}
