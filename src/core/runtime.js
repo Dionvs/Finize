@@ -3851,7 +3851,7 @@ function renderMobileSpaardoelen(){
   const distribution=groupSummary.map(group=>`<div class="mobile-goal-summary-line"><span>${group.label}</span><i><b style="width:${Math.round(group.ratio*100)}%"></b></i><strong>${eur(group.target)} (${pct(group.ratio)})</strong></div>`).join('');
   const monthSummary=groupSummary.map(group=>`<div class="mobile-goal-summary-line"><span>${group.label}</span><i><b style="width:${monthly>0?Math.round(group.monthly/monthly*100):0}%"></b></i><strong>${eur(group.monthly)}</strong></div>`).join('');
   const root=document.getElementById('tab-spaardoelen');
-  root.innerHTML=`${renderSharedEmptyTabHeader('Spaardoelen overzicht')}<div class="mobile-savings-overview"><div class="mobile-savings-kpis"><div class="card"><span>◈</span><small>Totaal gespaard</small><strong>${eur(saved)}</strong><em>van ${eur(target)}</em></div><div class="card"><span>◎</span><small>Totaal doelbedrag</small><strong>${eur(target)}</strong><em>zichtbare doelen samen</em></div><div class="card"><span>↗</span><small>Gemiddelde voortgang</small><strong>${pct(average)}</strong><em>op basis van doelbedrag</em></div><div class="card"><span>€</span><small>Inleg deze maand</small><strong>${eur(monthly)}</strong><em>${monthLabel(getSelectedMonth())}</em></div></div>${groups.map(renderMobileGoalGroup).join('')}<div class="mobile-savings-summary-grid"><div class="card"><h2>Verdeling van spaardoelen</h2>${distribution}<p>Percentages gebaseerd op totaal doelbedrag per groep.</p></div><div class="card"><h2>Inleg deze maand</h2>${monthSummary}<strong class="mobile-savings-month-total">${eur(monthly)} totaal</strong></div></div><div class="manage-stack">${groups.map(group=>`<details class="manage-section" data-goal-owner="${group.key}"><summary><span class="manage-title">Spaardoelen beheren — ${group.label}</span><span class="expand-chevron"></span></summary><div class="manage-body"><div class="card">${renderGoalGroup(`spaardoelen.${group.key}`,group.doelen,group.pot)}</div></div></details>`).join('')}</div></div>`;
+  root.innerHTML=`${renderSharedEmptyTabHeader('Spaardoelen')}<div class="mobile-savings-overview"><div class="mobile-savings-kpis"><div class="card"><span>◈</span><small>Totaal gespaard</small><strong>${eur(saved)}</strong><em>van ${eur(target)}</em></div><div class="card"><span>◎</span><small>Totaal doelbedrag</small><strong>${eur(target)}</strong><em>zichtbare doelen samen</em></div><div class="card"><span>↗</span><small>Gemiddelde voortgang</small><strong>${pct(average)}</strong><em>op basis van doelbedrag</em></div><div class="card"><span>€</span><small>Inleg deze maand</small><strong>${eur(monthly)}</strong><em>${monthLabel(getSelectedMonth())}</em></div></div>${groups.map(renderMobileGoalGroup).join('')}<div class="mobile-savings-summary-grid"><div class="card"><h2>Verdeling van spaardoelen</h2>${distribution}<p>Percentages gebaseerd op totaal doelbedrag per groep.</p></div><div class="card"><h2>Inleg deze maand</h2>${monthSummary}<strong class="mobile-savings-month-total">${eur(monthly)} totaal</strong></div></div><div class="manage-stack">${groups.map(group=>`<details class="manage-section" data-goal-owner="${group.key}"><summary><span class="manage-title">Spaardoelen beheren — ${group.label}</span><span class="expand-chevron"></span></summary><div class="manage-body"><div class="card">${renderGoalGroup(`spaardoelen.${group.key}`,group.doelen,group.pot)}</div></div></details>`).join('')}</div></div>`;
   root.querySelectorAll('.manage-section').forEach((section,index)=>{
     const body=section.querySelector('.manage-body');
     if (body) body.innerHTML=`<button type="button" class="ghost mobile-goal-manage-open" data-open-goal-manager="${section.dataset.goalOwner}">Open full-screen beheer</button>`;
@@ -5037,12 +5037,105 @@ function renderPersonalFirstRow(owner){
   ${renderDesktopGoalsPreview(state.spaardoelen[owner]||[],person.beschikbaarVoorSparen,owner)}`;
 }
 
+// Mobile presentation only: the existing monthly selectors remain the source of every amount.
+function renderMobileVisualGoal(item,owner,preview=false){
+  const goal=item.doel,progress=Math.max(0,Math.min(100,Math.round((item.voortgang||0)*100)));
+  return `<div class="mt-goal"><button type="button" class="mt-goal-open" data-open-goal-editor="${owner}:${attrSafe(goal.id)}" aria-label="${attrSafe(goal.naam||'Spaardoel')} bekijken">
+    ${goalImageIcon(goal)}<span class="mt-goal-copy"><strong>${textSafe(goal.naam||'Spaardoel')} ${preview?'':`<span class="mt-star" aria-label="${goal.favoriet?'Favoriet':'Geen favoriet'}">${goal.favoriet?'★':'☆'}</span>`}</strong><span>${eur(Number(goal.algespaard)||0)} van ${eur(Number(goal.doelbedrag)||0)}</span><span class="mt-goal-progress"><span class="progress-track"><span class="progress-fill" style="width:${progress}%"></span></span>${preview?`<b>${progress}%</b>`:''}</span><span class="mt-goal-month">Inleg deze maand <b>${eur(item.werkelijkeInleg)}</b></span></span><span class="mt-chevron" aria-hidden="true">›</span></button></div>`;
+}
+
+function renderMobileFixedRows(owner){
+  const rows=u3FixedOccurrences(getSelectedMonth()).filter(row=>row.financialFor===owner).map(row=>({row,date:fixedCashDate(row)||'',actual:fixedOccurrenceActuals(state,row)}));
+  rows.sort((a,b)=>(a.date||'9999').localeCompare(b.date||'9999')||String(a.row.naam||'').localeCompare(String(b.row.naam||''),'nl'));
+  return rows.map(({row,date,actual})=>`<button type="button" class="mt-fixed-row" data-mt-fixed="${attrSafe(row.itemId)}" data-mt-owner="${owner}" aria-label="${attrSafe(row.naam||'Vaste last')} bekijken"><time>${date?textSafe(new Date(date+'T12:00:00').toLocaleDateString('nl-NL',{day:'numeric',month:'short'})):'—'}</time><span class="mt-icon">${iconSvg(categoryIconName(`${row.naam||''} ${row.categorie||''}`))}</span><span class="mt-fixed-copy"><strong>${textSafe(row.naam||'Vaste last')}</strong><small>${actual.paid?'Betaald':'Nog niet betaald'}</small></span><strong>${eur(actual.planned)}</strong><span class="mt-chevron" aria-hidden="true">›</span></button>`).join('')||'<p class="hint">Geen vaste lasten gepland deze maand.</p>';
+}
+
+function renderMobileAccountOverview(owner){
+  const joint=owner==='gezamenlijk',r=calcScenario(state),data=getMonthlyScenarioData()[owner],person=joint?null:r[owner];
+  const visible=key=>joint||personalKpiVisible(owner,key);
+  const income=joint?dashboardIncomeBreakdown(getSelectedMonth()).total:personalIncomeOverview(owner,person.zakgeld).total;
+  const remaining=joint?r.forecast.owners.gezamenlijk.available:personalMonthRemaining({income,fixed:person.persoonlijkeVasteLasten,usedBudget:person.variabeleUitgaven});
+  const used=joint?r.variabelTotaal:person.variabeleUitgaven,budget=joint?r.variabelBudgetTotaal:sumBedrag(data.variabel||[]);
+  const ratio=budget>0?Math.min(100,Math.max(0,Math.round(used/budget*100))):0;
+  const pot=joint?r.spaarpotDezeMaand:person.beschikbaarVoorSparen;
+  const goals=calcGroep(state.spaardoelen[owner]||[],pot,TODAY);
+  const savingsAction=joint?'data-saving-edit':`data-personal-saving-edit="${owner}"`;
+  const variableRows=joint?renderJointFirstRow():renderPersonalFirstRow(owner);
+  // Reuse the existing category rows so refunds and uncategorized spending keep their exact display semantics.
+  const template=document.createElement('template');template.innerHTML=variableRows;
+  const variableList=template.content.querySelector('.joint-variable-overview-list')?.innerHTML||'';
+  const fixedDetails=template.content.querySelector('.joint-fixed-category-body')?.innerHTML||'';
+  return `<div class="mt-surface" data-mobile-account="${owner}">
+    <section class="mt-hero">
+      <img class="mt-art" src="dashboard-house.png" alt="">
+      ${visible('saving')?`<div class="mt-remaining" data-personal-kpi-mobile="saving"><h2>Over deze maand</h2><strong class="mt-amount ${remaining<0?'mt-negative':''}">${eur(remaining)}</strong><details class="mt-calculation"><summary>Bekijk berekening <span aria-hidden="true">→</span></summary><div>${joint?'<p>Dit bedrag volgt de bestaande maandprognose, inclusief zakgeld, reserveringen en spaarafspraken.</p>':'<p>Inkomen en teruggaven − vaste lasten − gebruikt budget</p>'}${visible('income')?`<p>Inkomen ${eur(income)}</p>`:''}${visible('fixed')?`<p>Vaste lasten ${eur(joint?r.vasteLastenTotaal:person.persoonlijkeVasteLasten)}</p>`:''}${visible('variable')?`<p>Variabel gebruikt ${eur(used)}</p>`:''}</div></details></div>`:''}
+      ${visible('income')?`<button type="button" class="mt-income" data-personal-kpi-mobile="income" data-open-income-overview="${owner}"><span>Inkomen</span> <strong>${eur(income)}</strong></button>`:''}
+    </section>
+    <div class="mt-kpis">
+      ${visible('fixed')?`<section class="mt-kpi"><span class="mt-icon">${iconSvg('house')}</span><div><h3>Vaste lasten</h3>${fixedPaymentKpi(owner)}</div></section>`:''}
+      ${visible('variable')?`<section class="mt-kpi"><span class="mt-icon">${iconSvg('chart')}</span><div><h3>Variabel</h3><strong>${eur(used)}</strong> <small>gebruikt</small><span class="mt-budget-total">van ${eur(budget)}</span><div class="progress-track" role="progressbar" aria-label="Variabel budget gebruikt" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${ratio}"><span class="progress-fill" style="width:${ratio}%"></span><span class="fixed-payment-percent">${ratio}%</span></div></div></section>`:''}
+    </div>
+    <section class="mt-section mt-fixed"><div class="mt-heading"><h2>Vaste lasten</h2><button type="button" class="mt-link" data-u3-open="planning" data-u3-planning-owner="${owner}">Verdeling bekijken →</button><button type="button" class="mt-add" data-mt-add-fixed="${owner}" aria-label="Vaste last toevoegen">+</button></div><div class="mt-fixed-list">${renderMobileFixedRows(owner)}</div><details class="mt-extra"><summary>Lasten per categorie</summary>${fixedDetails}</details></section>
+    <section class="mt-section"><div class="mt-heading"><h2>Variabele lasten</h2><button type="button" class="mt-link" data-open-owner-variable="${owner}">Wijzig →</button></div><div class="joint-variable-overview-list">${variableList}</div></section>
+    <section class="mt-section mt-transactions">${joint?renderJointTransactionsCard():renderPersonalTransactionsCard(owner)}</section>
+    <section class="mt-section u5-joint-goals-preview"><div class="mt-heading"><h2>Spaardoelen preview</h2><button type="button" class="mt-pot" ${savingsAction} aria-label="Spaargeld van ${attrSafe(ownerLabel(owner))} voor deze maand aanpassen">Spaarpot <strong>${eur(pot)}</strong></button></div>${goals.slice(0,2).map(item=>renderMobileVisualGoal(item,owner,true)).join('')||'<p class="hint">Nog geen spaardoelen.</p>'}<button type="button" class="mt-link" data-tab-shortcut="spaardoelen">Bekijk alle doelen →</button><details class="mt-extra"><summary>Alle doelbedragen en maandinleg</summary>${renderGoalOverviewTable(state.spaardoelen[owner]||[],pot,owner)}</details></section>
+  </div>`;
+}
+
+function bindMobileTabDesign(root){
+  root.querySelectorAll('.mt-kpi .fixed-payment-amounts>span:last-child').forEach(span=>{span.textContent=span.textContent.replace(/^\/\s*/,'van ');});
+  root.querySelectorAll('[data-mt-fixed]').forEach(button=>button.addEventListener('click',()=>u3OpenRecurringEditor('fixed',button.dataset.mtFixed,{planningOwner:button.dataset.mtOwner})));
+  root.querySelectorAll('[data-mt-add-fixed]').forEach(button=>button.addEventListener('click',()=>u3OpenRecurringEditor('fixed','',{owner:button.dataset.mtAddFixed,planningOwner:button.dataset.mtAddFixed})));
+  const title=root.querySelector('.mt-transactions h2');if(title)title.textContent='Transacties';
+  const add=root.querySelector('.mt-transactions .joint-transaction-add-btn');if(add)add.innerHTML=`${iconSvg('receipt')}<span>Importeren / document →</span>`;
+}
+
+function applyMobileSavingsDesign(root){
+  const surface=root.querySelector('.mobile-savings-overview');
+  if(!surface)return;
+  surface.classList.add('mt-surface','mt-savings');
+  const kpis=surface.querySelector('.mobile-savings-kpis');
+  const cards=[...kpis.children],hero=cards[0];
+  hero.className='mt-hero mt-savings-hero';
+  const percentage=cards[2].querySelector('strong').textContent.replace('.',',');
+  const fill=Math.min(100,Math.max(0,parseFloat(percentage.replace(',','.'))||0));
+  hero.insertAdjacentHTML('beforeend',`<img class="mt-art" src="dashboard-house.png" alt=""><div class="mt-total-progress"><span class="progress-track"><span class="progress-fill" style="width:${fill}%"></span></span><strong>${textSafe(percentage)}</strong></div>`);
+  surface.prepend(hero);
+  const monthly=cards[3];monthly.className='mt-monthly';
+  monthly.insertAdjacentHTML('afterbegin',`<span class="mt-icon">${iconSvg('euro')}</span>`);
+  hero.insertAdjacentElement('afterend',monthly);
+  kpis.remove();
+  const r=calcScenario(state);
+  surface.querySelectorAll('.mobile-goal-section').forEach(section=>{
+    const owner=section.dataset.goalOwner,pot=owner==='gezamenlijk'?r.spaarpotDezeMaand:r[owner].beschikbaarVoorSparen;
+    section.classList.add('mt-section');
+    const h2=section.querySelector('h2'),actions=section.querySelector('.u2-inline-actions');
+    const heading=document.createElement('div');heading.className='mt-heading mt-owner-heading';
+    section.prepend(heading);heading.append(h2);
+    if(actions){heading.append(actions);actions.querySelector('span').innerHTML=`Spaarpot <strong>${eur(pot)}</strong>`;actions.querySelector('button').className='mt-process';}
+    actions?.insertAdjacentHTML('beforeend',`<button type="button" class="mt-pot" data-add-goal="${owner}">+ Spaardoel</button>`);
+    section.querySelector('.mobile-goal-list').innerHTML=calcGroep(state.spaardoelen[owner]||[],pot,TODAY).map(item=>renderMobileVisualGoal(item,owner)).join('')||'<p class="hint">Nog geen spaardoelen.</p>';
+  });
+  const summaries=surface.querySelector('.mobile-savings-summary-grid');
+  [...summaries.children].forEach((card,index)=>{
+    const details=document.createElement('details');details.className='mt-summary';
+    const title=index===0?'Verdeling van spaardoelen':'Inleg per rekening';
+    details.innerHTML=`<summary><span class="mt-icon">${iconSvg(index===0?'chart':'euro')}</span>${title}<span class="mt-chevron" aria-hidden="true">›</span></summary>`;
+    card.querySelector('h2')?.remove();details.append(card);summaries.before(details);
+  });
+  summaries.remove();
+  const managers=surface.querySelector('.manage-stack');
+  if(managers){const details=document.createElement('details');details.className='mt-summary';details.innerHTML='<summary>Doelen beheren<span class="mt-chevron" aria-hidden="true">›</span></summary>';managers.before(details);details.append(managers);}
+  const history=root.querySelector('.u2-history-stack');
+  if(history){surface.append(history);history.classList.remove('manage-stack');history.classList.add('mt-history');const details=history.querySelector('.manage-section');details.className='mt-history-details';details.querySelector('summary').innerHTML=`<span class="mt-icon">${iconSvg('calendar')}</span><strong>Spaargeschiedenis</strong><span class="mt-chevron" aria-hidden="true">›</span>`;}
+}
+
 function renderEmptyVisualTab(tabId, title){
   const el = document.getElementById(tabId);
   if (!el) return;
   const owner = tabId.replace('tab-','');
-  const content = owner === 'gezamenlijk' ? renderJointFirstRow() : (['dion','dara'].includes(owner) ? renderPersonalFirstRow(owner) : '');
-  el.innerHTML = renderSharedEmptyTabHeader(title || '') + content;
+  el.innerHTML = renderSharedEmptyTabHeader(title || '') + renderMobileAccountOverview(owner);
+  applyReadOnlyPersonalTab(el,owner);
 }
 
 
@@ -5193,8 +5286,8 @@ function renderActiveTabMeasured(){
   try {
   if (activeTab==='dashboard') renderDashboard();
   else if (activeTab==='gezamenlijk') window.innerWidth >= 768 ? renderPersonOrJoint('tab-gezamenlijk','gezamenlijk','Gezamenlijk') : renderEmptyVisualTab('tab-gezamenlijk', 'Gezamenlijk');
-  else if (activeTab==='dion') window.innerWidth >= 768 || isReadOnlyPersonalTab('dion') ? renderPersonOrJoint('tab-dion','dion','Dion') : renderEmptyVisualTab('tab-dion', 'Dion');
-  else if (activeTab==='dara') window.innerWidth >= 768 || isReadOnlyPersonalTab('dara') ? renderPersonOrJoint('tab-dara','dara','Dara') : renderEmptyVisualTab('tab-dara', 'Dara');
+  else if (activeTab==='dion') window.innerWidth >= 768 ? renderPersonOrJoint('tab-dion','dion','Dion') : renderEmptyVisualTab('tab-dion', ownerLabel('dion'));
+  else if (activeTab==='dara') window.innerWidth >= 768 ? renderPersonOrJoint('tab-dara','dara','Dara') : renderEmptyVisualTab('tab-dara', ownerLabel('dara'));
   else if (activeTab==='spaardoelen') window.innerWidth >= 768 && window.FinizeUpdate5?.renderGoals ? window.FinizeUpdate5.renderGoals() : renderMobileSpaardoelen();
   else if (activeTab==='data') window.innerWidth >= 768 && window.FinizeUpdate5?.renderData ? window.FinizeUpdate5.renderData() : renderMobileDataTab();
   else if (activeTab==='settings') renderSettings();
@@ -5216,6 +5309,7 @@ function renderActiveTabMeasured(){
 
 
   const root = document.getElementById('tab-'+activeTab);
+  if(window.innerWidth<768)bindMobileTabDesign(root);
   bindInputs(root);
   handleTableClicks(root);
   handleGoalClicks(root);
@@ -5866,6 +5960,7 @@ renderMobileSpaardoelen=function(){
   const history=Object.values(state.spaardoelGeschiedenis||{}).filter(entry=>visibleOwners.includes(entry.eigenaar)).sort((a,b)=>String(b.maand).localeCompare(String(a.maand)));
   const historyHtml=`<div class="u2-history-list">${history.map(entry=>`<article><strong>${ownerLabel(entry.eigenaar)} · ${monthLabel(entry.maand)}</strong><span>Spaarpot ${eur(entry.spaarpot)} · verdeeld ${eur(entry.verdeeld)} · onverdeeld ${eur(entry.onverdeeld)}</span><small>${entry.transacties.map(tx=>`${textSafe(tx.doelNaam)} ${eur(tx.bedrag)}`).join(' · ')}</small></article>`).join('')||'<p class="hint">Nog geen maanden verwerkt.</p>'}</div>`;
   root.insertAdjacentHTML('beforeend',`<div class="manage-stack u2-history-stack">${renderManageSection('Spaargeschiedenis',historyHtml,false)}</div>`);
+  if(window.innerWidth<768)applyMobileSavingsDesign(root);
   root.querySelectorAll('.u2-goal-accordion [data-open-goal-editor]').forEach(btn=>btn.addEventListener('click',event=>{
     event.preventDefault();
     event.stopPropagation();

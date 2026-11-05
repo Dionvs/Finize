@@ -108,13 +108,12 @@ test('persoonlijke inkomenskaart toont op mobiel en desktop dezelfde totale bron
   const desktopTotal=await desktopCard.locator('.metric-value').innerText();
 
   await page.setViewportSize({width:390,height:844});
-  const mobileCard=page.locator('#tab-dion .mobile-kpi-card[data-personal-kpi-mobile="income"]');
+  const mobileCard=page.locator('#tab-dion .mt-income[data-personal-kpi-mobile="income"]');
   await expect(mobileCard).toBeVisible();
-  await expect(mobileCard).toContainText('Totaal inkomen');
-  await expect(mobileCard).toContainText('Zakgeld');
-  await expect(mobileCard).not.toContainText('Terugbetalingen');
-  await expect(mobileCard).toContainText('Vergoedingen');
-  await expect(mobileCard.locator('.mobile-kpi-value')).toHaveText(desktopTotal);
+  await expect(mobileCard.locator('strong')).toHaveText(desktopTotal);
+  await mobileCard.click();
+  await expect(page.locator('#incomeEditModal')).toContainText('Zakgeld');
+  await expect(page.locator('#incomeEditModal')).toContainText('Vergoedingen');
 });
 
 test('gedeelde andere tab opent alleen-lezen en verbergt gekozen KPI',async({page})=>{
@@ -126,4 +125,17 @@ test('gedeelde andere tab opent alleen-lezen en verbergt gekozen KPI',async({pag
   await expect(page.locator('#tab-dara [data-personal-kpi]')).toHaveCount(3);
   await expect(page.locator('#tab-dara input:not([type="hidden"])')).toHaveCount(0);
   await expect(page.locator('#tab-dara button').first()).toBeDisabled();
+});
+
+test('mobiele gedeelde tab bewaart verborgen KPI’s en alleen-lezenbediening',async({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  await installAccount(page,{otherShared:true,hiddenKpis:['income','saving']});
+  await page.locator('.v4-bottom-nav [data-tab="settings"]').click();
+  await page.getByRole('button',{name:'Open gedeeld overzicht van Dara'}).click();
+  const root=page.locator('#tab-dara');
+  await expect(root.locator('.mt-surface')).toBeVisible();
+  await expect(root.locator('.u6-readonly-banner')).toBeVisible();
+  await expect(root.locator('.mt-income,.mt-remaining')).toHaveCount(0);
+  for(const button of await root.locator('.mt-surface button').all())await expect(button).toBeDisabled();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
 });
