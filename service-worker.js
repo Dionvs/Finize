@@ -1,11 +1,11 @@
-const CACHE_NAME = "finize-v118-r39";
+const CACHE_NAME = "finize-v118-r40";
 const CACHE_PREFIX = "finize-";
 
 const CRITICAL_SHELL = [
   "./",
   "./index.html",
-  "./app.js?v=118-r39",
-  "./app.css?v=118-r39",
+  "./app.js?v=118-r40",
+  "./app.css?v=118-r40",
   "./manifest.json"
 ];
 
@@ -45,7 +45,7 @@ self.addEventListener("activate", event => {
 });
 
 function isCurrentShellHtml(html) {
-  if (html.includes('<meta name="finize-inline-release" content="118-r39">')) return true;
+  if (html.includes('<meta name="finize-inline-release" content="118-r40">')) return true;
   const script = html.match(/<script\b[^>]*\bsrc=["']([^"']*app\.js\?v=[^"']+)["']/)?.[1];
   const style = html.match(/<link\b[^>]*\bhref=["']([^"']*app\.css\?v=[^"']+)["']/)?.[1];
   return CRITICAL_SHELL.includes(script) && CRITICAL_SHELL.includes(style);
@@ -64,14 +64,9 @@ self.addEventListener("fetch", event => {
   if (event.request.method !== "GET") return;
 
   if (event.request.mode === "navigate") {
-    event.respondWith(
-      fetch(event.request)
-        .then(async response => {
-          await cacheNavigationShell(response).catch(() => {});
-          return response;
-        })
-        .catch(() => caches.match("./index.html", {cacheName:CACHE_NAME}))
-    );
+    const network = fetch(event.request);
+    event.waitUntil(network.then(cacheNavigationShell).catch(() => {}));
+    event.respondWith(network.catch(() => caches.match("./index.html", {cacheName:CACHE_NAME})));
     return;
   }
 

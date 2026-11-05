@@ -3,8 +3,20 @@ test('Late oude cache mag offline HTML of assets nooit terugzetten naar een oude
  const source=fs.readFileSync('service-worker.js','utf8'),name=source.match(/const CACHE_NAME = "([^"]+)"/)[1],handlers={},reads=[];
  const caches={match:async(request,options)=>{reads.push(options);return new Response(options?.cacheName===name?'actueel':'verouderd');}};
  vm.runInNewContext(source,{self:{addEventListener:(key,fn)=>handlers[key]=fn,skipWaiting:()=>{},clients:{claim:()=>{}}},caches,fetch:async()=>{throw new Error('offline');}});
- for(const mode of ['navigate','cors']){let response;handlers.fetch({request:{method:'GET',mode,url:'https://example.test/Finize/'},respondWith:promise=>response=promise});assert.equal(await (await response).text(),'actueel');}
+ for(const mode of ['navigate','cors']){let response;handlers.fetch({request:{method:'GET',mode,url:'https://example.test/Finize/'},respondWith:promise=>response=promise,waitUntil:()=>{}});assert.equal(await (await response).text(),'actueel');}
  assert.equal(reads.length,2);assert.ok(reads.every(options=>options.cacheName===name));
+});
+test('Navigatie wacht niet op het opslaan van de offline HTML',async()=>{
+ const handlers={},source=fs.readFileSync('service-worker.js','utf8');
+ const release=source.match(/finize-v(118-r\d+)/)[1];
+ const html='<meta name="finize-inline-release" content="'+release+'">';
+ const caches={open:async()=>({put:()=>new Promise(()=>{})})};
+ vm.runInNewContext(source,{self:{addEventListener:(key,fn)=>handlers[key]=fn},caches,fetch:async()=>new Response(html)});
+ let response,background;
+ handlers.fetch({request:{method:'GET',mode:'navigate'},respondWith:promise=>response=promise,waitUntil:promise=>background=promise});
+ assert.ok(background);
+ const result=await Promise.race([response.then(()=>true),new Promise(resolve=>setTimeout(()=>resolve(false),100))]);
+ assert.equal(result,true,'De HTML-respons mag niet op Cache Storage wachten.');
 });
 test('Cache-activatie wacht op verwijderen oude caches en op overnemen paginas',async()=>{
  const handlers={},steps=[];let deleted,claimed;
