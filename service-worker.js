@@ -1,15 +1,16 @@
-const CACHE_NAME = "finize-v118-r37";
+const CACHE_NAME = "finize-v118-r38";
 const CACHE_PREFIX = "finize-";
 
 const CRITICAL_SHELL = [
   "./",
   "./index.html",
-  "./app.js?v=118-r37",
-  "./app.css?v=118-r37",
+  "./app.js?v=118-r38",
+  "./app.css?v=118-r38",
   "./manifest.json"
 ];
 
 const OPTIONAL_SHELL = [
+  "./dashboard-house.png",
   "./icons/icon-192.png",
   "./icons/icon-512.png"
 ];
@@ -44,7 +45,7 @@ self.addEventListener("activate", event => {
 });
 
 function isCurrentShellHtml(html) {
-  if (html.includes('<meta name="finize-inline-release" content="118-r37">')) return true;
+  if (html.includes('<meta name="finize-inline-release" content="118-r38">')) return true;
   const script = html.match(/<script\b[^>]*\bsrc=["']([^"']*app\.js\?v=[^"']+)["']/)?.[1];
   const style = html.match(/<link\b[^>]*\bhref=["']([^"']*app\.css\?v=[^"']+)["']/)?.[1];
   return CRITICAL_SHELL.includes(script) && CRITICAL_SHELL.includes(style);

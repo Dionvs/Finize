@@ -4227,9 +4227,12 @@
   var head = (title, action2 = "") => `<div class="p3-head"><h2>${title}</h2>${action2}</div>`;
   var action = (name, label = "Bekijk alles") => `<button type="button" class="p3-link" data-p3-action="${name}">${label}<span aria-hidden="true"> ›</span></button>`;
   var meter = (value, label) => `<progress max="100" value="${Math.max(0, Math.min(100, value))}" aria-label="${escape2(label)}"></progress>`;
-  function paymentsHtml(p, label, canOpen = () => false) {
+  function paymentsHtml(p, label, canOpen = () => false, iconSvg2 = () => "") {
     const rows = paymentEvents(p);
-    return rows.map((e) => `<li${canOpen(e) ? "" : ' class="p3-payment"'}>${canOpen(e) ? `<button type="button" class="p3-payment p3-payment-button" data-p3-event="${escape2(e.id)}">` : ""}<time datetime="${e.date}">${date(e.date)}</time><span class="p3-event-icon ${e.amountCents < 0 ? "out" : "in"}" aria-hidden="true">${e.amountCents < 0 ? "↗" : "↙"}</span><span class="p3-payment-copy"><strong>${escape2(label(e))}</strong><small>${status(e.status)}${e.dateQuality === "estimated" ? " · Geschat" : ""}</small></span><strong class="${e.amountCents < 0 ? "" : "p3-positive"}">${e.amountCents > 0 ? "+ " : ""}${money2(e.amountCents)}</strong>${canOpen(e) ? "</button>" : ""}</li>`).join("") || '<li class="p3-empty">Geen toekomstige vaste betalingen of inkomsten binnen deze periode.</li>';
+    return rows.map((e) => {
+      const title = label(e), icon = e.amountCents > 0 ? "download" : /energie|stroom/i.test(title) ? "bolt" : /zorg|verzekering/i.test(title) ? "heart" : /internet|simpel|mobiel/i.test(title) ? "internet" : "wallet";
+      return `<li${canOpen(e) ? "" : ' class="p3-payment"'}>${canOpen(e) ? `<button type="button" class="p3-payment p3-payment-button" data-p3-event="${escape2(e.id)}">` : ""}<time datetime="${e.date}">${date(e.date)}</time><span class="p3-event-icon ${e.amountCents < 0 ? "out" : "in"}" aria-hidden="true">${iconSvg2(icon)}</span><span class="p3-payment-copy"><strong>${escape2(title)}</strong><small>${status(e.status)}${e.dateQuality === "estimated" ? " · Geschat" : ""}</small></span><strong class="${e.amountCents < 0 ? "" : "p3-positive"}">${e.amountCents > 0 ? "+ " : ""}${money2(e.amountCents)}</strong>${canOpen(e) ? "</button>" : ""}</li>`;
+    }).join("") || '<li class="p3-empty">Geen toekomstige vaste betalingen of inkomsten binnen deze periode.</li>';
   }
   function chartHtml(p, width = 720) {
     width = Math.max(210, width);
@@ -4260,14 +4263,14 @@
     }).join("");
     const unknown = days.filter((d) => !Number.isSafeInteger(d.expectedBalanceCents));
     const gap = unknown.length ? `<p class="p3-caption" data-p3-unknown-days>${date(unknown[0].date)} – ${date(unknown.at(-1).date)}: saldo onbekend. Een bruikbaar beginsaldo ontbreekt voor deze dagen; de lijn begint bij het eerste bekende saldo.</p>` : "";
-    return `<div class="p3-chart">${gap}<svg viewBox="0 0 ${width} ${chartHeight}" role="group" aria-label="Verwachte saldo-ontwikkeling; selecteer een dag voor bedragen en gebeurtenissen">${known.length ? ticks : ""}${segment(segments.past, "history")}${segment(segments.future, "future")}${known.length ? `<line x1="${plotStart}" x2="${plotEnd}" y1="${y(p.bufferCents)}" y2="${y(p.bufferCents)}" class="p3-buffer-line"/>` : ""}${today}${markers}${labels2}</svg><div class="p3-chart-legend">${segments.past.length ? '<span class="p3-history-key"><i aria-hidden="true">━</i> Verstreken dagen</span>' : ""}<span>━ Vandaag en toekomst</span><span class="p3-income-key">● Inkomsten</span><span class="p3-expense-key">● Uitgaven</span><span>◇ Minimum</span><span>┄ Buffer ${money2(p.bufferCents)}</span></div><div class="p3-chart-controls"><label class="p3-day-select">Bekijk een dag <select data-p3-day aria-label="Dag in saldo-ontwikkeling">${days.map((d) => `<option value="${d.date}">${date(d.date)}${Number.isSafeInteger(d.expectedBalanceCents) ? "" : " · onbekend"}</option>`).join("")}</select></label><div class="p3-point-detail" data-p3-point-detail aria-live="polite"></div></div></div>`;
+    return `<div class="p3-chart">${gap}<svg viewBox="0 0 ${width} ${chartHeight}" role="group" aria-label="Verwachte saldo-ontwikkeling; selecteer een dag voor bedragen en gebeurtenissen">${known.length ? ticks : ""}${segment(segments.past, "history")}${segment(segments.future, "future")}${known.length ? `<line x1="${plotStart}" x2="${plotEnd}" y1="${y(p.bufferCents)}" y2="${y(p.bufferCents)}" class="p3-buffer-line"/>` : ""}${today}${markers}${labels2}</svg><div class="p3-chart-legend">${segments.past.length ? '<span class="p3-history-key"><i aria-hidden="true">━</i> Verstreken dagen</span>' : ""}<span>━ Vandaag en toekomst</span><span class="p3-income-key">● Inkomsten</span><span class="p3-expense-key">● Uitgaven</span><span>◇ Minimum</span><span>┄ Buffer ${money2(p.bufferCents)}</span></div><div class="p3-chart-controls"><label class="p3-day-select">Bekijk een dag <select data-p3-day aria-label="Dag in saldo-ontwikkeling">${days.map((d) => `<option value="${d.date}">${date(d.date)}${Number.isSafeInteger(d.expectedBalanceCents) ? "" : " · onbekend"}</option>`).join("")}</select></label><div class="p3-point-detail" data-p3-point-detail aria-live="polite" hidden></div></div></div>`;
   }
-  var info = (key, title, content) => `<button type="button" class="p3-info-button" data-p3-info="${key}" aria-label="Uitleg over ${escape2(title)}" aria-controls="p3-info-${key}" aria-expanded="false">ⓘ</button><div class="p3-info-popover" id="p3-info-${key}" popover="auto" role="dialog" aria-modal="false" aria-label="${escape2(title)}" data-p3-info-panel="${key}"><div class="p3-info-heading"><strong>${title}</strong><button type="button" class="ghost small" data-p3-close-info="${key}" aria-label="Sluiten · uitleg over ${escape2(title)}">Sluiten</button></div>${content}</div>`;
+  var info = (key, title, content, buttonLabel = "ⓘ") => `<button type="button" class="p3-info-button" data-p3-info="${key}" aria-label="Uitleg over ${escape2(title)}" aria-controls="p3-info-${key}" aria-expanded="false">${buttonLabel}</button><div class="p3-info-popover" id="p3-info-${key}" popover="auto" role="dialog" aria-modal="false" aria-label="${escape2(title)}" data-p3-info-panel="${key}"><div class="p3-info-heading"><strong>${title}</strong><button type="button" class="ghost small" data-p3-close-info="${key}" aria-label="Sluiten · uitleg over ${escape2(title)}">Sluiten</button></div>${content}</div>`;
   var savingDate = (value) => value ? new Intl.DateTimeFormat("nl-NL", { day: "numeric", month: "long", timeZone: "UTC" }).format(/* @__PURE__ */ new Date(value + "T12:00:00Z")) : "maandultimo";
   var calculationHelp = (p) => {
     var _a2, _b;
     const s = p.monthEndSavings;
-    return s ? `${p.forecastNotice ? `<p>${escape2(p.forecastNotice)}</p>` : ""}<p>Het maximaal over te boeken bedrag op ${savingDate(s.transferDate)}. Dit is geen geld dat vandaag vrij besteedbaar is.</p>${((_a2 = p.externalCurrentBalance) == null ? void 0 : _a2.source) === "external" ? "<p>De berekening gebruikt de laatst ontvangen ING-stand met de resterende planning en budgetten. Geïmporteerde bankboekingen worden niet opnieuw op die stand toegepast.</p>" : "<p>De berekening gebruikt het vastgelegde saldo en de aanwezige transacties. Werk zelf je bank bij op de laatste dag van de maand. Onbevestigde bankdekking is informatief en houdt het bedrag niet tegen.</p>"}<p>Verwacht eindsaldo: ${money2(s.expectedEndBalanceCents)}<br>Nodig vanaf volgende maand: ${money2(s.requiredOpeningCents)}<br>Inclusief permanente buffer: ${money2((_b = s.bufferCents) != null ? _b : p.bufferCents)}.</p><p>Alleen de volledige volgende kalendermaand telt mee (tot en met ${date(s.assessmentEndDate)}). Salarissen en vaste lasten tellen op hun ingestelde betaaldatums. Het volledige resterende variabele maandbudget wordt alleen op de laatste kalenderdag afgetrokken. Concrete budgetbetalingen verlagen de resterende pot en tellen niet dubbel mee. De simulatie begint bij € 0; het benodigde beginsaldo is € 200 min de laagste cumulatieve kasstroom (inclusief het startpunt € 0). Veilig te sparen is het verwachte eindsaldo min dit beginsaldo, met minimaal € 0. De buffer telt precies één keer mee. De dagelijkse budgetspreiding voor Laagste prognose blijft ongewijzigd. Gepland sparen en Extra ruimte zijn alleen een vergelijking; de bestaande planning wordt niet automatisch gewijzigd.</p>` : "";
+    return s ? `${p.forecastNotice ? `<p>${escape2(p.forecastNotice)}</p>` : ""}<p>Het maximaal over te boeken bedrag op ${savingDate(s.transferDate)}. Dit is geen geld dat vandaag vrij besteedbaar is.</p>${((_a2 = p.externalCurrentBalance) == null ? void 0 : _a2.source) === "external" ? "<p>De berekening gebruikt de laatst ontvangen ING-stand met de resterende planning en budgetten. Geïmporteerde bankboekingen worden niet opnieuw op die stand toegepast.</p>" : "<p>De berekening gebruikt het vastgelegde saldo en de aanwezige transacties. Werk zelf je bank bij op de laatste dag van de maand. Onbevestigde bankdekking is informatief en houdt het bedrag niet tegen.</p>"}<p>Gepland sparen: ${money2(s.plannedCents)}<br>Extra ruimte: ${money2(s.extraCents)}</p><p>Verwacht eindsaldo: ${money2(s.expectedEndBalanceCents)}<br>Nodig vanaf volgende maand: ${money2(s.requiredOpeningCents)}<br>Inclusief permanente buffer: ${money2((_b = s.bufferCents) != null ? _b : p.bufferCents)}.</p><p>Alleen de volledige volgende kalendermaand telt mee (tot en met ${date(s.assessmentEndDate)}). Salarissen en vaste lasten tellen op hun ingestelde betaaldatums. Het volledige resterende variabele maandbudget wordt alleen op de laatste kalenderdag afgetrokken. Concrete budgetbetalingen verlagen de resterende pot en tellen niet dubbel mee. De simulatie begint bij € 0; het benodigde beginsaldo is € 200 min de laagste cumulatieve kasstroom (inclusief het startpunt € 0). Veilig te sparen is het verwachte eindsaldo min dit beginsaldo, met minimaal € 0. De buffer telt precies één keer mee. De dagelijkse budgetspreiding voor Laagste prognose blijft ongewijzigd. Gepland sparen en Extra ruimte zijn alleen een vergelijking; de bestaande planning wordt niet automatisch gewijzigd.</p>` : "";
   };
   function qualityHelp(p) {
     var _a2;
@@ -4294,22 +4297,19 @@
     }, { capture: true, ...signal ? { signal } : {} });
   }
   function outlookHtml(p, profile, label, iconSvg2, bankMarkup = "") {
-    var _a2, _b, _c;
+    var _a2, _b;
     if (!profile) return `<p class="p3-empty">Kies de primaire betaalrekening voor deze context. Er wordt geen willekeurige rekening gebruikt.</p>${action("accounts", "Rekening instellen")}`;
     if (!p) return '<p class="p3-empty" role="status">Vooruitblik laden…</p>';
-    const v = liquidityView(p), balance = p.externalCurrentBalance || p.currentBalance || p.opening;
-    const kpi = (key, title, value, sub, icon, explanation, act = "") => `<article class="p3-kpi">${act ? `<button type="button" class="ux-card-primary" data-p3-action="${act}" aria-label="${title} ${escape2(value)} · ${act === "balance" ? "Saldo bijwerken" : "Buffer instellen"}"></button>` : ""}<span class="p3-kpi-icon" aria-hidden="true">${iconSvg2(icon)}</span><span class="p3-kpi-copy"><span class="p3-kpi-title"><span>${title}</span>${info(key, title, explanation)}</span><strong>${value}</strong><small>${sub}</small>${key === "balance" ? bankMarkup : ""}</span></article>`;
-    const warning = bufferWarningHtml(p.bufferWarning, label, iconSvg2);
-    const saving = p.monthEndSavings, amount = (_b = (_a2 = saving == null ? void 0 : saving.safeCents) != null ? _a2 : saving == null ? void 0 : saving.indicativeCents) != null ? _b : null;
-    const savingTitle = "Veilig te sparen op " + savingDate(saving == null ? void 0 : saving.transferDate);
-    const freeSub = `${amount === null ? "Onvolledige prognose · bedrag niet vast te stellen" : saving.status === "provisional" ? "Indicatie" : ""}<span data-p3-savings-plan>Gepland sparen: ${money2(saving == null ? void 0 : saving.plannedCents)}</span>${amount === null ? "" : `<span data-p3-savings-extra>Extra ruimte: ${money2(saving.extraCents)}</span>`}`;
-    const blockingReasons = explainLiquidityReasons({ reasons: ((saving == null ? void 0 : saving.reasons) || []).filter((r) => !["partial-bank-coverage", "unknown-bank-coverage"].includes(r.code) && (r.severity === "incomplete" || ["unknown-cash-date", "missing-checkpoint", "past-saving-date"].includes(r.code))) });
-    const savingsWarning = amount === null ? `<div class="p3-warning" role="status">Spaarbedrag nog niet te berekenen.${blockingReasons.length ? `<ul>${blockingReasons.map((r) => `<li>${escape2(r.problem)} ${escape2(r.solution)}</li>`).join("")}</ul>` : " Open de uitleg bij Veilig te sparen voor de beschikbare gegevens."}</div>` : "";
-    const balanceDate = (_c = balance.checkpoint) == null ? void 0 : _c.asOfDate;
-    const balanceSub = balance.source === "external" ? `${balance.balanceType === "expected" ? "Verwacht banksaldo" : balance.balanceType === "available" ? "Beschikbaar banksaldo" : "Geboekt banksaldo"} · ${escape2(balance.providerType)} · ${escape2(new Date(balance.observedAt || balance.fetchedAt).toLocaleString("nl-NL"))}` : `Reconstructie · ${status(balance.status)}${balanceDate ? ` · Berekend t/m ${date(balance.toDate || p.asOfDate)}` : ""}${bankMarkup ? "" : " · Saldo bijwerken"}`;
-    const reconciliations = (p.reconciliations || []).filter((r) => r.differenceCents !== null && r.differenceCents !== 0).map((r) => `<p class="p3-caption">Saldo-ijkpunt ${date(r.date)}: ${money2(r.observedCents)} · berekend ${money2(r.modeledCents)} · verschil ${money2(r.differenceCents)}. Vanaf deze dag loopt de berekening verder met het handmatig ingestelde saldo.</p>`).join("");
-    const qualityActions = p.reasons.length ? `<div class="p3-quality-actions">${action("settings", p.reasons.some((r) => r.code === "missing-reliable-horizon") ? "Salarisdatum instellen" : "Prognose instellen")}${v.balance === null ? action("balance", "Saldo instellen") : ""}</div>` : "";
-    return `<div class="p3-kpis">${kpi("free", savingTitle, amount === null ? "—" : money2(amount), freeSub, "income", calculationHelp(p) + qualityHelp(p))}${kpi("balance", p.horizon.endDate < p.asOfDate ? "Saldo op " + date(p.horizon.endDate) : "Huidig saldo", v.balance === null ? "Saldo onbekend" : money2(v.balance), balanceSub, "wallet", balance.source === "external" ? `<p>Rechtstreeks ontvangen van ING. ${escape2(balance.providerType)} · opgehaald ${escape2(new Date(balance.fetchedAt).toLocaleString("nl-NL"))}. Er zijn geen transacties bij dit bedrag opgeteld of afgetrokken.</p>` : `<p>Dit is de rekeningstand op basis van je vastgelegde banksaldo en beschikbare bankboekingen. ${balanceDate ? `Het startpunt is het saldo-ijkpunt van ${date(balanceDate)}. Daarna tellen beschikbare bankboekingen mee tot en met ${date(balance.toDate || p.asOfDate)}.` : ""} Dit is geen automatische bevestiging van je bank.</p>${qualityHelp(p)}`, "balance")}${kpi("minimum", "Laagste prognose", money2(v.minimum), `${date(v.minimumDate)} · ${status(p.status)}`, "chart", `<p>Het laagste verwachte saldo vanaf vandaag tot vlak vóór je volgende salaris- of zakgeldontvangst, inclusief je huidige saldo. Deze KPI verandert niet wanneer je de grafiekperiode wisselt.</p>${qualityHelp(p)}`)}${kpi("buffer", "Buffer", money2(v.buffer), "Buffer instellen", "shield", `<p>De buffer is de veiligheidsmarge die je op deze rekening wilt houden. Veilig te sparen op maandultimo beschermt deze marge. Je buffer is geen aparte bankboeking.</p>`, "settings")}</div>${warning}${savingsWarning}<div class="p3-outlook-footer"><span class="p3-account-name">Rekening: ${escape2(profile.name)}</span>${qualityActions}${reconciliations}</div>`;
+    const v = liquidityView(p), saving = p.monthEndSavings, amount = (_b = (_a2 = saving == null ? void 0 : saving.safeCents) != null ? _a2 : saving == null ? void 0 : saving.indicativeCents) != null ? _b : null;
+    const balance = p.externalCurrentBalance || p.currentBalance || p.opening;
+    const balanceSub = balance.source === "external" ? `${balance.balanceType === "expected" ? "Verwacht banksaldo" : balance.balanceType === "available" ? "Beschikbaar banksaldo" : "Geboekt banksaldo"} · ${escape2(balance.providerType)} · ${escape2(new Date(balance.observedAt || balance.fetchedAt).toLocaleString("nl-NL"))}` : `Reconstructie · ${status(balance.status)}`;
+    const reasons2 = explainLiquidityReasons({ reasons: ((saving == null ? void 0 : saving.reasons) || []).filter((r) => r.severity === "incomplete") });
+    return `<section class="p3-savings-card"><div class="p3-savings-main"><div class="p3-savings-copy"><h2>Veilig te sparen</h2><strong class="p3-savings-amount">${amount === null ? "—" : money2(amount)}</strong><span class="p3-savings-date">${amount === null ? "Bedrag niet vast te stellen" : `Op ${savingDate(saving.transferDate)}${saving.status === "provisional" ? " · Indicatie" : ""}`}</span>${info("free", "Veilig te sparen", calculationHelp(p) + qualityHelp(p), "Bekijk berekening →")}</div><img class="p3-savings-art" src="dashboard-house.png" alt="" aria-hidden="true"></div><div class="p3-savings-balance"><button type="button" data-p3-action="balance"><span>Huidig saldo</span><strong>${v.balance === null ? "Saldo onbekend" : money2(v.balance)}</strong><span class="p3-balance-arrow" aria-hidden="true">›</span></button><small>${balanceSub}</small>${bankMarkup ? `<details class="p3-bank-detail"><summary>Bankstatus</summary>${bankMarkup}</details>` : ""}</div></section>${bufferWarningHtml(p.bufferWarning, label, iconSvg2)}${amount === null ? `<div class="p3-warning" role="status">Spaarbedrag nog niet te berekenen.${reasons2.length ? `<ul>${reasons2.map((r) => `<li>${escape2(r.problem)} ${escape2(r.solution)}</li>`).join("")}</ul>` : ""}</div>` : ""}<div class="p3-outlook-footer"><span class="p3-account-name">Rekening: ${escape2(profile.name)}</span>${p.reasons.length ? action("settings", p.reasons.some((r) => r.code === "missing-reliable-horizon") ? "Salarisdatum instellen" : "Prognose instellen") : ""}</div>`;
+  }
+  function chartStatsHtml(p, iconSvg2) {
+    if (!p) return "";
+    const v = liquidityView(p);
+    return `<div class="p3-chart-stat"><span class="p3-chart-stat-icon" aria-hidden="true">${iconSvg2("download")}</span><span><small>Laagste prognose</small><strong>${money2(v.minimum)}</strong></span>${info("minimum", "Laagste prognose", `<p>Het laagste verwachte saldo vanaf vandaag tot vlak vóór je volgende salaris- of zakgeldontvangst, inclusief je huidige saldo. Deze KPI verandert niet wanneer je de grafiekperiode wisselt.</p>${qualityHelp(p)}`)}</div><div class="p3-chart-stat"><span class="p3-chart-stat-icon" aria-hidden="true">${iconSvg2("shield")}</span><span><small>Buffer</small><strong>${money2(v.buffer)}</strong></span>${info("buffer", "Buffer", `<p>De buffer is de veiligheidsmarge die je op deze rekening wilt houden. Veilig te sparen op maandultimo beschermt deze marge. Je buffer is geen aparte bankboeking.</p>${action("settings", "Buffer instellen")}`)}</div>`;
   }
   function yearHtml(year, getMonth) {
     const v = yearView(year, getMonth), max = Math.max(1, ...v.months.filter((m) => !m.missing).flatMap((m) => [m.income, m.spent]));
@@ -4346,14 +4346,14 @@
     }
     function renderLower(root2) {
       const data = deps.summary(owner());
-      root2.querySelector("[data-p3-summary]").innerHTML = `<section class="p3-panel p3-budget">${head("Budgetten", action("budgets"))}<p class="p3-caption">${escape2(deps.monthLabel())} · ${escape2(deps.ownerLabel(owner()))}</p><div class="p3-budget-body"><div class="p3-ring" style="--progress:${Math.max(0, Math.min(100, data.budget ? data.used / data.budget * 100 : 0))}%"><strong>${deps.eur(data.used)}</strong><span>van ${deps.eur(data.budget)}</span></div><dl><dt>Besteed</dt><dd>${deps.eur(data.used)}</dd><dt>Resterend</dt><dd>${deps.eur(data.budget - data.used)}</dd></dl></div></section><section class="p3-panel p3-allowance">${head("Zakgeld", action("allowance"))}<p class="p3-caption">${escape2(deps.monthLabel())} · Geplande verdeling</p>${data.retainedJointIncome ? `<p class="p3-caption" data-p3-retained-income>${deps.eur(data.retainedJointIncome)} inkomen blijft bij gezamenlijk en wordt niet als zakgeld verdeeld.</p>` : ""}${data.allowances.map((p) => {
+      const favorites = data.goals.filter((g) => g.doel.favoriet).slice(0, 2);
+      root2.querySelector("[data-p3-summary]").innerHTML = `<section class="p3-allowance">${head("Zakgeld")}${data.retainedJointIncome ? `<p class="p3-caption" data-p3-retained-income>${deps.eur(data.retainedJointIncome)} inkomen blijft bij gezamenlijk.</p>` : ""}<div class="p3-allowance-grid">${data.allowances.map((p) => {
         const share = allowanceShare(p.amount, data.allowanceDistribution);
-        return `<div class="p3-allowance-row"><strong>${escape2(p.name)}</strong><span>${deps.eur(p.amount)} · ${share === null ? "Verdeling niet beschikbaar" : new Intl.NumberFormat("nl-NL", { maximumFractionDigits: 1 }).format(share) + "%"}</span>${share === null ? "" : meter(share, "Aandeel " + p.name)}</div>`;
-      }).join("")}</section><section class="p3-panel p3-goals">${head("Spaardoelen", action("goals"))}<p class="p3-caption">Huidige stand · planning ${escape2(deps.monthLabel())}</p><div class="p3-goal-list">${data.goals.slice(0, 2).map((g) => {
+        return `<div class="p3-allowance-row"><span>${escape2(p.name)}</span><strong>${deps.eur(p.amount)}</strong><small>${share === null ? "Verdeling niet beschikbaar" : new Intl.NumberFormat("nl-NL", { maximumFractionDigits: 1 }).format(share) + "% van het zakgeld"}</small></div>`;
+      }).join("")}</div>${action("allowance", "Hoe is dit verdeeld?")}</section><section class="p3-goals">${head("Favoriete spaardoelen")}<div class="p3-goal-list">${favorites.map((g) => {
         const target = Number(g.doel.doelbedrag) || 0, saved = Number(g.doel.algespaard) || 0, progress = target > 0 ? saved / target * 100 : 0;
-        return `<div class="p3-goal">${deps.goalIcon(g.doel)}<div><strong>${escape2(g.doel.naam)}</strong><span>${deps.eur(saved)} / ${deps.eur(target)} · ${Math.round(progress)}%</span>${meter(progress, g.doel.naam)}</div></div>`;
-      }).join("") || '<p class="p3-empty">Nog geen spaardoelen in deze context.</p>'}</div></section>`;
-      root2.querySelector("[data-p3-year-panel]").innerHTML = yearHtml(year, deps.getMonth);
+        return `<div class="p3-goal">${deps.goalIcon(g.doel)}<div><strong>${escape2(g.doel.naam)}</strong><span>${deps.eur(saved)} van ${deps.eur(target)}</span>${meter(progress, g.doel.naam)}</div><span aria-hidden="true">›</span></div>`;
+      }).join("") || '<p class="p3-empty">Nog geen favoriete spaardoelen.</p>'}</div>${action("goals", "Bekijk alle spaardoelen")}</section>`;
     }
     function showDay(root2, day) {
       if (!projection) return;
@@ -4409,7 +4409,7 @@
       lastChartWidth = width;
       host.innerHTML = chartHtml(projection, width);
       const days = chartDays(projection);
-      if (days.length) showDay(root2, days.some((day) => day.date === selectedDay) ? selectedDay : days[0].date);
+      if (days.some((day) => day.date === selectedDay)) showDay(root2, selectedDay);
       if (focusDay) (_b = [...host.querySelectorAll("[data-p3-point]")].find((point) => point.dataset.p3Point === focusDay)) == null ? void 0 : _b.focus({ preventScroll: true });
       else if (focusSelect) (_c = host.querySelector("[data-p3-day]")) == null ? void 0 : _c.focus({ preventScroll: true });
     }
@@ -4432,6 +4432,7 @@
       projection = null;
       const profile = primaryAccount(deps.profiles(), owner());
       root2.querySelector("[data-p3-outlook]").innerHTML = outlookHtml(null, profile, deps.eventLabel, deps.iconSvg);
+      root2.querySelector("[data-p3-chart-stats]").innerHTML = "";
       root2.querySelector("[data-p3-chart]").innerHTML = '<p class="p3-empty">Saldo-ontwikkeling laden…</p>';
       root2.querySelector("[data-p3-payments]").innerHTML = "";
       root2.querySelector("[data-p3-period]").textContent = "Prognoseperiode laden…";
@@ -4454,19 +4455,22 @@
         }
         projection = p;
         root2.querySelector("[data-p3-outlook]").innerHTML = outlookHtml(kpis, profile, deps.eventLabel, deps.iconSvg, ((_a2 = deps.bankMarkup) == null ? void 0 : _a2.call(deps, profile)) || "");
+        root2.querySelector("[data-p3-chart-stats]").innerHTML = chartStatsHtml(kpis, deps.iconSvg);
         (_b = deps.bindBank) == null ? void 0 : _b.call(deps, root2.querySelector("[data-p3-outlook]"), profile);
         root2.querySelector("[data-p3-period]").textContent = forecastPeriod(p);
         drawChart(root2, true);
-        root2.querySelector("[data-p3-payments]").innerHTML = paymentsHtml(p, deps.eventLabel, deps.canOpenEvent);
+        root2.querySelector("[data-p3-payments]").innerHTML = paymentsHtml(p, deps.eventLabel, deps.canOpenEvent, deps.iconSvg);
       } catch (e) {
         if (token !== generation || !root2.isConnected) return;
         root2.querySelector("[data-p3-outlook]").innerHTML = `<p class="p3-empty" role="status">${escape2(e.message)}</p>${action("settings", "Prognose instellen")}`;
+        root2.querySelector("[data-p3-chart-stats]").innerHTML = "";
         root2.querySelector("[data-p3-period]").textContent = forecastPeriod(null);
         root2.querySelector("[data-p3-chart]").innerHTML = chartHtml(null);
         root2.querySelector("[data-p3-payments]").innerHTML = '<li class="p3-empty">Betalingen konden niet worden geladen.</li>';
       }
     }
     return { unmount, mount(root2) {
+      var _a2;
       unmount();
       controller = new AbortController();
       const signal = controller.signal;
@@ -4476,17 +4480,16 @@
         filter = "month";
         custom = "";
         selectedDay = null;
-        year = Number(month.slice(0, 4));
         savePreference();
       }
       selectedMonth = month;
-      year != null ? year : year = Number(month.slice(0, 4));
       const bounds = dashboardPeriod({ month, today: deps.today() });
       root2.classList.add("p3-dashboard");
-      root2.insertAdjacentHTML("beforeend", `<div class="p3-surface"><section class="p3-panel p3-outlook"><div class="p3-toolbar"><div><h2>Vooruitblik</h2></div><div class="p3-context" role="group" aria-label="Dashboardcontext">${["gezamenlijk", "persoonlijk"].map((c) => `<button type="button" data-p3-context="${c}" aria-pressed="${context === c}">${c === "gezamenlijk" ? "Gezamenlijk" : "Persoonlijk"}</button>`).join("")}</div>${!deps.personalRole() ? `<label class="p3-person" ${context === "gezamenlijk" ? "hidden" : ""}>Persoon <select data-p3-person><option value="dion" ${localPerson === "dion" ? "selected" : ""}>Dion</option><option value="dara" ${localPerson === "dara" ? "selected" : ""}>Dara</option></select></label>` : ""}<div class="p3-filters" role="group" aria-label="Prognoseperiode">${[["month", "Deze maand"], ["7", "7 dagen"], ["14", "14 dagen"], ["custom", "Eigen datum"], ["salary", "Volgend salaris"]].map(([value, title]) => `<button type="button" data-p3-filter="${value}" aria-pressed="${filter === value}">${title}</button>`).join("")}</div></div><label class="p3-custom" ${filter === "custom" ? "" : "hidden"}>Tot en met <input type="date" data-p3-custom min="${bounds.minDate}" max="${bounds.maxDate}" value="${custom}" required></label><div data-p3-outlook></div></section><div class="p3-main"><section class="p3-panel">${head("Saldo-ontwikkeling", info("chart", "Saldo-ontwikkeling", "<p>Bij een bruikbare ING-opgave begint de actuele prognose bij die bankstand, met resterende planning en budgetten. Anders geldt de bestaande saldoreconstructie. Oranje toont het verleden, groen vandaag en de toekomst. Budgetuitgaven zonder datum zijn geschat.</p><p>Het minimum en de bufferlijn blijven in de grafiek zichtbaar. Kies een dag voor de bijbehorende bedragen en betalingen.</p>"))}<p class="p3-period" data-p3-period aria-live="polite"></p><div data-p3-chart></div></section><section class="p3-panel">${head("Betalingen in deze periode")}<p class="p3-caption">Toekomstige vaste lasten en inkomsten na vandaag.</p><ul class="p3-payments" data-p3-payments tabindex="0" aria-label="Toekomstige vaste betalingen en inkomsten"></ul></section></div><div class="p3-summary" data-p3-summary></div><section class="p3-panel p3-year" data-p3-year-panel></section></div>`);
+      root2.insertAdjacentHTML("beforeend", `<div class="p3-surface"><div class="p3-toolbar"><div class="p3-context" role="group" aria-label="Dashboardcontext">${["gezamenlijk", "persoonlijk"].map((c) => `<button type="button" data-p3-context="${c}" aria-pressed="${context === c}">${c === "gezamenlijk" ? "Gezamenlijk" : "Persoonlijk"}</button>`).join("")}</div>${!deps.personalRole() ? `<label class="p3-person">Persoon <select data-p3-person><option value="dion" ${localPerson === "dion" ? "selected" : ""}>Dion</option><option value="dara" ${localPerson === "dara" ? "selected" : ""}>Dara</option></select></label>` : ""}</div><div data-p3-outlook></div><section class="p3-chart-section">${head("Saldo-ontwikkeling", info("chart", "Saldo-ontwikkeling", "<p>Oranje toont het verleden, groen vandaag en de toekomst. Kies een dag voor bedragen en betalingen. Het minimum en de bufferlijn blijven zichtbaar.</p>"))}<div class="p3-period-controls"><label class="p3-filter-select">Periode <select data-p3-filter aria-label="Prognoseperiode">${[["month", "Deze maand"], ["7", "7 dagen"], ["14", "14 dagen"], ["custom", "Eigen datum"], ["salary", "Volgend salaris"]].map(([value, title]) => `<option value="${value}" ${filter === value ? "selected" : ""}>${title}</option>`).join("")}</select></label><label class="p3-custom" ${filter === "custom" ? "" : "hidden"}>Tot en met <input type="date" data-p3-custom min="${bounds.minDate}" max="${bounds.maxDate}" value="${custom}" required></label></div><p class="p3-period" data-p3-period aria-live="polite"></p><div data-p3-chart></div><div class="p3-chart-stats" data-p3-chart-stats></div></section><section class="p3-payments-section">${head("Komende betalingen", action("payments", "Bekijk alles"))}<ul class="p3-payments" data-p3-payments tabindex="0" aria-label="Toekomstige vaste betalingen en inkomsten"></ul></section><div class="p3-summary" data-p3-summary></div></div>`);
+      (_a2 = root2.querySelector(".p3-person")) == null ? void 0 : _a2.toggleAttribute("hidden", context === "gezamenlijk");
       const isInfoOpen = (panel) => typeof panel.showPopover === "function" ? panel.matches(":popover-open") : panel.dataset.open === "true";
       const closeInfo = (panel) => {
-        var _a2;
+        var _a3;
         if (!panel) return;
         const key = panel.dataset.p3InfoPanel;
         if (typeof panel.hidePopover === "function") {
@@ -4494,19 +4497,19 @@
         } else {
           delete panel.dataset.open;
         }
-        (_a2 = root2.querySelector(`[data-p3-info="${key}"]`)) == null ? void 0 : _a2.setAttribute("aria-expanded", "false");
+        (_a3 = root2.querySelector(`[data-p3-info="${key}"]`)) == null ? void 0 : _a3.setAttribute("aria-expanded", "false");
       };
       root2.addEventListener("toggle", (e) => {
-        var _a2;
-        if (e.target.matches("[data-p3-info-panel]")) (_a2 = root2.querySelector(`[data-p3-info="${e.target.dataset.p3InfoPanel}"]`)) == null ? void 0 : _a2.setAttribute("aria-expanded", String(e.newState === "open"));
+        var _a3;
+        if (e.target.matches("[data-p3-info-panel]")) (_a3 = root2.querySelector(`[data-p3-info="${e.target.dataset.p3InfoPanel}"]`)) == null ? void 0 : _a3.setAttribute("aria-expanded", String(e.newState === "open"));
       }, { capture: true, signal });
       root2.addEventListener("click", (e) => {
-        var _a2;
+        var _a3;
         const button = e.target.closest("[data-p3-info]"), close = e.target.closest("[data-p3-close-info]");
         if (close) {
           const panel2 = root2.querySelector(`#p3-info-${close.dataset.p3CloseInfo}`);
           closeInfo(panel2);
-          (_a2 = root2.querySelector(`[data-p3-info="${close.dataset.p3CloseInfo}"]`)) == null ? void 0 : _a2.focus();
+          (_a3 = root2.querySelector(`[data-p3-info="${close.dataset.p3CloseInfo}"]`)) == null ? void 0 : _a3.focus();
           return;
         }
         if (!button) return;
@@ -4525,14 +4528,14 @@
         panel.style.top = Math.max(12, Math.min(innerHeight - box.height - 12, anchor.bottom + 8)) + "px";
       }, { signal });
       root2.addEventListener("keydown", (e) => {
-        var _a2;
+        var _a3;
         if (e.key !== "Escape") return;
         const open = [...root2.querySelectorAll("[data-p3-info-panel]")].find(isInfoOpen);
         if (open) {
           e.preventDefault();
           e.stopImmediatePropagation();
           closeInfo(open);
-          (_a2 = root2.querySelector(`[data-p3-info="${open.dataset.p3InfoPanel}"]`)) == null ? void 0 : _a2.focus();
+          (_a3 = root2.querySelector(`[data-p3-info="${open.dataset.p3InfoPanel}"]`)) == null ? void 0 : _a3.focus();
         }
       }, { signal });
       document.addEventListener("click", (e) => {
@@ -4553,9 +4556,9 @@
         root2.querySelectorAll("[data-p3-point]").forEach((point) => point.setAttribute("aria-pressed", "false"));
       };
       root2.addEventListener("pointermove", (e) => {
-        var _a2, _b;
+        var _a3, _b;
         if (e.pointerType !== "mouse" || e.buttons) return;
-        const day = (_a2 = e.target.closest("[data-p3-point]")) == null ? void 0 : _a2.dataset.p3Point;
+        const day = (_a3 = e.target.closest("[data-p3-point]")) == null ? void 0 : _a3.dataset.p3Point;
         if (!day) {
           hideHover();
           return;
@@ -4574,8 +4577,8 @@
         }
       }, { signal });
       root2.addEventListener("pointerout", (e) => {
-        var _a2, _b;
-        if (e.pointerType === "mouse" && e.target.closest("[data-p3-point]") !== ((_b = (_a2 = e.relatedTarget) == null ? void 0 : _a2.closest) == null ? void 0 : _b.call(_a2, "[data-p3-point]"))) hideHover();
+        var _a3, _b;
+        if (e.pointerType === "mouse" && e.target.closest("[data-p3-point]") !== ((_b = (_a3 = e.relatedTarget) == null ? void 0 : _a3.closest) == null ? void 0 : _b.call(_a3, "[data-p3-point]"))) hideHover();
       }, { signal });
       root2.addEventListener("keydown", (e) => {
         if (e.key === "Escape") {
@@ -4589,7 +4592,7 @@
         }
       }, { signal });
       root2.addEventListener("click", (e) => {
-        var _a2;
+        var _a3;
         const day = chartDay(root2, e);
         if (day) showDay(root2, day);
         if (e.target.closest("[data-p3-close-detail]")) {
@@ -4641,7 +4644,7 @@
               deps.balance();
               break;
             case "payments":
-              deps.modal(`<h2>Betalingen binnen je prognoseperiode</h2><p>${date((projection == null ? void 0 : projection.displayStartDate) || (projection == null ? void 0 : projection.asOfDate))} tot en met ${date((_a2 = projection == null ? void 0 : projection.horizon) == null ? void 0 : _a2.endDate)}</p><ul class="p3-payments">${projection ? paymentsHtml(projection, deps.eventLabel, deps.canOpenEvent) : "<li>Stel eerst je prognose in.</li>"}</ul>`, (id) => {
+              deps.modal(`<h2>Betalingen binnen je prognoseperiode</h2><p>${date((projection == null ? void 0 : projection.displayStartDate) || (projection == null ? void 0 : projection.asOfDate))} tot en met ${date((_a3 = projection == null ? void 0 : projection.horizon) == null ? void 0 : _a3.endDate)}</p><ul class="p3-payments">${projection ? paymentsHtml(projection, deps.eventLabel, deps.canOpenEvent, deps.iconSvg) : "<li>Stel eerst je prognose in.</li>"}</ul>`, (id) => {
                 const event2 = paymentEvents(projection).find((e2) => e2.id === id);
                 if (event2) deps.openEvent(event2);
               });
@@ -4665,6 +4668,20 @@
           savePreference();
           renderLower(root2);
           load(root2);
+        }
+        if (e.target.matches("[data-p3-filter]")) {
+          filter = e.target.value;
+          savePreference();
+          root2.querySelector(".p3-custom").hidden = filter !== "custom";
+          if (filter === "custom" && !custom) {
+            ++generation;
+            projection = null;
+            root2.querySelector("[data-p3-period]").textContent = "Kies een einddatum";
+            root2.querySelector("[data-p3-outlook]").innerHTML = '<p class="p3-empty" role="status">Kies een einddatum voor je prognose.</p>';
+            root2.querySelector("[data-p3-chart]").innerHTML = chartHtml(null);
+            root2.querySelector("[data-p3-payments]").innerHTML = '<li class="p3-empty">Kies eerst een einddatum.</li>';
+            root2.querySelector("[data-p3-custom]").focus();
+          } else load(root2);
         }
         if (e.target.matches("[data-p3-day]")) showDay(root2, e.target.value);
         if (e.target.matches("[data-p3-year]")) {
