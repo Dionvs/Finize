@@ -10,8 +10,8 @@ for(const width of [195,320,390,430])test(`header en enkele navigatierij blijven
  await navigate(page,'dion');
  const header=page.locator('#tab-dion .mobile-header-top');
  await expect(header.locator('.mobile-status-pill')).toContainText('synchronisatie volgt');
- const boxes=await header.evaluate(h=>Object.fromEntries(['mobile-brand','mobile-month-slot','mobile-status-pill'].map(cls=>[cls,h.querySelector('.'+cls).getBoundingClientRect().toJSON()])));
- const brand=boxes['mobile-brand'],month=boxes['mobile-month-slot'],status=boxes['mobile-status-pill'];
+ const boxes=await header.evaluate(h=>Object.fromEntries(['mobile-tab-title','mobile-month-slot','mobile-status-pill'].map(cls=>[cls,h.querySelector('.'+cls).getBoundingClientRect().toJSON()])));
+ const brand=boxes['mobile-tab-title'],month=boxes['mobile-month-slot'],status=boxes['mobile-status-pill'];
  expect(month.x).toBeGreaterThanOrEqual(brand.right);
  await expect(header.getByRole('heading',{name:'Dion',exact:true})).toHaveCount(1);
  await expect(page.locator('#tab-dion .mobile-dashboard-header')).toHaveCount(0);
@@ -41,4 +41,16 @@ for(const width of [195,320,390,430])test(`header en enkele navigatierij blijven
  const first=navigation.locator('button:visible').first();await first.focus();await expect(first).toBeInViewport();
  const last=navigation.locator('button:visible').last();await last.focus();await expect(last).toBeInViewport();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
+});
+
+for(const width of [320,390])test(`compacte header en maandpil op ${width}px`,async({page},info)=>{
+ await boot(page,width,false,test.info().project.use.baseURL+'/');await navigate(page,'gezamenlijk');
+ const header=page.locator('#tab-gezamenlijk .mobile-header-top');
+ const sizes=await header.evaluate(h=>{
+  const title=h.querySelector('.mobile-tab-title').getBoundingClientRect(),pill=h.querySelector('.month-picker-btn').getBoundingClientRect();
+  return {height:h.getBoundingClientRect().height,pillHeight:pill.height,titleCenter:title.top+title.height/2,pillCenter:pill.top+pill.height/2};
+ });
+ expect(sizes.height).toBeLessThanOrEqual(60);expect(sizes.pillHeight).toBe(26);
+ expect(Math.abs(sizes.titleCenter-sizes.pillCenter)).toBeLessThanOrEqual(1);
+ await header.screenshot({path:info.outputPath(`compact-header-${width}.png`)});
 });
