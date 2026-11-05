@@ -50,7 +50,7 @@ for(const width of [320,390])test(`compacte header en maandpil op ${width}px`,as
   const title=h.querySelector('.mobile-tab-title').getBoundingClientRect(),pill=h.querySelector('.month-picker-btn').getBoundingClientRect();
   return {height:h.getBoundingClientRect().height,pillHeight:pill.height,titleCenter:title.top+title.height/2,pillCenter:pill.top+pill.height/2};
  });
- expect(sizes.height).toBeLessThanOrEqual(60);expect(sizes.pillHeight).toBe(26);
+ expect(sizes.height).toBeLessThanOrEqual(60);expect(sizes.pillHeight).toBe(30);
  expect(Math.abs(sizes.titleCenter-sizes.pillCenter)).toBeLessThanOrEqual(1);
  await header.screenshot({path:info.outputPath(`compact-header-${width}.png`)});
 });
