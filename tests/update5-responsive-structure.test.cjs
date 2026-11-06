@@ -11,9 +11,7 @@ const html = markup + js;
 const presentationJs = fs.readFileSync(path.join(root, 'src', 'ui', 'presentation.js'), 'utf8');
 const sw = fs.readFileSync(path.join(root, 'service-worker.js'), 'utf8');
 
-assert.match(markup, /app\.css/);
-assert.match(markup, /app\.js/);
-assert.match(sw, /finize-v118-r25/);
+require('./helpers/release-shell.cjs').assertReleaseShell(markup,sw);
 assert.match(js, /createDashboard/);
 assert.match(sw, /\.\/app\.css/);
 assert.match(sw, /\.\/app\.js/);
@@ -30,7 +28,7 @@ assert.match(html, /function openPersonalSavingEditModal\(owner\)/);
 assert.match(html, /Gebruik Over deze maand/);
 assert.match(dashboard, /Veilig te sparen op /);
 assert.doesNotMatch(dashboard, /Vrij na verplichtingen/);
-assert.match(dashboard, /Geplande verdeling/);
+assert.match(dashboard, /Zakgeld/);
 assert.match(html, /data-u3-open="planning" data-u3-planning-owner="\$\{(?:owner|opts\.openFixedOwner)\}" aria-label="Vaste lasten van/);
 assert.match(html, /function u3OpenPlanning\(owner=''\)/);
 assert.doesNotMatch(js, /data-open-owner-fixed/);
@@ -60,7 +58,7 @@ for (const marker of [
 assert.match(css, /\.v4-bottom-nav\{display:none !important\}/);
 
 // P3 replaces the historical dashboard composition; incumbent non-dashboard contracts stay below.
-for(const marker of ['p3-kpis','p3-main','p3-summary','p3-year-kpis','p3-year-chart'])assert.ok(dashboard.includes(marker),marker);
+for(const marker of ['p3-savings-card','data-p3-chart','p3-summary','p3-year-kpis','p3-year-chart'])assert.ok(dashboard.includes(marker),marker);
 assert.match(js, /getMonth:getMonthFinancialResult/);
 assert.doesNotMatch(html, /Werkelijk maandresultaat|Deze realisatie verandert het vooraf berekende zakgeld niet/);
 assert.match(dashboard, /freeAfterObligationsCents/);

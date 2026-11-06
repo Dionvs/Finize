@@ -78,7 +78,7 @@ test('P4 budget IDs separate OV and Overig without rewriting legacy transactions
   assert.throws(()=>bindBudgetAssignment(s,'2026-10','gezamenlijk',{category:'OV',budgetItemId:'missing'}));
   s.budgetDefaultsHistory.gezamenlijk.push({effectiveFrom:'2026-11',rows:[{id:'ov',post:'Openbaar vervoer',bedrag:125},{id:'other',post:'Overig',bedrag:200}]});
   assert.equal(budgetActual(s,'2026-10','gezamenlijk','OV','ov'),50);
-  materialize(s,[{...row('c','uitgave',-30,{category:'OV',budgetItemId:'ov'}),bankOriginal:{...row('c').bankOriginal,bankDate:'2026-11-03'}}],'november');
+  materialize(s,[{...row('c','uitgave',-30,{category:'OV',budgetItemId:'ov',processingDate:'2026-11-03'}),bankOriginal:{...row('c').bankOriginal,bankDate:'2026-11-03'}}],'november');
   assert.equal(budgetActual(s,'2026-11','gezamenlijk','Openbaar vervoer','ov'),30);
   assert.equal(budgetActual(s,'2026-11','gezamenlijk','Overig','other'),0);
   s.budgetDefaultsHistory.gezamenlijk[0].rows.push({id:'ambiguous',post:'OV',bedrag:5});

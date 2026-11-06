@@ -20,7 +20,7 @@ test('P4 explicitly reopened legacy salary restores configured forecast and pres
   assert.deepEqual(s.incomeDefaultsHistory,before.incomeDefaultsHistory);
 });
 function salary(id,person,amount,date='2026-10-03',employer='NL10EMPLOYER'){
-  const r=row(id,'salaris',amount,{salaryLinkVersion:117,salaryPersonId:person});r.bankOriginal.bankDate=date;r.bankOriginal.counterpartyAccount=employer;return r;
+  const r=row(id,'salaris',amount,{salaryLinkVersion:117,salaryPersonId:person,processingDate:date});r.bankOriginal.bankDate=date;r.bankOriginal.counterpartyAccount=employer;return r;
 }
 test('P4 actual Dion 2530 and Dara 3200 replace only their planned salaries',()=>{
   const s=fixture(),goals=structuredClone(s.savingsGoalLedger);materialize(s,[salary('dion','dion',2530),salary('dara','dara',3200)],'both');
