@@ -1,0 +1,284 @@
+{
+  "date": "2026-11-06",
+  "baseCommit": "7a7d72e25660975ba88269e7835b98d32858ada5",
+  "branch": "herstel/pakket1-financiele-bugs",
+  "codeCommits": [
+    "b8aa562fd4c5721d2b425a23276b85038c6a0193",
+    "25a58506afd1c6954bed0952d72a92bd43c47aeb"
+  ],
+  "package1Complete": true,
+  "package2Started": false,
+  "package3Started": false,
+  "published": false,
+  "production": {
+    "dataChanged": false,
+    "bankSyncStarted": false,
+    "firestoreRulesChanged": false,
+    "newMigrations": false
+  },
+  "b1": {
+    "newUnitBefore": {
+      "pass": 7,
+      "fail": 15
+    },
+    "newUnitAfter": {
+      "pass": 22,
+      "fail": 0
+    },
+    "capitalBrowserBefore": {
+      "fail": 4
+    },
+    "capitalAfter": "saved capital 100 retained after save, reload and repeated save at product prices 49.95 and 0; explicit manual correction to 75 retained"
+  },
+  "b2": {
+    "newUnitBefore": {
+      "pass": 60,
+      "fail": 12
+    },
+    "newUnitAfter": {
+      "pass": 72,
+      "fail": 0
+    },
+    "financialBefore": {
+      "monthlyFixed": 40,
+      "dates": [
+        "2026-11-08",
+        "2026-11-15",
+        "2026-11-22",
+        "2026-11-29"
+      ],
+      "minimumCents": 96000,
+      "safeCents": 76000
+    },
+    "financialAfter": {
+      "monthlyFixed": 50,
+      "dates": [
+        "2026-11-01",
+        "2026-11-08",
+        "2026-11-15",
+        "2026-11-22",
+        "2026-11-29"
+      ],
+      "minimumCents": 95000,
+      "safeCents": 75000
+    },
+    "monthlyControls": {
+      "count": 5,
+      "unchanged": true,
+      "values": [
+        {
+          "config": {},
+          "safe": 75000,
+          "required": 200000,
+          "end": 275000,
+          "forecast": {
+            "income": 3000,
+            "available": 1100,
+            "actualIncome": 0,
+            "realExpense": 0,
+            "savingsFunded": 0,
+            "unusedSavings": 0,
+            "refundCashflow": 0
+          }
+        },
+        {
+          "config": {
+            "balance": 230000
+          },
+          "safe": 30000,
+          "required": 200000,
+          "end": 230000,
+          "forecast": {
+            "income": 3000,
+            "available": 1100,
+            "actualIncome": 0,
+            "realExpense": 0,
+            "savingsFunded": 0,
+            "unusedSavings": 0,
+            "refundCashflow": 0
+          }
+        },
+        {
+          "config": {
+            "late": 4000
+          },
+          "safe": 0,
+          "required": 300000,
+          "end": 275000,
+          "forecast": {
+            "income": 3000,
+            "available": -2800,
+            "actualIncome": 0,
+            "realExpense": 0,
+            "savingsFunded": 0,
+            "unusedSavings": 0,
+            "refundCashflow": 0
+          }
+        },
+        {
+          "config": {
+            "first": 1700
+          },
+          "safe": 85000,
+          "required": 190000,
+          "end": 275000,
+          "forecast": {
+            "income": 3000,
+            "available": 1200,
+            "actualIncome": 0,
+            "realExpense": 0,
+            "savingsFunded": 0,
+            "unusedSavings": 0,
+            "refundCashflow": 0
+          }
+        },
+        {
+          "config": {
+            "buffer": 0
+          },
+          "safe": 75000,
+          "required": 200000,
+          "end": 275000,
+          "forecast": {
+            "income": 3000,
+            "available": 1100,
+            "actualIncome": 0,
+            "realExpense": 0,
+            "savingsFunded": 0,
+            "unusedSavings": 0,
+            "refundCashflow": 0
+          }
+        }
+      ]
+    }
+  },
+  "financialRegression": {
+    "before": {
+      "root": "C:\\Users\\dionv\\Documents\\Codex\\Finize-herstel-pakket1-20261106\\.cache\\pakket1\\baseline",
+      "files": [
+        "tests/subgoal-product-link.test.cjs",
+        "tests/update2-calculations.test.cjs",
+        "tests/update4-2-savings-ledger.test.cjs",
+        "tests/month-end-savings.test.cjs",
+        "tests/package2-planning-timeline.test.cjs",
+        "tests/v118-p2-liquidity.test.cjs",
+        "tests/safe-savings-correction.test.cjs",
+        "tests/liquidity-budget-pot.test.cjs",
+        "tests/liquidity-current-day.test.cjs",
+        "tests/month-end-budget-timing.test.cjs",
+        "tests/paid-date-period-index.test.cjs",
+        "tests/current-balance-payment-date.test.cjs",
+        "tests/package3-processing-integration.test.cjs",
+        "tests/package3-transaction-engine.test.cjs",
+        "tests/package4-savings-refunds-forecast.test.cjs",
+        "tests/package4-allowance-planning-correction.test.cjs",
+        "tests/personal-month-summary.test.cjs",
+        "tests/income-outlook.test.cjs",
+        "tests/v118-vrij-spaardoel.test.cjs",
+        "tests/v117-budget-detail-capital.test.cjs"
+      ],
+      "exit": 0,
+      "tests": 384,
+      "pass": 384,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    "after": {
+      "root": "C:\\Users\\dionv\\Documents\\Codex\\Finize-herstel-pakket1-20261106",
+      "files": [
+        "tests/product-price-preservation.test.cjs",
+        "tests/weekly-calendar.test.cjs",
+        "tests/subgoal-product-link.test.cjs",
+        "tests/update2-calculations.test.cjs",
+        "tests/update4-2-savings-ledger.test.cjs",
+        "tests/month-end-savings.test.cjs",
+        "tests/package2-planning-timeline.test.cjs",
+        "tests/v118-p2-liquidity.test.cjs",
+        "tests/safe-savings-correction.test.cjs",
+        "tests/liquidity-budget-pot.test.cjs",
+        "tests/liquidity-current-day.test.cjs",
+        "tests/month-end-budget-timing.test.cjs",
+        "tests/paid-date-period-index.test.cjs",
+        "tests/current-balance-payment-date.test.cjs",
+        "tests/package3-processing-integration.test.cjs",
+        "tests/package3-transaction-engine.test.cjs",
+        "tests/package4-savings-refunds-forecast.test.cjs",
+        "tests/package4-allowance-planning-correction.test.cjs",
+        "tests/personal-month-summary.test.cjs",
+        "tests/income-outlook.test.cjs",
+        "tests/v118-vrij-spaardoel.test.cjs",
+        "tests/v117-budget-detail-capital.test.cjs"
+      ],
+      "exit": 0,
+      "tests": 478,
+      "pass": 478,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    }
+  },
+  "browserFinal": {
+    "startTime": "2026-11-06T09:12:20.865Z",
+    "duration": 67003.755,
+    "expected": 35,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0,
+    "files": [
+      "pakket1-product-price.spec.cjs",
+      "pakket1-weekly-calendar.spec.cjs",
+      "subgoal-product-link.spec.cjs",
+      "bootstrap-stability.spec.cjs",
+      "dynamic-html-security.spec.cjs",
+      "service-worker-upgrade.spec.cjs",
+      "bank-import-generation.spec.cjs"
+    ],
+    "temporaryPort": 4191,
+    "mimeSetupCorrected": true
+  },
+  "checks": {
+    "generated": "Gegenereerde runtime is byte-reproduceerbaar.",
+    "syntax": "JavaScript-syntax geldig, inclusief 2 inline scripts.",
+    "css": "CSS geldig: 1487 hoofdnodes, 1 bekende ongedefinieerde tokens.",
+    "cssSourceChanged": false
+  },
+  "googleDriveFiles": [
+    {
+      "path": "app.css",
+      "sha256": "B0DF14385C9D751B567DCE330F04977E47F7C33745D2E0DA644BDE404630F117",
+      "unchanged": true
+    },
+    {
+      "path": "app.js",
+      "sha256": "FA6B6B278162FC30D9973C404E682026E637A6B1819D2B2C3130844C9A46DB72",
+      "unchanged": true
+    },
+    {
+      "path": "index.html",
+      "sha256": "0606D2214ACE4CAC1919114BEB2C2E4A50C2891CA937BAB448BCB6EA9129A6EA",
+      "unchanged": true
+    },
+    {
+      "path": "src/styles/dashboard-p3.css",
+      "sha256": "D1C45BE3F0A5B5B719A9FAA3BF0360613769E03817C5BB270DA8C1444257BD80",
+      "unchanged": true
+    },
+    {
+      "path": "src/ui/dashboard.mjs",
+      "sha256": "69FA1AB5503881D7B74F3E112F35F3BBE368824F1DAC93C961667A8041DA9CFC",
+      "unchanged": true
+    },
+    {
+      "path": "tests/browser/v118-p3-dashboard.spec.cjs",
+      "sha256": "330DBEDD77955671F8B681E623FC9BDCCAA0EA4B95587ACE512347D002FE5014",
+      "unchanged": true
+    }
+  ],
+  "limitations": [
+    "Full old test suite and known scan failures deferred to package 2",
+    "No production access or full emulator run",
+    "No physical-device or deployed release upgrade test",
+    "No automatic reconstruction of previously damaged data"
+  ]
+}
