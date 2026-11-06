@@ -10030,10 +10030,12 @@ html body.v4-app .transaction-overview-credit{color:var(--green)}
     const unit = U3_FREQUENCY_UNITS.includes(item.frequentieEenheid) ? item.frequentieEenheid : "maanden";
     const dates = [];
     if (unit === "weken") {
-      const stepMs = amount * 7 * 864e5;
-      let index = Math.max(0, Math.floor((bounds.start - start) / stepMs) - 1);
+      const stepDays = amount * 7;
+      const calendarDay = (date2) => Date.UTC(date2.getFullYear(), date2.getMonth(), date2.getDate()) / 864e5;
+      let index = Math.max(0, Math.floor((calendarDay(bounds.start) - calendarDay(start)) / stepDays) - 1);
       for (let guard = 0; guard < 64; guard++, index++) {
-        const date2 = new Date(start.getTime() + index * stepMs);
+        const date2 = new Date(start);
+        date2.setDate(start.getDate() + index * stepDays);
         if (date2 > bounds.end) break;
         if (date2 >= bounds.start && date2 >= start && (!end || date2 <= end)) dates.push(u3IsoDate(date2));
       }

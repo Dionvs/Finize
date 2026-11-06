@@ -41,10 +41,12 @@ function u3OccurrenceDates(item, month){
   const unit = U3_FREQUENCY_UNITS.includes(item.frequentieEenheid) ? item.frequentieEenheid : 'maanden';
   const dates = [];
   if (unit === 'weken'){
-    const stepMs = amount*7*86400000;
-    let index = Math.max(0,Math.floor((bounds.start-start)/stepMs)-1);
+    const stepDays = amount*7;
+    const calendarDay = date => Date.UTC(date.getFullYear(),date.getMonth(),date.getDate())/86400000;
+    let index = Math.max(0,Math.floor((calendarDay(bounds.start)-calendarDay(start))/stepDays)-1);
     for (let guard=0; guard<64; guard++,index++){
-      const date = new Date(start.getTime()+index*stepMs);
+      const date = new Date(start);
+      date.setDate(start.getDate()+index*stepDays);
       if (date > bounds.end) break;
       if (date >= bounds.start && date >= start && (!end || date <= end)) dates.push(u3IsoDate(date));
     }
