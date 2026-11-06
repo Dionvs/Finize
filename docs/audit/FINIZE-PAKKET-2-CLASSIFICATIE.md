@@ -51,7 +51,7 @@ Aanvullende echte browserprobes via huidige zichtbare bediening slagen **3/3**:
 
 De eerste versie van de onderzoeksprobe gebruikte zelf nog de verborgen native selector en een verkeerd transactiefamilie-ID. Die probe is gecorrigeerd naar zichtbare bediening; er is daarvoor geen applicatiecode gewijzigd. Beide onderzoeksruns zijn bewaard.
 
-De overige acht mislukkingen in deze prioriteitsrun betreffen verdwenen dashboard-/lijstmarkup, gewijzigde zichtbare labels of oude spaardoel-/budgetselectors. Deze krijgen pas een definitieve beoordeling nadat de huidige route met dezelfde financiële eindpunten is herhaald. Geen financiële assertion mag verdwijnen om een groene uitslag te krijgen.
+De overige acht mislukkingen in deze prioriteitsrun zijn aanvankelijk kandidaten voor verdwenen dashboard-/lijstmarkup, gewijzigde zichtbare labels of oude spaardoel-/budgetselectors. Nadere inspectie bevestigt echter een echte applicatieregressie bij de directe mobiele doelvolgorde: de huidige mobiele kaarten bevatten helemaal geen verplaatsknoppen. Zie [de afzonderlijke bevinding](FINIZE-PAKKET-2-APPLICATIEBUG-01.md). De oorspronkelijke test is hiervoor niet afgezwakt of aangepast. De overige gevallen krijgen pas een definitieve beoordeling na herhaling via de actuele route.
 
 ## Vervolg en grenzen
 
