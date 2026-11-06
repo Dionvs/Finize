@@ -9085,7 +9085,8 @@
   }
   function normalizeProductSnapshot(value) {
     if (!value || typeof value !== "object") return null;
-    const price = Number(value.price);
+    const hasPrice = typeof value.price === "number" || typeof value.price === "string" && value.price.trim() !== "";
+    const price = hasPrice ? Number(value.price) : NaN;
     const url = normalizeProductUrl(value.url);
     if (!url) return null;
     return {
@@ -13245,7 +13246,7 @@
         if (!await commitChange(() => {
           const current = state.spaardoelen[owner].find((item) => item.id === id);
           if (!current) throw new Error("Dit spaardoel is intussen verplaatst of verwijderd. Heropen de actuele stand.");
-          Object.assign(current, changes);
+          Object.assign(current, changes, { algespaard: savedAmount });
           u2NormalizeChildren(current);
           u2SetGoalSavedAmount(current, savedAmount);
           if (targetOwner !== owner) {

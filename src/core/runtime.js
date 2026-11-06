@@ -3791,7 +3791,7 @@ function openMobileGoalEditor(owner,id){
       if(!await commitChange(()=>{
         const current=state.spaardoelen[owner].find(item=>item.id===id);
         if(!current)throw new Error('Dit spaardoel is intussen verplaatst of verwijderd. Heropen de actuele stand.');
-        Object.assign(current,changes);u2NormalizeChildren(current);u2SetGoalSavedAmount(current,savedAmount);
+        Object.assign(current,changes,{algespaard:savedAmount});u2NormalizeChildren(current);u2SetGoalSavedAmount(current,savedAmount);
         if(targetOwner!==owner){moveItemById(`spaardoelen.${owner}`,`spaardoelen.${targetOwner}`,id);}
       },{render:false})) throw new Error('Lokale opslag is mislukt.');
       if (!goalImageData){

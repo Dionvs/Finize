@@ -93,7 +93,8 @@ function safeRemoteImage(value){
 
 export function normalizeProductSnapshot(value){
   if(!value||typeof value!=='object')return null;
-  const price=Number(value.price);
+  const hasPrice=typeof value.price==='number'||(typeof value.price==='string'&&value.price.trim()!=='');
+  const price=hasPrice?Number(value.price):NaN;
   const url=normalizeProductUrl(value.url);
   if(!url)return null;
   return {
