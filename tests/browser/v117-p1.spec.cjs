@@ -1,6 +1,7 @@
 const testOrigin=require('./helpers/test-origin.cjs');
 const {test,expect}=require('@playwright/test'),fs=require('node:fs');
 const fixture=JSON.parse(fs.readFileSync(require('node:path').join(__dirname,'../fixtures/v50-visual-state.json'),'utf8'));
+fixture.accountProfiles=[{id:'v117-joint',name:'Gezamenlijk',accountOwner:'gezamenlijk',identifier:'NL01JOINT'},{id:'v117-savings',name:'Spaarrekening',accountOwner:'gezamenlijk',identifier:'NL02SAVINGS'}];
 test.setTimeout(60000);
 async function boot(page){
   page.on('dialog',d=>d.accept());await page.clock.setFixedTime(new Date('2026-10-09T12:00:00Z'));
@@ -9,7 +10,7 @@ async function boot(page){
   await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   await page.evaluate(()=>commitChange(()=>{
     state.meta.selectedMonth='2026-10';state.transactions=[];state.importSummaries=[];state.activeImportId='';state.monthRecords={};state.recognitionRules=[];state.recurringFixedExpenses=[];state.manualTransactionReplacements=[];state.internalTransferPairs=[];state.savingsCoverageAllocations=[];state.advanceLedger=[];state.advanceRepayments=[];
-    state.accountProfiles=[{id:'v117-joint',name:'Gezamenlijk',accountOwner:'gezamenlijk',identifier:'NL01JOINT'},{id:'v117-savings',name:'Spaarrekening',accountOwner:'gezamenlijk',identifier:'NL02SAVINGS'}];
+    
     state.budgetDefaultsHistory={gezamenlijk:[{effectiveFrom:'0000-01',rows:[{id:'food',post:'Boodschappen',bedrag:1000}]}],dion:[],dara:[]};
     state.spaardoelen={gezamenlijk:[{id:'v117-goal',naam:'Buffer',doelbedrag:10000,algespaard:0}],dion:[],dara:[]};state.savingsGoalLedger=[];
   },{render:true}));
@@ -21,6 +22,7 @@ async function upload(page,saving=false,sourceAmounts=amounts){
   await page.locator('[data-u4-file]').setInputFiles({name:'synthetic-v117.csv',mimeType:'text/csv',buffer:Buffer.from(csv)});
   await expect(page.locator('[data-u4-row]')).toHaveCount(sourceAmounts.length);
   await page.locator('#u4ImportModalRoot details').evaluateAll(ns=>ns.forEach(n=>n.open=true));
+  await page.locator('[data-u4-row]').first().locator('[data-u4-focus-open]').click();
   return page.locator('[data-u4-row]').first();
 }
 async function inspect(page){return page.evaluate(async()=>{
