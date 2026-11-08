@@ -10,7 +10,7 @@ for(const width of [390,1440])test(`V117 vaste last buiten budgetdetail en inter
   state.transactions.push({id:'gym',source:'manual',accountContext:'gezamenlijk',financialFor:'gezamenlijk',date:'2026-10-01',amount:62.83,kind:'vaste-last',transactionType:'vaste-last',category:'Overig',description:'Sportschool test',fixedExpenseId:'p3-hyp',fixedOccurrenceId:'p3-hyp:2026-10-01',fixedOccurrenceMonth:'2026-10'});
  },{render:true}));
  await page.evaluate(()=>document.querySelector('#tabs [data-tab="gezamenlijk"]').click());
- await page.locator('#tab-gezamenlijk').getByRole('button',{name:'Open transacties voor Overig',exact:true}).click();
+ await page.locator('#tab-gezamenlijk').locator('[data-open-budget-transactions="Overig"]').click();
  await expect(page.locator('#transactionModal')).not.toContainText('Sportschool test');
  await page.locator('[data-close-budget-transactions]').click();
  const baseline=await page.evaluate(()=>FinizeTransactions.forecast('2026-10'));
@@ -23,7 +23,7 @@ for(const width of [390,1440])test(`V117 vaste last buiten budgetdetail en inter
  await expect(incoming.locator('[data-u4-field="contributionAmount"]')).toHaveValue('6100');await approve(page,'capital-0');
  const afterIncoming=await page.evaluate(()=>FinizeTransactions.forecast('2026-10'));
  expect(afterIncoming.household.income).toBe(baseline.household.income);expect(afterIncoming.owners.dion.allowance).toBe(baseline.owners.dion.allowance);expect(afterIncoming.owners.dara.allowance).toBe(baseline.owners.dara.allowance);
- const deposit=page.locator('[data-u4-row="capital-1"]');
+ await focusRow(page,'capital-1');const deposit=page.locator('[data-u4-row="capital-1"]');
  await deposit.locator('[data-u4-field="savingsContributionId"]').selectOption('tx-capital-0');
  await expect(deposit.locator('[data-u4-field="savingsContributionAmount"]')).toHaveValue('6100');await approve(page,'capital-1');
  await process(page);
@@ -55,15 +55,23 @@ async function draft(page,id,owner,lines){
   await u.ImportStore.putImport(__p3Draft);u.testRenderDraftModal(window,__p3Draft);
   document.querySelectorAll('.u4-section-unknown,.u4-section-review,.u4-section-approved').forEach(section=>section.open=true);
  },{id,owner,lines});
+ await page.locator('[data-u4-view-month]').selectOption('');
+ await focusRow(page,id+'-0');
+}
+async function focusRow(page,id){
+ const row=page.locator(`[data-u4-row="${id}"]`);
+ if(await row.evaluate(el=>el.classList.contains('u4-focus-row')))return;
+ const back=page.locator('.u4-focus-row [data-u4-focus-back]');if(await back.isVisible())await back.click();
+ await row.locator('[data-u4-focus-open]').click();
 }
 async function editPersonalSource(page,width,label){
- if(width>=1000){await page.locator('#tab-dion').getByRole('button',{name:'Open transacties voor Overig',exact:true}).click();await page.locator('[data-open-budget-transaction-id]').filter({hasText:label}).first().click();}
+ if(width>=1000){await page.locator('#tab-dion').locator('[data-open-budget-transactions="Overig"]').click();await page.locator('[data-open-budget-transaction-id]').filter({hasText:label}).first().click();}
  else await page.locator('#tab-dion [data-edit-personal-transaction]').filter({hasText:label}).first().click();
 }
 async function sections(page){await page.evaluate(()=>document.querySelectorAll('.u4-section-unknown,.u4-section-review,.u4-section-approved').forEach(section=>section.open=true));}
-async function approve(page,id){await sections(page);await page.locator(`[data-u4-row="${id}"] [data-u4-approve]`).click();await expect.poll(()=>page.evaluate(id=>state.transactions.some(tx=>tx.importTransactionId===id&&['goedgekeurd','niet-meetellen'].includes(tx.processingStatus)),id)).toBe(true);}
-async function process(page){await page.locator('[data-u4-process]').click();await expect.poll(()=>page.evaluate(()=>__p3Draft.status)).toBe('verwerkt');await expect(page.getByRole('heading',{name:'Import verwerkt'})).toBeVisible();}
-async function openMore(page,id){const more=page.locator(`[data-u4-row="${id}"] details`).first();await more.evaluate(node=>node.open=true);}
+async function approve(page,id){await sections(page);await focusRow(page,id);await page.locator(`[data-u4-row="${id}"] [data-u4-approve]`).click();await expect.poll(()=>page.evaluate(id=>state.transactions.some(tx=>tx.importTransactionId===id&&['goedgekeurd','niet-meetellen'].includes(tx.processingStatus)),id)).toBe(true);}
+async function process(page){const back=page.locator('.u4-focus-row [data-u4-focus-back]');if(await back.isVisible())await back.click();await page.locator('[data-u4-process]').click();await expect.poll(()=>page.evaluate(()=>__p3Draft.status)).toBe('verwerkt');await expect(page.getByRole('heading',{name:'Import verwerkt'})).toBeVisible();}
+async function openMore(page,id){await focusRow(page,id);const more=page.locator(`[data-u4-row="${id}"] details`).first();await more.evaluate(node=>node.open=true);}
 for(const width of [390,1440])test(`Pakket 3 transacties, splits, fixed actuals, salaris en reload op ${width}px`,async({page})=>{
  const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});await boot(page,width);
  for(const tab of ['dashboard','gezamenlijk','dion','dara']){await page.evaluate(tab=>document.querySelector(`#tabs [data-tab="${tab}"]`).click(),tab);await expect(page.locator('#tab-'+tab)).not.toBeEmpty();}
@@ -86,7 +94,7 @@ for(const width of [390,1440])test(`Pakket 3 transacties, splits, fixed actuals,
  const fixed=()=>page.evaluate(()=>FinizeTransactions.fixedActual({id:'p3-hyp:2026-10-01',month:'2026-10',amount:100}));
  expect(await fixed()).toMatchObject({planned:100,actual:120,deviation:20,status:'Betaald'});
  expect(await page.evaluate(()=>({budget:FinizeTransactions.total('budgetImpact',{month:'2026-11'}),cash:FinizeTransactions.total('accountCashflow',{month:'2026-11',account:'gezamenlijk'}),income:FinizeUpdate3.actualIncome('2026-11')}))).toEqual({budget:50,cash:-170,income:0});
- await page.evaluate(()=>FinizeUpdate4Runtime.testRenderDraftModal(window,__p3Draft));await sections(page);await page.locator('[data-u4-row="p3-fixed-0"] [data-u4-reopen]').click();await expect.poll(()=>fixed().then(p=>p.actual)).toBe(120); // editing keeps the approved payment active
+ await page.evaluate(()=>FinizeUpdate4Runtime.testRenderDraftModal(window,__p3Draft));await sections(page);await focusRow(page,'p3-fixed-0');await page.locator('[data-u4-row="p3-fixed-0"] [data-u4-reopen]').click();await expect.poll(()=>fixed().then(p=>p.actual)).toBe(120); // editing keeps the approved payment active
  await approve(page,'p3-fixed-0');await expect.poll(()=>fixed().then(p=>p.actual)).toBe(120);
  expect(await page.evaluate(()=>__p3Draft.rows.map(row=>row.bankOriginal))).toEqual(originals);
  await page.locator('[data-u4-close]').first().click();await expect(page.locator('#u4ImportModalRoot')).not.toHaveClass(/open/);
@@ -95,7 +103,7 @@ for(const width of [390,1440])test(`Pakket 3 transacties, splits, fixed actuals,
  for(const id of ['p3-income-0','p3-income-1'])await approve(page,id);await process(page);
  expect(await page.evaluate(()=>FinizeUpdate3.actualIncome('2026-10','dion'))).toBe(2745);
  await page.evaluate(()=>document.querySelector('#tabs [data-tab="gezamenlijk"]').click());
- const incomeCard=width===390?page.locator('#tab-gezamenlijk .mobile-kpi-card.joint-total-income-card'):page.locator('#tab-gezamenlijk .overview-kpi-row .icon-kpi').filter({hasText:'Totaal gezamenlijk inkomen'});await expect(incomeCard).toContainText('5.655,00'); // actual salary and extra income; purchase refund is not salary or income
+ const incomeCard=width===390?page.locator('#tab-gezamenlijk .mt-income'):page.locator('#tab-gezamenlijk .overview-kpi-row .icon-kpi').filter({hasText:'Totaal gezamenlijk inkomen'});await expect(incomeCard).toContainText('5.655,00'); // actual salary and extra income; purchase refund is not salary or income
  await page.locator('[data-u4-close]').first().click();await expect(page.locator('#u4ImportModalRoot')).not.toHaveClass(/open/);
  const before=await page.evaluate(()=>({tx:structuredClone(state.transactions),ledger:structuredClone(state.savingsGoalLedger),planning:structuredClone(state.planning),revision:state.meta.revision}));
  await page.setViewportSize({width:width===390?1440:390,height:900});await page.evaluate(()=>{state.meta.selectedMonth='2026-09';renderActiveTab();});
@@ -123,10 +131,12 @@ for(const width of [390,1440])test(`Pakket 3 expliciete replacement en transferp
  await expect(page.locator('#transactionModal')).not.toHaveClass(/open/);expect(await page.evaluate(()=>FinizeTransactions.total('budgetImpact',{month:'2026-10'}))).toBe(55);
  await page.locator('[data-u4-close]').first().click();await expect(page.locator('#u4ImportModalRoot')).not.toHaveClass(/open/);
  await page.evaluate(async()=>{
-  const make=(id,account,amount)=>({id,date:'2026-10-10',transactionDate:'2026-10-10',amount:Math.abs(amount),source:'csv',bankOriginal:{bankDate:'2026-10-10',amount,description:'Internal '+id},importBatchId:'p3-transfers',importTransactionId:id,accountContext:account,account:account,accountOwner:account,budgetOwner:account,financialFor:account,owner:account,kind:'interne-overboeking',transactionType:'interne-overboeking',processingStatus:'goedgekeurd',certainty:'goedgekeurd',approvalSource:'manual'});
+  const make=(id,account,amount)=>({id,date:'2026-10-10',transactionDate:'2026-10-10',amount:Math.abs(amount),source:'csv',bankOriginal:{bankDate:'2026-10-10',amount,description:'Internal '+id},importBatchId:'p3-transfers',importTransactionId:id==='transfer-out'?'p3-transfers-0':'p3-transfers-1',accountContext:account,account:account,accountOwner:account,budgetOwner:account,financialFor:account,owner:account,kind:'interne-overboeking',transactionType:'interne-overboeking',processingStatus:'goedgekeurd',certainty:'goedgekeurd',approvalSource:'manual'});
   await commitChange(()=>{state.transactions.push(make('transfer-out','dion',-500),make('transfer-in','gezamenlijk',500));state.internalTransferPairs.push({id:'p3-pair',status:'voorgesteld',transactionIds:['transfer-out','transfer-in'],amount:500});},{render:false});
-  window.__transferDraft={id:'p3-transfers',fileName:'transfers.csv',status:'verwerkt',accountProfileId:'dion',accountOwner:'dion',rows:[],summary:{}};FinizeUpdate4Runtime.testRenderDraftModal(window,__transferDraft);
+
  });
+ await draft(page,'p3-transfers','dion',[{amount:-500,date:'2026-10-10',label:'Internal out',type:'interne-overboeking'},{amount:500,date:'2026-10-10',label:'Internal in',type:'interne-overboeking'}]);
+ await page.locator('.u4-focus-row [data-u4-focus-back]').click();
  expect(await page.evaluate(()=>FinizeTransactions.total('unconfirmedTransferCashflow',{month:'2026-10',account:'dion'}))).toBe(-500);
  await page.locator('[data-u4-confirm-pair="p3-pair"]').evaluate(node=>node.closest('details').open=true);await page.locator('[data-u4-confirm-pair="p3-pair"]').click();
  await expect.poll(()=>page.evaluate(()=>state.internalTransferPairs.find(pair=>pair.id==='p3-pair').status)).toBe('bevestigd');
@@ -183,11 +193,11 @@ for(const width of [430,1440])test('extra inkomen kiezen voor gezamenlijk zonder
  const source=page.locator('[data-u4-row="allowance-choice-0"]'),choice=source.locator('[data-u4-field="meetellenVoorVerdeling"]');
  await expect(choice).toBeChecked();await choice.uncheck();await approve(page,'allowance-choice-0');await expect.poll(()=>page.evaluate(()=>state.transactions.find(t=>t.id==='tx-allowance-choice-0')?.processing.meetellenVoorVerdeling)).toBe(false);
  let result=await snapshot();expect(result).toMatchObject({dion:base.dion,dara:base.dara,joint:base.joint+225,income:base.income+225,held:225,goal:0});
- await page.locator('[data-u4-row="allowance-choice-1"] [data-u4-field="savingsContributionId"]').selectOption('tx-allowance-choice-0');await approve(page,'allowance-choice-1');
+ await focusRow(page,'allowance-choice-1');await page.locator('[data-u4-row="allowance-choice-1"] [data-u4-field="savingsContributionId"]').selectOption('tx-allowance-choice-0');await approve(page,'allowance-choice-1');
  result=await snapshot();expect(result).toMatchObject({dion:base.dion,dara:base.dara,joint:base.joint,income:base.income+225,available:base.available,goal:225,held:225});
- await sections(page);await source.locator('[data-u4-reopen]').click();await expect(choice).not.toBeChecked();await choice.check();await approve(page,'allowance-choice-0');await expect.poll(()=>page.evaluate(()=>state.transactions.find(t=>t.id==='tx-allowance-choice-0').processing.meetellenVoorVerdeling)).toBe(true);
+ await focusRow(page,'allowance-choice-0');await sections(page);await source.locator('[data-u4-reopen]').click();await expect(choice).not.toBeChecked();await choice.check();await approve(page,'allowance-choice-0');await expect.poll(()=>page.evaluate(()=>state.transactions.find(t=>t.id==='tx-allowance-choice-0').processing.meetellenVoorVerdeling)).toBe(true);
  const shared=await snapshot();expect(shared.dion+shared.dara).toBeCloseTo(base.dion+base.dara+225,2);expect(shared.income).toBe(result.income);expect(shared.available).toBe(result.available);expect(shared.goal).toBe(225);
- await sections(page);await source.locator('[data-u4-reopen]').click();await choice.uncheck();await approve(page,'allowance-choice-0');
+ await focusRow(page,'allowance-choice-0');await sections(page);await source.locator('[data-u4-reopen]').click();await choice.uncheck();await approve(page,'allowance-choice-0');
  await expect.poll(snapshot).toEqual(result);expect(await page.evaluate(()=>JSON.stringify(__p3Draft.rows.map(r=>r.bankOriginal)))).toBe(originals);
  fs.mkdirSync('.cache/upcoming-payments',{recursive:true});await page.screenshot({path:'.cache/upcoming-payments/allowance-choice-'+width+'.png',fullPage:true});await process(page);
  await page.reload();await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);expect(await snapshot()).toEqual(result);
