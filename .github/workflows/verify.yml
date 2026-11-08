@@ -2,14 +2,29 @@ name: Finize regressie
 
 on:
   push:
-    branches: [refactor/finize-cleanup]
+    branches: [main]
   pull_request:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '20 3 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: finize-verify-${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
 
 jobs:
-  test:
+  quick:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: pnpm/action-setup@v4
         with:
           version: 11.9.0
@@ -18,5 +33,70 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Syntax, CSS en reproduceerbare build
+        run: |
+          pnpm run check:syntax
+          pnpm run check:css
+          pnpm run check:generated
+      - name: Alle Node-tests inclusief financiële regressiebasis
+        run: pnpm run test:unit
+      - name: Backend HTTP met provider- en SDK-mocks
+        run: pnpm run test:backend
       - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm test
+      - name: Browser-smoke inclusief pakket 1 en mobiel herstel
+        run: pnpm run test:smoke --reporter=line,json
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: test-results/smoke.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: quick-test-results
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  extended:
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      FIREBASE_CLI_DISABLE_USAGE_REPORTING: '1'
+      JAVA_TOOL_OPTIONS: -Xmx2g
+      FINIZE_FIREBASE_CLI: ${{ github.workspace }}/.cache/ci-tools/node_modules/firebase-tools/lib/bin/firebase.js
+      FINIZE_BANK_DEPENDENCIES: ${{ github.workspace }}/.cache/ci-tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: pnpm install --frozen-lockfile
+      - name: Afzonderlijke emulatorhulpmiddelen, zonder productierechten
+        run: npm install --prefix .cache/ci-tools --no-save --ignore-scripts --no-audit --no-fund firebase-tools@15.24.0 firebase-admin@13.6.0
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Werkelijke Firestore-regels met opslag- en historiefixtures
+        run: pnpm run test:emulator
+      - name: Native bankretentie op afzonderlijke loopback-emulator
+        run: pnpm run test:emulator:bank
+      - name: Volledige browserinventaris met lokale Firestore
+        run: node "$FINIZE_FIREBASE_CLI" emulators:exec --only firestore --project demo-finize-v117 --config firebase.emulator.json 'pnpm exec playwright test --reporter=line,json'
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: test-results/full.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: extended-test-results
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7
