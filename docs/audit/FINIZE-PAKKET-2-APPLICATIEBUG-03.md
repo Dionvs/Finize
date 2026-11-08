@@ -1,6 +1,6 @@
 # Pakket 2 — applicatiebug 03: negatieve mobiele budgetbalk
 
-Status: bewezen, **niet gerepareerd**; afzonderlijk akkoord nodig volgens de opdracht. Geen productiegegevens gebruikt of gewijzigd.
+Status: afzonderlijk door de gebruiker goedgekeurd en gericht hersteld. Geen productiegegevens gebruikt of gewijzigd.
 
 ## Reproductie
 
@@ -35,3 +35,15 @@ Behoud de bestaande financiële assertions en de 0%-assertion. Controleer netto 
 - `tests/browser/v113-csv-processing.spec.cjs`: bestaande test `V113 optionele spaarbudgetcorrectie en negatieve refund`.
 
 De verouderde rekeningfixture, maandkeuze en kaartbediening zijn eerst gecorrigeerd. Daardoor bereikt deze test nu de oorspronkelijke inhoudelijke balkassertion. Deze assertion wordt niet aangepast om de suite groen te maken.
+
+## Uitgevoerd herstel en controle
+
+Eén bronregel in `renderJointFirstRow` begrenst nu alleen de zichtbare ratio op 0–1. `app.js` en de inline `index.html` zijn via de bestaande build bijgewerkt. De getoonde negatieve bedragen, financiële effecten en historische opslag zijn ongemoeid gebleven.
+
+- Bestaande V113-reeks: 16/16 geslaagd, inclusief de eerder falende negatieve-refundbalk.
+- Nieuwe `budget-bar-refunds.spec.cjs`: 4/4 geslaagd op 360/390/430/1440 px, telkens met netto −400, nul, 25 en 150 bij budget 100. Zowel de ingestelde breedte als de werkelijke vulling wordt getoetst; de spoorbreedte is de binnenbreedte, zodat desktopranden niet als vulling meetellen.
+- Alle 1372 normale Node-tests slagen, 0 mislukt en 0 overgeslagen.
+- De nieuwe mobiele screenshot is geopend en visueel gecontroleerd. De balk is leeg, het negatieve bedrag blijft zichtbaar.
+- De vier nieuwe gevallen zijn toegevoegd aan de bestaande smoke-opdracht; de oorspronkelijke 35 en vijf eerdere herstelgevallen blijven behouden. De nieuwe smoke-inventaris telt 44 gevallen; de gezamenlijke run volgt nog.
+
+Bewijs: `.cache/pakket2/budget-bar-fixed.json`, `budget-bar-final.json`, `node-after-budget-bar.log` en `evidence/pakket2-bug03-na-430.png`. Geen productiegegevens, bankverbindingen of beveiligingsregels gewijzigd.

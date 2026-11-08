@@ -4914,7 +4914,7 @@ function renderJointFirstRow(){
   unassignedUsed=round2(sumTransactions('gezamenlijk')-Object.values(usedByBudgetKey).reduce((sum,n)=>sum+n,0));
   const variableRows = Array.from(variableBudgetMap.entries()).map(([key,row])=>{
     const used = usedByBudgetKey[key] || 0;
-    const ratio = row.budget > 0 ? Math.min(1, used / row.budget) : 0;
+    const ratio = row.budget > 0 ? Math.max(0, Math.min(1, used / row.budget)) : 0;
     return `<button type="button" class="budget-preview-item budget-preview-button" data-open-budget-transactions="${textSafe(row.label)}" data-budget-id="${textSafe(row.id||'')}" data-budget-owner="gezamenlijk" aria-label="Open transacties voor ${textSafe(row.label)}">
       <div class="budget-preview-thumb tone-green">${iconSvg(categoryIconName(row.label))}</div>
       <div class="budget-preview-main">
