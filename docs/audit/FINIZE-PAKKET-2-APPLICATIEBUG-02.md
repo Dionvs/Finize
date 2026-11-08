@@ -1,6 +1,6 @@
 # Pakket 2 — applicatiebug 02: leeg importscherm na groepsgoedkeuring
 
-**Status: bewezen op 390 en 1440 px; niet gerepareerd. Pakket 2 is onderbroken voor een afzonderlijk gebruikersbesluit.**
+**Status: bewezen op 390 en 1440 px en na afzonderlijk gebruikersakkoord gericht hersteld. Pakket 2 is hervat.**
 
 ## Reproductie en verwacht gedrag
 
@@ -49,6 +49,8 @@ De kleinste voorgestelde correctie is om **na** het herstellen van de eerdere gr
 Na afzonderlijk akkoord moeten regressietests minimaal de zichtbare actieve kaart, terugkeer naar de lijst, maandkeuze, behoud van zes goedkeuringen, de ongekeurde zevende bron, herladen en de bestaande gedeeltelijke-opslagfoutproef controleren. Zowel mobiel als desktop blijven vereist.
 
 ## Stop en bewaarde status
+
+Onderstaande stopstatus beschrijft het moment vóór het aanvullende gebruikersakkoord. Na akkoord is één aanroep van de bestaande `applyImportFocus` toegevoegd na het herstellen van de groepen. De tien bestaande importgevallen slagen nu 10/10. Twee nieuwe blijvende regressietests in `tests/browser/import-approval-focus.spec.cjs` slagen op 390 en 1440 px: zichtbare actieve kaart, terugroute, maandkeuze, zes unieke boekingen, ongekeurde zevende bron, behoud van oorspronkelijke bankgegevens en herladen. Er zijn geen financiële rekenregels of opslagstructuren gewijzigd.
 
 - Geen applicatiereparatie voor deze bug uitgevoerd.
 - Huidige herstelbranch blijft behouden. Geen push, samenvoeging of publicatie.

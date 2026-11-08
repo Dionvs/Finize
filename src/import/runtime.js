@@ -2119,6 +2119,7 @@ import { normalizeDataTransaction, getTransactionDate, getTransactionAccountCont
     renderDraftModal(root,draft);
     const next=document.getElementById('u4ImportModalRoot');
     for(const section of sections){const node=section.name&&next?.querySelector('.'+section.name);if(node)node.open=section.open;}
+    applyImportFocus(next);
     requestAnimationFrame(()=>{
       const nextScroller=next?.querySelector('.u4-import-modal');
       if(nextScroller)nextScroller.scrollTop=scrollTop;

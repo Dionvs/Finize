@@ -20300,6 +20300,7 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
         const node = section.name && (next == null ? void 0 : next.querySelector("." + section.name));
         if (node) node.open = section.open;
       }
+      applyImportFocus(next);
       requestAnimationFrame(() => {
         var _a2;
         const nextScroller = next == null ? void 0 : next.querySelector(".u4-import-modal");
