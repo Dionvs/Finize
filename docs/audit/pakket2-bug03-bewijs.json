@@ -1,0 +1,22 @@
+{
+  "synthetic": true,
+  "productionDataUsed": false,
+  "results": [
+    {
+      "style": "width:-400%",
+      "computedWidth": "264px",
+      "fillWidth": 264,
+      "trackWidth": 264,
+      "text": "\n      \n      \n        Kleding-€ 400,00 / € 100,00\n        \n      \n    ",
+      "viewportWidth": 360
+    },
+    {
+      "style": "width:0%",
+      "computedWidth": "0px",
+      "fillWidth": 0,
+      "trackWidth": 419.328125,
+      "text": "\n      Kleding-€ 400,00 / € 100,00 Op schema\n      \n    ",
+      "viewportWidth": 1440
+    }
+  ]
+}
