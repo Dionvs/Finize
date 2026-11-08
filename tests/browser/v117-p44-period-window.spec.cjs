@@ -1,3 +1,4 @@
+const testOrigin=require('./helpers/test-origin.cjs');
 const {test,expect}=require('@playwright/test');
 const {boot,attach,newHousehold}=require('../helpers/v117-p4-browser.cjs');
 const {state,row,materialize}=require('../helpers/package5-fixture.cjs');
@@ -13,7 +14,7 @@ async function scope(page){
 test('P4 release: equal active worksets stay equal with 20 and 100 total sources; pins do not expand queries',async({browser})=>{
   test.setTimeout(180000);const results=[];
   for(const count of [20,100]){
-    const context=await browser.newContext({baseURL:'http://127.0.0.1:4173',serviceWorkers:'block'});
+    const context=await browser.newContext({baseURL:testOrigin,serviceWorkers:'block'});
     try{
       const page=await context.newPage(),f=await newHousehold(),s=state();s.meta.selectedMonth='2026-10';s.monthRecords={};
       const current=[],history=[];
@@ -61,7 +62,7 @@ test('P4 release: existing 500 and 5400 histories use bounded verified windows o
   for(const months of [3,36]){
     const prior=JSON.parse(fs.readFileSync('backups/v117-stabilisatie/p44-scale-'+months+'.json','utf8'));
     expect(prior.financiallyVerified).toBe(true);
-    const f={householdId:prior.householdId,email:prior.householdId+'@example.invalid'},context=await browser.newContext({baseURL:'http://127.0.0.1:4173',serviceWorkers:'block'});
+    const f={householdId:prior.householdId,email:prior.householdId+'@example.invalid'},context=await browser.newContext({baseURL:testOrigin,serviceWorkers:'block'});
     try{
       const page=await context.newPage(),startMs=performance.now();await boot(page,f);await attach(page,f);
       const start=await scope(page),startupMs=performance.now()-startMs;

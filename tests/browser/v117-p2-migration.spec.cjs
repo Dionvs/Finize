@@ -1,3 +1,4 @@
+const testOrigin=require('./helpers/test-origin.cjs');
 const {test,expect,chromium}=require('@playwright/test');
 const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
 const fixture=require('../fixtures/v50-visual-state.json');
@@ -27,7 +28,7 @@ for(const phase of ['after-backup','during-financial-commit','after-prepared','a
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),'finize-v117-p2-'));
   let context;
   try{
-    context=await chromium.launchPersistentContext(directory,{headless:true,baseURL:'http://127.0.0.1:4173',serviceWorkers:'block'});
+    context=await chromium.launchPersistentContext(directory,{headless:true,baseURL:testOrigin,serviceWorkers:'block'});
     let page=await context.newPage();await offline(page);await page.route('**/app.js*',r=>r.abort());await page.goto('/');
     await page.evaluate(async({fixture,retained,key})=>{
       localStorage.setItem(key,JSON.stringify(fixture));
@@ -52,7 +53,7 @@ for(const phase of ['after-backup','during-financial-commit','after-prepared','a
     if(phase==='after-activation')expect(head.verified).toBe(true);
     if(['after-backup','during-financial-commit'].includes(phase))expect(head).toBeUndefined();
     for(const name of Object.keys(retained))expect(interrupted[name]).toEqual(retained[name]);
-    await context.close();context=await chromium.launchPersistentContext(directory,{headless:true,baseURL:'http://127.0.0.1:4173',serviceWorkers:'block'});
+    await context.close();context=await chromium.launchPersistentContext(directory,{headless:true,baseURL:testOrigin,serviceWorkers:'block'});
     page=await context.newPage();await offline(page);await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
     const resumed=await rawStores(page);
     expect(resumed.financialHead[0].verified).toBe(true);expect(resumed.financialHead[0].migration.retainedStores.imports.count).toBe(1);

@@ -1,3 +1,4 @@
+const testOrigin=require('./helpers/test-origin.cjs');
 const {test,expect}=require('@playwright/test'),fs=require('node:fs');
 const fixture=JSON.parse(fs.readFileSync(require('node:path').join(__dirname,'../fixtures/v50-visual-state.json'),'utf8'));
 test.setTimeout(60000);
@@ -135,7 +136,7 @@ test('V117 ten savings approvals survive existing cloud protocol and second brow
     return {docs:[...__v117Cloud.docs],writes:__v117Cloud.metrics.coreWrites};
   });
   expect(exported.writes).toBe(1);
-  const context=await browser.newContext({baseURL:'http://127.0.0.1:4173',serviceWorkers:'block'});
+  const context=await browser.newContext({baseURL:testOrigin,serviceWorkers:'block'});
   try{
     const second=await context.newPage();await boot(second);await installCloudDouble(second,exported.docs);
     await second.evaluate(async()=>{

@@ -56,3 +56,43 @@ De overige acht mislukkingen in deze prioriteitsrun zijn aanvankelijk kandidaten
 ## Vervolg en grenzen
 
 Pas na deze registratie worden bestaande tests en uitvoerconfiguraties gericht bijgewerkt. Applicatiebugs die bij het bereiken van de oorspronkelijke financiële eindpunten alsnog blijken, krijgen een afzonderlijke reproductie en worden niet automatisch gerepareerd. De pakket-1-basis van 478 Node-gevallen en 35 browsergevallen blijft behouden. Geen publicatie, productiegegevens of bankverbindingen; uitsluitend fixtures, mocks en lokale demo-emulators.
+
+## Herhaling via actuele routes
+
+De vier vaste-lastenstromen plus aanvullende verdelings-/afschrijfdagtest en rekeningselectie slagen nu 6/6. De rekeningfixture stond op juli terwijl de bankimport oktober betreft: ook de geselecteerde maand is daarom vóór openen afgestemd. De compacte vaste-lastenlijst toont verdeling niet meer; dezelfde verdeling wordt nu in de actuele editor en canonieke tijdlijn gecontroleerd. De betalingsdag is een dagkeuze in plaats van een volledige datum. Geldbedragen, maanduitzondering, stop/verwijderhistorie en gewijzigde spaarverdeling blijven getoetst.
+
+De drie goedkeuringsgevallen en CSV/API-overlap slagen na het zichtbaar openen van de transactiekaart. De financiële assertions zijn ongewijzigd. De bank-/rekeningbestanden tellen samen 33 geslaagd en vier resterende fouten in deze tussenrun: de rekeningfixture (inmiddels apart geslaagd) en drie dashboardgevallen op oude `.p3-kpi`-markup. De huidige renderer `outlookHtml` toont het rechtstreekse banksaldo, inclusief herkomst en waarnemingstijd; de oude tekst 'Berekend t/m' en het oude balance-infopaneel bestaan niet meer. De test moet het actuele saldo en de bron/peildatum via de huidige saldoactie controleren, naast de ongewijzigde herhaal-/netwerkassertions. Dit is een verouderde testverwachting, geen in deze run aangetoonde financiële bug.
+
+De volledige niet-emulator-Node-suite is na het mobiele herstel opnieuw uitgevoerd: 1.372 geslaagd, 0 mislukt, 0 overgeslagen.
+
+## Testserverconfiguratie
+
+De testserver geeft `.mjs` terug als `application/octet-stream`, terwijl diverse browsertests pure ES-modules laden. De tijdelijke pakket-1/2-server corrigeerde dit al. Dit is een bewezen omgevingsprobleem: de standaard testserver krijgt dezelfde JavaScript-MIME-koppeling zodat de suite zonder tijdelijke server kan draaien. De geïsoleerde browserprocessen blijven uitsluitend op loopback en met fixtures/mocks werken. Het hergebruik van een willekeurig bestaand serverproces wordt uitgeschakeld om testen van een verkeerde checkout te voorkomen.
+
+## Poortisolatie vóór brede uitvoering
+
+Poort 4173 blijkt al bezet door een Node-testserver die sinds 5 november draait. Dat bestaande proces blijft ongemoeid. Negentien browserbestanden bevatten hardgecodeerde 4173-origins, ook voor tweede browsercontexten en quota. Om alle controles daadwerkelijk op deze clone uit te voeren, wordt de testorigin via één helper uit `FINIZE_TEST_PORT` afgeleid (standaard blijft 4173). De brede lokale run gebruikt een vrije poort. Dit verandert uitsluitend testconfiguratie; geen assertions of applicatieroutes.
+
+## Emulators en CI-voorbereiding
+
+De eerder ontbrekende emulatoromgeving is daadwerkelijk uitgevoerd: 42 P3/P4-opslaggevallen en 4 native bankretentiegevallen slagen, zonder overgeslagen gevallen. Alleen demo-projecten op loopback zijn gebruikt. De bestaande emulatorstarter bevat Windows-specifieke globale CLI-/Java-paden. Voor reproduceerbare Linux-CI moet de starter een expliciet geïnstalleerde test-CLI en standaard JAVA_HOME ondersteunen. Bestaande lokale terugvalpaden blijven werken. De retentietest houdt zijn strikte 8189-guard; de SDK komt uit de tijdelijke testtoolmap. Er worden geen productieafhankelijkheden bijgewerkt.
+
+## Brede dashboardclassificatie vóór aanpassing
+
+De eerste brede poging is afgebroken tijdens het bestand `dashboard-selected-month.spec.cjs`, na negen vastgelegde mislukkingen. Er is geen volledige suite-uitslag geclaimd; de oorspronkelijke voortgang/errorlogs zijn bewaard. Drie gevallen bevestigen de al bekende 194,5px-onderruimte. De grens van 125 px blijft ongewijzigd: dit is een echte, reeds voor pakket 3 ingeplande layoutbevinding.
+
+De overige dashboardgevallen gebruiken oude periodeknoppen, verwachten automatisch geopende dagdetails of dashboardpanelen die bewust verdwenen zijn. `docs/v118-r38-dashboard.md` bevestigt expliciet de verwijdering van Budgetten/Jaaroverzicht en vervanging door een periodekeuzelijst. De huidige bron sluit dagdetails aanvankelijk en opent ze na dagkeuze. Dit zijn verouderde testverwachtingen. Maandgrenzen, onbekende saldi, behoud van financiële state, context, betaalgebeurtenissen en racebescherming blijven assertions. De browserproef voor een verdwenen jaarselector wordt gericht op kalenderjaarovergang en filterreset; de bestaande financiële jaarberekeningen blijven integraal door de Node-tests voor `yearView` getoetst. Geen verwijderde UI wordt opnieuw geïntroduceerd om oude tests te laten slagen.
+
+Het oude vaste 104px-doelbalkcontract in `desktop-special-tabs` is eveneens achterhaald door de huidige compacte mobiele kaarten. De nieuwe controle toetst gelijke beschikbare breedte voor bedrag/balk/inleg, geldige voortgang en geen overloop bij korte/lange doelinhoud. Budgetbewerkers worden via hun huidige `data-open-owner-variable`-knop geopend. De dashboardinkomenssom wordt op de huidige gezamenlijke overzichtsroute gecontroleerd; de zichtbare zakgeldverdeling blijft apart aan de bestaande scenario-uitkomsten gekoppeld.
+
+De herhaling bereikt twee aanvullende oude verwachtingen: het salarisfilter is sinds de gedocumenteerde inkomensprognosecorrectie inclusief de ontvangstdag (`docs/audit/finize-inkomensprognose-20261026.md`), dus 25 september en 25 kalenderdagen in deze fixture. De bestaande spaarbedragdialoog toont 'Over deze maand' en 'Handmatig spaarbedrag voor deze maand' in plaats van de oude labels. Alleen deze verwachtingen worden aangepast; geldbedragen en beschikbare bediening blijven getoetst.
+
+Aanvullende fixtureclassificatie: de persoonlijke 'onbekende salarisgrens'-proef krijgt inmiddels expliciet een zakgeldontvangst op de 25e via de gedeelde UX-fixture. Om het oorspronkelijke onzekerheidsscenario werkelijk te testen worden voor dat specifieke profiel eerst de bekende ontvangstinstellingen verwijderd. De vaste-lastenoverzichtsdialoog heeft geen inkomstenstap of oude '→ Dion'-rijtekst meer; de eigenaar wordt nu voor iedere zichtbare rij tegen het canonieke item gecontroleerd, met een verplichte niet-lege lijst.
+
+De brede inventaris blijft lang wachten op reeds verdwenen bediening doordat veel bestanden een testdeadline van 90 seconden hebben en geen actiegrens. De standaard zichtbare interactie krijgt een limiet van 10 seconden; expliciet langere bestandsinstellingen blijven leidend. Financiële assertions, opslag-wachtvoorwaarden en testgevallen worden niet verwijderd. De afgebroken diagnostische runs worden niet als complete testuitslag geteld.
+
+## Prioriteitsronde afgerond
+
+De definitieve gezamenlijke herhaling van `dashboard-selected-month`, `desktop-special-tabs`, `v118-p1b-accounts` en `v118-p5b-bank` slaagt: **59 geslaagd, 0 mislukt, 0 overgeslagen** (ruwe JSON `.cache/pakket2/priority-final.json`). Alle negen oorspronkelijke onverklaarde UI-gevallen zijn hiermee via de actuele gebruikersroute onderzocht en geslaagd, met behoud van financiële en historische eindassertions. Het afzonderlijk goedgekeurde herstel van mobiele doelvolgorde is de enige applicatiewijziging voor deze ronde.
+
+De oorspronkelijke Node-nulmeting telde 1.292 door Node gerapporteerde testgevallen: 1.272 geslaagd, 20 mislukt. Vier niet-gebouwde backendbestanden en de ontbrekende emulator rapporteerden daarbij alleen een falende bestandswrapper; hun interne gevallen werden pas na correct inrichten werkelijk uitgevoerd. Daarom is 1.372 normale gevallen plus vier native emulatorgevallen geen simpele toevoeging van 84 nieuwe tests. De bestandentelling vóór herstel blijft 84/100 geslaagd en 16/100 mislukt.

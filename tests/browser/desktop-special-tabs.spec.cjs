@@ -13,22 +13,16 @@ test('desktop spaardoelen en data back-up renderen volledig', async ({ page }) =
 
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
-  const dashboardDistributionCards = page.locator('#tab-dashboard .u5-planning-realisation > .card');
-  await expect(dashboardDistributionCards).toHaveCount(2);
-  await expect(dashboardDistributionCards.nth(0)).toContainText('Geplande verdeling');
-  await expect(dashboardDistributionCards.nth(1)).toContainText('Verdeling Dion / Dara');
-  await expect(page.locator('#tab-dashboard')).not.toContainText('Werkelijk maandresultaat');
-  const dashboardIncomeValues = await page.locator('#tab-dashboard .u5-primary-kpi .metric-value').allTextContents();
-  expect(dashboardIncomeValues).toHaveLength(4);
-  expect(parseEuro(dashboardIncomeValues[2])).toBeCloseTo(
-    parseEuro(dashboardIncomeValues[0]) + parseEuro(dashboardIncomeValues[1]),
-    2
-  );
-  const flowIcon = await page.locator('.u5-flow-list > div').nth(1).locator('span').evaluate(element =>
-    getComputedStyle(element, '::before').content
-  );
-  expect(flowIcon).toBe('"−"');
-  await expect(page.locator('.u5-flow-list')).not.toContainText('âˆ');
+  await expect(page.locator('#tab-dashboard .p3-allowance-row')).toHaveCount(2);
+  const allowances=await page.locator('#tab-dashboard .p3-allowance-row strong').allTextContents();
+  const scenario=await page.evaluate(()=>FinizeUpdate3.scenarioResult());
+  expect(allowances.map(parseEuro)).toEqual([scenario.dion.zakgeld,scenario.dara.zakgeld]);
+  await page.locator('.v4-sidebar [data-tab="gezamenlijk"]').click();
+  const income=page.locator('#tab-gezamenlijk .icon-kpi').filter({has:page.locator('.metric-label',{hasText:'Totaal gezamenlijk inkomen'})});
+  const total=parseEuro(await income.locator('.metric-value').innerText());
+  const sources=await income.locator('.personal-income-sources strong').allTextContents();
+  expect(sources.length).toBeGreaterThan(0);
+  expect(sources.map(parseEuro).reduce((a,b)=>a+b,0)).toBeCloseTo(total,2);
 
   await page.locator('.v4-sidebar [data-tab="dion"]').click();
   const dionBudget = page.locator('#tab-dion .card').filter({ hasText: 'Budgetgebruik deze maand' }).first();
@@ -45,8 +39,8 @@ test('desktop spaardoelen en data back-up renderen volledig', async ({ page }) =
   await dionBudgetDialog.getByRole('button', { name: 'Sluiten' }).click();
   await page.getByRole('button', { name: 'Spaargeld van Dion voor deze maand aanpassen' }).click();
   const personalSavingDialog = page.getByRole('dialog', { name: 'Spaargeld van Dion aanpassen' });
-  await expect(personalSavingDialog.getByText('Automatisch berekend')).toBeVisible();
-  await expect(personalSavingDialog.getByRole('spinbutton', { name: 'Eigen spaarbedrag voor deze maand' })).toBeVisible();
+  await expect(personalSavingDialog.getByText('Over deze maand',{exact:true})).toBeVisible();
+  await expect(personalSavingDialog.getByRole('spinbutton', { name: 'Handmatig spaarbedrag voor deze maand' })).toBeVisible();
   await expect(personalSavingDialog.getByRole('button', { name: 'Gebruik Over deze maand' })).toBeVisible();
   await personalSavingDialog.getByRole('button', { name: 'Annuleren' }).click();
   await expect(page.locator('.overview-kpi-row [data-u3-planning-owner="dion"]')).toBeVisible();
@@ -57,11 +51,9 @@ test('desktop spaardoelen en data back-up renderen volledig', async ({ page }) =
   await page.locator('.overview-kpi-row [data-u3-planning-owner="dion"]').click();
   const dionFixedDialog = page.getByRole('dialog');
   await expect(dionFixedDialog.getByRole('heading', { name: 'Dion vaste lasten' })).toBeVisible();
-  await expect(dionFixedDialog).toContainText('Inkomstenbronnen');
-  const dionFixedRows = dionFixedDialog.locator('.u3-step').first().locator('.u3-admin-row');
-  for (let index = 0; index < await dionFixedRows.count(); index += 1) {
-    await expect(dionFixedRows.nth(index)).toContainText('→ Dion');
-  }
+  const fixedIds=await dionFixedDialog.locator('[data-joint-fixed-id]').evaluateAll(rows=>rows.map(row=>row.dataset.jointFixedId));
+  expect(fixedIds.length).toBeGreaterThan(0);
+  expect(await page.evaluate(ids=>ids.map(id=>FinizePlanning.fixed(getSelectedMonth()).find(row=>row.id===id)?.financialFor),fixedIds)).toEqual(fixedIds.map(()=>'dion'));
   await dionFixedDialog.getByRole('button', { name: 'Sluiten' }).click();
 
   await page.locator('.v4-sidebar [data-tab="dara"]').click();
@@ -210,16 +202,16 @@ test('mobiel en desktop beheren vaste lasten via dezelfde canonieke editor',asyn
   await mobileFixed.click();
   const planning=page.getByRole('dialog');
   await expect(planning.getByRole('heading',{name:'Gezamenlijk vaste lasten'})).toBeVisible();
-  await planning.locator('.u3-admin-row').filter({hasText:'Pariteit gezamenlijke last'}).getByRole('button',{name:'Bewerken'}).click();
+  await planning.locator('.u3-admin-row').filter({hasText:'Pariteit gezamenlijke last'}).click();await page.getByRole('dialog').locator('summary',{hasText:'Extra instellingen'}).click();
   const editor=page.getByRole('dialog');
   await expect(editor.locator('#u3RecDistributionField')).toBeVisible();
   await editor.locator('#u3RecDistribution').selectOption('equal');
-  await editor.locator('#u3RecDebitDate').fill('2026-09-05');
-  await editor.getByRole('button',{name:'Opslaan'}).click();
+  await editor.locator('#u3RecDebitDay').selectOption('5');
+  await editor.locator('#u3RecSave').click();
   await expect.poll(()=>page.evaluate(()=>FinizePlanning.fixed(state.meta.selectedMonth).find(item=>item.id==='parity-joint')?.distributionMode)).toBe('equal');
-  await expect.poll(()=>page.evaluate(()=>FinizePlanning.fixed(state.meta.selectedMonth).find(item=>item.id==='parity-joint')?.afschrijfdatum)).toBe('2026-09-05');
+  await expect.poll(()=>page.evaluate(()=>FinizePlanning.fixed(state.meta.selectedMonth).find(item=>item.id==='parity-joint')?.afschrijfdag)).toBe(5);
   expect(await page.evaluate(()=>JSON.stringify(state.planning.gezamenlijk.vasteLasten))).toBe(legacyBefore);
-  await expect(page.getByRole('dialog').locator('.u3-admin-row').filter({hasText:'Pariteit gezamenlijke last'})).toContainText('50/50');
+  expect(await page.evaluate(()=>FinizePlanning.fixed(getSelectedMonth()).find(x=>x.id==='parity-joint').distributionMode)).toBe('equal');
   await page.getByRole('dialog').getByRole('button',{name:'Sluiten'}).click();
 
   for(const width of [768,1024,1280]){
@@ -229,22 +221,22 @@ test('mobiel en desktop beheren vaste lasten via dezelfde canonieke editor',asyn
   }
   await page.locator('#tab-gezamenlijk [data-u3-planning-owner="gezamenlijk"]').first().click();
   const desktopRow=page.getByRole('dialog').locator('.u3-admin-row').filter({hasText:'Pariteit gezamenlijke last'});
-  await expect(desktopRow).toContainText('50/50');
-  await desktopRow.getByRole('button',{name:'Bewerken'}).click();
+  await expect(desktopRow).toBeVisible();
+  await desktopRow.click();await page.getByRole('dialog').locator('summary',{hasText:'Extra instellingen'}).click();
   await page.getByRole('dialog').locator('#u3RecDistribution').selectOption('income-ratio');
-  await page.getByRole('dialog').getByRole('button',{name:'Opslaan'}).click();
+  await page.getByRole('dialog').locator('#u3RecSave').click();
   await expect.poll(()=>page.evaluate(()=>FinizePlanning.fixed(state.meta.selectedMonth).find(item=>item.id==='parity-joint')?.distributionMode)).toBe('income-ratio');
   await page.getByRole('dialog').getByRole('button',{name:'Sluiten'}).click();
 
   await page.setViewportSize({width:390,height:844});
   await page.evaluate(()=>renderActiveTab());
   await page.locator('#tab-gezamenlijk [data-u3-planning-owner="gezamenlijk"]').click();
-  await expect(page.getByRole('dialog').locator('.u3-admin-row').filter({hasText:'Pariteit gezamenlijke last'})).toContainText('Naar rato · Dion minimaal 40%');
+  expect(await page.evaluate(()=>FinizePlanning.fixed(getSelectedMonth()).find(x=>x.id==='parity-joint').distributionMode)).toBe('income-ratio');
   await page.getByRole('dialog').getByRole('button',{name:'Sluiten'}).click();
 
   await page.locator('.v4-bottom-nav [data-tab="dion"]').click();
   await page.locator('#tab-dion [data-u3-planning-owner="dion"]').click();
-  await page.getByRole('dialog').locator('.u3-admin-row').filter({hasText:'Pariteit persoonlijk'}).getByRole('button',{name:'Bewerken'}).click();
+  await page.getByRole('dialog').locator('.u3-admin-row').filter({hasText:'Pariteit persoonlijk'}).click();await page.getByRole('dialog').locator('summary',{hasText:'Extra instellingen'}).click();
   await expect(page.getByRole('dialog').locator('#u3RecDistributionField')).toBeHidden();
   await expect(page.getByRole('dialog').locator('#u3RecDistribution')).toBeDisabled();
   await page.setViewportSize({width:360,height:800});
@@ -266,14 +258,16 @@ test('de gedeelde mobiele editor bewaart 50/50 in de normale tijdlijn',async({pa
   });
   await page.locator('.v4-bottom-nav [data-tab="gezamenlijk"]').click();
   await page.locator('#tab-gezamenlijk [data-u3-planning-owner="gezamenlijk"]').click();
-  await page.getByRole('dialog').locator('.u3-admin-row').filter({hasText:'Last na verkoop'}).getByRole('button',{name:'Bewerken'}).click();
+  await page.getByRole('dialog').locator('.u3-admin-row').filter({hasText:'Last na verkoop'}).click();await page.getByRole('dialog').locator('summary',{hasText:'Extra instellingen'}).click();
   const editor=page.getByRole('dialog');
   await expect(editor.locator('#u3RecDistribution')).toHaveValue('income-ratio');
   await expect(editor.locator('#u3RecDistribution').locator('option').first()).toHaveText('Naar rato · Dion minimaal 40%');
   await editor.locator('#u3RecDistribution').selectOption('equal');
-  await editor.getByRole('button',{name:'Opslaan'}).click();
+  await editor.locator('#u3RecSave').click();
   await expect.poll(()=>page.evaluate(()=>FinizePlanning.fixed(state.meta.selectedMonth).find(item=>item.id==='parity-after-sale')?.distributionMode)).toBe('equal');
-  await expect(page.getByRole('dialog').locator('.u3-admin-row').filter({hasText:'Last na verkoop'})).toContainText('50/50');
+  await page.getByRole('dialog').locator('[data-joint-fixed-id="parity-after-sale"]').click();
+  await page.getByRole('dialog').locator('summary',{hasText:'Extra instellingen'}).click();
+  await expect(page.locator('#u3RecDistribution')).toHaveValue('equal');
 });
 
 test('mobiel voegt een canonieke vaste last met maanduitzondering toe en kan die stoppen',async({page})=>{
@@ -284,20 +278,21 @@ test('mobiel voegt een canonieke vaste last met maanduitzondering toe en kan die
   const legacyBefore=await page.evaluate(()=>JSON.stringify(state.planning.gezamenlijk.vasteLasten));
   await page.locator('.v4-bottom-nav [data-tab="gezamenlijk"]').click();
   await page.locator('#tab-gezamenlijk [data-u3-planning-owner="gezamenlijk"]').click();
-  await page.getByRole('dialog').getByRole('button',{name:'+ Vaste last'}).click();
+  await page.getByRole('dialog').locator('[data-u3-add-recurring="fixed"]').click();
   const editor=page.getByRole('dialog');
+  await editor.locator('summary',{hasText:'Extra instellingen'}).click();
   await editor.locator('#u3RecName').fill('Mobiele canonieke last');
   await editor.locator('#u3RecAmount').fill('42.50');
   await editor.locator('#u3RecCategory').fill('Test');
-  await editor.locator('#u3RecDebitDate').fill(`${month}-12`);
+  await editor.locator('#u3RecDebitDay').selectOption('12');
   await editor.locator('#u3RecDistribution').selectOption('equal');
   await editor.locator('#u3RecScope').selectOption('once');
-  await editor.getByRole('button',{name:'Opslaan'}).click();
+  await editor.locator('#u3RecSave').click();
   await expect.poll(()=>page.evaluate(()=>state.recurringFixedExpenses.find(item=>item.naam==='Mobiele canonieke last')?.distributionMode)).toBe('equal');
   await expect.poll(()=>page.evaluate(selectedMonth=>state.recurringFixedExpenses.find(item=>item.naam==='Mobiele canonieke last')?.amountHistory.find(entry=>entry.effectiveFrom===selectedMonth)?.amount,month)).toBe(42.5);
   expect(await page.evaluate(()=>JSON.stringify(state.planning.gezamenlijk.vasteLasten))).toBe(legacyBefore);
   const row=page.getByRole('dialog').locator('.u3-admin-row').filter({hasText:'Mobiele canonieke last'});
-  await row.getByRole('button',{name:'Bewerken'}).click();
+  await row.click();await page.getByRole('dialog').locator('summary',{hasText:'Extra instellingen'}).click();
   await page.getByRole('dialog').getByRole('button',{name:'Stoppen na deze maand'}).click();
   await expect.poll(()=>page.evaluate(()=>state.recurringFixedExpenses.find(item=>item.naam==='Mobiele canonieke last')?.validUntil)).toBeTruthy();
   const stoppedOccurrences=await page.evaluate(selectedMonth=>{
@@ -329,10 +324,10 @@ test('een vaste last kan naast stoppen vanaf de gekozen maand worden verwijderd'
   },{render:false}));
   await page.locator('.v4-bottom-nav [data-tab="gezamenlijk"]').click();
   await page.locator('#tab-gezamenlijk [data-u3-planning-owner="gezamenlijk"]').click();
-  await page.getByRole('dialog').locator('.u3-admin-row').filter({hasText:'Te verwijderen last'}).getByRole('button',{name:'Bewerken'}).click();
+  await page.getByRole('dialog').locator('.u3-admin-row').filter({hasText:'Te verwijderen last'}).click();await page.getByRole('dialog').locator('summary',{hasText:'Extra instellingen'}).click();
   await expect(page.getByRole('dialog').getByRole('button',{name:'Stoppen na deze maand'})).toBeVisible();
   page.once('dialog',dialog=>dialog.accept());
-  await page.getByRole('dialog').getByRole('button',{name:'Verwijderen'}).click();
+  await page.getByRole('dialog').locator('#u3RecDelete').click();
   await expect(page.getByRole('dialog').locator('.u3-admin-row').filter({hasText:'Te verwijderen last'})).toHaveCount(0);
   await expect(page.getByRole('dialog').locator('[data-u3-add-recurring="fixed"]')).toBeVisible();
   const result=await page.evaluate(async()=>{
@@ -352,7 +347,7 @@ test('een vaste last kan naast stoppen vanaf de gekozen maand worden verwijderd'
   await expect(page.getByRole('dialog').locator('.u3-admin-row').filter({hasText:'Te verwijderen last'})).toHaveCount(0);
 });
 
-test('vaste lasten laten hun verdeling aanpassen en bewaren een administratieve afschrijfdatum',async({page})=>{
+test('vaste lasten laten hun verdeling aanpassen en bewaren de administratieve afschrijfdag',async({page})=>{
   await page.setViewportSize({width:1280,height:900});
   await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   await page.evaluate(()=>{
@@ -367,29 +362,28 @@ test('vaste lasten laten hun verdeling aanpassen en bewaren een administratieve 
   await page.locator('.overview-kpi-row [data-u3-planning-owner="gezamenlijk"]').click();
   const planning=page.getByRole('dialog');
   const row=planning.locator('.u3-admin-row').filter({hasText:'Administratieve last'});
-  await expect(row).toContainText('Naar rato · Dion minimaal 40%');
+  await expect(row).toBeVisible();
   const ratioResult=await page.evaluate(()=>({zakgeld:FinizeUpdate3.scenarioResult().dion.zakgeld,ratio:FinizeUpdate3.scenarioResult().effDion}));
-  await row.getByRole('button',{name:'Bewerken'}).click();
+  await row.click();await page.getByRole('dialog').locator('summary',{hasText:'Extra instellingen'}).click();
   const editor=page.getByRole('dialog');
   await expect(editor.locator('#u3RecDistribution')).toHaveValue('income-ratio');
   await editor.locator('#u3RecDistribution').selectOption('equal');
-  await editor.locator('#u3RecDebitDate').fill('2026-08-24');
-  await editor.getByRole('button',{name:'Opslaan'}).click();
-  await expect.poll(()=>page.evaluate(()=>FinizePlanning.fixed(state.meta.selectedMonth).find(item=>item.id==='admin-fixed-date')?.afschrijfdatum)).toBe('2026-08-24');
+  await editor.locator('#u3RecDebitDay').selectOption('24');
+  await editor.locator('#u3RecSave').click();
+  await expect.poll(()=>page.evaluate(()=>FinizePlanning.fixed(state.meta.selectedMonth).find(item=>item.id==='admin-fixed-date')?.afschrijfdag)).toBe(24);
   await expect.poll(()=>page.evaluate(()=>FinizePlanning.fixed(state.meta.selectedMonth).find(item=>item.id==='admin-fixed-date')?.distributionMode)).toBe('equal');
   const equalZakgeld=await page.evaluate(()=>FinizeUpdate3.scenarioResult().dion.zakgeld);
   const expectedEqual=Math.round((ratioResult.zakgeld+73.45*(ratioResult.ratio-.5))*100)/100;
   expect(Math.abs(equalZakgeld-expectedEqual)).toBeLessThanOrEqual(.011);
   expect(await page.evaluate(()=>FinizePlanning.fixed(state.meta.selectedMonth).find(item=>item.id==='admin-fixed-date')?.bedrag)).toBe(73.45);
   const savedRow=page.getByRole('dialog').locator('.u3-admin-row').filter({hasText:'Administratieve last'});
-  await expect(savedRow).toContainText('afschrijving 24-08-2026');
-  await expect(savedRow).toContainText('50/50');
+  await expect(savedRow).toContainText('24');
 
   await page.setViewportSize({width:390,height:844});
-  await savedRow.getByRole('button',{name:'Bewerken'}).click();
+  await savedRow.click();await page.getByRole('dialog').locator('summary',{hasText:'Extra instellingen'}).click();
   await expect(page.getByRole('dialog').locator('#u3RecDistribution')).toBeVisible();
   await expect(page.getByRole('dialog').locator('#u3RecDistribution')).toHaveValue('equal');
-  await page.getByRole('dialog').getByRole('button',{name:'Terug'}).click();
+  await page.getByRole('dialog').getByRole('button',{name:'Annuleren',exact:true}).click();
 
   await page.getByRole('dialog').getByRole('button',{name:'Sluiten'}).click();
   await page.setViewportSize({width:1280,height:900});
@@ -399,7 +393,9 @@ test('vaste lasten laten hun verdeling aanpassen en bewaren een administratieve 
     renderActiveTab();
   });
   await page.locator('.overview-kpi-row [data-u3-planning-owner="gezamenlijk"]').click();
-  await expect(page.getByRole('dialog').locator('.u3-admin-row').filter({hasText:'Hypotheek test'})).toContainText('Naar rato · Dion minimaal 40%');
+  await page.getByRole('dialog').locator('[data-joint-fixed-id="admin-mortgage"]').click();
+  await page.getByRole('dialog').locator('summary',{hasText:'Extra instellingen'}).click();
+  await expect(page.locator('#u3RecDistribution')).toHaveValue('income-ratio');
 });
 
 test('spaardoelkaarten wijzigen direct van volgorde zonder beheerpop-up',async({page})=>{
@@ -462,7 +458,7 @@ test('budgetten openen op desktop transacties en zijn op mobiel bewerkbaar', asy
   await page.reload();
   await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   await page.locator('.v4-bottom-nav [data-tab="gezamenlijk"]').click();
-  const jointEdit=page.locator('#tab-gezamenlijk').getByRole('button',{name:'Gezamenlijke maandbudgetten wijzigen'});
+  const jointEdit=page.locator('#tab-gezamenlijk [data-open-owner-variable="gezamenlijk"]');
   await expect(jointEdit).toContainText('Wijzig');
   await expect(jointEdit).toBeVisible();
   await expect.poll(async()=> (await jointEdit.boundingBox())?.height??0).toBeGreaterThanOrEqual(44);
@@ -472,7 +468,7 @@ test('budgetten openen op desktop transacties en zijn op mobiel bewerkbaar', asy
   await jointDialog.getByRole('button',{name:'Sluiten'}).click();
 
   await page.locator('.v4-bottom-nav [data-tab="dion"]').click();
-  const personalEdit=page.locator('#tab-dion').getByRole('button',{name:'Maandbudgetten van Dion wijzigen'});
+  const personalEdit=page.locator('#tab-dion [data-open-owner-variable="dion"]');
   await expect(personalEdit).toContainText('Wijzig');
   await personalEdit.click();
   const personalDialog=page.getByRole('dialog',{name:'Variabele lasten aanpassen'});
@@ -480,38 +476,28 @@ test('budgetten openen op desktop transacties en zijn op mobiel bewerkbaar', asy
   await personalDialog.getByRole('button',{name:'Sluiten'}).click();
 });
 
-test('mobiele spaardoelbalken houden hun vaste breedte', async ({ page }) => {
+test('mobiele spaardoelbalken volgen de beschikbare kaartbreedte', async ({ page }) => {
   await page.setViewportSize({ width: 430, height: 900 });
   await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
-  const mobileIncomeValues = await page.locator('#tab-dashboard .mobile-kpi-card .mobile-kpi-value').allTextContents();
-  expect(mobileIncomeValues).toHaveLength(4);
-  expect(parseEuro(mobileIncomeValues[2])).toBeCloseTo(
-    parseEuro(mobileIncomeValues[0]) + parseEuro(mobileIncomeValues[1]),
-    2
-  );
+  await page.locator('.v4-bottom-nav [data-tab="gezamenlijk"]').click();
+  await page.locator('#tab-gezamenlijk [data-open-income-overview="gezamenlijk"]').click();
+  const income=page.getByRole('dialog');
+  const total=parseEuro(await income.locator('.metric-value').innerText());
+  const sources=await income.locator('.personal-income-sources strong').allTextContents();
+  expect(sources.length).toBeGreaterThan(0);
+  expect(sources.map(parseEuro).reduce((a,b)=>a+b,0)).toBeCloseTo(total,2);
+  await income.getByRole('button',{name:'Sluiten',exact:true}).click();
   await page.locator('.v4-bottom-nav [data-tab="spaardoelen"]').click();
-
-  const measurements = await page.locator('#tab-spaardoelen .mobile-goal-main').evaluateAll(items =>
-    items.map(item => {
-      const amount = item.querySelector(':scope > span');
-      const bar = item.querySelector(':scope > .progress-track');
-      const inleg = item.querySelector(':scope > .goal-inleg-breakdown');
-      return {
-        amount: amount?.getBoundingClientRect().width,
-        bar: bar?.getBoundingClientRect().width,
-        inleg: inleg?.getBoundingClientRect().width,
-        amountAlign: amount ? getComputedStyle(amount).textAlign : '',
-        inlegAlign: inleg ? getComputedStyle(inleg).textAlign : ''
-      };
-    })
-  );
-
+  const measurements=await page.locator('#tab-spaardoelen .mt-goal-copy').evaluateAll(items=>items.map(item=>{
+    const amount=item.querySelector(':scope > span'),bar=item.querySelector('.progress-track'),inleg=item.querySelector('.mt-goal-month');
+    return {amount:amount.getBoundingClientRect().width,bar:bar.getBoundingClientRect().width,inleg:inleg.getBoundingClientRect().width,overflow:item.scrollWidth-item.clientWidth};
+  }));
   expect(measurements.length).toBeGreaterThan(0);
-  measurements.forEach(item => {
-    expect(item.amount).toBe(104);
-    expect(item.bar).toBe(104);
-    expect(item.inleg).toBe(104);
-    expect(item.amountAlign).toBe('center');
-    expect(item.inlegAlign).toBe('center');
+  measurements.forEach(item=>{
+    expect(item.amount).toBeGreaterThan(100);
+    expect(item.bar).toBeCloseTo(item.amount,0);
+    expect(item.inleg).toBeCloseTo(item.amount,0);
+    expect(item.overflow).toBeLessThanOrEqual(1);
   });
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
 });

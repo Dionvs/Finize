@@ -1,3 +1,4 @@
+const testOrigin=require('./helpers/test-origin.cjs');
 const fs=require('node:fs'),path=require('node:path');
 const {test,expect}=require('@playwright/test');
 const fixture=JSON.parse(fs.readFileSync(path.join(__dirname,'../fixtures/v50-visual-state.json'),'utf8'));
@@ -87,7 +88,7 @@ test('twee devices/cloudmock delen historie; echo heeft geen nieuwe write',async
   await page.locator('#u3RecAmount').fill('1850');await page.locator('#u3RecSave').click();
   await expect.poll(()=>fixedValue(page,'2026-10')).toBe(1850);
   const documentData=await page.evaluate(()=>({state:structuredClone(state),syncVersion:15,commitId:'timeline-device-a'}));
-  const secondContext=await browser.newContext({baseURL:'http://127.0.0.1:4173',serviceWorkers:'block'});
+  const secondContext=await browser.newContext({baseURL:testOrigin,serviceWorkers:'block'});
   const deviceB=await secondContext.newPage();await boot(deviceB);
   expect(await fixedValue(deviceB,'2026-10')).toBe(1807);
   const result=await deviceB.evaluate(async documentData=>{

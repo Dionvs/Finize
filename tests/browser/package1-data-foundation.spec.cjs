@@ -1,3 +1,4 @@
+const testOrigin=require('./helpers/test-origin.cjs');
 const fs=require('node:fs');
 const path=require('node:path');
 const {test,expect}=require('@playwright/test');
@@ -126,7 +127,7 @@ test('twee devices lezen v11; cloudmigratie schrijft eenmaal en echo schrijft ni
   expect(migratedCloud.writes).toBe(1);expect(migratedCloud.manifest.syncVersion).toBe(4);expect(migratedCloud.data.state.meta.schemaVersion).toBe(11);
   expect(migratedCloud.manifest.stateFormat).toBe('finize-json-chunks-v1');expect(migratedCloud.manifest).not.toHaveProperty('state');
   expect(migratedCloud.echoUnchanged).toBe(true);expect(migratedCloud.original).toEqual(fixture);
-  const deviceB=await browser.newContext({baseURL:'http://127.0.0.1:4173',serviceWorkers:'block'});
+  const deviceB=await browser.newContext({baseURL:testOrigin,serviceWorkers:'block'});
   try{
     const second=await deviceB.newPage();await boot(second);await installMigrationCloudMock(second,migratedCloud.docs);
     const result=await second.evaluate(async()=>{

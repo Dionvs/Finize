@@ -1,3 +1,4 @@
+const testOrigin=require('./helpers/test-origin.cjs');
 const {test,expect}=require('@playwright/test');
 const {boot,attach,newHousehold,importTen}=require('../helpers/v117-p4-browser.cjs');
 const {state,row,materialize}=require('../helpers/package5-fixture.cjs');
@@ -104,7 +105,7 @@ test('P4 cache quota failure cannot undo or misreport an already durable period 
 
 test('P4 cache is household scoped and pending financial changes prevent cleanup',async({page,browser})=>{
   const f=await newHousehold(),other=await newHousehold();await boot(page,f);await attach(page,f,{initialize:true});await page.evaluate(()=>DataAdapter.store().cache.pin('2026-10',true));
-  const context=await browser.newContext({baseURL:'http://127.0.0.1:4173',serviceWorkers:'block'});
+  const context=await browser.newContext({baseURL:testOrigin,serviceWorkers:'block'});
   try{const second=await context.newPage();await boot(second,other);const usage=await second.evaluate(()=>DataAdapter.store().cache.usage());expect(usage.scope).toBe(other.householdId);expect(usage.periods).toHaveLength(0);}finally{await context.close();}
   await page.evaluate(()=>commitChange(()=>state.meta.p4PendingChange='protected',{render:false}));
   expect(await page.evaluate(()=>DataAdapter.store().cache.evict({selectedMonth:'2026-10',targetBytes:0}))).toMatchObject({blocked:true,removed:[]});
@@ -116,7 +117,7 @@ test('P4 same bank source changed on two clients stays blocked with both approva
   const f=await newHousehold();await boot(page,f);await page.evaluate(()=>commitChange(()=>{
     state.accountProfiles=[{id:'joint',accountOwner:'gezamenlijk',identifier:'NL01JOINT'},{id:'savings',accountOwner:'gezamenlijk',identifier:'NL02SAVINGS'}];state.spaardoelen={gezamenlijk:['p4-goal','choice-a','choice-b'].map(id=>({id,naam:id,doelbedrag:10000,algespaard:0})),dion:[],dara:[]};state.savingsGoalLedger=[];
   },{render:false}));await attach(page,f,{initialize:true});await importTen(page);await page.evaluate(()=>p4.sync());await page.evaluate(()=>p4.openMonth('2026-10'));
-  const context=await browser.newContext({baseURL:'http://127.0.0.1:4173',serviceWorkers:'block'});
+  const context=await browser.newContext({baseURL:testOrigin,serviceWorkers:'block'});
   try{
     const second=await context.newPage();await boot(second,f);await attach(second,f);
     for(const [client,goal]of [[page,'choice-a'],[second,'choice-b']]){
@@ -175,7 +176,7 @@ test('P4 new household without legacy: first CSV bulk approval, full localStorag
   await page.evaluate(async options=>{window.p4=await FinizeCloudRecords.createEmulatorSession(options);await p4.attach({automatic:false,periodLoading:false});},{householdId:f.householdId,token:require('../helpers/v117-p3-emulator.cjs').token(f.email)});
   expect((await page.evaluate(()=>p4.sync())).outcome).toBe('committed');expect((await page.evaluate(()=>p4.sync())).outcome).toBe('idle');
   const projection=await page.evaluate(async()=>(await p4.loadPeriod('2026-10')).financials);
-  const context=await browser.newContext({baseURL:'http://127.0.0.1:4173',serviceWorkers:'block'});
+  const context=await browser.newContext({baseURL:testOrigin,serviceWorkers:'block'});
   try{
     const second=await context.newPage();await boot(second,f);await attach(second,f);expect(await second.evaluate(()=>FinizeTransactions.total('savingsDeposit',{month:'2026-10'}))).toBe(750);
     expect(await second.evaluate(()=>state.transactions.filter(row=>row.recordRole==='bank-source').map(row=>({id:row.id,amount:row.bankOriginal.amount,date:row.bankOriginal.bankDate,account:row.bankOriginal.accountIdentifier})).sort((a,b)=>a.id.localeCompare(b.id)))).toEqual(sources);

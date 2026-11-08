@@ -1,3 +1,4 @@
+const testOrigin=require('./test-origin.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
 const fixture = JSON.parse(fs.readFileSync(path.join(__dirname, '../../fixtures/v50-visual-state.json'), 'utf8'));
@@ -9,7 +10,7 @@ const profiles = ['gezamenlijk', 'dion', 'dara'].map((owner, index) => ({
     salaryDays: owner === 'gezamenlijk' ? { dion: 25, dara: 27 } : {},
     allowanceDays: owner === 'gezamenlijk' ? {} : { [owner]: 25 } }
 }));
-async function boot(page, width = 390, balance = true, url = 'http://127.0.0.1:4173/') {
+async function boot(page, width = 390, balance = true, url = testOrigin+'/') {
   await page.setViewportSize({ width, height: 900 });
   await page.clock.setFixedTime(new Date('2026-10-14T12:00:00Z'));
   await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());

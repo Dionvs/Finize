@@ -1,3 +1,4 @@
+const testOrigin=require('./helpers/test-origin.cjs');
 const {test,expect}=require('@playwright/test');
 const {boot,attach,newHousehold}=require('../helpers/v117-p4-browser.cjs');
 const {state}=require('../helpers/package5-fixture.cjs');
@@ -62,7 +63,7 @@ test('P4 salary person proposal, explicit correction, offline restart and second
   expect((await page.evaluate(()=>p4.sync())).outcome).toBe('committed');expect((await page.evaluate(()=>p4.sync())).outcome).toBe('idle');
   const proof=await page.evaluate(()=>({oct:FinizeTransactions.forecast('2026-10'),sep:FinizeTransactions.forecast('2026-09'),sources:state.transactions.filter(t=>t.recordRole==='bank-source').map(t=>t.id).sort(),effects:['2026-09','2026-10'].flatMap(month=>FinizeTransactions.effects({month}).map(p=>p.id)).sort(),goals:state.savingsGoalLedger}));
   expect(proof.oct.household.income).toBe(5880);expect(proof.sep.owners.dion.salary).toBe(2530);expect(proof.sep.owners.dara.salary).toBe(3200);
-  const context=await browser.newContext({baseURL:'http://127.0.0.1:4173',serviceWorkers:'block'});
+  const context=await browser.newContext({baseURL:testOrigin,serviceWorkers:'block'});
   try{const second=await context.newPage();await boot(second,f);await attach(second,f);expect(await second.evaluate(()=>({oct:FinizeTransactions.forecast('2026-10'),sep:FinizeTransactions.forecast('2026-09'),sources:state.transactions.filter(t=>t.recordRole==='bank-source').map(t=>t.id).sort(),effects:['2026-09','2026-10'].flatMap(month=>FinizeTransactions.effects({month}).map(p=>p.id)).sort(),goals:state.savingsGoalLedger}))).toEqual(proof);}finally{await context.close();}
 });
 test('P4 manual salary person is editable while other income keeps its bank account destination',async({page})=>{

@@ -1,3 +1,4 @@
+const testOrigin=require('./helpers/test-origin.cjs');
 const {test,expect}=require('@playwright/test');
 const {fixture,admin,token}=require('../helpers/v117-p3-emulator.cjs');
 const visual=require('../fixtures/v50-visual-state.json');
@@ -68,7 +69,7 @@ test('V117 P3 partial history: real screens, ten CSV approvals, offline restart,
   expect(await page.evaluate(()=>[...state.verifiedPeriods].sort())).toEqual(['2025-03']);
   expect(await page.evaluate(async()=>{const row=state.transactions.find(row=>row.id==='history-2025-03');return FinizeManual.save({...row,amount:25,expenseImpact:25},'gezamenlijk');})).toBe(true);
   expect((await page.evaluate(()=>p3.sync())).outcome).toBe('committed');expect(await page.evaluate(async()=>(await p3.loadPeriod('2025-03')).financials.totalsCents.budgetImpact)).toBe(2500);
-  const context=await browser.newContext({baseURL:'http://127.0.0.1:4173',serviceWorkers:'block'});
+  const context=await browser.newContext({baseURL:testOrigin,serviceWorkers:'block'});
   try{
     const second=await context.newPage();await boot(second,f,null);await second.evaluate(async options=>{window.p3=await FinizeCloudRecords.createEmulatorSession(options);await p3.attach({automatic:false});},{householdId:f.householdId,token:token(f.email,'partial-second')});
     expect(await second.evaluate(()=>({count:state.transactions.length,savings:FinizeTransactions.total('savingsDeposit'),goal:state.spaardoelen.gezamenlijk[0].algespaard}))).toEqual({count:20,savings:750,goal:750});
@@ -100,7 +101,7 @@ test('V117 P3 real Firestore: offline ten savings approvals, restart, repeated s
   expect(cloud.snapshot.operations).toHaveLength(0);expect(cloud.queue).toHaveLength(0);expect(cloud.period.financials.totalsCents.savingsDeposit).toBe(75000);expect(cloud.period.financials.approvedEffectCount).toBe(10);
   expect(cloud.period.financials.application.monthResult).toMatchObject({savings:750});
   expect((await page.evaluate(()=>p3.sync())).outcome).toBe('idle');expect(await page.evaluate(async()=>(await p3.cloudStore.context()).head.data.revision)).toBe(cloud.all.head.revision);
-  const context=await browser.newContext({baseURL:'http://127.0.0.1:4173',serviceWorkers:'block'});
+  const context=await browser.newContext({baseURL:testOrigin,serviceWorkers:'block'});
   try{
     const second=await context.newPage();await boot(second,f,null);
     await second.evaluate(async options=>{window.p3=await FinizeCloudRecords.createEmulatorSession(options);await p3.attach({automatic:false,periodLoading:false});},{householdId:f.householdId,token:token(f.email,'second-browser')});
@@ -128,7 +129,7 @@ test('V117 P3 real Firestore: offline ten savings approvals, restart, repeated s
 
 test('V117 P3 real Firestore: divergent offline clients preserve both versions and reject silent replacement',async({page,browser})=>{
   const f=await fixture();await boot(page,f);expect((await session(page,f,true)).outcome).toBe('matched');await page.evaluate(()=>p3.sync());
-  const baseline=await page.evaluate(()=>DataAdapter.readDurableState()),context=await browser.newContext({baseURL:'http://127.0.0.1:4173',serviceWorkers:'block'});
+  const baseline=await page.evaluate(()=>DataAdapter.readDurableState()),context=await browser.newContext({baseURL:testOrigin,serviceWorkers:'block'});
   try{
     const second=await context.newPage();await boot(second,f,baseline);expect((await session(second,f)).outcome).toBe('matched');await second.evaluate(()=>p3.sync());
     // Match the latest unchanged cloud base after device B's initial local migration proof.
@@ -185,7 +186,7 @@ test('V117 P3 partial history: commit hydrates historical dependencies once and 
 
 test('V117 P3 partial history: reviewed disjoint offline approvals preserve both clients after lost acknowledgment',async({page,browser})=>{
   const f=await fixture();await boot(page,f);await savings(page);await session(page,f,true);await page.evaluate(()=>p3.sync());await page.evaluate(()=>p3.openMonth('2026-10'));
-  const context=await browser.newContext({baseURL:'http://127.0.0.1:4173',serviceWorkers:'block'});
+  const context=await browser.newContext({baseURL:testOrigin,serviceWorkers:'block'});
   try{
     const second=await context.newPage();await boot(second,f,null);
     await second.evaluate(async options=>{window.p3=await FinizeCloudRecords.createEmulatorSession(options);await p3.attach({automatic:false});},{householdId:f.householdId,token:token(f.email)});

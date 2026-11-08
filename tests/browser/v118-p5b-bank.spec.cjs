@@ -1,3 +1,4 @@
+const testOrigin=require('./helpers/test-origin.cjs');
 const { test, expect } = require('@playwright/test');
 const fs = require('node:fs'), path = require('node:path');
 const visual = require('../fixtures/v50-visual-state.json');
@@ -13,7 +14,7 @@ async function boot(page, width = 390, enabled = true, balance = false) {
   await page.route('https://firestore.googleapis.com/**', route => route.abort());
   await page.route('https://api.enablebanking.com/**', route => { throw new Error('Production bank request forbidden in this test'); });
   // The production app loads bundled JS; only this isolated test imports pure source modules.
-  await page.route('http://127.0.0.1:4173/src/**', route => route.fulfill({
+  await page.route(testOrigin+'/src/**', route => route.fulfill({
     contentType: 'text/javascript', body: fs.readFileSync(root + new URL(route.request().url()).pathname, 'utf8')
   }));
   const seed = { ...visual, ...fixture() };
@@ -73,14 +74,18 @@ for (const width of [320,390,1440]) test('P5b dashboard bankknop, peildatum en h
   await expect(page.locator('[data-balance-value]')).toContainText('990,00');
   const calls=[];page.on('request',r=>{if(r.url().endsWith('/bank/sync'))calls.push(JSON.parse(r.postData()));});
   await page.locator('[data-tab="dashboard"]:visible').first().click();
-  const quick=page.locator('[data-bank-compact]'),card=page.locator('.p3-kpi').nth(1);
+  const quick=page.locator('[data-bank-compact]'),card=page.locator('.p3-savings-balance');
   await expect(quick.locator('[data-bank-sync]')).toBeEnabled();
   expect(calls).toEqual([]);
-  await expect(card).toContainText('Berekend t/m 23 okt');
-  await expect(card).not.toContainText('Saldo van 20 okt');
-  await card.locator('[data-p3-info="balance"]').click();
-  await expect(card.locator('[data-p3-info-panel="balance"]')).toContainText('saldo-ijkpunt van 20 okt');
-  await page.keyboard.press('Escape');
+  await expect(card).toContainText('990,00');
+  await expect(card).toContainText('Reconstructie');
+  expect(await page.evaluate(async()=>(await FinizeLiquidity.project({accountProfileId:'joint',startDate:'2026-10-01',asOfDate:'2026-10-23',endDate:'2026-10-25'})).asOfDate)).toBe('2026-10-23');
+  await card.locator('[data-p3-action="balance"]').click();
+  await expect(page.locator('[data-balance-value]')).toContainText('990,00');
+  await page.locator('.balance-history summary').click();
+  await expect(page.locator('.balance-history')).toContainText('20-10-2026');
+  await page.locator('[data-tab="dashboard"]:visible').first().click();
+  await page.locator('.p3-bank-detail > summary').click();
   let release;
   await page.route('http://127.0.0.1:4999/bank/sync',async route=>{
     await new Promise(resolve=>release=resolve);
@@ -96,6 +101,7 @@ for (const width of [320,390,1440]) test('P5b dashboard bankknop, peildatum en h
   expect(await page.evaluate(()=>FinizeTransactions.total('realExpense',{month:'2026-10'}))).toBe(0);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
   await page.screenshot({path:info.outputPath('dashboard-bank-bijwerken.png'),fullPage:true});
+  await page.locator('.p3-bank-detail > summary').click();
   await page.locator('[data-bank-compact] [data-bank-review]').click();
   await expect(page.locator('[data-u4-row]')).toHaveCount(1);
   await expect(page.locator('[data-u4-row] .u4-status')).toHaveText('Nakijken');
@@ -204,6 +210,7 @@ for (const width of [390, 1440]) test('P5b ' + width + ' direct cash, existing r
   expect(await page.evaluate(() => state.transactions.filter(row => row.recordRole === 'bank-source').length)).toBe(1);
   await page.locator('[data-bank-review]').click();
   const row = page.locator('[data-u4-row]').first(); await expect(row).toBeVisible();
+  await row.locator('[data-u4-focus-open]').click();
   await expect(row.locator('.u4-status')).toHaveText('Nakijken');
   await expect(row.locator('[data-u4-field=category]')).toHaveValue('Kleding');
   await page.screenshot({ path: info.outputPath('nakijken.png') });
@@ -240,7 +247,7 @@ for (const phase of ['request','response','staging','storage']) test('audit bank
 });
 test('audit a concurrent import revision after staging stops without overwriting the newer choice',async({page})=>{
  await boot(page);await page.locator('[data-bank-sync]').click();await expect(page.locator('[data-balance-value]')).toContainText('990,00');
- await page.locator('[data-bank-review]').click();await page.locator('[data-u4-row]').first().locator('[data-u4-approve]').click();
+ await page.locator('[data-bank-review]').click();await page.locator('[data-u4-row]').first().locator('[data-u4-focus-open]').click();await page.locator('[data-u4-row]').first().locator('[data-u4-approve]').click();
  await expect(page.locator('[data-u4-group-result]')).toContainText('1 van 1');await page.locator('[data-u4-close]').click();await page.evaluate(()=>openBankAccountDetails('joint'));
  const before=await page.evaluate(()=>JSON.stringify(state.transactions));
  await page.evaluate(()=>{const runtime=FinizeUpdate4Runtime,save=runtime.persistImportDraft;runtime.persistImportDraft=async(root,batch)=>{const current=await runtime.ImportStore.getImport(batch.id);current.version++;current.operationId='concurrent-test';current.rows[0].processing.note='newer local choice';await runtime.ImportStore.putImport(current);return save(root,batch);};});
@@ -279,6 +286,7 @@ test('P5b existing approved CSV remains intact when API overlap is explicitly li
   await expect(page.locator('[data-balance-value]')).toContainText('990,00');
   expect(await page.evaluate(() => state.transactions.filter(row => row.recordRole !== 'bank-source'))).toEqual(original);
   await page.locator('[data-bank-review]').click();
+  await page.locator('[data-u4-row]').first().locator('[data-u4-focus-open]').click();
   await expect(page.locator('[data-u4-identity="same"]')).toBeVisible();
   await page.locator('[data-u4-identity="same"]').click();
   await expect.poll(() => page.evaluate(async () => {

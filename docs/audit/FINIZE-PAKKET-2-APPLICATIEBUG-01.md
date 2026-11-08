@@ -1,6 +1,6 @@
 # Pakket 2 — applicatieregressie 01: directe mobiele doelvolgorde
 
-**Status: bewezen; niet gerepareerd; pakket 2 onderbroken voor gebruikersbesluit.**
+**Status: bewezen en na expliciet gebruikersakkoord hersteld in `34df089`; bestaande test en drie aanvullende mobiele controles slagen.**
 
 ## Reproductie
 

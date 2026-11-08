@@ -1,9 +1,10 @@
+const testOrigin=require('./helpers/test-origin.cjs');
 const {test,expect}=require('@playwright/test');
 const fs=require('node:fs'),path=require('node:path'),visual=require('../fixtures/v50-visual-state.json'),{state:fixture}=require('../helpers/package5-fixture.cjs');
 test.setTimeout(60000);
 async function boot(page){
  await page.route('https://**',route=>route.abort());
- await page.route('http://127.0.0.1:4173/src/**',route=>route.fulfill({contentType:'text/javascript',body:fs.readFileSync(path.resolve(__dirname,'../..')+new URL(route.request().url()).pathname,'utf8')}));
+ await page.route(testOrigin+'/src/**',route=>route.fulfill({contentType:'text/javascript',body:fs.readFileSync(path.resolve(__dirname,'../..')+new URL(route.request().url()).pathname,'utf8')}));
  const seed={...visual,...fixture()};seed.accountProfiles=[{id:'personal',accountOwner:'dion',identifier:'NL20INGB0001234567',name:'Persoonlijk',status:'active',accountType:'payment'},{id:'joint',accountOwner:'gezamenlijk',identifier:'NL91ABNA0417164300',name:'Gezamenlijk',status:'active',accountType:'payment'}];seed.monthRecords={};
  await page.addInitScript(value=>{if(!localStorage.getItem('finize-budget-planner-v1'))localStorage.setItem('finize-budget-planner-v1',JSON.stringify(value));},seed);
  await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
