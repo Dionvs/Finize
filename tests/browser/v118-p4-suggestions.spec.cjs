@@ -11,7 +11,7 @@ async function boot(page,width,incoming=false){
  await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
  await page.evaluate(()=>openBankImportForOwner('gezamenlijk'));
  const csv='Datum;Omschrijving;Rekening;Tegenrekening;Bedrag\n'+Array.from({length:10},(_,i)=>`2026-10-03;Winkel ${String.fromCharCode(65+i)};NL01JOINT;NL99SHOP;-${i+10}.00`).join('\n');
- await page.locator('[data-u4-file]').setInputFiles({name:'p4-review.csv',mimeType:'text/csv',buffer:Buffer.from(incoming?csv.replaceAll(';-',';'):csv)});await expect(page.locator('[data-u4-row]')).toHaveCount(10);
+ await page.locator('[data-u4-file]').setInputFiles({name:'p4-review.csv',mimeType:'text/csv',buffer:Buffer.from(incoming?csv.replaceAll(';-',';'):csv)});await expect(page.locator('[data-u4-row]')).toHaveCount(10);await page.locator('[data-u4-row]').first().locator('[data-u4-focus-open]').click();
 }
 for(const width of [1440,390,320])test(`P4 ${width}px conflict alternatief bulk expliciete approval en duurzame herstart`,async({page})=>{
  const errors=[];page.on('pageerror',e=>errors.push(e.message));await boot(page,width);
@@ -19,6 +19,7 @@ for(const width of [1440,390,320])test(`P4 ${width}px conflict alternatief bulk 
  const first=page.locator('[data-u4-row]').first();await expect(first.locator('[data-suggestion-status=conflict]')).toBeVisible();await expect(first.locator('[data-suggestion-status=conflict]')).toContainText('Meerdere herkenningsregels');
  await first.locator('.u4-suggestion summary').click();await expect(first.locator('.u4-suggestion')).toContainText('Herkomst onbekend');
  await first.locator('[data-u4-suggestion-rule]').selectOption('clothes');await expect(first.locator('[data-u4-field=category]')).toHaveValue('Kleding');await expect(first.locator('.u4-status')).toHaveText('Nakijken');
+ await page.locator('.u4-focus-row [data-u4-focus-back]').click();
  for(let i=0;i<5;i++)await page.locator('[data-u4-select-approval]').nth(i).check();
  await page.locator('.u4-bulk-section summary').click();await page.locator('[data-u4-bulk-scope]').selectOption('selected');await page.locator('[data-u4-bulk-category]').selectOption('Overig');
  page.once('dialog',dialog=>dialog.accept());await page.locator('[data-u4-apply-bulk]').click();
@@ -27,9 +28,9 @@ for(const width of [1440,390,320])test(`P4 ${width}px conflict alternatief bulk 
  expect(await page.evaluate(()=>({goals:state.savingsGoalLedger,months:state.monthRecords,impact:FinizeTransactions.total('budgetImpact',{month:'2026-10'})}))).toEqual(before);
  await page.locator('[data-u4-close]').click();await page.reload();await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);await page.evaluate(id=>FinizeUpdate4.openImportDetails(id),batchId);await expect(page.locator('[data-u4-row]')).toHaveCount(10);
  await expect(page.locator('[data-u4-row]').first().locator('[data-u4-field=category]')).toHaveValue('Overig');
- const card=page.locator('[data-u4-row]').first();await card.locator('[data-u4-approve]').click();await expect(page.locator('[data-u4-match-only]')).toBeVisible();await page.locator('[data-u4-match-only]').click();await expect.poll(()=>page.evaluate(()=>state.transactions.filter(t=>t.recordRole!=='bank-source'&&t.approvalSource==='manual').length)).toBe(1);
+ await page.locator('[data-u4-row]').first().locator('[data-u4-focus-open]').click();const card=page.locator('[data-u4-row]').first();await card.locator('[data-u4-approve]').click();await expect(page.locator('[data-u4-match-only]')).toBeVisible();await page.locator('[data-u4-match-only]').click();await expect.poll(()=>page.evaluate(()=>state.transactions.filter(t=>t.recordRole!=='bank-source'&&t.approvalSource==='manual').length)).toBe(1);
  const approved=await page.evaluate(()=>state.transactions.filter(t=>t.recordRole!=='bank-source').map(t=>({id:t.id,amount:t.amount,source:t.importTransactionId})));expect(approved).toHaveLength(1);expect(approved[0].amount).toBe(10);
- await page.locator('[data-u4-row]').nth(5).locator('.u4-suggestion summary').click();
+ await page.locator('.u4-focus-row [data-u4-focus-back]').click();await page.locator('[data-u4-row]').nth(5).locator('[data-u4-focus-open]').click();await page.locator('[data-u4-row]').nth(5).locator('.u4-suggestion summary').click();
  fs.mkdirSync(path.join(__dirname,'../../.cache/v118-p4'),{recursive:true});await page.screenshot({path:path.join(__dirname,`../../.cache/v118-p4/review-${width}.png`),fullPage:true});
  expect(await page.locator('.u4-import-modal').evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
  const metrics=await page.locator('[data-u4-row]').nth(5).locator('.u4-suggestion').evaluate(el=>({font:parseFloat(getComputedStyle(el).fontSize),width:el.getBoundingClientRect().width}));expect(metrics.font).toBeGreaterThanOrEqual(12);expect(metrics.width).toBeGreaterThan(150);

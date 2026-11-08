@@ -31,7 +31,7 @@ for(const width of [1440,390,320])test(`P1 ${width}px invoeren vergelijken corri
   await expect(page.locator('[data-balance-add]')).toBeVisible();
   await expect(page.locator('[data-balance-value]')).toHaveText('Onbekend');
   await enter(page,'1000','2026-10-10');await page.locator('[data-balance-confirm]').click();
-  await expect(page.locator('[data-balance-value]')).toContainText('900,00');await expect(page.locator('[data-balance-status]')).toHaveText('Voorlopig');
+  await expect(page.locator('[data-balance-value]')).toContainText('900,00');await expect(page.locator('[data-balance-status]')).toHaveText('Reconstructie · Voorlopig');
   await page.locator('.balance-explanation').evaluate(node=>node.open=true);await expect(page.locator('.balance-explanation')).toContainText('Nakijken');
   await enter(page,'875','2026-10-12');
   await expect(page.locator('[data-balance-comparison]')).toContainText('900,00');await expect(page.locator('[data-balance-comparison]')).toContainText('-25,00');
