@@ -40,3 +40,7 @@ Bij optie 2 blijven expliciete goedkeuring, brongegevens, salarisvervanging, his
 ## Bewijs en grenzen
 
 `pakket2-bevinding04-bewijs.json` bevat beide werkelijke synthetische voorstellen en de actieve regeltypen. De ruwe logs staan onder `.cache/pakket2/salary-proposal-probe.*` en `salary-distinct-control.*`. Er is geen conclusie over echte banktransacties getrokken en geen productiegegeven geraadpleegd.
+
+## Besluit gebruiker
+
+De gebruiker kiest: bestaand gedrag behouden, beperking rapporteren en pakket 2 vervolgen. De gemengde testdataset en haar oorspronkelijke salarisverwachting blijven behouden; de mislukking wordt verklaard gerapporteerd. Er volgt geen functionele herkenningscorrectie in pakket 2.
