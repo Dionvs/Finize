@@ -13,7 +13,7 @@ pnpm run check:generated
 pnpm run test:smoke
 ```
 
-`test:unit` bouwt eerst de gedeelde backendmodules en voert alle root-Node-testbestanden uit, behalve de expliciete native Firestore-retentietest. `test:backend` controleert de HTTP-laag met SDK-/providermocks. `test:smoke` behoudt de 35 browsergevallen van pakket 1 en voegt drie mobiele volgordegevallen toe. De volledige browserinventaris blijft beschikbaar via `pnpm run test:browser`; bekende mislukkingen worden in het pakketverslag genoemd en worden niet automatisch overgeslagen.
+`test:unit` bouwt eerst de gedeelde backendmodules en voert alle root-Node-testbestanden uit, behalve de expliciete native Firestore-retentietest. `test:backend` controleert de HTTP-laag met SDK-/providermocks. `test:smoke` behoudt de 35 browsergevallen van pakket 1 en voegt drie mobiele volgordegevallen en twee importfocusgevallen toe. De volledige browserinventaris blijft beschikbaar via `pnpm run test:browser`; bekende mislukkingen worden in het pakketverslag genoemd en worden niet automatisch overgeslagen.
 
 ## Een eigen lokale testpoort
 
