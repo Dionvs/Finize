@@ -9230,8 +9230,8 @@
           (_a2 = section.querySelector("h2")) == null ? void 0 : _a2.insertAdjacentElement("afterend", actions);
         }
         if (!actions.querySelector("[data-add-goal]")) actions.insertAdjacentHTML("beforeend", `<button type="button" class="ghost small" data-add-goal="${owner}">+ Spaardoel</button>`);
-        section.querySelectorAll(".mobile-goal-row").forEach((row) => {
-          var _a3;
+        section.querySelectorAll(".mobile-goal-row,.mt-goal").forEach((row) => {
+          var _a3, _b;
           const editor = row.querySelector("[data-open-goal-editor]");
           const reference = (editor == null ? void 0 : editor.dataset.openGoalEditor) || "";
           const [rowOwner, id] = reference.split(":");
@@ -9241,7 +9241,7 @@
           card.dataset.goalOwner = rowOwner || owner;
           card.dataset.goalId = id;
           if (!card.querySelector(":scope > .goal-direct-order-controls")) {
-            const label = attrSafe(((_a3 = row.querySelector("strong")) == null ? void 0 : _a3.textContent) || "Spaardoel");
+            const label = attrSafe(((_b = (_a3 = state.spaardoelen[rowOwner || owner]) == null ? void 0 : _a3.find((goal) => goal.id === id)) == null ? void 0 : _b.naam) || "Spaardoel");
             card.insertAdjacentHTML("afterbegin", `<span class="goal-direct-order-controls" aria-label="Volgorde aanpassen"><button type="button" class="goal-direct-order-arrow up" data-goal-move="-1" aria-label="${label} omhoog" title="Omhoog"></button><button type="button" class="goal-direct-order-arrow down" data-goal-move="1" aria-label="${label} omlaag" title="Omlaag"></button></span>`);
           }
         });

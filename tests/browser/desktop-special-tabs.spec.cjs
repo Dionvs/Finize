@@ -418,7 +418,8 @@ test('spaardoelkaarten wijzigen direct van volgorde zonder beheerpop-up',async({
   await expect(ownerSection.getByRole('button',{name:'Eerste doel omhoog'})).toBeDisabled();
   await expect(ownerSection.getByRole('button',{name:'Tweede doel omlaag'})).toBeDisabled();
   const arrowBoxes=await ownerSection.locator('.goal-direct-order-arrow').evaluateAll(buttons=>buttons.map(button=>({width:button.getBoundingClientRect().width,height:button.getBoundingClientRect().height})));
-  arrowBoxes.forEach(box=>{expect(box.width).toBeLessThanOrEqual(24);expect(box.height).toBeLessThanOrEqual(22);});
+  // De huidige mobiele toegankelijkheidsregels vereisen een aanraakvlak van 44 px.
+  arrowBoxes.forEach(box=>{expect(box.width).toBe(44);expect(box.height).toBe(44);});
   await ownerSection.getByRole('button',{name:'Tweede doel omhoog'}).click();
   await expect.poll(()=>page.evaluate(()=>state.spaardoelen.dion.map(goal=>goal.id).join(','))).toBe('direct-b,direct-a');
   await ownerSection.getByRole('button',{name:'Tweede doel omlaag'}).click();

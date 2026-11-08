@@ -7322,6 +7322,9 @@ html body.v4-app .transaction-overview-credit{color:var(--green)}
   html body.v4-app .mt-surface .mt-pot{border:0;background:var(--mt-pale);color:#465d2c;border-radius:20px;min-height:44px;padding:5px 9px;white-space:nowrap;font-size:11px}
   .mt-pot strong{font-size:12px;margin-left:4px}
   .mt-goal{border-bottom:1px solid var(--mt-line)}
+  .mt-goal[data-reorder-goal]{display:flex;align-items:center;gap:6px}
+  .mt-goal[data-reorder-goal]>.goal-direct-order-controls{flex:0 0 44px;width:44px;height:88px;grid-template-rows:repeat(2,44px)}
+  .mt-goal[data-reorder-goal]>.mt-goal-open{min-width:0;flex:1}
   .mt-goal-open{display:flex;align-items:flex-start;width:100%;gap:10px;text-align:left;padding:11px 0;border:0;background:transparent;border-radius:0;min-height:70px}
   .mt-goal .joint-savings-goal-icon{display:grid;place-items:center;flex:0 0 36px;width:36px!important;height:36px!important;min-width:36px!important;border-radius:50%!important;background-color:var(--mt-pale)!important;color:var(--mt-green)!important;background-size:cover;background-position:center}
   .mt-goal .joint-savings-goal-icon svg{width:22px;height:22px}
@@ -16731,8 +16734,8 @@ html body.v4-app .transaction-overview-credit{color:var(--green)}
           (_a2 = section.querySelector("h2")) == null ? void 0 : _a2.insertAdjacentElement("afterend", actions);
         }
         if (!actions.querySelector("[data-add-goal]")) actions.insertAdjacentHTML("beforeend", `<button type="button" class="ghost small" data-add-goal="${owner}">+ Spaardoel</button>`);
-        section.querySelectorAll(".mobile-goal-row").forEach((row) => {
-          var _a3;
+        section.querySelectorAll(".mobile-goal-row,.mt-goal").forEach((row) => {
+          var _a3, _b;
           const editor = row.querySelector("[data-open-goal-editor]");
           const reference = (editor == null ? void 0 : editor.dataset.openGoalEditor) || "";
           const [rowOwner, id] = reference.split(":");
@@ -16742,7 +16745,7 @@ html body.v4-app .transaction-overview-credit{color:var(--green)}
           card.dataset.goalOwner = rowOwner || owner;
           card.dataset.goalId = id;
           if (!card.querySelector(":scope > .goal-direct-order-controls")) {
-            const label = attrSafe(((_a3 = row.querySelector("strong")) == null ? void 0 : _a3.textContent) || "Spaardoel");
+            const label = attrSafe(((_b = (_a3 = state.spaardoelen[rowOwner || owner]) == null ? void 0 : _a3.find((goal) => goal.id === id)) == null ? void 0 : _b.naam) || "Spaardoel");
             card.insertAdjacentHTML("afterbegin", `<span class="goal-direct-order-controls" aria-label="Volgorde aanpassen"><button type="button" class="goal-direct-order-arrow up" data-goal-move="-1" aria-label="${label} omhoog" title="Omhoog"></button><button type="button" class="goal-direct-order-arrow down" data-goal-move="1" aria-label="${label} omlaag" title="Omlaag"></button></span>`);
           }
         });

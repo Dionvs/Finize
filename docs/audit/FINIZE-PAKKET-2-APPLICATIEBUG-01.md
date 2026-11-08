@@ -60,3 +60,9 @@ De classificatie is vóór testwijzigingen gecommitte in `9a782c8`. Daarna zijn 
 - CI-aanpassingen, GitHub Actions-uitvoering en de volledige browsersuite zijn nog niet uitgevoerd. Er is niets gepusht of gepubliceerd.
 
 De classificatie is dus nog geen voltooid pakketverslag. Pakket 2 en de vrijgave voor publicatie blijven open.
+
+## Goedgekeurd herstel en verificatie
+
+De gebruiker heeft op 8 november 2026 gericht herstel goedgekeurd. `bindDirectGoalOrdering` herkent nu ook de actuele `.mt-goal`-kaarten, gebruikt de onbewerkte doelnaam voor toegankelijke pijlknoppen en hergebruikt dezelfde opslaghandler. De bestaande mobiele stijl reserveert alleen ruimte voor de teruggebrachte bediening; de huidige 44px-aanraakvlakken blijven behouden. Previewkaarten buiten de spaardoelenpagina krijgen geen nieuwe bediening.
+
+De bestaande directe-volgordetest slaagt; alleen de verouderde verwachting van maximaal 24×22 px is aangepast naar de reeds bestaande 44×44 px toegankelijkheidsregel. Drie aanvullende browsergevallen op 360, 390 en 430 px slagen: grensknoppen, duurzaam verplaatsen, herladen, ongewijzigde doelbedragen/gespaard kapitaal, doelbewerker en geen horizontale overloop. Screenshot 360 px is geopend en visueel gecontroleerd. Rekenregels en productiegegevens zijn niet gewijzigd.

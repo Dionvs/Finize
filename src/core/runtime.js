@@ -130,7 +130,7 @@ function bindDirectGoalOrdering(root){
       let actions=section.querySelector('.u2-inline-actions');
       if(!actions){actions=document.createElement('div');actions.className='u2-inline-actions';section.querySelector('h2')?.insertAdjacentElement('afterend',actions);}
       if(!actions.querySelector('[data-add-goal]'))actions.insertAdjacentHTML('beforeend',`<button type="button" class="ghost small" data-add-goal="${owner}">+ Spaardoel</button>`);
-      section.querySelectorAll('.mobile-goal-row').forEach(row=>{
+      section.querySelectorAll('.mobile-goal-row,.mt-goal').forEach(row=>{
         const editor=row.querySelector('[data-open-goal-editor]');
         const reference=editor?.dataset.openGoalEditor||'';
         const [rowOwner,id]=reference.split(':');
@@ -138,7 +138,7 @@ function bindDirectGoalOrdering(root){
         const card=row.closest('.u2-goal-accordion')||row;
         card.dataset.reorderGoal='';card.dataset.goalOwner=rowOwner||owner;card.dataset.goalId=id;
         if(!card.querySelector(':scope > .goal-direct-order-controls')){
-          const label=attrSafe(row.querySelector('strong')?.textContent||'Spaardoel');
+          const label=attrSafe(state.spaardoelen[rowOwner||owner]?.find(goal=>goal.id===id)?.naam||'Spaardoel');
           card.insertAdjacentHTML('afterbegin',`<span class="goal-direct-order-controls" aria-label="Volgorde aanpassen"><button type="button" class="goal-direct-order-arrow up" data-goal-move="-1" aria-label="${label} omhoog" title="Omhoog"></button><button type="button" class="goal-direct-order-arrow down" data-goal-move="1" aria-label="${label} omlaag" title="Omlaag"></button></span>`);
         }
       });
