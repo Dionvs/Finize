@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const tests = (await readdir(path.join(root, "tests")))
-  .filter(file => /\.test\.(cjs|mjs)$/.test(file) && !file.includes('-emulator.test.'))
+  .filter(file => /\.test\.(cjs|mjs)$/.test(file) && file !== 'v118-p5b-retention-emulator.test.mjs')
   .sort();
 
 // Pure backend tests import the same generated shared modules as the deployment.
