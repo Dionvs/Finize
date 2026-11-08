@@ -4,26 +4,18 @@ const { expect, test } = require('@playwright/test');
 
 const state = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'fixtures', 'v50-visual-state.json'), 'utf8'));
 const widths = [360, 390, 430, 768, 1024, 1440];
-const styleSelectors = [
-  'body',
-  '.mobile-dashboard-header',
-  '.mobile-kpi-grid',
-  '.dashboard-grid',
-  '.joint-account-card',
-  '.allowance-return-card',
-  '.dashboard-goals-preview',
-  '.v4-bottom-nav'
-];
+const styleReference=require('../fixtures/main-r46-computed-styles.json');
+const styleSelectors=Object.keys(styleReference);
 
 async function keepVisualFixtureLocal(page) {
   await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
 }
 
-test.skip(process.platform !== 'win32', 'De pixelbaseline gebruikt de Windows-letterrendering van de v50-baseline.');
+test.skip(process.platform !== 'win32', 'De pixelbaseline gebruikt de Windows-letterrendering van de main-r46-referentie.');
 test.setTimeout(60_000);
 
 for (const width of widths) {
-  test(`v50 visuele baseline op ${width}px`, async ({ page }) => {
+  test(`r46 visuele regressiebaseline op ${width}px`, async ({ page }) => {
     await keepVisualFixtureLocal(page);
     await page.addInitScript(fixture => {
       localStorage.setItem('finize-budget-planner-v1', JSON.stringify(fixture));
@@ -36,13 +28,13 @@ for (const width of widths) {
     const session = await page.context().newCDPSession(page);
     const capture = await session.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
     const screenshot = Buffer.from(capture.data, 'base64');
-    expect(screenshot).toMatchSnapshot(`v50-${width}.png`, {
+    expect(screenshot).toMatchSnapshot(`r46-${width}.png`, {
       maxDiffPixelRatio: 0.002
     });
   });
 }
 
-test('v50 computed-style-contract', async ({ page }) => {
+test('r46 computed-style-contract', async ({ page }) => {
   await keepVisualFixtureLocal(page);
   await page.addInitScript(fixture => {
     localStorage.setItem('finize-budget-planner-v1', JSON.stringify(fixture));
@@ -65,5 +57,5 @@ test('v50 computed-style-contract', async ({ page }) => {
       gridTemplateColumns: computed.gridTemplateColumns
     }];
   })), styleSelectors);
-  expect(styles).toEqual(require('../fixtures/v50-computed-styles.json'));
+  expect(styles).toEqual(styleReference);
 });
