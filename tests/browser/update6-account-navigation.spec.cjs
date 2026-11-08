@@ -56,7 +56,7 @@ for(const role of ['dion','dara']){
       window.state.spaardoelen.dara=[goal('goal-dara-favorite','Dara favoriet',true),goal('goal-dara-regular','Dara niet favoriet',false)];
       window.renderActiveTab();
     });
-    const dashboardPreview=page.locator('#tab-dashboard .dashboard-goals-preview.v4-mobile-only-block');
+    const dashboardPreview=page.locator('#tab-dashboard .p3-goals');
     await expect(dashboardPreview).toContainText('Gezamenlijk favoriet');
     await expect(dashboardPreview).not.toContainText('niet favoriet');
 
@@ -76,8 +76,8 @@ for(const role of ['dion','dara']){
 
 test('dashboard en gezamenlijk blijven voor ieder account bewerkbaar op desktop',async({page})=>{
   await installAccount(page);
-  await expect(page.getByRole('button',{name:'Inkomen van Dion aanpassen'})).toBeEnabled();
-  await expect(page.getByRole('button',{name:'Inkomen van Dara aanpassen'})).toBeEnabled();
+  await expect(page.locator('[data-p3-action="allowance"]')).toBeEnabled();
+  await expect(page.locator('[data-p3-action="goals"]')).toBeEnabled();
 
   await page.locator('.v4-sidebar .tab-btn[data-tab="gezamenlijk"]').click();
   await expect(page.locator('#tab-gezamenlijk .u6-readonly-banner')).toHaveCount(0);

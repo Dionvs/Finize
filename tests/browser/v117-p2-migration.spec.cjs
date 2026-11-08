@@ -29,12 +29,12 @@ for(const phase of ['after-backup','during-financial-commit','after-prepared','a
   let context;
   try{
     context=await chromium.launchPersistentContext(directory,{headless:true,baseURL:testOrigin,serviceWorkers:'block'});
-    let page=await context.newPage();await offline(page);await page.route('**/app.js*',r=>r.abort());await page.goto('/');
+    let page=await context.newPage();await offline(page);await page.route(testOrigin+'/',r=>r.fulfill({contentType:'text/html',body:'<!doctype html><title>Isolated migration fixture</title>'}));await page.goto('/');
     await page.evaluate(async({fixture,retained,key})=>{
       localStorage.setItem(key,JSON.stringify(fixture));
       await new Promise((resolve,reject)=>{const r=indexedDB.open('finize-imports-v1',1);r.onupgradeneeded=()=>{for(const name of Object.keys(retained))r.result.createObjectStore(name,{keyPath:'id'});};r.onsuccess=()=>{const db=r.result,tx=db.transaction(Object.keys(retained),'readwrite');for(const[name,records]of Object.entries(retained))for(const record of records)tx.objectStore(name).put(record);tx.oncomplete=()=>{db.close();resolve();};tx.onabort=()=>reject(tx.error);};});
     },{fixture,retained,key:legacyKey});
-    await page.unroute('**/app.js*');
+    await page.unroute(testOrigin+'/');
     await page.addInitScript(phase=>{
       const put=IDBObjectStore.prototype.put,transaction=IDBDatabase.prototype.transaction;
       IDBDatabase.prototype.transaction=function(names,mode,...rest){if(phase==='after-backup'&&mode==='readwrite'&&Array.isArray(names)&&names.includes('financialHead')){window.__p2Checkpoint=phase;throw new DOMException('browser interruption before commit','AbortError');}return transaction.call(this,names,mode,...rest);};
@@ -152,14 +152,14 @@ test('V117 P2 household switch reloads editors and keeps state, imports, receipt
 });
 
 test('V117 P2 referenced legacy goal image is copied to household scope without deleting the original',async({page})=>{
-  await offline(page);await page.route('**/app.js*',r=>r.abort());await page.goto('/');
+  await offline(page);await page.route(testOrigin+'/',r=>r.fulfill({contentType:'text/html',body:'<!doctype html><title>Isolated migration fixture</title>'}));await page.goto('/');
   await page.evaluate(async fixture=>{
     const original=structuredClone(fixture);original.spaardoelen.gezamenlijk=[{id:'legacy-image-goal',naam:'Foto behouden',doelbedrag:1000,algespaard:0,afbeelding:'idb:goal-image:legacy-image-goal'}];
     localStorage.setItem('finize-budget-planner-v1:account:image-house:image-user',JSON.stringify(original));
     await new Promise((resolve,reject)=>{const r=indexedDB.open('finize-goal-images-v1',1);r.onupgradeneeded=()=>r.result.createObjectStore('images');r.onsuccess=()=>{const db=r.result,tx=db.transaction('images','readwrite');tx.objectStore('images').put('data:image/png;base64,T0xE','legacy-image-goal');tx.oncomplete=()=>{db.close();resolve();};tx.onabort=()=>reject(tx.error);};});
   },fixture);
   await page.addInitScript(()=>{const user={uid:'image-user',email:'image@example.test',emailVerified:true};window.__FINIZE_AUTH_ENABLED__=true;window.__FINIZE_AUTH_TEST_DRIVER__={initialize(callback){setTimeout(()=>callback(user),0);},loadAssignment:async()=>({householdId:'image-house',role:'dion'}),setPersistence:async()=>{}};});
-  await page.unroute('**/app.js*');await page.reload();await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
+  await page.unroute(testOrigin+'/');await page.reload();await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   const result=await page.evaluate(async()=>{
     const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('finize-goal-images-v1');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
     const read=key=>new Promise((resolve,reject)=>{const tx=db.transaction('images','readonly'),q=tx.objectStore('images').get(key);q.onsuccess=()=>resolve(q.result);q.onerror=()=>reject(q.error);});
