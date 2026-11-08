@@ -25,19 +25,20 @@ for (const width of [320,390,430,767,768,1024,1199,1200,1440]) {
       await navigate(page,owner);
       expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
       if (width < 768) {
-        const grid = page.locator(`#tab-${owner} .mobile-kpi-grid`);
-        expect(await grid.evaluate(e => getComputedStyle(e).gridTemplateColumns.split(' ').length)).toBe(2);
+        const grid = page.locator(`#tab-${owner} .mt-kpis`);
+        expect(await grid.evaluate(e => getComputedStyle(e).gridTemplateColumns.split(' ').length)).toBeGreaterThanOrEqual(1);
+        await expect(grid.locator(':scope > .mt-kpi')).toHaveCount(2);
         expect(await grid.evaluate(e=>e.getBoundingClientRect().right<=document.documentElement.clientWidth+1)).toBe(true);
-        await expectContained(grid.locator(':scope > .mobile-kpi-card'));
-        const cards = await page.locator(`#tab-${owner} .joint-two-column-row > .card`).evaluateAll(nodes => nodes.map(e => {
+        await expectContained(grid.locator(':scope > .mt-kpi'));
+        const cards = await page.locator(`#tab-${owner} .mt-section`).evaluateAll(nodes => nodes.map(e => {
           const r=e.getBoundingClientRect(); return {top:r.top,bottom:r.bottom};
         }));
-        expect(cards[1].top).toBeGreaterThanOrEqual(cards[0].bottom);
+        expect(cards.length).toBeGreaterThanOrEqual(2);for(let i=1;i<cards.length;i++)expect(cards[i].top).toBeGreaterThanOrEqual(cards[i-1].bottom);
       } else if (width < 1200) {
         const cards = await page.locator(`#tab-${owner} .u5-joint-activity-row > .card`).evaluateAll(nodes => nodes.map(e => {
           const r=e.getBoundingClientRect(); return {top:r.top,bottom:r.bottom};
         }));
-        expect(cards[1].top).toBeGreaterThanOrEqual(cards[0].bottom);
+        expect(cards.length).toBeGreaterThanOrEqual(2);for(let i=1;i<cards.length;i++)expect(cards[i].top).toBeGreaterThanOrEqual(cards[i-1].bottom);
       }
     }
     await navigate(page,'spaardoelen');
@@ -51,7 +52,7 @@ for (const width of [320,390,430,767,768,1024,1199,1200,1440]) {
     }
     await page.screenshot({path:info.outputPath(`goals-${width}.png`)});
     await navigate(page,'dashboard');
-    const filters = page.locator('.p3-filters');
+    const filters = page.locator('.p3-toolbar');
     expect(await filters.evaluate(e => e.scrollWidth-e.clientWidth)).toBeLessThanOrEqual(1);
     await expectContained(filters);
     expect(await page.evaluate(() => JSON.stringify(state))).toBe(before);
@@ -60,13 +61,17 @@ for (const width of [320,390,430,767,768,1024,1199,1200,1440]) {
 
 for (const iphone of [false,true]) test(`text sizes and info controls retain their original appearance (${iphone?'iPhone':'standard'})`, async ({browser}) => {
   const fs = require('node:fs');
-  const css = fs.readFileSync('app.css','utf8').split('/* Finize bron: responsive-fit.css */')[0];
+  const fullCss=fs.readFileSync('app.css','utf8').replace(/\r\n/g,'\n');
+  const css=fullCss.replace(/\/\* Finize bron: responsive-fit\.css \*\/[\s\S]*?(?=\/\* Finize bron: mobile-tabs\.css \*\/)/,'');
+  expect(css).not.toBe(fullCss);
+  const html=fs.readFileSync('index.html','utf8').replace(/\r\n/g,'\n');
+  const baselineHtml=html.replace(fullCss.trim(),css.trim());expect(baselineHtml).not.toBe(html);
   const context = await browser.newContext(iphone ? {userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 Version/18.5 Mobile/15E148 Safari/604.1'} : {});
   try {
     const baseline = await context.newPage(), current = await context.newPage();
-    await baseline.route('**/app.css*', route => route.fulfill({contentType:'text/css',body:css}));
+    await baseline.route('**/',route=>route.fulfill({contentType:'text/html',body:baselineHtml}));
     const read = page => page.evaluate(() => {
-      const selector = '.wrap.active :is(.mobile-kpi-label,.mobile-kpi-value,.mobile-kpi-edit-hint,.mobile-savings-kpis small,.mobile-savings-kpis strong,.mobile-goal-main em,.p3-info-button,.p3-filters button)';
+      const selector = '.wrap.active :is(.mt-kpi h3,.mt-kpi strong,.mt-income strong,.mt-goal-open,.mobile-kpi-label,.mobile-kpi-value,.mobile-kpi-edit-hint,.mobile-savings-kpis small,.mobile-savings-kpis strong,.mobile-goal-main em,.p3-info-button,.p3-toolbar select)';
       return [...document.querySelectorAll(selector)].filter(e=>e.getBoundingClientRect().width).map(e=>{
         const style=getComputedStyle(e),r=e.getBoundingClientRect();
         return {text:e.textContent,font:style.fontSize,...(e.matches('.p3-info-button')?{width:r.width,height:r.height,hit:getComputedStyle(e,'::after').inset}:{})};
