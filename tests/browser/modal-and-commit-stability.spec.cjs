@@ -15,8 +15,9 @@ test('transacties worden alleen vanuit persoonlijk en gezamenlijk toegevoegd', a
   await expect(modal.getByRole('heading',{name:'Uitgave toevoegen'})).toBeVisible();
   await expect(modal.getByRole('button',{name:/Bankbestand importeren/})).toBeVisible();
   await modal.getByRole('button',{name:/Handmatig invoeren/}).click();
-  await expect(modal.getByRole('heading',{name:'Gezamenlijk transactie toevoegen'})).toBeVisible();
+  await expect(modal.getByRole('heading',{name:'Transactie toevoegen'})).toBeVisible();
   await expect(modal.getByLabel('Eigenaar')).toHaveCount(0);
+  await expect(modal.locator('.transaction-detail-account strong')).toHaveText('Gezamenlijk');
   await modal.locator('#btnCloseJointTransaction').click();
   await expect(modal).not.toHaveClass(/open/);
 
@@ -24,8 +25,9 @@ test('transacties worden alleen vanuit persoonlijk en gezamenlijk toegevoegd', a
   await page.getByRole('button',{name:'+ Uitgave van Dion'}).click();
   await expect(modal.getByRole('heading',{name:'Uitgave toevoegen'})).toBeVisible();
   await modal.getByRole('button',{name:/Handmatig invoeren/}).click();
-  await expect(modal.getByRole('heading',{name:'Dion transactie toevoegen'})).toBeVisible();
+  await expect(modal.getByRole('heading',{name:'Transactie toevoegen'})).toBeVisible();
   await expect(modal.getByLabel('Eigenaar')).toHaveCount(0);
+  await expect(modal.locator('.transaction-detail-account strong')).toHaveText('Dion');
   await modal.locator('#personalTxAmount').fill('12.34');
   await modal.locator('#personalTxDescription').fill('Persoonlijke test');
   await modal.locator('#btnSavePersonalTransaction').click();
@@ -74,13 +76,13 @@ test('gezamenlijk over deze maand gebruikt alle inkomsten en trekt zakgeld allee
   });
   const incomeAfter=parseEuro(await incomeCard.locator('.metric-value').innerText());
   expect(incomeAfter-incomeBefore).toBe(125);
-  const fixed=parseEuro(await cards.filter({hasText:'Vaste lasten totaal'}).locator('.metric-value').innerText());
+  const fixed=parseEuro(await cards.filter({hasText:'Vaste lasten totaal'}).locator('.fixed-payment-amounts > span:last-child').innerText());
   const used=parseEuro((await cards.filter({hasText:'Variabel gebruikt'}).locator('.metric-value').innerText()).split('/')[0]);
   const saving=parseEuro(await page.locator('#tab-gezamenlijk .savings-month-button strong').innerText());
   const remaining=parseEuro(await remainingCard.locator('.metric-value').innerText());
   await expect(remainingCard.locator('.metric-sub')).toHaveCount(0);
   await page.locator('.v4-sidebar .tab-btn[data-tab="dashboard"]').click();
-  const allowance=parseEuro(await page.locator('#tab-dashboard .allowance-return-card .metric-value').innerText());
+  const allowance=(await page.locator('#tab-dashboard .p3-allowance-row > strong').allTextContents()).map(parseEuro).reduce((a,b)=>a+b,0);
   expect(remaining).toBeCloseTo(incomeAfter-fixed-used-saving-allowance,2);
 });
 
@@ -209,14 +211,14 @@ test('twee expliciet gekoppelde salarissen vervangen in juli beide persoonlijke 
   });
 });
 
-test('dashboard toont alleen het directe jaaroverzicht onderaan', async ({ page }) => {
+test('dashboard behoudt de compacte r38-panelen zonder oud jaaroverzicht', async ({ page }) => {
   await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   await expect(page.locator('#tab-dashboard')).not.toContainText('Maandadministratie');
   await expect(page.locator('#tab-dashboard')).not.toContainText('Onderling te verrekenen');
   const year=page.locator('#tab-dashboard [data-p3-year-panel]');
-  await expect(year).toBeVisible();
-  await expect(year.locator('.p3-year-bars > div')).toHaveCount(12);
-  await expect(year.locator('details')).toHaveCount(0);
+  await expect(year).toHaveCount(0);
+  await expect(page.locator('#tab-dashboard .p3-allowance')).toBeVisible();
+  await expect(page.locator('#tab-dashboard .p3-goals')).toBeVisible();
 });
 
 test('opgeslagen inkomen valt niet terug door een nieuwere cloudsnapshot', async ({ page }) => {
@@ -234,6 +236,8 @@ test('opgeslagen inkomen valt niet terug door een nieuwere cloudsnapshot', async
     CloudAdapter.cloudVersion = 100;
     CloudAdapter.lastCloudSignature = `${Number(base.meta.revision)||0}|${base.meta.updatedAt||''}|${base.meta.updatedBy||''}`;
   });
+  await page.locator('.v4-sidebar [data-tab="dion"]').click();
+  await page.locator('#tab-dion details.manage-section').filter({hasText:'Inkomen en vaste teruggaven'}).locator('summary').click();
   await page.locator('[data-income-edit="dion"]').first().click();
   await page.locator('#incomeEditInput').fill('2344');
   await page.locator('#btnSaveIncomeEdit').click();
