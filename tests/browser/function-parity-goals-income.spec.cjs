@@ -125,7 +125,7 @@ test('inkomen gebruikt op mobiel en desktop dezelfde historie zonder legacy-writ
   await page.setViewportSize({width:390,height:900});
   await page.locator('.v4-bottom-nav [data-tab="dion"]').click();
   const legacyBefore=await page.evaluate(()=>JSON.stringify(state.personen.dion.vasteTeruggaven));
-  await page.getByRole('button',{name:'Inkomensoverzicht Dion',exact:true}).click();
+  await page.locator('#tab-dion [data-open-income-overview="dion"]').click();
   await page.getByRole('button',{name:'Inkomen van Dion aanpassen'}).click();
   await page.locator('#incomeEditInput').fill('2345.67');
   await page.locator('#incomeRefundInput').fill('89.10');
