@@ -2,7 +2,6 @@ const CACHE_NAME = "finize-v118-r46";
 const CACHE_PREFIX = "finize-";
 
 const CRITICAL_SHELL = [
-  "./",
   "./index.html",
   "./app.js?v=118-r46",
   "./app.css?v=118-r46",
@@ -19,7 +18,7 @@ self.addEventListener("install", event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(async cache => {
       await cache.addAll(CRITICAL_SHELL);
-      for (const shell of ["./", "./index.html"]) {
+      for (const shell of ["./index.html"]) {
         const response = await cache.match(shell);
         if (!response?.ok || !isCurrentShellHtml(await response.text())) {
           await caches.delete(CACHE_NAME);
