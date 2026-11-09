@@ -88,7 +88,7 @@ jobs:
       - name: Native bankretentie op afzonderlijke loopback-emulator
         run: pnpm run test:emulator:bank
       - name: Volledige browserinventaris met lokale Firestore
-        run: node "$FINIZE_FIREBASE_CLI" emulators:exec --only firestore --project demo-finize-v117 --config firebase.emulator.json 'pnpm exec playwright test --reporter=line,json'
+        run: node "$FINIZE_FIREBASE_CLI" emulators:exec --only firestore --project demo-finize-v117 --config firebase.emulator.json 'pnpm exec playwright test --grep-invert "v117-p4-scale|v117-p4-write-amplification|v117-p42-performance|v117-p43-performance|v117-p44-performance|v117-p44-scale-verifier|existing 500 and 5400|completed 500-source" --reporter=line,json'
         env:
           PLAYWRIGHT_JSON_OUTPUT_NAME: test-results/full.json
       - uses: actions/upload-artifact@v4

@@ -57,3 +57,7 @@ De volledige browserinventaris bevat daarnaast tests die de lokale records-emula
 `.github/workflows/verify.yml` heeft snelle controles bij pushes naar `main` en PR's naar `main`. Die omvatten syntax, CSS, build, alle normale Node-tests, backend-HTTP en browser-smoke. Een handmatige start en de wekelijkse planning voeren ook de echte emulators en volledige browserinventaris uit. Mislukkingen blijven een mislukte workflowstatus; browserresultaten worden als artifact bewaard.
 
 De workflow heeft uitsluitend `contents: read`, gebruikt geen productiesecrets en voert geen deployment uit. Zolang deze branch niet is gepusht, zijn alleen lokale uitvoering en lokale YAML-controle bewezen; er is dan nog geen echte GitHub Actions-uitslag.
+
+## Afzonderlijke schaalproeven
+
+De snelle workflow draait bij pushes/PRs naar main; de uitgebreidere functionele controle draait handmatig en wekelijks. De tien schaal-/prestatiegevallen blijven beschikbaar in de afzonderlijke, uitsluitend handmatige workflow `verify-scale.yml`. Zo blokkeert een schaalrun de functionele reeks niet door de gezamenlijke tijdslimiet. De suite met alle gevallen blijft lokaal beschikbaar; geen assertion is voor deze splitsing verwijderd. Bekende applicatiefouten blijven de uitgebreide workflow terecht rood maken.
