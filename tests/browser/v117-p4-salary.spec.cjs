@@ -7,11 +7,18 @@ async function load(page,text,name,expected=text.split('\n').length-1){
   await page.evaluate(()=>openBankImportForOwner('gezamenlijk'));
   await page.locator('[data-u4-file]').setInputFiles({name,mimeType:'text/csv',buffer:Buffer.from(text)});
   if(expected===0)await expect(page.locator('#u4ImportModalRoot summary').filter({hasText:'Eerder geïmporteerd — overgeslagen'})).toContainText('1');
+  if(expected>0){await page.locator('select[data-u4-view-month]').selectOption('');await expect(page.locator('[data-u4-month-context]')).toContainText('Alle maanden');}
   await expect(page.locator('[data-u4-row]')).toHaveCount(expected);
   await page.locator('#u4ImportModalRoot details').evaluateAll(nodes=>nodes.forEach(node=>node.open=true));
-  return page.locator('[data-u4-row]').evaluateAll(nodes=>nodes.map(n=>n.dataset.u4Row).sort());
+  const ids=await page.locator('[data-u4-row]').evaluateAll(nodes=>nodes.map(n=>n.dataset.u4Row).sort());if(ids.length)await focus(page,ids[0]);return ids;
+}
+async function focus(page,id){
+ const row=page.locator(`[data-u4-row="${id}"]`);if(await row.evaluate(el=>el.classList.contains('u4-focus-row')))return;
+ const back=page.locator('.u4-focus-row [data-u4-focus-back]');if(await back.isVisible())await back.click();
+ await row.locator('[data-u4-focus-open]').click();
 }
 async function approve(page,id,count){
+  await focus(page,id);
   await page.locator(`[data-u4-row="${id}"] [data-u4-approve]`).click();
   await expect.poll(async()=>await page.locator('[data-u4-match-only]').isVisible()||await page.evaluate(()=>['2026-09','2026-10'].reduce((n,month)=>n+FinizeTransactions.effects({month}).length,0))>=count).toBe(true);
   if(await page.locator('[data-u4-match-only]').isVisible())await page.locator('[data-u4-match-only]').click();
@@ -19,7 +26,7 @@ async function approve(page,id,count){
 }
 const header='Datum;Omschrijving;Rekening;Tegenrekening;Bedrag\n';
 for(const salaryMonth of ['2026-09','2026-10'])test(`P4 legacy salary ${salaryMonth} without reliable person blocks totals visibly and preserves data`,async({page})=>{
-  const f=await newHousehold(),s=state();s.meta.selectedMonth='2026-10';s.monthRecords={};
+  const f=await newHousehold(),s=state();s.meta.selectedMonth=salaryMonth;s.monthRecords={};
   const {row,materialize}=require('../helpers/package5-fixture.cjs'),payment=row('Ongekoppeld salaris','salaris',2530);payment.bankOriginal.bankDate=salaryMonth+'-03';payment.processing.processingDate=salaryMonth+'-03';materialize(s,[payment]);
   await boot(page,f,s);await expect(page.getByRole('heading',{name:'Salaris koppelen'})).toBeVisible();await expect(page.locator('[data-salary-review]')).toHaveCount(1);
   expect(await page.evaluate(()=>state.transactions.filter(t=>t.recordRole!=='bank-source').map(t=>t.financialFor))).toEqual(['gezamenlijk']);
@@ -34,7 +41,7 @@ test('P4 salary person proposal, explicit correction, offline restart and second
   const first=page.locator(`[data-u4-row="${ids[0]}"]`);await expect(first.locator('[data-u4-field="salaryPersonId"]')).toHaveValue('');
   await first.locator('[data-u4-approve]').click();await expect(first.locator('[data-u4-validation-field="salaryPersonId"]')).toBeVisible();expect(await page.evaluate(()=>FinizeTransactions.total('incomeImpact'))).toBe(0);
   await page.locator('[data-u4-validation-close]').click();
-  for(const [i,person]of ['dion','dara'].entries()){
+  for(const [i,person]of ['dion','dara'].entries()){await focus(page,ids[i]);
     await page.locator(`[data-u4-row="${ids[i]}"] [data-u4-field="salaryPersonId"]`).selectOption(person);
     if(i===0)await page.locator(`[data-u4-row="${ids[i]}"]`).screenshot({path:'backups/v117-stabilisatie/p4-salary-person-ui.png'});
     await approve(page,ids[i],i+1);

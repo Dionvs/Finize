@@ -1,0 +1,13 @@
+[
+  {
+    "test": "V117 P3 partial history: real screens, ten CSV approvals, offline restart, historical correction and second client",
+    "status": "failed",
+    "startTime": "2026-11-09T13:46:52.291Z",
+    "diagnostics": [
+      "EDITOR_EVENT {\"family\":\"sparen\",\"draft\":\"import-mv0wy2o0-vmpuuhog\",\"target\":\"import-mv0wy2o0-vmpuuhog-00001\",\"rows\":[\"import-mv0wy2o0-vmpuuhog-00001\",\"import-mv0wy2o0-vmpuuhog-00002\",\"import-mv0wy2o0-vmpuuhog-00003\",\"import-mv0wy2o0-vmpuuhog-00004\",\"import-mv0wy2o0-vmpuuhog-00005\",\"import-mv0wy2o0-vmpuuhog-00006\",\"import-mv0wy2o0-vmpuuhog-00007\",\"import-mv0wy2o0-vmpuuhog-00008\",\"import-mv0wy2o0-vmpuuhog-00009\",\"import-mv0wy2o0-vmpuuhog-00010\"]}\n",
+      "EDITOR_BEFORE {\"processingDate\":\"2026-10-01\",\"processedAmount\":50,\"description\":\"Periode Sparen X\",\"category\":\"Ongecategoriseerd\",\"transactionType\":\"interne-overboeking\",\"budgetOwner\":\"gezamenlijk\",\"budgetItemId\":\"\",\"fixedExpenseId\":\"\",\"fixedAmountMode\":\"none\",\"savingsGoalId\":\"\",\"splits\":[],\"advanceMode\":\"auto\",\"include\":true,\"recognitionRuleId\":\"\",\"note\":\"\",\"sourceAccountProfileId\":\"p3-joint\",\"destinationAccountProfileId\":\"p3-savings\"}\n",
+      "EDITOR_AFTER {\"processingDate\":\"2026-10-01\",\"processedAmount\":50,\"description\":\"Periode Sparen X\",\"category\":\"Sparen\",\"transactionType\":\"sparen\",\"budgetOwner\":\"gezamenlijk\",\"budgetItemId\":\"\",\"fixedExpenseId\":\"\",\"fixedAmountMode\":\"none\",\"savingsGoalId\":\"\",\"splits\":[],\"advanceMode\":\"none\",\"include\":true,\"recognitionRuleId\":\"\",\"note\":\"\",\"sourceAccountProfileId\":\"\",\"destinationAccountProfileId\":\"\",\"fixedOccurrenceId\":\"\",\"fixedOccurrenceMonth\":\"\",\"refundCategory\":\"\",\"refundMonth\":\"\",\"internalPairId\":\"\",\"transferPairId\":\"\",\"repaymentAllocations\":[],\"editorVersion\":113}\n",
+      "EDITOR_ERROR Error: Een vereiste financiële periode is niet geverifieerd. Ontbrekende historie is geen nul.\n    at periodDependencyState (http://127.0.0.1:4193/:10337:249)\n    at selectTransactionProjections (http://127.0.0.1:4193/:10301:75)\n    at savingsContributionFields (http://127.0.0.1:4193/:27379:27)\n    at dependentFieldsHtml (http://127.0.0.1:4193/:27406:520)\n    at rowHtml (http://127.0.0.1:4193/:27466:9)\n    at renderDraftRowCard (http://127.0.0.1:4193/:27826:27)\n    at HTMLDivElement.onDraftChange (http://127.0.0.1:4193/:28018:30)\n    at async <anonymous>:317:30\n"
+    ]
+  }
+]
