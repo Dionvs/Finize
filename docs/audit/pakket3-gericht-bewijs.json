@@ -1,0 +1,159 @@
+{
+  "date": "2026-11-09",
+  "baseline": "648591c",
+  "cache": {
+    "before": [
+      {
+        "url": "/",
+        "bytes": 2308161
+      },
+      {
+        "url": "/index.html",
+        "bytes": 2308161
+      },
+      {
+        "url": "/app.js?v=118-r46",
+        "bytes": 1955369
+      },
+      {
+        "url": "/app.css?v=118-r46",
+        "bytes": 346078
+      },
+      {
+        "url": "/manifest.json",
+        "bytes": 611
+      },
+      {
+        "url": "/icons/icon-192.png",
+        "bytes": 19806
+      },
+      {
+        "url": "/icons/icon-512.png",
+        "bytes": 138171
+      },
+      {
+        "url": "/dashboard-house.png",
+        "bytes": 1008485
+      }
+    ],
+    "after": [
+      {
+        "url": "/index.html",
+        "bytes": 2308161
+      },
+      {
+        "url": "/app.js?v=118-r46",
+        "bytes": 1955369
+      },
+      {
+        "url": "/app.css?v=118-r46",
+        "bytes": 346078
+      },
+      {
+        "url": "/manifest.json",
+        "bytes": 611
+      },
+      {
+        "url": "/icons/icon-192.png",
+        "bytes": 19806
+      },
+      {
+        "url": "/dashboard-house.png",
+        "bytes": 1008485
+      },
+      {
+        "url": "/icons/icon-512.png",
+        "bytes": 138171
+      }
+    ],
+    "beforeBytes": 8084842,
+    "afterBytes": 5776681,
+    "savedBytes": 2308161,
+    "savedPercent": 28.54924066543292
+  },
+  "goalComputedStyles": [
+    {
+      "width": 390,
+      "rows": [
+        {
+          "text": "Spaarpot € 0,00Spaarpot verwerken+ Spaardoel",
+          "display": "contents",
+          "gap": "8px",
+          "padding": "0px",
+          "fontSize": "13px",
+          "color": "rgb(61, 33, 22)",
+          "width": 0,
+          "height": 0
+        },
+        {
+          "text": "Spaarpot € 1.192,16Spaarpot verwerken+ Spaardoel",
+          "display": "contents",
+          "gap": "8px",
+          "padding": "0px",
+          "fontSize": "13px",
+          "color": "rgb(61, 33, 22)",
+          "width": 0,
+          "height": 0
+        },
+        {
+          "text": "Spaarpot € 96,81Spaarpot verwerken+ Spaardoel",
+          "display": "contents",
+          "gap": "8px",
+          "padding": "0px",
+          "fontSize": "13px",
+          "color": "rgb(61, 33, 22)",
+          "width": 0,
+          "height": 0
+        }
+      ],
+      "extra": {
+        "display": "grid",
+        "gap": "2px",
+        "fontSize": "8.5px",
+        "color": "rgb(112, 95, 82)",
+        "gridColumn": "1 / -1",
+        "justifyContent": "space-between",
+        "marginTop": "3px"
+      }
+    },
+    {
+      "width": 1440,
+      "rows": [],
+      "extra": {
+        "display": "grid",
+        "gap": "2px",
+        "fontSize": "8.5px",
+        "color": "rgb(112, 95, 82)",
+        "gridColumn": "1 / -1",
+        "justifyContent": "space-between",
+        "marginTop": "3px"
+      }
+    },
+    {
+      "width": 820,
+      "rows": [],
+      "extra": {
+        "display": "grid",
+        "gap": "2px",
+        "fontSize": "8.5px",
+        "color": "rgb(112, 95, 82)",
+        "gridColumn": "1 / -1",
+        "justifyContent": "space-between",
+        "marginTop": "3px"
+      }
+    }
+  ],
+  "testScope": {
+    "browserUniquePassed": 3,
+    "nodeTestCasesPassed": 4,
+    "standaloneNodeChecksPassed": 2,
+    "emulatorRuns": 0,
+    "scaleRuns": 0
+  },
+  "limitations": [
+    "Geen volledige regressiesuite of externe GitHub Actions uitgevoerd.",
+    "Registratie-update zonder nieuwe release, offline/reconnect en stale-cache getest; volledige rollout/rollback met een andere echte release blijft publicatiecontrole.",
+    "Alleen doelcomponent-CSS geconsolideerd. Andere componenten behouden.",
+    "Oorspronkelijke 33 functienamen niet beschikbaar; actuele screening apart vastgelegd."
+  ]
+}
