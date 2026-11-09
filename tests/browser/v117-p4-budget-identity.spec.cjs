@@ -4,8 +4,8 @@ const {state,row,materialize}=require('../helpers/package5-fixture.cjs');
 test.setTimeout(240000);
 function fixture(){const s=state();s.meta.selectedMonth='2026-10';s.monthRecords={};s.budgetDefaultsHistory.gezamenlijk=[{effectiveFrom:'0000-01',rows:[{id:'budget-ov',post:'OV',bedrag:100},{id:'budget-other',post:'Overig',bedrag:200}]}];return s;}
 async function check(page,label,amount,description){
-  await page.evaluate(()=>document.querySelector('#tabs [data-tab="dashboard"]').click());
-  const budget=page.locator(`#tab-dashboard [data-open-budget-transactions="${label}"]`);
+  await page.evaluate(()=>document.querySelector('#tabs [data-tab="gezamenlijk"]').click());
+  const budget=page.locator(`#tab-gezamenlijk [data-open-budget-transactions="${label}"]`);
   await expect(budget.locator('.neutral-amount').first()).toHaveText(new RegExp(amount+',00'));
   await budget.click();await expect(page.locator('[data-open-budget-transaction-id]')).toHaveCount(1);
   await expect(page.locator('.budget-transactions-list')).toContainText(new RegExp(description,'i'));
@@ -26,9 +26,10 @@ for(const width of [1440,390])test(`P4 CSV budget identities survive rename rest
   await page.evaluate(()=>openBankImportForOwner('gezamenlijk'));
   await page.locator('[data-u4-file]').setInputFiles({name:'budgetten.csv',mimeType:'text/csv',buffer:Buffer.from(csv)});
   await expect(page.locator('[data-u4-row]')).toHaveCount(2);
-  const rowIds=await page.locator('[data-u4-row]').evaluateAll(nodes=>nodes.map(n=>n.dataset.u4Row));
+  const rowIds=await page.locator('[data-u4-row]').evaluateAll(nodes=>nodes.map(n=>n.dataset.u4Row).sort());
   for(const [index,category]of ['OV','Overig'].entries()){
     await page.locator('#u4ImportModalRoot details').evaluateAll(nodes=>nodes.forEach(n=>n.open=true));
+    const back=page.locator('.u4-focus-row [data-u4-focus-back]');if(await back.isVisible())await back.click();await page.locator(`[data-u4-row="${rowIds[index]}"] [data-u4-focus-open]`).click();
     const item=page.locator(`[data-u4-row="${rowIds[index]}"]`);await item.locator('[data-u4-family]').selectOption('uitgave');await item.locator('[data-u4-field="category"]').selectOption(category);await item.locator('[data-u4-approve]').click();
     if(await page.locator('[data-u4-match-only]').isVisible())await page.locator('[data-u4-match-only]').click();
     await expect.poll(()=>page.evaluate(()=>FinizeTransactions.effects({month:'2026-10'}).length)).toBe(index+1);

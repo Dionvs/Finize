@@ -1,3 +1,4 @@
+const testOrigin=require('./helpers/test-origin.cjs');
 const {test,expect}=require('@playwright/test');
 const {boot,attach,newHousehold,importTen}=require('../helpers/v117-p4-browser.cjs');
 const {state,row,materialize}=require('../helpers/package5-fixture.cjs');
@@ -20,7 +21,7 @@ test('P4.4 release: pending group stays visibly busy and duplicate clicks cannot
   })});
   // Observe the real UI while its first financial commit is still pending.
   try{
-    await page.waitForFunction(()=>window.p44Held);
+    await Promise.race([page.waitForFunction(()=>window.p44Held,null,{timeout:60000}),operation.then(()=>{throw new Error('Goedkeuring eindigde zonder de verwachte blokkeerpoort.');})]);
     await expect(page.locator('[data-u4-match-feedback]')).toContainText('afzonderlijk opgeslagen');
     await expect(page.locator('[data-u4-match-apply]')).toBeDisabled();
     await expect(page.locator('[data-u4-match-close]')).toBeDisabled();
@@ -57,7 +58,7 @@ test('P4.4 release: completed 500-source household survives real offline PWA res
   expect(previous.financiallyVerified).toBe(true);
   const f={householdId:previous.householdId,email:previous.householdId+'@example.invalid'};
   const ids=previous.sourceProof.sources.map(r=>r.id),originals=previous.sourceProof.sources.map(r=>({id:r.id,bankOriginal:r.bankOriginal}));
-  const context=await browser.newContext({baseURL:'http://127.0.0.1:4173',serviceWorkers:'allow'});
+  const context=await browser.newContext({baseURL:testOrigin,serviceWorkers:'allow'});
   try{
     const page=await context.newPage();await boot(page,f);
     await page.waitForFunction(async()=>{const r=await navigator.serviceWorker.getRegistration();return r?.active&&navigator.serviceWorker.controller;});

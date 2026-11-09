@@ -1,5 +1,6 @@
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const {createEmulatorRecordTransport}=require('../../src/storage/firestore-record-transport.mjs');
+const {host}=require('../helpers/isolated-emulator.cjs');
 const {createRecordCloudStore}=require('../../src/storage/cloud-records.mjs');
 const {state,row,materialize,copy}=require('../helpers/package5-fixture.cjs');
 const {digest}=require('../../src/storage/period-projections.mjs');
@@ -135,7 +136,7 @@ test('P3 actual rules: verified migration preserves legacy, ten savings sources 
   assert.equal(result.outcome,'committed');
   const period=await f.store.loadPeriod('2026-10');assert.equal(period.financials.totalsCents.savingsDeposit,54500);assert.equal(period.financials.approvedEffectCount,10);
   assert.equal((await f.store.operationReceipt('local-9')).outcome,'committed');
-  const another=createRecordCloudStore({householdId:f.householdId,transport:createEmulatorRecordTransport({token:token(f.email,'other-client')})});
+  const another=createRecordCloudStore({householdId:f.householdId,transport:createEmulatorRecordTransport({token:token(f.email,'other-client'),...(host?{host}:{})})});
   assert.deepEqual((await another.loadPeriod('2026-10')).financials,period.financials);
   const before=await another.context();assert.equal((await another.commit({state:candidate,imports:[batch],operationId:'savings-ten',expectedRevision:1,members:Array.from({length:10},(_,i)=>({id:'local-'+i,sha256:'a'.repeat(64),storageRevision:i+1}))})).replayed,true);
   assert.equal((await another.context()).head.data.revision,before.head.data.revision);
@@ -147,7 +148,7 @@ test('P3 actual rules: verified migration preserves legacy, ten savings sources 
 for(const phase of ['protected','operation-prepared','changes-staged','locked','records-applied','target-verified','members-staged','committed','verified-readback'])test('P3 actual rules: resumable migration after interruption at '+phase,async()=>{
   const f=await fixture();let interrupted=false;
   await assert.rejects(()=>f.store.migrate({state:f.s,epoch:'epoch-one',legacyPointer:f.legacy,checkpoint:point=>{if(point===phase&&!interrupted){interrupted=true;throw new Error('simulated closed client at '+phase);}}}),/simulated closed/);
-  const resumed=createRecordCloudStore({householdId:f.householdId,transport:createEmulatorRecordTransport({token:token(f.email,'restarted-client')})});
+  const resumed=createRecordCloudStore({householdId:f.householdId,transport:createEmulatorRecordTransport({token:token(f.email,'restarted-client'),...(host?{host}:{})})});
   await resumed.migrate({state:f.s,epoch:'epoch-one',legacyPointer:f.legacy});await resumed.activate({approveTestCutover:true});
   assert.deepEqual((await resumed.verifyIntegrity()).state,f.s);
   const operations=await f.transport.query(`households/${f.householdId}/financialEpochs/epoch-one/operations`);assert.equal(operations.length,1);assert.equal(operations[0].data.phase,'committed');
@@ -183,7 +184,7 @@ for(const phase of ['changes-staged','locked','members-staged','committed'])test
   await assert.rejects(()=>f.store.commit({...args,checkpoint:point=>{if(point===phase&&!interrupted){interrupted=true;throw new Error('interrupted');}}}),/interrupted/);
   if(['locked','members-staged'].includes(phase))await assert.rejects(()=>f.store.loadPeriod('2026-10'),{code:'cloud-pending'});
   if(phase==='members-staged')assert.equal(await f.store.operationReceipt('local-saving'),null);
-  const other=createRecordCloudStore({householdId:f.householdId,transport:createEmulatorRecordTransport({token:token(f.email,'device-two')})});
+  const other=createRecordCloudStore({householdId:f.householdId,transport:createEmulatorRecordTransport({token:token(f.email,'device-two'),...(host?{host}:{})})});
   await other.commit(args);assert.equal((await other.loadPeriod('2026-10')).financials.totalsCents.savingsDeposit,7000);
   const before=(await other.context()).head.data.revision;await other.commit(args);assert.equal((await other.context()).head.data.revision,before);
   assert.equal((await other.operationReceipt('local-saving')).outcome,'committed');

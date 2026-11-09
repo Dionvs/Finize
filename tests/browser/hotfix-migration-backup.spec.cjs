@@ -82,10 +82,10 @@ test('overlapping cloud acceptances serialize durable commits without weakening 
 });
 
 for(const boundary of ['backup','images'])test(`a durable local approval during remote ${boundary} preparation retains its state and outbox`,async({page})=>{
- if(boundary==='images')await page.route('**/app.js*',async route=>{
-  const source=require('node:fs').readFileSync(require('node:path').join(__dirname,'../../app.js'),'utf8'),marker='async initializeState(target, { legacySource = null } = {}) {';
+ if(boundary==='images')await page.route('**/',async route=>{
+  const source=require('node:fs').readFileSync(require('node:path').join(__dirname,'../../index.html'),'utf8'),marker='async initializeState(target, { legacySource = null } = {}) {';
   expect(source).toContain(marker);
-  await route.fulfill({contentType:'text/javascript',body:source.replace(marker,marker+' if(window.__p4ImageGate)await window.__p4ImageGate();')});
+  await route.fulfill({contentType:'text/html',body:source.replace(marker,marker+' if(window.__p4ImageGate)await window.__p4ImageGate();')});
  });
  await boot(page);
  const result=await page.evaluate(async boundary=>{

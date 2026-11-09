@@ -75,7 +75,6 @@
 .u2-subgoal-row{display:grid;grid-template-columns:20px minmax(120px,1.3fr) 100px minmax(130px,1fr) 70px 30px 30px 30px;gap:5px;align-items:center;padding:5px;border:1px solid var(--border);border-radius:9px;background:var(--surface)}
 .u2-subgoal-row.dragging{opacity:.45}
 .u2-drag{cursor:grab;color:var(--text-faint);text-align:center}
-.u2-dashboard-extra{grid-column:1/-1;display:flex;justify-content:space-between;gap:8px;font-size:9px}
 .progress-fill{transition:width .45s ease}
 @media(prefers-reduced-motion:reduce){.progress-fill{transition:none}}
 .u2-inline-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:-2px 0 6px}
@@ -85,7 +84,7 @@
 .u2-history-list article{display:grid;gap:3px;padding:9px 0;border-bottom:1px solid var(--border-soft)}
 .u2-history-list article:last-child{border-bottom:0}
 .u2-history-list article span,.u2-history-list article small{color:var(--text-dim);font-size:10px}
-.u2-dashboard-extra{display:grid;gap:2px;font-size:8.5px;color:var(--text-dim);margin-top:3px}
+.u2-dashboard-extra{grid-column:1/-1;display:grid;justify-content:space-between;gap:2px;font-size:8.5px;color:var(--text-dim);margin-top:3px}
 .u2-goal-accordion{border-bottom:1px solid var(--border-soft)}
 .u2-goal-accordion:last-child{border-bottom:0}
 .u2-goal-accordion>summary{list-style:none;cursor:pointer;position:relative}

@@ -7,19 +7,18 @@ for(const width of [390,1440])test(`older CSV opens from history without changin
   await page.setViewportSize({width,height:900});
   await page.clock.setFixedTime(new Date('2026-10-07T12:00:00Z'));
   await page.route('**/*',route=>new URL(route.request().url()).hostname==='127.0.0.1'?route.continue():route.abort());
-  await page.addInitScript(input=>{if(!localStorage.getItem('finize-budget-planner-v1'))localStorage.setItem('finize-budget-planner-v1',JSON.stringify(input));},fixture);
+  await page.addInitScript(input=>{if(!localStorage.getItem('finize-budget-planner-v1'))localStorage.setItem('finize-budget-planner-v1',JSON.stringify(input));},{...fixture,accountProfiles:[{id:'history-dion',name:'Dion testrekening',identifier:'NL01TEST',accountOwner:'dion'}]});
   await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   await page.evaluate(async()=>{
     const u=FinizeUpdate4Runtime;
-    await commitChange(()=>{
+    if(!await commitChange(()=>{
       state.meta.selectedMonth='2026-10';state.importSummaries=[];state.activeImportId='';
-      state.accountProfiles=[{id:'history-dion',name:'Dion testrekening',identifier:'NL01TEST',accountOwner:'dion'}];
-    },{render:false});
+    },{render:false}))throw Error('Historiefixture moet vóór openen duurzaam zijn opgeslagen.');
     const draft=u.createImportDraft({id:'history-july',text:'Datum;Omschrijving;Rekening;Bedrag\n2026-07-24;Historische testregel A;NL01TEST;-10\n2026-07-28;Historische testregel B;NL01TEST;-20',profiles:state.accountProfiles,existingImports:[],entryOwner:'dion'});
     // A stored legacy processed batch may still contain review rows; viewing it never approves them.
     draft.status='verwerkt';
     await u.ImportStore.putImport(draft);
-    await commitChange(()=>state.importSummaries=[u.compactSummary(draft)],{render:false});
+    if(!await commitChange(()=>state.importSummaries=[u.compactSummary(draft)],{render:false}))throw Error('Importbewijs moet vóór herladen zijn opgeslagen.');
   });
   await page.reload();await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   // Instrument only after bootstrap; opening and closing details must be read-only.
@@ -30,7 +29,7 @@ for(const width of [390,1440])test(`older CSV opens from history without changin
   await modal.locator('[data-u4-all-imports]').click();
   await expect(modal).toContainText('juli 2026');
   await modal.locator('[data-u4-open-receipt="history-july"]').click();
-  await expect(modal.locator('h2')).toHaveText('Importdetails');
+  await expect(modal.getByRole('heading',{name:'Importdetails',exact:true})).toHaveText('Importdetails');
   await expect(modal).toContainText('Historische Testregel A');
   await expect(modal).toContainText('Historische Testregel B');
   await expect(modal).toContainText('24-07-2026');

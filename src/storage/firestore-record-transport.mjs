@@ -41,8 +41,18 @@ function createFirestoreRecordTransport({endpoint,projectId,token,fetcher,identi
     const segments=path.split('/'),collectionId=segments.pop(),parent=segments.length?'/'+segments.join('/'):'';
     const structuredQuery={from:[{collectionId}]};
     if(filter)structuredQuery.where={fieldFilter:{field:{fieldPath:filter.field},op:filter.op||'EQUAL',value:toValue(filter.value)}};
-    const result=await request('POST',base+parent+':runQuery',{structuredQuery});
-    const rows=(result||[]).filter(row=>row.document).map(row=>decode(row.document));metrics.reads+=Math.max(1,rows.length);return rows;
+    // Full integrity reads still return every record, without one oversized response.
+    const pageSize=200,rows=[];
+    if(!filter)Object.assign(structuredQuery,{limit:pageSize,orderBy:[{field:{fieldPath:'__name__'},direction:'ASCENDING'}]});
+    while(true){
+      const result=await request('POST',base+parent+':runQuery',{structuredQuery});
+      const page=(result||[]).filter(row=>row.document);
+      rows.push(...page.map(row=>decode(row.document)));metrics.reads+=Math.max(1,page.length);
+      if(filter||page.length<pageSize)return rows;
+      const name=page.at(-1).document.name;
+      if(!name||structuredQuery.startAt?.values[0].referenceValue===name)throw storageError('cloud-incomplete','De volledige recordcontrole kon niet worden voortgezet.');
+      structuredQuery.startAt={values:[{referenceValue:name}],before:false};
+    }
   }
   async function commit(writes,expected=new Map()){
     for(const write of writes)assertPath(write.path);

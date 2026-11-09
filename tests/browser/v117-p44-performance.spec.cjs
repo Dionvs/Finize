@@ -1,3 +1,4 @@
+const testOrigin=require('./helpers/test-origin.cjs');
 const {test,expect}=require('@playwright/test');
 const fs=require('node:fs'),crypto=require('node:crypto');
 const {boot,attach,newHousehold,importTen}=require('../helpers/v117-p4-browser.cjs');
@@ -26,7 +27,7 @@ test('P4.4 small read and CPU measurements: 20 and 100 sources, ten edits and te
   const output='backups/v117-stabilisatie/p44-performance-'+phase+'.json';
   const save=()=>fs.writeFileSync(output,JSON.stringify({phase,appSha256:crypto.createHash('sha256').update(fs.readFileSync('app.js')).digest('hex'),note:'CPU spans are nested; asynchronous request and transaction durations overlap and are not additive. Browser estimate is separate from submitted UTF-8 payload bytes.',measurements},null,2));
   for(const count of [20,100]){
-    const context=await browser.newContext({baseURL:'http://127.0.0.1:4173',serviceWorkers:'block'}),page=await context.newPage();
+    const context=await browser.newContext({baseURL:testOrigin,serviceWorkers:'block'}),page=await context.newPage();
     try{
       await installPerformanceMeter(page);const household=await newHousehold(),seed=fixture(count),sample={count,operations:[]};measurements.push(sample);
       let start=performance.now();await boot(page,household,seed.state);
@@ -61,7 +62,7 @@ test('P4.4 small read and CPU measurements: 20 and 100 sources, ten edits and te
       materialize(seed.state,[50,100,75,25,200,40,60,90,30,80].map((n,i)=>row('expected-saving-'+i,'naar-spaarrekening',-n,{savingsGoalId:'goal'})),'expected-savings');
       expect(JSON.parse(before.global.payload).totalsCents).toEqual(cumulativeFinancials(seed.state).totalsCents);
       for(const document of before.periods){const actual=JSON.parse(document.payload),expected=periodFinancials(seed.state,document.month);expect(actual.totalsCents).toEqual(expected.totalsCents);expect(actual.categories).toEqual(expected.categories);}
-      const secondContext=await browser.newContext({baseURL:'http://127.0.0.1:4173',serviceWorkers:'block'});
+      const secondContext=await browser.newContext({baseURL:testOrigin,serviceWorkers:'block'});
       try{const second=await secondContext.newPage();await boot(second,household);await attach(second,household);expect(await second.evaluate(()=>FinizeTransactions.total('savingsDeposit',{month:'2026-10'}))).toBe(750);expect((await second.evaluate(()=>p4.cloudStore.verifyIntegrity())).global).toEqual(before.global);}finally{await secondContext.close();}
       start=performance.now();await page.reload();await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
       sample.operations.push({label:'warm-startup',wallMs:performance.now()-start,...await page.evaluate(()=>idbPerformanceMeter.report('startup'))});await page.evaluate(()=>idbPerformanceMeter.stop());

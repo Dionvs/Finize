@@ -1,3 +1,4 @@
+const {release,assertReleaseShell}=require('../helpers/release-shell.cjs');
 const {test,expect}=require('@playwright/test'),fs=require('node:fs'),path=require('node:path'),http=require('node:http');
 const visual=require('../fixtures/v50-visual-state.json'),{fixture}=require('../helpers/month-end-savings.cjs');
 test.use({serviceWorkers:'allow'});
@@ -14,8 +15,8 @@ test('r23 to r24 upgrade, offline and rollback retain financial state and Indexe
   await page.goto(url);await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);await page.evaluate(()=>navigator.serviceWorker.ready);await page.reload();await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   const before=await page.evaluate(async()=>{await FinizeUpdate4Runtime.ImportStore.putImport({id:'r19-evidence',version:1,operationId:'synthetic',rows:[{id:'source',bankOriginal:{amount:-10,bankDate:'2026-10-03',description:'Synthetic evidence'}}]});return JSON.stringify(state);});
   expect(await page.evaluate(()=>caches.keys())).toContain('finize-v118-r23');previous=false;
-  await page.evaluate(async()=>{const r=await navigator.serviceWorker.getRegistration();await r.update();});await expect.poll(()=>page.evaluate(()=>caches.keys())).toContain('finize-v118-r25');
-  for(const offline of [false,true]){await context.setOffline(offline);await page.reload();await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);expect(await page.evaluate(()=>JSON.stringify(state))).toBe(before);await expect(page.locator('script[src*="118-r25"]')).toHaveCount(1);expect(await page.evaluate(async()=>(await FinizeUpdate4Runtime.ImportStore.getImport('r19-evidence')).rows[0].bankOriginal.amount)).toBe(-10);}
+  await page.evaluate(async()=>{const r=await navigator.serviceWorker.getRegistration();await r.update();});await expect.poll(()=>page.evaluate(()=>caches.keys())).toContain(`finize-v${release}`);
+  for(const offline of [false,true]){await context.setOffline(offline);await page.reload();await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);expect(await page.evaluate(()=>JSON.stringify(state))).toBe(before);assertReleaseShell(await page.content());expect(await page.evaluate(async()=>(await FinizeUpdate4Runtime.ImportStore.getImport('r19-evidence')).rows[0].bankOriginal.amount)).toBe(-10);}
   await context.setOffline(false);previous=true;await page.evaluate(async()=>{const r=await navigator.serviceWorker.getRegistration();await r.update();});await expect.poll(()=>page.evaluate(()=>caches.keys())).toContain('finize-v118-r23');await page.reload();await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);expect(await page.evaluate(()=>JSON.stringify(state))).toBe(before);await expect(page.locator('script[src*="118-r23"]')).toHaveCount(1);expect(await page.evaluate(async()=>(await FinizeUpdate4Runtime.ImportStore.getImport('r19-evidence')).rows[0].id)).toBe('source');
  }finally{await context.setOffline(false);await context.close();await new Promise(r=>server.close(r));}
 });

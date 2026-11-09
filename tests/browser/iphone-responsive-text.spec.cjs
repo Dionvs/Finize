@@ -23,12 +23,14 @@ for (const width of iphoneWidths) {
     await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
 
     await expect(page.locator('html')).toHaveClass(/finize-ios-phone/);
-    // The current dashboard uses P3 cards; owner tabs contain the legacy KPI grid.
+    // The current account cards use the responsive mobile grid.
     await page.locator('.v4-bottom-nav [data-tab="dion"]').click();
-    const columns = await page.locator('.mobile-kpi-grid').first().evaluate(element =>
-      getComputedStyle(element).gridTemplateColumns.split(' ').filter(Boolean).length
-    );
-    expect(columns).toBe(2);
+    const grid=page.locator('#tab-dion .mt-kpis');
+    await expect(grid).toHaveCSS('display','grid');
+    await expect(grid.locator(':scope > .mt-kpi')).toHaveCount(2);
+    const boxes=await grid.locator(':scope > .mt-kpi').evaluateAll(cards=>cards.map(card=>card.getBoundingClientRect().toJSON()));
+    expect(boxes[0].right<=boxes[1].left+1||boxes[0].bottom<=boxes[1].top+1).toBe(true);
+    for(const box of boxes){expect(box.width).toBeGreaterThan(100);expect(box.x).toBeGreaterThanOrEqual(0);expect(box.right).toBeLessThanOrEqual(width);}
 
     for (const tab of ['dashboard', 'gezamenlijk', 'dion', 'dara', 'spaardoelen', 'data']) {
       if (tab === 'data') await page.locator('#tab-spaardoelen [data-tab-shortcut="data"]').click();
@@ -40,10 +42,10 @@ for (const width of iphoneWidths) {
     }
 
     await page.locator('.v4-bottom-nav [data-tab="dion"]').click();
-    const labelSize = await page.locator('#tab-dion .mobile-kpi-label').first().evaluate(element =>
+    const labelSize = await page.locator('#tab-dion .mt-remaining h2').first().evaluate(element =>
       parseFloat(getComputedStyle(element).fontSize)
     );
-    const valueSize = await page.locator('#tab-dion .mobile-kpi-value').first().evaluate(element =>
+    const valueSize = await page.locator('#tab-dion .mt-amount').first().evaluate(element =>
       parseFloat(getComputedStyle(element).fontSize)
     );
     expect(labelSize).toBeGreaterThanOrEqual(12);
@@ -58,8 +60,9 @@ test('iPhone-invoervelden voorkomen Safari-inzoom, Android deelt mobiele kolomme
   });
   const iphonePage = await iphoneContext.newPage();
   await keepTestLocal(iphonePage);
-  await iphonePage.goto('/');
+  await iphonePage.goto('/');await iphonePage.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   await iphonePage.locator('.v4-bottom-nav [data-tab="dion"]').click();
+  const iphoneColumns=await iphonePage.locator('#tab-dion .mt-kpis').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').filter(Boolean).length);
   await iphonePage.locator('#tab-dion [data-open-owner-variable="dion"]').click();
   const iphoneInputSize = await iphonePage.getByRole('spinbutton', { name: 'Maandbudget' }).first().evaluate(element =>
     parseFloat(getComputedStyle(element).fontSize)
@@ -73,19 +76,19 @@ test('iPhone-invoervelden voorkomen Safari-inzoom, Android deelt mobiele kolomme
   });
   const androidPage = await androidContext.newPage();
   await keepTestLocal(androidPage);
-  await androidPage.goto('/');
+  await androidPage.goto('/');await androidPage.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   await expect(androidPage.locator('html')).not.toHaveClass(/finize-ios-phone/);
   await androidPage.locator('.v4-bottom-nav [data-tab="dion"]').click();
-  const androidColumns = await androidPage.locator('.mobile-kpi-grid').first().evaluate(element =>
+  const androidColumns = await androidPage.locator('#tab-dion .mt-kpis').evaluate(element =>
     getComputedStyle(element).gridTemplateColumns.split(' ').filter(Boolean).length
   );
-  expect(androidColumns).toBe(2);
+  expect(androidColumns).toBe(iphoneColumns);
   await androidContext.close();
 
   const desktopContext = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const desktopPage = await desktopContext.newPage();
   await keepTestLocal(desktopPage);
-  await desktopPage.goto('/');
+  await desktopPage.goto('/');await desktopPage.waitForFunction(()=>window.__finizeBootstrap?.rendered);
   await expect(desktopPage.locator('html')).not.toHaveClass(/finize-ios-phone/);
   await expect(desktopPage.locator('.v4-sidebar')).toBeVisible();
   await desktopContext.close();

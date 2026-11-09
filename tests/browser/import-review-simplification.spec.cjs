@@ -91,7 +91,7 @@ test('CSV-controle toont vier hoofdvelden en alleen relevante vervolgkeuzes',asy
   const row=await openReview(page);
   await row.locator('[data-u4-focus-open]').click();
   await expect(row.locator('.u4-row-grid > label')).toHaveCount(4);
-  await expect(row.locator('.u4-row-grid')).toContainText('Verwerkingsdatum');
+  await expect(row.locator('.u4-row-grid')).toContainText('Betaaldatum');
   await expect(row.locator('.u4-row-grid')).toContainText('Bedrag');
   await expect(row.locator('.u4-row-grid')).toContainText('Budgeteigenaar');
   await expect(row.locator('.u4-row-grid')).toContainText('Transactie');

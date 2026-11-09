@@ -1,0 +1,211 @@
+{
+  "baseline": "648591c",
+  "method": "Named function declarations with one name occurrence in src; exported declarations excluded. Textual screening, not a full call graph.",
+  "candidates": [
+    {
+      "name": "moneyToneClass",
+      "sourceOccurrencesBefore": 1,
+      "externalReferences": [],
+      "status": "behouden: geen statische aanroep gevonden; legacy/compatibiliteit niet verwijderd buiten doelcomponent"
+    },
+    {
+      "name": "previousMonthKey",
+      "sourceOccurrencesBefore": 1,
+      "externalReferences": [],
+      "status": "behouden: geen statische aanroep gevonden; legacy/compatibiliteit niet verwijderd buiten doelcomponent"
+    },
+    {
+      "name": "monthOptions",
+      "sourceOccurrencesBefore": 1,
+      "externalReferences": [],
+      "status": "behouden: geen statische aanroep gevonden; legacy/compatibiliteit niet verwijderd buiten doelcomponent"
+    },
+    {
+      "name": "getVariableBudgetDefaultsAt",
+      "sourceOccurrencesBefore": 1,
+      "externalReferences": [],
+      "status": "behouden: geen statische aanroep gevonden; legacy/compatibiliteit niet verwijderd buiten doelcomponent"
+    },
+    {
+      "name": "setVariableBudgetDefaultsFromMonth",
+      "sourceOccurrencesBefore": 1,
+      "externalReferences": [],
+      "status": "behouden: geen statische aanroep gevonden; legacy/compatibiliteit niet verwijderd buiten doelcomponent"
+    },
+    {
+      "name": "isBudgetExpenseTransaction",
+      "sourceOccurrencesBefore": 1,
+      "externalReferences": [],
+      "status": "behouden: geen statische aanroep gevonden; legacy/compatibiliteit niet verwijderd buiten doelcomponent"
+    },
+    {
+      "name": "transactionsByCategory",
+      "sourceOccurrencesBefore": 1,
+      "externalReferences": [],
+      "status": "behouden: geen statische aanroep gevonden; legacy/compatibiliteit niet verwijderd buiten doelcomponent"
+    },
+    {
+      "name": "startFinizeIconObserver",
+      "sourceOccurrencesBefore": 1,
+      "externalReferences": [],
+      "status": "behouden: geen statische aanroep gevonden; legacy/compatibiliteit niet verwijderd buiten doelcomponent"
+    },
+    {
+      "name": "renderDashboardCardHead",
+      "sourceOccurrencesBefore": 1,
+      "externalReferences": [],
+      "status": "behouden: geen statische aanroep gevonden; legacy/compatibiliteit niet verwijderd buiten doelcomponent"
+    },
+    {
+      "name": "renderJointSavingsOverviewCard",
+      "sourceOccurrencesBefore": 1,
+      "externalReferences": [],
+      "status": "behouden: geen statische aanroep gevonden; legacy/compatibiliteit niet verwijderd buiten doelcomponent"
+    },
+    {
+      "name": "renderAppSection",
+      "sourceOccurrencesBefore": 1,
+      "externalReferences": [],
+      "status": "behouden: geen statische aanroep gevonden; legacy/compatibiliteit niet verwijderd buiten doelcomponent"
+    },
+    {
+      "name": "availabilityBadge",
+      "sourceOccurrencesBefore": 1,
+      "externalReferences": [],
+      "status": "behouden: geen statische aanroep gevonden; legacy/compatibiliteit niet verwijderd buiten doelcomponent"
+    },
+    {
+      "name": "personStatusBadge",
+      "sourceOccurrencesBefore": 1,
+      "externalReferences": [],
+      "status": "behouden: geen statische aanroep gevonden; legacy/compatibiliteit niet verwijderd buiten doelcomponent"
+    },
+    {
+      "name": "isStorageQuotaError",
+      "sourceOccurrencesBefore": 1,
+      "externalReferences": [],
+      "status": "behouden: geen statische aanroep gevonden; legacy/compatibiliteit niet verwijderd buiten doelcomponent"
+    },
+    {
+      "name": "renderRowsTable",
+      "sourceOccurrencesBefore": 1,
+      "externalReferences": [],
+      "status": "behouden: geen statische aanroep gevonden; legacy/compatibiliteit niet verwijderd buiten doelcomponent"
+    },
+    {
+      "name": "splitLastIndex",
+      "sourceOccurrencesBefore": 1,
+      "externalReferences": [],
+      "status": "behouden: geen statische aanroep gevonden; legacy/compatibiliteit niet verwijderd buiten doelcomponent"
+    },
+    {
+      "name": "renderRecentTransactionsList",
+      "sourceOccurrencesBefore": 1,
+      "externalReferences": [],
+      "status": "behouden: geen statische aanroep gevonden; legacy/compatibiliteit niet verwijderd buiten doelcomponent"
+    },
+    {
+      "name": "renderRecurringFixedManage",
+      "sourceOccurrencesBefore": 1,
+      "externalReferences": [
+        "tests/update5-responsive-structure.test.cjs"
+      ],
+      "status": "behouden: test/tooling-referentie; geen verbreding van deze componentronde"
+    },
+    {
+      "name": "renderSpaardoelen",
+      "sourceOccurrencesBefore": 1,
+      "externalReferences": [],
+      "status": "behouden: geen statische aanroep gevonden; legacy/compatibiliteit niet verwijderd buiten doelcomponent"
+    },
+    {
+      "name": "bankRememberCategory",
+      "sourceOccurrencesBefore": 1,
+      "externalReferences": [],
+      "status": "behouden: geen statische aanroep gevonden; legacy/compatibiliteit niet verwijderd buiten doelcomponent"
+    },
+    {
+      "name": "renderJointFixedCostsEditorRows",
+      "sourceOccurrencesBefore": 1,
+      "externalReferences": [],
+      "status": "behouden: geen statische aanroep gevonden; legacy/compatibiliteit niet verwijderd buiten doelcomponent"
+    },
+    {
+      "name": "openFixedExpenseAddModal",
+      "sourceOccurrencesBefore": 1,
+      "externalReferences": [],
+      "status": "behouden: geen statische aanroep gevonden; legacy/compatibiliteit niet verwijderd buiten doelcomponent"
+    },
+    {
+      "name": "openJointFixedCostsModal",
+      "sourceOccurrencesBefore": 1,
+      "externalReferences": [],
+      "status": "behouden: geen statische aanroep gevonden; legacy/compatibiliteit niet verwijderd buiten doelcomponent"
+    },
+    {
+      "name": "u2NormalizeState",
+      "sourceOccurrencesBefore": 1,
+      "externalReferences": [],
+      "status": "behouden: geen statische aanroep gevonden; legacy/compatibiliteit niet verwijderd buiten doelcomponent"
+    },
+    {
+      "name": "u3ConfirmedTransactions",
+      "sourceOccurrencesBefore": 1,
+      "externalReferences": [
+        "tests/update3-administration.test.cjs",
+        "tests/update4-4-zero-income.test.cjs"
+      ],
+      "status": "behouden: test/tooling-referentie; geen verbreding van deze componentronde"
+    },
+    {
+      "name": "u3IncomeForOwner",
+      "sourceOccurrencesBefore": 1,
+      "externalReferences": [],
+      "status": "behouden: geen statische aanroep gevonden; legacy/compatibiliteit niet verwijderd buiten doelcomponent"
+    },
+    {
+      "name": "u3WithSelectedMonth",
+      "sourceOccurrencesBefore": 1,
+      "externalReferences": [],
+      "status": "behouden: geen statische aanroep gevonden; legacy/compatibiliteit niet verwijderd buiten doelcomponent"
+    },
+    {
+      "name": "renderU3AdminPanel",
+      "sourceOccurrencesBefore": 1,
+      "externalReferences": [
+        "tests/update3-ui-structure.test.cjs",
+        "tests/update4-ui-structure.test.cjs"
+      ],
+      "status": "behouden: test/tooling-referentie; geen verbreding van deze componentronde"
+    },
+    {
+      "name": "u3RecurringVisibleInMonth",
+      "sourceOccurrencesBefore": 1,
+      "externalReferences": [],
+      "status": "behouden: geen statische aanroep gevonden; legacy/compatibiliteit niet verwijderd buiten doelcomponent"
+    },
+    {
+      "name": "undoImport",
+      "sourceOccurrencesBefore": 1,
+      "externalReferences": [],
+      "status": "behouden: geen statische aanroep gevonden; legacy/compatibiliteit niet verwijderd buiten doelcomponent"
+    },
+    {
+      "name": "processedSummaryHtml",
+      "sourceOccurrencesBefore": 1,
+      "externalReferences": [],
+      "status": "behouden: geen statische aanroep gevonden; legacy/compatibiliteit niet verwijderd buiten doelcomponent"
+    }
+  ],
+  "limit": "De oorspronkelijke lijst van 33 namen ontbreekt. Deze screening reconstrueert die lijst niet: 31 huidige eenmalige namen, plus twee afzonderlijk bewezen dode helpers. Geen algemene claim dat alle 33 scanbevindingen definitief zijn afgedaan.",
+  "removed": [
+    {
+      "name": "u2RenderChildSummary",
+      "proof": "Alle aanroepen stonden uitsluitend in de twee overschreven tussenrenderers of in de eveneens dode u2RenderGoalRow."
+    },
+    {
+      "name": "u2RenderGoalRow",
+      "proof": "Enige aanroep stond in de eerste mobiele tussenrenderer, die synchroon werd overschreven zonder capture of tussenliggende aanroep."
+    }
+  ]
+}

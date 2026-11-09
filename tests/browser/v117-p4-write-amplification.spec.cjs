@@ -1,3 +1,4 @@
+const testOrigin=require('./helpers/test-origin.cjs');
 const {test,expect}=require('@playwright/test');
 const fs=require('node:fs');
 const {boot,attach,newHousehold}=require('../helpers/v117-p4-browser.cjs');
@@ -30,7 +31,7 @@ test('P4 repeated edits: ten commits on the same bank source with 20 and 100 mov
   test.setTimeout(360000);
   const measurements=[];
   for(const count of [20,100]){
-    const context=await browser.newContext({baseURL:'http://127.0.0.1:4173',serviceWorkers:'block'}),page=await context.newPage();
+    const context=await browser.newContext({baseURL:testOrigin,serviceWorkers:'block'}),page=await context.newPage();
     try{
       const f=await newHousehold(),seed=fixture(count);await boot(page,f,seed.state);
       await page.evaluate(async imports=>{for(const batch of imports)await FinizeUpdate4Runtime.ImportStore.putImport(batch);},seed.imports);
@@ -120,7 +121,7 @@ test('P4 repeated edits: reopen, rollback failure, lost acknowledgment and offli
   await page.reload();await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);expect(await inspect()).toEqual(after);
   await page.unroute(require('../helpers/isolated-emulator.cjs').browserPattern);await attach(page,f);expect((await page.evaluate(()=>p4.sync())).outcome).toBe('committed');
   const once=await page.evaluate(()=>p4.cloudStore.verifyIntegrity());await page.evaluate(()=>p4.sync());expect(await page.evaluate(()=>p4.cloudStore.verifyIntegrity())).toEqual(once);
-  const context=await browser.newContext({baseURL:'http://127.0.0.1:4173',serviceWorkers:'block'});
+  const context=await browser.newContext({baseURL:testOrigin,serviceWorkers:'block'});
   try{const second=await context.newPage();await boot(second,f);await attach(second,f);
     expect(await second.evaluate(()=>FinizeTransactions.total('budgetImpact'))).toBe(before.total);
     expect(await second.evaluate(()=>state.transactions.find(row=>row.recordRole==='bank-source'&&row.importTransactionId==='edit-0').approvedProcessing.category)).toBe('Overig');

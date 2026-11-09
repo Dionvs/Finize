@@ -1,3 +1,4 @@
+const testOrigin=require('./helpers/test-origin.cjs');
 const {test,expect}=require('@playwright/test');
 const {boot,attach,newHousehold,importTen}=require('../helpers/v117-p4-browser.cjs');
 const {administration}=require('../helpers/v117-p4-fixture.cjs');
@@ -14,8 +15,8 @@ const difference=(after,before)=>Object.fromEntries(Object.keys(after).map(key=>
 const quotaBytes=384*1024*1024;
 async function boundedOrigin(page){
   const session=await page.context().newCDPSession(page);
-  await session.send('Storage.overrideQuotaForOrigin',{origin:'http://127.0.0.1:4173',quotaSize:quotaBytes});
-  const proof=await session.send('Storage.getUsageAndQuota',{origin:'http://127.0.0.1:4173'});
+  await session.send('Storage.overrideQuotaForOrigin',{origin:testOrigin,quotaSize:quotaBytes});
+  const proof=await session.send('Storage.getUsageAndQuota',{origin:testOrigin});
   expect(proof.quota).toBe(quotaBytes);return proof;
 }
 for(const {months,bankMovements,rounds} of [{months:3,bankMovements:500,rounds:1},{months:36,bankMovements:5400,rounds:3}])test(`P4 real browser and rules: ${bankMovements} bank movements / ${months} months, ${rounds} measurements`,async({page,browser},testInfo)=>{
@@ -40,7 +41,7 @@ for(const {months,bankMovements,rounds} of [{months:3,bankMovements:500,rounds:1
   await page.addInitScript(audit);await page.evaluate(audit);
   try{for(let i=0;i<rounds;i++){
     const round={};
-    const context=await browser.newContext({baseURL:'http://127.0.0.1:4173',serviceWorkers:'block'});
+    const context=await browser.newContext({baseURL:testOrigin,serviceWorkers:'block'});
     try{const cold=await context.newPage();await boundedOrigin(cold);const start=performance.now();await boot(cold,f);await attach(cold,f);timings.coldStartup.push(performance.now()-start);round.coldStartup=await metrics(cold);}finally{await context.close();}
     const warm=performance.now();await page.reload();await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);await attach(page,f);timings.warmStartup.push(performance.now()-warm);
     round.warmStartup=await metrics(page);
@@ -94,7 +95,7 @@ for(const {months,bankMovements,rounds} of [{months:3,bankMovements:500,rounds:1
         expect((await page.evaluate(()=>p4.sync())).outcome).toBe('idle');expect((await page.evaluate(()=>p4.cloudStore.verifyIntegrity())).global).toEqual(cloud.global);
         await page.reload();await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);await attach(page,f);
         expect(await page.evaluate(()=>FinizeTransactions.total('savingsDeposit',{month:'2026-10'}))).toBe(local.savings);
-        const secondContext=await browser.newContext({baseURL:'http://127.0.0.1:4173',serviceWorkers:'block'});
+        const secondContext=await browser.newContext({baseURL:testOrigin,serviceWorkers:'block'});
         try{
           const second=await secondContext.newPage();await boundedOrigin(second);await boot(second,f);await attach(second,f);
           expect(await second.evaluate(()=>FinizeTransactions.total('savingsDeposit',{month:'2026-10'}))).toBe(local.savings);
@@ -114,7 +115,7 @@ for(const {months,bankMovements,rounds} of [{months:3,bankMovements:500,rounds:1
   const proof=await savingsSourceProof(page,approvedSourceIds);assertSavingsSourceProof(proof,rounds*11,traffic.flatMap(round=>round.originals));
   await page.reload();await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);await attach(page,f);await page.evaluate(()=>p4.sync());
   const reloadedProof=await savingsSourceProof(page,approvedSourceIds);assertSavingsSourceProof(reloadedProof,rounds*11,traffic.flatMap(round=>round.originals));expect(reloadedProof).toEqual(proof);
-  const secondContext=await browser.newContext({baseURL:'http://127.0.0.1:4173',serviceWorkers:'block'});
+  const secondContext=await browser.newContext({baseURL:testOrigin,serviceWorkers:'block'});
   try{
     const second=await secondContext.newPage();await boundedOrigin(second);await boot(second,f);await attach(second,f);
     const secondProof=await savingsSourceProof(second,approvedSourceIds);assertSavingsSourceProof(secondProof,rounds*11,traffic.flatMap(round=>round.originals));expect(secondProof).toEqual(proof);

@@ -1,0 +1,1055 @@
+{
+  "date": "2026-11-09T19:38:01.196Z",
+  "baseCommit": "3f779bae97a4748f8296a018dddbda92a651c25d",
+  "scope": "Geen releaseacceptatie. De 101 browsergevallen liepen voor de laatste afbakening van de beheerroute. Daarna zijn alleen de twee gewijzigde routes en de bijbehorende structuurcontrole gericht herhaald. Import- en recordtransportbron zijn sindsdien gelijk gebleven. Geen volledige hertest van alle browsergevallen; zware vervolgtests zijn op gebruikersverzoek gestopt.",
+  "builds": {
+    "combinedRegression": {
+      "date": "2026-11-09T15:50:46.359Z",
+      "files": {
+        "index.html": "a91dd0304dea59a25d7ff5f5e3663918f999fc31be319f2e897f0a1e04aed28e",
+        "app.js": "a8564cb9185a5a06df3462a963e8962e76559cc09d53eba1e11f2369911c3f17",
+        "app.css": "2652fc78707ab265e061c9a0d3e22b564c825f2445d2f14122535224d205bcee",
+        "src/core/runtime.js": "7793a0917f8685dad932aa837f2ffcd379c75febc2c464bc019e8f497b407768",
+        "src/import/runtime.js": "1771ac0a2c904810be777bdd9b30be289f6f75e3d159b0003fafcd1f92ae76e1",
+        "src/ui/dialog-accessibility.js": "c85e6e2720953a8b93409a3b8e7ff6070c4db58791ee54be28d25ed5750e5fe4",
+        "src/styles/responsive-fit.css": "841bbf65424a4ad0c0b924602863feda24344382c14669a384cf8e74a74903f3",
+        "src/styles/ux-minimal.css": "5688445d516581af2e2c7e3f30f9aa3e7bbb7d36781eb16a4faff81e46a64cfa",
+        "src/storage/firestore-record-transport.mjs": "9178e6c1cfd702857bbfe86c40f3e2780bba37c4575b028d38b2e67a87850de8"
+      }
+    },
+    "finalRoute": {
+      "date": "2026-11-09T19:34:02.928Z",
+      "files": {
+        "index.html": "1831a72b8de59ba0d0b285021cc2c7a60590cf165696198e52fa6496161c699f",
+        "app.js": "656cc037fda99a71bfe918a68c6f64a85b99a5b993c060e445e31e9029cece21",
+        "app.css": "2652fc78707ab265e061c9a0d3e22b564c825f2445d2f14122535224d205bcee",
+        "src/core/runtime.js": "f65e7617f51277aec7c9eb907762426bfb5db946a55e1ebf58cc9338a7f7e212",
+        "src/import/runtime.js": "1771ac0a2c904810be777bdd9b30be289f6f75e3d159b0003fafcd1f92ae76e1",
+        "src/ui/dialog-accessibility.js": "c85e6e2720953a8b93409a3b8e7ff6070c4db58791ee54be28d25ed5750e5fe4",
+        "src/styles/responsive-fit.css": "841bbf65424a4ad0c0b924602863feda24344382c14669a384cf8e74a74903f3",
+        "src/styles/ux-minimal.css": "5688445d516581af2e2c7e3f30f9aa3e7bbb7d36781eb16a4faff81e46a64cfa",
+        "src/storage/firestore-record-transport.mjs": "9178e6c1cfd702857bbfe86c40f3e2780bba37c4575b028d38b2e67a87850de8"
+      }
+    }
+  },
+  "counts": {
+    "priorRootNodePassed": 1376,
+    "priorCombinedBrowserPassed": 101,
+    "finalRouteBrowserPassed": 2,
+    "finalStructurePassed": 1,
+    "storageRulesPassed": 42,
+    "bankRetentionPassed": 4,
+    "backendHttpPassed": 1,
+    "originalFailedCasesWithPassedRetest": 14,
+    "verified500SourceScenario": true,
+    "largeScenarioFailed": 1,
+    "otherScaleCasesIncomplete": true
+  },
+  "reports": {
+    "regression-final.json": {
+      "stats": {
+        "startTime": "2026-11-09T15:51:32.231Z",
+        "duration": 434600.61199999996,
+        "expected": 101,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "sha256": "a0c64a34caa1dd81c478dce3fd59e4e86e2d5059cb4ea630354462311c6d6fcb"
+    },
+    "scope-route-final.json": {
+      "stats": {
+        "startTime": "2026-11-09T19:31:23.322Z",
+        "duration": 7709.966999999999,
+        "expected": 2,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "sha256": "ef0c82a001742a2c107adfc4f544bfaa80ef605e666c8518adea11edc71ccd21"
+    },
+    "scale-large-final.json": {
+      "stats": {
+        "startTime": "2026-11-09T16:21:36.006Z",
+        "duration": 856019.0920000001,
+        "expected": 0,
+        "skipped": 0,
+        "unexpected": 1,
+        "flaky": 0
+      },
+      "sha256": "e4bf85d0407f95b53dc27c56047fecea7dea00cd8799f77ee5d8d016ad5ce73e"
+    }
+  },
+  "logSha256": {
+    ".cache/herstel-unit-final-paged.log": "6570447427ba94e9a0ea7e5a53ae647ea357bd8995e801f80ef074cb6a5fc229",
+    ".cache/herstel-emulator-final-paged.log": "2453cb45dc1e7088e98f77c6cae8a104130f3193a3efb7a42922b390bf7e86c2",
+    ".cache/herstel-retention-final.log": "b4a1ebc63711c0a6c0475438ae43769508a690a292c23129e0310118d595a27d",
+    ".cache/herstel-backend.log": "b1400e092f72147107b30ba98de98f260a28ae264de8d50782e8312c084dee90",
+    ".cache/herstel-scope-structure-final.log": "6d2fe9a42d985b5b19ce34388c467edb58790fd0ee993fdd0d0066697f7e8e8e",
+    ".cache/herstel-scope-route-final.log": "24058decb083de20c99a194e4b027592ce61197e1abb8906853d7badbd507234",
+    ".cache/herstel-scale-large-final.log": "5e1a9640761cde8dedc42a48790864fa32eddd5475f53cc1568b26bb914f2c32",
+    ".cache/herstel-scale-small-final.log": "12b1a783319e38a227f361648e2240b88ca0706ac5d8840be4f357a16c0d376c",
+    ".cache/herstel-vervolg/fresh-emulator/firestore-debug.log": "3e6aadbd52c6a91abb53aace0df916d280bdf199e473a6bef2aa08ce0c1a923d"
+  },
+  "originalFailureResults": [
+    {
+      "file": "dashboard-olive-live.spec.cjs",
+      "title": "nieuw dashboard 320px",
+      "status": "passed",
+      "startTime": "2026-11-09T15:51:51.497Z",
+      "duration": 2379,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "dashboard-olive-live.spec.cjs",
+      "title": "nieuw dashboard 390px",
+      "status": "passed",
+      "startTime": "2026-11-09T15:51:53.890Z",
+      "duration": 2174,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "dashboard-olive-live.spec.cjs",
+      "title": "nieuw dashboard 430px",
+      "status": "passed",
+      "startTime": "2026-11-09T15:51:56.081Z",
+      "duration": 1895,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v117-p3.spec.cjs",
+      "title": "V117 P3 partial history: real screens, ten CSV approvals, offline restart, historical correction and second client",
+      "status": "passed",
+      "startTime": "2026-11-09T15:52:48.812Z",
+      "duration": 27012,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v117-p4-salary.spec.cjs",
+      "title": "P4 salary person proposal, explicit correction, offline restart and second client preserve cents",
+      "status": "passed",
+      "startTime": "2026-11-09T15:54:07.505Z",
+      "duration": 17511,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v117-p4-scale.spec.cjs",
+      "title": "P4 real browser and rules: 500 bank movements / 3 months, 1 measurements",
+      "status": "passed",
+      "evidence": "backups/v117-stabilisatie/p44-scale-3.json",
+      "evidenceSha256": "7a71df89bb195ebaa66464e9c6339ebe388dc6476ea8fbe492f3eb73a9b365f4",
+      "basis": "Complete financiele scenario-uitvoer en resultaatregel; brede schaalrun later afgebroken op verzoek."
+    },
+    {
+      "file": "v117-p4.spec.cjs",
+      "title": "P4 new household without legacy: first CSV bulk approval, full localStorage, offline restart and second client",
+      "status": "passed",
+      "startTime": "2026-11-09T15:55:18.013Z",
+      "duration": 19268,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v117-p4.spec.cjs",
+      "title": "P4 same bank source changed on two clients stays blocked with both approvals and proofs preserved",
+      "status": "passed",
+      "startTime": "2026-11-09T15:54:58.301Z",
+      "duration": 19698,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v117-p43-verifier.spec.cjs",
+      "title": "P4.3 small verifier uses source identities after ten savings approvals",
+      "status": "passed",
+      "startTime": "2026-11-09T15:55:37.313Z",
+      "duration": 15261,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v117-p44-group-recovery.spec.cjs",
+      "title": "P4.4 100 sources: native failure at approval eight, restart and retry preserve seven durable successes",
+      "status": "passed",
+      "startTime": "2026-11-09T15:56:09.648Z",
+      "duration": 35399,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v117-p44-group-recovery.spec.cjs",
+      "title": "P4.4 20 sources: native failure at approval eight, restart and retry preserve seven durable successes",
+      "status": "passed",
+      "startTime": "2026-11-09T15:55:52.604Z",
+      "duration": 17027,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v117-p44-release-safety.spec.cjs",
+      "title": "P4.4 release: pending group stays visibly busy and duplicate clicks cannot approve twice",
+      "status": "passed",
+      "startTime": "2026-11-09T15:56:45.153Z",
+      "duration": 25447,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v118-ux-minimal.spec.cjs",
+      "title": "focusherstel vindt de oorspronkelijke kaart na hertekenen met veranderde tekst",
+      "status": "passed",
+      "startTime": "2026-11-09T15:57:43.978Z",
+      "duration": 2179,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v118-ux-minimal.spec.cjs",
+      "title": "jaarlegenda gebruikt de reeks-kleuren en bedragen zijn zonder hover uitleesbaar",
+      "status": "passed",
+      "startTime": "2026-11-09T15:58:18.110Z",
+      "duration": 2524,
+      "report": "regression-final.json"
+    }
+  ],
+  "completedBrowserCases": [
+    {
+      "file": "bank-import-generation.spec.cjs",
+      "title": "deleted second account needs explicit confirmation; cancellation preserves all financial state and first approval",
+      "status": "passed",
+      "startTime": "2026-11-09T15:51:34.447Z",
+      "duration": 819,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "bank-import-generation.spec.cjs",
+      "title": "confirmed generation survives repeat and reload without duplicate sources or loss of personal approval",
+      "status": "passed",
+      "startTime": "2026-11-09T15:51:35.423Z",
+      "duration": 1037,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "bank-import-generation.spec.cjs",
+      "title": "financial change while confirmation is open rejects stale consent without a new generation",
+      "status": "passed",
+      "startTime": "2026-11-09T15:51:36.472Z",
+      "duration": 764,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "bank-import-generation.spec.cjs",
+      "title": "explicit approval in the new generation survives another bank update without replaying old approvals",
+      "status": "passed",
+      "startTime": "2026-11-09T15:51:37.250Z",
+      "duration": 1053,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "bank-import-generation.spec.cjs",
+      "title": "parallel confirmations create at most one stable generation",
+      "status": "passed",
+      "startTime": "2026-11-09T15:51:38.321Z",
+      "duration": 912,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "bank-import-generation.spec.cjs",
+      "title": "commit-time pending parent operation aborts all financial and import writes",
+      "status": "passed",
+      "startTime": "2026-11-09T15:51:39.250Z",
+      "duration": 1024,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "bank-import-generation.spec.cjs",
+      "title": "offline tombstone fallback never authorizes a new import generation",
+      "status": "passed",
+      "startTime": "2026-11-09T15:51:40.295Z",
+      "duration": 847,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "bank-import-generation.spec.cjs",
+      "title": "native IndexedDB abort leaves no generation or financial effects; retry creates one",
+      "status": "passed",
+      "startTime": "2026-11-09T15:51:41.173Z",
+      "duration": 1266,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "bank-import-generation.spec.cjs",
+      "title": "atomic store rejects a restart batch from another household without financial writes",
+      "status": "passed",
+      "startTime": "2026-11-09T15:51:42.461Z",
+      "duration": 970,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "bank-import-generation.spec.cjs",
+      "title": "manual bank update shows explicit new-bundle confirmation and review-only result 320",
+      "status": "passed",
+      "startTime": "2026-11-09T15:51:43.449Z",
+      "duration": 1164,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "bank-import-generation.spec.cjs",
+      "title": "manual bank update shows explicit new-bundle confirmation and review-only result 390",
+      "status": "passed",
+      "startTime": "2026-11-09T15:51:44.631Z",
+      "duration": 987,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "bank-import-generation.spec.cjs",
+      "title": "manual bank update shows explicit new-bundle confirmation and review-only result 430",
+      "status": "passed",
+      "startTime": "2026-11-09T15:51:45.633Z",
+      "duration": 1147,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "bootstrap-stability.spec.cjs",
+      "title": "bootstrap rendert de actieve tab exact één keer",
+      "status": "passed",
+      "startTime": "2026-11-09T15:51:46.800Z",
+      "duration": 529,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "budget-bar-refunds.spec.cjs",
+      "title": "budget bars retain signed amounts and clamp display at 360px",
+      "status": "passed",
+      "startTime": "2026-11-09T15:51:47.349Z",
+      "duration": 925,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "budget-bar-refunds.spec.cjs",
+      "title": "budget bars retain signed amounts and clamp display at 390px",
+      "status": "passed",
+      "startTime": "2026-11-09T15:51:48.287Z",
+      "duration": 929,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "budget-bar-refunds.spec.cjs",
+      "title": "budget bars retain signed amounts and clamp display at 430px",
+      "status": "passed",
+      "startTime": "2026-11-09T15:51:49.228Z",
+      "duration": 1100,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "budget-bar-refunds.spec.cjs",
+      "title": "budget bars retain signed amounts and clamp display at 1440px",
+      "status": "passed",
+      "startTime": "2026-11-09T15:51:50.347Z",
+      "duration": 1105,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "dashboard-olive-live.spec.cjs",
+      "title": "nieuw dashboard 320px",
+      "status": "passed",
+      "startTime": "2026-11-09T15:51:51.497Z",
+      "duration": 2379,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "dashboard-olive-live.spec.cjs",
+      "title": "nieuw dashboard 390px",
+      "status": "passed",
+      "startTime": "2026-11-09T15:51:53.890Z",
+      "duration": 2174,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "dashboard-olive-live.spec.cjs",
+      "title": "nieuw dashboard 430px",
+      "status": "passed",
+      "startTime": "2026-11-09T15:51:56.081Z",
+      "duration": 1895,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "dashboard-olive-live.spec.cjs",
+      "title": "nieuw dashboard 768px",
+      "status": "passed",
+      "startTime": "2026-11-09T15:51:57.990Z",
+      "duration": 2050,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "dashboard-olive-live.spec.cjs",
+      "title": "nieuw dashboard 1280px",
+      "status": "passed",
+      "startTime": "2026-11-09T15:52:00.054Z",
+      "duration": 2352,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "dashboard-olive-live.spec.cjs",
+      "title": "nieuw dashboard 1440px",
+      "status": "passed",
+      "startTime": "2026-11-09T15:52:02.420Z",
+      "duration": 2643,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "dashboard-olive-live.spec.cjs",
+      "title": "Veilig te sparen blijft dezelfde berekening bij elke grafiekperiode",
+      "status": "passed",
+      "startTime": "2026-11-09T15:52:05.076Z",
+      "duration": 986,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "dynamic-html-security.spec.cjs",
+      "title": "financiële tekst blijft letterlijke tekst en voert geen HTML uit",
+      "status": "passed",
+      "startTime": "2026-11-09T15:52:06.086Z",
+      "duration": 510,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "import-approval-focus.spec.cjs",
+      "title": "groepsgoedkeuring behoudt zichtbare kaart, terugroute en zes unieke boekingen 390",
+      "status": "passed",
+      "startTime": "2026-11-09T15:52:06.619Z",
+      "duration": 2139,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "import-approval-focus.spec.cjs",
+      "title": "groepsgoedkeuring behoudt zichtbare kaart, terugroute en zes unieke boekingen 1440",
+      "status": "passed",
+      "startTime": "2026-11-09T15:52:08.773Z",
+      "duration": 2264,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "mobile-goal-order.spec.cjs",
+      "title": "directe mobiele doelvolgorde blijft duurzaam en behoudt bedragen (360px)",
+      "status": "passed",
+      "startTime": "2026-11-09T15:52:11.064Z",
+      "duration": 1527,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "mobile-goal-order.spec.cjs",
+      "title": "directe mobiele doelvolgorde blijft duurzaam en behoudt bedragen (390px)",
+      "status": "passed",
+      "startTime": "2026-11-09T15:52:12.606Z",
+      "duration": 1597,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "mobile-goal-order.spec.cjs",
+      "title": "directe mobiele doelvolgorde blijft duurzaam en behoudt bedragen (430px)",
+      "status": "passed",
+      "startTime": "2026-11-09T15:52:14.215Z",
+      "duration": 1605,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "pakket1-product-price.spec.cjs",
+      "title": "B1 desktop tabelbewerker behoudt bedrag en verdeling bij ontbrekende prijs",
+      "status": "passed",
+      "startTime": "2026-11-09T15:52:15.837Z",
+      "duration": 971,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "pakket1-product-price.spec.cjs",
+      "title": "B1 390px expliciete handmatige saldocorrectie blijft mogelijk",
+      "status": "passed",
+      "startTime": "2026-11-09T15:52:16.819Z",
+      "duration": 951,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "pakket1-product-price.spec.cjs",
+      "title": "B1 390px ontbrekend: bewaren, heropenen en opnieuw opslaan",
+      "status": "passed",
+      "startTime": "2026-11-09T15:52:17.780Z",
+      "duration": 1559,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "pakket1-product-price.spec.cjs",
+      "title": "B1 390px leeg: bewaren, heropenen en opnieuw opslaan",
+      "status": "passed",
+      "startTime": "2026-11-09T15:52:19.351Z",
+      "duration": 1723,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "pakket1-product-price.spec.cjs",
+      "title": "B1 390px ongeldig: bewaren, heropenen en opnieuw opslaan",
+      "status": "passed",
+      "startTime": "2026-11-09T15:52:21.085Z",
+      "duration": 1683,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "pakket1-product-price.spec.cjs",
+      "title": "B1 390px geldig: bewaren, heropenen en opnieuw opslaan",
+      "status": "passed",
+      "startTime": "2026-11-09T15:52:22.782Z",
+      "duration": 1527,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "pakket1-product-price.spec.cjs",
+      "title": "B1 390px nul: bewaren, heropenen en opnieuw opslaan",
+      "status": "passed",
+      "startTime": "2026-11-09T15:52:24.322Z",
+      "duration": 1493,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "pakket1-product-price.spec.cjs",
+      "title": "B1 390px zonder link: bewaren, heropenen en opnieuw opslaan",
+      "status": "passed",
+      "startTime": "2026-11-09T15:52:25.825Z",
+      "duration": 1462,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "pakket1-product-price.spec.cjs",
+      "title": "B1 390px nieuw doel met handmatig subdoelbedrag en product zonder prijs",
+      "status": "passed",
+      "startTime": "2026-11-09T15:52:27.300Z",
+      "duration": 1242,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "pakket1-product-price.spec.cjs",
+      "title": "B1 1440px expliciete handmatige saldocorrectie blijft mogelijk",
+      "status": "passed",
+      "startTime": "2026-11-09T15:52:28.553Z",
+      "duration": 1133,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "pakket1-product-price.spec.cjs",
+      "title": "B1 1440px ontbrekend: bewaren, heropenen en opnieuw opslaan",
+      "status": "passed",
+      "startTime": "2026-11-09T15:52:29.698Z",
+      "duration": 1588,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "pakket1-product-price.spec.cjs",
+      "title": "B1 1440px leeg: bewaren, heropenen en opnieuw opslaan",
+      "status": "passed",
+      "startTime": "2026-11-09T15:52:31.297Z",
+      "duration": 1549,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "pakket1-product-price.spec.cjs",
+      "title": "B1 1440px ongeldig: bewaren, heropenen en opnieuw opslaan",
+      "status": "passed",
+      "startTime": "2026-11-09T15:52:32.857Z",
+      "duration": 1740,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "pakket1-product-price.spec.cjs",
+      "title": "B1 1440px geldig: bewaren, heropenen en opnieuw opslaan",
+      "status": "passed",
+      "startTime": "2026-11-09T15:52:34.607Z",
+      "duration": 1692,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "pakket1-product-price.spec.cjs",
+      "title": "B1 1440px nul: bewaren, heropenen en opnieuw opslaan",
+      "status": "passed",
+      "startTime": "2026-11-09T15:52:36.309Z",
+      "duration": 1600,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "pakket1-product-price.spec.cjs",
+      "title": "B1 1440px zonder link: bewaren, heropenen en opnieuw opslaan",
+      "status": "passed",
+      "startTime": "2026-11-09T15:52:37.920Z",
+      "duration": 1527,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "pakket1-product-price.spec.cjs",
+      "title": "B1 1440px nieuw doel met handmatig subdoelbedrag en product zonder prijs",
+      "status": "passed",
+      "startTime": "2026-11-09T15:52:39.458Z",
+      "duration": 1112,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "pakket1-weekly-calendar.spec.cjs",
+      "title": "B2 390px kalenderplanning, prognose en financiële kaarten",
+      "status": "passed",
+      "startTime": "2026-11-09T15:52:40.594Z",
+      "duration": 610,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "pakket1-weekly-calendar.spec.cjs",
+      "title": "B2 1440px kalenderplanning, prognose en financiële kaarten",
+      "status": "passed",
+      "startTime": "2026-11-09T15:52:41.215Z",
+      "duration": 689,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "savings-link-proposals.spec.cjs",
+      "title": "saving proposal remains a draft until explicit approval and survives reload 390",
+      "status": "passed",
+      "startTime": "2026-11-09T15:52:41.923Z",
+      "duration": 1667,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "savings-link-proposals.spec.cjs",
+      "title": "saving proposal remains a draft until explicit approval and survives reload 1440",
+      "status": "passed",
+      "startTime": "2026-11-09T15:52:43.600Z",
+      "duration": 1834,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "savings-link-proposals.spec.cjs",
+      "title": "equal incoming amounts require a choice; income links keep their administrative meaning",
+      "status": "passed",
+      "startTime": "2026-11-09T15:52:45.447Z",
+      "duration": 775,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "savings-link-proposals.spec.cjs",
+      "title": "savings editor uses the verified row month in partial history and still rejects missing proof",
+      "status": "passed",
+      "startTime": "2026-11-09T15:52:46.234Z",
+      "duration": 551,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "service-worker-upgrade.spec.cjs",
+      "title": "Offline herladen kiest actuele release ook wanneer oude cache eerder staat",
+      "status": "passed",
+      "startTime": "2026-11-09T15:52:46.803Z",
+      "duration": 867,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "subgoal-product-link.spec.cjs",
+      "title": "een productlink vult bestaande subdoelvelden zonder nieuwe interface",
+      "status": "passed",
+      "startTime": "2026-11-09T15:52:47.690Z",
+      "duration": 1081,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v117-p3.spec.cjs",
+      "title": "V117 P3 partial history: real screens, ten CSV approvals, offline restart, historical correction and second client",
+      "status": "passed",
+      "startTime": "2026-11-09T15:52:48.812Z",
+      "duration": 27012,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v117-p3.spec.cjs",
+      "title": "V117 P3 real Firestore: offline ten savings approvals, restart, repeated sync and second browser client",
+      "status": "passed",
+      "startTime": "2026-11-09T15:53:15.837Z",
+      "duration": 8783,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v117-p3.spec.cjs",
+      "title": "V117 P3 real Firestore: divergent offline clients preserve both versions and reject silent replacement",
+      "status": "passed",
+      "startTime": "2026-11-09T15:53:24.633Z",
+      "duration": 7907,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v117-p3.spec.cjs",
+      "title": "V117 P3 browser gateway refuses household and production addresses",
+      "status": "passed",
+      "startTime": "2026-11-09T15:53:32.555Z",
+      "duration": 634,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v117-p3.spec.cjs",
+      "title": "V117 P3 partial history: commit hydrates historical dependencies once and ordinary edits stay targeted",
+      "status": "passed",
+      "startTime": "2026-11-09T15:53:33.203Z",
+      "duration": 13881,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v117-p3.spec.cjs",
+      "title": "V117 P3 partial history: reviewed disjoint offline approvals preserve both clients after lost acknowledgment",
+      "status": "passed",
+      "startTime": "2026-11-09T15:53:47.097Z",
+      "duration": 13841,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v117-p3.spec.cjs",
+      "title": "V117 P3 actual browser close resumes locked migration and transfers household image bytes",
+      "status": "passed",
+      "startTime": "2026-11-09T15:54:00.953Z",
+      "duration": 5032,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v117-p4-salary.spec.cjs",
+      "title": "P4 legacy salary 2026-09 without reliable person blocks totals visibly and preserves data",
+      "status": "passed",
+      "startTime": "2026-11-09T15:54:06.023Z",
+      "duration": 781,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v117-p4-salary.spec.cjs",
+      "title": "P4 legacy salary 2026-10 without reliable person blocks totals visibly and preserves data",
+      "status": "passed",
+      "startTime": "2026-11-09T15:54:06.820Z",
+      "duration": 673,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v117-p4-salary.spec.cjs",
+      "title": "P4 salary person proposal, explicit correction, offline restart and second client preserve cents",
+      "status": "passed",
+      "startTime": "2026-11-09T15:54:07.505Z",
+      "duration": 17511,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v117-p4-salary.spec.cjs",
+      "title": "P4 manual salary person is editable while other income keeps its bank account destination",
+      "status": "passed",
+      "startTime": "2026-11-09T15:54:25.034Z",
+      "duration": 1399,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v117-p4.spec.cjs",
+      "title": "P4 storage inventory includes protected backup databases and scopes every byte",
+      "status": "passed",
+      "startTime": "2026-11-09T15:54:26.474Z",
+      "duration": 898,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v117-p4.spec.cjs",
+      "title": "P4 blocked database upgrade preserves the old records and can be retried",
+      "status": "passed",
+      "startTime": "2026-11-09T15:54:27.384Z",
+      "duration": 806,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v117-p4.spec.cjs",
+      "title": "P4 cache eviction, offline pin, corruption and reload preserve canonical financial totals",
+      "status": "passed",
+      "startTime": "2026-11-09T15:54:28.202Z",
+      "duration": 19774,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v117-p4.spec.cjs",
+      "title": "P4 cache quota failure cannot undo or misreport an already durable period commit",
+      "status": "passed",
+      "startTime": "2026-11-09T15:54:47.994Z",
+      "duration": 5505,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v117-p4.spec.cjs",
+      "title": "P4 cache is household scoped and pending financial changes prevent cleanup",
+      "status": "passed",
+      "startTime": "2026-11-09T15:54:53.519Z",
+      "duration": 4771,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v117-p4.spec.cjs",
+      "title": "P4 same bank source changed on two clients stays blocked with both approvals and proofs preserved",
+      "status": "passed",
+      "startTime": "2026-11-09T15:54:58.301Z",
+      "duration": 19698,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v117-p4.spec.cjs",
+      "title": "P4 new household without legacy: first CSV bulk approval, full localStorage, offline restart and second client",
+      "status": "passed",
+      "startTime": "2026-11-09T15:55:18.013Z",
+      "duration": 19268,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v117-p43-verifier.spec.cjs",
+      "title": "P4.3 small verifier uses source identities after ten savings approvals",
+      "status": "passed",
+      "startTime": "2026-11-09T15:55:37.313Z",
+      "duration": 15261,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v117-p44-group-recovery.spec.cjs",
+      "title": "P4.4 20 sources: native failure at approval eight, restart and retry preserve seven durable successes",
+      "status": "passed",
+      "startTime": "2026-11-09T15:55:52.604Z",
+      "duration": 17027,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v117-p44-group-recovery.spec.cjs",
+      "title": "P4.4 100 sources: native failure at approval eight, restart and retry preserve seven durable successes",
+      "status": "passed",
+      "startTime": "2026-11-09T15:56:09.648Z",
+      "duration": 35399,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v117-p44-release-safety.spec.cjs",
+      "title": "P4.4 release: pending group stays visibly busy and duplicate clicks cannot approve twice",
+      "status": "passed",
+      "startTime": "2026-11-09T15:56:45.153Z",
+      "duration": 25447,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v118-ux-minimal.spec.cjs",
+      "title": "tablet behoudt namen voor iedere navigatieknop",
+      "status": "passed",
+      "startTime": "2026-11-09T15:57:10.719Z",
+      "duration": 5639,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v118-ux-minimal.spec.cjs",
+      "title": "dialogen 390px begrenzen focus, sluiten en herstellen focus",
+      "status": "passed",
+      "startTime": "2026-11-09T15:57:16.394Z",
+      "duration": 8026,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v118-ux-minimal.spec.cjs",
+      "title": "dialogen 1440px begrenzen focus, sluiten en herstellen focus",
+      "status": "passed",
+      "startTime": "2026-11-09T15:57:24.458Z",
+      "duration": 9626,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v118-ux-minimal.spec.cjs",
+      "title": "Escape en sluiten bewaren gewijzigde invoer na weigeren",
+      "status": "passed",
+      "startTime": "2026-11-09T15:57:34.111Z",
+      "duration": 4414,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v118-ux-minimal.spec.cjs",
+      "title": "inkomensbron en primaire kaartactie zijn afzonderlijk bedienbaar",
+      "status": "passed",
+      "startTime": "2026-11-09T15:57:38.576Z",
+      "duration": 5304,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v118-ux-minimal.spec.cjs",
+      "title": "focusherstel vindt de oorspronkelijke kaart na hertekenen met veranderde tekst",
+      "status": "passed",
+      "startTime": "2026-11-09T15:57:43.978Z",
+      "duration": 2179,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v118-ux-minimal.spec.cjs",
+      "title": "vervolgactie uit informatie opent het bestaande venster en herstelt focus",
+      "status": "passed",
+      "startTime": "2026-11-09T15:57:46.177Z",
+      "duration": 3376,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v118-ux-minimal.spec.cjs",
+      "title": "spaardoel selecteren blijft werken zonder geneste knopsemantiek",
+      "status": "passed",
+      "startTime": "2026-11-09T15:57:49.571Z",
+      "duration": 3174,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v118-ux-minimal.spec.cjs",
+      "title": "informatie 320px werkt via klik, toetsenbord, Escape en buitenklik",
+      "status": "passed",
+      "startTime": "2026-11-09T15:57:52.768Z",
+      "duration": 3514,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v118-ux-minimal.spec.cjs",
+      "title": "informatie 390px werkt via klik, toetsenbord, Escape en buitenklik",
+      "status": "passed",
+      "startTime": "2026-11-09T15:57:56.302Z",
+      "duration": 11315,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v118-ux-minimal.spec.cjs",
+      "title": "informatie 768px werkt via klik, toetsenbord, Escape en buitenklik",
+      "status": "passed",
+      "startTime": "2026-11-09T15:58:07.659Z",
+      "duration": 3058,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v118-ux-minimal.spec.cjs",
+      "title": "informatie 1440px werkt via klik, toetsenbord, Escape en buitenklik",
+      "status": "passed",
+      "startTime": "2026-11-09T15:58:10.739Z",
+      "duration": 3040,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v118-ux-minimal.spec.cjs",
+      "title": "onvolledigheidsuitleg volgt de actuele motor en verdwenen oorzaken verdwijnen",
+      "status": "passed",
+      "startTime": "2026-11-09T15:58:13.799Z",
+      "duration": 1930,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v118-ux-minimal.spec.cjs",
+      "title": "geen bestedingsruimte en essentiële tekortwaarschuwing blijven zichtbaar",
+      "status": "passed",
+      "startTime": "2026-11-09T15:58:15.744Z",
+      "duration": 2351,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v118-ux-minimal.spec.cjs",
+      "title": "jaarlegenda gebruikt de reeks-kleuren en bedragen zijn zonder hover uitleesbaar",
+      "status": "passed",
+      "startTime": "2026-11-09T15:58:18.110Z",
+      "duration": 2524,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v118-ux-minimal.spec.cjs",
+      "title": "volledig bruikbare prognose krijgt geen verzonnen onvolledigheidsreden",
+      "status": "passed",
+      "startTime": "2026-11-09T15:58:20.652Z",
+      "duration": 1675,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v118-ux-minimal.spec.cjs",
+      "title": "uitgebreide klikgebieden raken geen naburige bediening",
+      "status": "passed",
+      "startTime": "2026-11-09T15:58:22.343Z",
+      "duration": 2919,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v50-visual-baseline.spec.cjs",
+      "title": "r46 visuele regressiebaseline op 360px",
+      "status": "passed",
+      "startTime": "2026-11-09T15:58:25.326Z",
+      "duration": 2557,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v50-visual-baseline.spec.cjs",
+      "title": "r46 visuele regressiebaseline op 390px",
+      "status": "passed",
+      "startTime": "2026-11-09T15:58:27.926Z",
+      "duration": 3537,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v50-visual-baseline.spec.cjs",
+      "title": "r46 visuele regressiebaseline op 430px",
+      "status": "passed",
+      "startTime": "2026-11-09T15:58:31.494Z",
+      "duration": 2493,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v50-visual-baseline.spec.cjs",
+      "title": "r46 visuele regressiebaseline op 768px",
+      "status": "passed",
+      "startTime": "2026-11-09T15:58:34.023Z",
+      "duration": 2241,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v50-visual-baseline.spec.cjs",
+      "title": "r46 visuele regressiebaseline op 1024px",
+      "status": "passed",
+      "startTime": "2026-11-09T15:58:36.301Z",
+      "duration": 2929,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v50-visual-baseline.spec.cjs",
+      "title": "r46 visuele regressiebaseline op 1440px",
+      "status": "passed",
+      "startTime": "2026-11-09T15:58:39.255Z",
+      "duration": 4207,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v50-visual-baseline.spec.cjs",
+      "title": "r46 computed-style-contract",
+      "status": "passed",
+      "startTime": "2026-11-09T15:58:43.491Z",
+      "duration": 1779,
+      "report": "regression-final.json"
+    },
+    {
+      "file": "v118-ux-minimal.spec.cjs",
+      "title": "gezamenlijke inkomstenbeheerroute toont geen persoonlijke planning 390px",
+      "status": "passed",
+      "startTime": "2026-11-09T19:31:25.313Z",
+      "duration": 2516,
+      "report": "scope-route-final.json"
+    },
+    {
+      "file": "v118-ux-minimal.spec.cjs",
+      "title": "gezamenlijke inkomstenbeheerroute toont geen persoonlijke planning 1440px",
+      "status": "passed",
+      "startTime": "2026-11-09T19:31:28.061Z",
+      "duration": 2503,
+      "report": "scope-route-final.json"
+    }
+  ],
+  "verifiedScaleCase": {
+    "file": "v117-p4-scale.spec.cjs",
+    "title": "P4 real browser and rules: 500 bank movements / 3 months, 1 measurements",
+    "status": "passed",
+    "evidence": "backups/v117-stabilisatie/p44-scale-3.json",
+    "evidenceSha256": "7a71df89bb195ebaa66464e9c6339ebe388dc6476ea8fbe492f3eb73a9b365f4",
+    "basis": "Complete financiele scenario-uitvoer en resultaatregel; brede schaalrun later afgebroken op verzoek."
+  },
+  "failedLargeCase": {
+    "file": "v117-p4-scale.spec.cjs",
+    "title": "P4 real browser and rules: 5400 bank movements / 36 months, 3 measurements",
+    "status": "failed",
+    "startTime": "2026-11-09T16:21:38.445Z",
+    "duration": 852317
+  },
+  "limits": [
+    "5400 bronnen: geen volledige financiele acceptatie; lokale emulator liep vast op geheugen.",
+    "Afhankelijke grote-periodencontrole en onderbroken schaal-/performancegevallen niet als geslaagd geteld.",
+    "Bestaande V117-upgradeproeven vereisen gecontroleerde oude assets.",
+    "Geen GitHub Actions-run of publicatie."
+  ]
+}

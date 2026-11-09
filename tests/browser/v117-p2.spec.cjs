@@ -1,18 +1,20 @@
 const {test,expect}=require('@playwright/test'),fs=require('node:fs'),path=require('node:path');
 const fixture=JSON.parse(fs.readFileSync(path.join(__dirname,'../fixtures/v50-visual-state.json'),'utf8'));
+fixture.accountProfiles=[{id:'joint',accountOwner:'gezamenlijk',name:'Gezamenlijk',identifier:'NL01JOINT'}];
 test.setTimeout(60000);
 async function boot(page){
   page.on('dialog',dialog=>dialog.accept());await page.clock.setFixedTime(new Date('2026-10-09T12:00:00Z'));
   await page.route('https://www.gstatic.com/**',route=>route.abort());await page.route('https://firestore.googleapis.com/**',route=>route.abort());
   await page.addInitScript(state=>{if(!localStorage.getItem('finize-budget-planner-v1'))localStorage.setItem('finize-budget-planner-v1',JSON.stringify(state));},fixture);
   await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
-  await page.evaluate(()=>commitChange(()=>{state.meta.selectedMonth='2026-10';state.monthRecords={};state.transactions=[];state.importSummaries=[];state.activeImportId='';state.recognitionRules=[];state.accountProfiles=[{id:'joint',accountOwner:'gezamenlijk',name:'Gezamenlijk',identifier:'NL01JOINT'}];}));
+  await page.evaluate(()=>commitChange(()=>{state.meta.selectedMonth='2026-10';state.monthRecords={};state.transactions=[];state.importSummaries=[];state.activeImportId='';state.recognitionRules=[];}));
 }
 async function upload(page,count=1){
   await page.evaluate(()=>openBankImportForOwner('gezamenlijk'));
   await page.locator('[data-u4-file]').setInputFiles({name:'quota.csv',mimeType:'text/csv',buffer:Buffer.from('Datum;Omschrijving;Rekening;Bedrag\n'+Array.from({length:count},(_,i)=>`2026-10-${String(i%3+1).padStart(2,'0')};P2 test;NL01JOINT;-${35+i}`).join('\n'))});
   await expect(page.locator('[data-u4-row]')).toHaveCount(count);
   await page.locator('#u4ImportModalRoot details').evaluateAll(nodes=>nodes.forEach(node=>node.open=true));
+  await page.locator('[data-u4-row]').first().locator('[data-u4-focus-open]').click();
   await page.locator('[data-u4-field="category"]').first().selectOption('Overig');
 }
 async function durable(page){return page.evaluate(async()=>({state:await DataAdapter.readDurableState(),batch:await FinizeUpdate4.importStore.getImport(state.importSummaries[0].id)}));}
@@ -102,6 +104,7 @@ test('V117 P2 browser close with pending approval never executes it during resta
   expect(await restarted.evaluate(()=>FinizeTransactions.total('budgetImpact',{month:'2026-10'}))).toBe(0);
   await restarted.evaluate(()=>FinizeUpdate4.openImportDetails(state.importSummaries[0].id));
   await restarted.locator('#u4ImportModalRoot details').evaluateAll(nodes=>nodes.forEach(node=>node.open=true));
+  await restarted.locator('[data-u4-row]').first().locator('[data-u4-focus-open]').click();
   await restarted.locator('[data-u4-field="category"]').selectOption('Overig');await restarted.locator('[data-u4-approve]').click();
   await expect(restarted.locator('[data-u4-group-result]')).toContainText('1 van 1');
   expect(await restarted.evaluate(()=>FinizeTransactions.total('budgetImpact',{month:'2026-10'}))).toBe(35);

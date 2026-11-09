@@ -2,15 +2,16 @@ const test=require('node:test'),assert=require('node:assert/strict');
 const {state,row,materialize,copy}=require('./helpers/package5-fixture.cjs');
 const engine=require('../src/core/transaction-engine.mjs'),commands=require('../src/core/transaction-processing.mjs'),planning=require('../src/core/planning-timeline.mjs'),lifecycle=require('../src/import/import-lifecycle.mjs'),model=require('../src/core/transaction-model.mjs'),ledger=require('../src/core/data-normalization.mjs'),runtime=require('../src/import/update4-runtime.cjs');
 const month='2026-10',today='2026-10-06';
+const {release}=require('./helpers/release-shell.cjs');
 
 async function workerNavigation(response){
  const fs=require('node:fs'),vm=require('node:vm'),handlers={},cached=new Map();
  const html=fs.readFileSync('index.html','utf8');cached.set('./index.html',new Response(html));
  const caches={open:async()=>({put:async(key,value)=>cached.set(key,value.clone())}),match:async key=>cached.get(key)?.clone()};
  vm.runInNewContext(fs.readFileSync('service-worker.js','utf8'),{self:{addEventListener:(key,handler)=>handlers[key]=handler,skipWaiting:()=>{},clients:{claim:()=>{}}},caches,fetch:async()=>response.clone()});
- let navigation;handlers.fetch({request:{method:'GET',mode:'navigate'},respondWith:promise=>navigation=promise});await navigation;await new Promise(resolve=>setImmediate(resolve));return {html,cached:await cached.get('./index.html').text()};
+ let navigation;const pending=[];handlers.fetch({request:{method:'GET',mode:'navigate'},respondWith:promise=>navigation=promise,waitUntil:promise=>pending.push(promise)});await navigation;await Promise.all(pending);return {html,cached:await cached.get('./index.html').text()};
 }
-test('P7 W3 interrupted release navigation retains offline shell for cached asset version',async()=>{const fs=require('node:fs'),html=fs.readFileSync('index.html','utf8'),next=html.replaceAll('118-r25','106-isolated-test');const result=await workerNavigation(new Response(next));assert.equal(result.cached,result.html);});
+test('P7 W3 interrupted release navigation retains offline shell for cached asset version',async()=>{const fs=require('node:fs'),html=fs.readFileSync('index.html','utf8'),next=html.replaceAll(release,'106-isolated-test');const result=await workerNavigation(new Response(next));assert.equal(result.cached,result.html);});
 test('P7 W5 failed HTTP navigation never replaces valid offline shell',async()=>{const result=await workerNavigation(new Response('<html>Service unavailable</html>',{status:503}));assert.equal(result.cached,result.html);});
 async function workerInstall(html){
  const fs=require('node:fs'),vm=require('node:vm'),handlers={},cached=new Map(),deleted=[];
@@ -19,7 +20,7 @@ async function workerInstall(html){
  vm.runInNewContext(fs.readFileSync('service-worker.js','utf8'),{self:{addEventListener:(key,handler)=>handlers[key]=handler,skipWaiting:()=>{},clients:{claim:()=>{}}},caches});
  let installing;handlers.install({waitUntil:promise=>installing=promise});return {installing,deleted};
 }
-test('P7 W2/W3 mismatched shell cannot install over the working worker',async()=>{const fs=require('node:fs'),html=fs.readFileSync('index.html','utf8').replaceAll('118-r25','101-functional-consolidation'),result=await workerInstall(html);await assert.rejects(result.installing,/assetversie/);assert.deepEqual(result.deleted,['finize-v118-r25']);});
+test('P7 W2/W3 mismatched shell cannot install over the working worker',async()=>{const fs=require('node:fs'),html=fs.readFileSync('index.html','utf8').replaceAll(release,'101-functional-consolidation'),result=await workerInstall(html);await assert.rejects(result.installing,/assetversie/);assert.deepEqual(result.deleted,[`finize-v${release}`]);});
 test('P7 W1 matching shell installs successfully',async()=>{const result=await workerInstall(require('node:fs').readFileSync('index.html','utf8'));await result.installing;assert.deepEqual(result.deleted,[]);});
 function manual(s,id,changes={},account='gezamenlijk'){return commands.upsertManualFinancialTransaction(s,{id,source:'manual',date:month+'-03',amount:100,transactionType:'uitgave',category:'Kleding',financialFor:account,budgetOwner:account,...changes},account,{today});}
 function batchCommand(s,b,type){return lifecycle.planImportCommand(s,b,{type,operationId:b.id+'-'+type,timestamp:today+'T12:00:00Z'},{validateRow:runtime.rowProcessingValidation});}

@@ -1,0 +1,92 @@
+{
+  "body": {
+    "display": "block",
+    "position": "static",
+    "color": "rgb(47, 31, 24)",
+    "backgroundColor": "rgba(0, 0, 0, 0)",
+    "fontSize": "16px",
+    "borderRadius": "0px",
+    "gridTemplateColumns": "none"
+  },
+  ".mobile-header-top": {
+    "display": "grid",
+    "position": "relative",
+    "color": "rgb(47, 31, 24)",
+    "backgroundColor": "rgba(255, 243, 230, 0.74)",
+    "fontSize": "16px",
+    "borderRadius": "18px",
+    "gridTemplateColumns": "50.5px 171.5px 124px"
+  },
+  ".mobile-tab-title": {
+    "display": "block",
+    "position": "static",
+    "color": "rgb(47, 31, 24)",
+    "backgroundColor": "rgba(0, 0, 0, 0)",
+    "fontSize": "21px",
+    "borderRadius": "0px",
+    "gridTemplateColumns": "none"
+  },
+  ".mobile-status-pill": {
+    "display": "flex",
+    "position": "relative",
+    "color": "rgb(112, 95, 82)",
+    "backgroundColor": "rgba(0, 0, 0, 0)",
+    "fontSize": "9.9px",
+    "borderRadius": "12px",
+    "gridTemplateColumns": "none"
+  },
+  ".p3-surface": {
+    "display": "flex",
+    "position": "static",
+    "color": "rgb(61, 33, 22)",
+    "backgroundColor": "rgb(255, 249, 243)",
+    "fontSize": "16px",
+    "borderRadius": "0px",
+    "gridTemplateColumns": "none"
+  },
+  ".p3-toolbar": {
+    "display": "flex",
+    "position": "static",
+    "color": "rgb(61, 33, 22)",
+    "backgroundColor": "rgba(0, 0, 0, 0)",
+    "fontSize": "16px",
+    "borderRadius": "0px",
+    "gridTemplateColumns": "none"
+  },
+  ".p3-context": {
+    "display": "flex",
+    "position": "static",
+    "color": "rgb(61, 33, 22)",
+    "backgroundColor": "rgb(245, 234, 221)",
+    "fontSize": "16px",
+    "borderRadius": "28px",
+    "gridTemplateColumns": "none"
+  },
+  ".p3-chart-section": {
+    "display": "block",
+    "position": "static",
+    "color": "rgb(61, 33, 22)",
+    "backgroundColor": "rgba(0, 0, 0, 0)",
+    "fontSize": "16px",
+    "borderRadius": "0px",
+    "gridTemplateColumns": "none"
+  },
+  ".v4-bottom-nav": {
+    "display": "flex",
+    "position": "fixed",
+    "color": "rgb(47, 31, 24)",
+    "backgroundColor": "rgba(255, 243, 230, 0.92)",
+    "fontSize": "16px",
+    "borderRadius": "24px",
+    "gridTemplateColumns": "none"
+  },
+  ".v4-sidebar": {
+    "display": "none",
+    "position": "sticky",
+    "color": "rgb(47, 31, 24)",
+    "backgroundColor": "rgba(255, 250, 244, 0.92)",
+    "fontSize": "16px",
+    "borderRadius": "0px",
+    "gridTemplateColumns": "none"
+  }
+}

@@ -1,6 +1,8 @@
+const testOrigin=require('./helpers/test-origin.cjs');
 const {test,expect}=require('@playwright/test');
 const {fixture,admin,token}=require('../helpers/v117-p3-emulator.cjs');
-const visual=require('../fixtures/v50-visual-state.json');
+const visual=structuredClone(require('../fixtures/v50-visual-state.json'));
+visual.accountProfiles=[{id:'p3-joint',name:'Gezamenlijk',accountOwner:'gezamenlijk',identifier:'NL01JOINT'},{id:'p3-savings',name:'Spaarrekening',accountOwner:'gezamenlijk',identifier:'NL02SAVINGS'}];
 test.setTimeout(120000);
 async function boot(page,f,seed=visual){
   await require('../helpers/isolated-emulator.cjs').isolateBrowser(page);
@@ -26,7 +28,7 @@ async function session(page,f,migrate=false){
 async function savings(page){
   await page.evaluate(()=>commitChange(()=>{
     state.meta.selectedMonth='2026-10';state.transactions=[];state.importSummaries=[];state.activeImportId='';state.monthRecords={};state.recognitionRules=[];state.recurringFixedExpenses=[];state.manualTransactionReplacements=[];state.internalTransferPairs=[];state.savingsCoverageAllocations=[];state.advanceLedger=[];state.advanceRepayments=[];
-    state.accountProfiles=[{id:'p3-joint',name:'Gezamenlijk',accountOwner:'gezamenlijk',identifier:'NL01JOINT'},{id:'p3-savings',name:'Spaarrekening',accountOwner:'gezamenlijk',identifier:'NL02SAVINGS'}];
+
     state.spaardoelen={gezamenlijk:[{id:'p3-goal',naam:'Buffer',doelbedrag:10000,algespaard:0}],dion:[],dara:[]};state.savingsGoalLedger=[];
   },{render:true}));
 }
@@ -52,7 +54,7 @@ test('V117 P3 partial history: real screens, ten CSV approvals, offline restart,
   const amounts=[50,100,75,25,200,40,60,90,30,80],csv='Datum;Omschrijving;Rekening;Tegenrekening;Bedrag\n'+amounts.map((n,i)=>`2026-10-0${i%3+1};Periode sparen X;NL01JOINT;NL02SAVINGS;-${n}`).join('\n');
   await page.locator('[data-u4-file]').setInputFiles({name:'partial-ten.csv',mimeType:'text/csv',buffer:Buffer.from(csv)});
   await expect(page.locator('[data-u4-row]')).toHaveCount(10);await page.locator('#u4ImportModalRoot details').evaluateAll(ns=>ns.forEach(n=>n.open=true));
-  const first=page.locator('[data-u4-row]').first();await first.locator('[data-u4-family]').selectOption('sparen');await first.locator('[data-u4-field="transactionType"]').selectOption('naar-spaarrekening');await first.locator('[data-u4-field="savingsGoalId"]').selectOption('p3-goal');
+  const firstId=await page.locator('[data-u4-row]').first().getAttribute('data-u4-row');const first=page.locator(`[data-u4-row="${firstId}"]`);await first.locator('[data-u4-focus-open]').click();await first.locator('[data-u4-family]').selectOption('sparen');await expect(first.locator('[data-u4-field="savingsGoalId"]')).toBeVisible();await first.locator('[data-u4-field="transactionType"]').selectOption('naar-spaarrekening');await first.locator('[data-u4-field="savingsGoalId"]').selectOption('p3-goal');
   await first.locator('[data-u4-approve]').click();await expect(page.locator('[data-u4-match-apply]')).toHaveText('Geselecteerde transacties goedkeuren (10)');await page.locator('[data-u4-match-apply]').click();
   await expect.poll(()=>inspect(page)).toMatchObject({approved:10,bankSources:10,savings:750});const approved=await inspect(page);
   expect(await page.evaluate(()=>state.transactions.some(row=>row.id.startsWith('history-')))).toBe(false);
@@ -68,7 +70,7 @@ test('V117 P3 partial history: real screens, ten CSV approvals, offline restart,
   expect(await page.evaluate(()=>[...state.verifiedPeriods].sort())).toEqual(['2025-03']);
   expect(await page.evaluate(async()=>{const row=state.transactions.find(row=>row.id==='history-2025-03');return FinizeManual.save({...row,amount:25,expenseImpact:25},'gezamenlijk');})).toBe(true);
   expect((await page.evaluate(()=>p3.sync())).outcome).toBe('committed');expect(await page.evaluate(async()=>(await p3.loadPeriod('2025-03')).financials.totalsCents.budgetImpact)).toBe(2500);
-  const context=await browser.newContext({baseURL:'http://127.0.0.1:4173',serviceWorkers:'block'});
+  const context=await browser.newContext({baseURL:testOrigin,serviceWorkers:'block'});
   try{
     const second=await context.newPage();await boot(second,f,null);await second.evaluate(async options=>{window.p3=await FinizeCloudRecords.createEmulatorSession(options);await p3.attach({automatic:false});},{householdId:f.householdId,token:token(f.email,'partial-second')});
     expect(await second.evaluate(()=>({count:state.transactions.length,savings:FinizeTransactions.total('savingsDeposit'),goal:state.spaardoelen.gezamenlijk[0].algespaard}))).toEqual({count:20,savings:750,goal:750});
@@ -85,7 +87,7 @@ test('V117 P3 real Firestore: offline ten savings approvals, restart, repeated s
   const amounts=[50,100,75,25,200,40,60,90,30,80],csv='Datum;Omschrijving;Rekening;Tegenrekening;Bedrag\n'+amounts.map((n,i)=>`2026-10-0${i%3+1};Sparen X;NL01JOINT;NL02SAVINGS;-${n}`).join('\n');
   await page.locator('[data-u4-file]').setInputFiles({name:'p3-ten.csv',mimeType:'text/csv',buffer:Buffer.from(csv)});
   await expect(page.locator('[data-u4-row]')).toHaveCount(10);await page.locator('#u4ImportModalRoot details').evaluateAll(ns=>ns.forEach(n=>n.open=true));
-  const first=page.locator('[data-u4-row]').first();await first.locator('[data-u4-family]').selectOption('sparen');await first.locator('[data-u4-field="transactionType"]').selectOption('naar-spaarrekening');await first.locator('[data-u4-field="savingsGoalId"]').selectOption('p3-goal');
+  const firstId=await page.locator('[data-u4-row]').first().getAttribute('data-u4-row');const first=page.locator(`[data-u4-row="${firstId}"]`);await first.locator('[data-u4-focus-open]').click();await first.locator('[data-u4-family]').selectOption('sparen');await expect(first.locator('[data-u4-field="savingsGoalId"]')).toBeVisible();await first.locator('[data-u4-field="transactionType"]').selectOption('naar-spaarrekening');await first.locator('[data-u4-field="savingsGoalId"]').selectOption('p3-goal');
   await first.locator('[data-u4-approve]').click();await expect(page.locator('[data-u4-match-apply]')).toHaveText('Geselecteerde transacties goedkeuren (10)');await page.locator('[data-u4-match-apply]').click();
   await expect.poll(()=>inspect(page)).toMatchObject({approved:10,bankSources:10,savings:750});const before=await inspect(page);
   expect(new Set(before.effects.map(r=>r.source)).size).toBe(10);
@@ -100,7 +102,7 @@ test('V117 P3 real Firestore: offline ten savings approvals, restart, repeated s
   expect(cloud.snapshot.operations).toHaveLength(0);expect(cloud.queue).toHaveLength(0);expect(cloud.period.financials.totalsCents.savingsDeposit).toBe(75000);expect(cloud.period.financials.approvedEffectCount).toBe(10);
   expect(cloud.period.financials.application.monthResult).toMatchObject({savings:750});
   expect((await page.evaluate(()=>p3.sync())).outcome).toBe('idle');expect(await page.evaluate(async()=>(await p3.cloudStore.context()).head.data.revision)).toBe(cloud.all.head.revision);
-  const context=await browser.newContext({baseURL:'http://127.0.0.1:4173',serviceWorkers:'block'});
+  const context=await browser.newContext({baseURL:testOrigin,serviceWorkers:'block'});
   try{
     const second=await context.newPage();await boot(second,f,null);
     await second.evaluate(async options=>{window.p3=await FinizeCloudRecords.createEmulatorSession(options);await p3.attach({automatic:false,periodLoading:false});},{householdId:f.householdId,token:token(f.email,'second-browser')});
@@ -128,7 +130,7 @@ test('V117 P3 real Firestore: offline ten savings approvals, restart, repeated s
 
 test('V117 P3 real Firestore: divergent offline clients preserve both versions and reject silent replacement',async({page,browser})=>{
   const f=await fixture();await boot(page,f);expect((await session(page,f,true)).outcome).toBe('matched');await page.evaluate(()=>p3.sync());
-  const baseline=await page.evaluate(()=>DataAdapter.readDurableState()),context=await browser.newContext({baseURL:'http://127.0.0.1:4173',serviceWorkers:'block'});
+  const baseline=await page.evaluate(()=>DataAdapter.readDurableState()),context=await browser.newContext({baseURL:testOrigin,serviceWorkers:'block'});
   try{
     const second=await context.newPage();await boot(second,f,baseline);expect((await session(second,f)).outcome).toBe('matched');await second.evaluate(()=>p3.sync());
     // Match the latest unchanged cloud base after device B's initial local migration proof.
@@ -185,7 +187,7 @@ test('V117 P3 partial history: commit hydrates historical dependencies once and 
 
 test('V117 P3 partial history: reviewed disjoint offline approvals preserve both clients after lost acknowledgment',async({page,browser})=>{
   const f=await fixture();await boot(page,f);await savings(page);await session(page,f,true);await page.evaluate(()=>p3.sync());await page.evaluate(()=>p3.openMonth('2026-10'));
-  const context=await browser.newContext({baseURL:'http://127.0.0.1:4173',serviceWorkers:'block'});
+  const context=await browser.newContext({baseURL:testOrigin,serviceWorkers:'block'});
   try{
     const second=await context.newPage();await boot(second,f,null);
     await second.evaluate(async options=>{window.p3=await FinizeCloudRecords.createEmulatorSession(options);await p3.attach({automatic:false});},{householdId:f.householdId,token:token(f.email)});

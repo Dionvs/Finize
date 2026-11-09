@@ -1,0 +1,176 @@
+{
+  "synthetic": true,
+  "cases": [
+    {
+      "scenario": "same-counterparty",
+      "rules": [
+        {
+          "counterparty": "NL20EMPLOYERB",
+          "transactionType": "salaris"
+        },
+        {
+          "counterparty": "NL10EMPLOYERA",
+          "transactionType": "overige-inkomsten"
+        }
+      ],
+      "historicalRows": [
+        {
+          "bankOriginal": {
+            "bankDate": "2026-09-30",
+            "bookingDate": "",
+            "transactionTime": "",
+            "description": "Salaris werkgever A september",
+            "rawDescription": "Salaris werkgever A september",
+            "amount": 2530,
+            "accountIdentifier": "NL01JOINT",
+            "counterpartyAccount": "NL10EMPLOYERA",
+            "currency": "EUR",
+            "reference": "",
+            "code": "",
+            "notes": "",
+            "lineNumber": 2,
+            "rawCells": [
+              "2026-09-30",
+              "Salaris werkgever A september",
+              "NL01JOINT",
+              "NL10EMPLOYERA",
+              "2530"
+            ],
+            "valid": true,
+            "importBatchId": "import-mv2cdxc0-c6orz2u7",
+            "importTransactionId": "import-mv2cdxc0-c6orz2u7-00001",
+            "fingerprint": "u4-53221085"
+          },
+          "processing": {
+            "processingDate": "2026-09-30",
+            "processedAmount": 2530,
+            "description": "Bonus",
+            "category": "Ongecategoriseerd",
+            "transactionType": "overige-inkomsten",
+            "budgetOwner": "gezamenlijk",
+            "budgetItemId": "",
+            "fixedExpenseId": "",
+            "fixedAmountMode": "none",
+            "savingsGoalId": "",
+            "splits": [],
+            "advanceMode": "auto",
+            "include": true,
+            "recognitionRuleId": "u4-rule-f4831946",
+            "note": ""
+          },
+          "suggestion": {
+            "version": 118,
+            "status": "supported",
+            "level": "counterparty",
+            "ruleIds": [
+              "u4-rule-f4831946"
+            ],
+            "reasons": [
+              "Gebaseerd op een eerdere expliciete goedkeuring binnen deze rekeningcontext.",
+              "Herkenningssignaal: tegenrekening."
+            ],
+            "needsConfirmation": [],
+            "alternatives": [],
+            "provenance": {
+              "approvedAt": "2026-10-10T12:00:00.000Z",
+              "importBatchId": "import-mv2cdxc0-cywjqwnx",
+              "kind": "manual-approval",
+              "sourceRowId": "import-mv2cdxc0-cywjqwnx-00004"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "distinct-counterparties-control",
+      "rules": [
+        {
+          "counterparty": "NL40BONUS",
+          "transactionType": "overige-inkomsten"
+        },
+        {
+          "counterparty": "NL30HOLIDAY",
+          "transactionType": "vakantiegeld"
+        },
+        {
+          "counterparty": "NL20EMPLOYERB",
+          "transactionType": "salaris"
+        },
+        {
+          "counterparty": "NL10EMPLOYERA",
+          "transactionType": "salaris"
+        }
+      ],
+      "historicalRows": [
+        {
+          "bankOriginal": {
+            "bankDate": "2026-09-30",
+            "bookingDate": "",
+            "transactionTime": "",
+            "description": "Salaris werkgever A september",
+            "rawDescription": "Salaris werkgever A september",
+            "amount": 2530,
+            "accountIdentifier": "NL01JOINT",
+            "counterpartyAccount": "NL10EMPLOYERA",
+            "currency": "EUR",
+            "reference": "",
+            "code": "",
+            "notes": "",
+            "lineNumber": 2,
+            "rawCells": [
+              "2026-09-30",
+              "Salaris werkgever A september",
+              "NL01JOINT",
+              "NL10EMPLOYERA",
+              "2530"
+            ],
+            "valid": true,
+            "importBatchId": "import-mv2cdxc0-4mc7pavs",
+            "importTransactionId": "import-mv2cdxc0-4mc7pavs-00001",
+            "fingerprint": "u4-53221085"
+          },
+          "processing": {
+            "processingDate": "2026-09-30",
+            "processedAmount": 2530,
+            "description": "Salaris Werkgever A",
+            "category": "Ongecategoriseerd",
+            "transactionType": "salaris",
+            "salaryLinkVersion": 117,
+            "salaryPersonId": "dion",
+            "budgetOwner": "gezamenlijk",
+            "budgetItemId": "",
+            "fixedExpenseId": "",
+            "fixedAmountMode": "none",
+            "savingsGoalId": "",
+            "splits": [],
+            "advanceMode": "auto",
+            "include": true,
+            "recognitionRuleId": "u4-rule-f4831946",
+            "note": ""
+          },
+          "suggestion": {
+            "version": 118,
+            "status": "supported",
+            "level": "counterparty",
+            "ruleIds": [
+              "u4-rule-f4831946"
+            ],
+            "reasons": [
+              "Gebaseerd op een eerdere expliciete goedkeuring binnen deze rekeningcontext.",
+              "Herkenningssignaal: tegenrekening.",
+              "Werkgever en ontvangstrekening komen overeen met actief, handmatig goedgekeurd salaris."
+            ],
+            "needsConfirmation": [],
+            "alternatives": [],
+            "provenance": {
+              "approvedAt": "2026-10-10T12:00:00.000Z",
+              "importBatchId": "import-mv2cdxc0-ltcjmhzi",
+              "kind": "manual-approval",
+              "sourceRowId": "import-mv2cdxc0-ltcjmhzi-00001"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

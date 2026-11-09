@@ -7,8 +7,7 @@ const js=require('./helpers/runtime-source.cjs');
 const css=fs.readFileSync(path.join(__dirname,'..','app.css'),'utf8');
 const html=markup+js;
 
-assert.match(markup,/app\.css/);
-assert.match(markup,/app\.js/);
+require('./helpers/release-shell.cjs').assertReleaseShell(markup);
 assert.doesNotMatch(html,/renderManageSection\('Bank import & uitgaven'/);
 for(const marker of ['Bankimport controleren','Onbekend','Nakijken','Goedgekeurd','Meer opties','Terugtrekken','Herkenningsregels','Alle imports bekijken','Import uit cloud ophalen','Opnieuw proberen']){
   assert.match(js,new RegExp(marker),`UI-marker ontbreekt: ${marker}`);

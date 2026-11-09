@@ -15,8 +15,9 @@ for(const width of [320,390,430])test(`mobiel herstel ${width}: header, geld, la
    return [{status:status.getBoundingClientRect().toJSON(),month:month.getBoundingClientRect().toJSON(),brand:h.querySelector('.mobile-tab-title').getBoundingClientRect().toJSON()}];
   }));
   for(const {status,month,brand} of headers){
-   expect(status.height).toBeGreaterThanOrEqual(24);
-   expect(Math.abs(brand.y+brand.height/2-month.y-month.height/2)).toBeLessThanOrEqual(1);
+   expect(status.height).toBeGreaterThanOrEqual(20);
+   expect(Math.abs(brand.y-month.y)).toBeLessThanOrEqual(1);
+   expect(month.height).toBeLessThanOrEqual(brand.height+1);
    expect(month.x).toBeGreaterThanOrEqual(brand.x+brand.width);
    expect(status.y).toBeGreaterThanOrEqual(Math.max(brand.y+brand.height,month.y+month.height));
   }

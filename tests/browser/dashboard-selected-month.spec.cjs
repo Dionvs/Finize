@@ -6,7 +6,7 @@ async function changeMonth(page,month){
  await page.locator('#monthPickerButton').click();
  if(!(await page.locator(`[data-month-value="${month}"]`).count()))await page.locator(`[data-month-year="${month.slice(0,4)}"]`).click();
  await page.locator(`[data-month-value="${month}"]`).click();
- await expect(page.locator('[data-p3-filter="month"]')).toHaveAttribute('aria-pressed','true');
+ await expect(page.locator('[data-p3-filter]')).toHaveValue('month');
  await expect(page.locator('[data-p3-day] option').first()).toHaveAttribute('value',month+'-01');
 }
 const snapshot=page=>page.evaluate(()=>JSON.stringify({transactions:state.transactions,fixed:state.recurringFixedExpenses,goals:state.savingsGoalLedger,profiles:state.accountProfiles,checkpoints:state.balanceCheckpoints}));
@@ -15,24 +15,27 @@ for(const width of [320,390,768,1440])test(`gekozen kalendermaand, onbekende dag
  const before=await snapshot(page);
  await expect(page.locator('[data-p3-day] option')).toHaveCount(31);
  await expect(page.locator('[data-p3-day]')).toHaveValue('2026-10-01');
+ await page.locator('[data-p3-day]').selectOption('2026-10-01');
  await expect(page.locator('[data-p3-point-detail]')).toContainText('Saldo onbekend');
  await expect(page.locator('g[data-p3-point="2026-10-01"]')).toHaveCount(0);
  await expect(page.locator('[data-p3-unknown-days]')).toContainText('1 okt – 13 okt');
- await page.locator('[data-p3-filter="7"]').click();
+ await page.locator('[data-p3-filter]').selectOption('7');
  await expect(page.locator('[data-p3-period]')).toContainText('20 okt');
  await changeMonth(page,'2026-11');
  await expect(page.locator('[data-p3-day] option')).toHaveCount(30);
  await expect(page.locator('[data-p3-day] option').last()).toHaveAttribute('value','2026-11-30');
  await expect(page.locator('[data-p3-period]')).toContainText('1 nov – 30 nov 2026');
  expect(await page.locator('[data-p3-payments] time').evaluateAll(nodes=>nodes.every(n=>n.dateTime.startsWith('2026-11')))).toBe(true);
- await expect(page.locator('.p3-budget')).toContainText('november 2026');
- await expect(page.locator('.p3-allowance')).toContainText('november 2026');
- await expect(page.locator('.p3-goals')).toContainText('Huidige stand');
+ await expect(page.locator('.p3-budget,.p3-year')).toHaveCount(0);
+ expect(await page.evaluate(()=>getSelectedMonth())).toBe('2026-11');
+ await expect(page.locator('.p3-goals')).toContainText('Favoriete spaardoelen');
  const r=await page.evaluate(()=>FinizeUpdate3.scenarioResult());
  const eur=n=>new Intl.NumberFormat('nl-NL',{style:'currency',currency:'EUR'}).format(n);
- await expect(page.locator('.p3-budget')).toContainText(eur(r.variabelBudgetTotaal));
+ await navigate(page,'gezamenlijk');
+ await expect(page.locator('#tab-gezamenlijk')).toContainText(eur(r.variabelBudgetTotaal));
+ await navigate(page,'dashboard');
  await expect(page.locator('.p3-allowance')).toContainText(eur(r.dion.zakgeld));
- await expect(page.locator('[data-p3-payments]').locator('..').locator('.p3-head button')).toHaveCount(0);
+ await expect(page.locator('[data-p3-payments]').locator('..').locator('[data-p3-action="payments"]')).toBeVisible();
  await page.locator('[data-p3-context="persoonlijk"]').click();
  await expect(page.locator('[data-p3-period]')).toContainText('1 nov – 30 nov 2026');
  await page.locator('[data-p3-person]').selectOption('dara');
@@ -43,49 +46,50 @@ for(const width of [320,390,768,1440])test(`gekozen kalendermaand, onbekende dag
  await page.screenshot({path:`.cache/dashboard-selected-month/november-${width}.png`,fullPage:true});
  expect(await snapshot(page)).toBe(before);expect(errors).toEqual([]);
 });
-test('jaar volgt maandwissel; handmatig jaar en filters blijven tot de volgende maandwissel',async({page})=>{
- await boot(page,1440);await page.locator('[data-p3-year]').selectOption('2025');
- await page.locator('[data-p3-filter="14"]').click();await expect(page.locator('[data-p3-year]')).toHaveValue('2025');
- await changeMonth(page,'2026-12');await expect(page.locator('[data-p3-year]')).toHaveValue('2026');
- await page.locator('[data-p3-filter="custom"]').click();await page.locator('[data-p3-custom]').fill('2026-12-15');await page.locator('[data-p3-custom]').dispatchEvent('change');
+test('kalenderjaarovergang reset periode en eigen datum bij maandwissel',async({page})=>{
+ await boot(page,1440);
+ await page.locator('[data-p3-filter]').selectOption('14');await expect(page.locator('[data-p3-filter]')).toHaveValue('14');
+ await changeMonth(page,'2026-12');expect(await page.evaluate(()=>getSelectedMonth())).toBe('2026-12');
+ await page.locator('[data-p3-filter]').selectOption('custom');await page.locator('[data-p3-custom]').fill('2026-12-15');await page.locator('[data-p3-custom]').dispatchEvent('change');
  await expect(page.locator('[data-p3-period]')).toContainText('15 dec 2026');
- await changeMonth(page,'2027-01');await expect(page.locator('[data-p3-year]')).toHaveValue('2027');
+ await changeMonth(page,'2027-01');expect(await page.evaluate(()=>getSelectedMonth())).toBe('2027-01');
  await expect(page.locator('[data-p3-custom]')).toHaveValue('');
  await expect(page.locator('[data-p3-day] option')).toHaveCount(31);
 });
 test('kort filter en eigen datum zijn begrensd; onbekende historische maand heeft geen lijn',async({page})=>{
  await boot(page,390);await page.clock.setFixedTime(new Date('2026-10-30T12:00:00Z'));
- await page.locator('[data-p3-filter="14"]').click();await expect(page.locator('[data-p3-day] option')).toHaveCount(2);
- await changeMonth(page,'2026-11');await page.locator('[data-p3-filter="7"]').click();await expect(page.locator('[data-p3-day] option')).toHaveCount(7);
- await page.locator('[data-p3-filter="custom"]').click();await expect(page.locator('[data-p3-custom]')).toHaveAttribute('min','2026-11-01');await expect(page.locator('[data-p3-custom]')).toHaveAttribute('max','2026-11-30');
+ await page.locator('[data-p3-filter]').selectOption('14');await expect(page.locator('[data-p3-day] option')).toHaveCount(2);
+ await changeMonth(page,'2026-11');await page.locator('[data-p3-filter]').selectOption('7');await expect(page.locator('[data-p3-day] option')).toHaveCount(7);
+ await page.locator('[data-p3-filter]').selectOption('custom');await expect(page.locator('[data-p3-custom]')).toHaveAttribute('min','2026-11-01');await expect(page.locator('[data-p3-custom]')).toHaveAttribute('max','2026-11-30');
  await page.locator('[data-p3-custom]').fill('2026-12-01');await page.locator('[data-p3-custom]').dispatchEvent('change');
  await expect(page.locator('[data-p3-outlook]')).toContainText('binnen de geselecteerde maand');
  await expect(page.locator('.p3-line')).toHaveCount(0);
  await changeMonth(page,'2026-09');await expect(page.locator('[data-p3-day] option')).toHaveCount(30);
- await expect(page.locator('.p3-line')).toHaveCount(0);await expect(page.locator('[data-p3-point-detail]')).toContainText('Saldo onbekend');
+ await expect(page.locator('.p3-line')).toHaveCount(0);await page.locator('[data-p3-day]').selectOption('2026-09-01');await expect(page.locator('[data-p3-point-detail]')).toContainText('Saldo onbekend');
  await page.screenshot({path:'.cache/dashboard-selected-month/september-onbekend-390.png',fullPage:true});
 });
 test('late oktoberrespons kan november niet overschrijven',async({page})=>{
  await boot(page,390);
  await page.evaluate(()=>{const original=FinizeLiquidity;window.__monthDelayed=[];window.FinizeLiquidity={...original,project:async options=>{const result=await original.project(options);if(options.startDate==='2026-10-14')await new Promise(resolve=>window.__monthDelayed.push(resolve));return result;}};});
- await page.locator('[data-p3-filter="7"]').click();await page.waitForFunction(()=>__monthDelayed.length===1);
+ await page.locator('[data-p3-filter]').selectOption('7');await page.waitForFunction(()=>__monthDelayed.length===1);
  await changeMonth(page,'2026-11');await page.evaluate(()=>__monthDelayed.forEach(resolve=>resolve()));
  await expect(page.locator('[data-p3-period]')).toContainText('1 nov – 30 nov 2026');
  await expect(page.locator('[data-p3-day] option')).toHaveCount(30);
  await page.reload();await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
- await expect(page.locator('[data-p3-filter="month"]')).toHaveAttribute('aria-pressed','true');
+ await expect(page.locator('[data-p3-filter]')).toHaveValue('month');
  await expect(page.locator('[data-p3-period]')).toContainText('1 nov – 30 nov 2026');
 });
 test('historisch salarisfilter en toekomstige korte horizon blijven bij hun geselecteerde maand',async({page})=>{
- await boot(page,390);await changeMonth(page,'2026-09');await page.locator('[data-p3-filter="salary"]').click();
- await expect(page.locator('[data-p3-period]')).toContainText('1 sep – 24 sep 2026');
- await expect(page.locator('[data-p3-day] option')).toHaveCount(24);await expect(page.locator('.p3-line')).toHaveCount(0);
- await changeMonth(page,'2026-11');await page.locator('[data-p3-filter="7"]').click();
+ await boot(page,390);await changeMonth(page,'2026-09');await page.locator('[data-p3-filter]').selectOption('salary');
+ await expect(page.locator('[data-p3-period]')).toContainText('1 sep – 25 sep 2026');
+ await expect(page.locator('[data-p3-day] option')).toHaveCount(25);await expect(page.locator('.p3-line')).toHaveCount(0);
+ await changeMonth(page,'2026-11');await page.locator('[data-p3-filter]').selectOption('7');
  await expect(page.locator('[data-p3-period]')).toContainText('1 nov – 7 nov 2026');
  await expect(page.locator('[data-p3-day] option')).toHaveCount(7);
- await page.locator('[data-p3-context="persoonlijk"]').click();await page.locator('[data-p3-filter="salary"]').click();
+ await page.evaluate(()=>{const p=state.accountProfiles.find(p=>p.id==='ux-dion');p.liquidity.allowanceDays={};p.liquidity.salaryDays={};});
+ await page.locator('[data-p3-context="persoonlijk"]').click();await page.locator('[data-p3-filter]').selectOption('salary');
  await expect(page.locator('[data-p3-period]')).toContainText('onbekend');
- await expect(page.locator('[data-p3-chart]')).toContainText('betrouwbare volgende salarisdatum ontbreekt');
+ await expect(page.locator('[data-p3-chart]')).toContainText('Een betrouwbaar volgend salaris- of zakgeldmoment ontbreekt. Kies een andere periode of controleer de inkomensplanning bij Bankrekeningen.');
 });
 
 
@@ -118,14 +122,14 @@ for(const width of [390,430,1440])test('betalingskaart toont toekomstige vaste p
  await expect(list).not.toContainText('Voorlopig');
  expect(await page.locator('.p3-line').evaluateAll(nodes=>nodes.map(n=>n.getAttribute('d')))).toEqual(paths);
 
- await expect(list.locator('..').locator('.p3-head button')).toHaveCount(0);
+ await expect(list.locator('..').locator('[data-p3-action="payments"]')).toBeVisible();
  const scroll=await list.evaluate(el=>{el.scrollTop=el.scrollHeight;return {height:el.clientHeight,content:el.scrollHeight,top:el.scrollTop,overflow:getComputedStyle(el).overflowY};});
  expect(scroll.height).toBeLessThanOrEqual(360);expect(scroll.content).toBeGreaterThan(scroll.height);expect(scroll.top).toBeGreaterThan(0);expect(scroll.overflow).toBe('auto');
  fs.mkdirSync('.cache/upcoming-payments',{recursive:true});
  await page.screenshot({path:'.cache/upcoming-payments/dashboard-'+width+'.png',fullPage:true});
- await page.locator('[data-p3-filter="7"]').click();
+ await page.locator('[data-p3-filter]').selectOption('7');
  await expect(list.locator('time')).toHaveCount(10);
- await page.locator('[data-p3-filter="custom"]').click();
+ await page.locator('[data-p3-filter]').selectOption('custom');
  await page.locator('[data-p3-custom]').fill('2026-10-19');
  await page.locator('[data-p3-custom]').dispatchEvent('change');
  await expect(list).toContainText('Geen toekomstige vaste betalingen of inkomsten');

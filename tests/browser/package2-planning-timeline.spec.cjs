@@ -1,3 +1,4 @@
+const testOrigin=require('./helpers/test-origin.cjs');
 const fs=require('node:fs'),path=require('node:path');
 const {test,expect}=require('@playwright/test');
 const fixture=JSON.parse(fs.readFileSync(path.join(__dirname,'../fixtures/v50-visual-state.json'),'utf8'));
@@ -35,7 +36,7 @@ for(const width of [390,1440])test(`Historische/future editors en herladen op ${
   expect(await page.evaluate(()=>({writes:window.__writes,revision:state.meta.revision}))).toEqual(initial);
   await month(page,'2027-01');await nav(page,'gezamenlijk');
   await page.locator('#tab-gezamenlijk [data-u3-planning-owner="gezamenlijk"]').first().click();
-  await page.getByRole('dialog').locator('.u3-admin-row').filter({hasText:'Historische hypotheek'}).getByRole('button',{name:'Bewerken'}).click();
+  await page.getByRole('dialog').locator('.u3-admin-row').filter({hasText:'Historische hypotheek'}).click();
   await page.locator('#u3RecAmount').fill('1900');await page.locator('#u3RecName').fill('Hypotheek januari');await page.locator('#u3RecSave').click();
   await expect(page.getByRole('dialog').locator('.u3-admin-row').filter({hasText:'Hypotheek januari'})).toContainText('1.900,00');
   await page.getByRole('dialog').getByRole('button',{name:'Sluiten'}).click();
@@ -74,20 +75,21 @@ test('Kaartposities en afmetingen behouden op mobiel/tablet/desktop',async({page
   await page.route('**/*',route=>new URL(route.request().url()).hostname==='127.0.0.1'?route.continue():route.abort());
   await page.addInitScript(({fixture,key})=>localStorage.setItem(key,JSON.stringify(fixture)),{fixture,key});
   await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
-  for(const [width,y,height]of [[390,126.40625,100],[768,189,132],[1024,164,132],[1440,121,142]]){
+  const reference=require('../fixtures/main-r46-layout.json');
+  for(const width of [360,390,430,768,1024,1440]){
     await page.setViewportSize({width,height:900});await page.evaluate(()=>renderActiveTab());
-    const bounds=await page.locator(width<768?'.mobile-kpi-grid':'.u5-primary-kpi').first().boundingBox();
-    expect(bounds.y).toBeCloseTo(y,1);expect(bounds.height).toBeCloseTo(height,1);
+    const bounds=await page.locator('.p3-surface').boundingBox();
+    for(const key of ['x','y','width','height'])expect(bounds[key]).toBeCloseTo(reference.viewports[width][key],1);
   }
 });
 test('twee devices/cloudmock delen historie; echo heeft geen nieuwe write',async({page,browser})=>{
   await boot(page);await month(page,'2026-10');await nav(page,'gezamenlijk');
   await page.locator('#tab-gezamenlijk [data-u3-planning-owner="gezamenlijk"]').first().click();
-  await page.getByRole('dialog').locator('.u3-admin-row').filter({hasText:'Historische hypotheek'}).getByRole('button',{name:'Bewerken'}).click();
+  await page.getByRole('dialog').locator('.u3-admin-row').filter({hasText:'Historische hypotheek'}).click();
   await page.locator('#u3RecAmount').fill('1850');await page.locator('#u3RecSave').click();
   await expect.poll(()=>fixedValue(page,'2026-10')).toBe(1850);
   const documentData=await page.evaluate(()=>({state:structuredClone(state),syncVersion:15,commitId:'timeline-device-a'}));
-  const secondContext=await browser.newContext({baseURL:'http://127.0.0.1:4173',serviceWorkers:'block'});
+  const secondContext=await browser.newContext({baseURL:testOrigin,serviceWorkers:'block'});
   const deviceB=await secondContext.newPage();await boot(deviceB);
   expect(await fixedValue(deviceB,'2026-10')).toBe(1807);
   const result=await deviceB.evaluate(async documentData=>{

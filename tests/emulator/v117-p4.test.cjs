@@ -4,7 +4,8 @@ const {newHousehold}=require('../helpers/v117-p4-browser.cjs');
 const {token}=require('../helpers/v117-p3-emulator.cjs');
 const {createEmulatorRecordTransport}=require('../../src/storage/firestore-record-transport.mjs');
 const {createRecordCloudStore}=require('../../src/storage/cloud-records.mjs');
-async function empty(){const f=await newHousehold();return {...f,store:createRecordCloudStore({householdId:f.householdId,transport:createEmulatorRecordTransport({token:token(f.email)})})};}
+const {host}=require('../helpers/isolated-emulator.cjs');
+async function empty(){const f=await newHousehold();return {...f,store:createRecordCloudStore({householdId:f.householdId,transport:createEmulatorRecordTransport({token:token(f.email),...(host?{host}:{})})})};}
 test('P4 actual rules: initialize empty cloud with local CSV history, without a legacy document',async()=>{
   const f=await empty(),s=state(),batch=materialize(s,[row('first','naar-spaarrekening',-50,{savingsGoalId:'goal'})]);
   await f.store.initializeNew({state:s,imports:[batch],epoch:'fresh',approveTestCutover:true});

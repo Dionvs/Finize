@@ -90,6 +90,9 @@
   html body.v4-app .mt-surface .mt-pot{border:0;background:var(--mt-pale);color:#465d2c;border-radius:20px;min-height:44px;padding:5px 9px;white-space:nowrap;font-size:11px}
   .mt-pot strong{font-size:12px;margin-left:4px}
   .mt-goal{border-bottom:1px solid var(--mt-line)}
+  .mt-goal[data-reorder-goal]{display:flex;align-items:center;gap:6px}
+  .mt-goal[data-reorder-goal]>.goal-direct-order-controls{flex:0 0 44px;width:44px;height:88px;grid-template-rows:repeat(2,44px)}
+  .mt-goal[data-reorder-goal]>.mt-goal-open{min-width:0;flex:1}
   .mt-goal-open{display:flex;align-items:flex-start;width:100%;gap:10px;text-align:left;padding:11px 0;border:0;background:transparent;border-radius:0;min-height:70px}
   .mt-goal .joint-savings-goal-icon{display:grid;place-items:center;flex:0 0 36px;width:36px!important;height:36px!important;min-width:36px!important;border-radius:50%!important;background-color:var(--mt-pale)!important;color:var(--mt-green)!important;background-size:cover;background-position:center}
   .mt-goal .joint-savings-goal-icon svg{width:22px;height:22px}

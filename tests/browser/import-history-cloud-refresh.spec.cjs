@@ -50,7 +50,7 @@ for(const width of [390,1440])for(const changed of [false,true])test(`legacy his
     expect(local.rows[0].processing.note).toBe('Een echte lokale wijziging tijdens ophalen');
     expect(local.version).toBeUndefined();expect(local.operationId).toBeUndefined();
   }else{
-    await expect(modal.locator('h2')).toHaveText('Importdetails');
+    await expect(modal.getByRole('heading',{name:'Importdetails',exact:true})).toHaveText('Importdetails');
     await expect(modal).toContainText('Historische Septemberregel');
     await expect(modal).not.toContainText('Ophalen mislukt');
     const local=await page.evaluate(()=>FinizeUpdate4Runtime.ImportStore.getImport('history-september'));

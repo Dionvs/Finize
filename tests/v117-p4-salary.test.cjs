@@ -20,7 +20,7 @@ test('P4 explicitly reopened legacy salary restores configured forecast and pres
   assert.deepEqual(s.incomeDefaultsHistory,before.incomeDefaultsHistory);
 });
 function salary(id,person,amount,date='2026-10-03',employer='NL10EMPLOYER'){
-  const r=row(id,'salaris',amount,{salaryLinkVersion:117,salaryPersonId:person});r.bankOriginal.bankDate=date;r.bankOriginal.counterpartyAccount=employer;return r;
+  const r=row(id,'salaris',amount,{salaryLinkVersion:117,salaryPersonId:person,processingDate:date});r.bankOriginal.bankDate=date;r.bankOriginal.counterpartyAccount=employer;return r;
 }
 test('P4 actual Dion 2530 and Dara 3200 replace only their planned salaries',()=>{
   const s=fixture(),goals=structuredClone(s.savingsGoalLedger);materialize(s,[salary('dion','dion',2530),salary('dara','dara',3200)],'both');
@@ -55,6 +55,19 @@ test('P4 holiday and bonus remain extra receipts even if linked to a salary sour
   for(const [description,type]of [['Vakantiegeld','vakantiegeld'],['Bonus','overige-inkomsten'],['Nabetaling','nabetaling']]){
     const p=imports.classifyOriginal({description,rawDescription:description,amount:100,bankDate:'2026-10-05',counterpartyAccount:'NL10EMPLOYER',accountIdentifier:'NL01JOINT'},s.accountProfiles[0],rules,s.accountProfiles,[],s.transactions);
     assert.equal(p.processing.transactionType,type);assert.equal(p.processing.salaryPersonId,undefined);assert.equal(p.approvalSource,'');
+  }
+});
+
+test('P4 salary description and approved person survive a later bonus rule from the same account',()=>{
+  const s=fixture();materialize(s,[salary('old','dion',2530)]);
+  const rules=[{id:'bonus-rule',enabled:true,level:'counterparty',value:'NL10EMPLOYER',transactionType:'overige-inkomsten',category:'Inkomen',displayName:'Bonus'}];
+  const original={description:'Salaris werkgever september',rawDescription:'Salaris werkgever september',amount:2530,bankDate:'2026-09-30',counterpartyAccount:'NL10EMPLOYER',accountIdentifier:'NL01JOINT'};
+  const before=structuredClone(s);
+  const proposal=imports.classifyOriginal(original,s.accountProfiles[0],rules,s.accountProfiles,[],s.transactions);
+  assert.equal(proposal.processing.transactionType,'salaris');assert.equal(proposal.processing.salaryPersonId,'dion');assert.match(proposal.processing.description.toLowerCase(),/salaris/);assert.equal(proposal.approvalSource,'');assert.equal(proposal.certainty,'nakijken');assert.deepEqual(s,before);
+  for(const change of [{counterpartyAccount:'NL99UNKNOWN'},{accountIdentifier:'NL02OTHER'},{description:'Ontvangst',rawDescription:'Ontvangst'},{amount:-2530}]){
+    const p=imports.classifyOriginal({...original,...change},s.accountProfiles[0],rules,s.accountProfiles,[],s.transactions);
+    assert.notEqual(p.processing.salaryPersonId,'dion');assert.equal(p.approvalSource,'');
   }
 });
 test('P4 bank month boundary and later salary planning preserve historic actuals',()=>{

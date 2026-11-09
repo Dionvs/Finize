@@ -25,6 +25,6 @@ ast.walkDecls(decl => {
 
 const undefinedTokens = [...used].filter(token => !defined.has(token) && !runtimeTokens.has(token)).sort();
 if (undefinedTokens.length) {
-  console.warn(`Bekende v50-tokens zonder definitie: ${undefinedTokens.join(", ")}`);
+  console.warn(`CSS-variabelen zonder definitie: ${undefinedTokens.join(", ")}`);
 }
 console.log(`CSS geldig: ${ast.nodes.length} hoofdnodes, ${undefinedTokens.length} bekende ongedefinieerde tokens.`);

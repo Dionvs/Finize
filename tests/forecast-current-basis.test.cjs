@@ -32,7 +32,7 @@ test('historical reconciliation is presentation-only, once at today, and preserv
   const source=JSON.stringify(s),legacy=selectDailyLiquidity(s,legacyOptions),p=graph(s,'month'),basis=p.events.filter(e=>e.type==='balance-basis'),today=p.days.find(d=>d.date===o.asOfDate),previous=p.days.filter(d=>d.date<o.asOfDate).at(-1);
   assert.equal(JSON.stringify(s),source);assert.deepEqual(p.days.filter(d=>d.date<o.asOfDate),legacy.days.filter(d=>d.date<o.asOfDate));
   assert.equal(basis.length,sign===0?0:1);if(sign)assert.equal(Math.sign(basis[0].amountCents),sign);
-  assert.equal(today.openingBalanceCents+today.mutationCents,today.expectedBalanceCents);assert.equal(today.expectedBalanceCents,200000);
+  assert.equal(today.openingBalanceCents+today.mutationCents,today.expectedBalanceCents);assert.equal(today.cashBalanceCents,200000);assert.equal(today.reservedObligationCents,sign>0?10000:0);assert.equal(today.expectedBalanceCents,200000-today.reservedObligationCents);
   if(sign)assert.equal(today.openingBalanceCents,previous.expectedBalanceCents);
   for(const d of p.days.filter(d=>d.date>o.asOfDate))assert(!d.eventIds.some(id=>id.startsWith('view-balance-basis:')));
   assert(!legacy.events.some(e=>e.type==='balance-basis'));assert.deepEqual(graph(s,'month'),p);

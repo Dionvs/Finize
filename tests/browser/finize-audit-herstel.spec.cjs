@@ -18,7 +18,7 @@ async function boot(page,customCsv=''){
 }
 test('audit six selected retain category and approval after native IndexedDB reload; seventh unchanged',async({page},info)=>{
  const id=await boot(page);
- await page.locator('[data-u4-row]').first().locator('[data-u4-approve]').click();
+ await page.locator('[data-u4-row]').first().locator('[data-u4-focus-open]').click();await page.locator('[data-u4-row]').first().locator('[data-u4-approve]').click();
  await expect(page.locator('[data-u4-match-id]')).toHaveCount(7);
  await page.locator('[data-u4-match-id]').last().uncheck();
  await expect(page.locator('[data-u4-match-apply]')).toContainText('(6)');
@@ -43,7 +43,7 @@ test('audit mixed month presentation pins context and limits all matches and bul
  page.once('dialog',async dialog=>{expect(dialog.message()).toContain('5 transacties');await dialog.accept();});await page.locator('[data-u4-apply-bulk]').click();
  const scoped=await page.evaluate(async id=>(await FinizeUpdate4.importStore.getJournal('editor-draft-'+id))?.draft.rows.map(row=>row.processing.category),id);
  await expect.poll(()=>page.evaluate(async id=>(await FinizeUpdate4.importStore.getJournal('editor-draft-'+id))?.draft.rows.map(row=>row.processing.category),id)).toEqual([...Array(3).fill('Kleding'),...Array(5).fill('Ongecategoriseerd')]);
- await page.locator('[data-u4-row]').first().locator('[data-u4-field=category]').selectOption('Kleding');
+ await page.locator('[data-u4-row]').first().locator('[data-u4-focus-open]').click();await page.locator('[data-u4-row]').first().locator('[data-u4-field=category]').selectOption('Kleding');
  await page.evaluate(()=>{state.meta.selectedMonth='2026-09';});
  await page.locator('[data-u4-row]').first().locator('[data-u4-approve]').click();
  await expect(page.locator('[data-u4-match-id]')).toHaveCount(5);
@@ -51,7 +51,7 @@ test('audit mixed month presentation pins context and limits all matches and bul
  await expect(page.locator('[data-u4-month-context]')).toContainText('oktober');
  const rows=await page.evaluate(async id=>(await FinizeUpdate4.importStore.getImport(id)).rows,id);
  expect(rows.slice(0,3).every(row=>!row.approvalSource)).toBe(true);expect(rows.map(row=>row.bankOriginal)).toEqual(originals);
- await page.locator('[data-u4-view-month]').selectOption('');await expect(page.locator('[data-u4-row]')).toHaveCount(8);
+ await page.locator('.u4-focus-row [data-u4-focus-back]').click();await page.locator('[data-u4-view-month]').selectOption('');await expect(page.locator('[data-u4-row]')).toHaveCount(8);
  await page.locator('[data-u4-view-month]').selectOption('2026-09');await expect(page.locator('[data-u4-row]')).toHaveCount(3);
  await expect(page.locator('.u4-import-summary')).toContainText('33,00');
  await page.screenshot({path:info.outputPath('september-only.png'),fullPage:true});
@@ -65,7 +65,7 @@ test('audit mixed month presentation pins context and limits all matches and bul
 });
 test('audit native storage failure reports partial group and retry never doubles approved effects',async({page})=>{
  const id=await boot(page);
- await page.locator('[data-u4-row]').first().locator('[data-u4-approve]').click();
+ await page.locator('[data-u4-row]').first().locator('[data-u4-focus-open]').click();await page.locator('[data-u4-row]').first().locator('[data-u4-approve]').click();
  await page.locator('[data-u4-match-id]').last().uncheck();
  await page.evaluate(()=>{
   const put=IDBObjectStore.prototype.put;let writes=0;
@@ -82,7 +82,7 @@ test('audit native storage failure reports partial group and retry never doubles
  await page.reload();await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
  expect(await page.evaluate(()=>state.transactions.filter(row=>row.recordRole!=='bank-source').length)).toBe(1);
  await page.evaluate(id=>FinizeUpdate4.openImportDetails(id),id);
- await page.locator('.u4-section-review [data-u4-approve]').first().click();
+ await page.locator('.u4-section-review [data-u4-focus-open]').first().click();await page.locator('.u4-section-review [data-u4-approve]').first().click();
  await page.locator('[data-u4-match-id]').last().uncheck();
  await page.locator('[data-u4-match-apply]').click();
  await expect(page.locator('[data-u4-group-result]')).toContainText('5 van 5');
@@ -94,18 +94,18 @@ test('audit five Middelburg plus three Vlissingen form eight independent approva
  const id=await boot(page,csv);
  await expect(page.locator('[data-u4-undated]')).toContainText('1 bronregel');
  const before=await page.evaluate(async id=>(await FinizeUpdate4.importStore.getImport(id)).rows.map(row=>row.bankOriginal),id);
- await page.locator('[data-u4-row]').first().locator('[data-u4-approve]').click();await expect(page.locator('[data-u4-match-id]')).toHaveCount(8);
+ await page.locator('[data-u4-row]').first().locator('[data-u4-focus-open]').click();await page.locator('[data-u4-row]').first().locator('[data-u4-approve]').click();await expect(page.locator('[data-u4-match-id]')).toHaveCount(8);
  await page.locator('[data-u4-match-apply]').click();await expect(page.locator('[data-u4-group-result]')).toContainText('8 van 8');
  const final=await page.evaluate(async id=>({rows:(await FinizeUpdate4.importStore.getImport(id)).rows,effects:state.transactions.filter(row=>row.recordRole!=='bank-source')}),id);
  expect(final.effects).toHaveLength(8);expect(new Set(final.effects.map(row=>row.id)).size).toBe(8);expect(final.rows.map(row=>row.bankOriginal)).toEqual(before);
  expect(final.rows[8].approvalSource).toBe('');expect(final.rows[9].approvalSource).toBe('');
- await page.locator('select[data-u4-view-month]').selectOption('');await expect(page.locator('.u4-modal-body')).toContainText('Importfouten');
+ await page.locator('.u4-focus-row [data-u4-focus-back]').click();await page.locator('select[data-u4-view-month]').selectOption('');await expect(page.locator('.u4-modal-body')).toContainText('Importfouten');
  await page.reload();await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);expect(await page.evaluate(()=>state.transactions.filter(row=>row.recordRole!=='bank-source').length)).toBe(8);
 });
 test('audit existing fixed occurrence flow replaces 100 planning with 110 actual and keeps future settings',async({page},info)=>{
  await boot(page,'Datum;Omschrijving;Rekening;Bedrag\n2026-10-03;Hypotheek;NL01JOINT;-110.00');
  await page.evaluate(()=>commitChange(()=>{state.recurringFixedExpenses=[{id:'fixed-test',naam:'Hypotheek',categorie:'Wonen',bedrag:100,financialFor:'gezamenlijk',rekening:'gezamenlijk',begindatum:'2026-01-03',actief:true,frequentieAantal:1,frequentieEenheid:'maanden',amountHistory:[{effectiveFrom:'2026-01-01',amount:100}]}];},{render:false}));
- const card=page.locator('[data-u4-row]').first();await card.locator('[data-u4-field=category]').selectOption('Vaste lasten');
+ const card=page.locator('[data-u4-row]').first();await card.locator('[data-u4-focus-open]').click();await card.locator('[data-u4-field=category]').selectOption('Vaste lasten');
  await card.locator('[data-u4-field=fixedExpenseId]').selectOption('fixed-test');await card.locator('[data-u4-field=fixedOccurrenceId]').selectOption('fixed-test:2026-10-03');
  await expect(card).toContainText('De toekomstige planning blijft behouden');
  await card.screenshot({path:info.outputPath('fixed-occurrence.png')});
@@ -114,7 +114,7 @@ test('audit existing fixed occurrence flow replaces 100 planning with 110 actual
 });
 test('audit six approvals use real IndexedDB and simulated record-cloud responses with durable readback',async({page})=>{
  const id=await boot(page);await require('../helpers/audit-record-cloud.cjs').attachMockRecordCloud(page);
- await page.locator('[data-u4-row]').first().locator('[data-u4-approve]').click();await page.locator('[data-u4-match-id]').last().uncheck();await page.locator('[data-u4-match-apply]').click();
+ await page.locator('[data-u4-row]').first().locator('[data-u4-focus-open]').click();await page.locator('[data-u4-row]').first().locator('[data-u4-approve]').click();await page.locator('[data-u4-match-id]').last().uncheck();await page.locator('[data-u4-match-apply]').click();
  await expect(page.locator('[data-u4-group-result]')).toContainText('6 van 6');
  const outcome=await page.evaluate(()=>auditRecordSession.sync());expect(outcome.outcome).toBe('committed');
  const remote=await page.evaluate(async id=>{const batch=await auditRecordSession.loadImport(id);return {approvals:batch.rows.map(row=>row.approvalSource),integrity:(await auditRecordSession.cloudStore.verifyIntegrity()).head.revision};},id);
@@ -147,7 +147,7 @@ for(const width of [320,430,1440])test('audit import presentation and approval d
  const errors=[];page.on('pageerror',error=>errors.push(error.message));await boot(page);await page.setViewportSize({width,height:900});
  await expect(page.locator('select[data-u4-view-month]')).toHaveValue('2026-10');
  expect(await page.locator('.u4-import-modal').evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
- await page.locator('[data-u4-row]').first().locator('[data-u4-approve]').click();await expect(page.locator('[data-u4-match-id]')).toHaveCount(7);
+ await page.locator('[data-u4-row]').first().locator('[data-u4-focus-open]').click();await page.locator('[data-u4-row]').first().locator('[data-u4-approve]').click();await expect(page.locator('[data-u4-match-id]')).toHaveCount(7);
  expect(await page.locator('.u4-match-dialog').evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
  await page.screenshot({path:info.outputPath('review-'+width+'.png')});expect(errors).toEqual([]);
 });

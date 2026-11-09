@@ -1,3 +1,4 @@
+const testOrigin=require('./helpers/test-origin.cjs');
 const {test,expect}=require('@playwright/test');
 const {boot,attach,newHousehold,importTen}=require('../helpers/v117-p4-browser.cjs');
 const {state,row,materialize}=require('../helpers/package5-fixture.cjs');
@@ -27,6 +28,7 @@ for(const count of [20,100])test(`P4.4 ${count} sources: native failure at appro
   // Unattempted sources retain their previous durable choices. Explicitly choose
   // the shared destination again; selecting alone must never invent that choice.
   const remaining=page.locator('[data-u4-row]').filter({has:page.locator('[data-u4-select-approval]')}).first();
+  await remaining.locator('[data-u4-focus-open]').click();
   await remaining.locator('[data-u4-family]').selectOption('sparen');await remaining.locator('[data-u4-field="transactionType"]').selectOption('naar-spaarrekening');await remaining.locator('[data-u4-field="savingsGoalId"]').selectOption('goal');
   await remaining.locator('[data-u4-approve]').click();await expect(page.locator('[data-u4-match-apply]')).toHaveText('Geselecteerde transacties goedkeuren (3)');await page.locator('[data-u4-match-apply]').click();
   await expect(page.locator('[data-u4-group-result]')).toContainText('3 van 3 transacties goedgekeurd');
@@ -34,7 +36,7 @@ for(const count of [20,100])test(`P4.4 ${count} sources: native failure at appro
   expect(final.sources.map(r=>r.bankOriginal)).toEqual(beforeRestart.sources.map(r=>r.bankOriginal));
   await page.unroute(require('../helpers/isolated-emulator.cjs').browserPattern);await attach(page,f);const syncStarted=performance.now();expect((await page.evaluate(()=>p4.sync())).outcome).toBe('committed');const cloudMs=performance.now()-syncStarted;
   const once=await page.evaluate(()=>p4.cloudStore.verifyIntegrity());expect(JSON.parse(once.global.payload).bankSourceCount).toBe(count+10);expect(JSON.parse(once.global.payload).totalsCents.savingsDeposit).toBe(75000);await page.evaluate(()=>p4.sync());expect(await page.evaluate(()=>p4.cloudStore.verifyIntegrity())).toEqual(once);
-  const secondContext=await browser.newContext({baseURL:'http://127.0.0.1:4173',serviceWorkers:'block'});
+  const secondContext=await browser.newContext({baseURL:testOrigin,serviceWorkers:'block'});
   try{const second=await secondContext.newPage();await boot(second,f);await attach(second,f);expect(await second.evaluate(()=>FinizeTransactions.total('savingsDeposit'))).toBe(750);expect(await second.evaluate(()=>FinizeTransactions.total('budgetImpact'))).toBe(count*10);
     expect(await second.evaluate(ids=>state.transactions.filter(r=>r.recordRole==='bank-source'&&ids.includes(r.id)),partial.sourceIds)).toEqual(final.sources);
   }finally{await secondContext.close();}

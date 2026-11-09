@@ -38,7 +38,7 @@ test('V117 P2 missing referenced record is an integrity error, never an empty fi
 });
 
 test('V117 P2 every financial storage caller awaits or returns its asynchronous result',()=>{
-  const fs=require('node:fs'),{babelParse,traverse}=require('../node_modules/playwright/lib/transform/babelBundle.js'),violations=[];
+  const fs=require('node:fs'),path=require('node:path'),playwright=path.dirname(require.resolve('playwright',{paths:[require.resolve('@playwright/test')]})),{babelParse,traverse}=require(path.join(playwright,'lib/transform/babelBundle.js')),violations=[];
   for(const file of ['src/core/runtime.js','src/import/runtime.js']){
     const source=fs.readFileSync(require('node:path').join(__dirname,'..',file),'utf8');
     traverse(babelParse(source,file,false),{CallExpression(p){

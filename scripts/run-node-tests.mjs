@@ -5,17 +5,11 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const tests = (await readdir(path.join(root, "tests")))
-  .filter(file => file.endsWith(".test.cjs"))
+  .filter(file => /\.test\.(cjs|mjs)$/.test(file) && file !== 'v118-p5b-retention-emulator.test.mjs')
   .sort();
 
-for (const test of tests) {
-  const result = spawnSync(process.execPath, [path.join("tests", test)], {
-    cwd: root,
-    encoding: "utf8"
-  });
-  process.stdout.write(result.stdout);
-  process.stderr.write(result.stderr);
-  if (result.status !== 0) process.exit(result.status ?? 1);
-}
-
-console.log(`${tests.length} Node-tests geslaagd.`);
+// Pure backend tests import the same generated shared modules as the deployment.
+await import('../functions/build.mjs');
+console.log(`${tests.length} Node-testbestanden; bankretentie-emulatortest afzonderlijk (vereist loopback-emulator 8189).`);
+const result = spawnSync(process.execPath, ['--test','--test-concurrency=1',...tests.map(test=>path.join('tests',test))], {cwd:root,stdio:'inherit'});
+process.exit(result.status ?? 1);

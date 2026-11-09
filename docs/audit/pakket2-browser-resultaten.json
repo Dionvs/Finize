@@ -1,0 +1,4579 @@
+{
+  "date": "2026-11-09",
+  "inventory": 647,
+  "counts": {
+    "passed": 624,
+    "failed": 14,
+    "blocked": 7,
+    "skipped": 2
+  },
+  "method": "Per actuele unieke (bestand,titel) het nieuwste werkelijk uitgevoerde resultaat op result.startTime; drie gedocumenteerde historische titelaliassen; tijdelijke tegenproef salary-distinct-control uitgesloten. blocked betekent niet voltooid, geen Playwright-pass. Geen optelling van overlappende runs.",
+  "reportRoot": ".cache/pakket2",
+  "reportSha256": {
+    "smoke-after-budget.json": "e7af77558e91729f6c768dabdf82f9208486b1065a651999583f014c8ddeb721",
+    "browser-full-final.json": "d6bcae23a6f8c65eed4e8f7170e7cf6de38896af38ec1ef4af4baf7118ef680d",
+    "income-parity.json": "ccbc0f986d421d79de0321c0cf78058566ffdddd4a8a96a87ed20d53b6caa1c3",
+    "history-income-followup.json": "a1691c8fdbdc9b4a70d3d7e3c8d91d854c013334f19428d7781d20e7dd29f518",
+    "mobile-modal-followup.json": "e53426b9e8d11ce63f9ddb1ca1fd82e13ab54b2b87d7e6e654bcdc73fc45bc23",
+    "mobile-modal-final.json": "d073003487594a66792328b6d10e2457e7d799bb7173667a564ab7b7c4fe3499",
+    "old-shell-upgrades.json": "516437d308eb73943c50a37f88d5b8ae650d5a5c1ad2b05c2f5b8434eda111e7",
+    "balance-timing.json": "e7beffc0eb2d4b3c4bce82f2a29712f9714a457fd2ce473aec4ddb04bf8314cd",
+    "month-end-current.json": "20cb0743ee59f0b4c74914e89e2b164117869830fd0f53949486124b9db37a03",
+    "reference-and-history.json": "551d1968957bfcddab97508bc9d50b1fa23eb8647b385c8fc6178fa24bf3a0a5",
+    "pkg3-final.json": "24f1524eadc863a7edf9fff5dd9ef943aa0116037117ad0c0a6755a62d965266",
+    "financial-editors-retest.json": "2eab09d1d742b6267f7117c5ad0a397bae5eb590f75925edd2b4ed92f7343e54",
+    "p4-p5-current.json": "d88a90ff8c102277b418fb5dd7403e75d2df7c4c04f6e76c390d9f287da2b033",
+    "financial-editors-final.json": "acc717c947a9120fb0039c59d764b35168de9fdcedc48629dd1eb73bd9eab962",
+    "ui-followup.json": "0b1dbe711e2994bdd21033b1edb96c7e840ff24abda36b9444d09fff361c6fee",
+    "current-routes.json": "d6b0abd64e503656cc4d56a8a951a9b31a9d780931b25da6cf0082be36cfde4f",
+    "source-route.json": "9248359aaf137d368822d3ffe00ceec72c057cda60409aa87df193c80c2d37c5",
+    "budget-bar-fixed.json": "5f4903d49e1db30274af5b42e52ff8a664cd096d2cc8fe325d037d324c5b7d60",
+    "p1-current.json": "a18a4e261f57f30057a03fa977a62ed38657705b7fa081d07aca7b39c9c9e064",
+    "p2-current.json": "55486131eabeac7329fbb02fd049f21b2ccd3fef02f63123cb31a9ca300d7cc5",
+    "records-retest.json": "fb0e16bcdd8d03b803ffaf975b51dcb36b0ba5bec7a804bdb07f39ef1376024b",
+    "editor-delegation-stack.json": "6b80742c74d080aac83500e25a3d0493f7cea8e6cdaa35ed3607f8245d6f5783",
+    "emulator-browser-targeted.json": "391507c014d7c93d19a91e2b0a5557033d242ae2f0b8664603bd6dadaa4078d5",
+    "salary-proposal-probe.json": "6975a86ae7ebe5b12d219ac353c9368e41783a9ca4e4d160f93785c6d1ab861d",
+    "remaining-small-records.json": "a3f88fbb8daf65ad7502e9ed9d84486012dd203adf9477e1624dd0c2921439fe",
+    "remaining-records.json": "3a2c267e033307cc265cb39e70efc541dd72d89591ba886a53daec5d836babbc",
+    "new-household-current-route.json": "e98c03982116f1e9cad916efc6fa2fd9cb9cab1d523008a4f79af5be708a49c6",
+    "records-last-two.json": "da86121f433b2b243b9b80958a8d1f3c87bf1f213ae6ed9aefb63552aa660e4a",
+    "record-partial-diagnostic.json": "e4f132ac10bde6efb4f67307400c7ffc2e0ae013c1d2a037c4473a6ea88e1e79",
+    "record-focus-retest.json": "f6e8fce58757c8da7c3b178e754368c2d4ca0650b6cd2521b9408cdec8591ca5",
+    "busy-preparation-final.json": "de4c3eab31816985b04a7ae358a9ed247d541e93fedb75e819a630764503cea8",
+    "accounts-liquidity-retest.json": "8b1582fcad599a5188cbf823fc81a5fa72c5a64b2c4aff9507054b78454ecf94",
+    "accounts-liquidity-current.json": "389900964ec052074f8017e58302ec7321734fd0853d146470e266b1e97852cc",
+    "dashboard-prognose-updated.json": "2cb3c68c556f3b64e7248868d505750f8f72c9e106688b2031bd79f67eedfeb7",
+    "dashboard-prognose-retest.json": "3155edaef52a6eb6a56c821bfabaf8262b0a3fc9c6f3b539d5e3ae04b417ce77",
+    "bank-mock-current.json": "801a9282f62d9ee76b3a8f6a41e4f8122baa26c78a975abeca92c1fb30141e53",
+    "periods-savings-retest.json": "e54bbf15fd4ce139bff6e2f635a0c2f44235bc129fa50f98ce0c757454fab402",
+    "periods-release-smoke.json": "ffddfd2e9f00b8fcf8c8eb84394086d697ad3d9913e4e08976b95a805ea57855",
+    "release-extra.json": "684f81cd784751c72e9e320cbf7c919f23e81ca9413688400d9bcab637ef6196",
+    "ux-current-retest.json": "2dca7edcf405b5a642a715591ff1916a0b42f5124a4463f99f201c4fb3d796e1",
+    "ux-last-three.json": "d62ad6c0ac5504c84f45f0c93fe7dd064ccf2c3af2f62c9c6266bad56a639841",
+    "ux-768-final.json": "3070197613bc4f92d206a23396ab0c0b776092ef481a999d2dac96e99deea678",
+    "savings-current-final.json": "22b83cfd8245b184ddd672d5ee4ee4fa394faa32a4e08c2ab2ec0a4f624c85ef"
+  },
+  "cases": [
+    {
+      "file": "bank-import-generation.spec.cjs",
+      "title": "atomic store rejects a restart batch from another household without financial writes",
+      "when": "2026-11-08T20:34:07.773Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "bank-import-generation.spec.cjs",
+      "title": "commit-time pending parent operation aborts all financial and import writes",
+      "when": "2026-11-08T20:34:05.234Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "bank-import-generation.spec.cjs",
+      "title": "confirmed generation survives repeat and reload without duplicate sources or loss of personal approval",
+      "when": "2026-11-08T20:34:01.922Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "bank-import-generation.spec.cjs",
+      "title": "deleted second account needs explicit confirmation; cancellation preserves all financial state and first approval",
+      "when": "2026-11-08T20:34:00.982Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "bank-import-generation.spec.cjs",
+      "title": "explicit approval in the new generation survives another bank update without replaying old approvals",
+      "when": "2026-11-08T20:34:03.606Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "bank-import-generation.spec.cjs",
+      "title": "financial change while confirmation is open rejects stale consent without a new generation",
+      "when": "2026-11-08T20:34:02.905Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "bank-import-generation.spec.cjs",
+      "title": "manual bank update shows explicit new-bundle confirmation and review-only result 320",
+      "when": "2026-11-08T20:34:08.613Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "bank-import-generation.spec.cjs",
+      "title": "manual bank update shows explicit new-bundle confirmation and review-only result 390",
+      "when": "2026-11-08T20:34:09.714Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "bank-import-generation.spec.cjs",
+      "title": "manual bank update shows explicit new-bundle confirmation and review-only result 430",
+      "when": "2026-11-08T20:34:10.977Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "bank-import-generation.spec.cjs",
+      "title": "native IndexedDB abort leaves no generation or financial effects; retry creates one",
+      "when": "2026-11-08T20:34:06.780Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "bank-import-generation.spec.cjs",
+      "title": "offline tombstone fallback never authorizes a new import generation",
+      "when": "2026-11-08T20:34:06.055Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "bank-import-generation.spec.cjs",
+      "title": "parallel confirmations create at most one stable generation",
+      "when": "2026-11-08T20:34:04.472Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "bootstrap-stability.spec.cjs",
+      "title": "bootstrap rendert de actieve tab exact één keer",
+      "when": "2026-11-08T20:34:11.970Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "budget-bar-refunds.spec.cjs",
+      "title": "budget bars retain signed amounts and clamp display at 1440px",
+      "when": "2026-11-08T20:34:15.092Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "budget-bar-refunds.spec.cjs",
+      "title": "budget bars retain signed amounts and clamp display at 360px",
+      "when": "2026-11-08T20:34:12.447Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "budget-bar-refunds.spec.cjs",
+      "title": "budget bars retain signed amounts and clamp display at 390px",
+      "when": "2026-11-08T20:34:13.339Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "budget-bar-refunds.spec.cjs",
+      "title": "budget bars retain signed amounts and clamp display at 430px",
+      "when": "2026-11-08T20:34:14.157Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "buffer-warning.spec.cjs",
+      "title": "dashboard-integratie 1440px",
+      "when": "2026-11-08T17:29:12.934Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "buffer-warning.spec.cjs",
+      "title": "dashboard-integratie 320px",
+      "when": "2026-11-08T17:29:08.438Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "buffer-warning.spec.cjs",
+      "title": "dashboard-integratie 390px",
+      "when": "2026-11-08T17:29:09.950Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "buffer-warning.spec.cjs",
+      "title": "dashboard-integratie 430px",
+      "when": "2026-11-08T17:29:11.446Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "buffer-warning.spec.cjs",
+      "title": "hard op 1440px",
+      "when": "2026-11-08T17:29:04.964Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "buffer-warning.spec.cjs",
+      "title": "hard op 320px",
+      "when": "2026-11-08T17:28:55.465Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "buffer-warning.spec.cjs",
+      "title": "hard op 390px",
+      "when": "2026-11-08T17:28:58.454Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "buffer-warning.spec.cjs",
+      "title": "hard op 430px",
+      "when": "2026-11-08T17:29:01.733Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "buffer-warning.spec.cjs",
+      "title": "none op 1440px",
+      "when": "2026-11-08T17:29:04.652Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "buffer-warning.spec.cjs",
+      "title": "none op 320px",
+      "when": "2026-11-08T17:28:54.800Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "buffer-warning.spec.cjs",
+      "title": "none op 390px",
+      "when": "2026-11-08T17:28:58.165Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "buffer-warning.spec.cjs",
+      "title": "none op 430px",
+      "when": "2026-11-08T17:29:01.385Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "buffer-warning.spec.cjs",
+      "title": "soft op 1440px",
+      "when": "2026-11-08T17:29:06.029Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "buffer-warning.spec.cjs",
+      "title": "soft op 320px",
+      "when": "2026-11-08T17:28:56.364Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "buffer-warning.spec.cjs",
+      "title": "soft op 390px",
+      "when": "2026-11-08T17:28:59.510Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "buffer-warning.spec.cjs",
+      "title": "soft op 430px",
+      "when": "2026-11-08T17:29:02.755Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "buffer-warning.spec.cjs",
+      "title": "uncertain op 1440px",
+      "when": "2026-11-08T17:29:07.242Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "buffer-warning.spec.cjs",
+      "title": "uncertain op 320px",
+      "when": "2026-11-08T17:28:57.406Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "buffer-warning.spec.cjs",
+      "title": "uncertain op 390px",
+      "when": "2026-11-08T17:29:00.456Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "buffer-warning.spec.cjs",
+      "title": "uncertain op 430px",
+      "when": "2026-11-08T17:29:03.764Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "dashboard-olive-live.spec.cjs",
+      "title": "Veilig te sparen blijft dezelfde berekening bij elke grafiekperiode",
+      "when": "2026-11-08T17:29:41.013Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "dashboard-olive-live.spec.cjs",
+      "title": "nieuw dashboard 1280px",
+      "when": "2026-11-08T17:29:33.691Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "dashboard-olive-live.spec.cjs",
+      "title": "nieuw dashboard 1440px",
+      "when": "2026-11-08T17:29:37.232Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "dashboard-olive-live.spec.cjs",
+      "title": "nieuw dashboard 320px",
+      "when": "2026-11-08T17:29:15.098Z",
+      "status": "failed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "dashboard-olive-live.spec.cjs",
+      "title": "nieuw dashboard 390px",
+      "when": "2026-11-08T17:29:20.035Z",
+      "status": "failed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "dashboard-olive-live.spec.cjs",
+      "title": "nieuw dashboard 430px",
+      "when": "2026-11-08T17:29:25.134Z",
+      "status": "failed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "dashboard-olive-live.spec.cjs",
+      "title": "nieuw dashboard 768px",
+      "when": "2026-11-08T17:29:30.066Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "dashboard-selected-month.spec.cjs",
+      "title": "betalingskaart toont toekomstige vaste planning en scrollt compact 1440px",
+      "when": "2026-11-08T17:30:24.381Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "dashboard-selected-month.spec.cjs",
+      "title": "betalingskaart toont toekomstige vaste planning en scrollt compact 390px",
+      "when": "2026-11-08T17:30:18.547Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "dashboard-selected-month.spec.cjs",
+      "title": "betalingskaart toont toekomstige vaste planning en scrollt compact 430px",
+      "when": "2026-11-08T17:30:21.495Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "dashboard-selected-month.spec.cjs",
+      "title": "gekozen kalendermaand, onbekende dagen en contexten 1440px",
+      "when": "2026-11-08T17:29:56.467Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "dashboard-selected-month.spec.cjs",
+      "title": "gekozen kalendermaand, onbekende dagen en contexten 320px",
+      "when": "2026-11-08T17:29:42.309Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "dashboard-selected-month.spec.cjs",
+      "title": "gekozen kalendermaand, onbekende dagen en contexten 390px",
+      "when": "2026-11-08T17:29:46.807Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "dashboard-selected-month.spec.cjs",
+      "title": "gekozen kalendermaand, onbekende dagen en contexten 768px",
+      "when": "2026-11-08T17:29:50.842Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "dashboard-selected-month.spec.cjs",
+      "title": "historisch salarisfilter en toekomstige korte horizon blijven bij hun geselecteerde maand",
+      "when": "2026-11-08T17:30:14.971Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "dashboard-selected-month.spec.cjs",
+      "title": "kalenderjaarovergang reset periode en eigen datum bij maandwissel",
+      "when": "2026-11-08T17:30:02.553Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "dashboard-selected-month.spec.cjs",
+      "title": "kort filter en eigen datum zijn begrensd; onbekende historische maand heeft geen lijn",
+      "when": "2026-11-08T17:30:07.965Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "dashboard-selected-month.spec.cjs",
+      "title": "late oktoberrespons kan november niet overschrijven",
+      "when": "2026-11-08T17:30:11.541Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "desktop-special-tabs.spec.cjs",
+      "title": "budgetten openen op desktop transacties en zijn op mobiel bewerkbaar",
+      "when": "2026-11-08T17:30:48.107Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "desktop-special-tabs.spec.cjs",
+      "title": "de gedeelde mobiele editor bewaart 50/50 in de normale tijdlijn",
+      "when": "2026-11-08T17:30:38.128Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "desktop-special-tabs.spec.cjs",
+      "title": "desktop spaardoelen en data back-up renderen volledig",
+      "when": "2026-11-08T17:30:28.207Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "desktop-special-tabs.spec.cjs",
+      "title": "een vaste last kan naast stoppen vanaf de gekozen maand worden verwijderd",
+      "when": "2026-11-08T17:30:41.797Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "desktop-special-tabs.spec.cjs",
+      "title": "mobiel en desktop beheren vaste lasten via dezelfde canonieke editor",
+      "when": "2026-11-08T17:30:34.608Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "desktop-special-tabs.spec.cjs",
+      "title": "mobiel voegt een canonieke vaste last met maanduitzondering toe en kan die stoppen",
+      "when": "2026-11-08T17:30:39.795Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "desktop-special-tabs.spec.cjs",
+      "title": "mobiele spaardoelbalken volgen de beschikbare kaartbreedte",
+      "when": "2026-11-08T17:30:50.645Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "desktop-special-tabs.spec.cjs",
+      "title": "persoonlijke spaardoelen met subdoelen klappen op desktop open",
+      "when": "2026-11-08T17:30:31.142Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "desktop-special-tabs.spec.cjs",
+      "title": "spaardoelkaarten wijzigen direct van volgorde zonder beheerpop-up",
+      "when": "2026-11-08T17:30:46.169Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "desktop-special-tabs.spec.cjs",
+      "title": "subdoelen zijn rechtstreeks in de spaardoelentabel uitklapbaar en bewerkbaar",
+      "when": "2026-11-08T17:30:32.605Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "desktop-special-tabs.spec.cjs",
+      "title": "vaste lasten laten hun verdeling aanpassen en bewaren de administratieve afschrijfdag",
+      "when": "2026-11-08T17:30:43.644Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "dynamic-html-security.spec.cjs",
+      "title": "financiële tekst blijft letterlijke tekst en voert geen HTML uit",
+      "when": "2026-11-08T20:34:16.052Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "finize-audit-herstel.spec.cjs",
+      "title": "audit existing fixed occurrence flow replaces 100 planning with 110 actual and keeps future settings",
+      "when": "2026-11-08T17:31:06.182Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "finize-audit-herstel.spec.cjs",
+      "title": "audit five Middelburg plus three Vlissingen form eight independent approvals; unknown merchant and undated source stay outside",
+      "when": "2026-11-08T17:31:03.392Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "finize-audit-herstel.spec.cjs",
+      "title": "audit import presentation and approval dialog fit 1440px without runtime errors",
+      "when": "2026-11-08T17:31:18.262Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "finize-audit-herstel.spec.cjs",
+      "title": "audit import presentation and approval dialog fit 320px without runtime errors",
+      "when": "2026-11-08T17:31:15.497Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "finize-audit-herstel.spec.cjs",
+      "title": "audit import presentation and approval dialog fit 430px without runtime errors",
+      "when": "2026-11-08T17:31:16.881Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "finize-audit-herstel.spec.cjs",
+      "title": "audit late import response cannot reopen closed modal and a historical source opens its own month",
+      "when": "2026-11-08T17:31:13.754Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "finize-audit-herstel.spec.cjs",
+      "title": "audit mixed month presentation pins context and limits all matches and bulk to that month",
+      "when": "2026-11-08T17:30:55.953Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "finize-audit-herstel.spec.cjs",
+      "title": "audit native storage failure reports partial group and retry never doubles approved effects",
+      "when": "2026-11-08T17:30:59.845Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "finize-audit-herstel.spec.cjs",
+      "title": "audit six approvals use real IndexedDB and simulated record-cloud responses with durable readback",
+      "when": "2026-11-08T17:31:08.202Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "finize-audit-herstel.spec.cjs",
+      "title": "audit six selected retain category and approval after native IndexedDB reload; seventh unchanged",
+      "when": "2026-11-08T17:30:53.143Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "fix-round-1-6.spec.cjs",
+      "title": "F1/F2 personal KPI, account tables, edit accessibility and no financial writes 1440",
+      "when": "2026-11-08T17:31:36.974Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "fix-round-1-6.spec.cjs",
+      "title": "F1/F2 personal KPI, account tables, edit accessibility and no financial writes 390",
+      "when": "2026-11-08T17:31:27.364Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "fix-round-1-6.spec.cjs",
+      "title": "F1/F2 viewport parity uses identical goals and month result",
+      "when": "2026-11-08T17:31:48.069Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "fix-round-1-6.spec.cjs",
+      "title": "F4/F5 type transitions, refund dropdown, automatic fixed month 1440",
+      "when": "2026-11-08T17:31:38.847Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "fix-round-1-6.spec.cjs",
+      "title": "F4/F5 type transitions, refund dropdown, automatic fixed month 390",
+      "when": "2026-11-08T17:31:29.442Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "fix-round-1-6.spec.cjs",
+      "title": "F6 approved edit retains actual across close and applies only explicit reapproval 1440",
+      "when": "2026-11-08T17:31:45.197Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "fix-round-1-6.spec.cjs",
+      "title": "F6 approved edit retains actual across close and applies only explicit reapproval 390",
+      "when": "2026-11-08T17:31:34.801Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "fix-round-1-6.spec.cjs",
+      "title": "F6 local draft survives reload; group approval and next row stay usable 1440",
+      "when": "2026-11-08T17:31:40.750Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "fix-round-1-6.spec.cjs",
+      "title": "F6 local draft survives reload; group approval and next row stay usable 390",
+      "when": "2026-11-08T17:31:31.306Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "fix-round-1-6.spec.cjs",
+      "title": "F6 selected recognition matches are individually approved; next source remains usable 1440",
+      "when": "2026-11-08T17:31:55.093Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "fix-round-1-6.spec.cjs",
+      "title": "F6 selected recognition matches are individually approved; next source remains usable 390",
+      "when": "2026-11-08T17:31:49.861Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "fix-round-1-6.spec.cjs",
+      "title": "F6 slow own hydration cannot replace a newer completed approval or block the next source",
+      "when": "2026-11-08T17:32:01.597Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "fix-round-1-6.spec.cjs",
+      "title": "joint month KPI and goal table fit 1280",
+      "when": "2026-11-08T17:31:24.440Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "fix-round-1-6.spec.cjs",
+      "title": "joint month KPI and goal table fit 1440",
+      "when": "2026-11-08T17:31:25.911Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "fix-round-1-6.spec.cjs",
+      "title": "joint month KPI and goal table fit 390",
+      "when": "2026-11-08T17:31:20.566Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "fix-round-1-6.spec.cjs",
+      "title": "joint month KPI and goal table fit 768",
+      "when": "2026-11-08T17:31:22.826Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "fixed-editor-redesign.spec.cjs",
+      "title": "aanpassen bewaren en annuleren 1440",
+      "when": "2026-11-08T17:32:07.031Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "fixed-editor-redesign.spec.cjs",
+      "title": "aanpassen bewaren en annuleren 320",
+      "when": "2026-11-08T17:32:03.775Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "fixed-editor-redesign.spec.cjs",
+      "title": "aanpassen bewaren en annuleren 390",
+      "when": "2026-11-08T17:32:05.373Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "fixed-editor-redesign.spec.cjs",
+      "title": "afwijkende bestaande afschrijfrekening blijft zichtbaar vóór opslaan",
+      "when": "2026-11-08T17:32:13.064Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "fixed-editor-redesign.spec.cjs",
+      "title": "desktopvensters passen op 1024px en mobiele velden blijven onder elkaar",
+      "when": "2026-11-08T17:32:14.207Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "fixed-editor-redesign.spec.cjs",
+      "title": "extra instellingen en weekfrequentie blijven werken",
+      "when": "2026-11-08T17:32:08.805Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "fixed-editor-redesign.spec.cjs",
+      "title": "jaarlijkse post toevoegen met rekening voor dezelfde persoon",
+      "when": "2026-11-08T17:32:11.660Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "fixed-editor-redesign.spec.cjs",
+      "title": "stoppen geldt na deze maand en verwijderen bewaart eerdere planning",
+      "when": "2026-11-08T17:32:10.145Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "fixed-payment-progress.spec.cjs",
+      "title": "fixed paid/planned stays visual and owner scoped 1440",
+      "when": "2026-11-08T17:32:21.858Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "fixed-payment-progress.spec.cjs",
+      "title": "fixed paid/planned stays visual and owner scoped 320",
+      "when": "2026-11-08T17:32:15.599Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "fixed-payment-progress.spec.cjs",
+      "title": "fixed paid/planned stays visual and owner scoped 390",
+      "when": "2026-11-08T17:32:17.596Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "fixed-payment-progress.spec.cjs",
+      "title": "fixed paid/planned stays visual and owner scoped 430",
+      "when": "2026-11-08T17:32:19.722Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "fixed-payment-progress.spec.cjs",
+      "title": "overpayment caps the bar but retains actual amount; zero plan is not NaN",
+      "when": "2026-11-08T17:32:24.309Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "forecast-current-basis.spec.cjs",
+      "title": "calendar budget keeps the same November day in KPI, graph and selected-day details",
+      "when": "2026-11-08T17:32:29.854Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "forecast-current-basis.spec.cjs",
+      "title": "current cash, graph and minimum share the future basis after past unreviewed salary 320",
+      "when": "2026-11-08T17:32:25.395Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "forecast-current-basis.spec.cjs",
+      "title": "current cash, graph and minimum share the future basis after past unreviewed salary 390",
+      "when": "2026-11-08T17:32:26.933Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "forecast-current-basis.spec.cjs",
+      "title": "current cash, graph and minimum share the future basis after past unreviewed salary 430",
+      "when": "2026-11-08T17:32:28.405Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "function-parity-goals-income.spec.cjs",
+      "title": "de gedeelde doelbewerker bewaart eigenaar, verdeling en subdoelen over viewports",
+      "when": "2026-11-08T17:32:40.862Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "function-parity-goals-income.spec.cjs",
+      "title": "inkomen gebruikt op mobiel en desktop dezelfde historie zonder legacy-write",
+      "when": "2026-11-08T17:34:14.932Z",
+      "status": "passed",
+      "report": "income-parity.json"
+    },
+    {
+      "file": "function-parity-goals-income.spec.cjs",
+      "title": "spaardoel toevoegen blijft op ieder formaat bij dara",
+      "when": "2026-11-08T17:32:34.010Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "function-parity-goals-income.spec.cjs",
+      "title": "spaardoel toevoegen blijft op ieder formaat bij dion",
+      "when": "2026-11-08T17:32:30.692Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "function-parity-goals-income.spec.cjs",
+      "title": "spaardoelen blijven op alle afgesproken breedtes binnen beeld",
+      "when": "2026-11-08T17:32:38.971Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "function-parity-goals-income.spec.cjs",
+      "title": "spaarpot verwerken en geschiedenis zijn mobiel, tablet en desktop bereikbaar",
+      "when": "2026-11-08T17:32:37.288Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "hotfix-migration-backup.spec.cjs",
+      "title": "H1 large v9 cloud state succeeds beyond old localStorage backup capacity",
+      "when": "2026-11-08T17:40:23.687Z",
+      "status": "passed",
+      "report": "history-income-followup.json"
+    },
+    {
+      "file": "hotfix-migration-backup.spec.cjs",
+      "title": "H10 repeated load/capture has stable identity and no double migration write",
+      "when": "2026-11-08T17:40:35.919Z",
+      "status": "passed",
+      "report": "history-income-followup.json"
+    },
+    {
+      "file": "hotfix-migration-backup.spec.cjs",
+      "title": "H11 backup context isolation rejects another household/user",
+      "when": "2026-11-08T17:40:37.138Z",
+      "status": "passed",
+      "report": "history-income-followup.json"
+    },
+    {
+      "file": "hotfix-migration-backup.spec.cjs",
+      "title": "H12 isolated fixture/mock execution makes no production requests",
+      "when": "2026-11-08T17:40:38.108Z",
+      "status": "passed",
+      "report": "history-income-followup.json"
+    },
+    {
+      "file": "hotfix-migration-backup.spec.cjs",
+      "title": "H2 complete original and v10 intermediate read back with verified SHA-256",
+      "when": "2026-11-08T17:40:26.322Z",
+      "status": "passed",
+      "report": "history-income-followup.json"
+    },
+    {
+      "file": "hotfix-migration-backup.spec.cjs",
+      "title": "H3 IndexedDB failure blocks local and cloud source replacement",
+      "when": "2026-11-08T17:40:27.309Z",
+      "status": "passed",
+      "report": "history-income-followup.json"
+    },
+    {
+      "file": "hotfix-migration-backup.spec.cjs",
+      "title": "H4 corrupt readback blocks migration and retains raw storage",
+      "when": "2026-11-08T17:40:28.369Z",
+      "status": "passed",
+      "report": "history-income-followup.json"
+    },
+    {
+      "file": "hotfix-migration-backup.spec.cjs",
+      "title": "H5 successful backup gates local migration to schema 11",
+      "when": "2026-11-08T17:40:29.675Z",
+      "status": "passed",
+      "report": "history-income-followup.json"
+    },
+    {
+      "file": "hotfix-migration-backup.spec.cjs",
+      "title": "H6 migrated financial/persistent output exactly equals unchanged approved migration",
+      "when": "2026-11-08T17:40:30.656Z",
+      "status": "passed",
+      "report": "history-income-followup.json"
+    },
+    {
+      "file": "hotfix-migration-backup.spec.cjs",
+      "title": "H7 historical localStorage envelope remains readable",
+      "when": "2026-11-08T17:40:32.016Z",
+      "status": "passed",
+      "report": "history-income-followup.json"
+    },
+    {
+      "file": "hotfix-migration-backup.spec.cjs",
+      "title": "H8 historical backups are never overwritten or deleted",
+      "when": "2026-11-08T17:40:33.032Z",
+      "status": "passed",
+      "report": "history-income-followup.json"
+    },
+    {
+      "file": "hotfix-migration-backup.spec.cjs",
+      "title": "H9 reload preserves migrated state and backup",
+      "when": "2026-11-08T17:40:34.442Z",
+      "status": "passed",
+      "report": "history-income-followup.json"
+    },
+    {
+      "file": "hotfix-migration-backup.spec.cjs",
+      "title": "a durable local approval during remote backup preparation retains its state and outbox",
+      "when": "2026-11-08T17:40:42.316Z",
+      "status": "passed",
+      "report": "history-income-followup.json"
+    },
+    {
+      "file": "hotfix-migration-backup.spec.cjs",
+      "title": "a durable local approval during remote images preparation retains its state and outbox",
+      "when": "2026-11-08T17:40:43.699Z",
+      "status": "passed",
+      "report": "history-income-followup.json"
+    },
+    {
+      "file": "hotfix-migration-backup.spec.cjs",
+      "title": "async backup cannot allow an older cloud listener to replace a newer snapshot",
+      "when": "2026-11-08T17:40:39.344Z",
+      "status": "passed",
+      "report": "history-income-followup.json"
+    },
+    {
+      "file": "hotfix-migration-backup.spec.cjs",
+      "title": "overlapping cloud acceptances serialize durable commits without weakening revision checks",
+      "when": "2026-11-08T17:40:41.066Z",
+      "status": "passed",
+      "report": "history-income-followup.json"
+    },
+    {
+      "file": "import-approval-focus.spec.cjs",
+      "title": "groepsgoedkeuring behoudt zichtbare kaart, terugroute en zes unieke boekingen 1440",
+      "when": "2026-11-08T20:34:18.803Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "import-approval-focus.spec.cjs",
+      "title": "groepsgoedkeuring behoudt zichtbare kaart, terugroute en zes unieke boekingen 390",
+      "when": "2026-11-08T20:34:16.601Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "import-history-cloud-refresh.spec.cjs",
+      "title": "legacy history cloud refresh opens an unchanged local copy 1440px",
+      "when": "2026-11-08T17:40:47.793Z",
+      "status": "passed",
+      "report": "history-income-followup.json"
+    },
+    {
+      "file": "import-history-cloud-refresh.spec.cjs",
+      "title": "legacy history cloud refresh opens an unchanged local copy 390px",
+      "when": "2026-11-08T17:40:45.425Z",
+      "status": "passed",
+      "report": "history-income-followup.json"
+    },
+    {
+      "file": "import-history-cloud-refresh.spec.cjs",
+      "title": "legacy history cloud refresh protects a real concurrent local edit 1440px",
+      "when": "2026-11-08T17:40:49.171Z",
+      "status": "passed",
+      "report": "history-income-followup.json"
+    },
+    {
+      "file": "import-history-cloud-refresh.spec.cjs",
+      "title": "legacy history cloud refresh protects a real concurrent local edit 390px",
+      "when": "2026-11-08T17:40:46.681Z",
+      "status": "passed",
+      "report": "history-income-followup.json"
+    },
+    {
+      "file": "import-history-readonly.spec.cjs",
+      "title": "older CSV opens from history without changing processing or finances 1440px",
+      "when": "2026-11-08T17:40:52.479Z",
+      "status": "passed",
+      "report": "history-income-followup.json"
+    },
+    {
+      "file": "import-history-readonly.spec.cjs",
+      "title": "older CSV opens from history without changing processing or finances 390px",
+      "when": "2026-11-08T17:40:50.365Z",
+      "status": "passed",
+      "report": "history-income-followup.json"
+    },
+    {
+      "file": "import-listener-stability.spec.cjs",
+      "title": "bankimport en historie blijven beperkt tot de gekozen rekeninghouder",
+      "when": "2026-11-08T17:34:40.737Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "import-listener-stability.spec.cjs",
+      "title": "importkaart toont geselecteerde maand en historie heeft maandkoppen",
+      "when": "2026-11-08T17:34:39.841Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "import-listener-stability.spec.cjs",
+      "title": "vaste lasten volgen de budgeteigenaar en datums zijn Nederlands",
+      "when": "2026-11-08T17:34:38.632Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "import-listener-stability.spec.cjs",
+      "title": "vijftig importrenders houden één gedelegeerde click- en change-handler",
+      "when": "2026-11-08T17:34:37.205Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "import-review-simplification.spec.cjs",
+      "title": "CSV-controle toont vier hoofdvelden en alleen relevante vervolgkeuzes",
+      "when": "2026-11-08T17:41:02.666Z",
+      "status": "passed",
+      "report": "history-income-followup.json"
+    },
+    {
+      "file": "import-review-simplification.spec.cjs",
+      "title": "bankregel openen toont één verwerking en behoudt oorspronkelijke gegevens",
+      "when": "2026-11-08T17:40:54.929Z",
+      "status": "passed",
+      "report": "history-income-followup.json"
+    },
+    {
+      "file": "import-review-simplification.spec.cjs",
+      "title": "bankregel verwerken vanuit de gerichte weergave vraagt de bestaande goedkeuring",
+      "when": "2026-11-08T17:40:56.229Z",
+      "status": "passed",
+      "report": "history-income-followup.json"
+    },
+    {
+      "file": "import-review-simplification.spec.cjs",
+      "title": "compacte regels blijven selecteerbaar voor groepsgoedkeuring",
+      "when": "2026-11-08T17:40:57.342Z",
+      "status": "passed",
+      "report": "history-income-followup.json"
+    },
+    {
+      "file": "import-review-simplification.spec.cjs",
+      "title": "de vier hoofdvelden blijven op telefoon leesbaar",
+      "when": "2026-11-08T17:41:04.210Z",
+      "status": "passed",
+      "report": "history-income-followup.json"
+    },
+    {
+      "file": "import-review-simplification.spec.cjs",
+      "title": "gedeeltelijke verwerking houdt onbekende regels open en activeert expliciete goedkeuring",
+      "when": "2026-11-08T17:41:01.287Z",
+      "status": "passed",
+      "report": "history-income-followup.json"
+    },
+    {
+      "file": "import-review-simplification.spec.cjs",
+      "title": "importcontrole splitst onbekend, nakijken en alleen handmatig goedgekeurd",
+      "when": "2026-11-08T17:41:00.300Z",
+      "status": "passed",
+      "report": "history-income-followup.json"
+    },
+    {
+      "file": "import-review-simplification.spec.cjs",
+      "title": "mobiele importacties zijn bereikbaar zonder hoge vaste actiebalk 320px",
+      "when": "2026-11-08T17:40:58.319Z",
+      "status": "passed",
+      "report": "history-income-followup.json"
+    },
+    {
+      "file": "import-review-simplification.spec.cjs",
+      "title": "mobiele importacties zijn bereikbaar zonder hoge vaste actiebalk 390px",
+      "when": "2026-11-08T17:40:59.297Z",
+      "status": "passed",
+      "report": "history-income-followup.json"
+    },
+    {
+      "file": "income-outlook.spec.cjs",
+      "title": "a late previous KPI projection cannot overwrite a newer graph filter or account context",
+      "when": "2026-11-08T17:41:12.395Z",
+      "status": "passed",
+      "report": "history-income-followup.json"
+    },
+    {
+      "file": "income-outlook.spec.cjs",
+      "title": "financial change between KPI and graph retries both against the same committed snapshot and date",
+      "when": "2026-11-08T17:41:13.397Z",
+      "status": "passed",
+      "report": "history-income-followup.json"
+    },
+    {
+      "file": "income-outlook.spec.cjs",
+      "title": "income KPI values remain fixed through five filters in both contexts 320",
+      "when": "2026-11-08T17:41:05.194Z",
+      "status": "passed",
+      "report": "history-income-followup.json"
+    },
+    {
+      "file": "income-outlook.spec.cjs",
+      "title": "income KPI values remain fixed through five filters in both contexts 390",
+      "when": "2026-11-08T17:41:07.264Z",
+      "status": "passed",
+      "report": "history-income-followup.json"
+    },
+    {
+      "file": "income-outlook.spec.cjs",
+      "title": "income KPI values remain fixed through five filters in both contexts 430",
+      "when": "2026-11-08T17:41:09.302Z",
+      "status": "passed",
+      "report": "history-income-followup.json"
+    },
+    {
+      "file": "income-outlook.spec.cjs",
+      "title": "received October 31 allowance makes salary filter include November income while KPI stops before it",
+      "when": "2026-11-08T17:41:11.329Z",
+      "status": "passed",
+      "report": "history-income-followup.json"
+    },
+    {
+      "file": "income-overview.spec.cjs",
+      "title": "iPhone 390px retains visible personal breakdown and joint tap overview",
+      "when": "2026-11-08T17:47:36.242Z",
+      "status": "passed",
+      "report": "mobile-modal-followup.json"
+    },
+    {
+      "file": "income-overview.spec.cjs",
+      "title": "income breakdown sums, parity and read-only 1440px",
+      "when": "2026-11-08T17:47:58.115Z",
+      "status": "passed",
+      "report": "mobile-modal-followup.json"
+    },
+    {
+      "file": "income-overview.spec.cjs",
+      "title": "income breakdown sums, parity and read-only 390px",
+      "when": "2026-11-08T17:47:49.243Z",
+      "status": "passed",
+      "report": "mobile-modal-followup.json"
+    },
+    {
+      "file": "income-overview.spec.cjs",
+      "title": "income fallback, explicit zero, actual salary and historical month 1440px",
+      "when": "2026-11-08T17:48:00.034Z",
+      "status": "passed",
+      "report": "mobile-modal-followup.json"
+    },
+    {
+      "file": "income-overview.spec.cjs",
+      "title": "income fallback, explicit zero, actual salary and historical month 390px",
+      "when": "2026-11-08T17:47:52.489Z",
+      "status": "passed",
+      "report": "mobile-modal-followup.json"
+    },
+    {
+      "file": "income-overview.spec.cjs",
+      "title": "income overview financial baseline",
+      "when": "2026-11-08T17:47:44.598Z",
+      "status": "passed",
+      "report": "mobile-modal-followup.json"
+    },
+    {
+      "file": "income-overview.spec.cjs",
+      "title": "income source opens relevant transactions without editing 1440px",
+      "when": "2026-11-08T17:47:55.506Z",
+      "status": "passed",
+      "report": "mobile-modal-followup.json"
+    },
+    {
+      "file": "income-overview.spec.cjs",
+      "title": "income source opens relevant transactions without editing 390px",
+      "when": "2026-11-08T17:47:46.412Z",
+      "status": "passed",
+      "report": "mobile-modal-followup.json"
+    },
+    {
+      "file": "income-overview.spec.cjs",
+      "title": "personal mobile card opens readable income sources Android 390px",
+      "when": "2026-11-08T17:47:39.433Z",
+      "status": "passed",
+      "report": "mobile-modal-followup.json"
+    },
+    {
+      "file": "income-overview.spec.cjs",
+      "title": "personal mobile card opens readable income sources iPhone 390px",
+      "when": "2026-11-08T17:47:42.050Z",
+      "status": "passed",
+      "report": "mobile-modal-followup.json"
+    },
+    {
+      "file": "income-overview.spec.cjs",
+      "title": "personal overview respects shared-tab privacy and read-only income",
+      "when": "2026-11-08T17:48:13.568Z",
+      "status": "passed",
+      "report": "mobile-modal-followup.json"
+    },
+    {
+      "file": "income-overview.spec.cjs",
+      "title": "private receipts stay on physical account and refund corrects joint category 1440px",
+      "when": "2026-11-08T17:48:10.094Z",
+      "status": "passed",
+      "report": "mobile-modal-followup.json"
+    },
+    {
+      "file": "income-overview.spec.cjs",
+      "title": "private receipts stay on physical account and refund corrects joint category 390px",
+      "when": "2026-11-08T17:48:05.839Z",
+      "status": "passed",
+      "report": "mobile-modal-followup.json"
+    },
+    {
+      "file": "income-overview.spec.cjs",
+      "title": "source drilldown uses historical month and escapes transaction descriptions",
+      "when": "2026-11-08T17:48:15.495Z",
+      "status": "passed",
+      "report": "mobile-modal-followup.json"
+    },
+    {
+      "file": "income-overview.spec.cjs",
+      "title": "source transactions preserve physical account isolation, privacy and split projection identity",
+      "when": "2026-11-08T17:48:03.276Z",
+      "status": "passed",
+      "report": "mobile-modal-followup.json"
+    },
+    {
+      "file": "iphone-responsive-text.spec.cjs",
+      "title": "iPhone-invoervelden voorkomen Safari-inzoom, Android deelt mobiele kolommen en desktop behoudt zijbalk",
+      "when": "2026-11-08T17:53:14.850Z",
+      "status": "passed",
+      "report": "mobile-modal-final.json"
+    },
+    {
+      "file": "iphone-responsive-text.spec.cjs",
+      "title": "iPhone-tekst blijft leesbaar en binnen beeld op 320px",
+      "when": "2026-11-08T17:52:55.764Z",
+      "status": "passed",
+      "report": "mobile-modal-final.json"
+    },
+    {
+      "file": "iphone-responsive-text.spec.cjs",
+      "title": "iPhone-tekst blijft leesbaar en binnen beeld op 375px",
+      "when": "2026-11-08T17:52:58.531Z",
+      "status": "passed",
+      "report": "mobile-modal-final.json"
+    },
+    {
+      "file": "iphone-responsive-text.spec.cjs",
+      "title": "iPhone-tekst blijft leesbaar en binnen beeld op 390px",
+      "when": "2026-11-08T17:53:00.824Z",
+      "status": "passed",
+      "report": "mobile-modal-final.json"
+    },
+    {
+      "file": "iphone-responsive-text.spec.cjs",
+      "title": "iPhone-tekst blijft leesbaar en binnen beeld op 393px",
+      "when": "2026-11-08T17:53:03.073Z",
+      "status": "passed",
+      "report": "mobile-modal-final.json"
+    },
+    {
+      "file": "iphone-responsive-text.spec.cjs",
+      "title": "iPhone-tekst blijft leesbaar en binnen beeld op 402px",
+      "when": "2026-11-08T17:53:05.437Z",
+      "status": "passed",
+      "report": "mobile-modal-final.json"
+    },
+    {
+      "file": "iphone-responsive-text.spec.cjs",
+      "title": "iPhone-tekst blijft leesbaar en binnen beeld op 414px",
+      "when": "2026-11-08T17:53:07.849Z",
+      "status": "passed",
+      "report": "mobile-modal-final.json"
+    },
+    {
+      "file": "iphone-responsive-text.spec.cjs",
+      "title": "iPhone-tekst blijft leesbaar en binnen beeld op 428px",
+      "when": "2026-11-08T17:53:10.303Z",
+      "status": "passed",
+      "report": "mobile-modal-final.json"
+    },
+    {
+      "file": "iphone-responsive-text.spec.cjs",
+      "title": "iPhone-tekst blijft leesbaar en binnen beeld op 430px",
+      "when": "2026-11-08T17:53:12.557Z",
+      "status": "passed",
+      "report": "mobile-modal-final.json"
+    },
+    {
+      "file": "joint-fixed-overview.spec.cjs",
+      "title": "gezamenlijk overzicht behoudt gegevens en bediening 1440",
+      "when": "2026-11-08T17:40:52.422Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "joint-fixed-overview.spec.cjs",
+      "title": "gezamenlijk overzicht behoudt gegevens en bediening 320",
+      "when": "2026-11-08T17:40:48.240Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "joint-fixed-overview.spec.cjs",
+      "title": "gezamenlijk overzicht behoudt gegevens en bediening 390",
+      "when": "2026-11-08T17:40:50.602Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "joint-fixed-overview.spec.cjs",
+      "title": "persoonlijk overzicht dara blijft gescheiden 1440",
+      "when": "2026-11-08T17:40:58.773Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "joint-fixed-overview.spec.cjs",
+      "title": "persoonlijk overzicht dara blijft gescheiden 390",
+      "when": "2026-11-08T17:40:55.928Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "joint-fixed-overview.spec.cjs",
+      "title": "persoonlijk overzicht dion blijft gescheiden 1440",
+      "when": "2026-11-08T17:40:57.320Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "joint-fixed-overview.spec.cjs",
+      "title": "persoonlijk overzicht dion blijft gescheiden 390",
+      "when": "2026-11-08T17:40:54.432Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "liquidity-pot-release.spec.cjs",
+      "title": "r23 to r24 upgrade, offline and rollback retain financial state and IndexedDB evidence",
+      "when": "2026-11-09T13:51:42.238Z",
+      "status": "passed",
+      "report": "old-shell-upgrades.json"
+    },
+    {
+      "file": "mobile-goal-order.spec.cjs",
+      "title": "directe mobiele doelvolgorde blijft duurzaam en behoudt bedragen (360px)",
+      "when": "2026-11-08T20:34:21.233Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "mobile-goal-order.spec.cjs",
+      "title": "directe mobiele doelvolgorde blijft duurzaam en behoudt bedragen (390px)",
+      "when": "2026-11-08T20:34:22.962Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "mobile-goal-order.spec.cjs",
+      "title": "directe mobiele doelvolgorde blijft duurzaam en behoudt bedragen (430px)",
+      "when": "2026-11-08T20:34:24.790Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "mobile-header-nav.spec.cjs",
+      "title": "compacte header en maandpil op 320px",
+      "when": "2026-11-08T17:41:18.914Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "mobile-header-nav.spec.cjs",
+      "title": "compacte header en maandpil op 390px",
+      "when": "2026-11-08T17:41:20.372Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "mobile-header-nav.spec.cjs",
+      "title": "header en enkele navigatierij blijven bruikbaar op 195px",
+      "when": "2026-11-08T17:41:08.825Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "mobile-header-nav.spec.cjs",
+      "title": "header en enkele navigatierij blijven bruikbaar op 320px",
+      "when": "2026-11-08T17:41:11.484Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "mobile-header-nav.spec.cjs",
+      "title": "header en enkele navigatierij blijven bruikbaar op 390px",
+      "when": "2026-11-08T17:41:14.049Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "mobile-header-nav.spec.cjs",
+      "title": "header en enkele navigatierij blijven bruikbaar op 430px",
+      "when": "2026-11-08T17:41:16.478Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "mobile-recovery.spec.cjs",
+      "title": "doelbewerker: invoer, toetsenbordfocus, annuleren en liggend scrollen",
+      "when": "2026-11-08T17:53:31.577Z",
+      "status": "passed",
+      "report": "mobile-modal-final.json"
+    },
+    {
+      "file": "mobile-recovery.spec.cjs",
+      "title": "grote bedragen en lange namen blijven bereikbaar 320",
+      "when": "2026-11-08T17:53:26.980Z",
+      "status": "passed",
+      "report": "mobile-modal-final.json"
+    },
+    {
+      "file": "mobile-recovery.spec.cjs",
+      "title": "grote bedragen en lange namen blijven bereikbaar 390",
+      "when": "2026-11-08T17:53:28.483Z",
+      "status": "passed",
+      "report": "mobile-modal-final.json"
+    },
+    {
+      "file": "mobile-recovery.spec.cjs",
+      "title": "grote bedragen en lange namen blijven bereikbaar 430",
+      "when": "2026-11-08T17:53:30.014Z",
+      "status": "passed",
+      "report": "mobile-modal-final.json"
+    },
+    {
+      "file": "mobile-recovery.spec.cjs",
+      "title": "hybride tablet krijgt leesbare invoer zonder iPhone-identiteit",
+      "when": "2026-11-08T17:53:35.953Z",
+      "status": "passed",
+      "report": "mobile-modal-final.json"
+    },
+    {
+      "file": "mobile-recovery.spec.cjs",
+      "title": "mobiel herstel 320: header, geld, laatste actie en state",
+      "when": "2026-11-08T17:53:18.255Z",
+      "status": "passed",
+      "report": "mobile-modal-final.json"
+    },
+    {
+      "file": "mobile-recovery.spec.cjs",
+      "title": "mobiel herstel 390: header, geld, laatste actie en state",
+      "when": "2026-11-08T17:53:21.235Z",
+      "status": "passed",
+      "report": "mobile-modal-final.json"
+    },
+    {
+      "file": "mobile-recovery.spec.cjs",
+      "title": "mobiel herstel 430: header, geld, laatste actie en state",
+      "when": "2026-11-08T17:53:24.119Z",
+      "status": "passed",
+      "report": "mobile-modal-final.json"
+    },
+    {
+      "file": "mobile-recovery.spec.cjs",
+      "title": "reduced motion behoudt foutnadruk en laat een toast alleen vervagen",
+      "when": "2026-11-08T17:53:34.187Z",
+      "status": "passed",
+      "report": "mobile-modal-final.json"
+    },
+    {
+      "file": "mobile-tabs-olive.spec.cjs",
+      "title": "bestaande acties openen zonder financiële state te wijzigen",
+      "when": "2026-11-08T17:41:58.038Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "mobile-tabs-olive.spec.cjs",
+      "title": "desktop behoudt bestaande weergave 1440",
+      "when": "2026-11-08T17:42:04.106Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "mobile-tabs-olive.spec.cjs",
+      "title": "desktop behoudt bestaande weergave 768",
+      "when": "2026-11-08T17:42:03.075Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "mobile-tabs-olive.spec.cjs",
+      "title": "maandwissel gebruikt de bestaande maandbediening in alle nieuwe tabs",
+      "when": "2026-11-08T17:42:00.947Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "mobile-tabs-olive.spec.cjs",
+      "title": "mobiele tabs dara 320: bedragen, details en navigatie",
+      "when": "2026-11-08T17:41:47.110Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "mobile-tabs-olive.spec.cjs",
+      "title": "mobiele tabs dara 390: bedragen, details en navigatie",
+      "when": "2026-11-08T17:41:51.494Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "mobile-tabs-olive.spec.cjs",
+      "title": "mobiele tabs dara 430: bedragen, details en navigatie",
+      "when": "2026-11-08T17:41:55.837Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "mobile-tabs-olive.spec.cjs",
+      "title": "mobiele tabs dion 320: bedragen, details en navigatie",
+      "when": "2026-11-08T17:41:44.904Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "mobile-tabs-olive.spec.cjs",
+      "title": "mobiele tabs dion 390: bedragen, details en navigatie",
+      "when": "2026-11-08T17:41:49.304Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "mobile-tabs-olive.spec.cjs",
+      "title": "mobiele tabs dion 430: bedragen, details en navigatie",
+      "when": "2026-11-08T17:41:53.659Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "mobile-tabs-olive.spec.cjs",
+      "title": "tekort en lege doelen blijven leesbaar",
+      "when": "2026-11-08T17:41:59.953Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "mobile-tabs-upgrade.spec.cjs",
+      "title": "r40 naar r41, offline herladen en terugrollen bewaren financiële state en importbron",
+      "when": "2026-11-09T13:51:45.237Z",
+      "status": "passed",
+      "report": "old-shell-upgrades.json"
+    },
+    {
+      "file": "modal-and-commit-stability.spec.cjs",
+      "title": "backdrop sluit ook na interne klikken en na opnieuw openen",
+      "when": "2026-11-08T17:53:50.472Z",
+      "status": "passed",
+      "report": "mobile-modal-final.json"
+    },
+    {
+      "file": "modal-and-commit-stability.spec.cjs",
+      "title": "bankimport opent vanuit de gekozen uitgavenknop en staat niet op dashboard",
+      "when": "2026-11-08T17:53:39.365Z",
+      "status": "passed",
+      "report": "mobile-modal-final.json"
+    },
+    {
+      "file": "modal-and-commit-stability.spec.cjs",
+      "title": "dashboard behoudt de compacte r38-panelen zonder oud jaaroverzicht",
+      "when": "2026-11-08T17:53:47.007Z",
+      "status": "passed",
+      "report": "mobile-modal-final.json"
+    },
+    {
+      "file": "modal-and-commit-stability.spec.cjs",
+      "title": "een no-op veroorzaakt geen revision of lokale write",
+      "when": "2026-11-08T17:53:49.512Z",
+      "status": "passed",
+      "report": "mobile-modal-final.json"
+    },
+    {
+      "file": "modal-and-commit-stability.spec.cjs",
+      "title": "gezamenlijk inkomen vervangt standaardsalaris en negeert oude dubbele teruggaven",
+      "when": "2026-11-08T17:53:44.564Z",
+      "status": "passed",
+      "report": "mobile-modal-final.json"
+    },
+    {
+      "file": "modal-and-commit-stability.spec.cjs",
+      "title": "gezamenlijk over deze maand gebruikt alle inkomsten en trekt zakgeld alleen visueel af",
+      "when": "2026-11-08T17:53:41.783Z",
+      "status": "passed",
+      "report": "mobile-modal-final.json"
+    },
+    {
+      "file": "modal-and-commit-stability.spec.cjs",
+      "title": "gezamenlijk spaarbedrag blijft per maand gescheiden",
+      "when": "2026-11-08T17:53:43.069Z",
+      "status": "passed",
+      "report": "mobile-modal-final.json"
+    },
+    {
+      "file": "modal-and-commit-stability.spec.cjs",
+      "title": "opgeslagen inkomen valt niet terug door een nieuwere cloudsnapshot",
+      "when": "2026-11-08T17:53:47.974Z",
+      "status": "passed",
+      "report": "mobile-modal-final.json"
+    },
+    {
+      "file": "modal-and-commit-stability.spec.cjs",
+      "title": "transacties worden alleen vanuit persoonlijk en gezamenlijk toegevoegd",
+      "when": "2026-11-08T17:53:37.516Z",
+      "status": "passed",
+      "report": "mobile-modal-final.json"
+    },
+    {
+      "file": "modal-and-commit-stability.spec.cjs",
+      "title": "twee expliciet gekoppelde salarissen vervangen in juli beide persoonlijke standaardsalarissen",
+      "when": "2026-11-08T17:53:45.770Z",
+      "status": "passed",
+      "report": "mobile-modal-final.json"
+    },
+    {
+      "file": "modal-and-commit-stability.spec.cjs",
+      "title": "zonder huishouden toont persoonlijk zakgeld en fysieke persoonlijke inkomsten, geen salaris",
+      "when": "2026-11-08T17:53:40.649Z",
+      "status": "passed",
+      "report": "mobile-modal-final.json"
+    },
+    {
+      "file": "month-end-budget-timing.spec.cjs",
+      "title": "3000 end balance leaves 950 safe savings and at least 200 on every next-month day",
+      "when": "2026-11-08T19:08:25.777Z",
+      "status": "passed",
+      "report": "balance-timing.json"
+    },
+    {
+      "file": "month-end-budget-timing.spec.cjs",
+      "title": "confirmed month-end bank cash is not reduced by the unused budget of the closed month",
+      "when": "2026-11-08T19:08:26.755Z",
+      "status": "passed",
+      "report": "balance-timing.json"
+    },
+    {
+      "file": "month-end-budget-timing.spec.cjs",
+      "title": "month-end budget timing, full next month explanation and unchanged KPI 1440",
+      "when": "2026-11-08T19:08:24.401Z",
+      "status": "passed",
+      "report": "balance-timing.json"
+    },
+    {
+      "file": "month-end-budget-timing.spec.cjs",
+      "title": "month-end budget timing, full next month explanation and unchanged KPI 320",
+      "when": "2026-11-08T19:08:20.179Z",
+      "status": "passed",
+      "report": "balance-timing.json"
+    },
+    {
+      "file": "month-end-budget-timing.spec.cjs",
+      "title": "month-end budget timing, full next month explanation and unchanged KPI 390",
+      "when": "2026-11-08T19:08:21.892Z",
+      "status": "passed",
+      "report": "balance-timing.json"
+    },
+    {
+      "file": "month-end-budget-timing.spec.cjs",
+      "title": "month-end budget timing, full next month explanation and unchanged KPI 430",
+      "when": "2026-11-08T19:08:23.152Z",
+      "status": "passed",
+      "report": "balance-timing.json"
+    },
+    {
+      "file": "month-end-savings.spec.cjs",
+      "title": "coverage is advisory while unavailable payment dates still block the amount 1440",
+      "when": "2026-11-08T18:58:56.575Z",
+      "status": "passed",
+      "report": "month-end-current.json"
+    },
+    {
+      "file": "month-end-savings.spec.cjs",
+      "title": "coverage is advisory while unavailable payment dates still block the amount 320",
+      "when": "2026-11-08T18:58:52.979Z",
+      "status": "passed",
+      "report": "month-end-current.json"
+    },
+    {
+      "file": "month-end-savings.spec.cjs",
+      "title": "coverage is advisory while unavailable payment dates still block the amount 390",
+      "when": "2026-11-08T18:58:54.158Z",
+      "status": "passed",
+      "report": "month-end-current.json"
+    },
+    {
+      "file": "month-end-savings.spec.cjs",
+      "title": "coverage is advisory while unavailable payment dates still block the amount 430",
+      "when": "2026-11-08T18:58:55.370Z",
+      "status": "passed",
+      "report": "month-end-current.json"
+    },
+    {
+      "file": "month-end-savings.spec.cjs",
+      "title": "future shortage and incomplete data are explicit instead of showing old spending capacity",
+      "when": "2026-11-08T18:58:51.062Z",
+      "status": "passed",
+      "report": "month-end-current.json"
+    },
+    {
+      "file": "month-end-savings.spec.cjs",
+      "title": "month-end savings replaces first KPI without changing plans or graph 1440",
+      "when": "2026-11-08T18:58:49.427Z",
+      "status": "passed",
+      "report": "month-end-current.json"
+    },
+    {
+      "file": "month-end-savings.spec.cjs",
+      "title": "month-end savings replaces first KPI without changing plans or graph 320",
+      "when": "2026-11-08T18:58:44.178Z",
+      "status": "passed",
+      "report": "month-end-current.json"
+    },
+    {
+      "file": "month-end-savings.spec.cjs",
+      "title": "month-end savings replaces first KPI without changing plans or graph 390",
+      "when": "2026-11-08T18:58:46.263Z",
+      "status": "passed",
+      "report": "month-end-current.json"
+    },
+    {
+      "file": "month-end-savings.spec.cjs",
+      "title": "month-end savings replaces first KPI without changing plans or graph 430",
+      "when": "2026-11-08T18:58:47.909Z",
+      "status": "passed",
+      "report": "month-end-current.json"
+    },
+    {
+      "file": "month-end-savings.spec.cjs",
+      "title": "only informative plan changes: 750/600/150; plan above capacity: 300/500/0",
+      "when": "2026-11-08T18:58:52.001Z",
+      "status": "passed",
+      "report": "month-end-current.json"
+    },
+    {
+      "file": "p2-balance-date.spec.cjs",
+      "title": "P2 central ING balance and forecast 1440",
+      "when": "2026-11-08T19:08:28.890Z",
+      "status": "passed",
+      "report": "balance-timing.json"
+    },
+    {
+      "file": "p2-balance-date.spec.cjs",
+      "title": "P2 central ING balance and forecast 390",
+      "when": "2026-11-08T19:08:27.674Z",
+      "status": "passed",
+      "report": "balance-timing.json"
+    },
+    {
+      "file": "p2-release-upgrade.spec.cjs",
+      "title": "r36 to r37 upgrade, offline and rollback retain financial state and IndexedDB evidence",
+      "when": "2026-11-09T13:51:48.023Z",
+      "status": "passed",
+      "report": "old-shell-upgrades.json"
+    },
+    {
+      "file": "package1-data-foundation.spec.cjs",
+      "title": "Pakket 1: zes schermen, data en stabiele herstart op 1440px",
+      "when": "2026-11-08T17:45:40.389Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "package1-data-foundation.spec.cjs",
+      "title": "Pakket 1: zes schermen, data en stabiele herstart op 390px",
+      "when": "2026-11-08T17:45:37.796Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "package1-data-foundation.spec.cjs",
+      "title": "bankOriginal wordt bij state-commit en ImportStore-write beschermd",
+      "when": "2026-11-08T17:45:45.399Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "package1-data-foundation.spec.cjs",
+      "title": "herstel stopt als de back-up van de huidige state niet kan worden gemaakt",
+      "when": "2026-11-08T17:45:44.485Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "package1-data-foundation.spec.cjs",
+      "title": "lokale laadfout bewaart originele opslag en laadt geen defaults",
+      "when": "2026-11-08T17:45:42.738Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "package1-data-foundation.spec.cjs",
+      "title": "migratieback-upfout bewaart v9-opslag zonder default- of cloudwrite",
+      "when": "2026-11-08T17:45:43.172Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "package1-data-foundation.spec.cjs",
+      "title": "state-opslagfout bij migratie behoudt de originele state en alle back-ups",
+      "when": "2026-11-08T17:45:43.652Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "package1-data-foundation.spec.cjs",
+      "title": "twee devices lezen v11; cloudmigratie schrijft eenmaal en echo schrijft niet opnieuw",
+      "when": "2026-11-08T17:45:46.381Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "package2-planning-timeline.spec.cjs",
+      "title": "Historische/future editors en herladen op 1440px",
+      "when": "2026-11-08T18:01:40.690Z",
+      "status": "passed",
+      "report": "reference-and-history.json"
+    },
+    {
+      "file": "package2-planning-timeline.spec.cjs",
+      "title": "Historische/future editors en herladen op 390px",
+      "when": "2026-11-08T18:01:34.999Z",
+      "status": "passed",
+      "report": "reference-and-history.json"
+    },
+    {
+      "file": "package2-planning-timeline.spec.cjs",
+      "title": "Kaartposities en afmetingen behouden op mobiel/tablet/desktop",
+      "when": "2026-11-08T18:01:46.663Z",
+      "status": "passed",
+      "report": "reference-and-history.json"
+    },
+    {
+      "file": "package2-planning-timeline.spec.cjs",
+      "title": "twee devices/cloudmock delen historie; echo heeft geen nieuwe write",
+      "when": "2026-11-08T18:01:47.995Z",
+      "status": "passed",
+      "report": "reference-and-history.json"
+    },
+    {
+      "file": "package2-planning-timeline.spec.cjs",
+      "title": "v10-back-upfout verwijdert Na niet uit opslag",
+      "when": "2026-11-08T18:01:46.046Z",
+      "status": "passed",
+      "report": "reference-and-history.json"
+    },
+    {
+      "file": "package3-transaction-engine.spec.cjs",
+      "title": "Legacy CSV zonder importreferentie blijft intact op 1440px",
+      "when": "2026-11-08T18:57:48.365Z",
+      "status": "passed",
+      "report": "pkg3-final.json"
+    },
+    {
+      "file": "package3-transaction-engine.spec.cjs",
+      "title": "Legacy CSV zonder importreferentie blijft intact op 390px",
+      "when": "2026-11-08T18:57:46.887Z",
+      "status": "passed",
+      "report": "pkg3-final.json"
+    },
+    {
+      "file": "package3-transaction-engine.spec.cjs",
+      "title": "Pakket 3 expliciete replacement en transferpaar op 1440px",
+      "when": "2026-11-08T18:57:41.055Z",
+      "status": "passed",
+      "report": "pkg3-final.json"
+    },
+    {
+      "file": "package3-transaction-engine.spec.cjs",
+      "title": "Pakket 3 expliciete replacement en transferpaar op 390px",
+      "when": "2026-11-08T18:57:37.746Z",
+      "status": "passed",
+      "report": "pkg3-final.json"
+    },
+    {
+      "file": "package3-transaction-engine.spec.cjs",
+      "title": "Pakket 3 transacties, splits, fixed actuals, salaris en reload op 1440px",
+      "when": "2026-11-08T18:57:29.664Z",
+      "status": "passed",
+      "report": "pkg3-final.json"
+    },
+    {
+      "file": "package3-transaction-engine.spec.cjs",
+      "title": "Pakket 3 transacties, splits, fixed actuals, salaris en reload op 390px",
+      "when": "2026-11-08T18:57:20.964Z",
+      "status": "passed",
+      "report": "pkg3-final.json"
+    },
+    {
+      "file": "package3-transaction-engine.spec.cjs",
+      "title": "V117 vaste last buiten budgetdetail en interne inleg voor spaardoel op 1440px",
+      "when": "2026-11-08T18:57:10.982Z",
+      "status": "passed",
+      "report": "pkg3-final.json"
+    },
+    {
+      "file": "package3-transaction-engine.spec.cjs",
+      "title": "V117 vaste last buiten budgetdetail en interne inleg voor spaardoel op 390px",
+      "when": "2026-11-08T18:57:05.652Z",
+      "status": "passed",
+      "report": "pkg3-final.json"
+    },
+    {
+      "file": "package3-transaction-engine.spec.cjs",
+      "title": "belastingteruggave administratief koppelen aan spaarinleg 1440px",
+      "when": "2026-11-08T18:57:55.847Z",
+      "status": "passed",
+      "report": "pkg3-final.json"
+    },
+    {
+      "file": "package3-transaction-engine.spec.cjs",
+      "title": "belastingteruggave administratief koppelen aan spaarinleg 390px",
+      "when": "2026-11-08T18:57:49.745Z",
+      "status": "passed",
+      "report": "pkg3-final.json"
+    },
+    {
+      "file": "package3-transaction-engine.spec.cjs",
+      "title": "belastingteruggave administratief koppelen aan spaarinleg 430px",
+      "when": "2026-11-08T18:57:52.825Z",
+      "status": "passed",
+      "report": "pkg3-final.json"
+    },
+    {
+      "file": "package3-transaction-engine.spec.cjs",
+      "title": "extra inkomen kiezen voor gezamenlijk zonder dubbel zakgeld of sparen 1440px",
+      "when": "2026-11-08T18:58:04.833Z",
+      "status": "passed",
+      "report": "pkg3-final.json"
+    },
+    {
+      "file": "package3-transaction-engine.spec.cjs",
+      "title": "extra inkomen kiezen voor gezamenlijk zonder dubbel zakgeld of sparen 430px",
+      "when": "2026-11-08T18:58:00.822Z",
+      "status": "passed",
+      "report": "pkg3-final.json"
+    },
+    {
+      "file": "package3-transaction-engine.spec.cjs",
+      "title": "handmatige extra inkomsten hebben dezelfde zakgeldkeuze 1440px",
+      "when": "2026-11-08T18:58:12.899Z",
+      "status": "passed",
+      "report": "pkg3-final.json"
+    },
+    {
+      "file": "package3-transaction-engine.spec.cjs",
+      "title": "handmatige extra inkomsten hebben dezelfde zakgeldkeuze 430px",
+      "when": "2026-11-08T18:58:10.381Z",
+      "status": "passed",
+      "report": "pkg3-final.json"
+    },
+    {
+      "file": "package4-allowance-planning-correction.spec.cjs",
+      "title": "P4 correction planned allowance stable before/after actuals 1440px",
+      "when": "2026-11-08T20:02:05.501Z",
+      "status": "passed",
+      "report": "financial-editors-retest.json"
+    },
+    {
+      "file": "package4-allowance-planning-correction.spec.cjs",
+      "title": "P4 correction planned allowance stable before/after actuals 390px",
+      "when": "2026-11-08T20:02:03.915Z",
+      "status": "passed",
+      "report": "financial-editors-retest.json"
+    },
+    {
+      "file": "package4-savings-refunds-forecast.spec.cjs",
+      "title": "P4 CSV savings source reopen/exclusion/reapproval with retained coverage 1440px",
+      "when": "2026-11-08T20:02:22.616Z",
+      "status": "passed",
+      "report": "financial-editors-retest.json"
+    },
+    {
+      "file": "package4-savings-refunds-forecast.spec.cjs",
+      "title": "P4 CSV savings source reopen/exclusion/reapproval with retained coverage 390px",
+      "when": "2026-11-08T20:02:11.064Z",
+      "status": "passed",
+      "report": "financial-editors-retest.json"
+    },
+    {
+      "file": "package4-savings-refunds-forecast.spec.cjs",
+      "title": "P4 cloudmock A/B preserves optional allocations and ledger with no migration echo",
+      "when": "2026-11-08T20:02:31.669Z",
+      "status": "passed",
+      "report": "financial-editors-retest.json"
+    },
+    {
+      "file": "package4-savings-refunds-forecast.spec.cjs",
+      "title": "P4 manual many-to-many, coverage edit/remove, correction and reload 1440px",
+      "when": "2026-11-08T20:02:18.620Z",
+      "status": "passed",
+      "report": "financial-editors-retest.json"
+    },
+    {
+      "file": "package4-savings-refunds-forecast.spec.cjs",
+      "title": "P4 manual many-to-many, coverage edit/remove, correction and reload 390px",
+      "when": "2026-11-08T20:02:06.856Z",
+      "status": "passed",
+      "report": "financial-editors-retest.json"
+    },
+    {
+      "file": "package4-savings-refunds-forecast.spec.cjs",
+      "title": "P4 manual refund historical month and validation before writes 1440px",
+      "when": "2026-11-08T20:02:29.509Z",
+      "status": "passed",
+      "report": "financial-editors-retest.json"
+    },
+    {
+      "file": "package4-savings-refunds-forecast.spec.cjs",
+      "title": "P4 manual refund historical month and validation before writes 390px",
+      "when": "2026-11-08T20:02:16.415Z",
+      "status": "passed",
+      "report": "financial-editors-retest.json"
+    },
+    {
+      "file": "package4-savings-refunds-forecast.spec.cjs",
+      "title": "P4 mixed fixed/variable refund is an explicit category correction 1440px",
+      "when": "2026-11-08T20:02:34.937Z",
+      "status": "passed",
+      "report": "financial-editors-retest.json"
+    },
+    {
+      "file": "package4-savings-refunds-forecast.spec.cjs",
+      "title": "P4 mixed fixed/variable refund is an explicit category correction 390px",
+      "when": "2026-11-08T20:02:33.591Z",
+      "status": "passed",
+      "report": "financial-editors-retest.json"
+    },
+    {
+      "file": "package4-savings-refunds-forecast.spec.cjs",
+      "title": "P4 split coverage and historical split refund with undo 1440px",
+      "when": "2026-11-08T20:02:26.550Z",
+      "status": "passed",
+      "report": "financial-editors-retest.json"
+    },
+    {
+      "file": "package4-savings-refunds-forecast.spec.cjs",
+      "title": "P4 split coverage and historical split refund with undo 390px",
+      "when": "2026-11-08T20:02:13.828Z",
+      "status": "passed",
+      "report": "financial-editors-retest.json"
+    },
+    {
+      "file": "package5-import-lifecycle.spec.cjs",
+      "title": "P5 actual IndexedDB store isolates households without mixing identical batch IDs",
+      "when": "2026-11-08T19:27:22.250Z",
+      "status": "passed",
+      "report": "p4-p5-current.json"
+    },
+    {
+      "file": "package5-import-lifecycle.spec.cjs",
+      "title": "P5 multiple open batches, source errors and exact identity 1440px",
+      "when": "2026-11-08T19:27:13.848Z",
+      "status": "passed",
+      "report": "p4-p5-current.json"
+    },
+    {
+      "file": "package5-import-lifecycle.spec.cjs",
+      "title": "P5 multiple open batches, source errors and exact identity 390px",
+      "when": "2026-11-08T19:27:04.520Z",
+      "status": "passed",
+      "report": "p4-p5-current.json"
+    },
+    {
+      "file": "package5-import-lifecycle.spec.cjs",
+      "title": "P5 partial approval, withdraw/restore/delete, reload and allowance 1440px",
+      "when": "2026-11-08T19:27:06.512Z",
+      "status": "passed",
+      "report": "p4-p5-current.json"
+    },
+    {
+      "file": "package5-import-lifecycle.spec.cjs",
+      "title": "P5 partial approval, withdraw/restore/delete, reload and allowance 390px",
+      "when": "2026-11-08T19:26:59.152Z",
+      "status": "passed",
+      "report": "p4-p5-current.json"
+    },
+    {
+      "file": "package5-import-lifecycle.spec.cjs",
+      "title": "P5 real compact CloudAdapter publishes header and financial materialization atomically, B reload",
+      "when": "2026-11-08T19:27:16.043Z",
+      "status": "passed",
+      "report": "p4-p5-current.json"
+    },
+    {
+      "file": "package5-import-lifecycle.spec.cjs",
+      "title": "P5 savings+coverage and refund batch lifecycle 1440px",
+      "when": "2026-11-08T19:27:09.461Z",
+      "status": "passed",
+      "report": "p4-p5-current.json"
+    },
+    {
+      "file": "package5-import-lifecycle.spec.cjs",
+      "title": "P5 savings+coverage and refund batch lifecycle 390px",
+      "when": "2026-11-08T19:27:01.706Z",
+      "status": "passed",
+      "report": "p4-p5-current.json"
+    },
+    {
+      "file": "package5-import-lifecycle.spec.cjs",
+      "title": "P5 two isolated devices approve different sources and roundtrip durable processing",
+      "when": "2026-11-08T19:27:18.573Z",
+      "status": "passed",
+      "report": "p4-p5-current.json"
+    },
+    {
+      "file": "package6-functional-consolidation.spec.cjs",
+      "title": "P6 U1/U2/U3/U5 shared manual create/edit contract 1440px",
+      "when": "2026-11-08T19:57:20.507Z",
+      "status": "passed",
+      "report": "financial-editors-final.json"
+    },
+    {
+      "file": "package6-functional-consolidation.spec.cjs",
+      "title": "P6 U1/U2/U3/U5 shared manual create/edit contract 390px",
+      "when": "2026-11-08T19:57:02.894Z",
+      "status": "passed",
+      "report": "financial-editors-final.json"
+    },
+    {
+      "file": "package6-functional-consolidation.spec.cjs",
+      "title": "P6 U11/U12/U13 source activity drives normal lists 1440px",
+      "when": "2026-11-08T19:57:27.800Z",
+      "status": "passed",
+      "report": "financial-editors-final.json"
+    },
+    {
+      "file": "package6-functional-consolidation.spec.cjs",
+      "title": "P6 U11/U12/U13 source activity drives normal lists 390px",
+      "when": "2026-11-08T19:57:10.520Z",
+      "status": "passed",
+      "report": "financial-editors-final.json"
+    },
+    {
+      "file": "package6-functional-consolidation.spec.cjs",
+      "title": "P6 U14 refund bankmonth and historical category correction 1440px",
+      "when": "2026-11-08T19:57:28.451Z",
+      "status": "passed",
+      "report": "financial-editors-final.json"
+    },
+    {
+      "file": "package6-functional-consolidation.spec.cjs",
+      "title": "P6 U14 refund bankmonth and historical category correction 390px",
+      "when": "2026-11-08T19:57:11.202Z",
+      "status": "passed",
+      "report": "financial-editors-final.json"
+    },
+    {
+      "file": "package6-functional-consolidation.spec.cjs",
+      "title": "P6 U15 savings shared goal ledger, no ordinary income/expense 1440px",
+      "when": "2026-11-08T19:57:30.298Z",
+      "status": "passed",
+      "report": "financial-editors-final.json"
+    },
+    {
+      "file": "package6-functional-consolidation.spec.cjs",
+      "title": "P6 U15 savings shared goal ledger, no ordinary income/expense 390px",
+      "when": "2026-11-08T19:57:13.024Z",
+      "status": "passed",
+      "report": "financial-editors-final.json"
+    },
+    {
+      "file": "package6-functional-consolidation.spec.cjs",
+      "title": "P6 U4 historical category source and H15 month selector 1440px",
+      "when": "2026-11-08T19:57:23.552Z",
+      "status": "passed",
+      "report": "financial-editors-final.json"
+    },
+    {
+      "file": "package6-functional-consolidation.spec.cjs",
+      "title": "P6 U4 historical category source and H15 month selector 390px",
+      "when": "2026-11-08T19:57:05.903Z",
+      "status": "passed",
+      "report": "financial-editors-final.json"
+    },
+    {
+      "file": "package6-functional-consolidation.spec.cjs",
+      "title": "P6 U6/U7 shared forecast and planning allowance on viewport/reload 1440px",
+      "when": "2026-11-08T19:57:25.931Z",
+      "status": "passed",
+      "report": "financial-editors-final.json"
+    },
+    {
+      "file": "package6-functional-consolidation.spec.cjs",
+      "title": "P6 U6/U7 shared forecast and planning allowance on viewport/reload 390px",
+      "when": "2026-11-08T19:57:08.627Z",
+      "status": "passed",
+      "report": "financial-editors-final.json"
+    },
+    {
+      "file": "package6-functional-consolidation.spec.cjs",
+      "title": "P6 U8/U9/U10 physical account lists independent of financial destination 1440px",
+      "when": "2026-11-08T19:57:27.069Z",
+      "status": "passed",
+      "report": "financial-editors-final.json"
+    },
+    {
+      "file": "package6-functional-consolidation.spec.cjs",
+      "title": "P6 U8/U9/U10 physical account lists independent of financial destination 390px",
+      "when": "2026-11-08T19:57:09.767Z",
+      "status": "passed",
+      "report": "financial-editors-final.json"
+    },
+    {
+      "file": "package6-functional-consolidation.spec.cjs",
+      "title": "P6 future budget/fixed/income editors preserve previous month 1440px",
+      "when": "2026-11-08T19:57:31.633Z",
+      "status": "passed",
+      "report": "financial-editors-final.json"
+    },
+    {
+      "file": "package6-functional-consolidation.spec.cjs",
+      "title": "P6 future budget/fixed/income editors preserve previous month 390px",
+      "when": "2026-11-08T19:57:14.422Z",
+      "status": "passed",
+      "report": "financial-editors-final.json"
+    },
+    {
+      "file": "package6-functional-consolidation.spec.cjs",
+      "title": "P6 personal refund adds to displayed income without reducing allowance 1440px",
+      "when": "2026-11-08T19:57:18.618Z",
+      "status": "passed",
+      "report": "financial-editors-final.json"
+    },
+    {
+      "file": "package6-functional-consolidation.spec.cjs",
+      "title": "P6 personal refund adds to displayed income without reducing allowance 390px",
+      "when": "2026-11-08T19:57:00.963Z",
+      "status": "passed",
+      "report": "financial-editors-final.json"
+    },
+    {
+      "file": "package6-functional-consolidation.spec.cjs",
+      "title": "P6 salaries received jointly retain personal salary precedence 1440px",
+      "when": "2026-11-08T19:57:17.106Z",
+      "status": "passed",
+      "report": "financial-editors-final.json"
+    },
+    {
+      "file": "package6-functional-consolidation.spec.cjs",
+      "title": "P6 salaries received jointly retain personal salary precedence 390px",
+      "when": "2026-11-08T19:56:59.402Z",
+      "status": "passed",
+      "report": "financial-editors-final.json"
+    },
+    {
+      "file": "package7-release-audit.spec.cjs",
+      "title": "P7 M12/M13/UI invalid processing is rejected before state change 1440px",
+      "when": "2026-11-08T19:19:07.312Z",
+      "status": "passed",
+      "report": "ui-followup.json"
+    },
+    {
+      "file": "package7-release-audit.spec.cjs",
+      "title": "P7 M12/M13/UI invalid processing is rejected before state change 390px",
+      "when": "2026-11-08T19:18:59.752Z",
+      "status": "passed",
+      "report": "ui-followup.json"
+    },
+    {
+      "file": "package7-release-audit.spec.cjs",
+      "title": "P7 Q1/Q2 configuration and status are inert text 1440px",
+      "when": "2026-11-08T19:19:02.528Z",
+      "status": "passed",
+      "report": "ui-followup.json"
+    },
+    {
+      "file": "package7-release-audit.spec.cjs",
+      "title": "P7 Q1/Q2 configuration and status are inert text 390px",
+      "when": "2026-11-08T19:18:54.297Z",
+      "status": "passed",
+      "report": "ui-followup.json"
+    },
+    {
+      "file": "package7-release-audit.spec.cjs",
+      "title": "P7 Q3-Q8 financial/source/category/diagnostic strings remain inert 1440px",
+      "when": "2026-11-08T19:19:08.771Z",
+      "status": "passed",
+      "report": "ui-followup.json"
+    },
+    {
+      "file": "package7-release-audit.spec.cjs",
+      "title": "P7 Q3-Q8 financial/source/category/diagnostic strings remain inert 390px",
+      "when": "2026-11-08T19:19:01.519Z",
+      "status": "passed",
+      "report": "ui-followup.json"
+    },
+    {
+      "file": "package7-release-audit.spec.cjs",
+      "title": "P7 Q7 legacy planning identifiers cannot create HTML attributes 1440px",
+      "when": "2026-11-08T19:19:04.967Z",
+      "status": "passed",
+      "report": "ui-followup.json"
+    },
+    {
+      "file": "package7-release-audit.spec.cjs",
+      "title": "P7 Q7 legacy planning identifiers cannot create HTML attributes 390px",
+      "when": "2026-11-08T19:18:57.375Z",
+      "status": "passed",
+      "report": "ui-followup.json"
+    },
+    {
+      "file": "package7-release-audit.spec.cjs",
+      "title": "P7 Q7/Q8 legacy review and transfer metadata are inert 1440px",
+      "when": "2026-11-08T19:19:06.174Z",
+      "status": "passed",
+      "report": "ui-followup.json"
+    },
+    {
+      "file": "package7-release-audit.spec.cjs",
+      "title": "P7 Q7/Q8 legacy review and transfer metadata are inert 390px",
+      "when": "2026-11-08T19:18:58.628Z",
+      "status": "passed",
+      "report": "ui-followup.json"
+    },
+    {
+      "file": "package7-release-audit.spec.cjs",
+      "title": "P7 Q9 data instructions cannot recommend public legacy Firestore rules 1440px",
+      "when": "2026-11-08T19:19:03.764Z",
+      "status": "passed",
+      "report": "ui-followup.json"
+    },
+    {
+      "file": "package7-release-audit.spec.cjs",
+      "title": "P7 Q9 data instructions cannot recommend public legacy Firestore rules 390px",
+      "when": "2026-11-08T19:18:56.066Z",
+      "status": "passed",
+      "report": "ui-followup.json"
+    },
+    {
+      "file": "package7-release-audit.spec.cjs",
+      "title": "P7 W1/W2/W3/W5/W7 old cache eviction and versioned shell match",
+      "when": "2026-11-08T19:19:09.736Z",
+      "status": "passed",
+      "report": "ui-followup.json"
+    },
+    {
+      "file": "package7-release-audit.spec.cjs",
+      "title": "P7 W4/W6/W8 offline/reconnect retains persisted state, journal and source details",
+      "when": "2026-11-08T19:19:11.067Z",
+      "status": "passed",
+      "report": "ui-followup.json"
+    },
+    {
+      "file": "pakket1-product-price.spec.cjs",
+      "title": "B1 1440px expliciete handmatige saldocorrectie blijft mogelijk",
+      "when": "2026-11-08T20:34:41.631Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "pakket1-product-price.spec.cjs",
+      "title": "B1 1440px geldig: bewaren, heropenen en opnieuw opslaan",
+      "when": "2026-11-08T20:34:47.316Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "pakket1-product-price.spec.cjs",
+      "title": "B1 1440px leeg: bewaren, heropenen en opnieuw opslaan",
+      "when": "2026-11-08T20:34:44.169Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "pakket1-product-price.spec.cjs",
+      "title": "B1 1440px nieuw doel met handmatig subdoelbedrag en product zonder prijs",
+      "when": "2026-11-08T20:34:52.232Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "pakket1-product-price.spec.cjs",
+      "title": "B1 1440px nul: bewaren, heropenen en opnieuw opslaan",
+      "when": "2026-11-08T20:34:48.915Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "pakket1-product-price.spec.cjs",
+      "title": "B1 1440px ongeldig: bewaren, heropenen en opnieuw opslaan",
+      "when": "2026-11-08T20:34:45.751Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "pakket1-product-price.spec.cjs",
+      "title": "B1 1440px ontbrekend: bewaren, heropenen en opnieuw opslaan",
+      "when": "2026-11-08T20:34:42.616Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "pakket1-product-price.spec.cjs",
+      "title": "B1 1440px zonder link: bewaren, heropenen en opnieuw opslaan",
+      "when": "2026-11-08T20:34:50.533Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "pakket1-product-price.spec.cjs",
+      "title": "B1 390px expliciete handmatige saldocorrectie blijft mogelijk",
+      "when": "2026-11-08T20:34:28.359Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "pakket1-product-price.spec.cjs",
+      "title": "B1 390px geldig: bewaren, heropenen en opnieuw opslaan",
+      "when": "2026-11-08T20:34:35.550Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "pakket1-product-price.spec.cjs",
+      "title": "B1 390px leeg: bewaren, heropenen en opnieuw opslaan",
+      "when": "2026-11-08T20:34:31.700Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "pakket1-product-price.spec.cjs",
+      "title": "B1 390px nieuw doel met handmatig subdoelbedrag en product zonder prijs",
+      "when": "2026-11-08T20:34:40.587Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "pakket1-product-price.spec.cjs",
+      "title": "B1 390px nul: bewaren, heropenen en opnieuw opslaan",
+      "when": "2026-11-08T20:34:37.181Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "pakket1-product-price.spec.cjs",
+      "title": "B1 390px ongeldig: bewaren, heropenen en opnieuw opslaan",
+      "when": "2026-11-08T20:34:33.777Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "pakket1-product-price.spec.cjs",
+      "title": "B1 390px ontbrekend: bewaren, heropenen en opnieuw opslaan",
+      "when": "2026-11-08T20:34:29.468Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "pakket1-product-price.spec.cjs",
+      "title": "B1 390px zonder link: bewaren, heropenen en opnieuw opslaan",
+      "when": "2026-11-08T20:34:39.068Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "pakket1-product-price.spec.cjs",
+      "title": "B1 desktop tabelbewerker behoudt bedrag en verdeling bij ontbrekende prijs",
+      "when": "2026-11-08T20:34:26.997Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "pakket1-weekly-calendar.spec.cjs",
+      "title": "B2 1440px kalenderplanning, prognose en financiële kaarten",
+      "when": "2026-11-08T20:34:53.994Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "pakket1-weekly-calendar.spec.cjs",
+      "title": "B2 390px kalenderplanning, prognose en financiële kaarten",
+      "when": "2026-11-08T20:34:53.371Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "personal-month-summary.spec.cjs",
+      "title": "asynchronous confirmation keeps the prior amount until durable save completes",
+      "when": "2026-11-08T17:55:30.847Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "personal-month-summary.spec.cjs",
+      "title": "failed durable savings copy keeps the modal, prior override and source records",
+      "when": "2026-11-08T17:55:29.294Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "personal-month-summary.spec.cjs",
+      "title": "later financial change updates remaining without automatically changing the copied savings amount",
+      "when": "2026-11-08T17:55:27.972Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "personal-month-summary.spec.cjs",
+      "title": "negative remaining stays visible while explicit copy and manual zero save zero",
+      "when": "2026-11-08T17:55:26.606Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "personal-month-summary.spec.cjs",
+      "title": "personal month formula and explicit savings copy preserve source state dara 1440",
+      "when": "2026-11-08T17:55:24.279Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "personal-month-summary.spec.cjs",
+      "title": "personal month formula and explicit savings copy preserve source state dara 430",
+      "when": "2026-11-08T17:55:22.012Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "personal-month-summary.spec.cjs",
+      "title": "personal month formula and explicit savings copy preserve source state dion 320",
+      "when": "2026-11-08T17:55:17.582Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "personal-month-summary.spec.cjs",
+      "title": "personal month formula and explicit savings copy preserve source state dion 390",
+      "when": "2026-11-08T17:55:19.776Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "pwa-offline.spec.cjs",
+      "title": "PWA start offline en geeft geen HTML terug voor ontbrekende assets",
+      "when": "2026-11-08T17:55:32.087Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "responsive-fit.spec.cjs",
+      "title": "layout fits 1024px without changing financial state",
+      "when": "2026-11-08T19:25:08.788Z",
+      "status": "passed",
+      "report": "current-routes.json"
+    },
+    {
+      "file": "responsive-fit.spec.cjs",
+      "title": "layout fits 1199px without changing financial state",
+      "when": "2026-11-08T19:25:11.122Z",
+      "status": "passed",
+      "report": "current-routes.json"
+    },
+    {
+      "file": "responsive-fit.spec.cjs",
+      "title": "layout fits 1200px without changing financial state",
+      "when": "2026-11-08T19:25:13.328Z",
+      "status": "passed",
+      "report": "current-routes.json"
+    },
+    {
+      "file": "responsive-fit.spec.cjs",
+      "title": "layout fits 1440px without changing financial state",
+      "when": "2026-11-08T19:25:15.425Z",
+      "status": "passed",
+      "report": "current-routes.json"
+    },
+    {
+      "file": "responsive-fit.spec.cjs",
+      "title": "layout fits 320px without changing financial state",
+      "when": "2026-11-08T19:24:57.028Z",
+      "status": "passed",
+      "report": "current-routes.json"
+    },
+    {
+      "file": "responsive-fit.spec.cjs",
+      "title": "layout fits 390px without changing financial state",
+      "when": "2026-11-08T19:24:59.775Z",
+      "status": "passed",
+      "report": "current-routes.json"
+    },
+    {
+      "file": "responsive-fit.spec.cjs",
+      "title": "layout fits 430px without changing financial state",
+      "when": "2026-11-08T19:25:02.043Z",
+      "status": "passed",
+      "report": "current-routes.json"
+    },
+    {
+      "file": "responsive-fit.spec.cjs",
+      "title": "layout fits 767px without changing financial state",
+      "when": "2026-11-08T19:25:04.311Z",
+      "status": "passed",
+      "report": "current-routes.json"
+    },
+    {
+      "file": "responsive-fit.spec.cjs",
+      "title": "layout fits 768px without changing financial state",
+      "when": "2026-11-08T19:25:06.610Z",
+      "status": "passed",
+      "report": "current-routes.json"
+    },
+    {
+      "file": "responsive-fit.spec.cjs",
+      "title": "mobile goal editor has one scroll owner and keeps save and close reachable",
+      "when": "2026-11-08T19:25:24.067Z",
+      "status": "passed",
+      "report": "current-routes.json"
+    },
+    {
+      "file": "responsive-fit.spec.cjs",
+      "title": "text sizes and info controls retain their original appearance (iPhone)",
+      "when": "2026-11-08T19:25:20.895Z",
+      "status": "passed",
+      "report": "current-routes.json"
+    },
+    {
+      "file": "responsive-fit.spec.cjs",
+      "title": "text sizes and info controls retain their original appearance (standard)",
+      "when": "2026-11-08T19:25:17.684Z",
+      "status": "passed",
+      "report": "current-routes.json"
+    },
+    {
+      "file": "savings-link-proposals.spec.cjs",
+      "title": "equal incoming amounts require a choice; income links keep their administrative meaning",
+      "when": "2026-11-08T19:25:31.648Z",
+      "status": "passed",
+      "report": "current-routes.json"
+    },
+    {
+      "file": "savings-link-proposals.spec.cjs",
+      "title": "saving proposal remains a draft until explicit approval and survives reload 1440",
+      "when": "2026-11-08T19:25:28.426Z",
+      "status": "passed",
+      "report": "current-routes.json"
+    },
+    {
+      "file": "savings-link-proposals.spec.cjs",
+      "title": "saving proposal remains a draft until explicit approval and survives reload 390",
+      "when": "2026-11-08T19:25:25.921Z",
+      "status": "passed",
+      "report": "current-routes.json"
+    },
+    {
+      "file": "service-worker-upgrade.spec.cjs",
+      "title": "Offline herladen kiest actuele release ook wanneer oude cache eerder staat",
+      "when": "2026-11-08T20:34:54.686Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "storage-hotfix-2.spec.cjs",
+      "title": "T1/T2 large ordinary backup stored and SHA verified in real IndexedDB",
+      "when": "2026-11-08T19:19:13.412Z",
+      "status": "passed",
+      "report": "ui-followup.json"
+    },
+    {
+      "file": "storage-hotfix-2.spec.cjs",
+      "title": "T2 corrupt ordinary backup readback refused",
+      "when": "2026-11-08T19:19:16.650Z",
+      "status": "passed",
+      "report": "ui-followup.json"
+    },
+    {
+      "file": "storage-hotfix-2.spec.cjs",
+      "title": "T3 backup write failure blocks cloud adoption and restore before mutation",
+      "when": "2026-11-08T19:19:14.800Z",
+      "status": "passed",
+      "report": "ui-followup.json"
+    },
+    {
+      "file": "storage-hotfix-2.spec.cjs",
+      "title": "T4 old localStorage ordinary backup readable and never deleted",
+      "when": "2026-11-08T19:19:15.745Z",
+      "status": "passed",
+      "report": "ui-followup.json"
+    },
+    {
+      "file": "storage-hotfix-2.spec.cjs",
+      "title": "async ordinary backup does not allow late older cloud adoption",
+      "when": "2026-11-08T19:19:19.904Z",
+      "status": "passed",
+      "report": "ui-followup.json"
+    },
+    {
+      "file": "storage-hotfix-2.spec.cjs",
+      "title": "cloud adapter commits chunk manifest atomically with existing import hook and reload",
+      "when": "2026-11-08T19:19:17.562Z",
+      "status": "passed",
+      "report": "ui-followup.json"
+    },
+    {
+      "file": "storage-hotfix-2.spec.cjs",
+      "title": "in-flight backup cannot adopt old household after sign-out",
+      "when": "2026-11-08T19:19:22.518Z",
+      "status": "passed",
+      "report": "ui-followup.json"
+    },
+    {
+      "file": "storage-hotfix-2.spec.cjs",
+      "title": "ordinary backup presentation and restore entry remain reachable at 390/1440px",
+      "when": "2026-11-08T19:19:20.950Z",
+      "status": "passed",
+      "report": "ui-followup.json"
+    },
+    {
+      "file": "storage-hotfix-2.spec.cjs",
+      "title": "restore rejects a newer local choice made during async backup",
+      "when": "2026-11-08T19:19:23.421Z",
+      "status": "passed",
+      "report": "ui-followup.json"
+    },
+    {
+      "file": "subgoal-product-link.spec.cjs",
+      "title": "een productlink vult bestaande subdoelvelden zonder nieuwe interface",
+      "when": "2026-11-08T20:34:55.530Z",
+      "status": "passed",
+      "report": "smoke-after-budget.json"
+    },
+    {
+      "file": "sync-hotfix-3.spec.cjs",
+      "title": "S10 real local core change creates exactly one new generation",
+      "when": "2026-11-08T17:59:04.914Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "sync-hotfix-3.spec.cjs",
+      "title": "S11 actual competing device still rejects stale CAS and preserves local rebase",
+      "when": "2026-11-08T17:59:06.069Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "sync-hotfix-3.spec.cjs",
+      "title": "S12 reload accepts existing chunked v11 without a new cloud generation",
+      "when": "2026-11-08T17:59:07.309Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "sync-hotfix-3.spec.cjs",
+      "title": "S5 own chunked echo without delay is side-effect free",
+      "when": "2026-11-08T17:59:01.203Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "sync-hotfix-3.spec.cjs",
+      "title": "S5 own inline echo without delay is side-effect free",
+      "when": "2026-11-08T17:59:00.127Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "sync-hotfix-3.spec.cjs",
+      "title": "S6/S8 integrated delayed own echo plus unpublishable queue never repeats identical commits",
+      "when": "2026-11-08T17:58:58.824Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "sync-hotfix-3.spec.cjs",
+      "title": "S7 a later other-device chunked commit is adopted normally",
+      "when": "2026-11-08T17:59:02.329Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "sync-hotfix-3.spec.cjs",
+      "title": "S9/S13 already atomically published import receipt retries without another core generation",
+      "when": "2026-11-08T17:59:08.983Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "sync-hotfix-3.spec.cjs",
+      "title": "S9/S14 repeated echo/flush/no-op preserves versions, generations, originals and financial output",
+      "when": "2026-11-08T17:59:03.684Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "transaction-overview-design.spec.cjs",
+      "title": "banktransactie tikken opent de bronverwerking bank-api",
+      "when": "2026-11-08T18:54:43.584Z",
+      "status": "passed",
+      "report": "source-route.json"
+    },
+    {
+      "file": "transaction-overview-design.spec.cjs",
+      "title": "banktransactie tikken opent de bronverwerking csv",
+      "when": "2026-11-08T18:54:42.551Z",
+      "status": "passed",
+      "report": "source-route.json"
+    },
+    {
+      "file": "transaction-overview-design.spec.cjs",
+      "title": "handmatige transactie kan met bestaande verwerking worden opgeslagen",
+      "when": "2026-11-08T17:59:21.502Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "transaction-overview-design.spec.cjs",
+      "title": "transacties blijven zichtbaar en bewerkbaar dara 1440",
+      "when": "2026-11-08T17:59:20.170Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "transaction-overview-design.spec.cjs",
+      "title": "transacties blijven zichtbaar en bewerkbaar dara 320",
+      "when": "2026-11-08T17:59:12.747Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "transaction-overview-design.spec.cjs",
+      "title": "transacties blijven zichtbaar en bewerkbaar dara 390",
+      "when": "2026-11-08T17:59:16.397Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "transaction-overview-design.spec.cjs",
+      "title": "transacties blijven zichtbaar en bewerkbaar dion 1440",
+      "when": "2026-11-08T17:59:18.823Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "transaction-overview-design.spec.cjs",
+      "title": "transacties blijven zichtbaar en bewerkbaar dion 320",
+      "when": "2026-11-08T17:59:11.513Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "transaction-overview-design.spec.cjs",
+      "title": "transacties blijven zichtbaar en bewerkbaar dion 390",
+      "when": "2026-11-08T17:59:15.106Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "transaction-overview-design.spec.cjs",
+      "title": "transacties blijven zichtbaar en bewerkbaar gezamenlijk 1440",
+      "when": "2026-11-08T17:59:17.519Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "transaction-overview-design.spec.cjs",
+      "title": "transacties blijven zichtbaar en bewerkbaar gezamenlijk 320",
+      "when": "2026-11-08T17:59:10.271Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "transaction-overview-design.spec.cjs",
+      "title": "transacties blijven zichtbaar en bewerkbaar gezamenlijk 390",
+      "when": "2026-11-08T17:59:13.925Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "update6-account-navigation.spec.cjs",
+      "title": "accountnavigatie toont eigen tab en Instellingen",
+      "when": "2026-11-08T19:27:23.031Z",
+      "status": "passed",
+      "report": "p4-p5-current.json"
+    },
+    {
+      "file": "update6-account-navigation.spec.cjs",
+      "title": "dashboard en gezamenlijk blijven voor ieder account bewerkbaar op desktop",
+      "when": "2026-11-08T19:27:27.477Z",
+      "status": "passed",
+      "report": "p4-p5-current.json"
+    },
+    {
+      "file": "update6-account-navigation.spec.cjs",
+      "title": "gedeelde andere tab opent alleen-lezen en verbergt gekozen KPI",
+      "when": "2026-11-08T19:27:30.281Z",
+      "status": "passed",
+      "report": "p4-p5-current.json"
+    },
+    {
+      "file": "update6-account-navigation.spec.cjs",
+      "title": "mobiel houdt vijf knoppen in de afgesproken volgorde",
+      "when": "2026-11-08T19:27:24.073Z",
+      "status": "passed",
+      "report": "p4-p5-current.json"
+    },
+    {
+      "file": "update6-account-navigation.spec.cjs",
+      "title": "mobiele gedeelde tab bewaart verborgen KPI’s en alleen-lezenbediening",
+      "when": "2026-11-08T19:27:31.427Z",
+      "status": "passed",
+      "report": "p4-p5-current.json"
+    },
+    {
+      "file": "update6-account-navigation.spec.cjs",
+      "title": "persoonlijke inkomenskaart toont op mobiel en desktop dezelfde totale bronnen",
+      "when": "2026-11-08T19:27:28.710Z",
+      "status": "passed",
+      "report": "p4-p5-current.json"
+    },
+    {
+      "file": "update6-account-navigation.spec.cjs",
+      "title": "spaardoelen zijn voor dara visueel afgeschermd en dashboard toont alleen favorieten",
+      "when": "2026-11-08T19:27:26.210Z",
+      "status": "passed",
+      "report": "p4-p5-current.json"
+    },
+    {
+      "file": "update6-account-navigation.spec.cjs",
+      "title": "spaardoelen zijn voor dion visueel afgeschermd en dashboard toont alleen favorieten",
+      "when": "2026-11-08T19:27:24.939Z",
+      "status": "passed",
+      "report": "p4-p5-current.json"
+    },
+    {
+      "file": "update6-auth-shell.spec.cjs",
+      "title": "blijft bruikbaar op telefoonformaat",
+      "when": "2026-11-08T18:00:18.449Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "update6-auth-shell.spec.cjs",
+      "title": "probeert cloudopslag pas na een geldige accountkoppeling",
+      "when": "2026-11-08T18:00:13.307Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "update6-auth-shell.spec.cjs",
+      "title": "rondt Google-inloggen af zonder redirect van de PWA",
+      "when": "2026-11-08T18:00:17.555Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "update6-auth-shell.spec.cjs",
+      "title": "toont de accountkeuzes en ingelogd blijven zonder de app erachter",
+      "when": "2026-11-08T18:00:12.368Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "update6-auth-shell.spec.cjs",
+      "title": "toont na accountaanmaak direct de verificatiestap",
+      "when": "2026-11-08T18:00:14.458Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "update6-auth-shell.spec.cjs",
+      "title": "vernieuwt na e-mailbevestiging de koppeling en opent de app",
+      "when": "2026-11-08T18:00:15.815Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "v113-csv-processing.spec.cjs",
+      "title": "CSV opslag toont oorzaak Error en behoudt goedgekeurde verwerking",
+      "when": "2026-11-08T19:38:12.627Z",
+      "status": "passed",
+      "report": "budget-bar-fixed.json"
+    },
+    {
+      "file": "v113-csv-processing.spec.cjs",
+      "title": "CSV opslag toont oorzaak QuotaExceededError en behoudt goedgekeurde verwerking",
+      "when": "2026-11-08T19:38:07.416Z",
+      "status": "passed",
+      "report": "budget-bar-fixed.json"
+    },
+    {
+      "file": "v113-csv-processing.spec.cjs",
+      "title": "CSV opslag toont oorzaak SecurityError en behoudt goedgekeurde verwerking",
+      "when": "2026-11-08T19:38:10.314Z",
+      "status": "passed",
+      "report": "budget-bar-fixed.json"
+    },
+    {
+      "file": "v113-csv-processing.spec.cjs",
+      "title": "Centrale commit behoudt financieel saldobericht na rollback en booleancontract",
+      "when": "2026-11-08T19:38:17.009Z",
+      "status": "passed",
+      "report": "budget-bar-fixed.json"
+    },
+    {
+      "file": "v113-csv-processing.spec.cjs",
+      "title": "ING septemberbetaling verwerkt in oktober zonder wijziging bankgegevens",
+      "when": "2026-11-08T19:38:15.022Z",
+      "status": "passed",
+      "report": "budget-bar-fixed.json"
+    },
+    {
+      "file": "v113-csv-processing.spec.cjs",
+      "title": "V113 echte herstelback-up in IndexedDB en CSV bronkoppeling zonder extra betaling",
+      "when": "2026-11-08T19:38:38.287Z",
+      "status": "passed",
+      "report": "budget-bar-fixed.json"
+    },
+    {
+      "file": "v113-csv-processing.spec.cjs",
+      "title": "V113 mogelijke overlap vereist expliciete keuze distinct",
+      "when": "2026-11-08T19:38:46.321Z",
+      "status": "passed",
+      "report": "budget-bar-fixed.json"
+    },
+    {
+      "file": "v113-csv-processing.spec.cjs",
+      "title": "V113 mogelijke overlap vereist expliciete keuze same",
+      "when": "2026-11-08T19:38:43.685Z",
+      "status": "passed",
+      "report": "budget-bar-fixed.json"
+    },
+    {
+      "file": "v113-csv-processing.spec.cjs",
+      "title": "V113 optionele spaarbudgetcorrectie en negatieve refund 1440px",
+      "when": "2026-11-08T19:38:31.716Z",
+      "status": "passed",
+      "report": "budget-bar-fixed.json"
+    },
+    {
+      "file": "v113-csv-processing.spec.cjs",
+      "title": "V113 optionele spaarbudgetcorrectie en negatieve refund 360px",
+      "when": "2026-11-08T19:38:21.594Z",
+      "status": "passed",
+      "report": "budget-bar-fixed.json"
+    },
+    {
+      "file": "v113-csv-processing.spec.cjs",
+      "title": "V113 oude onverwerkte import blijft na herladen leesbaar zonder gegevensconversie",
+      "when": "2026-11-08T19:38:49.218Z",
+      "status": "passed",
+      "report": "budget-bar-fixed.json"
+    },
+    {
+      "file": "v113-csv-processing.spec.cjs",
+      "title": "V113 overlap terugtrekken verwijderen en herwerken via B 1440px",
+      "when": "2026-11-08T19:38:35.262Z",
+      "status": "passed",
+      "report": "budget-bar-fixed.json"
+    },
+    {
+      "file": "v113-csv-processing.spec.cjs",
+      "title": "V113 overlap terugtrekken verwijderen en herwerken via B 360px",
+      "when": "2026-11-08T19:38:24.251Z",
+      "status": "passed",
+      "report": "budget-bar-fixed.json"
+    },
+    {
+      "file": "v113-csv-processing.spec.cjs",
+      "title": "V113 volledige CSV splitsen herwerken annuleren herladen 1440px",
+      "when": "2026-11-08T19:38:26.657Z",
+      "status": "passed",
+      "report": "budget-bar-fixed.json"
+    },
+    {
+      "file": "v113-csv-processing.spec.cjs",
+      "title": "V113 volledige CSV splitsen herwerken annuleren herladen 360px",
+      "when": "2026-11-08T19:38:18.075Z",
+      "status": "passed",
+      "report": "budget-bar-fixed.json"
+    },
+    {
+      "file": "v113-csv-processing.spec.cjs",
+      "title": "goedgekeurde CSV blijft offline herbewerkbaar na herladen",
+      "when": "2026-11-08T19:38:40.109Z",
+      "status": "passed",
+      "report": "budget-bar-fixed.json"
+    },
+    {
+      "file": "v117-p1.spec.cjs",
+      "title": "V117 exactly five selected matches change, five remain untouched",
+      "when": "2026-11-08T19:03:32.749Z",
+      "status": "passed",
+      "report": "p1-current.json"
+    },
+    {
+      "file": "v117-p1.spec.cjs",
+      "title": "V117 individual approval finishes before subsequent close; no late reopening",
+      "when": "2026-11-08T19:03:41.100Z",
+      "status": "passed",
+      "report": "p1-current.json"
+    },
+    {
+      "file": "v117-p1.spec.cjs",
+      "title": "V117 one confirmation approves all ten savings sources 1440px",
+      "when": "2026-11-08T19:03:28.164Z",
+      "status": "passed",
+      "report": "p1-current.json"
+    },
+    {
+      "file": "v117-p1.spec.cjs",
+      "title": "V117 one confirmation approves all ten savings sources 390px",
+      "when": "2026-11-08T19:03:22.875Z",
+      "status": "passed",
+      "report": "p1-current.json"
+    },
+    {
+      "file": "v117-p1.spec.cjs",
+      "title": "V117 seven durable successes survive storage failure and retry processes only remainder",
+      "when": "2026-11-08T19:03:36.909Z",
+      "status": "passed",
+      "report": "p1-current.json"
+    },
+    {
+      "file": "v117-p1.spec.cjs",
+      "title": "V117 ten savings approvals survive existing cloud protocol and second browser client",
+      "when": "2026-11-08T19:03:43.246Z",
+      "status": "passed",
+      "report": "p1-current.json"
+    },
+    {
+      "file": "v117-p2-migration.spec.cjs",
+      "title": "V117 P2 committed operation with lost acknowledgment is read back, never rejected or duplicated",
+      "when": "2026-11-08T19:27:50.847Z",
+      "status": "passed",
+      "report": "p4-p5-current.json"
+    },
+    {
+      "file": "v117-p2-migration.spec.cjs",
+      "title": "V117 P2 household switch reloads editors and keeps state, imports, receipts and outboxes separate",
+      "when": "2026-11-08T19:27:52.551Z",
+      "status": "passed",
+      "report": "p4-p5-current.json"
+    },
+    {
+      "file": "v117-p2-migration.spec.cjs",
+      "title": "V117 P2 operation receipts are immutable and replay does not advance the storage revision",
+      "when": "2026-11-08T19:27:57.692Z",
+      "status": "passed",
+      "report": "p4-p5-current.json"
+    },
+    {
+      "file": "v117-p2-migration.spec.cjs",
+      "title": "V117 P2 real browser close/reopen resumes migration after-activation",
+      "when": "2026-11-08T19:27:43.201Z",
+      "status": "passed",
+      "report": "p4-p5-current.json"
+    },
+    {
+      "file": "v117-p2-migration.spec.cjs",
+      "title": "V117 P2 real browser close/reopen resumes migration after-backup",
+      "when": "2026-11-08T19:27:32.786Z",
+      "status": "passed",
+      "report": "p4-p5-current.json"
+    },
+    {
+      "file": "v117-p2-migration.spec.cjs",
+      "title": "V117 P2 real browser close/reopen resumes migration after-prepared",
+      "when": "2026-11-08T19:27:39.489Z",
+      "status": "passed",
+      "report": "p4-p5-current.json"
+    },
+    {
+      "file": "v117-p2-migration.spec.cjs",
+      "title": "V117 P2 real browser close/reopen resumes migration during-financial-commit",
+      "when": "2026-11-08T19:27:36.251Z",
+      "status": "passed",
+      "report": "p4-p5-current.json"
+    },
+    {
+      "file": "v117-p2-migration.spec.cjs",
+      "title": "V117 P2 referenced legacy goal image is copied to household scope without deleting the original",
+      "when": "2026-11-08T19:27:55.564Z",
+      "status": "passed",
+      "report": "p4-p5-current.json"
+    },
+    {
+      "file": "v117-p2-migration.spec.cjs",
+      "title": "V117 P2 source changed during migration cannot activate an outdated IndexedDB copy",
+      "when": "2026-11-08T19:27:56.613Z",
+      "status": "passed",
+      "report": "p4-p5-current.json"
+    },
+    {
+      "file": "v117-p2-migration.spec.cjs",
+      "title": "V117 P2 stale client cannot overwrite a newer IndexedDB revision",
+      "when": "2026-11-08T19:27:48.413Z",
+      "status": "passed",
+      "report": "p4-p5-current.json"
+    },
+    {
+      "file": "v117-p2-migration.spec.cjs",
+      "title": "V117 P2 unchanged legacy source is protected; divergent old-client writes block new commits and restart",
+      "when": "2026-11-08T19:27:46.785Z",
+      "status": "passed",
+      "report": "p4-p5-current.json"
+    },
+    {
+      "file": "v117-p2.spec.cjs",
+      "title": "V117 P2 18 MiB administration commits to actual IndexedDB and reloads without rewriting unchanged payload",
+      "when": "2026-11-08T19:07:59.221Z",
+      "status": "passed",
+      "report": "p2-current.json"
+    },
+    {
+      "file": "v117-p2.spec.cjs",
+      "title": "V117 P2 IndexedDB abort at financialHead leaves all financial components unchanged",
+      "when": "2026-11-08T19:07:32.973Z",
+      "status": "passed",
+      "report": "p2-current.json"
+    },
+    {
+      "file": "v117-p2.spec.cjs",
+      "title": "V117 P2 IndexedDB abort at financialOutbox leaves all financial components unchanged",
+      "when": "2026-11-08T19:07:44.068Z",
+      "status": "passed",
+      "report": "p2-current.json"
+    },
+    {
+      "file": "v117-p2.spec.cjs",
+      "title": "V117 P2 IndexedDB abort at financialRecords leaves all financial components unchanged",
+      "when": "2026-11-08T19:07:30.119Z",
+      "status": "passed",
+      "report": "p2-current.json"
+    },
+    {
+      "file": "v117-p2.spec.cjs",
+      "title": "V117 P2 IndexedDB abort at imports leaves all financial components unchanged",
+      "when": "2026-11-08T19:07:35.695Z",
+      "status": "passed",
+      "report": "p2-current.json"
+    },
+    {
+      "file": "v117-p2.spec.cjs",
+      "title": "V117 P2 IndexedDB abort at journal leaves all financial components unchanged",
+      "when": "2026-11-08T19:07:46.963Z",
+      "status": "passed",
+      "report": "p2-current.json"
+    },
+    {
+      "file": "v117-p2.spec.cjs",
+      "title": "V117 P2 IndexedDB abort at operationReceipts leaves all financial components unchanged",
+      "when": "2026-11-08T19:07:41.211Z",
+      "status": "passed",
+      "report": "p2-current.json"
+    },
+    {
+      "file": "v117-p2.spec.cjs",
+      "title": "V117 P2 IndexedDB abort at syncQueue leaves all financial components unchanged",
+      "when": "2026-11-08T19:07:38.391Z",
+      "status": "passed",
+      "report": "p2-current.json"
+    },
+    {
+      "file": "v117-p2.spec.cjs",
+      "title": "V117 P2 IndexedDB abort plus failed rollback registration cannot execute a rejected intent on restart",
+      "when": "2026-11-08T19:07:56.359Z",
+      "status": "passed",
+      "report": "p2-current.json"
+    },
+    {
+      "file": "v117-p2.spec.cjs",
+      "title": "V117 P2 actual full localStorage does not block ten durable CSV group approvals",
+      "when": "2026-11-08T19:07:24.893Z",
+      "status": "passed",
+      "report": "p2-current.json"
+    },
+    {
+      "file": "v117-p2.spec.cjs",
+      "title": "V117 P2 browser close with pending approval never executes it during restart",
+      "when": "2026-11-08T19:07:52.761Z",
+      "status": "passed",
+      "report": "p2-current.json"
+    },
+    {
+      "file": "v117-p2.spec.cjs",
+      "title": "V117 P2 candidate remains unpublished until durable transaction completion",
+      "when": "2026-11-08T19:07:49.759Z",
+      "status": "passed",
+      "report": "p2-current.json"
+    },
+    {
+      "file": "v117-p2.spec.cjs",
+      "title": "V117 P2 migration readback is verified and original localStorage remains byte-identical",
+      "when": "2026-11-08T19:07:22.789Z",
+      "status": "passed",
+      "report": "p2-current.json"
+    },
+    {
+      "file": "v117-p2.spec.cjs",
+      "title": "V117 P2 month picker waits for the year commit before accepting a month",
+      "when": "2026-11-08T19:07:50.921Z",
+      "status": "passed",
+      "report": "p2-current.json"
+    },
+    {
+      "file": "v117-p3.spec.cjs",
+      "title": "V117 P3 actual browser close resumes locked migration and transfers household image bytes",
+      "when": "2026-11-08T20:29:50.419Z",
+      "status": "passed",
+      "report": "records-retest.json"
+    },
+    {
+      "file": "v117-p3.spec.cjs",
+      "title": "V117 P3 browser gateway refuses household and production addresses",
+      "when": "2026-11-08T20:29:23.827Z",
+      "status": "passed",
+      "report": "records-retest.json"
+    },
+    {
+      "file": "v117-p3.spec.cjs",
+      "title": "V117 P3 partial history: commit hydrates historical dependencies once and ordinary edits stay targeted",
+      "when": "2026-11-08T20:29:24.400Z",
+      "status": "passed",
+      "report": "records-retest.json"
+    },
+    {
+      "file": "v117-p3.spec.cjs",
+      "title": "V117 P3 partial history: real screens, ten CSV approvals, offline restart, historical correction and second client",
+      "when": "2026-11-09T13:46:52.291Z",
+      "status": "failed",
+      "report": "editor-delegation-stack.json"
+    },
+    {
+      "file": "v117-p3.spec.cjs",
+      "title": "V117 P3 partial history: reviewed disjoint offline approvals preserve both clients after lost acknowledgment",
+      "when": "2026-11-08T20:29:38.343Z",
+      "status": "passed",
+      "report": "records-retest.json"
+    },
+    {
+      "file": "v117-p3.spec.cjs",
+      "title": "V117 P3 real Firestore: divergent offline clients preserve both versions and reject silent replacement",
+      "when": "2026-11-08T20:29:15.658Z",
+      "status": "passed",
+      "report": "records-retest.json"
+    },
+    {
+      "file": "v117-p3.spec.cjs",
+      "title": "V117 P3 real Firestore: offline ten savings approvals, restart, repeated sync and second browser client",
+      "when": "2026-11-08T20:29:05.600Z",
+      "status": "passed",
+      "report": "records-retest.json"
+    },
+    {
+      "file": "v117-p4-budget-identity.spec.cjs",
+      "title": "P4 CSV budget identities survive rename restart and second client at 1440",
+      "when": "2026-11-08T20:29:56.206Z",
+      "status": "passed",
+      "report": "records-retest.json"
+    },
+    {
+      "file": "v117-p4-budget-identity.spec.cjs",
+      "title": "P4 CSV budget identities survive rename restart and second client at 390",
+      "when": "2026-11-08T20:30:04.602Z",
+      "status": "passed",
+      "report": "records-retest.json"
+    },
+    {
+      "file": "v117-p4-budget-identity.spec.cjs",
+      "title": "P4 OV and Overig legacy amounts and details are independent at 1440",
+      "when": "2026-11-08T20:29:54.534Z",
+      "status": "passed",
+      "report": "records-retest.json"
+    },
+    {
+      "file": "v117-p4-budget-identity.spec.cjs",
+      "title": "P4 OV and Overig legacy amounts and details are independent at 390",
+      "when": "2026-11-08T20:29:55.356Z",
+      "status": "passed",
+      "report": "records-retest.json"
+    },
+    {
+      "file": "v117-p4-payload-migration.spec.cjs",
+      "title": "P4 aborted physical activation leaves original finance intact and resumes safely",
+      "when": "2026-11-08T18:49:03.203Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "v117-p4-payload-migration.spec.cjs",
+      "title": "P4 cache cleanup preserves transitive financial proofs and can recreate deleted cache-only parts",
+      "when": "2026-11-08T18:49:01.841Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "v117-p4-payload-migration.spec.cjs",
+      "title": "P4 missing immutable payload blocks reads instead of displaying empty finance",
+      "when": "2026-11-08T18:49:04.539Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "v117-p4-payload-migration.spec.cjs",
+      "title": "P4 physical migration resumes after browser close and preserves pending imports receipts and original state",
+      "when": "2026-11-08T18:48:56.863Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "v117-p4-payload-migration.spec.cjs",
+      "title": "P4 physical storage rejects an unsupported format without changing original finance",
+      "when": "2026-11-08T18:49:01.002Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "v117-p4-payload-migration.spec.cjs",
+      "title": "P4 physical storage rejects an unsupported scope without changing original finance",
+      "when": "2026-11-08T18:49:00.167Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "v117-p4-payload-migration.spec.cjs",
+      "title": "P4.2 metadata query hydrates only required journals and revalidates each new transaction",
+      "when": "2026-11-08T18:49:05.976Z",
+      "status": "passed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "v117-p4-salary.spec.cjs",
+      "title": "P4 legacy salary 2026-09 without reliable person blocks totals visibly and preserves data",
+      "when": "2026-11-08T20:09:37.216Z",
+      "status": "passed",
+      "report": "emulator-browser-targeted.json"
+    },
+    {
+      "file": "v117-p4-salary.spec.cjs",
+      "title": "P4 legacy salary 2026-10 without reliable person blocks totals visibly and preserves data",
+      "when": "2026-11-08T20:09:38.207Z",
+      "status": "passed",
+      "report": "emulator-browser-targeted.json"
+    },
+    {
+      "file": "v117-p4-salary.spec.cjs",
+      "title": "P4 manual salary person is editable while other income keeps its bank account destination",
+      "when": "2026-11-08T20:09:54.562Z",
+      "status": "passed",
+      "report": "emulator-browser-targeted.json"
+    },
+    {
+      "file": "v117-p4-salary.spec.cjs",
+      "title": "P4 salary person proposal, explicit correction, offline restart and second client preserve cents",
+      "when": "2026-11-08T20:14:47.735Z",
+      "status": "failed",
+      "report": "salary-proposal-probe.json"
+    },
+    {
+      "file": "v117-p4-scale.spec.cjs",
+      "title": "P4 real browser and rules: 500 bank movements / 3 months, 1 measurements",
+      "when": "2026-11-08T18:49:43.833Z",
+      "status": "failed",
+      "report": "browser-full-final.json"
+    },
+    {
+      "file": "v117-p4-scale.spec.cjs",
+      "title": "P4 real browser and rules: 5400 bank movements / 36 months, 3 measurements",
+      "status": "blocked",
+      "reason": "Niet voltooid; schaal/prestatiegroep afzonderlijk gehouden."
+    },
+    {
+      "file": "v117-p4-write-amplification.spec.cjs",
+      "title": "P4 repeated edits: reopen, rollback failure, lost acknowledgment and offline replay preserve one effect",
+      "when": "2026-11-09T14:02:31.825Z",
+      "status": "passed",
+      "report": "remaining-small-records.json"
+    },
+    {
+      "file": "v117-p4-write-amplification.spec.cjs",
+      "title": "P4 repeated edits: ten commits on the same bank source with 20 and 100 movements",
+      "when": "2026-11-09T14:01:19.257Z",
+      "status": "passed",
+      "report": "remaining-small-records.json"
+    },
+    {
+      "file": "v117-p4.spec.cjs",
+      "title": "P4 blocked database upgrade preserves the old records and can be retried",
+      "when": "2026-11-09T13:50:06.077Z",
+      "status": "passed",
+      "report": "remaining-records.json"
+    },
+    {
+      "file": "v117-p4.spec.cjs",
+      "title": "P4 cache eviction, offline pin, corruption and reload preserve canonical financial totals",
+      "when": "2026-11-09T13:50:06.761Z",
+      "status": "passed",
+      "report": "remaining-records.json"
+    },
+    {
+      "file": "v117-p4.spec.cjs",
+      "title": "P4 cache is household scoped and pending financial changes prevent cleanup",
+      "when": "2026-11-09T13:50:36.980Z",
+      "status": "passed",
+      "report": "remaining-records.json"
+    },
+    {
+      "file": "v117-p4.spec.cjs",
+      "title": "P4 cache quota failure cannot undo or misreport an already durable period commit",
+      "when": "2026-11-09T13:50:31.064Z",
+      "status": "passed",
+      "report": "remaining-records.json"
+    },
+    {
+      "file": "v117-p4.spec.cjs",
+      "title": "P4 new household without legacy: first CSV bulk approval, full localStorage, offline restart and second client",
+      "when": "2026-11-09T14:00:17.420Z",
+      "status": "failed",
+      "report": "new-household-current-route.json"
+    },
+    {
+      "file": "v117-p4.spec.cjs",
+      "title": "P4 same bank source changed on two clients stays blocked with both approvals and proofs preserved",
+      "when": "2026-11-09T13:57:35.611Z",
+      "status": "failed",
+      "report": "records-last-two.json"
+    },
+    {
+      "file": "v117-p4.spec.cjs",
+      "title": "P4 storage inventory includes protected backup databases and scopes every byte",
+      "when": "2026-11-09T13:50:01.662Z",
+      "status": "passed",
+      "report": "remaining-records.json"
+    },
+    {
+      "file": "v117-p42-performance.spec.cjs",
+      "title": "P4.2 small read and CPU measurements: 20 and 100 sources, ten edits and ten savings approvals",
+      "status": "blocked",
+      "reason": "Niet voltooid; schaal/prestatiegroep afzonderlijk gehouden."
+    },
+    {
+      "file": "v117-p43-basis.spec.cjs",
+      "title": "P4.3 stale preparation epoch is rejected even with the same financial hash",
+      "when": "2026-11-09T13:51:25.658Z",
+      "status": "passed",
+      "report": "remaining-records.json"
+    },
+    {
+      "file": "v117-p43-basis.spec.cjs",
+      "title": "P4.3 stale preparation revision is rejected even with the same financial hash",
+      "when": "2026-11-09T13:51:24.493Z",
+      "status": "passed",
+      "report": "remaining-records.json"
+    },
+    {
+      "file": "v117-p43-performance.spec.cjs",
+      "title": "P4.3 small read and CPU measurements: 20 and 100 sources, ten edits and ten savings approvals",
+      "status": "blocked",
+      "reason": "Niet voltooid; schaal/prestatiegroep afzonderlijk gehouden."
+    },
+    {
+      "file": "v117-p43-verifier.spec.cjs",
+      "title": "P4.3 small verifier uses source identities after ten savings approvals",
+      "when": "2026-11-09T13:54:47.804Z",
+      "status": "failed",
+      "report": "record-partial-diagnostic.json"
+    },
+    {
+      "file": "v117-p44-group-recovery.spec.cjs",
+      "title": "P4.4 100 sources: native failure at approval eight, restart and retry preserve seven durable successes",
+      "when": "2026-11-09T13:53:54.008Z",
+      "status": "failed",
+      "report": "record-focus-retest.json"
+    },
+    {
+      "file": "v117-p44-group-recovery.spec.cjs",
+      "title": "P4.4 20 sources: native failure at approval eight, restart and retry preserve seven durable successes",
+      "when": "2026-11-09T13:53:37.464Z",
+      "status": "failed",
+      "report": "record-focus-retest.json"
+    },
+    {
+      "file": "v117-p44-performance.spec.cjs",
+      "title": "P4.4 small read and CPU measurements: 20 and 100 sources, ten edits and ten savings approvals",
+      "status": "blocked",
+      "reason": "Niet voltooid; schaal/prestatiegroep afzonderlijk gehouden."
+    },
+    {
+      "file": "v117-p44-period-window.spec.cjs",
+      "title": "P4 release: equal active worksets stay equal with 20 and 100 total sources; pins do not expand queries",
+      "when": "2026-11-09T14:02:47.692Z",
+      "status": "passed",
+      "report": "remaining-small-records.json"
+    },
+    {
+      "file": "v117-p44-period-window.spec.cjs",
+      "title": "P4 release: existing 500 and 5400 histories use bounded verified windows on final build",
+      "status": "blocked",
+      "reason": "Niet voltooid; schaal/prestatiegroep afzonderlijk gehouden."
+    },
+    {
+      "file": "v117-p44-release-safety.spec.cjs",
+      "title": "P4.4 release: completed 500-source household survives real offline PWA restart and repeated synchronization",
+      "status": "blocked",
+      "reason": "Niet voltooid; schaal/prestatiegroep afzonderlijk gehouden."
+    },
+    {
+      "file": "v117-p44-release-safety.spec.cjs",
+      "title": "P4.4 release: pending group stays visibly busy and duplicate clicks cannot approve twice",
+      "when": "2026-11-09T14:05:39.167Z",
+      "status": "failed",
+      "report": "busy-preparation-final.json"
+    },
+    {
+      "file": "v117-p44-scale-verifier.spec.cjs",
+      "title": "P4.4 scale verifier checks each source/effect pair and its immutable bank evidence",
+      "status": "blocked",
+      "reason": "Niet voltooid; schaal/prestatiegroep afzonderlijk gehouden."
+    },
+    {
+      "file": "v118-p1-balances.spec.cjs",
+      "title": "P1 1440px invoeren vergelijken corrigeren herladen en validatie",
+      "when": "2026-11-08T20:06:17.320Z",
+      "status": "passed",
+      "report": "accounts-liquidity-retest.json"
+    },
+    {
+      "file": "v118-p1-balances.spec.cjs",
+      "title": "P1 320px invoeren vergelijken corrigeren herladen en validatie",
+      "when": "2026-11-08T20:06:25.131Z",
+      "status": "passed",
+      "report": "accounts-liquidity-retest.json"
+    },
+    {
+      "file": "v118-p1-balances.spec.cjs",
+      "title": "P1 390px invoeren vergelijken corrigeren herladen en validatie",
+      "when": "2026-11-08T20:06:21.833Z",
+      "status": "passed",
+      "report": "accounts-liquidity-retest.json"
+    },
+    {
+      "file": "v118-p1-balances.spec.cjs",
+      "title": "P1 actual cloud acceptance preserves history and blocks a snapshot that drops it",
+      "when": "2026-11-08T20:03:21.921Z",
+      "status": "passed",
+      "report": "accounts-liquidity-current.json"
+    },
+    {
+      "file": "v118-p1-balances.spec.cjs",
+      "title": "P1 candidate is not visible before durable commit finishes",
+      "when": "2026-11-08T20:03:19.261Z",
+      "status": "passed",
+      "report": "accounts-liquidity-current.json"
+    },
+    {
+      "file": "v118-p1-balances.spec.cjs",
+      "title": "P1 changed source between preview and save requires new confirmation",
+      "when": "2026-11-08T20:03:20.362Z",
+      "status": "passed",
+      "report": "accounts-liquidity-current.json"
+    },
+    {
+      "file": "v118-p1-balances.spec.cjs",
+      "title": "P1 lost acknowledgement is reconciled through existing operation receipt",
+      "when": "2026-11-08T20:03:17.991Z",
+      "status": "passed",
+      "report": "accounts-liquidity-current.json"
+    },
+    {
+      "file": "v118-p1-balances.spec.cjs",
+      "title": "P1 real IndexedDB abort retains old state, then same operation retry commits once",
+      "when": "2026-11-08T20:03:16.130Z",
+      "status": "passed",
+      "report": "accounts-liquidity-current.json"
+    },
+    {
+      "file": "v118-p1-balances.spec.cjs",
+      "title": "P1 same UI supports a personal savings account without changing joint balance",
+      "when": "2026-11-08T20:03:23.103Z",
+      "status": "passed",
+      "report": "accounts-liquidity-current.json"
+    },
+    {
+      "file": "v118-p1b-accounts.spec.cjs",
+      "title": "Conflictbackup bewaart beide versies zonder keuzes of financiën te wijzigen",
+      "when": "2026-11-08T20:03:44.686Z",
+      "status": "passed",
+      "report": "accounts-liquidity-current.json"
+    },
+    {
+      "file": "v118-p1b-accounts.spec.cjs",
+      "title": "P1b 1440px toevoegen bewerken saldo corrigeren archiveren heractiveren herladen",
+      "when": "2026-11-08T20:03:24.502Z",
+      "status": "passed",
+      "report": "accounts-liquidity-current.json"
+    },
+    {
+      "file": "v118-p1b-accounts.spec.cjs",
+      "title": "P1b 320px toevoegen bewerken saldo corrigeren archiveren heractiveren herladen",
+      "when": "2026-11-08T20:03:31.261Z",
+      "status": "passed",
+      "report": "accounts-liquidity-current.json"
+    },
+    {
+      "file": "v118-p1b-accounts.spec.cjs",
+      "title": "P1b 390px toevoegen bewerken saldo corrigeren archiveren heractiveren herladen",
+      "when": "2026-11-08T20:03:28.178Z",
+      "status": "passed",
+      "report": "accounts-liquidity-current.json"
+    },
+    {
+      "file": "v118-p1b-accounts.spec.cjs",
+      "title": "P1b IndexedDB abort bewaart oude stand; herhalen gebruikt hetzelfde ID en operatie",
+      "when": "2026-11-08T20:03:37.138Z",
+      "status": "passed",
+      "report": "accounts-liquidity-current.json"
+    },
+    {
+      "file": "v118-p1b-accounts.spec.cjs",
+      "title": "P1b checksum dubbel IBAN en veilige correctie via formulier",
+      "when": "2026-11-08T20:03:34.446Z",
+      "status": "passed",
+      "report": "accounts-liquidity-current.json"
+    },
+    {
+      "file": "v118-p1b-accounts.spec.cjs",
+      "title": "P1b directe schrijfroutes blokkeren IBAN en eigenaar met ijkpunthistorie",
+      "when": "2026-11-08T20:03:43.403Z",
+      "status": "passed",
+      "report": "accounts-liquidity-current.json"
+    },
+    {
+      "file": "v118-p1b-accounts.spec.cjs",
+      "title": "P1b ingelogde Dion mag volgens lokale afspraak ook Dara toevoegen en saldo beheren",
+      "when": "2026-11-08T20:03:47.893Z",
+      "status": "passed",
+      "report": "accounts-liquidity-current.json"
+    },
+    {
+      "file": "v118-p1b-accounts.spec.cjs",
+      "title": "P1b nieuwe rekening in CSV en interne tegenrekeningselectie; oude saldoroute verwijst door",
+      "when": "2026-11-08T20:03:39.148Z",
+      "status": "passed",
+      "report": "accounts-liquidity-current.json"
+    },
+    {
+      "file": "v118-p1b-accounts.spec.cjs",
+      "title": "P1b nieuwe rekening vereist expliciete eigenaar en behoudt toetsenbordbediening",
+      "when": "2026-11-08T20:03:49.169Z",
+      "status": "passed",
+      "report": "accounts-liquidity-current.json"
+    },
+    {
+      "file": "v118-p1b-accounts.spec.cjs",
+      "title": "P1b profiel vanuit echte CSV-invoer gebruikt hetzelfde centrale register",
+      "when": "2026-11-08T20:03:46.796Z",
+      "status": "passed",
+      "report": "accounts-liquidity-current.json"
+    },
+    {
+      "file": "v118-p1b-accounts.spec.cjs",
+      "title": "P1b verloren ontvangstbevestiging wordt hersteld; kandidaat wacht op duurzame opslag",
+      "when": "2026-11-08T20:03:38.231Z",
+      "status": "passed",
+      "report": "accounts-liquidity-current.json"
+    },
+    {
+      "file": "v118-p1b-accounts.spec.cjs",
+      "title": "P1b verouderd formulier behoudt invoer en overschrijft actuele rekening niet",
+      "when": "2026-11-08T20:03:36.015Z",
+      "status": "passed",
+      "report": "accounts-liquidity-current.json"
+    },
+    {
+      "file": "v118-p1b-accounts.spec.cjs",
+      "title": "P1b werkelijke cloudacceptatie bewaart beide rekeningversies en conflict kan lokaal worden opgelost",
+      "when": "2026-11-08T20:03:40.967Z",
+      "status": "passed",
+      "report": "accounts-liquidity-current.json"
+    },
+    {
+      "file": "v118-p1b-accounts.spec.cjs",
+      "title": "P1b werkelijke cloudacceptatie laat gelijke rekeninginhoud met nieuwe synchronisatiemetadata door",
+      "when": "2026-11-08T20:03:42.522Z",
+      "status": "passed",
+      "report": "accounts-liquidity-current.json"
+    },
+    {
+      "file": "v118-p2-liquidity.spec.cjs",
+      "title": "P2 1440px instellingen opslaan herladen en gedeelde pure uitkomst",
+      "when": "2026-11-08T20:06:27.912Z",
+      "status": "passed",
+      "report": "accounts-liquidity-retest.json"
+    },
+    {
+      "file": "v118-p2-liquidity.spec.cjs",
+      "title": "P2 320px instellingen opslaan herladen en gedeelde pure uitkomst",
+      "when": "2026-11-08T20:06:31.259Z",
+      "status": "passed",
+      "report": "accounts-liquidity-retest.json"
+    },
+    {
+      "file": "v118-p2-liquidity.spec.cjs",
+      "title": "P2 390px instellingen opslaan herladen en gedeelde pure uitkomst",
+      "when": "2026-11-08T20:06:29.713Z",
+      "status": "passed",
+      "report": "accounts-liquidity-retest.json"
+    },
+    {
+      "file": "v118-p2-liquidity.spec.cjs",
+      "title": "P2 IndexedDB abort bewaart eerdere instellingen en opnieuw proberen is atomair",
+      "when": "2026-11-08T20:03:59.568Z",
+      "status": "passed",
+      "report": "accounts-liquidity-current.json"
+    },
+    {
+      "file": "v118-p2-liquidity.spec.cjs",
+      "title": "P2 cloudconflict bewaart instellingen en keuze overleeft herladen",
+      "when": "2026-11-08T20:04:01.829Z",
+      "status": "passed",
+      "report": "accounts-liquidity-current.json"
+    },
+    {
+      "file": "v118-p2-liquidity.spec.cjs",
+      "title": "P2 native validatie en verouderde invoer beschermen gehele instelling",
+      "when": "2026-11-08T20:04:03.049Z",
+      "status": "passed",
+      "report": "accounts-liquidity-current.json"
+    },
+    {
+      "file": "v118-p2-liquidity.spec.cjs",
+      "title": "P2 verloren ontvangstbevestiging herstelt instellingen zonder voortijdig zichtbaar maken",
+      "when": "2026-11-08T20:04:00.929Z",
+      "status": "passed",
+      "report": "accounts-liquidity-current.json"
+    },
+    {
+      "file": "v118-p3-dashboard.spec.cjs",
+      "title": "P3 1440px echte P2 waarden, layout, screenshot en navigatie",
+      "when": "2026-11-08T20:33:31.819Z",
+      "status": "passed",
+      "report": "dashboard-prognose-updated.json"
+    },
+    {
+      "file": "v118-p3-dashboard.spec.cjs",
+      "title": "P3 320px echte P2 waarden, layout, screenshot en navigatie",
+      "when": "2026-11-08T20:33:35.813Z",
+      "status": "passed",
+      "report": "dashboard-prognose-updated.json"
+    },
+    {
+      "file": "v118-p3-dashboard.spec.cjs",
+      "title": "P3 390px echte P2 waarden, layout, screenshot en navigatie",
+      "when": "2026-11-08T20:33:34.240Z",
+      "status": "passed",
+      "report": "dashboard-prognose-updated.json"
+    },
+    {
+      "file": "v118-p3-dashboard.spec.cjs",
+      "title": "P3 bekijk alles, jaarselectie en bestaande budget/zakgeld/doelenroutes",
+      "when": "2026-11-08T20:37:58.054Z",
+      "status": "passed",
+      "report": "dashboard-prognose-retest.json"
+    },
+    {
+      "file": "v118-p3-dashboard.spec.cjs",
+      "title": "P3 budgetten zakgeld en jaarcijfers zijn exact bestaande maandprojecties",
+      "when": "2026-11-08T20:38:00.874Z",
+      "status": "passed",
+      "report": "dashboard-prognose-retest.json"
+    },
+    {
+      "file": "v118-p3-dashboard.spec.cjs",
+      "title": "P3 context onthouden, persoonlijke rekening en juiste bestaande instellingen",
+      "when": "2026-11-08T20:37:55.904Z",
+      "status": "passed",
+      "report": "dashboard-prognose-retest.json"
+    },
+    {
+      "file": "v118-p3-dashboard.spec.cjs",
+      "title": "P3 filters, eigen datum, salaris, grafiek toetsenbord/touch en state ongewijzigd",
+      "when": "2026-11-08T20:33:37.363Z",
+      "status": "passed",
+      "report": "dashboard-prognose-updated.json"
+    },
+    {
+      "file": "v118-p3-dashboard.spec.cjs",
+      "title": "P3 herstel 320px markeringen minimum periode filters en mobiele 12px tekst",
+      "when": "2026-11-08T20:34:34.985Z",
+      "status": "passed",
+      "report": "dashboard-prognose-updated.json"
+    },
+    {
+      "file": "v118-p3-dashboard.spec.cjs",
+      "title": "P3 herstel 390px markeringen minimum periode filters en mobiele 12px tekst",
+      "when": "2026-11-08T20:34:32.794Z",
+      "status": "passed",
+      "report": "dashboard-prognose-updated.json"
+    },
+    {
+      "file": "v118-p3-dashboard.spec.cjs",
+      "title": "P3 herstel aandelen gezamenlijk Dion Dara en ongewijzigde bedragen en state",
+      "when": "2026-11-08T20:34:27.345Z",
+      "status": "passed",
+      "report": "dashboard-prognose-updated.json"
+    },
+    {
+      "file": "v118-p3-dashboard.spec.cjs",
+      "title": "P3 herstel resize 1440 naar 1200 en terug behoudt dataset selectie focus en doelgrootte",
+      "when": "2026-11-08T20:34:29.164Z",
+      "status": "passed",
+      "report": "dashboard-prognose-updated.json"
+    },
+    {
+      "file": "v118-p3-dashboard.spec.cjs",
+      "title": "P3 negatieve prognose meldt onzekerheid; ontbrekende salarisdatum heeft instellingsactie",
+      "when": "2026-11-08T20:38:02.799Z",
+      "status": "passed",
+      "report": "dashboard-prognose-retest.json"
+    },
+    {
+      "file": "v118-p3-dashboard.spec.cjs",
+      "title": "P3 ontbrekend ijkpunt, salarisdatum en ambigue rekening blijven bruikbaar",
+      "when": "2026-11-08T20:37:59.945Z",
+      "status": "passed",
+      "report": "dashboard-prognose-retest.json"
+    },
+    {
+      "file": "v118-p3-dashboard.spec.cjs",
+      "title": "P3 overlap van projecties toont uitsluitend laatste horizon",
+      "when": "2026-11-08T20:34:07.222Z",
+      "status": "passed",
+      "report": "dashboard-prognose-updated.json"
+    },
+    {
+      "file": "v118-p4-suggestions.spec.cjs",
+      "title": "P4 1440px conflict alternatief bulk expliciete approval en duurzame herstart",
+      "when": "2026-11-08T20:06:33.061Z",
+      "status": "passed",
+      "report": "accounts-liquidity-retest.json"
+    },
+    {
+      "file": "v118-p4-suggestions.spec.cjs",
+      "title": "P4 320px conflict alternatief bulk expliciete approval en duurzame herstart",
+      "when": "2026-11-08T20:06:38.385Z",
+      "status": "passed",
+      "report": "accounts-liquidity-retest.json"
+    },
+    {
+      "file": "v118-p4-suggestions.spec.cjs",
+      "title": "P4 390px conflict alternatief bulk expliciete approval en duurzame herstart",
+      "when": "2026-11-08T20:06:36.235Z",
+      "status": "passed",
+      "report": "accounts-liquidity-retest.json"
+    },
+    {
+      "file": "v118-p4-suggestions.spec.cjs",
+      "title": "P4 refund en refundsplits tonen een lege correctiemaand en blijven onbevestigd",
+      "when": "2026-11-08T20:06:40.496Z",
+      "status": "passed",
+      "report": "accounts-liquidity-retest.json"
+    },
+    {
+      "file": "v118-p5b-bank.spec.cjs",
+      "title": "P5b 1440 direct cash, existing review, explicit approval, repeat and durable reload",
+      "when": "2026-11-08T19:13:06.130Z",
+      "status": "passed",
+      "report": "bank-mock-current.json"
+    },
+    {
+      "file": "v118-p5b-bank.spec.cjs",
+      "title": "P5b 390 direct cash, existing review, explicit approval, repeat and durable reload",
+      "when": "2026-11-08T19:13:03.436Z",
+      "status": "passed",
+      "report": "bank-mock-current.json"
+    },
+    {
+      "file": "v118-p5b-bank.spec.cjs",
+      "title": "P5b activated release only checks status and starts authorization after an explicit click: auth.enablebanking.com",
+      "when": "2026-11-08T19:12:56.235Z",
+      "status": "passed",
+      "report": "bank-mock-current.json"
+    },
+    {
+      "file": "v118-p5b-bank.spec.cjs",
+      "title": "P5b activated release only checks status and starts authorization after an explicit click: tilisy.enablebanking.com",
+      "when": "2026-11-08T19:12:57.334Z",
+      "status": "passed",
+      "report": "bank-mock-current.json"
+    },
+    {
+      "file": "v118-p5b-bank.spec.cjs",
+      "title": "P5b dashboard bankknop, peildatum en herhalen 1440",
+      "when": "2026-11-08T19:12:51.064Z",
+      "status": "passed",
+      "report": "bank-mock-current.json"
+    },
+    {
+      "file": "v118-p5b-bank.spec.cjs",
+      "title": "P5b dashboard bankknop, peildatum en herhalen 320",
+      "when": "2026-11-08T19:12:46.471Z",
+      "status": "passed",
+      "report": "bank-mock-current.json"
+    },
+    {
+      "file": "v118-p5b-bank.spec.cjs",
+      "title": "P5b dashboard bankknop, peildatum en herhalen 390",
+      "when": "2026-11-08T19:12:48.769Z",
+      "status": "passed",
+      "report": "bank-mock-current.json"
+    },
+    {
+      "file": "v118-p5b-bank.spec.cjs",
+      "title": "P5b dashboard verlopen verbinding en ongekoppelde context halen niets op",
+      "when": "2026-11-08T19:12:54.868Z",
+      "status": "passed",
+      "report": "bank-mock-current.json"
+    },
+    {
+      "file": "v118-p5b-bank.spec.cjs",
+      "title": "P5b disconnected account cannot fetch; existing review remains accessible",
+      "when": "2026-11-08T19:12:58.320Z",
+      "status": "passed",
+      "report": "bank-mock-current.json"
+    },
+    {
+      "file": "v118-p5b-bank.spec.cjs",
+      "title": "P5b existing approved CSV remains intact when API overlap is explicitly linked",
+      "when": "2026-11-08T19:13:17.087Z",
+      "status": "passed",
+      "report": "bank-mock-current.json"
+    },
+    {
+      "file": "v118-p5b-bank.spec.cjs",
+      "title": "P5b expired authorization during fetch requests renewed permission without writing transactions",
+      "when": "2026-11-08T19:13:00.286Z",
+      "status": "passed",
+      "report": "bank-mock-current.json"
+    },
+    {
+      "file": "v118-p5b-bank.spec.cjs",
+      "title": "P5b explicit disabled override blocks bank requests",
+      "when": "2026-11-08T19:12:45.371Z",
+      "status": "passed",
+      "report": "bank-mock-current.json"
+    },
+    {
+      "file": "v118-p5b-bank.spec.cjs",
+      "title": "P5b failed revocation stays explicitly unconfirmed and can be retried",
+      "when": "2026-11-08T19:13:01.228Z",
+      "status": "passed",
+      "report": "bank-mock-current.json"
+    },
+    {
+      "file": "v118-p5b-bank.spec.cjs",
+      "title": "P5b opening details only reads status; offline status keeps review available",
+      "when": "2026-11-08T19:12:59.391Z",
+      "status": "passed",
+      "report": "bank-mock-current.json"
+    },
+    {
+      "file": "v118-p5b-bank.spec.cjs",
+      "title": "P5b outstanding revocation stays visible after reopening the account",
+      "when": "2026-11-08T19:13:02.445Z",
+      "status": "passed",
+      "report": "bank-mock-current.json"
+    },
+    {
+      "file": "v118-p5b-bank.spec.cjs",
+      "title": "P5b timestamp balance does not double count and missing pages remain visible",
+      "when": "2026-11-08T19:13:15.766Z",
+      "status": "passed",
+      "report": "bank-mock-current.json"
+    },
+    {
+      "file": "v118-p5b-bank.spec.cjs",
+      "title": "audit a concurrent import revision after staging stops without overwriting the newer choice",
+      "when": "2026-11-08T19:13:13.772Z",
+      "status": "passed",
+      "report": "bank-mock-current.json"
+    },
+    {
+      "file": "v118-p5b-bank.spec.cjs",
+      "title": "audit bank failure distinguishes request without exposing raw details",
+      "when": "2026-11-08T19:13:09.442Z",
+      "status": "passed",
+      "report": "bank-mock-current.json"
+    },
+    {
+      "file": "v118-p5b-bank.spec.cjs",
+      "title": "audit bank failure distinguishes response without exposing raw details",
+      "when": "2026-11-08T19:13:10.396Z",
+      "status": "passed",
+      "report": "bank-mock-current.json"
+    },
+    {
+      "file": "v118-p5b-bank.spec.cjs",
+      "title": "audit bank failure distinguishes staging without exposing raw details",
+      "when": "2026-11-08T19:13:11.329Z",
+      "status": "passed",
+      "report": "bank-mock-current.json"
+    },
+    {
+      "file": "v118-p5b-bank.spec.cjs",
+      "title": "audit bank failure distinguishes storage without exposing raw details",
+      "when": "2026-11-08T19:13:12.791Z",
+      "status": "passed",
+      "report": "bank-mock-current.json"
+    },
+    {
+      "file": "v118-p5b-bank.spec.cjs",
+      "title": "bankkoppelingstransactie opent vanuit overzicht zonder CSV-herstel en zonder mutatie",
+      "when": "2026-11-08T19:12:43.499Z",
+      "status": "passed",
+      "report": "bank-mock-current.json"
+    },
+    {
+      "file": "v118-p5b-bootstrap.spec.cjs",
+      "title": "gezamenlijke bootstrap blijft niet-actief en vereist expliciete klik 1440",
+      "when": "2026-11-08T19:13:23.779Z",
+      "status": "passed",
+      "report": "bank-mock-current.json"
+    },
+    {
+      "file": "v118-p5b-bootstrap.spec.cjs",
+      "title": "gezamenlijke bootstrap blijft niet-actief en vereist expliciete klik 320",
+      "when": "2026-11-08T19:13:18.749Z",
+      "status": "passed",
+      "report": "bank-mock-current.json"
+    },
+    {
+      "file": "v118-p5b-bootstrap.spec.cjs",
+      "title": "gezamenlijke bootstrap blijft niet-actief en vereist expliciete klik 390",
+      "when": "2026-11-08T19:13:21.583Z",
+      "status": "passed",
+      "report": "bank-mock-current.json"
+    },
+    {
+      "file": "v118-p5b-three-accounts.spec.cjs",
+      "title": "bankantwoord van verkeerde rekening wordt voor opslag afgewezen",
+      "when": "2026-11-08T19:19:39.769Z",
+      "status": "passed",
+      "report": "ui-followup.json"
+    },
+    {
+      "file": "v118-p5b-three-accounts.spec.cjs",
+      "title": "drie rekeningen: status, toestemming, gescheiden import en dashboard 1440",
+      "when": "2026-11-08T19:19:24.474Z",
+      "status": "passed",
+      "report": "ui-followup.json"
+    },
+    {
+      "file": "v118-p5b-three-accounts.spec.cjs",
+      "title": "drie rekeningen: status, toestemming, gescheiden import en dashboard 320",
+      "when": "2026-11-08T19:19:34.210Z",
+      "status": "passed",
+      "report": "ui-followup.json"
+    },
+    {
+      "file": "v118-p5b-three-accounts.spec.cjs",
+      "title": "drie rekeningen: status, toestemming, gescheiden import en dashboard 390",
+      "when": "2026-11-08T19:19:29.690Z",
+      "status": "passed",
+      "report": "ui-followup.json"
+    },
+    {
+      "file": "v118-p5b-three-accounts.spec.cjs",
+      "title": "eigen vergrendeling laat tweede rekening ophalen en intrekken zonder Dion te blokkeren",
+      "when": "2026-11-08T19:19:38.284Z",
+      "status": "passed",
+      "report": "ui-followup.json"
+    },
+    {
+      "file": "v118-prognose-correctie.spec.cjs",
+      "title": "correctie 1440px zakgeld instellen opslaan grafiek aanraken hover herladen",
+      "when": "2026-11-08T20:38:04.348Z",
+      "status": "passed",
+      "report": "dashboard-prognose-retest.json"
+    },
+    {
+      "file": "v118-prognose-correctie.spec.cjs",
+      "title": "correctie 320px zakgeld instellen opslaan grafiek aanraken hover herladen",
+      "when": "2026-11-08T20:38:09.372Z",
+      "status": "passed",
+      "report": "dashboard-prognose-retest.json"
+    },
+    {
+      "file": "v118-prognose-correctie.spec.cjs",
+      "title": "correctie 390px zakgeld instellen opslaan grafiek aanraken hover herladen",
+      "when": "2026-11-08T20:38:07.293Z",
+      "status": "passed",
+      "report": "dashboard-prognose-retest.json"
+    },
+    {
+      "file": "v118-prognose-correctie.spec.cjs",
+      "title": "correctie bestaand salaris behouden en afzonderlijke zakgeldontvangst kiest van wie en wanneer",
+      "when": "2026-11-08T20:35:19.926Z",
+      "status": "passed",
+      "report": "dashboard-prognose-updated.json"
+    },
+    {
+      "file": "v118-prognose-correctie.spec.cjs",
+      "title": "correctie vaste last dagkeuze geschiedenis occurrence en prognose blijven gekoppeld",
+      "when": "2026-11-08T20:35:17.810Z",
+      "status": "passed",
+      "report": "dashboard-prognose-updated.json"
+    },
+    {
+      "file": "v118-prognose-correctie.spec.cjs",
+      "title": "correctie zakgeld verkeerde rekening of eigenaar toont keuzehulp zonder opslaan",
+      "when": "2026-11-08T20:35:21.681Z",
+      "status": "passed",
+      "report": "dashboard-prognose-updated.json"
+    },
+    {
+      "file": "v118-prognose-periodes.spec.cjs",
+      "title": "periodes 1440px hele maand planning zonder CSV kleuren hover tik toetsenbord",
+      "when": "2026-11-09T13:58:17.264Z",
+      "status": "passed",
+      "report": "periods-savings-retest.json"
+    },
+    {
+      "file": "v118-prognose-periodes.spec.cjs",
+      "title": "periodes 320px hele maand planning zonder CSV kleuren hover tik toetsenbord",
+      "when": "2026-11-09T13:58:21.783Z",
+      "status": "passed",
+      "report": "periods-savings-retest.json"
+    },
+    {
+      "file": "v118-prognose-periodes.spec.cjs",
+      "title": "periodes 390px hele maand planning zonder CSV kleuren hover tik toetsenbord",
+      "when": "2026-11-09T13:58:19.784Z",
+      "status": "passed",
+      "report": "periods-savings-retest.json"
+    },
+    {
+      "file": "v118-prognose-periodes.spec.cjs",
+      "title": "periodes 7 14 eigen datum salaris context en herladen houden juiste horizon",
+      "when": "2026-11-09T13:58:23.775Z",
+      "status": "passed",
+      "report": "periods-savings-retest.json"
+    },
+    {
+      "file": "v118-prognose-periodes.spec.cjs",
+      "title": "periodes gedeeltelijke CSV vervangt historische planning en detail toont herkomst",
+      "when": "2026-11-09T13:58:26.533Z",
+      "status": "passed",
+      "report": "periods-savings-retest.json"
+    },
+    {
+      "file": "v118-prognose-periodes.spec.cjs",
+      "title": "periodes handmatig saldo overschrijft vanaf peildatum en behoudt eerdere grafiekdagen",
+      "when": "2026-11-09T13:58:30.016Z",
+      "status": "passed",
+      "report": "periods-savings-retest.json"
+    },
+    {
+      "file": "v118-prognose-periodes.spec.cjs",
+      "title": "periodes ontbrekend beginsaldo en latere ijkpunten maken geen fictieve maandlijn",
+      "when": "2026-11-09T13:58:28.321Z",
+      "status": "passed",
+      "report": "periods-savings-retest.json"
+    },
+    {
+      "file": "v118-r4-release.spec.cjs",
+      "title": "V118-r24 naar r25, offline en terugrollen behouden financiën, planning, imports en lokale opslag",
+      "when": "2026-11-09T13:51:31.936Z",
+      "status": "passed",
+      "report": "periods-release-smoke.json"
+    },
+    {
+      "file": "v118-r40-startup-upgrade.spec.cjs",
+      "title": "r39 naar r40, offline herladen en terugrollen bewaren financiële state en importbron",
+      "when": "2026-11-09T13:53:59.132Z",
+      "status": "passed",
+      "report": "release-extra.json"
+    },
+    {
+      "file": "v118-release-safety.spec.cjs",
+      "title": "V117 service worker upgrades to V118 offline shell and rolls back without deleting local data",
+      "status": "skipped",
+      "reason": "Gecontroleerde V117-assets ontbreken; bestaande expliciete skip."
+    },
+    {
+      "file": "v118-release-safety.spec.cjs",
+      "title": "V118 existing V117 IndexedDB upgrade and software rollback preserve financial data and optional checkpoints",
+      "status": "skipped",
+      "reason": "Gecontroleerde V117-assets ontbreken; bestaande expliciete skip."
+    },
+    {
+      "file": "v118-release-safety.spec.cjs",
+      "title": "V118 real IndexedDB abort keeps learning and financial approval atomic through restart and retry",
+      "when": "2026-11-09T13:54:02.498Z",
+      "status": "passed",
+      "report": "release-extra.json"
+    },
+    {
+      "file": "v118-ux-minimal.spec.cjs",
+      "title": "Escape en sluiten bewaren gewijzigde invoer na weigeren",
+      "when": "2026-11-09T13:55:48.814Z",
+      "status": "passed",
+      "report": "ux-current-retest.json"
+    },
+    {
+      "file": "v118-ux-minimal.spec.cjs",
+      "title": "dialogen 1440px begrenzen focus, sluiten en herstellen focus",
+      "when": "2026-11-09T13:55:43.840Z",
+      "status": "passed",
+      "report": "ux-current-retest.json"
+    },
+    {
+      "file": "v118-ux-minimal.spec.cjs",
+      "title": "dialogen 390px begrenzen focus, sluiten en herstellen focus",
+      "when": "2026-11-09T13:55:39.001Z",
+      "status": "passed",
+      "report": "ux-current-retest.json"
+    },
+    {
+      "file": "v118-ux-minimal.spec.cjs",
+      "title": "focusherstel vindt de oorspronkelijke kaart na hertekenen met veranderde tekst",
+      "when": "2026-11-09T13:55:52.064Z",
+      "status": "failed",
+      "report": "ux-current-retest.json"
+    },
+    {
+      "file": "v118-ux-minimal.spec.cjs",
+      "title": "geen bestedingsruimte en essentiële tekortwaarschuwing blijven zichtbaar",
+      "when": "2026-11-09T13:56:27.240Z",
+      "status": "passed",
+      "report": "ux-current-retest.json"
+    },
+    {
+      "file": "v118-ux-minimal.spec.cjs",
+      "title": "informatie 1440px werkt via klik, toetsenbord, Escape en buitenklik",
+      "when": "2026-11-09T13:58:36.127Z",
+      "status": "passed",
+      "report": "ux-last-three.json"
+    },
+    {
+      "file": "v118-ux-minimal.spec.cjs",
+      "title": "informatie 320px werkt via klik, toetsenbord, Escape en buitenklik",
+      "when": "2026-11-09T13:56:04.050Z",
+      "status": "passed",
+      "report": "ux-current-retest.json"
+    },
+    {
+      "file": "v118-ux-minimal.spec.cjs",
+      "title": "informatie 390px werkt via klik, toetsenbord, Escape en buitenklik",
+      "when": "2026-11-09T13:56:06.868Z",
+      "status": "passed",
+      "report": "ux-current-retest.json"
+    },
+    {
+      "file": "v118-ux-minimal.spec.cjs",
+      "title": "informatie 768px werkt via klik, toetsenbord, Escape en buitenklik",
+      "when": "2026-11-09T14:00:10.043Z",
+      "status": "passed",
+      "report": "ux-768-final.json"
+    },
+    {
+      "file": "v118-ux-minimal.spec.cjs",
+      "title": "inkomensbron en primaire kaartactie zijn afzonderlijk bedienbaar",
+      "when": "2026-11-09T13:55:50.379Z",
+      "status": "passed",
+      "report": "ux-current-retest.json"
+    },
+    {
+      "file": "v118-ux-minimal.spec.cjs",
+      "title": "jaarlegenda gebruikt de reeks-kleuren en bedragen zijn zonder hover uitleesbaar",
+      "when": "2026-11-09T13:56:28.909Z",
+      "status": "failed",
+      "report": "ux-current-retest.json"
+    },
+    {
+      "file": "v118-ux-minimal.spec.cjs",
+      "title": "onvolledigheidsuitleg volgt de actuele motor en verdwenen oorzaken verdwijnen",
+      "when": "2026-11-09T13:56:25.157Z",
+      "status": "passed",
+      "report": "ux-current-retest.json"
+    },
+    {
+      "file": "v118-ux-minimal.spec.cjs",
+      "title": "spaardoel selecteren blijft werken zonder geneste knopsemantiek",
+      "when": "2026-11-09T13:56:02.000Z",
+      "status": "passed",
+      "report": "ux-current-retest.json"
+    },
+    {
+      "file": "v118-ux-minimal.spec.cjs",
+      "title": "tablet behoudt namen voor iedere navigatieknop",
+      "when": "2026-11-09T13:55:37.202Z",
+      "status": "passed",
+      "report": "ux-current-retest.json"
+    },
+    {
+      "file": "v118-ux-minimal.spec.cjs",
+      "title": "uitgebreide klikgebieden raken geen naburige bediening",
+      "when": "2026-11-09T13:56:40.927Z",
+      "status": "passed",
+      "report": "ux-current-retest.json"
+    },
+    {
+      "file": "v118-ux-minimal.spec.cjs",
+      "title": "vervolgactie uit informatie opent het bestaande venster en herstelt focus",
+      "when": "2026-11-09T13:55:59.880Z",
+      "status": "passed",
+      "report": "ux-current-retest.json"
+    },
+    {
+      "file": "v118-ux-minimal.spec.cjs",
+      "title": "volledig bruikbare prognose krijgt geen verzonnen onvolledigheidsreden",
+      "when": "2026-11-09T13:58:38.808Z",
+      "status": "passed",
+      "report": "ux-last-three.json"
+    },
+    {
+      "file": "v118-vrij-spaardoel.spec.cjs",
+      "title": "vrij spaardoel 1440px historisch tekort vandaag ruimte budget doel en herladen",
+      "when": "2026-11-09T14:00:00.034Z",
+      "status": "passed",
+      "report": "savings-current-final.json"
+    },
+    {
+      "file": "v118-vrij-spaardoel.spec.cjs",
+      "title": "vrij spaardoel 320px historisch tekort vandaag ruimte budget doel en herladen",
+      "when": "2026-11-09T14:00:05.684Z",
+      "status": "passed",
+      "report": "savings-current-final.json"
+    },
+    {
+      "file": "v118-vrij-spaardoel.spec.cjs",
+      "title": "vrij spaardoel 390px historisch tekort vandaag ruimte budget doel en herladen",
+      "when": "2026-11-09T14:00:03.241Z",
+      "status": "passed",
+      "report": "savings-current-final.json"
+    },
+    {
+      "file": "v50-smoke.spec.cjs",
+      "title": "v50 start zonder horizontale overflow op 1024px",
+      "when": "2026-11-09T13:52:16.250Z",
+      "status": "passed",
+      "report": "periods-release-smoke.json"
+    },
+    {
+      "file": "v50-smoke.spec.cjs",
+      "title": "v50 start zonder horizontale overflow op 1440px",
+      "when": "2026-11-09T13:52:16.713Z",
+      "status": "passed",
+      "report": "periods-release-smoke.json"
+    },
+    {
+      "file": "v50-smoke.spec.cjs",
+      "title": "v50 start zonder horizontale overflow op 360px",
+      "when": "2026-11-09T13:52:14.231Z",
+      "status": "passed",
+      "report": "periods-release-smoke.json"
+    },
+    {
+      "file": "v50-smoke.spec.cjs",
+      "title": "v50 start zonder horizontale overflow op 390px",
+      "when": "2026-11-09T13:52:14.889Z",
+      "status": "passed",
+      "report": "periods-release-smoke.json"
+    },
+    {
+      "file": "v50-smoke.spec.cjs",
+      "title": "v50 start zonder horizontale overflow op 430px",
+      "when": "2026-11-09T13:52:15.338Z",
+      "status": "passed",
+      "report": "periods-release-smoke.json"
+    },
+    {
+      "file": "v50-smoke.spec.cjs",
+      "title": "v50 start zonder horizontale overflow op 768px",
+      "when": "2026-11-09T13:52:15.783Z",
+      "status": "passed",
+      "report": "periods-release-smoke.json"
+    },
+    {
+      "file": "v50-visual-baseline.spec.cjs",
+      "title": "r46 computed-style-contract",
+      "when": "2026-11-08T18:03:31.682Z",
+      "status": "passed",
+      "report": "reference-and-history.json"
+    },
+    {
+      "file": "v50-visual-baseline.spec.cjs",
+      "title": "r46 visuele regressiebaseline op 1024px",
+      "when": "2026-11-08T18:03:26.148Z",
+      "status": "passed",
+      "report": "reference-and-history.json"
+    },
+    {
+      "file": "v50-visual-baseline.spec.cjs",
+      "title": "r46 visuele regressiebaseline op 1440px",
+      "when": "2026-11-08T18:03:28.914Z",
+      "status": "passed",
+      "report": "reference-and-history.json"
+    },
+    {
+      "file": "v50-visual-baseline.spec.cjs",
+      "title": "r46 visuele regressiebaseline op 360px",
+      "when": "2026-11-08T18:03:15.512Z",
+      "status": "passed",
+      "report": "reference-and-history.json"
+    },
+    {
+      "file": "v50-visual-baseline.spec.cjs",
+      "title": "r46 visuele regressiebaseline op 390px",
+      "when": "2026-11-08T18:03:18.230Z",
+      "status": "passed",
+      "report": "reference-and-history.json"
+    },
+    {
+      "file": "v50-visual-baseline.spec.cjs",
+      "title": "r46 visuele regressiebaseline op 430px",
+      "when": "2026-11-08T18:03:20.868Z",
+      "status": "passed",
+      "report": "reference-and-history.json"
+    },
+    {
+      "file": "v50-visual-baseline.spec.cjs",
+      "title": "r46 visuele regressiebaseline op 768px",
+      "when": "2026-11-08T18:03:23.480Z",
+      "status": "passed",
+      "report": "reference-and-history.json"
+    }
+  ]
+}

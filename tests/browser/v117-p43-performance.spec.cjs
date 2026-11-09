@@ -1,3 +1,4 @@
+const testOrigin=require('./helpers/test-origin.cjs');
 const {test,expect}=require('@playwright/test');
 const fs=require('node:fs'),crypto=require('node:crypto');
 const {boot,attach,newHousehold,importTen}=require('../helpers/v117-p4-browser.cjs');
@@ -25,7 +26,7 @@ test('P4.3 small read and CPU measurements: 20 and 100 sources, ten edits and te
   const output='backups/v117-stabilisatie/p43-performance-'+phase+'.json';
   const save=()=>fs.writeFileSync(output,JSON.stringify({phase,appSha256:crypto.createHash('sha256').update(fs.readFileSync('app.js')).digest('hex'),note:'CPU spans are nested; asynchronous request and transaction durations overlap and are not additive. Browser estimate is separate from submitted UTF-8 payload bytes.',measurements},null,2));
   for(const count of [20,100]){
-    const context=await browser.newContext({baseURL:'http://127.0.0.1:4173',serviceWorkers:'block'}),page=await context.newPage();
+    const context=await browser.newContext({baseURL:testOrigin,serviceWorkers:'block'}),page=await context.newPage();
     try{
       await installPerformanceMeter(page);const household=await newHousehold(),seed=fixture(count),sample={count,operations:[]};measurements.push(sample);
       let start=performance.now();await boot(page,household,seed.state);

@@ -1,3 +1,4 @@
+const {release,assertReleaseShell}=require('../helpers/release-shell.cjs');
 const {test,expect}=require('@playwright/test'),fs=require('node:fs'),path=require('node:path'),http=require('node:http');
 const visual=require('../fixtures/v50-visual-state.json'),{fixture}=require('../helpers/month-end-savings.cjs');
 test.use({serviceWorkers:'allow'});
@@ -29,13 +30,13 @@ test('r40 naar r41, offline herladen en terugrollen bewaren financiële state en
     expect(await page.evaluate(()=>caches.keys())).toContain('finize-v118-r40');
     previous=false;
     await page.evaluate(async()=>{const registration=await navigator.serviceWorker.getRegistration();await registration.update();});
-    await expect.poll(()=>page.evaluate(()=>caches.keys())).toContain('finize-v118-r41');
+    await expect.poll(()=>page.evaluate(()=>caches.keys())).toContain(`finize-v${release}`);
     for(const offline of [false,true]){
       await context.setOffline(offline);await page.reload();await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);
       await page.evaluate(()=>document.querySelector('#tabs [data-tab=gezamenlijk]').click());
       await expect(page.locator('#tab-gezamenlijk .mt-surface')).toBeVisible();
       expect(await page.evaluate(()=>JSON.stringify(state))).toBe(before);
-      await expect(page.locator('meta[name="finize-inline-release"][content="118-r41"]')).toHaveCount(1);
+      await expect(page.locator('meta[name="finize-inline-release"]')).toHaveAttribute('content',release);
       expect(await page.evaluate(async()=>(await FinizeUpdate4Runtime.ImportStore.getImport('r41-evidence')).rows[0].bankOriginal.amount)).toBe(-10);
     }
     await context.setOffline(false);previous=true;

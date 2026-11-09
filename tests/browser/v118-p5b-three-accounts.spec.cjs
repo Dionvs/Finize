@@ -57,10 +57,10 @@ for(const width of [1440,390,320])test('drie rekeningen: status, toestemming, ge
   await page.locator('[data-bank-connection]').screenshot({path:info.outputPath('dara-bankpaneel.png')});
   await page.screenshot({path:info.outputPath('dara-geblokkeerd.png')});
   await page.locator('[data-tab="dashboard"]:visible').first().click();await expect(page.locator('[data-bank-compact] [data-bank-sync]')).toBeEnabled();
-  const prior=f.calls.length;await page.locator('[data-bank-compact] [data-bank-sync]').click();await expect(page.locator('[data-bank-compact] [data-bank-sync]')).toBeEnabled();
+  const prior=f.calls.length;await page.locator('.p3-bank-detail > summary').click();await page.locator('[data-bank-compact] [data-bank-sync]').click();await expect(page.locator('[data-bank-compact] [data-bank-sync]')).toBeEnabled();
   expect(f.calls.slice(prior).filter(x=>x.endpoint==='/sync').map(x=>x.id)).toEqual(['profile-gezamenlijk']);
   await page.locator('[data-p3-context="persoonlijk"]').click();await expect(page.locator('[data-bank-compact] [data-bank-sync]')).toBeEnabled();
-  const next=f.calls.length;await page.locator('[data-bank-compact] [data-bank-sync]').click();await expect(page.locator('[data-bank-compact] [data-bank-sync]')).toBeEnabled();
+  const next=f.calls.length;await page.locator('.p3-bank-detail > summary').click();await page.locator('[data-bank-compact] [data-bank-sync]').click();await expect(page.locator('[data-bank-compact] [data-bank-sync]')).toBeEnabled();
   expect(f.calls.slice(next).filter(x=>x.endpoint==='/sync').map(x=>x.id)).toEqual(['profile-dion']);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
   await page.screenshot({path:info.outputPath('dashboard-dion.png')});
