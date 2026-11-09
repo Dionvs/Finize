@@ -1,6 +1,6 @@
 {
-  "name": "finize-v50-cleanup",
-  "version": "50.0.0",
+  "name": "finize",
+  "version": "118.0.0",
   "private": true,
   "packageManager": "pnpm@11.9.0",
   "engines": {

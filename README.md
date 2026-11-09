@@ -14,7 +14,7 @@ pnpm run build
 pnpm test
 ```
 
-De actieve GitHub Pages-runtime wordt reproduceerbaar gebouwd naar `app.js` en `app.css`. `index.html` laadt uitsluitend deze twee runtimebestanden.
+De actieve V118-runtime wordt reproduceerbaar gebouwd naar `app.js` en `app.css`. De releasepagina `index.html` bevat dezelfde JavaScript en CSS inline, zodat de statische app ook als één HTML-bestand werkt.
 
 ## PWA installeren
 
@@ -37,7 +37,7 @@ Importbatches ondersteunen individuele beoordeling, meerdere open batches, Terug
 - `service-worker.js` en `manifest.json`: PWA-bestanden.
 - `firestore.rules`: toegangsregels voor de hoofdstate, imports en importchunks.
 - `tests/`: financiële, opslag-, structuur- en browserregressies.
-- `docs/v50-architecture.md`: actieve architectuur en opslagverantwoordelijkheden.
+- `docs/v50-architecture.md`: oorspronkelijke architectuur en opslagverantwoordelijkheden; zie de pakketdocumenten voor latere uitbreidingen.
 - `docs/package-1-data-foundation.md`: canoniek datamodel en migratiefundament, schema v10.
 - `docs/package-2-planning-timeline.md`: historische planning, scenario-uitfasering en veilige schema-v11-migratie.
 - `docs/package-3-transaction-engine.md`: canonieke transactiemotor, source-verwerking en resterende legacybeperking.
@@ -55,4 +55,4 @@ Na een bewuste wijziging van `firestore.rules`:
 firebase deploy --only firestore:rules
 ```
 
-Authenticatie en een dataherstructurering vallen buiten de v50-opruiming.
+Publicatie van beveiligingsregels is een afzonderlijke actie; deze herstelronde wijzigt of publiceert geen regels.
