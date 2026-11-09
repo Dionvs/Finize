@@ -40,6 +40,29 @@ test('P4 prepared production adapter fences household paths without network acce
 test('P4 emulator factory remains unable to address production',()=>{
   assert.throws(()=>createEmulatorRecordTransport({host:'firestore.googleapis.com',projectId:'finize',token:'owner'}),{code:'emulator-only'});
 });
+
+for(const count of [200,401])test(`P4 full record queries page through all ${count} immutable documents exactly once`,async()=>{
+  const root='projects/demo-finize-v117/databases/(default)/documents/',calls=[];
+  const documents=Array.from({length:count},(_,i)=>({name:root+'households/h/records/'+String(i).padStart(4,'0'),fields:{cents:{integerValue:String(i)}},updateTime:'2026-11-09T12:00:00Z'}));
+  const transport=createEmulatorRecordTransport({token:'owner',fetch:async(url,options)=>{
+    const body=JSON.parse(options.body),q=body.structuredQuery;calls.push(body);
+    assert.equal(url,'http://127.0.0.1:8181/v1/'+root+'households/h:runQuery');
+    assert.equal(q.limit,200);assert.deepEqual(q.orderBy,[{field:{fieldPath:'__name__'},direction:'ASCENDING'}]);
+    const start=q.startAt?documents.findIndex(row=>row.name===q.startAt.values[0].referenceValue)+1:0;
+    if(q.startAt)assert.equal(q.startAt.before,false);
+    return new Response(JSON.stringify(documents.slice(start,start+q.limit).map(document=>({document}))));
+  }});
+  const rows=await transport.query('households/h/records');
+  assert.deepEqual(rows.map(row=>row.data.cents),Array.from({length:count},(_,i)=>i));
+  assert.equal(new Set(rows.map(row=>row.path)).size,count);assert(rows.every(row=>row.version==='2026-11-09T12:00:00Z'));
+  assert.equal(calls.length,Math.floor(count/200)+1);assert.equal(transport.metrics.reads,count+(count%200===0?1:0));
+});
+
+test('P4 failure on a later record page rejects the complete read instead of returning partial proof',async()=>{
+  let calls=0;
+  const transport=createEmulatorRecordTransport({token:'owner',fetch:async()=>++calls===1?new Response(JSON.stringify(Array.from({length:200},(_,i)=>({document:{name:'projects/demo-finize-v117/databases/(default)/documents/households/h/records/'+i,fields:{}}})))):new Response(JSON.stringify({error:{status:'PERMISSION_DENIED',message:'Denied second page'}}),{status:403})});
+  await assert.rejects(()=>transport.query('households/h/records'),{code:'permission-denied'});assert.equal(calls,2);
+});
 test('P4 record transport retains native legacy timestamp fields during migration readback',async()=>{
   const timestamp='2026-10-10T19:49:57.808Z';
   const transport=createEmulatorRecordTransport({token:'owner',fetch:async()=>new Response(JSON.stringify({name:'projects/demo-finize-v117/databases/(default)/documents/households/h/budgetState/current',fields:{updatedAt:{timestampValue:timestamp},nested:{mapValue:{fields:{time:{timestampValue:timestamp}}}}},updateTime:timestamp}))});

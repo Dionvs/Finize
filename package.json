@@ -13,7 +13,7 @@
     "check:syntax": "node scripts/check-syntax.mjs",
     "check:css": "node scripts/check-css.mjs",
     "test:browser": "playwright test",
-    "test:smoke": "playwright test pakket1-product-price.spec.cjs pakket1-weekly-calendar.spec.cjs subgoal-product-link.spec.cjs bootstrap-stability.spec.cjs dynamic-html-security.spec.cjs service-worker-upgrade.spec.cjs bank-import-generation.spec.cjs mobile-goal-order.spec.cjs import-approval-focus.spec.cjs budget-bar-refunds.spec.cjs",
+    "test:smoke": "playwright test pakket1-product-price.spec.cjs pakket1-weekly-calendar.spec.cjs subgoal-product-link.spec.cjs bootstrap-stability.spec.cjs dynamic-html-security.spec.cjs service-worker-upgrade.spec.cjs bank-import-generation.spec.cjs mobile-goal-order.spec.cjs import-approval-focus.spec.cjs budget-bar-refunds.spec.cjs savings-link-proposals.spec.cjs",
     "test:backend": "node functions/build.mjs && node --experimental-test-module-mocks --test functions/test/bank-http.test.mjs",
     "test:emulator": "node scripts/test-p3-emulator.mjs --p4",
     "test:emulator:bank": "node scripts/test-bank-emulator.mjs",

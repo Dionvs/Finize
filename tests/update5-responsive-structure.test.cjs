@@ -30,7 +30,7 @@ assert.match(dashboard, /Veilig te sparen op /);
 assert.doesNotMatch(dashboard, /Vrij na verplichtingen/);
 assert.match(dashboard, /Zakgeld/);
 assert.match(html, /data-u3-open="planning" data-u3-planning-owner="\$\{(?:owner|opts\.openFixedOwner)\}" aria-label="Vaste lasten van/);
-assert.match(html, /function u3OpenPlanning\(owner=''\)/);
+assert.match(html, /function u3OpenPlanning\(owner='',\{includeIncome=false\}=\{\}\)/);
 assert.doesNotMatch(js, /data-open-owner-fixed/);
 assert.match(js, /if\(field\)field\.hidden=!isJoint/);
 assert.match(js, /distributionMode:changes\.financialFor==='gezamenlijk'/);

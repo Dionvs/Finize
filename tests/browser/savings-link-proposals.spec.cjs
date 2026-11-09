@@ -7,3 +7,19 @@ for(const width of [390,1440])test('saving proposal remains a draft until explic
 test('equal incoming amounts require a choice; income links keep their administrative meaning',async({page})=>{
  await boot(page,390,2,true);await expect(page.locator('[data-u4-link-saving]')).toHaveCount(2);expect(await page.evaluate(()=>__savingDraft.rows[0].processing.savingsContributionId||'')).toBe('');await page.locator('[data-u4-link-saving="receipt-1"]').click();await page.locator('[data-u4-approve]').click();await expect.poll(()=>page.evaluate(()=>FinizeTransactions.effects().filter(p=>p.savingsContribution?.kind==='income').length)).toBe(1);expect(await page.evaluate(()=>FinizeTransactions.effects().some(p=>p.effects.existingCapitalDeposit>0))).toBe(false);
 });
+
+test('savings editor uses the verified row month in partial history and still rejects missing proof',async({page})=>{
+ await boot(page);
+ const result=await page.evaluate(()=>{
+   const before=JSON.stringify(state),u=FinizeUpdate4Runtime;
+   state.__finizePartialHistory=true;state.verifiedPeriods=['2026-10'];state.__finizePeriodContext={periods:[{month:'2026-10'}]};
+   try{
+     u.testRenderDraftModal(window,__savingDraft);
+     const links=document.querySelectorAll('[data-u4-link-saving]').length;
+     state.verifiedPeriods=[];
+     let missingCode='';try{u.testRenderDraftModal(window,__savingDraft);}catch(error){missingCode=error.code;}
+     return {links,missingCode,approved:__savingDraft.rows[0].approvalSource};
+   }finally{delete state.__finizePartialHistory;delete state.verifiedPeriods;delete state.__finizePeriodContext;if(JSON.stringify(state)!==before)throw Error('Financial state changed while rendering');}
+ });
+ expect(result).toEqual({links:1,missingCode:'period-incomplete',approved:''});
+});

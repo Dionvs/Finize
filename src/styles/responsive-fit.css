@@ -95,6 +95,8 @@
     html body.v4-app[data-active-tab] .mobile-header-top #monthControl .month-picker-btn::before{display:none !important}
     html body.v4-app[data-active-tab] .mobile-header-top #monthControl .month-picker-btn::after{width:12px !important;height:12px !important;flex-basis:12px !important}
   }
+  /* The main container already reserves space for the fixed bottom navigation. */
+  html body.v4-app[data-real-active-tab]{padding-bottom:0}
   html body.v4-app[data-real-active-tab] .v4-main{width:100% !important;max-width:100% !important;min-width:0 !important;padding-bottom:calc(var(--mobile-nav-height,96px) + 24px) !important}
   html,html body.v4-app .v4-main{scroll-padding-bottom:calc(var(--mobile-nav-height,96px) + 24px)}
   html body.v4-app[data-real-active-tab] .wrap .mobile-kpi-grid{

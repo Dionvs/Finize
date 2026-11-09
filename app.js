@@ -7428,14 +7428,23 @@
       return decode(await request2("GET", base + "/" + path));
     }
     async function query(path, filter = null) {
+      var _a2;
       assertPath(path);
       const segments = path.split("/"), collectionId = segments.pop(), parent = segments.length ? "/" + segments.join("/") : "";
       const structuredQuery = { from: [{ collectionId }] };
       if (filter) structuredQuery.where = { fieldFilter: { field: { fieldPath: filter.field }, op: filter.op || "EQUAL", value: toValue(filter.value) } };
-      const result2 = await request2("POST", base + parent + ":runQuery", { structuredQuery });
-      const rows = (result2 || []).filter((row) => row.document).map((row) => decode(row.document));
-      metrics.reads += Math.max(1, rows.length);
-      return rows;
+      const pageSize = 200, rows = [];
+      if (!filter) Object.assign(structuredQuery, { limit: pageSize, orderBy: [{ field: { fieldPath: "__name__" }, direction: "ASCENDING" }] });
+      while (true) {
+        const result2 = await request2("POST", base + parent + ":runQuery", { structuredQuery });
+        const page = (result2 || []).filter((row) => row.document);
+        rows.push(...page.map((row) => decode(row.document)));
+        metrics.reads += Math.max(1, page.length);
+        if (filter || page.length < pageSize) return rows;
+        const name = page.at(-1).document.name;
+        if (!name || ((_a2 = structuredQuery.startAt) == null ? void 0 : _a2.values[0].referenceValue) === name) throw storageError("cloud-incomplete", "De volledige recordcontrole kon niet worden voortgezet.");
+        structuredQuery.startAt = { values: [{ referenceValue: name }], before: false };
+      }
     }
     async function commit(writes, expected = /* @__PURE__ */ new Map()) {
       for (const write of writes) assertPath(write.path);
@@ -13088,7 +13097,7 @@
     const remainingThisMonth = isJoint ? r.forecast.owners[key].available : personalMonthRemaining({ income: personalIncome.total, fixed: rr.persoonlijkeVasteLasten, usedBudget: rr.variabeleUitgaven });
     const jointKpis = isJoint ? `
     <div class="overview-kpi-row">
-      ${renderIconKpi("€", "green", "Totaal gezamenlijk inkomen", eur(jointVisibleIncome), renderIncomeSources(jointIncome), { valueClass: jointVisibleIncome < 0 ? "value neg" : "value pos" })}
+      ${renderIconKpi("€", "green", "Totaal gezamenlijk inkomen", eur(jointVisibleIncome), renderIncomeSources(jointIncome) + '<button type="button" class="ghost small" data-open-income-overview="gezamenlijk">Inkomensoverzicht</button>', { valueClass: jointVisibleIncome < 0 ? "value neg" : "value pos" })}
       ${renderIconKpi("▤", "blue", "Vaste lasten totaal", fixedPaymentKpi("gezamenlijk"), "Klik om te wijzigen", { valueClass: "value neg", openFixedOwner: "gezamenlijk" })}
       ${renderIconKpi("◎", "green", "Over deze maand", eur(remainingThisMonth), "", { valueClass: remainingThisMonth < 0 ? "value neg" : "value pos" })}
       ${renderIconKpi("▥", "blue", "Variabel gebruikt", `${eur(variableUsed)} / ${eur(variableBudget)}`, `<span class="overview-budget-track" style="--used-pct:${variablePct}%"></span>`)}
@@ -14385,7 +14394,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
     });
   }
   function openIncomeOverview(origin, trigger) {
-    var _a2;
+    var _a2, _b;
     const personal = ["dion", "dara"].includes(origin);
     if (personal && (!canViewPersonalTab(origin) || !personalKpiVisible(origin, "income"))) return;
     const modal = document.getElementById("incomeEditModal");
@@ -14399,6 +14408,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
     <div class="metric-value value ${overview.total < 0 ? "neg" : "pos"}">${eur(overview.total)}</div>
     ${renderIncomeSources(overview, owner)}
     ${personal && !isReadOnlyPersonalTab(owner) ? `<div class="modal-actions"><button type="button" class="ghost" data-edit-overview-income aria-label="Inkomen van ${attrSafe(ownerLabel(owner))} aanpassen">Inkomen aanpassen</button></div>` : ""}
+    ${!personal ? '<div class="modal-actions"><button type="button" class="ghost" data-manage-income-sources>Vaste lasten & inkomsten beheren</button></div>' : ""}
   </div>`;
     const close = () => {
       modal.classList.remove("open");
@@ -14412,6 +14422,10 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
     (_a2 = modal.querySelector("[data-edit-overview-income]")) == null ? void 0 : _a2.addEventListener("click", () => {
       close();
       openIncomeEditModal(owner, ownerLabel(owner));
+    });
+    (_b = modal.querySelector("[data-manage-income-sources]")) == null ? void 0 : _b.addEventListener("click", () => {
+      close();
+      u3OpenPlanning("gezamenlijk", { includeIncome: true });
     });
     modal.addEventListener("keydown", onKey);
     bindModalBackdrop(modal, close);
@@ -16412,14 +16426,14 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
     modal.querySelector("[data-u3-add-recurring]").addEventListener("click", () => u3OpenRecurringEditor("fixed", "", { owner, planningOwner: owner }));
     modal.querySelectorAll("[data-joint-fixed-id]").forEach((row) => row.addEventListener("click", () => u3OpenRecurringEditor("fixed", row.dataset.jointFixedId, { planningOwner: owner })));
   }
-  function u3OpenPlanning(owner = "") {
+  function u3OpenPlanning(owner = "", { includeIncome = false } = {}) {
     const planningOwner = U3_ACCOUNTS.includes(owner) ? owner : "";
     const fixed = resolveFixedExpensesForMonth(state, getSelectedMonth()).filter((item) => !planningOwner || (item.financialFor || item.rekening || "gezamenlijk") === planningOwner);
-    if (planningOwner) return u3OpenFixedOverview(fixed, planningOwner);
+    if (planningOwner && !includeIncome) return u3OpenFixedOverview(fixed, planningOwner);
     const incomes = resolveIncomeSourcesForMonth(state, getSelectedMonth(), null, { planningOnly: true }).filter((item) => !planningOwner || (planningOwner === "gezamenlijk" ? (item.financialFor || item.rekening) === planningOwner : item.eigenaar === planningOwner));
     const ownerName = planningOwner ? u3AccountLabel(planningOwner) : "";
     const rows = (items, kind) => items.map((item) => `<article class="u3-admin-row"><div class="u3-row-head"><div><strong>${textSafe(item.naam || "Zonder naam")}</strong><br><small>${u3AccountLabel(item.rekening)} → ${u3AccountLabel(item.financialFor || item.rekening)} · elke ${textSafe(item.frequentieAantal)} ${textSafe(item.frequentieEenheid)}${kind === "fixed" ? ` · ${textSafe(u3FixedDistributionLabel(item))}` : ""}</small></div><div><span class="u3-status ${item.actief !== false ? "ok" : ""}">${item.actief !== false ? "Actief" : "Gestopt"}</span> <button class="ghost small" data-u3-edit-recurring="${attrSafe(kind + ":" + item.id)}">Bewerken</button></div></div><div>${eur(u3AmountAt2(item, getSelectedMonth()))} <small>· gemiddeld ${eur(u3MonthlyAverage(item))} p/m${kind === "fixed" ? ` · afschrijving ${paymentDayLabel(item)}` : ""}${kind === "fixed" ? fixedRealizationLabel(item) : ""}</small></div></article>`).join("");
-    const { modal } = u3AdminModal(`<div class="u3-admin-head"><div><div class="section-kicker">${monthLabel(getSelectedMonth())} · Planning</div><h2>${planningOwner ? `${textSafe(ownerName)} vaste lasten` : "Planning beheren"}</h2><p>${planningOwner ? `Alleen de vaste lasten die financieel voor ${textSafe(ownerName)} zijn.` : "Bedragen kunnen voor één maand of vanaf deze maand wijzigen."}</p></div><button class="ghost" data-u3-close>Sluiten</button></div>
+    const { modal } = u3AdminModal(`<div class="u3-admin-head"><div><div class="section-kicker">${monthLabel(getSelectedMonth())} · Planning</div><h2>${planningOwner ? `${textSafe(ownerName)} vaste lasten & inkomsten` : "Planning beheren"}</h2><p>${planningOwner ? `Alleen posten die financieel voor ${textSafe(ownerName)} zijn.` : "Bedragen kunnen voor één maand of vanaf deze maand wijzigen."}</p></div><button class="ghost" data-u3-close>Sluiten</button></div>
     <div class="u3-steps">
       <section class="u3-step"><div class="u3-step-head"><div><h3>Vaste lasten</h3><p>${fixed.length} terugkerende posten${planningOwner ? ` voor ${textSafe(ownerName)}` : " in deze maand"}</p></div><button class="primary small" data-u3-add-recurring="fixed">+ Vaste last</button></div><div class="u3-admin-list">${rows(fixed, "fixed") || '<div class="u3-empty">Nog geen vaste lasten.</div>'}</div></section>
       ${`<section class="u3-step"><div class="u3-step-head"><div><h3>Inkomstenbronnen</h3><p>${incomes.length} terugkerende bronnen</p></div><button class="primary small" data-u3-add-recurring="income">+ Inkomstenbron</button></div><div class="u3-admin-list">${rows(incomes, "income") || '<div class="u3-empty">Nog geen inkomstenbronnen.</div>'}</div></section>`}
@@ -16477,7 +16491,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
     </div>
     <div class="modal-actions">${existing ? `${existing.actief !== false ? '<button class="ghost" id="u3RecStop">Stoppen na deze maand</button>' : ""}<button class="danger-ghost" id="u3RecDelete">Verwijderen</button>` : ""}<button class="ghost" data-u3-back-planning>Terug</button><button class="primary" id="u3RecSave">Opslaan</button></div>`;
     const { modal } = u3AdminModal(income ? incomeEditor : fixedEditor, income ? "" : "fixed-editor");
-    modal.querySelectorAll("[data-u3-back-planning]").forEach((button) => button.addEventListener("click", () => u3OpenPlanning(planningOwner)));
+    modal.querySelectorAll("[data-u3-back-planning]").forEach((button) => button.addEventListener("click", () => u3OpenPlanning(planningOwner, { includeIncome: income })));
     const updateDebitDay = () => {
       const day = modal.querySelector("#u3RecDebitDay");
       if (!day) return;
@@ -16505,7 +16519,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
       try {
         u3AssertMonthOpen();
         if (!await commitChange(() => income ? endIncomeSourceFromMonth(state, record, nextPlanningMonth(current)) : endRecurringFromMonth(record, nextPlanningMonth(current)), { render: false })) return;
-        u3OpenPlanning(planningOwner);
+        u3OpenPlanning(planningOwner, { includeIncome: income });
       } catch (error2) {
         alert(error2.message);
       }
@@ -16516,7 +16530,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
       try {
         u3AssertMonthOpen();
         if (!await commitChange(() => income ? endIncomeSourceFromMonth(state, record, current) : endRecurringFromMonth(record, current), { render: false })) return;
-        u3OpenPlanning(planningOwner);
+        u3OpenPlanning(planningOwner, { includeIncome: income });
         showQuickToast(`${income ? "Inkomstenbron" : "Vaste last"} verwijderd vanaf ${monthLabel(current)}`);
       } catch (error2) {
         alert(error2.message);
@@ -16552,7 +16566,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
             if (!record) u3RecurringRows(kind).push(item);
           }
         }, { render: false })) return;
-        u3OpenPlanning(planningOwner);
+        u3OpenPlanning(planningOwner, { includeIncome: income });
       } catch (error2) {
         alert(error2.message);
       }
@@ -18091,8 +18105,10 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
       var _a2, _b, _c, _d, _e, _f, _g, _h, _i;
       const proposal = recognitionProposal(original2, rules, profile);
       const explicitExtra = Number(original2.amount) > 0 && /\b(vakantiegeld|nabetaling|correctie loon|bonus|gratificatie|eindejaarsuitkering|dertiende maand)\b/.test(normalizeText(original2.rawDescription || original2.description));
-      const proposedType = explicitExtra ? proposeType(original2, profiles) : ((_a2 = proposal == null ? void 0 : proposal.rule) == null ? void 0 : _a2.transactionType) || proposeType(original2, profiles);
-      const type = !explicitExtra && ((_b = proposal == null ? void 0 : proposal.rule) == null ? void 0 : _b.fixedExpenseId) ? "vaste-last" : proposedType;
+      const describedType = proposeType(original2, profiles);
+      const knownSalary = (proposal == null ? void 0 : proposal.level) === "counterparty" && ["vakantiegeld", "nabetaling", "overige-inkomsten"].includes(proposal.rule.transactionType) && Number(original2.amount) > 0 && describedType === "salaris" && Boolean(proposeSalaryPerson(original2, transactions));
+      const proposedType = explicitExtra || knownSalary ? describedType : ((_a2 = proposal == null ? void 0 : proposal.rule) == null ? void 0 : _a2.transactionType) || describedType;
+      const type = !explicitExtra && !knownSalary && ((_b = proposal == null ? void 0 : proposal.rule) == null ? void 0 : _b.fixedExpenseId) ? "vaste-last" : proposedType;
       const fixedMatch = fixedRecognition(original2, profile, proposal == null ? void 0 : proposal.rule, fixedExpenses);
       const special = !["uitgave", "vaste-last"].includes(type);
       const category = ((_c = proposal == null ? void 0 : proposal.rule) == null ? void 0 : _c.category) || "Ongecategoriseerd";
@@ -18115,7 +18131,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
         processing: {
           processingDate: original2.bankDate,
           processedAmount: round23(Math.abs(Number(original2.amount) || 0)),
-          description: recognizedDescription(original2, proposal),
+          description: recognizedDescription(original2, knownSalary ? null : proposal),
           category,
           transactionType: type,
           ...type === "salaris" ? { salaryLinkVersion: 117, salaryPersonId: proposeSalaryPerson(original2, transactions) } : {},
@@ -18185,6 +18201,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
         }
       }
       if (p.transactionType === "salaris") {
+        if (knownSalary) evidence.reasons.push("De salarisomschrijving en eerder bevestigd salaris hebben voorrang op het laatst geleerde extra-inkomenstype van deze tegenrekening.");
         if (Number(original2.amount) <= 0) {
           p.salaryPersonId = "";
           uncertain("Een salarisontvangst vereist een bijschrijving.");
@@ -19864,7 +19881,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
       return `<div class="u4-dependent-grid"><label>Inleg bestaand geld voor spaardoel (optioneel)<select data-u4-field="contributionGoalId">${goalOptions(root2, p.contributionGoalId || "")}</select></label>${p.contributionGoalId ? `<label>Inlegbedrag<input type="number" min="0.01" step="0.01" data-u4-field="contributionAmount" value="${Number(p.contributionAmount) || 0}"></label><span class="u4-muted">Geen inkomen of extra zakgeld. Koppel na goedkeuring de daadwerkelijke spaarboeking aan deze inleg. Alleen die spaarboeking verhoogt het spaardoel.</span>` : ""}</div>`;
     }
     const dismissedSavingsProposals = /* @__PURE__ */ new WeakSet();
-    function savingsProposalsFor(root2, row, projections = selectTransactionProjections(root2.state)) {
+    function savingsProposalsFor(root2, row, projections = selectTransactionProjections(root2.state, { month: getTransactionDate(row).slice(0, 7) })) {
       var _a2, _b;
       const p = row.processing;
       if (((_a2 = p.splits) == null ? void 0 : _a2.length) || p.savingsContributionId) return [];
@@ -19872,7 +19889,7 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
     }
     function savingsContributionFields(root2, row) {
       const p = row.processing, month = getTransactionDate(row).slice(0, 7);
-      const projections = selectTransactionProjections(root2.state);
+      const projections = selectTransactionProjections(root2.state, { month });
       const sources = projections.filter((t) => {
         var _a2;
         return t.active && t.effects.accountCashflow > 0 && t.calendarMonth === month && t.financialFor === p.budgetOwner && (isSavingsIncomeSource(t) || ["interne-overboeking", "extra-bijdrage"].includes(t.transactionType) && ((_a2 = t.transaction.processing) == null ? void 0 : _a2.contributionGoalId) === p.savingsGoalId);
@@ -22061,7 +22078,7 @@ De bestaande verwerking is niet gewijzigd. Je kunt je invoer aanpassen en opnieu
   function openerSelector(element) {
     if (!element) return null;
     if (element.id) return `#${CSS.escape(element.id)}`;
-    for (const attribute of ["data-open-owner-variable", "data-open-goal-editor", "data-personal-saving-edit", "data-u3-planning-owner", "data-open-personal-transaction", "data-open-joint-transaction", "data-tab", "data-p3-info", "data-p3-action"]) {
+    for (const attribute of ["data-open-income-overview", "data-open-owner-variable", "data-open-goal-editor", "data-personal-saving-edit", "data-u3-planning-owner", "data-open-personal-transaction", "data-open-joint-transaction", "data-tab", "data-p3-info", "data-p3-action"]) {
       if (element.hasAttribute(attribute)) return `[${attribute}="${CSS.escape(element.getAttribute(attribute))}"]`;
     }
     if (element.matches(".ux-card-primary")) {

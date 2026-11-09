@@ -13,7 +13,7 @@ pnpm run check:generated
 pnpm run test:smoke
 ```
 
-`test:unit` bouwt eerst de gedeelde backendmodules en voert alle root-Node-testbestanden uit, behalve de expliciete native Firestore-retentietest. `test:backend` controleert de HTTP-laag met SDK-/providermocks. `test:smoke` behoudt de 35 browsergevallen van pakket 1 en voegt drie mobiele volgordegevallen, twee importfocusgevallen en vier budgetbalkgevallen toe. De volledige browserinventaris blijft beschikbaar via `pnpm run test:browser`; bekende mislukkingen worden in het pakketverslag genoemd en worden niet automatisch overgeslagen.
+`test:unit` bouwt eerst de gedeelde backendmodules en voert alle root-Node-testbestanden uit, behalve de expliciete native Firestore-retentietest. `test:backend` controleert de HTTP-laag met SDK-/providermocks. `test:smoke` behoudt de 35 browsergevallen van pakket 1 en voegt drie mobiele volgordegevallen, twee importfocusgevallen, vier budgetbalkgevallen en vier spaarkoppelgevallen toe (48 totaal). De spaarreeks controleert ook gedeeltelijk geladen, geverifieerde historie en de weigering van ontbrekend periodebewijs. De volledige browserinventaris blijft beschikbaar via `pnpm run test:browser`; mislukkingen worden niet automatisch overgeslagen.
 
 ## Een eigen lokale testpoort
 
@@ -61,3 +61,5 @@ De workflow heeft uitsluitend `contents: read`, gebruikt geen productiesecrets e
 ## Afzonderlijke schaalproeven
 
 De snelle workflow draait bij pushes/PRs naar main; de uitgebreidere functionele controle draait handmatig en wekelijks. De tien schaal-/prestatiegevallen blijven beschikbaar in de afzonderlijke, uitsluitend handmatige workflow `verify-scale.yml`. Zo blokkeert een schaalrun de functionele reeks niet door de gezamenlijke tijdslimiet. De suite met alle gevallen blijft lokaal beschikbaar; geen assertion is voor deze splitsing verwijderd. Bekende applicatiefouten blijven de uitgebreide workflow terecht rood maken.
+
+Gebruik voor een volledige schaalrun `FINIZE_EVIDENCE_PREFIX=p44`, zoals in de schaalworkflow. De 500- en 5.400-bronnenproeven schrijven dan de `p44-scale-3.json`- en `p44-scale-36.json`-bewijsbestanden die hun vervolgproeven verwachten. Voer ze in dezelfde emulatorrun uit; de bewijsbestanden verwijzen naar fictieve huishoudens in die emulator. De workflow bewaart ook deze lokale bewijsbestanden als artifact.

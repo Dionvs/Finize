@@ -6,7 +6,7 @@ test.use({serviceWorkers:'allow',actionTimeout:15000});test.setTimeout(300000);
 async function load(page,text,name,expected=text.split('\n').length-1){
   await page.evaluate(()=>openBankImportForOwner('gezamenlijk'));
   await page.locator('[data-u4-file]').setInputFiles({name,mimeType:'text/csv',buffer:Buffer.from(text)});
-  if(expected===0)await expect(page.locator('#u4ImportModalRoot summary').filter({hasText:'Eerder geïmporteerd — overgeslagen'})).toContainText('1');
+  if(expected===0){await page.locator('select[data-u4-view-month]').selectOption('');await expect(page.locator('#u4ImportModalRoot summary').filter({hasText:'Eerder geïmporteerd — overgeslagen'})).toContainText('1');}
   if(expected>0){await page.locator('select[data-u4-view-month]').selectOption('');await expect(page.locator('[data-u4-month-context]')).toContainText('Alle maanden');}
   await expect(page.locator('[data-u4-row]')).toHaveCount(expected);
   await page.locator('#u4ImportModalRoot details').evaluateAll(nodes=>nodes.forEach(node=>node.open=true));

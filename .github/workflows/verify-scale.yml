@@ -12,6 +12,7 @@ jobs:
     timeout-minutes: 90
     env:
       FIREBASE_CLI_DISABLE_USAGE_REPORTING: '1'
+      FINIZE_EVIDENCE_PREFIX: p44
       JAVA_TOOL_OPTIONS: -Xmx2g
       FINIZE_FIREBASE_CLI: ${{ github.workspace }}/.cache/ci-tools/node_modules/firebase-tools/lib/bin/firebase.js
       FINIZE_BANK_DEPENDENCIES: ${{ github.workspace }}/.cache/ci-tools
@@ -45,5 +46,6 @@ jobs:
           path: |
             test-results/
             playwright-report/
+            backups/v117-stabilisatie/
           if-no-files-found: ignore
           retention-days: 7

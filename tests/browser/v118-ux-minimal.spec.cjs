@@ -3,6 +3,31 @@ const { boot, navigate } = require('./helpers/v118-ux-fixture.cjs');
 test.setTimeout(60000);
 test.use({ actionTimeout:5000 });
 
+for(const width of [390,1440])test(`gezamenlijke inkomstenbeheerroute toont geen persoonlijke planning ${width}px`,async({page})=>{
+  await boot(page,width);
+  const privateNames=await page.evaluate(()=>{
+    const names=[];
+    for(const owner of ['dion','dara']){
+      const fixed=state.recurringFixedExpenses.find(row=>(row.financialFor||row.rekening)===owner);
+      if(!fixed)throw Error('Persoonlijke fixture ontbreekt');
+      fixed.naam='Persoonlijke bron '+owner;names.push(fixed.naam);
+    }
+    renderActiveTab();return names;
+  });
+  await navigate(page,'gezamenlijk');await page.locator('[data-open-income-overview="gezamenlijk"]:visible').click();
+  await page.getByRole('button',{name:'Vaste lasten & inkomsten beheren',exact:true}).click();
+  const dialog=page.getByRole('dialog');await expect(dialog.getByRole('button',{name:'+ Inkomstenbron',exact:true})).toBeVisible();
+  for(const name of privateNames)await expect(dialog).not.toContainText(name);
+  await dialog.getByRole('button',{name:'+ Inkomstenbron',exact:true}).click();await expect(page.locator('#u3RecName')).toBeVisible();
+  const name='Gezamenlijke testbron '+width;
+  await page.locator('#u3RecName').fill(name);await page.locator('#u3RecAmount').fill('123.45');await page.locator('#u3RecSave').click();
+  await expect(page.getByRole('dialog')).toContainText(name);
+  expect(await page.evaluate(name=>Math.round(state.recurringIncomeSources.find(row=>row.naam===name).verwachtBedrag*100),name)).toBe(12345);
+  await page.getByRole('dialog').locator('.u3-admin-row').filter({hasText:name}).getByRole('button',{name:'Bewerken',exact:true}).click();
+  await page.getByRole('button',{name:'Terug',exact:true}).click();
+  for(const name of privateNames)await expect(page.getByRole('dialog')).not.toContainText(name);
+});
+
 test('tablet behoudt namen voor iedere navigatieknop', async ({page}) => {
   await boot(page,768);
   for(const button of await page.locator('#tabs .tab-btn:visible').all()) {

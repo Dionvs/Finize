@@ -26,11 +26,11 @@ async function attach(page,f,{initialize=false}={}){
     await p4.attach({automatic:false});return true;
   },{householdId:f.householdId,token:token(f.email),initialize});
 }
-async function importTen(page,{goalId='p4-goal',prefix='P4 sparen',amounts=[50,100,75,25,200,40,60,90,30,80],beforeApprove=null,expectedCount=amounts.length,completionTimeoutMs=20000}={}){
+async function importTen(page,{goalId='p4-goal',prefix='P4 sparen',amounts=[50,100,75,25,200,40,60,90,30,80],accountIdentifier='NL01JOINT',counterpartyAccount='NL02SAVINGS',beforeApprove=null,expectedCount=amounts.length,completionTimeoutMs=20000}={}){
   const existingSourceIds=await page.evaluate(()=>state.transactions.filter(r=>r.recordRole==='bank-source').map(r=>r.id));
   const baseline=await page.evaluate(()=>FinizeTransactions.total('savingsDeposit',{month:'2026-10'}));
   await page.evaluate(()=>openBankImportForOwner('gezamenlijk'));
-  const csv='Datum;Omschrijving;Rekening;Tegenrekening;Bedrag\n'+amounts.map((n,i)=>`2026-10-${String(i%3+1).padStart(2,'0')};${prefix};NL01JOINT;NL02SAVINGS;-${n}`).join('\n');
+  const csv='Datum;Omschrijving;Rekening;Tegenrekening;Bedrag\n'+amounts.map((n,i)=>`2026-10-${String(i%3+1).padStart(2,'0')};${prefix};${accountIdentifier};${counterpartyAccount};-${n}`).join('\n');
   const importStarted=performance.now();
   await page.locator('[data-u4-file]').setInputFiles({name:prefix+'.csv',mimeType:'text/csv',buffer:Buffer.from(csv)});
   // Import creation awaits a durable commit before rendering its rows. Measure

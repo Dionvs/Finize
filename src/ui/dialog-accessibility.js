@@ -9,7 +9,7 @@ const sessions = new WeakMap(), inerted = new Map();
 function openerSelector(element) {
   if (!element) return null;
   if (element.id) return `#${CSS.escape(element.id)}`;
-  for (const attribute of ['data-open-owner-variable','data-open-goal-editor','data-personal-saving-edit','data-u3-planning-owner','data-open-personal-transaction','data-open-joint-transaction','data-tab','data-p3-info','data-p3-action']) {
+  for (const attribute of ['data-open-income-overview','data-open-owner-variable','data-open-goal-editor','data-personal-saving-edit','data-u3-planning-owner','data-open-personal-transaction','data-open-joint-transaction','data-tab','data-p3-info','data-p3-action']) {
     if (element.hasAttribute(attribute)) return `[${attribute}="${CSS.escape(element.getAttribute(attribute))}"]`;
   }
   if (element.matches('.ux-card-primary')) {

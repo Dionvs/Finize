@@ -28,6 +28,7 @@ for(const count of [20,100])test(`P4.4 ${count} sources: native failure at appro
   // Unattempted sources retain their previous durable choices. Explicitly choose
   // the shared destination again; selecting alone must never invent that choice.
   const remaining=page.locator('[data-u4-row]').filter({has:page.locator('[data-u4-select-approval]')}).first();
+  await remaining.locator('[data-u4-focus-open]').click();
   await remaining.locator('[data-u4-family]').selectOption('sparen');await remaining.locator('[data-u4-field="transactionType"]').selectOption('naar-spaarrekening');await remaining.locator('[data-u4-field="savingsGoalId"]').selectOption('goal');
   await remaining.locator('[data-u4-approve]').click();await expect(page.locator('[data-u4-match-apply]')).toHaveText('Geselecteerde transacties goedkeuren (3)');await page.locator('[data-u4-match-apply]').click();
   await expect(page.locator('[data-u4-group-result]')).toContainText('3 van 3 transacties goedgekeurd');

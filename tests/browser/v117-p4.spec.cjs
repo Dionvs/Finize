@@ -142,7 +142,7 @@ test('P4 new household without legacy: first CSV bulk approval, full localStorag
   await page.waitForFunction(async()=>{const registration=await navigator.serviceWorker.getRegistration();return registration?.active&&navigator.serviceWorker.controller;});
   expect(await page.evaluate(()=>DataAdapter.store().head.migration.sourceSha256)).toBeFalsy();
   expect(await page.evaluate(()=>({sources:state.transactions.filter(row=>row.recordRole==='bank-source').length,income:FinizeTransactions.total('incomeImpact'),expenses:FinizeTransactions.total('realExpense'),deposits:FinizeTransactions.total('savingsDeposit')}))).toEqual({sources:0,income:0,expenses:0,deposits:0});
-  await page.evaluate(()=>document.querySelector('#tabs [data-tab="dion"]').click());await page.locator('#tab-dion [data-u3-planning-owner="dion"]').first().click();await page.getByRole('dialog').getByRole('button',{name:'+ Inkomstenbron'}).click();
+  await page.evaluate(()=>document.querySelector('#tabs [data-tab="gezamenlijk"]').click());await page.locator('[data-open-income-overview="gezamenlijk"]:visible').click();await page.getByRole('button',{name:'Vaste lasten & inkomsten beheren',exact:true}).click();await page.getByRole('dialog').getByRole('button',{name:'+ Inkomstenbron'}).click();
   await page.locator('#u3RecName').fill('P4 salaris');await page.locator('#u3RecAmount').fill('3100');await page.locator('#u3RecStart').fill('2026-10-01');await page.locator('#u3RecSave').click();await page.getByRole('dialog').getByRole('button',{name:'Sluiten'}).click();
   await expect.poll(()=>page.evaluate(()=>state.recurringIncomeSources.find(row=>row.naam==='P4 salaris')?.verwachtBedrag)).toBe(3100);
   await page.evaluate(()=>document.querySelector('#tabs [data-tab="gezamenlijk"]').click());await page.locator('#tab-gezamenlijk [data-open-owner-variable="gezamenlijk"]').first().click();await page.locator('[data-variable-add]').click();
@@ -150,24 +150,24 @@ test('P4 new household without legacy: first CSV bulk approval, full localStorag
   await expect(page.locator('[data-variable-save]')).toHaveCount(0);
   await page.locator('#tab-gezamenlijk [data-open-owner-variable="gezamenlijk"]').first().click();await page.locator('[data-variable-field="bedrag"]').last().fill('475');await page.locator('[data-variable-save]').click();
   await expect(page.locator('[data-variable-save]')).toHaveCount(0);
-  await page.locator('#tab-gezamenlijk [data-u3-planning-owner="gezamenlijk"]').first().click();await page.getByRole('dialog').getByRole('button',{name:'+ Vaste last'}).click();await page.locator('#u3RecName').fill('P4 huur');await page.locator('#u3RecAmount').fill('900');await page.locator('#u3RecStart').fill('2026-10-01');await page.locator('#u3RecSave').click();
-  await page.getByRole('dialog').locator('.u3-admin-row').filter({hasText:'P4 huur'}).getByRole('button',{name:'Bewerken'}).click();await page.locator('#u3RecAmount').fill('925');await page.locator('#u3RecSave').click();await page.getByRole('dialog').getByRole('button',{name:'Sluiten'}).click();
+  await page.locator('#tab-gezamenlijk [data-u3-planning-owner="gezamenlijk"]').first().click();await page.getByRole('dialog').getByRole('button',{name:'Vaste last toevoegen'}).click();await page.locator('#u3RecName').fill('P4 huur');await page.locator('#u3RecAmount').fill('900');await page.locator('.fixed-editor-extra summary').click();await page.locator('#u3RecStart').fill('2026-10-01');await page.locator('#u3RecSave').click();
+  await page.getByRole('dialog').getByRole('button',{name:'P4 huur bewerken'}).click();await page.locator('#u3RecAmount').fill('925');await page.locator('#u3RecSave').click();await page.getByRole('dialog').getByRole('button',{name:'Sluiten'}).click();
   await expect.poll(()=>page.evaluate(()=>FinizePlanning.fixed('2026-10').find(row=>row.naam==='P4 huur')?.bedrag)).toBe(925);
   await page.evaluate(()=>document.querySelector('#tabs [data-tab="spaardoelen"]').click());await page.locator('[data-add-goal="gezamenlijk"]').first().click();
   await page.locator('#goalEditName').fill('P4 eerste spaardoel');await page.locator('#goalEditTarget').fill('1000');await page.locator('#goalEditSaved').fill('0');await page.locator('#goalEditSave').click();
   await expect.poll(()=>page.evaluate(()=>state.spaardoelen.gezamenlijk.some(row=>row.naam==='P4 eerste spaardoel'))).toBe(true);
   const goalId=await page.evaluate(()=>state.spaardoelen.gezamenlijk.find(row=>row.naam==='P4 eerste spaardoel').id);
-  await page.evaluate(()=>commitChange(()=>{
-    state.accountProfiles=[{id:'p4-joint',name:'Gezamenlijk',accountOwner:'gezamenlijk',identifier:'NL01JOINT'},{id:'p4-savings',name:'Spaarrekening',accountOwner:'gezamenlijk',identifier:'NL02SAVINGS'}];
-  },{render:true}));
+  expect(await page.evaluate(()=>commitChange(()=>{
+    state.accountProfiles=[{id:'p4-joint',name:'Gezamenlijk',accountOwner:'gezamenlijk',accountType:'payment',status:'active',identifier:'NL91ABNA0417164300'},{id:'p4-savings',name:'Spaarrekening',accountOwner:'gezamenlijk',accountType:'savings',status:'active',identifier:'NL02ABNA0123456789'}];
+  },{render:true}))).toBe(true);
   await attach(page,f,{initialize:true});
   await page.evaluate(()=>{try{for(let i=0;i<100;i++)localStorage.setItem('p4-fill-'+i,'x'.repeat(200000));}catch(e){if(e.name!=='QuotaExceededError')throw e;}});
   await page.context().setOffline(true);
-  await importTen(page,{goalId});
+  await importTen(page,{goalId,accountIdentifier:'NL91ABNA0417164300',counterpartyAccount:'NL02ABNA0123456789'});
   const durable=await page.evaluate(()=>DataAdapter.readDurableState());expect(durable.transactions.filter(row=>row.recordRole==='bank-source')).toHaveLength(10);
   const sources=durable.transactions.filter(row=>row.recordRole==='bank-source').map(row=>({id:row.id,amount:row.bankOriginal.amount,date:row.bankOriginal.bankDate,account:row.bankOriginal.accountIdentifier})).sort((a,b)=>a.id.localeCompare(b.id));
   const amounts=[50,100,75,25,200,40,60,90,30,80];
-  for(const source of sources){expect(source.account).toBe('NL01JOINT');expect(source.date).toBe('2026-10-'+String(amounts.indexOf(-source.amount)%3+1).padStart(2,'0'));}
+  for(const source of sources){expect(source.account).toBe('NL91ABNA0417164300');expect(source.date).toBe('2026-10-'+String(amounts.indexOf(-source.amount)%3+1).padStart(2,'0'));}
   expect(new Set(durable.transactions.filter(row=>row.recordRole==='bank-source').map(row=>row.id)).size).toBe(10);
   expect(await page.evaluate(()=>FinizeTransactions.total('savingsDeposit',{month:'2026-10'}))).toBe(750);
   await page.reload();await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);

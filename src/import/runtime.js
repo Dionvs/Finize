@@ -585,8 +585,10 @@ import { normalizeDataTransaction, getTransactionDate, getTransactionAccountCont
   function classifyOriginal(original,profile,rules=[],profiles=[],fixedExpenses=[],transactions=[],state=null){
     const proposal=recognitionProposal(original,rules,profile);
     const explicitExtra=Number(original.amount)>0&&/\b(vakantiegeld|nabetaling|correctie loon|bonus|gratificatie|eindejaarsuitkering|dertiende maand)\b/.test(normalizeText(original.rawDescription||original.description));
-    const proposedType=explicitExtra?proposeType(original,profiles):proposal?.rule?.transactionType||proposeType(original,profiles);
-    const type=!explicitExtra&&proposal?.rule?.fixedExpenseId?'vaste-last':proposedType;
+    const describedType=proposeType(original,profiles);
+    const knownSalary=proposal?.level==='counterparty'&&['vakantiegeld','nabetaling','overige-inkomsten'].includes(proposal.rule.transactionType)&&Number(original.amount)>0&&describedType==='salaris'&&Boolean(proposeSalaryPerson(original,transactions));
+    const proposedType=explicitExtra||knownSalary?describedType:proposal?.rule?.transactionType||describedType;
+    const type=!explicitExtra&&!knownSalary&&proposal?.rule?.fixedExpenseId?'vaste-last':proposedType;
     const fixedMatch=fixedRecognition(original,profile,proposal?.rule,fixedExpenses);
     const special=!['uitgave','vaste-last'].includes(type);
     const category=proposal?.rule?.category||'Ongecategoriseerd';
@@ -609,7 +611,7 @@ import { normalizeDataTransaction, getTransactionDate, getTransactionAccountCont
       processing:{
         processingDate:original.bankDate,
         processedAmount:round2(Math.abs(Number(original.amount)||0)),
-        description:recognizedDescription(original,proposal),
+        description:recognizedDescription(original,knownSalary?null:proposal),
         category,
         transactionType:type,
         ...(type==='salaris'?{salaryLinkVersion:117,salaryPersonId:proposeSalaryPerson(original,transactions)}:{}),
@@ -660,6 +662,7 @@ import { normalizeDataTransaction, getTransactionDate, getTransactionAccountCont
       else{p.budgetItemId=budget.id;p.category=budget.post||budget.categorie;}
     }
     if(p.transactionType==='salaris'){
+      if(knownSalary)evidence.reasons.push('De salarisomschrijving en eerder bevestigd salaris hebben voorrang op het laatst geleerde extra-inkomenstype van deze tegenrekening.');
       if(Number(original.amount)<=0){p.salaryPersonId='';uncertain('Een salarisontvangst vereist een bijschrijving.');}
       else if(!p.salaryPersonId)uncertain('Werkgever en ontvangstrekening leveren geen eenduidige salarispersoon. Kies Dion of Dara.');
       else{evidence.status=evidence.status==='conflict'?'conflict':'supported';evidence.reasons.push('Werkgever en ontvangstrekening komen overeen met actief, handmatig goedgekeurd salaris.');}
@@ -1823,14 +1826,14 @@ import { normalizeDataTransaction, getTransactionDate, getTransactionAccountCont
     return `<div class="u4-dependent-grid"><label>Inleg bestaand geld voor spaardoel (optioneel)<select data-u4-field="contributionGoalId">${goalOptions(root,p.contributionGoalId||'')}</select></label>${p.contributionGoalId?`<label>Inlegbedrag<input type="number" min="0.01" step="0.01" data-u4-field="contributionAmount" value="${Number(p.contributionAmount)||0}"></label><span class="u4-muted">Geen inkomen of extra zakgeld. Koppel na goedkeuring de daadwerkelijke spaarboeking aan deze inleg. Alleen die spaarboeking verhoogt het spaardoel.</span>`:''}</div>`;
   }
   const dismissedSavingsProposals=new WeakSet();
-  function savingsProposalsFor(root,row,projections=selectTransactionProjections(root.state)){
+  function savingsProposalsFor(root,row,projections=selectTransactionProjections(root.state,{month:getTransactionDate(row).slice(0,7)})){
     const p=row.processing;
     if(p.splits?.length||p.savingsContributionId)return [];
     return savingsLinkProposals(projections,{transactionType:p.transactionType,month:getTransactionDate(row).slice(0,7),owner:p.budgetOwner,goalId:p.savingsGoalId,amountCents:Math.round(Number(p.processedAmount)*100),excludeTransactionId:projections.find(t=>t.transaction.importTransactionId===row.id)?.id});
   }
   function savingsContributionFields(root,row){
     const p=row.processing,month=getTransactionDate(row).slice(0,7);
-    const projections=selectTransactionProjections(root.state);
+    const projections=selectTransactionProjections(root.state,{month});
     const sources=projections.filter(t=>t.active&&t.effects.accountCashflow>0&&t.calendarMonth===month&&t.financialFor===p.budgetOwner&&(isSavingsIncomeSource(t)||['interne-overboeking','extra-bijdrage'].includes(t.transactionType)&&t.transaction.processing?.contributionGoalId===p.savingsGoalId));
     const selected=sources.find(t=>t.id===p.savingsContributionId);
     const missing=p.savingsContributionId&&!selected;

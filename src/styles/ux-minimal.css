@@ -31,6 +31,7 @@ body.v4-app :is(.goal-table th,.scroll-area th,.joint-transactions-empty,.empty-
 body.v4-app .u5-joint-goals-preview td[colspan]{color:var(--text-dim)!important}
 body.v4-app .u5-segmented button.active{background:#5d7648;border-color:#5d7648;color:#fff}
 body.v4-app #goalEditDelete{color:var(--text-dim)}
+.p3-income{fill:#36669e}
 .p3-chart-legend .p3-income-key{color:#36669e}
 #authRoot :is(.auth-kicker,.auth-text-button){color:#36669e}
 #authRoot :is(.auth-intro p:not(.auth-kicker),.auth-state-card>p:not(.auth-kicker),.auth-assurances,.auth-panel-head p,.auth-divider,.auth-stay small,.auth-feedback){color:var(--text-dim)}
