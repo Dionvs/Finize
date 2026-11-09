@@ -114,8 +114,8 @@ test('P4 cache is household scoped and pending financial changes prevent cleanup
 });
 
 test('P4 same bank source changed on two clients stays blocked with both approvals and proofs preserved',async({page,browser})=>{
-  const f=await newHousehold();await boot(page,f);await page.evaluate(()=>commitChange(()=>{
-    state.accountProfiles=[{id:'joint',accountOwner:'gezamenlijk',identifier:'NL01JOINT'},{id:'savings',accountOwner:'gezamenlijk',identifier:'NL02SAVINGS'}];state.spaardoelen={gezamenlijk:['p4-goal','choice-a','choice-b'].map(id=>({id,naam:id,doelbedrag:10000,algespaard:0})),dion:[],dara:[]};state.savingsGoalLedger=[];
+  const f=await newHousehold();await boot(page,f,{...state(),accountProfiles:[{id:'joint',accountOwner:'gezamenlijk',identifier:'NL01JOINT'},{id:'savings',accountOwner:'gezamenlijk',identifier:'NL02SAVINGS'}]});await page.evaluate(()=>commitChange(()=>{
+    state.spaardoelen={gezamenlijk:['p4-goal','choice-a','choice-b'].map(id=>({id,naam:id,doelbedrag:10000,algespaard:0})),dion:[],dara:[]};state.savingsGoalLedger=[];
   },{render:false}));await attach(page,f,{initialize:true});await importTen(page);await page.evaluate(()=>p4.sync());await page.evaluate(()=>p4.openMonth('2026-10'));
   const context=await browser.newContext({baseURL:testOrigin,serviceWorkers:'block'});
   try{

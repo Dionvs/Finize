@@ -44,6 +44,6 @@ Eén bronregel in `renderJointFirstRow` begrenst nu alleen de zichtbare ratio op
 - Nieuwe `budget-bar-refunds.spec.cjs`: 4/4 geslaagd op 360/390/430/1440 px, telkens met netto −400, nul, 25 en 150 bij budget 100. Zowel de ingestelde breedte als de werkelijke vulling wordt getoetst; de spoorbreedte is de binnenbreedte, zodat desktopranden niet als vulling meetellen.
 - Alle 1372 normale Node-tests slagen, 0 mislukt en 0 overgeslagen.
 - De nieuwe mobiele screenshot is geopend en visueel gecontroleerd. De balk is leeg, het negatieve bedrag blijft zichtbaar.
-- De vier nieuwe gevallen zijn toegevoegd aan de bestaande smoke-opdracht; de oorspronkelijke 35 en vijf eerdere herstelgevallen blijven behouden. De nieuwe smoke-inventaris telt 44 gevallen; de gezamenlijke run volgt nog.
+- De vier nieuwe gevallen zijn toegevoegd aan de bestaande smoke-opdracht; de oorspronkelijke 35 en vijf eerdere herstelgevallen blijven behouden. De gezamenlijke smoke-run slaagt 44/44 (`smoke-after-budget.json`).
 
 Bewijs: `.cache/pakket2/budget-bar-fixed.json`, `budget-bar-final.json`, `node-after-budget-bar.log` en `evidence/pakket2-bug03-na-430.png`. Geen productiegegevens, bankverbindingen of beveiligingsregels gewijzigd.

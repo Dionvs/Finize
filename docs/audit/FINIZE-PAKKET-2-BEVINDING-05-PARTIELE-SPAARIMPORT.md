@@ -1,6 +1,6 @@
 # Pakket 2 — bevinding 05: spaarimport met gedeeltelijke historie
 
-Status: gereproduceerde applicatiefout; geen functionele correctie uitgevoerd. Besluit gebruiker nodig volgens de afgesproken stopregel voor nieuwe applicatiebugs.
+Status: gereproduceerde applicatiefout; op besluit van de gebruiker als bekende beperking gerapporteerd. Geen functionele correctie in pakket 2.
 
 ## Reproductie en bewijs
 
@@ -37,3 +37,7 @@ De tijdelijke meetinstrumentatie is verwijderd. De ongewijzigde productiebundel 
 - `.cache/pakket2/records-retest.json`: overige tien gerichte gevallen geslaagd, deze ene proef mislukt.
 
 Uitsluitend fictieve gegevens en een geïsoleerde lokale emulator zijn gebruikt. Productiegegevens en bankverbindingen zijn ongemoeid gebleven.
+
+## Besluit gebruiker
+
+De gebruiker kiest rapporteren. De fout blijft een bekende applicatiebeperking; de bestaande proef en haar financiële verwachtingen blijven behouden. Pakket 2 wordt vervolgd zonder deze applicatiecorrectie.

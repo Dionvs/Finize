@@ -6,6 +6,7 @@ async function newHousehold(){
   return {householdId,email};
 }
 async function boot(page,f,seed=null){
+  require('node:fs').mkdirSync('backups/v117-stabilisatie',{recursive:true});
   await require('./isolated-emulator.cjs').isolateBrowser(page);
   if(process.env.FINIZE_BROWSER_DIAGNOSTIC){page.on("console",m=>console.log("P4_BROWSER",m.type(),m.text()));page.on("requestfailed",r=>console.log("P4_REQUEST_FAILED",r.method(),r.url(),r.failure()));}
   if(seed)seed={...require('./migration-runtime.cjs')().migrateBudgetState(require('../fixtures/v50-visual-state.json')),...seed};
@@ -37,7 +38,7 @@ async function importTen(page,{goalId='p4-goal',prefix='P4 sparen',amounts=[50,1
   await expect(page.locator('[data-u4-row]')).toHaveCount(amounts.length,{timeout:20000});
   const importMs=performance.now()-importStarted;
   await page.locator('#u4ImportModalRoot details').evaluateAll(nodes=>nodes.forEach(node=>node.open=true));
-  const first=page.locator('[data-u4-row]').first();await first.locator('[data-u4-family]').selectOption('sparen');await first.locator('[data-u4-field="transactionType"]').selectOption('naar-spaarrekening');await first.locator('[data-u4-field="savingsGoalId"]').selectOption(goalId);
+  const firstId=await page.locator('[data-u4-row]').first().getAttribute('data-u4-row');const first=page.locator(`[data-u4-row="${firstId}"]`);await first.locator('[data-u4-focus-open]').click();await first.locator('[data-u4-family]').selectOption('sparen');await first.locator('[data-u4-field="transactionType"]').selectOption('naar-spaarrekening');await first.locator('[data-u4-field="savingsGoalId"]').selectOption(goalId);
   await page.evaluate(existingSourceIds=>{
     if(!window.p4ApprovalObserved){
       window.p4ApprovalObserved=true;const put=IDBObjectStore.prototype.put;

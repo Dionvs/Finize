@@ -21,7 +21,7 @@ test('P4.4 release: pending group stays visibly busy and duplicate clicks cannot
   })});
   // Observe the real UI while its first financial commit is still pending.
   try{
-    await page.waitForFunction(()=>window.p44Held);
+    await Promise.race([page.waitForFunction(()=>window.p44Held,null,{timeout:60000}),operation.then(()=>{throw new Error('Goedkeuring eindigde zonder de verwachte blokkeerpoort.');})]);
     await expect(page.locator('[data-u4-match-feedback]')).toContainText('afzonderlijk opgeslagen');
     await expect(page.locator('[data-u4-match-apply]')).toBeDisabled();
     await expect(page.locator('[data-u4-match-close]')).toBeDisabled();
