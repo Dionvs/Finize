@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   scale:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:
       FIREBASE_CLI_DISABLE_USAGE_REPORTING: '1'
