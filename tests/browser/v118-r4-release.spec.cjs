@@ -1,3 +1,4 @@
+const {release,assertReleaseShell}=require('../helpers/release-shell.cjs');
 const { test, expect } = require('@playwright/test');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -78,13 +79,13 @@ test('V118-r24 naar r25, offline en terugrollen behouden financiën, planning, i
     expect(before.months['2026-08'].snapshot).toEqual({ income: 123, expenses: 55 });
     old = false;
     await page.evaluate(async () => (await navigator.serviceWorker.getRegistration()).update());
-    await expect.poll(() => page.evaluate(() => caches.keys())).toContain('finize-v118-r25');
+    await expect.poll(() => page.evaluate(() => caches.keys())).toContain(`finize-v${release}`);
     // The new cache exists during install; wait for activation/cleanup as well.
     await expect.poll(() => page.evaluate(() => caches.keys())).not.toContain('finize-v118-r24');
     await page.reload();
     await page.waitForFunction(() => window.__finizeBootstrap?.rendered);
     expect(await snapshot()).toEqual(before);
-    expect(await page.locator('script[src*="app.js"]').getAttribute('src')).toContain('118-r25');
+    assertReleaseShell(await page.content());
     const keys = await page.evaluate(() => caches.keys());
     expect(keys).not.toContain('finize-v118-r24');
     expect(keys).not.toContain('finize-obsolete-r4');
@@ -93,12 +94,12 @@ test('V118-r24 naar r25, offline en terugrollen behouden financiën, planning, i
     await page.reload();
     await page.waitForFunction(() => window.__finizeBootstrap?.rendered);
     expect(await snapshot()).toEqual(before);
-    expect(await page.locator('script[src*="app.js"]').getAttribute('src')).toContain('118-r25');
+    assertReleaseShell(await page.content());
     await context.setOffline(false);
     old = true;
     await page.evaluate(async () => (await navigator.serviceWorker.getRegistration()).update());
     await expect.poll(() => page.evaluate(() => caches.keys())).toContain('finize-v118-r24');
-    await expect.poll(() => page.evaluate(() => caches.keys())).not.toContain('finize-v118-r25');
+    await expect.poll(() => page.evaluate(() => caches.keys())).not.toContain(`finize-v${release}`);
     await page.reload();
     await page.waitForFunction(() => window.__finizeBootstrap?.rendered);
     expect(await snapshot()).toEqual(before);
