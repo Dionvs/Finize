@@ -5833,67 +5833,9 @@ function u2OpenProcessModal(owner){
   render();
 }
 
-function u2RenderChildSummary(goal){
-  const active=u2ActiveChild(goal);
-  if(!goal.subdoelen?.length) return '';
-  return `<div class="u2-next-goal">${active?`<span>Volgende doel</span><strong>${textSafe(active.naam)} · nog ${eur(Math.max(0,Number(active.doelbedrag)-Number(active.gespaard)))}</strong>`:'<strong>Alle subdoelen voltooid</strong>'}</div>`;
-}
+// Preserve the original renderers used by the active subgoal wrappers.
 const u2OriginalDashboardGoalPreviewCard=renderDashboardGoalPreviewCard;
-renderDashboardGoalPreviewCard=function(item){
-  const goal=item.doel||item;
-  const owner=item.owner||goal.owner||ownerLabel(goal.eigenaar||'gezamenlijk');
-  const target=u2GoalTarget(goal),saved=u2GoalSaved(goal);
-  const progress=target>0?Math.min(1,saved/target):0;
-  const calculated=calcDoel(goal,TODAY);
-  return `<div class="dashboard-goal-preview-item">
-    <div class="dashboard-goal-preview-thumb tone-${ownerTone(owner)}">${goalImageIcon(goal)}</div>
-    <div class="dashboard-goal-preview-main">
-      <div class="dashboard-goal-preview-top"><strong>${textSafe(goal.naam||'Spaardoel')}</strong><span>${eur(saved)} / ${eur(target)}${saved>target?` · Extra ${eur(saved-target)}`:''}</span></div>
-      <div class="dashboard-goal-preview-meta"><span>${textSafe(owner)}</span><span>Doel: ${goal.doeldatum?formatDateNL(goal.doeldatum):'Geen doeldatum'}</span></div>
-      <div class="progress-track goal-positive"><div class="progress-fill goal-positive" style="width:${Math.round(progress*100)}%"></div></div>
-      <div class="u2-dashboard-extra">${u2RenderChildSummary(goal)}<span>Verwacht gereed: ${u2DateLabel(calculated.verwachteEinddatum)}</span></div>
-    </div>
-  </div>`;
-};
-
-function u2RenderGoalRow(item,owner){
-  const goal=item.doel;
-  const target=u2GoalTarget(goal),saved=u2GoalSaved(goal),progress=target>0?Math.min(100,Math.round(saved/target*100)):0;
-  const image=safeImageUrl(goalImageSource(goal));
-  return `<article class="card u2-goal-card" data-reorder-goal data-goal-owner="${owner}" data-goal-id="${textSafe(goal.id)}">
-    <span class="goal-direct-order-controls" aria-label="Volgorde aanpassen"><button type="button" class="goal-direct-order-arrow up" data-goal-move="-1" aria-label="${textSafe(goal.naam||'Spaardoel')} omhoog" title="Omhoog"></button><button type="button" class="goal-direct-order-arrow down" data-goal-move="1" aria-label="${textSafe(goal.naam||'Spaardoel')} omlaag" title="Omlaag"></button></span>
-    <button class="u2-goal-main" type="button" data-open-goal-editor="${owner}:${textSafe(goal.id)}">
-      <span class="u2-goal-image${image?' has-image':''}"${image?` style="background-image:url('${image}')"`:''}>${image?'':goalIcon(goal)}</span>
-      <span class="u2-goal-copy"><span class="u2-goal-title"><strong>${textSafe(goal.naam||'Spaardoel')}</strong><em class="u2-status ${item.status.key}">${item.status.label}</em></span><span>${eur(saved)} van ${eur(target)}</span><span class="progress-track"><span class="progress-fill" style="width:${progress}%"></span></span>${u2RenderChildSummary(goal)}</span>
-      <span class="u2-goal-side"><b>${progress}%</b><small>Nog ${eur(item.nogTeGaan)}</small></span>
-    </button>
-    <div class="u2-prognosis"><span>Inleg deze maand <strong>${eur(item.werkelijkeInleg)}</strong></span><span>Benodigd p/m <strong>${item.benodigdPerMaand===null?'—':eur(item.benodigdPerMaand)}</strong></span><span>Verwacht gereed <strong>${u2DateLabel(item.verwachteEinddatum)}</strong></span></div>
-  </article>`;
-}
 const u2OriginalMobileSpaardoelen=renderMobileSpaardoelen;
-renderMobileSpaardoelen=function(){
-  const r=calcScenario(state);
-  const groups=[
-    {key:'gezamenlijk',label:'Gezamenlijk',pot:Math.max(0,r.spaarpotDezeMaand)},
-    {key:'dion',label:'Dion',pot:Math.max(0,r.dion.beschikbaarVoorSparen)},
-    {key:'dara',label:'Dara',pot:Math.max(0,r.dara.beschikbaarVoorSparen)}
-  ];
-  const all=groups.flatMap(group=>calcGroep(state.spaardoelen[group.key],group.pot,TODAY));
-  const saved=round2(all.reduce((sum,item)=>sum+u2GoalSaved(item.doel),0));
-  const target=round2(all.reduce((sum,item)=>sum+u2GoalTarget(item.doel),0));
-  const root=document.getElementById('tab-spaardoelen');
-  root.innerHTML=`${renderSharedEmptyTabHeader('Slimme spaardoelen')}
-    <div class="mobile-savings-overview u2-savings">
-      <div class="mobile-savings-kpis"><div class="card"><small>Totaal gespaard</small><strong>${eur(saved)}</strong><em>van ${eur(target)}</em></div><div class="card"><small>Totale voortgang</small><strong>${target>0?Math.round(saved/target*100):0}%</strong><em>alle hoofddoelen</em></div><div class="card"><small>Openstaand</small><strong>${eur(Math.max(0,target-saved))}</strong><em>nog te sparen</em></div><div class="card"><small>Afgeronde maanden</small><strong>${Object.keys(state.spaardoelGeschiedenis||{}).length}</strong><em>in geschiedenis</em></div></div>
-      ${groups.map(group=>{
-        const items=calcGroep(state.spaardoelen[group.key],group.pot,TODAY);
-        const processed=u2IsProcessed(group.key);
-        return `<section class="u2-owner-section"><div class="u2-owner-head"><div><h2>${group.label}</h2><span>Spaarpot ${monthLabel(getSelectedMonth())}: ${eur(group.pot)}</span></div><div><button class="ghost small" data-add-goal="${group.key}">+ Spaardoel</button><button class="primary small" data-u2-process-owner="${group.key}" ${processed?'disabled':''}>${processed?'Maand verwerkt':'Spaarpot verwerken'}</button></div></div><div class="u2-goal-grid">${items.length?items.map(item=>u2RenderGoalRow(item,group.key)).join(''):'<div class="card"><p class="hint">Nog geen spaardoelen.</p></div>'}</div></section>`;
-      }).join('')}
-      <details class="card u2-history"><summary><strong>Spaargeschiedenis</strong><span>${Object.keys(state.spaardoelGeschiedenis||{}).length} maanden</span></summary><div>${Object.values(state.spaardoelGeschiedenis||{}).sort((a,b)=>String(b.maand).localeCompare(String(a.maand))).map(entry=>`<article><strong>${ownerLabel(entry.eigenaar)} · ${monthLabel(entry.maand)}</strong><span>Spaarpot ${eur(entry.spaarpot)} · verdeeld ${eur(entry.verdeeld)} · onverdeeld ${eur(entry.onverdeeld)}</span><small>${entry.transacties.map(tx=>`${textSafe(tx.doelNaam)} ${eur(tx.bedrag)}`).join(' · ')}</small></article>`).join('')||'<p class="hint">Nog geen maanden verwerkt.</p>'}</div></details>
-    </div>`;
-  root.querySelectorAll('[data-u2-process-owner]').forEach(btn=>btn.addEventListener('click',()=>u2OpenProcessModal(btn.dataset.u2ProcessOwner)));
-};
 
 renderDashboardGoalPreviewCard=function(item){
   const goal=item.doel||item;
