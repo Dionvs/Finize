@@ -1,5 +1,6 @@
 // Planning only. Transactions, approvals, ledger balances and saved closures are never resolved here.
 import { fixedPaymentDay, validPaymentDay } from './liquidity-settings.mjs';
+import { decimalAmountToCents } from '../import/bank-input-contract.mjs';
 const clone = value => JSON.parse(JSON.stringify(value));
 const plain = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const owners = ['gezamenlijk','dion','dara'];
@@ -68,6 +69,19 @@ export function resolveVariableBudgetsForMonth(state,month,owner,{defaultsOnly=f
   const override=state.monthlyBudgets?.[month]?.[`${owner}Variabel`];
   const rows=!defaultsOnly&&Array.isArray(override)?override:latest(state.budgetDefaultsHistory?.[owner],month)?.rows ?? state.planning?.[owner]?.variabel ?? [];
   return clone(rows);
+}
+export function accountVariableBudgetCents(state, profile, month) {
+  return owners.flatMap(owner=>resolveVariableBudgetsForMonth(state,month,owner).filter(row=>{
+    const explicit=(state.accountProfiles || []).find(p=>p.id===row.accountProfileId);
+    if(explicit)return explicit.id===profile.id;
+    if(row.accountProfileId&&!owners.includes(row.accountProfileId))return false;
+    const primary=(state.accountProfiles || []).filter(p=>p.accountOwner===owner&&p.status!=='archived'&&p.liquidity?.primaryForOwner);
+    return primary.length===1&&primary[0].id===profile.id;
+  })).reduce((total,row)=>{
+    const next=total+decimalAmountToCents(Number(row.bedrag || 0));
+    if(!Number.isSafeInteger(next))throw new Error('Budgetbedrag valt buiten het exacte centbereik.');
+    return next;
+  },0);
 }
 // One expense-category source; special processing choices are not budget categories.
 export function expenseCategoriesForMonth(state,month,owner,{existingCategory=''}={}) {

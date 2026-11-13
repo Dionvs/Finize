@@ -2,15 +2,35 @@ const {test,expect}=require('@playwright/test');
 const fs=require('node:fs'),path=require('node:path');
 const fixture=JSON.parse(fs.readFileSync(path.join(__dirname,'../fixtures/v50-visual-state.json'),'utf8'));
 test.setTimeout(60000);test.use({actionTimeout:7000});
-async function boot(page,width=390){
+async function boot(page,width=390,owner=null){
  await page.setViewportSize({width,height:900});await page.clock.setFixedTime(new Date('2026-10-14T12:00:00Z'));
  await page.route('https://www.gstatic.com/**',route=>route.abort());await page.route('https://firestore.googleapis.com/**',route=>route.abort());
- await page.addInitScript(seed=>{if(!localStorage.getItem('finize-budget-planner-v1'))localStorage.setItem('finize-budget-planner-v1',JSON.stringify({...seed,accountProfiles:[{id:'p2-joint',name:'Gezamenlijk betalen',accountOwner:'gezamenlijk',accountType:'payment',identifier:'NL91ABNA0417164300',status:'active'}]}));},fixture);
+ const seed=structuredClone(fixture);
+ if(owner)seed.monthlyBudgets=Object.fromEntries(['2026-07','2026-08','2026-09'].map(month=>[month,{[owner+'Variabel']:[{id:'early-budget',post:'Variabel',bedrag:500}]}]));
+ await page.addInitScript(({seed,owner})=>{if(!localStorage.getItem('finize-budget-planner-v1'))localStorage.setItem('finize-budget-planner-v1',JSON.stringify({...seed,accountProfiles:[{id:'p2-joint',name:'Gezamenlijk betalen',accountOwner:owner||'gezamenlijk',accountType:'payment',identifier:'NL91ABNA0417164300',status:'active'}]}));},{seed,owner});
  await page.goto('/');await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);await page.evaluate(()=>openBankAccountDetails('p2-joint'));await expect(page.locator('[data-liquidity-form]')).toBeVisible();
 }
 async function fill(page){await page.locator('[name="primaryForOwner"]').check();await expect(page.locator('[name="buffer"]')).toHaveValue('200');await page.locator('[name="buffer"]').fill('275.50');await page.locator('[data-income-person]').selectOption('dion');await page.locator('[data-income-day]').selectOption('25');await page.locator('[data-income-add]').click();await page.locator('[data-income-person]').last().selectOption('dara');await page.locator('[data-income-day]').last().selectOption('27');}
 const submit=page=>page.locator('[data-liquidity-form] button[type="submit"]').click();
 const saved=page=>expect.poll(()=>page.evaluate(()=>state.accountProfiles[0].liquidity?.bufferCents)).toBe(27550);
+for(const width of [1440,390])for(const owner of ['gezamenlijk','dion'])test(`Budget vóór inkomen ${owner} ${width}px opslaan, melding en maandhistorie`,async({page})=>{
+ const errors=[];page.on('pageerror',e=>errors.push(e.message));await boot(page,width,owner);
+ const input=page.locator('[name="budgetBeforeIncome"]');await expect(input).toHaveValue('0');
+ await page.locator('[name="primaryForOwner"]').check();
+ await input.fill('-1');await submit(page);expect(await page.evaluate(()=>state.accountProfiles[0].liquidity)).toBeUndefined();
+ await input.fill('500.01');await submit(page);await expect(page.locator('#budget-before-income-error')).toContainText('hoger dan het variabele maandbudget');
+ expect(await page.evaluate(()=>state.accountProfiles[0].liquidity)).toBeUndefined();
+ const bufferBox=await page.locator('[name="buffer"]').boundingBox(),budgetBox=await input.boundingBox();expect(budgetBox.y).toBeGreaterThan(bufferBox.y+bufferBox.height);expect(budgetBox.width).toBe(bufferBox.width);
+ await input.fill('123.45');await expect(page.locator('#budget-before-income-error')).toBeHidden();await submit(page);
+ await expect.poll(()=>page.evaluate(()=>state.accountProfiles[0].liquidity?.budgetBeforeIncomeHistory)).toEqual([{effectiveFrom:'2026-07',amountCents:12345}]);
+ await page.reload();await page.waitForFunction(()=>window.__finizeBootstrap?.rendered);await page.evaluate(()=>openBankAccountDetails('p2-joint'));await expect(input).toHaveValue('123.45');
+ await page.locator('#monthPickerButton').click();await page.locator('[data-month-value="2026-08"]').click();await page.evaluate(()=>openBankAccountDetails('p2-joint'));await expect(input).toHaveValue('123.45');
+ await input.fill('200');await submit(page);await expect.poll(()=>page.evaluate(()=>state.accountProfiles[0].liquidity?.budgetBeforeIncomeHistory?.length)).toBe(2);
+ await page.locator('#monthPickerButton').click();await page.locator('[data-month-value="2026-07"]').click();await page.evaluate(()=>openBankAccountDetails('p2-joint'));await expect(input).toHaveValue('123.45');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect(errors).toEqual([]);
+ fs.mkdirSync(path.join(__dirname,'../../.cache/budget-before-income'),{recursive:true});
+ await page.locator('[name="buffer"]').scrollIntoViewIfNeeded();await page.screenshot({path:path.join(__dirname,`../../.cache/budget-before-income/${owner}-${width}.png`)});
+});
 for(const width of [1440,390,320])test(`P2 ${width}px instellingen opslaan herladen en gedeelde pure uitkomst`,async({page})=>{
  const errors=[];page.on('pageerror',e=>errors.push(e.message));await boot(page,width);
  const before=await page.evaluate(()=>({forecast:FinizeTransactions.forecast('2026-10'),transactions:state.transactions,checkpoints:state.balanceCheckpoints||[]}));

@@ -3,7 +3,46 @@ const {fixture,options}=require('./helpers/month-end-savings.cjs');
 const {selectMonthEndSavings,selectDailyLiquidity,liquidityRequiredMonths}=require('../src/core/daily-liquidity.mjs');
 const {purchase}=require('./helpers/budget-timing.cjs');
 const saving=s=>selectMonthEndSavings(s,options(s));
+const earlyBudget=(s,amount)=>{s.accountProfiles[0].liquidity.budgetBeforeIncomeHistory=[{effectiveFrom:s.meta.selectedMonth,amountCents:amount}];return s;};
 function variable(s,amount){s.budgetDefaultsHistory.gezamenlijk=[{effectiveFrom:'0000-01',rows:[{id:'timing-budget',post:'Variabel',bedrag:amount}]}];return s;}
+
+test('budget before income increases the opening needed, keeps the buffer, and leaves month-end budget unchanged',()=>{
+ const s=variable(fixture({balance:400000,first:1850}),600),before=saving(s),daily=selectDailyLiquidity(s,options(s));
+ earlyBudget(s,30001);const p=saving(s);
+ assert.equal(p.requiredOpeningCents,before.requiredOpeningCents+30001);
+ assert.equal(p.indicativeCents,before.indicativeCents-30001);
+ assert.equal(p.firstIncomeDate,'2026-11-05');assert.equal(p.earlyBudgetCents,30001);
+ assert.equal(p.protectionDays.at(-1).protectedBalanceCents,before.protectionDays.at(-1).protectedBalanceCents);
+ for(const day of p.protectionDays.filter(d=>d.date>p.transferDate))assert(day.protectedBalanceCents-p.indicativeCents>=20000,day.date);
+ assert.deepEqual(selectDailyLiquidity(s,options(s)),daily);
+ earlyBudget(s,0);assert.deepEqual(saving(s),before);
+});
+
+test('concrete budget payments before and after income never double the early or month-end budget',()=>{
+ const make=()=>earlyBudget(variable(fixture({balance:1000000}),600),30000),original=saving(make());
+ for(const date of ['2026-11-02','2026-11-15']){
+  const s=make();purchase(s,{amount:100,date});const p=saving(s);
+  assert.equal(p.earlyBudgetCents,date<'2026-11-05'?20000:30000);
+  assert.equal(p.protectionDays.at(-1).protectedBalanceCents,original.protectionDays.at(-1).protectedBalanceCents);
+  if(date<'2026-11-05')assert.equal(p.protectionDays.find(d=>d.date===date).protectedBalanceCents,original.protectionDays.find(d=>d.date===date).protectedBalanceCents);
+ }
+});
+
+test('late obligations can dominate: budget room is not blindly added twice to the required opening',()=>{
+ const s=variable(fixture({balance:1000000,first:0,late:4000}),600),before=saving(s);earlyBudget(s,30000);const p=saving(s);
+ assert.equal(p.requiredOpeningCents,before.requiredOpeningCents);
+ assert.equal(p.protectionDays.at(-1).protectedBalanceCents-p.indicativeCents,20000);
+});
+
+test('income on the first, no income day, lower later budget and personal allowance use the configured timing',()=>{
+ const s=earlyBudget(variable(fixture({balance:1000000}),600),70000);
+ let p=saving(s);assert.equal(p.appliedBudgetBeforeIncomeCents,60000);
+ s.accountProfiles[0].liquidity.salaryDays={dion:1};p=saving(s);assert.equal(p.firstIncomeDate,'2026-11-01');assert.equal(p.earlyBudgetCents,0);
+ s.accountProfiles[0].liquidity.salaryDays={};p=saving(s);assert.equal(p.firstIncomeDate,null);assert.equal(p.earlyBudgetCents,60000);
+ s.accountProfiles[0].accountOwner='dion';s.accountProfiles[0].liquidity.allowanceDays={dion:12};
+ s.budgetDefaultsHistory.dion=s.budgetDefaultsHistory.gezamenlijk;s.budgetDefaultsHistory.gezamenlijk=[];
+ p=saving(s);assert.equal(p.firstIncomeDate,'2026-11-12');assert.equal(p.appliedBudgetBeforeIncomeCents,60000);
+});
 
 test('explicit 3000 - 2050 = 950: zero-based daily November simulation always retains 200',()=>{
  const s=fixture({balance:300000,first:1850,late:100}),before=structuredClone(s),p=saving(s);

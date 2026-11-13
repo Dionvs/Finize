@@ -2,6 +2,7 @@
 // unrestricted in this local version; these checks protect identity and history.
 import { getTransactionProcessingStatus } from './transaction-model.mjs';
 import { validateLiquiditySettings } from './liquidity-settings.mjs';
+import { accountVariableBudgetCents, assertPlanningMonth, nextPlanningMonth } from './planning-timeline.mjs';
 export const ACCOUNT_OWNERS = Object.freeze(['gezamenlijk','dion','dara']);
 export const ACCOUNT_TYPES = Object.freeze(['payment','savings']);
 export const normalizeAccountIban = value => String(value ?? '').toUpperCase().replace(/\s/g,'');
@@ -71,7 +72,7 @@ export function assertAccountProfileMutation(before, after, {imports=[]}={}) {
 export function applyAccountProfileCommand(state, command, {imports=[]}={}) {
   if (typeof command?.operationId !== 'string' || !command.operationId || typeof command.id !== 'string' || !command.id || !Number.isFinite(Date.parse(command.createdAt))) throw fail('invalid-account-command','De opslagactie mist een geldige identiteit of vastlegtijd. Open het formulier opnieuw.');
   const profiles = state.accountProfiles || [], old = profiles.find(profile=>profile.id===command.id);
-  const signature = JSON.stringify([command.type,command.id,command.values || {}]);
+  const signature = JSON.stringify([command.type,command.id,command.values || {},...(command.month?[command.month]:[])]);
   if (old?.lastAccountOperationId === command.operationId) {
     if (old.lastAccountOperationSignature !== signature) throw fail('account-operation-conflict','Deze opslagactie is al voor andere rekeninggegevens gebruikt.');
     return old;
@@ -90,6 +91,18 @@ export function applyAccountProfileCommand(state, command, {imports=[]}={}) {
   } else if (command.type === 'liquidity-settings') {
     const values=command.values || {};
     profile={...old,liquidity:{version:1,primaryForOwner:values.primaryForOwner,bufferCents:values.bufferCents,salaryDays:structuredClone(values.salaryDays),allowanceDays:structuredClone(values.allowanceDays ?? old?.liquidity?.allowanceDays ?? {})},updatedAt:command.createdAt};
+    if(old?.liquidity?.budgetBeforeIncomeHistory)profile.liquidity.budgetBeforeIncomeHistory=structuredClone(old.liquidity.budgetBeforeIncomeHistory);
+    if(Object.hasOwn(values,'budgetBeforeIncomeCents')){
+      assertPlanningMonth(command.month);
+      const amount=values.budgetBeforeIncomeCents;
+      if(!Number.isSafeInteger(amount)||amount<0)throw fail('invalid-budget-before-income','Vul € 0 of een positief bedrag in hele eurocenten in.');
+      const nextMonth=nextPlanningMonth(command.month);
+      if(amount>0&&state.__finizePartialHistory&&!state.verifiedPeriods?.includes(nextMonth))throw fail('invalid-budget-before-income','Laad eerst het variabele maandbudget van '+nextMonth+'.');
+      const profilesForBudget=profiles.map(p=>p.id===profile.id?profile:p);
+      const maximum=Math.max(0,accountVariableBudgetCents({...state,accountProfiles:profilesForBudget},profile,nextMonth));
+      if(amount>maximum)throw fail('invalid-budget-before-income','Dit bedrag is hoger dan het variabele maandbudget voor deze rekening ('+new Intl.NumberFormat('nl-NL',{style:'currency',currency:'EUR'}).format(maximum/100)+').');
+      profile.liquidity.budgetBeforeIncomeHistory=[...(profile.liquidity.budgetBeforeIncomeHistory || []).filter(row=>row.effectiveFrom<command.month),{effectiveFrom:command.month,amountCents:amount}];
+    }
   } else if (['archive','reactivate'].includes(command.type)) profile = {...old,status:command.type==='archive'?'archived':'active',updatedAt:command.createdAt};
   else throw fail('invalid-account-command','Deze rekeningactie wordt niet ondersteund.');
   profile.lastAccountOperationId = command.operationId;

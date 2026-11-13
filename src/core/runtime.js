@@ -6714,6 +6714,10 @@ window.FinizeAccounts=createBankAccountsUI({getState:()=>state,getScope:()=>Clou
   save:saveBankAccount,hasConflict:()=>CloudAdapter.conflict,openConflicts:()=>window.FinizeUpdate4.openConflicts()});
 async function saveBankAccount(command){
     const scope=CloudAdapter.importScope();
+    if(command.type==='liquidity-settings'&&command.values.budgetBeforeIncomeCents>0&&state.__finizePartialHistory&&CloudAdapter.recordSession){
+      const nextMonth=nextPlanningMonth(command.month);
+      if(!state.verifiedPeriods?.includes(nextMonth))await CloudAdapter.recordSession.openMonth(state.meta.selectedMonth,{additionalMonths:[nextMonth]});
+    }
     if(command.type==='update' && state.__finizePartialHistory && !state.__finizePeriodContext?.explicitFullHistory){
       const old=state.accountProfiles.find(row=>row.id===command.id);
       if(old && (command.values.identifier!==old.identifier || command.values.accountOwner!==old.accountOwner)){
