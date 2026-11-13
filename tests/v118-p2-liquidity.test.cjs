@@ -3,7 +3,7 @@ const {state,row,materialize,copy}=require('./helpers/package5-fixture.cjs');
 const {selectDailyLiquidity,buildLiquidityInput,projectDailyLiquidity,liquidityRequiredMonths}=require('../src/core/daily-liquidity.mjs');
 const {prepareBalanceCheckpoint,applyBalanceCheckpoint}=require('../src/core/balance-checkpoints.mjs');
 const {applyAccountProfileCommand}=require('../src/core/account-profiles.mjs');
-const {liquidityBuffer}=require('../src/core/liquidity-settings.mjs');
+const {liquidityBuffer,budgetBeforeIncome}=require('../src/core/liquidity-settings.mjs');
 const {financialForecastForMonth}=require('../src/core/transaction-engine.mjs');
 const {encodeCloudState,decodeCloudState,cloudStateManifest}=require('../src/storage/cloud-chunks.mjs');
 const {rebaseLocalChanges}=require('../src/storage/sync-protocol.mjs');
@@ -23,6 +23,23 @@ const project=(s,options={})=>selectDailyLiquidity(s,{accountProfileId:'joint',a
 function salary(s,person='dion',amount=2500,day=25){s.incomeDefaultsHistory[person]=[{effectiveFrom:'0000-01',salary:amount}];if(day)s.accountProfiles[0].liquidity.salaryDays[person]=day;}
 function fixed(s,extra={}){s.recurringFixedExpenses=[{id:'fixed',naam:'Vaste last',categorie:'Wonen',bedrag:100,financialFor:'gezamenlijk',rekening:'gezamenlijk',begindatum:'2026-01-01',afschrijfdatum:'2026-01-15',actief:true,frequentieAantal:1,frequentieEenheid:'maanden',...extra}];}
 function budget(s,amount=500){s.budgetDefaultsHistory.gezamenlijk=[{effectiveFrom:'0000-01',rows:[{id:'food',post:'Kleding',bedrag:amount}]}];}
+test('budget before income saves month history atomically and validates the account next-month budget',async()=>{
+ const s=setup();budget(s,500);let seq=0;
+ const save=(month,amount)=>applyAccountProfileCommand(s,{type:'liquidity-settings',id:'joint',expectedProfile:copy(s.accountProfiles[0]),operationId:'early-'+(++seq),createdAt:'2026-11-13T12:00:00Z',month,values:{...s.accountProfiles[0].liquidity,budgetBeforeIncomeCents:amount}});
+ assert.equal(budgetBeforeIncome(s.accountProfiles[0],'2026-10'),0);
+ save('2026-10',10001);save('2026-11',30000);
+ assert.equal(budgetBeforeIncome(s.accountProfiles[0],'2026-10'),10001);
+ assert.equal(budgetBeforeIncome(s.accountProfiles[0],'2026-11'),30000);
+ assert.equal(budgetBeforeIncome(s.accountProfiles[0],'2027-01'),30000);
+ const encoded=await encodeCloudState(s,'early-budget');encoded.descriptor.complete=true;
+ const restored=await decodeCloudState(cloudStateManifest(encoded.descriptor,{syncVersion:1,commitId:'early-budget'}),encoded.descriptor,encoded.chunks);
+ assert.deepEqual(restored.accountProfiles,s.accountProfiles);
+ const before=copy(s);
+ for(const amount of [-1,1.5,50001]){assert.throws(()=>save('2026-11',amount),{code:'invalid-budget-before-income'});assert.deepEqual(s,before);}
+ s.monthlyBudgets={'2026-12':{gezamenlijkVariabel:[{id:'food',post:'Kleding',bedrag:200}]}};
+ assert.throws(()=>save('2026-11',30000),/hoger dan.*200,00/);
+ save('2026-11',0);assert.equal(budgetBeforeIncome(s.accountProfiles[0],'2026-10'),10001);assert.equal(budgetBeforeIncome(s.accountProfiles[0],'2027-01'),0);
+});
 const banks=p=>p.events.filter(e=>e.type==='bank');
 const activePlans=p=>p.events.filter(e=>e.status==='planned');
 test('P2 01 saldo 500 min afschrijving 400 plus latere ontvangst 200 geeft minimum 100',()=>{

@@ -8,7 +8,7 @@ import { resolveFixedExpensesForMonth, resolveIncomeSourcesForMonth, resolveVari
 import { plannedOccurrences } from './recurring-occurrences.mjs';
 import { salaryPerson, salarySourceId } from './salary-assignment.mjs';
 import { sourceRecordKey, bankSourceForTransaction, bankSourceActive } from './bank-sources.mjs';
-import { liquidityBuffer, monthlyPaymentDate, fixedCashDate } from './liquidity-settings.mjs';
+import { liquidityBuffer, monthlyPaymentDate, fixedCashDate, budgetBeforeIncome } from './liquidity-settings.mjs';
 
 const owners = ['gezamenlijk','dion','dara'];
 const cents = value => decimalAmountToCents(value);
@@ -597,10 +597,28 @@ export function selectMonthEndSavings(state,options){
   // A confirmed closing balance already contains the whole bank day. Unspent
   // budget from that closed month remains cash; it is not a future payment.
   const closedOpeningMonth=input.opening.boundary==='end-of-bank-day'&&input.opening.checkpoint?.asOfDate===asOfDate&&asOfDate===monthEnd(asOfDate.slice(0,7))?asOfDate.slice(0,7):null;
+  const budgetBeforeIncomeCents=budgetBeforeIncome(profile,month);
+  const firstIncomeDate=[...Object.values(profile?.liquidity?.salaryDays || {}),...Object.values(profile?.liquidity?.allowanceDays || {})]
+    .map(day=>monthlyPaymentDate(nextMonth,day)).filter(Boolean).sort()[0] ?? null;
+  const nextBudgetPots=projection.reservations.filter(r=>r.type==='budget'&&r.month===nextMonth);
+  const appliedBudgetBeforeIncomeCents=Math.min(budgetBeforeIncomeCents,Math.max(0,sum(nextBudgetPots.map(r=>r.plannedCents))));
+  let earlyBudgetCents=0;
+  if(appliedBudgetBeforeIncomeCents>0&&firstIncomeDate!==nextMonth+'-01'){
+    // Concrete spending before income already supplies part of this budget room.
+    const cutoff=firstIncomeDate?shiftLiquidityDay(firstIncomeDate,-1):nextMonthEnd;
+    const earlyState={...state,__finizePartialHistory:false,transactions:(state.transactions || []).filter(tx=>String(tx.bankOriginal?.bankDate || tx.date || '')<=cutoff)};
+    const earlyUsedCents=sum(owners.flatMap(owner=>resolveVariableBudgetsForMonth(state,nextMonth,owner)
+      .filter(row=>nextBudgetPots.some(pot=>pot.owner===owner&&pot.budgetItemIds.includes(row.id)))
+      .map(row=>cents(budgetActual(earlyState,nextMonth,owner,row.post || row.categorie,row.id,{
+        acceptProjection:p=>physicalAccount(state,p.transaction.accountProfileId || p.accountContext,p.accountContext)===accountProfileId
+      })))));
+    earlyBudgetCents=Math.min(sum(nextBudgetPots.map(r=>r.amountCents)),Math.max(0,appliedBudgetBeforeIncomeCents-earlyUsedCents));
+  }
   const protectionDays=projection.days.map(day=>{
     // Concrete budget payments already affect cash and reduce these remaining
     // pots in P2. Deduct each remainder once, on its last calendar day only.
-    const budgetReservedCents=sum(projection.reservations.filter(r=>r.type==='budget'&&r.month!==closedOpeningMonth&&monthEnd(r.month)<=day.date).map(r=>r.amountCents));
+    const budgetReservedCents=safe(sum(projection.reservations.filter(r=>r.type==='budget'&&r.month!==closedOpeningMonth&&monthEnd(r.month)<=day.date).map(r=>r.amountCents))
+      +(day.date>=nextMonth+'-01'&&day.date<nextMonthEnd?earlyBudgetCents:0));
     const undatedReservedCents=sum(projection.reservations.filter(r=>r.type==='undated-obligation'&&(!r.month||r.month<=day.date.slice(0,7)||r.deadlineDate<=day.date)).map(r=>r.amountCents));
     return {date:day.date,cashBalanceCents:day.cashBalanceCents,budgetReservedCents,undatedReservedCents,
       protectedBalanceCents:safe(day.cashBalanceCents-budgetReservedCents-undatedReservedCents)};
@@ -608,7 +626,7 @@ export function selectMonthEndSavings(state,options){
   const selected=protectionDays.find(d=>d.date===transferDate);
   const plannedCents=sum(input.savingsPlans.filter(p=>p.month===month&&p.owner===profile?.accountOwner).map(p=>p.amountCents));
   if(monthlyTransfers.length>1&&!options.savingsTransferId)reasons.push(issue('ambiguous-saving-plan'));
-  const base={...empty,assessmentEndDate,bufferCents:normalized.bufferCents,plannedCents,requiredMonths:input.requiredMonths,reasons,protectionDays};
+  const base={...empty,assessmentEndDate,bufferCents:normalized.bufferCents,plannedCents,budgetBeforeIncomeCents,appliedBudgetBeforeIncomeCents,earlyBudgetCents,firstIncomeDate,requiredMonths:input.requiredMonths,reasons,protectionDays};
   // Coverage is advisory: the user updates the bank at month-end. Calculate
   // from the available balance/transactions without claiming complete coverage.
   const coverageAdvisories=new Set(['partial-bank-coverage','unknown-bank-coverage']);

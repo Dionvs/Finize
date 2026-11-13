@@ -19,12 +19,18 @@ export function fixedCashDate(occurrence) {
 export function liquidityBuffer(profile) {
   return profile?.liquidity?.bufferCents ?? (profile?.accountOwner === 'gezamenlijk' && profile?.liquidity?.primaryForOwner ? 20000 : 0);
 }
+export function budgetBeforeIncome(profile, month) {
+  return (profile?.liquidity?.budgetBeforeIncomeHistory || []).filter(row=>row.effectiveFrom<=month)
+    .slice().sort((a,b)=>a.effectiveFrom.localeCompare(b.effectiveFrom)).at(-1)?.amountCents ?? 0;
+}
 export function validateLiquiditySettings(profile, profiles) {
   const value = profile.liquidity;
   if (value === undefined) return;
   const fail = message => { throw Object.assign(new Error(message), {code:'invalid-liquidity-settings'}); };
   if (!value || value.version !== 1 || typeof value.primaryForOwner !== 'boolean' || !Number.isSafeInteger(value.bufferCents) || value.bufferCents < 0)
     fail('Vul een niet-negatieve veiligheidsbuffer in hele eurocenten in.');
+  if (value.budgetBeforeIncomeHistory !== undefined && (!Array.isArray(value.budgetBeforeIncomeHistory) || value.budgetBeforeIncomeHistory.some(row=>!row || !/^\d{4}-(0[1-9]|1[0-2])$/.test(row.effectiveFrom) || !Number.isSafeInteger(row.amountCents) || row.amountCents<0)))
+    fail('Vul een niet-negatief budget vóór inkomen in hele eurocenten met een geldige ingangsmaand in.');
   if (value.primaryForOwner && profile.accountType !== 'payment') fail('Kies een betaalrekening voor de maandplanning.');
   if (value.primaryForOwner && profiles.some(p => p.id !== profile.id && p.accountOwner === profile.accountOwner && p.liquidity?.primaryForOwner))
     fail('Er is al een rekening voor deze maandplanning. Schakel die keuze daar eerst uit.');

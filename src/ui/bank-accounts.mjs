@@ -31,7 +31,7 @@ export function createBankAccountsUI({getState,getScope,getImports,balances,save
         <div><dt>Eigenaar</dt><dd>${escape(ownerLabel(profile.accountOwner))}</dd></div><div><dt>Type</dt><dd>${labels[profile.accountType] || 'Nog niet ingesteld'}</dd></div></dl>
         <div class="bank-account-actions"><button type="button" class="primary" data-account-edit>Rekening bewerken</button><button type="button" class="ghost" data-account-status>${accountIsArchived(profile)?'Rekening heractiveren':'Rekening archiveren'}</button></div>
         <p role="alert" data-account-error></p><div data-account-archive-confirm hidden><p>De rekening blijft met alle historie bewaard. Voor nieuwe imports en banksaldo’s moet je haar eerst heractiveren.</p><button type="button" class="primary" data-account-archive>Bevestig archiveren</button><button type="button" class="ghost" data-account-archive-cancel>Annuleren</button></div></section>
-        ${renderLiquiditySettings(profile)}${globalThis.FinizeBank?.render(profile)||''}${balances.render()}`;
+        ${renderLiquiditySettings(profile,state.meta.selectedMonth)}${globalThis.FinizeBank?.render(profile)||''}${balances.render()}`;
       globalThis.FinizeBank?.bind(panel,profile);
       panel.querySelector('[data-accounts-back]').onclick=()=>open();
       panel.querySelector('[data-account-edit]').onclick=()=>{editing=true;onOpen();};
@@ -45,7 +45,7 @@ export function createBankAccountsUI({getState,getScope,getImports,balances,save
       panel.querySelector('[data-account-status]').onclick=()=>accountIsArchived(profile)?changeStatus():panel.querySelector('[data-account-archive-confirm]').hidden=false;
       panel.querySelector('[data-account-archive]').onclick=changeStatus;
       panel.querySelector('[data-account-archive-cancel]').onclick=()=>panel.querySelector('[data-account-archive-confirm]').hidden=true;
-      bindLiquiditySettings(panel,profile,{save,ensureScope,onOpen});
+      bindLiquiditySettings(panel,profile,{save,ensureScope,onOpen,month:state.meta.selectedMonth});
       bindConflicts();await balances.bind(panel,null,profile.id);
       return;
     }

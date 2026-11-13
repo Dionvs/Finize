@@ -2009,6 +2009,10 @@
     var _a2, _b, _c;
     return (_c = (_a2 = profile == null ? void 0 : profile.liquidity) == null ? void 0 : _a2.bufferCents) != null ? _c : (profile == null ? void 0 : profile.accountOwner) === "gezamenlijk" && ((_b = profile == null ? void 0 : profile.liquidity) == null ? void 0 : _b.primaryForOwner) ? 2e4 : 0;
   }
+  function budgetBeforeIncome(profile, month) {
+    var _a2, _b, _c;
+    return (_c = (_b = (((_a2 = profile == null ? void 0 : profile.liquidity) == null ? void 0 : _a2.budgetBeforeIncomeHistory) || []).filter((row) => row.effectiveFrom <= month).slice().sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom)).at(-1)) == null ? void 0 : _b.amountCents) != null ? _c : 0;
+  }
   function validateLiquiditySettings(profile, profiles) {
     const value = profile.liquidity;
     if (value === void 0) return;
@@ -2017,6 +2021,8 @@
     };
     if (!value || value.version !== 1 || typeof value.primaryForOwner !== "boolean" || !Number.isSafeInteger(value.bufferCents) || value.bufferCents < 0)
       fail8("Vul een niet-negatieve veiligheidsbuffer in hele eurocenten in.");
+    if (value.budgetBeforeIncomeHistory !== void 0 && (!Array.isArray(value.budgetBeforeIncomeHistory) || value.budgetBeforeIncomeHistory.some((row) => !row || !/^\d{4}-(0[1-9]|1[0-2])$/.test(row.effectiveFrom) || !Number.isSafeInteger(row.amountCents) || row.amountCents < 0)))
+      fail8("Vul een niet-negatief budget vóór inkomen in hele eurocenten met een geldige ingangsmaand in.");
     if (value.primaryForOwner && profile.accountType !== "payment") fail8("Kies een betaalrekening voor de maandplanning.");
     if (value.primaryForOwner && profiles.some((p) => {
       var _a2;
@@ -2191,6 +2197,22 @@
     const override = (_b = (_a2 = state2.monthlyBudgets) == null ? void 0 : _a2[month]) == null ? void 0 : _b[`${owner}Variabel`];
     const rows = !defaultsOnly && Array.isArray(override) ? override : (_h = (_g = (_d = latest((_c = state2.budgetDefaultsHistory) == null ? void 0 : _c[owner], month)) == null ? void 0 : _d.rows) != null ? _g : (_f = (_e = state2.planning) == null ? void 0 : _e[owner]) == null ? void 0 : _f.variabel) != null ? _h : [];
     return clone(rows);
+  }
+  function accountVariableBudgetCents(state2, profile, month) {
+    return owners.flatMap((owner) => resolveVariableBudgetsForMonth(state2, month, owner).filter((row) => {
+      const explicit = (state2.accountProfiles || []).find((p) => p.id === row.accountProfileId);
+      if (explicit) return explicit.id === profile.id;
+      if (row.accountProfileId && !owners.includes(row.accountProfileId)) return false;
+      const primary = (state2.accountProfiles || []).filter((p) => {
+        var _a2;
+        return p.accountOwner === owner && p.status !== "archived" && ((_a2 = p.liquidity) == null ? void 0 : _a2.primaryForOwner);
+      });
+      return primary.length === 1 && primary[0].id === profile.id;
+    })).reduce((total, row) => {
+      const next = total + decimalAmountToCents(Number(row.bedrag || 0));
+      if (!Number.isSafeInteger(next)) throw new Error("Budgetbedrag valt buiten het exacte centbereik.");
+      return next;
+    }, 0);
   }
   function expenseCategoriesForMonth(state2, month, owner, { existingCategory = "" } = {}) {
     const categories = [], seen = /* @__PURE__ */ new Set();
@@ -4028,7 +4050,7 @@
     };
   }
   function selectMonthEndSavings(state2, options) {
-    var _a2;
+    var _a2, _b, _c, _d;
     const { month, asOfDate, accountProfileId } = options;
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month) || !validCalendarDate(asOfDate)) throw new Error("Kies een geldige maand voor de spaarprognose.");
     const transferDate = monthEnd(month), nextMonth = nextPlanningMonth(month), nextMonthEnd = monthEnd(nextMonth);
@@ -4051,8 +4073,24 @@
     const projection = projectDailyLiquidity(normalized);
     const reasons2 = [...projection.reasons];
     const closedOpeningMonth = input.opening.boundary === "end-of-bank-day" && ((_a2 = input.opening.checkpoint) == null ? void 0 : _a2.asOfDate) === asOfDate && asOfDate === monthEnd(asOfDate.slice(0, 7)) ? asOfDate.slice(0, 7) : null;
+    const budgetBeforeIncomeCents = budgetBeforeIncome(profile, month);
+    const firstIncomeDate = (_d = [...Object.values(((_b = profile == null ? void 0 : profile.liquidity) == null ? void 0 : _b.salaryDays) || {}), ...Object.values(((_c = profile == null ? void 0 : profile.liquidity) == null ? void 0 : _c.allowanceDays) || {})].map((day) => monthlyPaymentDate(nextMonth, day)).filter(Boolean).sort()[0]) != null ? _d : null;
+    const nextBudgetPots = projection.reservations.filter((r) => r.type === "budget" && r.month === nextMonth);
+    const appliedBudgetBeforeIncomeCents = Math.min(budgetBeforeIncomeCents, Math.max(0, sum(nextBudgetPots.map((r) => r.plannedCents))));
+    let earlyBudgetCents = 0;
+    if (appliedBudgetBeforeIncomeCents > 0 && firstIncomeDate !== nextMonth + "-01") {
+      const cutoff = firstIncomeDate ? shiftLiquidityDay(firstIncomeDate, -1) : nextMonthEnd;
+      const earlyState = { ...state2, __finizePartialHistory: false, transactions: (state2.transactions || []).filter((tx) => {
+        var _a3;
+        return String(((_a3 = tx.bankOriginal) == null ? void 0 : _a3.bankDate) || tx.date || "") <= cutoff;
+      }) };
+      const earlyUsedCents = sum(owners2.flatMap((owner) => resolveVariableBudgetsForMonth(state2, nextMonth, owner).filter((row) => nextBudgetPots.some((pot) => pot.owner === owner && pot.budgetItemIds.includes(row.id))).map((row) => cents3(budgetActual(earlyState, nextMonth, owner, row.post || row.categorie, row.id, {
+        acceptProjection: (p) => physicalAccount(state2, p.transaction.accountProfileId || p.accountContext, p.accountContext) === accountProfileId
+      })))));
+      earlyBudgetCents = Math.min(sum(nextBudgetPots.map((r) => r.amountCents)), Math.max(0, appliedBudgetBeforeIncomeCents - earlyUsedCents));
+    }
     const protectionDays = projection.days.map((day) => {
-      const budgetReservedCents = sum(projection.reservations.filter((r) => r.type === "budget" && r.month !== closedOpeningMonth && monthEnd(r.month) <= day.date).map((r) => r.amountCents));
+      const budgetReservedCents = safe(sum(projection.reservations.filter((r) => r.type === "budget" && r.month !== closedOpeningMonth && monthEnd(r.month) <= day.date).map((r) => r.amountCents)) + (day.date >= nextMonth + "-01" && day.date < nextMonthEnd ? earlyBudgetCents : 0));
       const undatedReservedCents = sum(projection.reservations.filter((r) => r.type === "undated-obligation" && (!r.month || r.month <= day.date.slice(0, 7) || r.deadlineDate <= day.date)).map((r) => r.amountCents));
       return {
         date: day.date,
@@ -4065,7 +4103,7 @@
     const selected = protectionDays.find((d) => d.date === transferDate);
     const plannedCents = sum(input.savingsPlans.filter((p) => p.month === month && p.owner === (profile == null ? void 0 : profile.accountOwner)).map((p) => p.amountCents));
     if (monthlyTransfers.length > 1 && !options.savingsTransferId) reasons2.push(issue("ambiguous-saving-plan"));
-    const base = { ...empty, assessmentEndDate, bufferCents: normalized.bufferCents, plannedCents, requiredMonths: input.requiredMonths, reasons: reasons2, protectionDays };
+    const base = { ...empty, assessmentEndDate, bufferCents: normalized.bufferCents, plannedCents, budgetBeforeIncomeCents, appliedBudgetBeforeIncomeCents, earlyBudgetCents, firstIncomeDate, requiredMonths: input.requiredMonths, reasons: reasons2, protectionDays };
     const coverageAdvisories = /* @__PURE__ */ new Set(["partial-bank-coverage", "unknown-bank-coverage"]);
     const blocked2 = !selected || projection.opening.balanceCents === null || reasons2.some((r) => !coverageAdvisories.has(r.code) && (r.severity === "incomplete" || ["unknown-cash-date", "missing-checkpoint"].includes(r.code)));
     if (blocked2) return { ...base, status: selected ? "incomplete" : "unknown" };
@@ -4277,9 +4315,9 @@
   var info = (key, title, content, buttonLabel = "ⓘ") => `<button type="button" class="p3-info-button" data-p3-info="${key}" aria-label="Uitleg over ${escape2(title)}" aria-controls="p3-info-${key}" aria-expanded="false">${buttonLabel}</button><div class="p3-info-popover" id="p3-info-${key}" popover="auto" role="dialog" aria-modal="false" aria-label="${escape2(title)}" data-p3-info-panel="${key}"><div class="p3-info-heading"><strong>${title}</strong><button type="button" class="ghost small" data-p3-close-info="${key}" aria-label="Sluiten · uitleg over ${escape2(title)}">Sluiten</button></div>${content}</div>`;
   var savingDate = (value) => value ? new Intl.DateTimeFormat("nl-NL", { day: "numeric", month: "long", timeZone: "UTC" }).format(/* @__PURE__ */ new Date(value + "T12:00:00Z")) : "maandultimo";
   var calculationHelp = (p) => {
-    var _a2, _b;
+    var _a2, _b, _c, _d, _e;
     const s = p.monthEndSavings;
-    return s ? `${p.forecastNotice ? `<p>${escape2(p.forecastNotice)}</p>` : ""}<p>Het maximaal over te boeken bedrag op ${savingDate(s.transferDate)}. Dit is geen geld dat vandaag vrij besteedbaar is.</p>${((_a2 = p.externalCurrentBalance) == null ? void 0 : _a2.source) === "external" ? "<p>De berekening gebruikt de laatst ontvangen ING-stand met de resterende planning en budgetten. Geïmporteerde bankboekingen worden niet opnieuw op die stand toegepast.</p>" : "<p>De berekening gebruikt het vastgelegde saldo en de aanwezige transacties. Werk zelf je bank bij op de laatste dag van de maand. Onbevestigde bankdekking is informatief en houdt het bedrag niet tegen.</p>"}<p>Gepland sparen: ${money2(s.plannedCents)}<br>Extra ruimte: ${money2(s.extraCents)}</p><p>Verwacht eindsaldo: ${money2(s.expectedEndBalanceCents)}<br>Nodig vanaf volgende maand: ${money2(s.requiredOpeningCents)}<br>Inclusief permanente buffer: ${money2((_b = s.bufferCents) != null ? _b : p.bufferCents)}.</p><p>Alleen de volledige volgende kalendermaand telt mee (tot en met ${date(s.assessmentEndDate)}). Salarissen en vaste lasten tellen op hun ingestelde betaaldatums. Het volledige resterende variabele maandbudget wordt alleen op de laatste kalenderdag afgetrokken. Concrete budgetbetalingen verlagen de resterende pot en tellen niet dubbel mee. De simulatie begint bij € 0; het benodigde beginsaldo is € 200 min de laagste cumulatieve kasstroom (inclusief het startpunt € 0). Veilig te sparen is het verwachte eindsaldo min dit beginsaldo, met minimaal € 0. De buffer telt precies één keer mee. De dagelijkse budgetspreiding voor Laagste prognose blijft ongewijzigd. Gepland sparen en Extra ruimte zijn alleen een vergelijking; de bestaande planning wordt niet automatisch gewijzigd.</p>` : "";
+    return s ? `${p.forecastNotice ? `<p>${escape2(p.forecastNotice)}</p>` : ""}<p>Het maximaal over te boeken bedrag op ${savingDate(s.transferDate)}. Dit is geen geld dat vandaag vrij besteedbaar is.</p>${((_a2 = p.externalCurrentBalance) == null ? void 0 : _a2.source) === "external" ? "<p>De berekening gebruikt de laatst ontvangen ING-stand met de resterende planning en budgetten. Geïmporteerde bankboekingen worden niet opnieuw op die stand toegepast.</p>" : "<p>De berekening gebruikt het vastgelegde saldo en de aanwezige transacties. Werk zelf je bank bij op de laatste dag van de maand. Onbevestigde bankdekking is informatief en houdt het bedrag niet tegen.</p>"}<p>Gepland sparen: ${money2(s.plannedCents)}<br>Extra ruimte: ${money2(s.extraCents)}</p><p>Verwacht eindsaldo: ${money2(s.expectedEndBalanceCents)}<br>Nodig vanaf volgende maand: ${money2(s.requiredOpeningCents)}<br>Inclusief permanente buffer: ${money2((_b = s.bufferCents) != null ? _b : p.bufferCents)}.</p><p>Alleen de volledige volgende kalendermaand telt mee (tot en met ${date(s.assessmentEndDate)}). Salarissen en vaste lasten tellen op hun ingestelde betaaldatums. Budget vóór inkomen: ${money2((_c = s.budgetBeforeIncomeCents) != null ? _c : 0)}. ${s.firstIncomeDate ? `Eerste salaris of zakgeld: ${date(s.firstIncomeDate)}.` : "Geen eerste inkomensdag bekend; de budgetruimte wordt vanaf de 1e gereserveerd."} ${((_d = s.appliedBudgetBeforeIncomeCents) != null ? _d : 0) < ((_e = s.budgetBeforeIncomeCents) != null ? _e : 0) ? `Het maandbudget is lager; toegepast: ${money2(s.appliedBudgetBeforeIncomeCents)}.` : ""} Dit bedrag is onderdeel van het variabele maandbudget en telt mee bij het benodigde beginsaldo op de 1e. Bij inkomen op de 1e is er geen voorafgaande budgetperiode. Het nog benodigde deel wordt vanaf de 1e meegerekend; de rest van het variabele maandbudget wordt alleen op de laatste kalenderdag afgetrokken. Concrete budgetbetalingen verlagen de resterende pot en tellen niet dubbel mee. De simulatie begint bij € 0; het benodigde beginsaldo is € 200 min de laagste cumulatieve kasstroom (inclusief het startpunt € 0). Veilig te sparen is het verwachte eindsaldo min dit beginsaldo, met minimaal € 0. De buffer telt precies één keer mee. De dagelijkse budgetspreiding voor Laagste prognose blijft ongewijzigd. Gepland sparen en Extra ruimte zijn alleen een vergelijking; de bestaande planning wordt niet automatisch gewijzigd.</p>` : "";
   };
   function qualityHelp(p) {
     var _a2;
@@ -4770,10 +4808,10 @@
     }
   }
   function applyAccountProfileCommand(state2, command, { imports = [] } = {}) {
-    var _a2, _b, _c;
+    var _a2, _b, _c, _d, _e;
     if (typeof (command == null ? void 0 : command.operationId) !== "string" || !command.operationId || typeof command.id !== "string" || !command.id || !Number.isFinite(Date.parse(command.createdAt))) throw fail4("invalid-account-command", "De opslagactie mist een geldige identiteit of vastlegtijd. Open het formulier opnieuw.");
     const profiles = state2.accountProfiles || [], old = profiles.find((profile2) => profile2.id === command.id);
-    const signature2 = JSON.stringify([command.type, command.id, command.values || {}]);
+    const signature2 = JSON.stringify([command.type, command.id, command.values || {}, ...command.month ? [command.month] : []]);
     if ((old == null ? void 0 : old.lastAccountOperationId) === command.operationId) {
       if (old.lastAccountOperationSignature !== signature2) throw fail4("account-operation-conflict", "Deze opslagactie is al voor andere rekeninggegevens gebruikt.");
       return old;
@@ -4800,6 +4838,18 @@
     } else if (command.type === "liquidity-settings") {
       const values = command.values || {};
       profile = { ...old, liquidity: { version: 1, primaryForOwner: values.primaryForOwner, bufferCents: values.bufferCents, salaryDays: structuredClone(values.salaryDays), allowanceDays: structuredClone((_c = (_b = values.allowanceDays) != null ? _b : (_a2 = old == null ? void 0 : old.liquidity) == null ? void 0 : _a2.allowanceDays) != null ? _c : {}) }, updatedAt: command.createdAt };
+      if ((_d = old == null ? void 0 : old.liquidity) == null ? void 0 : _d.budgetBeforeIncomeHistory) profile.liquidity.budgetBeforeIncomeHistory = structuredClone(old.liquidity.budgetBeforeIncomeHistory);
+      if (Object.hasOwn(values, "budgetBeforeIncomeCents")) {
+        assertPlanningMonth(command.month);
+        const amount = values.budgetBeforeIncomeCents;
+        if (!Number.isSafeInteger(amount) || amount < 0) throw fail4("invalid-budget-before-income", "Vul € 0 of een positief bedrag in hele eurocenten in.");
+        const nextMonth = nextPlanningMonth(command.month);
+        if (amount > 0 && state2.__finizePartialHistory && !((_e = state2.verifiedPeriods) == null ? void 0 : _e.includes(nextMonth))) throw fail4("invalid-budget-before-income", "Laad eerst het variabele maandbudget van " + nextMonth + ".");
+        const profilesForBudget = profiles.map((p) => p.id === profile.id ? profile : p);
+        const maximum = Math.max(0, accountVariableBudgetCents({ ...state2, accountProfiles: profilesForBudget }, profile, nextMonth));
+        if (amount > maximum) throw fail4("invalid-budget-before-income", "Dit bedrag is hoger dan het variabele maandbudget voor deze rekening (" + new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR" }).format(maximum / 100) + ").");
+        profile.liquidity.budgetBeforeIncomeHistory = [...(profile.liquidity.budgetBeforeIncomeHistory || []).filter((row) => row.effectiveFrom < command.month), { effectiveFrom: command.month, amountCents: amount }];
+      }
     } else if (["archive", "reactivate"].includes(command.type)) profile = { ...old, status: command.type === "archive" ? "archived" : "active", updatedAt: command.createdAt };
     else throw fail4("invalid-account-command", "Deze rekeningactie wordt niet ondersteund.");
     profile.lastAccountOperationId = command.operationId;
@@ -4994,7 +5044,7 @@
   function receiptHtml({ kind = "salary", person = "dion", day = "" } = {}) {
     return `<fieldset data-income-receipt class="bank-account-fields"><legend>Geplande ontvangst</legend><label>Soort inkomsten<select data-income-kind><option value="salary" ${kind === "salary" ? "selected" : ""}>Salaris</option><option value="allowance" ${kind === "allowance" ? "selected" : ""}>Zakgeld</option></select></label><label>Van wie<select data-income-person>${["dion", "dara"].map((p) => `<option value="${p}" ${p === person ? "selected" : ""}>${p === "dion" ? "Dion" : "Dara"}</option>`).join("")}</select></label><label>Dag van de maand<select data-income-day ${kind === "salary" ? `name="salary-${person}"` : ""}>${dayOptions(day)}</select></label><button type="button" class="ghost" data-income-remove>Ontvangst verwijderen</button></fieldset>`;
   }
-  function renderLiquiditySettings(profile) {
+  function renderLiquiditySettings(profile, month) {
     const config = profile.liquidity || {}, joint = profile.accountOwner === "gezamenlijk";
     const receipts = ["salary", "allowance"].flatMap((kind) => Object.entries(config[kind === "salary" ? "salaryDays" : "allowanceDays"] || {}).map(([person, day]) => ({ kind, person, day })));
     if (!receipts.length) receipts.push({ person: joint ? "dion" : profile.accountOwner });
@@ -5002,15 +5052,24 @@
  <label class="bank-account-archive-filter"><input type="checkbox" name="primaryForOwner" ${config.primaryForOwner ? "checked" : ""} ${profile.accountType !== "payment" ? "disabled" : ""}> Gebruik deze betaalrekening voor de maandplanning van ${joint ? "Gezamenlijk" : escape4(profile.accountOwner === "dion" ? "Dion" : "Dara")}</label>
  <p class="hint">Deze keuze koppelt vaste lasten en budgetten zonder eigen rekeningkeuze aan deze fysieke rekening.</p>
  <label>Veiligheidsbuffer (€)<input name="buffer" type="number" min="0" step="0.01" required inputmode="decimal" value="${liquidityBuffer(profile) / 100}"></label>
+ <label>Budget vóór inkomen (€)<input name="budgetBeforeIncome" type="number" min="0" step="0.01" required inputmode="decimal" aria-describedby="budget-before-income-hint budget-before-income-error" value="${budgetBeforeIncome(profile, month) / 100}"></label>
+ <p class="hint" id="budget-before-income-hint">Het deel van je maandbudget dat je tussen de 1e en je eerste salaris of zakgeld wilt kunnen gebruiken.</p>
+ <p class="hint" role="alert" id="budget-before-income-error" hidden></p>
  <div data-income-receipts>${receipts.map(receiptHtml).join("")}</div><button type="button" class="ghost" data-income-add>Ontvangst toevoegen</button>
  <p class="hint">Kies per ontvangst salaris óf zakgeld, van wie en wanneer. Zakgeld hoort op de persoonlijke betaalrekening van die persoon. Het bedrag volgt automatisch de bestaande maandberekening. In een kortere maand gebruiken we de laatste kalenderdag. Niet ingesteld betekent dat geen betaaldag bekend is. ${joint ? "De standaardbuffer voor de primaire gezamenlijke betaalrekening is € 200." : ""}</p>
  <p role="alert" data-liquidity-error></p><div class="bank-account-actions"><button class="primary" type="submit">Prognose-instellingen opslaan</button></div></form></section>`;
   }
-  function bindLiquiditySettings(panel, profile, { save, ensureScope, onOpen }) {
+  function bindLiquiditySettings(panel, profile, { save, ensureScope, onOpen, month }) {
     const form = panel.querySelector("[data-liquidity-form]");
     if (!form) return;
     const operationId = crypto.randomUUID(), createdAt = (/* @__PURE__ */ new Date()).toISOString(), expectedProfile = structuredClone(profile);
     let busy2 = false;
+    const budgetError = form.querySelector("#budget-before-income-error");
+    form.elements.budgetBeforeIncome.oninput = () => {
+      budgetError.textContent = "";
+      budgetError.hidden = true;
+      form.elements.budgetBeforeIncome.removeAttribute("aria-invalid");
+    };
     form.elements.primaryForOwner.onchange = () => {
       if (profile.accountOwner === "gezamenlijk") form.elements.buffer.value = form.elements.primaryForOwner.checked ? "200" : "0";
     };
@@ -5035,7 +5094,7 @@
       const error2 = form.querySelector("[data-liquidity-error]");
       error2.textContent = "";
       try {
-        const values = { primaryForOwner: form.elements.primaryForOwner.checked, bufferCents: decimalAmountToCents(Number(form.elements.buffer.value)), salaryDays: {}, allowanceDays: {} };
+        const values = { primaryForOwner: form.elements.primaryForOwner.checked, bufferCents: decimalAmountToCents(Number(form.elements.buffer.value)), budgetBeforeIncomeCents: decimalAmountToCents(Number(form.elements.budgetBeforeIncome.value)), salaryDays: {}, allowanceDays: {} };
         for (const row of form.querySelectorAll("[data-income-receipt]")) {
           const kind = row.querySelector("[data-income-kind]").value, person = row.querySelector("[data-income-person]").value, day = row.querySelector("[data-income-day]").value;
           if (!day) continue;
@@ -5047,11 +5106,17 @@
         busy2 = true;
         form.querySelectorAll("input,select,button").forEach((el) => el.disabled = true);
         ensureScope();
-        await save({ type: "liquidity-settings", id: profile.id, expectedProfile, values, operationId, createdAt });
+        await save({ type: "liquidity-settings", id: profile.id, expectedProfile, values, month, operationId, createdAt });
         ensureScope();
         onOpen();
       } catch (failure2) {
         error2.textContent = failure2.commitOutcome === "uncertain" ? "Opslaguitkomst onzeker. Herlaad de app voordat je opnieuw probeert." : failure2.message;
+        if (failure2.code === "invalid-budget-before-income") {
+          error2.textContent = "";
+          budgetError.textContent = failure2.message;
+          budgetError.hidden = false;
+          form.elements.budgetBeforeIncome.setAttribute("aria-invalid", "true");
+        }
         if (failure2.commitOutcome !== "uncertain") {
           busy2 = false;
           form.querySelectorAll("input,select,button").forEach((el) => el.disabled = false);
@@ -5108,7 +5173,7 @@
         <div><dt>Eigenaar</dt><dd>${escape5(ownerLabel2(profile.accountOwner))}</dd></div><div><dt>Type</dt><dd>${labels[profile.accountType] || "Nog niet ingesteld"}</dd></div></dl>
         <div class="bank-account-actions"><button type="button" class="primary" data-account-edit>Rekening bewerken</button><button type="button" class="ghost" data-account-status>${accountIsArchived(profile) ? "Rekening heractiveren" : "Rekening archiveren"}</button></div>
         <p role="alert" data-account-error></p><div data-account-archive-confirm hidden><p>De rekening blijft met alle historie bewaard. Voor nieuwe imports en banksaldo’s moet je haar eerst heractiveren.</p><button type="button" class="primary" data-account-archive>Bevestig archiveren</button><button type="button" class="ghost" data-account-archive-cancel>Annuleren</button></div></section>
-        ${renderLiquiditySettings(profile)}${((_a2 = globalThis.FinizeBank) == null ? void 0 : _a2.render(profile)) || ""}${balances.render()}`;
+        ${renderLiquiditySettings(profile, state2.meta.selectedMonth)}${((_a2 = globalThis.FinizeBank) == null ? void 0 : _a2.render(profile)) || ""}${balances.render()}`;
         (_b = globalThis.FinizeBank) == null ? void 0 : _b.bind(panel, profile);
         panel.querySelector("[data-accounts-back]").onclick = () => open();
         panel.querySelector("[data-account-edit]").onclick = () => {
@@ -5137,7 +5202,7 @@
         panel.querySelector("[data-account-status]").onclick = () => accountIsArchived(profile) ? changeStatus() : panel.querySelector("[data-account-archive-confirm]").hidden = false;
         panel.querySelector("[data-account-archive]").onclick = changeStatus;
         panel.querySelector("[data-account-archive-cancel]").onclick = () => panel.querySelector("[data-account-archive-confirm]").hidden = true;
-        bindLiquiditySettings(panel, profile, { save, ensureScope, onOpen });
+        bindLiquiditySettings(panel, profile, { save, ensureScope, onOpen, month: state2.meta.selectedMonth });
         bindConflicts();
         await balances.bind(panel, null, profile.id);
         return;
@@ -16717,9 +16782,13 @@ Publiceer regels uitsluitend als afzonderlijk geautoriseerde releasestap.</pre><
     openConflicts: () => window.FinizeUpdate4.openConflicts()
   });
   async function saveBankAccount(command) {
-    var _a2;
+    var _a2, _b;
     const scope = CloudAdapter.importScope();
-    if (command.type === "update" && state.__finizePartialHistory && !((_a2 = state.__finizePeriodContext) == null ? void 0 : _a2.explicitFullHistory)) {
+    if (command.type === "liquidity-settings" && command.values.budgetBeforeIncomeCents > 0 && state.__finizePartialHistory && CloudAdapter.recordSession) {
+      const nextMonth = nextPlanningMonth(command.month);
+      if (!((_a2 = state.verifiedPeriods) == null ? void 0 : _a2.includes(nextMonth))) await CloudAdapter.recordSession.openMonth(state.meta.selectedMonth, { additionalMonths: [nextMonth] });
+    }
+    if (command.type === "update" && state.__finizePartialHistory && !((_b = state.__finizePeriodContext) == null ? void 0 : _b.explicitFullHistory)) {
       const old = state.accountProfiles.find((row) => row.id === command.id);
       if (old && (command.values.identifier !== old.identifier || command.values.accountOwner !== old.accountOwner)) {
         const session = CloudAdapter.recordSession;
